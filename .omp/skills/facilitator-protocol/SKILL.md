@@ -7,9 +7,13 @@ description: Workspace Link wire contract — CloudEvents envelope, command/even
 > `protocol/json-schema/` + `protocol/cloudevents-schemas/`, 40 fixture cases in
 > `protocol/conformance-fixtures/` (index.json = arbiter), generated DTOs in
 > `src/protocol/src/generated/` (TS) + `protocol/dotnet/Ofac.Protocol/Generated/` (C#),
-> `@ofac/protocol` validators, and the `Validate.Fixtures` CLI. The runtime (Link server,
-> Gateways, adapters) is still unbuilt — every endpoint/runtime path below remains a
-> spec-proposed target. Update this skill the moment a slice lands.
+> `@ofac/protocol` validators, and the `Validate.Fixtures` CLI. As of Plan 02 the kernel
+> enforces the contract at `POST /api/ingress/events`: fail-closed `unknown-command`
+> (7-type `KnownCommands` table, embedded schemas via `EnvelopeValidator`) and dedupe on
+> the `inbox` table (`(event_source, event_id)`, `command_id`, provider delivery id) with
+> live `accepted`/`duplicate` receipts at that endpoint. The runtime Link server,
+> Gateways, and adapters are still unbuilt — the handshake/transport paths below remain
+> spec-proposed targets. Update this skill the moment a slice lands.
 
 # Facilitator Protocol
 

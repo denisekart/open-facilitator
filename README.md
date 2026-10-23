@@ -2,7 +2,7 @@
 
 **Portable, pluggable, multi-workspace orchestration of autonomous, assisted, and deterministic workloads across independently operated execution environments.**
 
-> **Status: greenfield.** The repository currently holds the specification and a tailored [omp](https://github.com/can1357/oh-my-pi) agent workspace. No framework code exists yet — everything named in the specs (modules, schemas, endpoints, CLIs, compose services) is a target, not a reality.
+> **Status: first slice landed.** Plans 00–02 are real: buildable monorepo, frozen v1 wire contract (`protocol/`), and the transactional kernel in `src/facilitator` — Postgres schema, Work state machines, transactional inbox/outbox, HTTP + CLI ingress. Everything else named in the specs (modules, endpoints, CLIs, compose services) remains a target, not a reality.
 
 ## The idea in one paragraph
 
@@ -40,8 +40,9 @@ Key properties, normatively defined in the specs:
 |---|---|
 | [`docs/specs/open_facilitator_framework_architecture.md`](docs/specs/open_facilitator_framework_architecture.md) | Normative architecture: domain model, wire contract, scaling, packaging, identity, policy, adapters, memory, artifacts, data model, reference Compose, delivery slices, conformance suite |
 | [`docs/specs/open-facilitator-appendix.md`](docs/specs/open-facilitator-appendix.md) | Normative clarifications: trust modes, evidence validation, approval canonicalization (RFC 8785), outbox/inbox patterns, memory ACLs, acceptance checklist |
-| [`docs/protocol.md`](docs/protocol.md) | As-built v1 wire contract: envelope, type registry, namespacing/versioning rules, conformance fixtures, payload limits |
-| [`AGENTS.md`](AGENTS.md) | Agent working rules: stack decisions, spec pointers, delegation routing, repository layout |
+| [`docs/protocol.md`](docs/protocol.md) | As-built v1 wire contract: envelope, type registry, namespacing/versioning rules, conformance fixtures, payload limits, kernel ingress endpoints and error contract |
+| [`docs/security.md`](docs/security.md) | Trust vs data-plane split, interim bootstrap-token auth, Plan 07 OIDC cutover seam, ingress hard limits |
+| [`docs/getting-started.md`](docs/getting-started.md) | Contributor loop: build/test, running the Facilitator against Postgres 17, CLI examples |
 
 ## Repository layout
 
@@ -49,7 +50,7 @@ Repo root **is** the spec §22.1 `framework/` tree (Plan 00). Every directory ca
 
 ```text
 ├── src/
-│   ├── facilitator/       # .NET 10: /health stub now; HTTP, SignalR Link hub, event loop (Plans 02-03); admin SPA wwwroot embed (Plan 12)
+│   ├── facilitator/       # .NET 10: transactional kernel (schema, state machines, inbox/outbox, /api ingress + CLI, outbox dispatcher); SignalR Link hub (Plan 03); admin SPA wwwroot embed (Plan 12)
 │   ├── gateway/           # @ofac/gateway stub now; runtime, connectors, provisioner ports (Plan 05)
 │   ├── workspace-link/    # @ofac/workspace-link stub now; Link runtime + SDK (Plan 04)
 │   └── adapters/          # mattermost (13) / forgejo (14) / kafka (15) + harnesses/ (06+)
@@ -78,10 +79,11 @@ Delivery is vertical slices with runnable exit tests (spec §26): transactional 
 ## Development environment
 
 1. **Recommended: devcontainer.** Open the repo in the included `.devcontainer` — Docker-in-Docker, .NET SDK 10, Node 24, pnpm 12 preinstalled; nothing to install.
-2. **Manual path:** .NET SDK per `global.json` (`10.0.40x`), Node ≥ 22, then `corepack enable && corepack install` (honors `packageManager: pnpm@12.5.1`). Docker is optional, for image builds.
+2. **Manual path:** .NET SDK per `global.json` (`10.0.40x`), Node ≥ 22, then `corepack enable && corepack install` (honors `packageManager: pnpm@12.5.1`). Docker is required for `make test` (Testcontainers) and image builds.
 3. **Daily loop:** `make restore` → `make build` → `make test` → `make lint`; `make format` before committing.
-4. **Running tests:** .NET — `dotnet test OpenFacilitator.slnx [-c Release] [--filter FullyQualifiedName~HealthEndpointTests]`; TypeScript — per package `pnpm --filter @ofac/gateway test`, workspace-wide `pnpm -r test`, single file `pnpm --filter @ofac/workspace-link exec vitest run test/package.test.ts`. Behavior/integration tests (Testcontainers, dockerized Facilitator) appear from Plan 02 onward.
-5. **CI is the merge gate** — see [`.github/workflows/README.md`](.github/workflows/README.md). Release = push a `v*` tag → images to GHCR.
+4. **Running the kernel:** start Postgres 17 (`docker run -d -e POSTGRES_USER=demo -e POSTGRES_PASSWORD=demo -e POSTGRES_DB=facilitator -p 5432:5432 postgres:17-alpine`), then `ConnectionStrings__Facilitator="Host=localhost;Database=facilitator;Username=demo;Password=demo" dotnet run --project src/facilitator` — it auto-migrates and serves `/api` with the dev bootstrap token. The CLI rides the same public API: `dotnet run --project src/facilitator -- cli work create --objective "kernel check"`. Full loop: [`docs/getting-started.md`](docs/getting-started.md).
+5. **Running tests:** .NET — `dotnet test OpenFacilitator.slnx [-c Release] [--filter FullyQualifiedName~HealthEndpointTests]` (Docker required: the Plan 02 integration suite boots Postgres 17 via Testcontainers); TypeScript — per package `pnpm --filter @ofac/gateway test`, workspace-wide `pnpm -r test`, single file `pnpm --filter @ofac/workspace-link exec vitest run test/package.test.ts`.
+6. **CI is the merge gate** — see [`.github/workflows/README.md`](.github/workflows/README.md). Release = push a `v*` tag → images to GHCR.
 
 This repo is also an omp agent workspace: project skills in `.omp/skills/` encode the spec rules agents must not violate (every implementation slice updates the matching skill in the same change), MCP servers are declared in `.omp/mcp.json`, plans land in `.omp/plans/`, and demo secrets are never committed (`.env`, `secrets/` are gitignored).
 

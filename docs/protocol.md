@@ -1,6 +1,6 @@
 # Wire protocol (v1)
 
-This document describes the implemented wire contract: the JSON Schemas under `protocol/`, the conformance fixtures, and the rules both endpoints MUST follow. It is the as-built companion to spec §5 (`docs/specs/open_facilitator_framework_architecture.md`) and appendix §16 (`docs/specs/open-facilitator-appendix.md`); where the spec proposes and this document records, this document reflects the shipped artifacts. No framework runtime consumes the contract yet — Plan 03 (Link server) and Plan 04 (Workspace Link SDK) are the first consumers.
+This document describes the implemented wire contract: the JSON Schemas under `protocol/`, the conformance fixtures, and the rules both endpoints MUST follow. It is the as-built companion to spec §5 (`docs/specs/open_facilitator_framework_architecture.md`) and appendix §16 (`docs/specs/open-facilitator-appendix.md`); where the spec proposes and this document records, this document reflects the shipped artifacts. The framework runtime that consumes the contract today is the Plan 02 transactional kernel (see Kernel ingress below); the Link transport (Plan 03) and the Workspace Link SDK (Plan 04) are the next consumers.
 
 ## Message classes and envelopes
 
@@ -88,3 +88,55 @@ Events carry identity in the envelope (`source` + `id` + `time`), so their `data
 ## Transport neutrality
 
 The contract is transport-independent: the same fixtures MUST validate identically over the SignalR reference transport (Plan 03) and the HTTP long-poll fallback stubbed in `protocol/openapi/link-v1.yaml` (enroll, events, deliveries, receipts, capabilities). Consumers should use the `@ofac/protocol` package (`src/protocol/`): `schemaById` resolves a `dataschema` URI to its schema, `KNOWN_COMMAND_TYPES` is the fail-closed command table, and `validateEnvelope` / `validateReceipt` / `validateControlFrame` return the same `errorClass` taxonomy as the fixtures index.
+
+## Kernel ingress (implemented, Plan 02)
+
+The Facilitator kernel (`src/facilitator`, namespace `Facilitator.Kernel`) consumes the contract over HTTP today. All endpoints sit under `/api` and require `Authorization: Bearer <token>` (interim bootstrap token; see [`security.md`](security.md)). Errors are RFC 9457 `ProblemDetails` with `type` URIs under `https://errors.openfacilitator.org/v1/`.
+
+### Endpoints
+
+|Endpoint|Purpose|Success|
+|---|---|---|
+|`POST /api/works`|Create a Work (`{"objective": "...", "projectId": uuid?}`); participates in dedupe via a synthetic inbox row|`201` + `WorkDto`|
+|`GET /api/works`|List newest 50 Works|`200` array|
+|`GET /api/works/{id}`|Fetch one Work|`200` `WorkDto {workId, projectId, objective, state, version, createdAt, updatedAt}`|
+|`POST /api/works/{id}/steer`|Steer (`{"directive", "commandId", "expectedVersion"}`)|`200` `WorkDto` (version bumped)|
+|`POST /api/works/{id}/transitions`|Operator-driven state walk (`{"to", "expectedVersion", "reason?"}`), guarded by the §4.1 transition table|`200` `WorkDto`|
+|`GET /api/works/{id}/timeline`|`work_events` rows, ascending|`200` array|
+|`POST /api/ingress/events`|Raw CloudEvents 1.0 structured-JSON envelope (any type in the registry above)|`200 {"status":"accepted","inboxId":...}` or `200 {"status":"duplicate",...}`|
+|`GET /api/dev/deliveries`|Outbox delivery ledger dump (Plan 12 replaces with admin views)|`200` array|
+
+### Error contract
+
+|Type URI suffix|HTTP|When|
+|---|---|---|
+|`invalid-state-transition`|`422`|Edge illegal per the §4.1 guard table; message names the illegal edge|
+|`version-conflict`|`409`|`expectedVersion` mismatch (problem body carries `currentVersion`)|
+|`unknown-command`|`422`|Command type outside the known-command table (fail closed, §5.5); the envelope is still persisted to `inbox` state `failed` as an audit record|
+|`schema-violation`|`400`|Envelope well-formed, `data` payload violates its `dataschema`|
+|`envelope-violation`|`400`|CloudEvents envelope violates `protocol/cloudevents-schemas/*`|
+|`payload-too-large`|`413`|Serialized body exceeds 262144 bytes|
+|`unauthorized`|`401`|Missing/wrong bearer token|
+|`work-not-found`|`404`|Unknown Work id|
+
+A duplicate admission is **not** an error: `200 {"status":"duplicate"}`.
+
+### Dedupe semantics (spec §7.1, appendix §5.6)
+
+Admission is idempotent on three independent keys, all enforced by PostgreSQL uniqueness in the `facilitator.inbox` table:
+
+1. CloudEvents identity: `UNIQUE (event_source, event_id)`.
+2. Business-command identity: `inbox.command_id` unique — a re-posted `commandId` returns the stored duplicate outcome without re-executing the command.
+3. Provider webhooks: `UNIQUE (provider, provider_delivery_id)` where both are supplied (`provider_events` audit row records the full source).
+
+A duplicate returns `200 {"status":"duplicate"}` with zero reprocessing — no second timeline row, no second outbox row. Never dedupe on textual content.
+
+### Size limit
+
+`POST /api/ingress/events` reads bodies with a 262144-byte cap, the same value as `limits.maxEnvelopeBytes` in `protocol/conformance-fixtures/index.json`; oversize bodies get `413` `payload-too-large` before any parsing.
+
+### Validation at ingress
+
+`POST /api/ingress/events` validates against the exact same schema files as the harnesses: `protocol/json-schema/*` and `protocol/cloudevents-schemas/*`, shipped as `EmbeddedResource`s of `Ofac.Protocol` (the container image can't read `protocol/` at runtime) and enforced by the shared `EnvelopeValidator` in `protocol/dotnet/Ofac.Protocol/Validation/EnvelopeValidator.cs`. It returns the same `errorClass` taxonomy as the fixture index (`envelope-violation | schema-violation | payload-too-large | unknown-command`). Commands outside the fail-closed 7-type known-command table (`Validation/KnownCommands.cs`, derived from the same list as `KNOWN_COMMAND_TYPES` in `src/protocol/src/validate.ts`) are rejected `422` and audited in the inbox. Of the seven known commands, `work.steer.v1` is the only one with a business effect this slice; the rest admit (`202`-path, inbox row `processed`) without side effects, typed rather than silent.
+
+The kernel's own emission path builds outbox envelopes with the same validator before insert — the kernel emits conformant envelopes by construction. Kernel integration tests consume real files from `protocol/conformance-fixtures/` as live inputs to `/api/ingress/events` (e.g. `valid/command.work.steer.json` posted twice proves the duplicate path; `invalid/command.unknown.v1.json` proves fail-closed `unknown-command`; `invalid/envelope.specversion.json` proves `400 envelope-violation`), so the fixtures gate the runtime, not just the harnesses.

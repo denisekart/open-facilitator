@@ -3,11 +3,27 @@ name: facilitator-architecture
 description: Domain model, ownership boundaries, state machines, durable coordination (Postgres outbox/inbox, SKIP LOCKED leases, session placement), and design-gate questions for the Open Facilitator Framework.
 ---
 
-> **Status:** the framework is unimplemented. Every table, interface, and state named below is a spec-proposed target, not existing code. Update this skill the moment a slice lands so implemented reality replaces spec proposals.
+> **Status:** the transactional kernel is IMPLEMENTED (Plan 02) — see "Implemented (Plan 02)" below. Links, approvals behavior, memory, and artifacts remain spec-proposed targets. Update this skill the moment a slice lands so implemented reality replaces spec proposals.
 
 # Facilitator Architecture
 
 Normative source: `docs/specs/open_facilitator_framework_architecture.md` §2–§4, §7, §9–§12, §15, §19–§20; appendix §2–§4. Read the relevant chapter before changing a boundary — component ownership is prescriptive, not stylistic.
+
+## Implemented (Plan 02)
+
+Kernel code lives in `src/facilitator` (single deployable), folders `Kernel/Domain`, `Kernel/Persistence`, `Kernel/Ingress`, `Kernel/Dispatch`, `Kernel/Auth`; namespace root `Facilitator.Kernel.*`.
+
+- **Schema** (Postgres `facilitator` schema, EF Core baseline migration `InitialCreate`, auto-applied on startup behind `pg_advisory_lock(420001)`): `teams`, `projects`, `works`, `work_events`, `inbox`, `outbox`, `dead_letters`, `provider_events` are written by Plan 02. `assignments`, `execution_attempts`, `link_sessions`, `approvals`, `communication_bindings` exist schema-only for Plans 03/07/08/09/13.
+- **HTTP surface** (all under `/api`, bearer token, RFC 9457 ProblemErrors with type URIs `https://errors.openfacilitator.org/v1/<code>`): `POST /api/works` (201), `GET /api/works`, `GET /api/works/{id}`, `POST /api/works/{id}/steer`, `POST /api/works/{id}/transitions`, `GET /api/works/{id}/timeline`, `POST /api/ingress/events` (raw CloudEvents 1.0 envelope, ≤262144 bytes), `GET /api/dev/deliveries`. Error codes: `invalid-state-transition` 422, `version-conflict` 409 (carries `currentVersion`), `unknown-command` 422, `schema-violation` 400, `envelope-violation` 400, `payload-too-large` 413, `unauthorized` 401, `work-not-found` 404; duplicate ⇒ 200 `{"status":"duplicate"}` (not an error). Endpoint detail: `docs/protocol.md` (Kernel ingress).
+- **Dedupe**: `inbox UNIQUE (event_source, event_id)`, `inbox.command_id` unique for business commands, `provider_events UNIQUE (provider, provider_delivery_id)`. Duplicate ⇒ 200 duplicate, zero reprocessing.
+- **Per-Work serialization**: `pg_advisory_xact_lock(hashtext(work_id::text))` inside each processing transaction + optimistic `workVersion` fencing (spec §7.4). Illegal transitions fail closed 422 naming the edge; the §4.1 guard tables (`Kernel/Domain/StateGuard`) are the single authority — no shortcuts.
+- **Outbox dispatcher** (`OutboxDispatcher : BackgroundService`, in-process, no new container): state+outbox rows commit in one tx; claim `FOR UPDATE SKIP LOCKED`; `NOTIFY facilitator_outbox` is a wake hint only (§7.3) — correctness never depends on it; sinks invoked outside any tx; backoff `min(2^attempts*2s, 5m)`; `attempts >= 5` ⇒ `dead_letters` row (reason + full envelope) + status `dead_letter`. Channel-prefix sinks: `kernel.log` (stub ledger, exposed via `GET /api/dev/deliveries`); `link.*` requeues until Plan 03.
+- **Ingress validation**: shared .NET `EnvelopeValidator` in `Ofac.Protocol` (schemas embedded as resources); fail-closed 7-type `KnownCommands` table mirroring `src/protocol/src/validate.ts`; kernel tests consume `protocol/conformance-fixtures` files as live inputs.
+- **Auth interim**: bootstrap shared token (`Auth:BootstrapToken`; unset + Development ⇒ literal `dev-token`, unset + non-Development ⇒ fail-closed). Seam: `IIngressTokenValidator` — Plan 07 swaps in Keycloak OIDC, call sites unchanged.
+- **CLI**: same assembly, rides the public HTTP API only — `dotnet run --project src/facilitator -- cli [--url URL] [--token TOKEN] work create|steer|get|timeline ...` (defaults `http://localhost:8088`, token env `FACILITATOR_TOKEN` else `dev-token`).
+- **Config keys**: `ConnectionStrings:Facilitator`, `Database:AutoMigrate` (default true), `Auth:BootstrapToken`, `Kernel:ReplicaId`, `Otel:Endpoint` (OTLP exporter when set).
+- **Observability**: meter `facilitator` — counters `facilitator.delivery.attempts`, `facilitator.inbox.processed`; histograms `facilitator.delivery.latency`, `facilitator.ingress.processing.latency`; gauges `facilitator.outbox.queue_depth`, `facilitator.inbox.queue_depth`, `facilitator.delivery.dead_letter_count`; activity source `Facilitator.Kernel` (spans `ingress.process`, `outbox.dispatch`); log correlation `workId`/`deliveryId` (appendix §9).
+- **Still target, not reality**: Link sessions/placement (`link_sessions` behavior, Plan 03), approvals enforcement (Plan 08), memory (`postgres-fts`, Plan 09+), artifacts (Plan 09), admin SPA (Plan 12), OIDC (Plan 07).
 
 ## When to use
 

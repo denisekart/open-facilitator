@@ -1,10 +1,22 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- Generated wire DTOs (Generated/) plus hand-written envelope helpers.
-       No runtime deps: DTOs are System.Text.Json attributes only. -->
+  <!-- Generated wire DTOs (Generated/) plus hand-written envelope validation
+       helpers. Runtime dep: JsonSchema.Net (envelope/data validation against
+       the shipped draft 2020-12 schemas, embedded below so consumers that
+       cannot read protocol/ at runtime still validate). -->
   <PropertyGroup>
     <RootNamespace>Ofac.Protocol</RootNamespace>
     <!-- Generated DTOs use `?` syntax without non-nullable-init noise. -->
     <Nullable>annotations</Nullable>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="JsonSchema.Net" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Logical name = plain filename; filenames are unique across both dirs,
+         so a dataschema $id maps to the same filename as the fixture harness's
+         schemaById. -->
+    <EmbeddedResource Include="../../json-schema/*.json" LogicalName="%(Filename)%(Extension)" />
+    <EmbeddedResource Include="../../cloudevents-schemas/*.json" LogicalName="%(Filename)%(Extension)" />
+  </ItemGroup>
 </Project>

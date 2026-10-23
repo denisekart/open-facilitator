@@ -1,4 +1,4 @@
-.PHONY: restore build test lint format protocol compose-slim compose-full clean
+.PHONY: restore build test lint format protocol db-update compose-slim compose-full clean
 
 restore:
 	dotnet restore OpenFacilitator.slnx
@@ -25,6 +25,10 @@ protocol:
 	pnpm protocol:codegen
 	npx swagger-cli validate protocol/openapi/link-v1.yaml
 	git diff --exit-code -- src/protocol/src/generated protocol/dotnet/Ofac.Protocol/Generated src/protocol/schemas
+
+db-update:
+	dotnet tool restore
+	dotnet ef database update -p src/facilitator -s src/facilitator
 
 compose-slim compose-full:
 	@echo "Reference environment lands in Plan 11: cd reference && ./referencectl up slim|full"

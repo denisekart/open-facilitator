@@ -2,6 +2,11 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 COPY global.json Directory.Build.props Directory.Packages.props nuget.config OpenFacilitator.slnx ./
+COPY protocol/dotnet/Ofac.Protocol/Ofac.Protocol.csproj protocol/dotnet/Ofac.Protocol/
+COPY protocol/dotnet/Ofac.Protocol/Generated/ protocol/dotnet/Ofac.Protocol/Generated/
+COPY protocol/dotnet/Ofac.Protocol/Validation/ protocol/dotnet/Ofac.Protocol/Validation/
+COPY protocol/json-schema/ protocol/json-schema/
+COPY protocol/cloudevents-schemas/ protocol/cloudevents-schemas/
 COPY src/facilitator/Facilitator.csproj src/facilitator/
 RUN dotnet restore src/facilitator/Facilitator.csproj
 COPY src/facilitator/ src/facilitator/

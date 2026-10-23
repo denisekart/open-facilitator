@@ -53,4 +53,43 @@ public static class ProblemErrors
     /// <summary>404 unknown work.</summary>
     public static ProblemDetails WorkNotFound(Guid workId) =>
         Create("work-not-found", "Work not found", StatusCodes.Status404NotFound, $"no work {workId}");
+
+    /// <summary>422 message class the link path cannot act on (e.g. work.assign FROM a link).</summary>
+    public static ProblemDetails Unsupported(string detail) =>
+        Create("unsupported", "Unsupported", StatusCodes.Status422UnprocessableEntity, detail);
+
+    /// <summary>409 another session superseded this endpoint's live session.</summary>
+    public static ProblemDetails SessionSuperseded(string endpointId) =>
+        Create("session-superseded", "Session superseded", StatusCodes.Status409Conflict,
+            $"link session for '{endpointId}' was superseded by a newer session epoch");
+
+    /// <summary>404 no live link_sessions row (or the lease expired).</summary>
+    public static ProblemDetails SessionNotFound(string endpointId) =>
+        Create("session-not-found", "Session not found", StatusCodes.Status404NotFound,
+            $"no live link session for '{endpointId}' (enroll + hello/handshake first)");
+
+    /// <summary>404 unknown deliveryId or a delivery of another endpoint.</summary>
+    public static ProblemDetails DeliveryNotFound(Guid deliveryId) =>
+        Create("delivery-not-found", "Delivery not found", StatusCodes.Status404NotFound,
+            $"no link delivery {deliveryId} for this endpoint");
+
+    /// <summary>404 enrollment never supplied a capability manifest.</summary>
+    public static ProblemDetails CapabilitiesNotFound(string endpointId) =>
+        Create("capabilities-not-found", "Capabilities not found", StatusCodes.Status404NotFound,
+            $"enrollment for '{endpointId}' has not advertised a capability manifest");
+
+    /// <summary>403 manifest ownerTeam does not equal the principal's team.</summary>
+    public static ProblemDetails TeamMismatch(string team) =>
+        Create("team-mismatch", "Team mismatch", StatusCodes.Status403Forbidden,
+            $"ownerTeam '{team}' is not the authenticated principal's team");
+
+    /// <summary>401 enrollment secret (Link:EnrollmentToken) missing or wrong.</summary>
+    public static ProblemDetails EnrollmentSecretInvalid() =>
+        Create("enrollment-secret-invalid", "Enrollment secret invalid", StatusCodes.Status401Unauthorized,
+            "the enrollment token did not match Link:EnrollmentToken");
+
+    /// <summary>409 HTTP-surface equivalent of the no-compatible-protocol-version goodbye.</summary>
+    public static ProblemDetails NoCommonVersion() =>
+        Create("no-common-version", "No common protocol version", StatusCodes.Status409Conflict,
+            "no protocol version the server supports was offered");
 }

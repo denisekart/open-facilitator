@@ -12,6 +12,7 @@ import {
   validateControlFrame,
   validateEnvelope,
   validateReceipt,
+  validateAgainstSchemaId,
   type ErrorClass,
   type ValidationResult,
 } from "../src/index.js";
@@ -19,10 +20,12 @@ import {
 interface FixtureCase {
   file: string;
   expect: "valid" | "invalid";
-  class: "command" | "event" | "receipt" | "control";
+  class: "command" | "event" | "receipt" | "control" | "enroll" | "delivery";
   type?: string;
   errorClass?: ErrorClass;
   receipt?: string;
+  /** For enroll/delivery classes: schema filename under the contract $id base. */
+  schemaFile?: string;
 }
 interface FixtureIndex {
   version: number;
@@ -48,7 +51,12 @@ function runCase(c: FixtureCase): ValidationResult {
       ? validateReceipt(payload)
       : c.class === "control"
         ? validateControlFrame(payload)
-        : validateEnvelope(payload);
+        : c.class === "enroll" || c.class === "delivery"
+          ? validateAgainstSchemaId(
+              `https://schemas.openfacilitator.org/v1/${c.schemaFile}`,
+              payload,
+            )
+          : validateEnvelope(payload);
   // Payload-size gate applies to envelope wire bytes (fixture pipeline never
   // pretty-prints: JSON.stringify of the parsed payload is the wire form).
   if (result.ok && (c.class === "command" || c.class === "event")) {

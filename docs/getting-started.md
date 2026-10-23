@@ -1,6 +1,6 @@
 # Getting started
 
-Status: Plan 02 (transactional kernel) — the Facilitator runs against PostgreSQL with HTTP ingress, Work state machines, and the outbox dispatcher. The slim reference environment (`referencectl up slim`) arrives with Plan 11; until then, this is the full contributor loop.
+Status: Plans 02–03 (transactional kernel + Link server) — the Facilitator runs against PostgreSQL with HTTP ingress, Work state machines, the outbox dispatcher, and the Workspace Link transport (SignalR hub + HTTP fallback). The slim reference environment (`referencectl up slim`) arrives with Plan 11; until then, this is the full contributor loop.
 
 ## 1. Environment
 
@@ -55,6 +55,16 @@ curl -s -X POST localhost:8088/api/works/<workId>/transitions \
 ```
 
 Responses and errors follow the kernel error contract ([`docs/protocol.md`](protocol.md#kernel-ingress-implemented-plan-02)); a wrong bearer token yields a `401` ProblemDetails.
+
+The Link server (Plan 03) rides the same process — enroll an endpoint with the dev enrollment secret, then use its `linkToken` as a bearer (contract: [`docs/protocol.md`](protocol.md#link-transport-implemented-plan-03); the scripted fake client lives in `tests/Facilitator.Tests/LinkTestHarness.cs`):
+
+```bash
+curl -s -X POST localhost:8088/api/link/v1/enroll -H 'Content-Type: application/json' \
+  -d '{"token":"enroll-dev","endpointId":"gw-dev","instanceId":"i1","trustMode":"isolated-executor"}'   # 201 → linkToken
+curl -s -X POST localhost:8088/api/link/v1/capabilities -H "Authorization: Bearer <linkToken>" \
+  -H 'Content-Type: application/json' -d '{"apiVersion":"facilitator.framework/v1","kind":"CapabilityManifest","ownerTeam":"default","capabilities":[{"id":"research.analyze","version":1,"execution":"asynchronous"}]}'   # 204
+curl -s "localhost:8088/api/link/v1/deliveries?wait=2&limit=16" -H "Authorization: Bearer <linkToken>"  # 404 session-not-found until a hub hello opens a session
+```
 
 The same assembly doubles as its own client, riding the public HTTP API only (defaults `--url http://localhost:8088`, token from env `FACILITATOR_TOKEN` else `dev-token`):
 

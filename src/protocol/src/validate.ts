@@ -133,6 +133,22 @@ export function validateControlFrame(v: unknown): ValidationResult {
 }
 
 /**
+ * Validate a plain-JSON payload against any registered schema by $id (fixture
+ * classes enroll/delivery and other non-envelope wire objects). An unknown
+ * $id fails closed as schema-violation, mirroring the envelope path.
+ */
+export function validateAgainstSchemaId(schemaId: string, v: unknown): ValidationResult {
+  if (!schemaById(schemaId)) {
+    return fail("schema-violation", `unknown schema $id: ${schemaId}`);
+  }
+  const validate = validator(schemaId);
+  if (!validate(v)) {
+    return fail("schema-violation", firstMessage(validate));
+  }
+  return { ok: true };
+}
+
+/**
  * Pure size gate: harnesses count wire bytes themselves
  * (`Buffer.byteLength(JSON.stringify(payload))` / UTF-8 on .NET side).
  */

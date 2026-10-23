@@ -331,6 +331,116 @@ namespace Facilitator.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Facilitator.Kernel.Persistence.LinkDeliveryEntity", b =>
+                {
+                    b.Property<Guid>("DeliveryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("delivery_id");
+
+                    b.Property<DateTime?>("AckedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("acked_at");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempts");
+
+                    b.Property<DateTime?>("DeliveredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("delivered_at");
+
+                    b.Property<string>("EndpointId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("endpoint_id");
+
+                    b.Property<string>("Receipt")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("receipt");
+
+                    b.Property<DateTime?>("RedeliverAfter")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("redeliver_after");
+
+                    b.Property<long>("SessionEpoch")
+                        .HasColumnType("bigint")
+                        .HasColumnName("session_epoch");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("state");
+
+                    b.HasKey("DeliveryId");
+
+                    b.HasIndex("EndpointId", "State")
+                        .HasDatabaseName("link_deliveries_endpoint_id_state_idx");
+
+                    b.ToTable("link_deliveries", "facilitator", t =>
+                        {
+                            t.HasCheckConstraint("link_deliveries_state_check", "state IN ('pending', 'in_flight', 'acked')");
+                        });
+                });
+
+            modelBuilder.Entity("Facilitator.Kernel.Persistence.LinkEnrollmentEntity", b =>
+                {
+                    b.Property<Guid>("EnrollmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("enrollment_id");
+
+                    b.Property<string>("CapabilitiesDigest")
+                        .HasColumnType("text")
+                        .HasColumnName("capabilities_digest");
+
+                    b.Property<string>("CapabilityManifest")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("capability_manifest");
+
+                    b.Property<string>("EndpointId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("endpoint_id");
+
+                    b.Property<DateTime>("EnrolledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("enrolled_at");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<DateTime?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at");
+
+                    b.Property<Guid>("TeamId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("team_id");
+
+                    b.Property<string>("TokenSha256")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("token_sha256");
+
+                    b.Property<string>("TrustMode")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("trust_mode");
+
+                    b.HasKey("EnrollmentId");
+
+                    b.HasIndex("EndpointId")
+                        .IsUnique()
+                        .HasDatabaseName("link_enrollments_endpoint_id_key");
+
+                    b.HasIndex("TeamId");
+
+                    b.ToTable("link_enrollments", "facilitator", t =>
+                        {
+                            t.HasCheckConstraint("link_enrollments_trust_mode_check", "trust_mode IN ('shared-runtime', 'separate-process-same-host', 'isolated-executor')");
+                        });
+                });
+
             modelBuilder.Entity("Facilitator.Kernel.Persistence.LinkSessionEntity", b =>
                 {
                     b.Property<string>("LogicalEndpointId")
@@ -679,6 +789,26 @@ namespace Facilitator.Migrations
                         .HasConstraintName("execution_attempts_assignment_id_fkey");
 
                     b.Navigation("Assignment");
+                });
+
+            modelBuilder.Entity("Facilitator.Kernel.Persistence.LinkDeliveryEntity", b =>
+                {
+                    b.HasOne("Facilitator.Kernel.Persistence.OutboxEntity", null)
+                        .WithMany()
+                        .HasForeignKey("DeliveryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("link_deliveries_delivery_id_fkey");
+                });
+
+            modelBuilder.Entity("Facilitator.Kernel.Persistence.LinkEnrollmentEntity", b =>
+                {
+                    b.HasOne("Facilitator.Kernel.Persistence.TeamEntity", null)
+                        .WithMany()
+                        .HasForeignKey("TeamId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("link_enrollments_team_id_fkey");
                 });
 
             modelBuilder.Entity("Facilitator.Kernel.Persistence.ProjectEntity", b =>

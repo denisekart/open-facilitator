@@ -42,6 +42,10 @@ public class FacilitatorDbContext(DbContextOptions<FacilitatorDbContext> options
 
     public DbSet<LinkSessionEntity> LinkSessions => Set<LinkSessionEntity>();
 
+    public DbSet<LinkEnrollmentEntity> LinkEnrollments => Set<LinkEnrollmentEntity>();
+
+    public DbSet<LinkDeliveryEntity> LinkDeliveries => Set<LinkDeliveryEntity>();
+
     public DbSet<ApprovalEntity> Approvals => Set<ApprovalEntity>();
 
     public DbSet<CommunicationBindingEntity> CommunicationBindings => Set<CommunicationBindingEntity>();
@@ -244,6 +248,45 @@ public class FacilitatorDbContext(DbContextOptions<FacilitatorDbContext> options
             e.Property(x => x.LeaseUntil).HasColumnName("lease_until").IsRequired();
             e.Property(x => x.LastHeartbeat).HasColumnName("last_heartbeat").IsRequired();
             e.Property(x => x.CapabilitiesDigest).HasColumnName("capabilities_digest");
+        });
+
+        model.Entity<LinkEnrollmentEntity>(e =>
+        {
+            e.ToTable("link_enrollments");
+            e.HasKey(x => x.EnrollmentId);
+            e.Property(x => x.EnrollmentId).HasColumnName("enrollment_id").ValueGeneratedNever();
+            e.Property(x => x.EndpointId).HasColumnName("endpoint_id").IsRequired();
+            e.Property(x => x.TeamId).HasColumnName("team_id").IsRequired();
+            e.Property(x => x.TokenSha256).HasColumnName("token_sha256").IsRequired();
+            e.Property(x => x.TrustMode).HasColumnName("trust_mode").IsRequired();
+            e.Property(x => x.CapabilityManifest).HasColumnName("capability_manifest").HasColumnType("jsonb");
+            e.Property(x => x.CapabilitiesDigest).HasColumnName("capabilities_digest");
+            e.Property(x => x.EnrolledAt).HasColumnName("enrolled_at").IsRequired();
+            e.Property(x => x.ExpiresAt).HasColumnName("expires_at").IsRequired();
+            e.Property(x => x.RevokedAt).HasColumnName("revoked_at");
+            e.HasIndex(x => x.EndpointId).IsUnique().HasDatabaseName("link_enrollments_endpoint_id_key");
+            e.HasOne<TeamEntity>().WithMany().HasForeignKey(x => x.TeamId).HasConstraintName("link_enrollments_team_id_fkey");
+            e.ToTable(t => t.HasCheckConstraint("link_enrollments_trust_mode_check",
+                InList("trust_mode", ["shared-runtime", "separate-process-same-host", "isolated-executor"])));
+        });
+
+        model.Entity<LinkDeliveryEntity>(e =>
+        {
+            e.ToTable("link_deliveries");
+            e.HasKey(x => x.DeliveryId);
+            e.Property(x => x.DeliveryId).HasColumnName("delivery_id").ValueGeneratedNever();
+            e.Property(x => x.EndpointId).HasColumnName("endpoint_id").IsRequired();
+            e.Property(x => x.SessionEpoch).HasColumnName("session_epoch").IsRequired();
+            e.Property(x => x.State).HasColumnName("state").IsRequired();
+            e.Property(x => x.DeliveredAt).HasColumnName("delivered_at");
+            e.Property(x => x.AckedAt).HasColumnName("acked_at");
+            e.Property(x => x.Receipt).HasColumnName("receipt").HasColumnType("jsonb");
+            e.Property(x => x.Attempts).HasColumnName("attempts").IsRequired();
+            e.Property(x => x.RedeliverAfter).HasColumnName("redeliver_after");
+            e.HasIndex(x => new { x.EndpointId, x.State }).HasDatabaseName("link_deliveries_endpoint_id_state_idx");
+            e.HasOne<OutboxEntity>().WithMany().HasForeignKey(x => x.DeliveryId).HasConstraintName("link_deliveries_delivery_id_fkey");
+            e.ToTable(t => t.HasCheckConstraint("link_deliveries_state_check",
+                InList("state", ["pending", "in_flight", "acked"])));
         });
 
         model.Entity<ApprovalEntity>(e =>

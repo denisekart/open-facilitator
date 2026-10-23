@@ -1,8 +1,10 @@
 using Facilitator.Kernel.Auth;
 using Facilitator.Kernel.Dispatch;
 using Facilitator.Kernel.Ingress;
+using Facilitator.Kernel.Link;
 using Facilitator.Kernel.Persistence;
 
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
@@ -31,6 +33,7 @@ public static class KernelServiceCollection
 
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddSingleton(EnvelopeValidator.CreateDefault());
+        builder.Services.AddSingleton(ControlFrameValidator.CreateDefault());
         builder.Services.AddSingleton<KernelMetrics>();
         builder.Services.AddSingleton<DeliveryLedger>();
         builder.Services.AddSingleton<ISink, KernelLogSink>();
@@ -43,6 +46,32 @@ public static class KernelServiceCollection
         builder.Services.AddSingleton<BootstrapAuthStartupCheck>();
         builder.Services.AddHostedService(sp => sp.GetRequiredService<BootstrapAuthStartupCheck>());
         builder.Services.AddHostedService<OutboxDispatcher>();
+
+        // Plan 03 link server: enrollment, sessions, ledger, pump, sink, ingress.
+        var linkOptions = Link.LinkOptions.FromConfiguration(builder.Configuration);
+        builder.Services.AddSingleton(linkOptions);
+        builder.Services.AddSingleton<LinkEnrollmentSecret>();
+        builder.Services.AddSingleton<LinkEnrollmentStartupCheck>();
+        builder.Services.AddHostedService(sp => sp.GetRequiredService<LinkEnrollmentStartupCheck>());
+        builder.Services.AddSingleton<LinkEnrollmentStore>();
+        builder.Services.AddSingleton<ILinkTokenValidator, StoreLinkTokenValidator>();
+        builder.Services.AddSingleton<LinkService>();
+        builder.Services.AddSingleton<LinkConnectionRegistry>();
+        builder.Services.AddSingleton<LinkLedger>();
+        builder.Services.AddSingleton<LinkDeliveryPump>();
+        builder.Services.AddHostedService(sp => sp.GetRequiredService<LinkDeliveryPump>());
+        builder.Services.AddScoped<LinkIngress>();
+        builder.Services.AddSingleton<ISink, LinkSink>();
+
+        var heartbeat = TimeSpan.FromSeconds(linkOptions.HeartbeatSeconds);
+        builder.Services.AddSignalR(options =>
+        {
+            options.KeepAliveInterval = heartbeat;
+            options.ClientTimeoutInterval = heartbeat + heartbeat;
+            options.HandshakeTimeout = TimeSpan.FromSeconds(15);
+        });
+        builder.Services.AddAuthentication().AddScheme<AuthenticationSchemeOptions, LinkBearerHandler>(LinkBearerHandler.SchemeName, null);
+        builder.Services.AddAuthorization();
 
         builder.Services.AddProblemDetails();
         builder.AddOpenTelemetry();

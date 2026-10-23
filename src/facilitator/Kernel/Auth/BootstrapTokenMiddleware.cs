@@ -84,8 +84,11 @@ public sealed class BootstrapTokenMiddleware(RequestDelegate next, IIngressToken
     /// <summary>Terminal handler for the middleware.</summary>
     public async Task InvokeAsync(HttpContext context)
     {
-        if (!context.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase))
+        if (!context.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase)
+            || context.Request.Path.StartsWithSegments("/api/link/v1", StringComparison.OrdinalIgnoreCase))
         {
+            // The link surface guards itself: LinkAuthMiddleware (bearer link
+            // tokens) + the enrollment secret on POST /enroll (Plan 03).
             await next(context);
             return;
         }

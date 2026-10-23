@@ -1,6 +1,6 @@
 # Wire protocol (v1)
 
-This document describes the implemented wire contract: the JSON Schemas under `protocol/`, the conformance fixtures, and the rules both endpoints MUST follow. It is the as-built companion to spec §5 (`docs/specs/open_facilitator_framework_architecture.md`) and appendix §16 (`docs/specs/open-facilitator-appendix.md`); where the spec proposes and this document records, this document reflects the shipped artifacts. The framework runtime that consumes the contract today is the Plan 02 transactional kernel (see Kernel ingress below); the Link transport (Plan 03) and the Workspace Link SDK (Plan 04) are the next consumers.
+This document describes the implemented wire contract: the JSON Schemas under `protocol/`, the conformance fixtures, and the rules both endpoints MUST follow. It is the as-built companion to spec §5 (`docs/specs/open_facilitator_framework_architecture.md`) and appendix §16 (`docs/specs/open-facilitator-appendix.md`); where the spec proposes and this document records, this document reflects the shipped artifacts. The framework runtime consumes the contract today: the Plan 02 transactional kernel (Kernel ingress below) and the Plan 03 Link server (Link transport below). The Workspace Link SDK (Plan 04) is the next consumer.
 
 ## Message classes and envelopes
 
@@ -87,7 +87,7 @@ Events carry identity in the envelope (`source` + `id` + `time`), so their `data
 
 ## Transport neutrality
 
-The contract is transport-independent: the same fixtures MUST validate identically over the SignalR reference transport (Plan 03) and the HTTP long-poll fallback stubbed in `protocol/openapi/link-v1.yaml` (enroll, events, deliveries, receipts, capabilities). Consumers should use the `@ofac/protocol` package (`src/protocol/`): `schemaById` resolves a `dataschema` URI to its schema, `KNOWN_COMMAND_TYPES` is the fail-closed command table, and `validateEnvelope` / `validateReceipt` / `validateControlFrame` return the same `errorClass` taxonomy as the fixtures index.
+The contract is transport-independent: the same fixtures MUST validate identically over the SignalR reference transport and the HTTP long-poll fallback, both implemented in the Facilitator (Link transport below; `protocol/openapi/link-v1.yaml` 1.0.1 is the frozen HTTP surface — enroll, events, deliveries, receipts, capabilities GET+POST). Consumers should use the `@ofac/protocol` package (`src/protocol/`): `schemaById` resolves a `dataschema` URI to its schema, `KNOWN_COMMAND_TYPES` is the fail-closed command table, and `validateEnvelope` / `validateReceipt` / `validateControlFrame` return the same `errorClass` taxonomy as the fixtures index.
 
 ## Kernel ingress (implemented, Plan 02)
 
@@ -140,3 +140,106 @@ A duplicate returns `200 {"status":"duplicate"}` with zero reprocessing — no s
 `POST /api/ingress/events` validates against the exact same schema files as the harnesses: `protocol/json-schema/*` and `protocol/cloudevents-schemas/*`, shipped as `EmbeddedResource`s of `Ofac.Protocol` (the container image can't read `protocol/` at runtime) and enforced by the shared `EnvelopeValidator` in `protocol/dotnet/Ofac.Protocol/Validation/EnvelopeValidator.cs`. It returns the same `errorClass` taxonomy as the fixture index (`envelope-violation | schema-violation | payload-too-large | unknown-command`). Commands outside the fail-closed 7-type known-command table (`Validation/KnownCommands.cs`, derived from the same list as `KNOWN_COMMAND_TYPES` in `src/protocol/src/validate.ts`) are rejected `422` and audited in the inbox. Of the seven known commands, `work.steer.v1` is the only one with a business effect this slice; the rest admit (`202`-path, inbox row `processed`) without side effects, typed rather than silent.
 
 The kernel's own emission path builds outbox envelopes with the same validator before insert — the kernel emits conformant envelopes by construction. Kernel integration tests consume real files from `protocol/conformance-fixtures/` as live inputs to `/api/ingress/events` (e.g. `valid/command.work.steer.json` posted twice proves the duplicate path; `invalid/command.unknown.v1.json` proves fail-closed `unknown-command`; `invalid/envelope.specversion.json` proves `400 envelope-violation`), so the fixtures gate the runtime, not just the harnesses.
+
+## Link transport (implemented, Plan 03)
+
+The Facilitator serves the Workspace Link contract over two transports with identical application semantics (`src/facilitator/Kernel/Link/`): the SignalR hub at `/hubs/link` (reference transport) and the HTTP surface frozen in `protocol/openapi/link-v1.yaml` 1.0.1 (fallback, every language first-class). Outbox rows addressed `link.<endpointId>` are materialized into the durable delivery ledger `facilitator.link_deliveries` and offered to the endpoint over whichever transport it is speaking.
+
+### Auth (interim; Plan 07 cutover seam)
+
+`POST /api/link/v1/enroll` is guarded by the **bootstrap enrollment secret** sent in the request body (`token`), not a bearer header: config `Link:EnrollmentToken` (env `Link__EnrollmentToken`); unset + Development accepts the literal `enroll-dev`; unset + non-Development refuses startup (fail closed, mirroring `Auth:BootstrapToken`). Every other `/api/link/v1/*` request and every hub connection carries `Authorization: Bearer <linkToken>`; invalid/expired/revoked tokens yield `401 unauthorized` with no oracle for whether an enrollment exists. The kernel bearer still guards `/api/*` **except** `/api/link/v1/*` (`BootstrapTokenMiddleware` has the one path exclusion). All resolution flows through the `ILinkTokenValidator` seam (`Kernel/Link/LinkAuth.cs`) — Plan 07 replaces the store-backed implementation (`StoreLinkTokenValidator`: SHA-256 lookup in `link_enrollments`) with OIDC + `principal_mappings`; call sites never change.
+
+Enrollment is an upsert by `endpointId` and **rotates the token**: the previous `linkToken` stops validating immediately. The response always includes the additive 1.0.1 fields — `linkToken` (opaque 256-bit base64url) and `expiresAt` (now + `Link:TokenLifetimeHours`, default 720 h). `trustMode` (`shared-runtime` | `separate-process-same-host` | `isolated-executor`) is echoed and MUST be logged at enrollment and at every `hello` (appendix §4). The enrollment record (endpoint, team, token hash, manifest + digest, timestamps) is stored server-side; an unknown team binds to a `default` team seeded on demand (Plan 11 replaces the seeding).
+
+### Handshake
+
+`hello` → `welcome` (fixture pair `valid/control.hello.json` / `valid/control.welcome.json`; the normative examples appendix §14 asked for):
+
+```json
+{ "kind": "hello", "protocolVersions": ["v1"], "supportedTransports": ["signalr", "websocket", "http-poll"], "endpointId": "gw-team-alpha", "instanceId": "inst-01", "capabilityManifestDigest": "sha256:abab…ab", "lastKnownAck": "del-100" }
+```
+
+The server validates the frame against `control.v1.json`, requires `endpointId` to equal the authenticated principal, intersects `protocolVersions` with its own `["v1"]`, bumps the session epoch (`session_epoch = existing + 1`, lease `now + heartbeatSeconds*3` clamped ≥ 15 s, `replica_id` from `Kernel:ReplicaId`), supersedes any older live session, then **immediately pumps pending deliveries from the DB ledger** before answering:
+
+```json
+{ "kind": "welcome", "sessionId": "9f2c…", "leaseEpoch": 1, "maxInFlight": 16, "heartbeatSeconds": 30, "protocolVersion": "v1" }
+```
+
+**The resume cursor is a hint, the receipt ledger is truth** (spec S:291): `lastKnownAck` is accepted, logged, and never trusted as proof — replay always recomputes the un-acked set from `link_deliveries`.
+
+**Version mismatch (null-return convention):** an empty intersection pushes the client method `Disconnect` carrying the frozen goodbye frame (fixture pair `invalid/control.hello.v9-only.json` → `valid/control.goodbye.incompatible.json`) and `Hello` **returns `null`** instead of a `WelcomeFrame` — the SignalR invocation simply has no result payload; no `link_sessions` row is written (the ephemeral `sessionId` in the goodbye is minted for the frame only):
+
+```json
+{ "kind": "goodbye", "sessionId": "7a41…", "reason": "no-compatible-protocol-version" }
+```
+
+**Supersede + epoch fencing:** a second `hello` for a live endpoint bumps the epoch and pushes `Disconnect` `{reason:"session-superseded"}` to the old connection on this replica; every other replica's socket is fenced by the DB epoch — a `heartbeat` carrying a stale `leaseEpoch` is refused (hub: `Disconnect` push + `false`; the reserved HTTP shape is 409 `session-superseded`), and delivery claims always charge the epoch of the current live `link_sessions` row, never a client-claimed one. Restarted endpoints re-use the logical `endpointId` and simply get a new session and epoch (spec §16.2).
+
+**Lease = liveness:** `lease_until = hello/heartbeat + max(15 s, heartbeatSeconds×3)`. The pump's sweeper deletes expired `link_sessions` rows and pushes `Disconnect` `{reason:"lease-expired"}` to tracked sockets — §7.3: lease expiry, not TCP, ends a session. A client-initiated `goodbye` (hub method) revokes the session row and acks nothing.
+
+### Hub method set
+
+Server methods `Hello`, `Envelope`, `Receipt`, `Heartbeat`, `Goodbye`; client methods `Welcome` (Hello's return value), `Deliver`, `FlowControl`, `Disconnect` (payloads are the frozen control frames / `link-delivery.v1.json`). The hub is thin transport — no work execution. `Envelope` and `Receipt` share one code path with the HTTP equivalents (`LinkIngress.AdmitAsync`, `LinkLedger.AckAsync`), so both transports answer identically. Frame validation is the embedded-schema `ControlFrameValidator` (`protocol/dotnet/Ofac.Protocol/Validation/`) — the same schemas the harnesses read.
+
+**Deliver frame** — the client-method payload is the SAME JSON object as the OpenAPI `Delivery` component (`protocol/cloudevents-schemas/link-delivery.v1.json`, fixture `valid/link.delivery.json`); durable delivery metadata is `deliveryId` + `deliveredAt`, and receipts reference the durable `deliveryId`, never the socket:
+
+```json
+{ "deliveryId": "01JDELIVERY01", "envelope": { "specversion": "1.0", "…": "full CloudEvent" }, "deliveredAt": "2026-10-22T18:00:00Z" }
+```
+
+Over SignalR the receipt posts via the `Receipt` method with the full `receipt.v1.json` frame:
+
+```json
+{ "deliveryId": "01JDELIVERY01", "status": "accepted", "processedAt": "2026-10-22T18:00:05Z" }
+```
+
+**FlowControl pause/resume:** when a session's in-flight count reaches `maxInFlight` the server pushes `{ "kind": "flow_control", "sessionId": "…", "maxInFlight": 0 }` (0 = pause, per the frozen schema); when a receipt frees capacity it pushes `maxInFlight` restored. The frames are advisory pacing hints — the claim-side window (`min(limit, maxInFlight − inFlight)`) is what actually enforces the cap (spec S:304).
+
+**Redelivery:** an `in_flight` row whose `redeliver_after` (= claim + `Link:InFlightLeaseSeconds`, default 120 s) has passed is claimable again — that IS the dropped-receipt mechanism (S:302). Delivery identity = the outbox row id, so a receipt arriving for an already-`acked` delivery answers the latest attempt idempotently and the dropped-receipt loop terminates. A `duplicate` receipt terminates redelivery exactly like `accepted` — the client saw the command.
+
+### HTTP fallback surface (link-v1.yaml 1.0.1)
+
+|Endpoint|Auth|Success|Errors|
+|---|---|---|---|
+|`POST /api/link/v1/enroll`|enrollment secret in body|`201` `EnrollResponse {enrollmentId, trustMode, linkToken, expiresAt}`|`400 schema-violation` (missing field, bad JSON), `401 enrollment-secret-invalid`, `413`|
+|`POST /api/link/v1/events`|link bearer|`202` receipt `{deliveryId, status, processedAt}` (`deliveryId` = inbox row id); duplicate ⇒ `200 {"status":"duplicate","inboxId":…}`|`400 envelope-violation`/`schema-violation` (receipt-class frames in an envelope ⇒ `400`), `409 version-conflict` / `422 invalid-state-transition` / `404 work-not-found` (steer effects), `422 unsupported` (unknown command, `work.assign` FROM a link), `413`|
+|`GET /api/link/v1/deliveries?wait=0..60&limit=1..64`|link bearer|`200` array of `Delivery` (empty on poll timeout)|`404 session-not-found`, `400 schema-violation` (bad `wait`/`limit`)|
+|`POST /api/link/v1/deliveries/{deliveryId}/receipt`|link bearer|`204` (idempotent re-receipt answers `204` again, overwriting the stored receipt jsonb)|`404 delivery-not-found` (unknown id or another endpoint's delivery), `400 schema-violation`, `413`|
+|`GET /api/link/v1/capabilities`|link bearer|`200` stored CapabilityManifest|`404 capabilities-not-found`|
+|`POST /api/link/v1/capabilities`|link bearer|`204` (stores manifest + SHA-256 digest)|`400 schema-violation`, `403 team-mismatch` (`ownerTeam` ≠ principal's team)|
+|`GET /api/dead-letters`|kernel bearer|`200` array `{deadLetterId, outboxId, reason, envelope, createdAt}`, newest 50 (appendix §5.6)|—|
+
+`wait` long-polls (per-endpoint wake channel + 1 s polling safety net + inline materialize/claim; NOTIFY `facilitator_outbox` is a wake hint only, §7.3) and `limit` is additionally bounded by `maxInFlight − inFlight`. HTTP principals get no `WelcomeFrame`: enrollment + bearer token IS the session bootstrap, **but a live `link_sessions` row is still REQUIRED for the delivery read** (404 `session-not-found` — enroll-then-poll without a handshake gets the 404; as-built that row is minted by a hub `hello`). Every successful `GET /deliveries` refreshes that row's lease (long-poll IS the heartbeat for a socketless principal, spec S:314). `/capabilities` (GET and POST) needs no session at all. Body size gate (413 at 262144) and dedupe keys are identical to Kernel ingress above; a link-originated `work.steer` runs the same `ApplySteerAsync` path as kernel ingress.
+
+### Error URIs (extends the Kernel ingress table, same ProblemDetails shape)
+
+|Type URI suffix|HTTP|When|
+|---|---|---|
+|`unsupported`|`422`|Command class outside the v1 contract or `work.assign` FROM a link (fail closed, §5.5; envelope audited in `inbox` state `failed`)|
+|`session-not-found`|`404`|Delivery read with no live `link_sessions` row|
+|`delivery-not-found`|`404`|Unknown receipt `deliveryId` or a delivery of another endpoint|
+|`capabilities-not-found`|`404`|Enrollment never advertised a manifest|
+|`team-mismatch`|`403`|Manifest `ownerTeam` ≠ principal's team|
+|`enrollment-secret-invalid`|`401`|Enroll body `token` ≠ `Link:EnrollmentToken`|
+|`session-superseded`|`409`|Reserved HTTP shape; as-built supersede surfaces as a SignalR `Disconnect` goodbye (heartbeat is hub-only)|
+|`no-common-version`|`409`|Reserved HTTP shape of the no-compatible-protocol-version goodbye|
+
+The receipt timestamp is the frozen `processedAt` — the spec §5.2 example's `acceptedAt` is superseded by the schema (see Receipts above).
+
+### Liveness, placement, observability
+
+- The pump (`LinkDeliveryPump : BackgroundService`) materializes `link.<endpointId>` outbox rows into the ledger **only while a live session exists**, then claims within the window and pushes `Deliver` — the claim phase runs ONLY for endpoints with a socket tracked on this replica; without one the pass is materialize-only. It runs after every `hello`/receipt, on every `NOTIFY facilitator_outbox`, on a 2 s safety poll, and inline (materialize-only) before an HTTP claim, which `GET /deliveries` then performs itself. Un-acked rows stay non-`delivered` in the outbox while the link is down — no outbox row is ever tied to a dead socket (§7.3).
+- `LinkSink` (`Channel = "link"`) is a routing liveness probe only: live session ⇒ `true` (the pump owns the row via the DB); no session anywhere ⇒ `false` ⇒ Plan 02's no-route requeue-with-backoff, unchanged.
+- The connection registry tracks THIS replica's sockets only; the DB lease is the cross-replica authority (§7.3).
+- No secrets in WebSocket query strings for framework clients (spec S:624): the bearer header rides both the negotiate request and the WebSocket upgrade; `?access_token=` is accepted ONLY as the documented fallback for non-TypeScript clients that cannot set headers on the upgrade.
+- Observability (appendix §9): span `link.handshake` on activity source `Facilitator.Kernel` (tags `facilitator.endpoint_id`, `facilitator.session_epoch`, `facilitator.protocol_version`); counter `facilitator.link.received`; gauge `facilitator.link.sessions`; link claims reuse `facilitator.delivery.attempts`.
+
+### Config keys (defaults live in code, `LinkOptions.FromConfiguration`)
+
+|Key|Default|Meaning|
+|---|---|---|
+|`Link:EnrollmentToken`|dev: `enroll-dev`; else required|Bootstrap enrollment secret (fail-closed startup gate when unset outside Development)|
+|`Link:TokenLifetimeHours`|720|Link-token expiry issued at enroll|
+|`Link:MaxInFlight`|16|Per-session in-flight window (≥1); advertised in `welcome`, enforced at claim|
+|`Link:HeartbeatSeconds`|30 (5..600)|Client heartbeat cadence in `welcome`; SignalR keepalive = this, client timeout = 2×|
+|`Link:InFlightLeaseSeconds`|120|Redelivery deadline after each claim|

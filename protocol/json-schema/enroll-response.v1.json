@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openfacilitator.org/v1/enroll-response.v1.json",
+  "title": "EnrollResponseV1",
+  "description": "Bootstrap enrollment response. linkToken/expiresAt are additive (OpenAPI 1.0.1): the interim link-token credential until Plan 05 OIDC principals; a server MAY omit both when it issues no bearer credential.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "enrollmentId",
+    "trustMode"
+  ],
+  "properties": {
+    "enrollmentId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "trustMode": {
+      "type": "string",
+      "enum": [
+        "shared-runtime",
+        "separate-process-same-host",
+        "isolated-executor"
+      ]
+    },
+    "linkToken": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096
+    },
+    "expiresAt": {
+      "$ref": "common.v1.json#/$defs/rfc3339DateTime"
+    }
+  }
+}

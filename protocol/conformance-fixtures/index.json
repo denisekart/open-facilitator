@@ -236,6 +236,37 @@
       "class": "control",
       "errorClass": "no-common-version",
       "receipt": "valid/control.goodbye.incompatible.json"
+    },
+    {
+      "file": "valid/enroll.request.json",
+      "expect": "valid",
+      "class": "enroll",
+      "schemaFile": "enroll-request.v1.json"
+    },
+    {
+      "file": "valid/enroll.response.json",
+      "expect": "valid",
+      "class": "enroll",
+      "schemaFile": "enroll-response.v1.json"
+    },
+    {
+      "file": "invalid/enroll.no-trustmode.json",
+      "expect": "invalid",
+      "class": "enroll",
+      "schemaFile": "enroll-request.v1.json",
+      "errorClass": "schema-violation"
+    },
+    {
+      "file": "valid/link.delivery.json",
+      "expect": "valid",
+      "class": "delivery",
+      "schemaFile": "link-delivery.v1.json"
+    },
+    {
+      "file": "invalid/link.receipt.no-processed-at.json",
+      "expect": "invalid",
+      "class": "receipt",
+      "errorClass": "schema-violation"
     }
   ]
 }

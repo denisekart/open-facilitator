@@ -31,6 +31,9 @@ import receiptV1 from "../schemas/receipt.v1.json" with { type: "json" };
 import controlV1 from "../schemas/control.v1.json" with { type: "json" };
 import resultManifestV1 from "../schemas/result-manifest.v1.json" with { type: "json" };
 import capabilityManifestV1 from "../schemas/capability-manifest.v1.json" with { type: "json" };
+import enrollRequestV1 from "../schemas/enroll-request.v1.json" with { type: "json" };
+import enrollResponseV1 from "../schemas/enroll-response.v1.json" with { type: "json" };
+import linkDeliveryV1 from "../schemas/link-delivery.v1.json" with { type: "json" };
 
 export type JsonSchema = Record<string, unknown>;
 
@@ -64,6 +67,9 @@ const all: JsonSchema[] = [
   controlV1,
   resultManifestV1,
   capabilityManifestV1,
+  enrollRequestV1,
+  enrollResponseV1,
+  linkDeliveryV1,
 ] as unknown as JsonSchema[];
 
 const byId = new Map<string, JsonSchema>(all.map((s) => [s["$id"] as string, s]));

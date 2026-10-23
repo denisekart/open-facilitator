@@ -3,17 +3,30 @@ name: facilitator-protocol
 description: Workspace Link wire contract — CloudEvents envelope, command/event/receipt/control classes, handshake, HTTP fallback endpoints, idempotency keys, fencing generations, and conformance rules for the Open Facilitator Framework.
 ---
 
-> **Status:** the contract layer is IMPLEMENTED (Plan 01): 26 draft-2020-12 schemas in
-> `protocol/json-schema/` + `protocol/cloudevents-schemas/`, 40 fixture cases in
+> **Status:** the contract layer is IMPLEMENTED (Plan 01, extended by Plan 03): 29 draft-2020-12 schemas in
+> `protocol/json-schema/` + `protocol/cloudevents-schemas/`, 45 fixture cases in
 > `protocol/conformance-fixtures/` (index.json = arbiter), generated DTOs in
 > `src/protocol/src/generated/` (TS) + `protocol/dotnet/Ofac.Protocol/Generated/` (C#),
-> `@ofac/protocol` validators, and the `Validate.Fixtures` CLI. As of Plan 02 the kernel
+> `@ofac/protocol` validators, and the `Validate.Fixtures` CLI. The kernel
 > enforces the contract at `POST /api/ingress/events`: fail-closed `unknown-command`
 > (7-type `KnownCommands` table, embedded schemas via `EnvelopeValidator`) and dedupe on
-> the `inbox` table (`(event_source, event_id)`, `command_id`, provider delivery id) with
-> live `accepted`/`duplicate` receipts at that endpoint. The runtime Link server,
-> Gateways, and adapters are still unbuilt — the handshake/transport paths below remain
-> spec-proposed targets. Update this skill the moment a slice lands.
+> the `inbox` table (`(event_source, event_id)`, `command_id`, provider delivery id).
+> The Link server is IMPLEMENTED (Plan 03, `src/facilitator/Kernel/Link/`): SignalR hub
+> `/hubs/link` (server methods `Hello`/`Envelope`/`Receipt`/`Heartbeat`/`Goodbye` ↔ client
+> methods `Welcome`/`Deliver`/`FlowControl`/`Disconnect`), the full HTTP fallback of
+> `protocol/openapi/link-v1.yaml` 1.0.1 incl. `POST /api/link/v1/capabilities`,
+> enrollment with per-endpoint link tokens (`link_enrollments`), `link_sessions` leases,
+> and the durable `link_deliveries` ledger with pump + FlowControl + redelivery.
+> Config keys: `Link:EnrollmentToken`, `Link:TokenLifetimeHours` (720),
+> `Link:MaxInFlight` (16), `Link:HeartbeatSeconds` (30, 5..600),
+> `Link:InFlightLeaseSeconds` (120) — defaults in code (`LinkOptions`), no appsettings
+> entry needed. Error URIs extend the kernel table: `unsupported` 422,
+> `session-not-found` 404, `delivery-not-found` 404, `capabilities-not-found` 404,
+> `team-mismatch` 403, `enrollment-secret-invalid` 401 (`session-superseded` 409 and
+> `no-common-version` 409 are reserved HTTP shapes; as-built those arrive as SignalR
+> `Disconnect` goodbyes). Interim auth: `ILinkTokenValidator` seam — Plan 07 swaps in
+> OIDC + `principal_mappings`, call sites unchanged. Gateways and adapters are still
+> unbuilt. Update this skill the moment a slice lands.
 
 # Facilitator Protocol
 
@@ -42,13 +55,13 @@ Normative source: `docs/specs/open_facilitator_framework_architecture.md` §5, �
 9. **`actorEvidenceRef` is validated, never opaque**: signature/issuer/expiry + required claims (`sub`, `iss`, `aud`, groups/scopes) before honoring a capability request. LLM text and memory content can never authorize.
 10. **Nudge is diagnostic**: `work.nudge` may not re-run costly tools, merge, or deploy; one nudge per `(assignmentId, generation, stallEpisode)`; adapters may advertise `supportsNudge: false`.
 
-## Handshake (must match)
+## Handshake (as-built, Plan 03)
 
-`hello({protocolVersions, supportedTransports, endpointId, instanceId, capabilityManifestDigest, lastKnownAck})` → `welcome({sessionId, leaseEpoch, maxInFlight, heartbeatSeconds, protocolVersion})`. Client resume cursor is a *hint*; pending deliveries come from the DB receipt ledger. Each reconnect = new session generation.
+`hello({protocolVersions, supportedTransports, endpointId, instanceId, capabilityManifestDigest, lastKnownAck})` → `welcome({sessionId, leaseEpoch, maxInFlight, heartbeatSeconds, protocolVersion})`. Client resume cursor is a *hint*; pending deliveries come from the DB receipt ledger (`link_deliveries`) and are pushed immediately after the welcome is minted. Each reconnect = new session generation: the epoch bump supersedes the old session (`Disconnect` goodbye `session-superseded`; stale-epoch heartbeats are fenced). Lease = `heartbeatSeconds*3` clamped ≥ 15 s; the pump sweeper ends sessions on lease expiry, not TCP. **On version mismatch the hub returns `null` from `Hello`** (the invocation has no result payload) after pushing `Disconnect` with the frozen goodbye frame `{reason:"no-compatible-protocol-version"}`; no `link_sessions` row is written — the goodbye's `sessionId` is minted for the frame only.
 
-- SignalR (default reference): hub methods `Hello`, `Envelope`, `Receipt`, `Heartbeat`; server→client `Welcome`, `Deliver`, `FlowControl`, `Disconnect`. Hub is thin transport — no work execution, no model calls.
-- HTTP fallback (every language must be able to implement this): `POST /api/link/v1/enroll`, `POST /api/link/v1/events`, `GET /api/link/v1/deliveries?wait=25&limit=16`, `POST /api/link/v1/deliveries/{deliveryId}/receipt`, `GET /api/link/v1/capabilities`. Same semantics as SignalR; both transports pass the same conformance suite.
-- Trust mode is declared at enrollment and immutable for the session: `shared-runtime` | `separate-process-same-host` | `isolated-executor`. Admin surfaces and audit records MUST show it truthfully.
+- SignalR (default reference): hub `/hubs/link`; server methods `Hello`, `Envelope`, `Receipt`, `Heartbeat`, `Goodbye`; server→client `Welcome` (Hello's return value), `Deliver`, `FlowControl`, `Disconnect`. Hub is thin transport — no work execution, no model calls. Bearer auth via the `facilitator-link` scheme (the SAME `ILinkTokenValidator` as HTTP); header-only for our TS clients (S:624), `?access_token=` is the documented WS-only fallback for clients that cannot set upgrade headers. `Deliver` payload = the OpenAPI `Delivery` object verbatim (`link-delivery.v1.json`). FlowControl `{maxInFlight:0}` = pause, restored value = resume; advisory hints — the claim window (`maxInFlight − inFlight`) enforces the cap.
+- HTTP fallback (every language must be able to implement this): `POST /api/link/v1/enroll` (enrollment secret in the body; re-enroll rotates the token), `POST /api/link/v1/events`, `GET /api/link/v1/deliveries?wait=25&limit=16`, `POST /api/link/v1/deliveries/{deliveryId}/receipt` (idempotent 204), `GET|POST /api/link/v1/capabilities`. Same semantics as SignalR — one admission/ack code path (`LinkIngress.AdmitAsync` / `LinkLedger.AckAsync`) serves both; both transports pass the same conformance suite. Delivery reads require a live session (404 `session-not-found` before any handshake); capabilities do not.
+- Trust mode is declared at enrollment and immutable for the session: `shared-runtime` | `separate-process-same-host` | `isolated-executor`. MUST be logged at enrollment and at every hello (appendix §4). Admin surfaces and audit records MUST show it truthfully.
 
 ## Compatibility discipline
 

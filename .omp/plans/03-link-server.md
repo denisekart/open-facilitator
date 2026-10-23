@@ -104,14 +104,14 @@ Unit (no DB): `ControlFrameValidator` fixture matrix (every `control.*` fixture 
 
 |Step|State|
 |---|---|
-|0 Inspection|Not started|
-|1 Migration + enrollment + auth|Not started|
-|2 Sessions + handshake hub|Not started|
-|3 Ledger + pump + sink + receipts|Not started|
-|4 HTTP fallback parity|Not started|
-|5 OpenAPI 1.0.1 + fixtures|Not started|
-|6 Test suite|Not started|
-|7 Docs/skills/status|Not started|
+|0 Inspection|Fully implemented — spec/appendix/frozen contract/as-built kernel read; findings in header + commit 5f724c0|
+|1 Migration + enrollment + auth|Fully implemented — `AddLinkServer` migration (`link_enrollments`, `link_deliveries` + indexes), `LinkEnrollmentStore` (secret check, rotation, default-team seed, trustMode log), `ILinkTokenValidator`/`StoreLinkTokenValidator`/`LinkAuthMiddleware`/`LinkBearerHandler`, `BootstrapTokenMiddleware` link/v1 exclusion, `POST /enroll`|
+|2 Sessions + handshake hub|Fully implemented — `LinkService` (epoch bump, lease heartbeatSeconds*3 ≥15s, sweeper input), `LinkHub` Hello/Envelope/Receipt/Heartbeat/Goodbye + Welcome/Deliver/FlowControl/Disconnect pushes, supersede + null-return goodbye, `ControlFrameValidator` (embedded schemas)|
+|3 Ledger + pump + sink + receipts|Fully implemented — `LinkLedger` (materialize/claim SKIP LOCKED/ack tx flipping outbox), `LinkDeliveryPump` (NOTIFY + 2s poll + lease sweeper + FlowControl; claim phase runs only with a tracked socket, socketless passes are materialize-only), `LinkSink` liveness probe, receipt endpoints, `GET /api/dead-letters`, `POST /api/dev/link-outbox` test affordance|
+|4 HTTP fallback parity|Fully implemented — one `LinkIngress.AdmitAsync` + `LinkLedger.AckAsync` path for hub and HTTP, long-poll wake + 1s safety net, 404-when-no-session rule, capabilities GET/POST (403 team-mismatch)|
+|5 OpenAPI 1.0.1 + fixtures|Fully implemented — link-v1.yaml 1.0.1 (optional linkToken/expiresAt, POST capabilities, $ref components incl. link-delivery.v1.json), 5 new fixtures registered in index.json (enroll request/response/no-trustmode, link.delivery, link.receipt.no-processed-at)|
+|6 Test suite|Fully implemented — EnrollmentTests, HandshakeTests, DeliveryFlowTests, ReceiptLossTests, ReplayOnReconnectTests, HttpFallbackParityTests, LinkIngressTests, FlowControlTests, HeartbeatTests, DeadLetterEndpointTests, MigrationAndAuthBoundaryTests, ControlFrameValidatorTests; wire-proof tier: SignalR client 10.0.13 over Kestrel (`LinkTestHarness.FakeLinkClient`, skip-negotiation, bearer header) + HTTP parity|
+|7 Docs/skills/status|Fully implemented — `docs/protocol.md` Link transport chapter (incl. pump claim law + HTTP lease-refresh), both skills updated to implemented reality, getting-started/README curl walkthrough, this table|
 
 ## Critical files & anchors
 

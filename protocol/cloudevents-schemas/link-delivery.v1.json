@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openfacilitator.org/v1/link-delivery.v1.json",
+  "title": "LinkDeliveryV1",
+  "description": "One durable delivery: the envelope plus the delivery metadata a receipt references (spec §5.2 — the receipt refers to the durable deliveryId, not the socket). Identical shape on the SignalR Deliver client method and the HTTP GET /deliveries items. The envelope $ref resolves by $id (same style as envelope-command.json); idToken/rfc3339DateTime constraints are inlined verbatim from common.v1.json#$defs because this file lives beside envelope.json in cloudevents-schemas/ and the OpenAPI validator resolves refs physically.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "deliveryId",
+    "envelope",
+    "deliveredAt"
+  ],
+  "properties": {
+    "deliveryId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "envelope": {
+      "$ref": "envelope.json"
+    },
+    "deliveredAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

@@ -52,6 +52,36 @@ export interface Envelope {
   [property: string]: unknown;
 }
 
+/**
+ * One durable delivery: the envelope plus the delivery metadata a receipt references (spec
+ * §5.2 — the receipt refers to the durable deliveryId, not the socket). Identical shape on
+ * the SignalR Deliver client method and the HTTP GET /deliveries items. The envelope $ref
+ * resolves by $id (same style as envelope-command.json); idToken/rfc3339DateTime
+ * constraints are inlined verbatim from common.v1.json#$defs because this file lives beside
+ * envelope.json in cloudevents-schemas/ and the OpenAPI validator resolves refs physically.
+ */
+export interface LinkDeliveryV1 {
+  deliveredAt: string;
+  deliveryId: string;
+  envelope: EnvelopeObject;
+}
+
+export interface EnvelopeObject {
+  causationid?: string;
+  correlationid?: string;
+  data?: { [key: string]: unknown };
+  datacontenttype: Datacontenttype;
+  dataschema: string;
+  id: string;
+  source: string;
+  specversion: Specversion;
+  subject: string;
+  time: string;
+  traceparent?: string;
+  type: string;
+  [property: string]: unknown;
+}
+
 export interface CapabilityManifestV1 {
   apiVersion: APIVersion;
   capabilities: [CapabilityDescriptor, ...CapabilityDescriptor[]];
@@ -176,6 +206,27 @@ export interface ControlFrame {
 export type ControlFrameKind = "hello" | "welcome" | "heartbeat" | "flow_control" | "goodbye";
 
 export type SupportedTransport = "signalr" | "websocket" | "http-poll";
+
+export interface EnrollRequestV1 {
+  endpointId: string;
+  instanceId: string;
+  token: string;
+  trustMode: TrustMode;
+}
+
+export type TrustMode = "shared-runtime" | "separate-process-same-host" | "isolated-executor";
+
+/**
+ * Bootstrap enrollment response. linkToken/expiresAt are additive (OpenAPI 1.0.1): the
+ * interim link-token credential until Plan 05 OIDC principals; a server MAY omit both when
+ * it issues no bearer credential.
+ */
+export interface EnrollResponseV1 {
+  enrollmentId: string;
+  expiresAt?: string;
+  linkToken?: string;
+  trustMode: TrustMode;
+}
 
 export interface ApprovalRequiredEventV1Data {
   actionDigest: string;

@@ -77,7 +77,8 @@ foreach (var c in cases)
     var file = c.GetProperty("file").GetString()!;
     var expect = c.GetProperty("expect").GetString()!;
     var errorClass = c.TryGetProperty("errorClass", out var ec) ? ec.GetString() : null;
-    var observed = RunCase(Path.Combine(fixturesDir, file), c.GetProperty("class").GetString()!);
+    var schemaFile = c.TryGetProperty("schemaFile", out var sf) ? sf.GetString() : null;
+    var observed = RunCase(Path.Combine(fixturesDir, file), c.GetProperty("class").GetString()!, schemaFile);
 
     var pass = expect == "valid" ? observed == null : observed == errorClass;
     if (pass && c.TryGetProperty("receipt", out var responseFixture))
@@ -120,10 +121,20 @@ Console.WriteLine(failed == 0 ? $"ALL {cases.Count} FIXTURE CASES PASS" : $"{fai
 return failed == 0 ? 0 : 1;
 
 // Returns the observed error class, or null when the payload is valid.
-string? RunCase(string path, string messageClass)
+string? RunCase(string path, string messageClass, string? schemaFile = null)
 {
     using var doc = JsonDocument.Parse(File.ReadAllText(path));
     var root = doc.RootElement;
+
+    // Non-envelope wire objects addressed by schema filename (enroll/delivery
+    // fixture classes): validate against the by-$id registry, strict.
+    if (messageClass is "enroll" or "delivery")
+    {
+        return Schema($"https://schemas.openfacilitator.org/v1/{schemaFile}")
+            .Evaluate(root, strict).IsValid
+            ? null
+            : "schema-violation";
+    }
 
     if (messageClass is "receipt")
     {

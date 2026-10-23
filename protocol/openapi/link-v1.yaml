@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Open Facilitator — Workspace Link HTTP surface (v1)
-  version: 1.0.0
+  version: 1.0.1
   description: |
     Provider-neutral HTTP fallback for the Workspace Link contract (spec §5.3).
     SignalR is the default reference transport; these endpoints carry identical
@@ -19,6 +19,18 @@ info:
     determines allowed team/Gateway/workspace identity.
 
     Implemented in Plan 03 (Link server); Plan 12 extends the admin surface.
+
+    1.0.1 rationale (additive minor change): EnrollResponse gains the optional
+    `linkToken` and `expiresAt` properties — the interim per-endpoint bearer
+    credential the Link server issues until Plan 05 pins OIDC principals — and
+    `POST /api/link/v1/capabilities` is added so an endpoint can advertise its
+    CapabilityManifest over the HTTP surface. No existing field changed
+    meaning or requiredness, so per semver/OpenAPI additive-change
+    conventions the minor bump is the only compatibility action required.
+    EnrollRequest / EnrollResponse / Delivery are now $refs to their
+    single-source-of-truth JSON Schema files (the precedent set by the events
+    path above); Delivery sits beside the envelope schema it embeds, under
+    protocol/cloudevents-schemas/.
 servers:
   - url: /
 security:
@@ -137,6 +149,28 @@ paths:
                 $ref: "../json-schema/capability-manifest.v1.json"
         "401":
           description: Missing or invalid bearer principal
+    post:
+      operationId: postCapabilities
+      summary: Advertise the endpoint's CapabilityManifest
+      description: |
+        Stores the manifest against the caller's enrollment; `ownerTeam` MUST
+        equal the authenticated principal's team. The body validates against
+        capability-manifest.v1.json.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "../json-schema/capability-manifest.v1.json"
+      responses:
+        "204":
+          description: Manifest stored
+        "400":
+          description: Body violates capability-manifest.v1.json
+        "401":
+          description: Missing or invalid bearer principal
+        "403":
+          description: ownerTeam does not match the authenticated principal's team
 components:
   securitySchemes:
     bearerAuth:
@@ -146,51 +180,11 @@ components:
       description: Placeholder — Plan 05 (identity) pins issuer/audience/claims validation.
   schemas:
     EnrollRequest:
-      type: object
-      additionalProperties: false
-      required: [token, endpointId, instanceId, trustMode]
-      properties:
-        token:
-          type: string
-          minLength: 1
-          maxLength: 4096
-        endpointId:
-          type: string
-          minLength: 1
-          maxLength: 128
-        instanceId:
-          type: string
-          minLength: 1
-          maxLength: 128
-        trustMode:
-          type: string
-          enum: [shared-runtime, separate-process-same-host, isolated-executor]
+      $ref: "../json-schema/enroll-request.v1.json"
     EnrollResponse:
-      type: object
-      additionalProperties: false
-      required: [enrollmentId, trustMode]
-      properties:
-        enrollmentId:
-          type: string
-          minLength: 1
-          maxLength: 128
-        trustMode:
-          type: string
-          enum: [shared-runtime, separate-process-same-host, isolated-executor]
+      $ref: "../json-schema/enroll-response.v1.json"
     Delivery:
-      type: object
-      additionalProperties: false
-      required: [deliveryId, envelope, deliveredAt]
-      properties:
-        deliveryId:
-          type: string
-          minLength: 1
-          maxLength: 128
-        envelope:
-          $ref: "../cloudevents-schemas/envelope.json"
-        deliveredAt:
-          type: string
-          format: date-time
+      $ref: "../cloudevents-schemas/link-delivery.v1.json"
     ReceiptWithoutDeliveryId:
       description: >
         receipt.v1 without deliveryId — the delivery identity travels in the

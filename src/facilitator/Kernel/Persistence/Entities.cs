@@ -258,6 +258,56 @@ public sealed class LinkSessionEntity
     public string? CapabilitiesDigest { get; set; }
 }
 
+/// <summary>facilitator.link_enrollments — Plan 03 enrollment records (appendix §4).</summary>
+public sealed class LinkEnrollmentEntity
+{
+    public Guid EnrollmentId { get; set; }
+
+    public required string EndpointId { get; set; }
+
+    public Guid TeamId { get; set; }
+
+    public required string TokenSha256 { get; set; }
+
+    /// <summary>shared-runtime | separate-process-same-host | isolated-executor</summary>
+    public required string TrustMode { get; set; }
+
+    /// <summary>jsonb CapabilityManifestV1 or NULL.</summary>
+    public string? CapabilityManifest { get; set; }
+
+    public string? CapabilitiesDigest { get; set; }
+
+    public DateTime EnrolledAt { get; set; }
+
+    public DateTime ExpiresAt { get; set; }
+
+    public DateTime? RevokedAt { get; set; }
+}
+
+/// <summary>facilitator.link_deliveries — Plan 03 durable delivery/receipt ledger (S:1336 delivery_receipts).</summary>
+public sealed class LinkDeliveryEntity
+{
+    public Guid DeliveryId { get; set; }
+
+    public required string EndpointId { get; set; }
+
+    public long SessionEpoch { get; set; }
+
+    /// <summary>pending | in_flight | acked</summary>
+    public required string State { get; set; }
+
+    public DateTime? DeliveredAt { get; set; }
+
+    public DateTime? AckedAt { get; set; }
+
+    /// <summary>jsonb — last receipt verbatim.</summary>
+    public string? Receipt { get; set; }
+
+    public int Attempts { get; set; }
+
+    public DateTime? RedeliverAfter { get; set; }
+}
+
 /// <summary>facilitator.approvals — Plan 08 behaviour, schema now (§ approvals).</summary>
 public sealed class ApprovalEntity
 {

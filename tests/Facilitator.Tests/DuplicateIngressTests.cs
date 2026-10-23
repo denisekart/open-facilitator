@@ -46,7 +46,8 @@ public class DuplicateIngressTests(PostgresFixture fixture)
         var unknownProblem = await Json.ReadJsonAsync(unknownResponse.Content);
         Assert.Equal("https://errors.openfacilitator.org/v1/unknown-command", unknownProblem.GetProperty("type").GetString());
         Assert.Equal(1, await fixture.CountAsync(
-            "SELECT count(*) FROM facilitator.inbox WHERE state = 'failed' AND payload->>'type' = 'org.facilitator.command.novel.thing.v1'"));
+            "SELECT count(*) FROM facilitator.inbox WHERE state = 'failed' " +
+            "AND payload->>'type' = 'org.facilitator.command.novel.thing.v1' AND event_id = '01JCOMMAND-NOVEL'"));
 
         // Envelope violation: bad specversion ⇒ 400 envelope-violation.
         using var envelopeResponse = await client.PostAsync("/api/ingress/events",

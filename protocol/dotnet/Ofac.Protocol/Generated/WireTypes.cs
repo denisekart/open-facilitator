@@ -151,6 +151,74 @@ namespace Ofac.Protocol
         public string type { get; set; }
     }
 
+    /// <summary>
+    /// One durable delivery: the envelope plus the delivery metadata a receipt references (spec
+    /// §5.2 — the receipt refers to the durable deliveryId, not the socket). Identical shape on
+    /// the SignalR Deliver client method and the HTTP GET /deliveries items. The envelope $ref
+    /// resolves by $id (same style as envelope-command.json); idToken/rfc3339DateTime
+    /// constraints are inlined verbatim from common.v1.json#$defs because this file lives beside
+    /// envelope.json in cloudevents-schemas/ and the OpenAPI validator resolves refs physically.
+    /// </summary>
+    public partial class LinkDeliveryV1
+    {
+        [JsonPropertyName("deliveredAt")]
+        public string deliveredAt { get; set; }
+
+        [JsonPropertyName("deliveryId")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string deliveryId { get; set; }
+
+        [JsonPropertyName("envelope")]
+        public EnvelopeClass envelope { get; set; }
+    }
+
+    public partial class EnvelopeClass
+    {
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("causationid")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string? causationid { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("correlationid")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string? correlationid { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("data")]
+        public Dictionary<string, object>? data { get; set; }
+
+        [JsonPropertyName("datacontenttype")]
+        public Datacontenttype datacontenttype { get; set; }
+
+        [JsonPropertyName("dataschema")]
+        public Uri dataschema { get; set; }
+
+        [JsonPropertyName("id")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string id { get; set; }
+
+        [JsonPropertyName("source")]
+        public string source { get; set; }
+
+        [JsonPropertyName("specversion")]
+        public Specversion specversion { get; set; }
+
+        [JsonPropertyName("subject")]
+        [JsonConverter(typeof(FluffyMinMaxLengthCheckConverter))]
+        public string subject { get; set; }
+
+        [JsonPropertyName("time")]
+        public string time { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("traceparent")]
+        public string? traceparent { get; set; }
+
+        [JsonPropertyName("type")]
+        public string type { get; set; }
+    }
+
     public partial class CapabilityManifestV1
     {
         [JsonPropertyName("apiVersion")]
@@ -478,6 +546,48 @@ namespace Ofac.Protocol
         public string? reason { get; set; }
     }
 
+    public partial class EnrollRequestV1
+    {
+        [JsonPropertyName("endpointId")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string endpointId { get; set; }
+
+        [JsonPropertyName("instanceId")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string instanceId { get; set; }
+
+        [JsonPropertyName("token")]
+        [JsonConverter(typeof(HilariousMinMaxLengthCheckConverter))]
+        public string token { get; set; }
+
+        [JsonPropertyName("trustMode")]
+        public TrustMode trustMode { get; set; }
+    }
+
+    /// <summary>
+    /// Bootstrap enrollment response. linkToken/expiresAt are additive (OpenAPI 1.0.1): the
+    /// interim link-token credential until Plan 05 OIDC principals; a server MAY omit both when
+    /// it issues no bearer credential.
+    /// </summary>
+    public partial class EnrollResponseV1
+    {
+        [JsonPropertyName("enrollmentId")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string enrollmentId { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("expiresAt")]
+        public string? expiresAt { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("linkToken")]
+        [JsonConverter(typeof(HilariousMinMaxLengthCheckConverter))]
+        public string? linkToken { get; set; }
+
+        [JsonPropertyName("trustMode")]
+        public TrustMode trustMode { get; set; }
+    }
+
     public partial class ApprovalRequiredEventV1Data
     {
         [JsonPropertyName("actionDigest")]
@@ -498,7 +608,7 @@ namespace Ofac.Protocol
         public string expiresAt { get; set; }
 
         [JsonPropertyName("nonce")]
-        [JsonConverter(typeof(HilariousMinMaxLengthCheckConverter))]
+        [JsonConverter(typeof(AmbitiousMinMaxLengthCheckConverter))]
         public string nonce { get; set; }
     }
 
@@ -581,7 +691,7 @@ namespace Ofac.Protocol
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("notes")]
-        [JsonConverter(typeof(AmbitiousMinMaxLengthCheckConverter))]
+        [JsonConverter(typeof(CunningMinMaxLengthCheckConverter))]
         public string? notes { get; set; }
 
         [JsonPropertyName("outputs")]
@@ -635,7 +745,7 @@ namespace Ofac.Protocol
         public string? executionId { get; set; }
 
         [JsonPropertyName("reason")]
-        [JsonConverter(typeof(CunningMinMaxLengthCheckConverter))]
+        [JsonConverter(typeof(HilariousMinMaxLengthCheckConverter))]
         public string reason { get; set; }
 
         [JsonPropertyName("retryable")]
@@ -649,7 +759,7 @@ namespace Ofac.Protocol
     public partial class MemoryCandidateEventV1Data
     {
         [JsonPropertyName("contentSummary")]
-        [JsonConverter(typeof(CunningMinMaxLengthCheckConverter))]
+        [JsonConverter(typeof(HilariousMinMaxLengthCheckConverter))]
         public string contentSummary { get; set; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -735,7 +845,7 @@ namespace Ofac.Protocol
         public long executionGeneration { get; set; }
 
         [JsonPropertyName("progressNote")]
-        [JsonConverter(typeof(CunningMinMaxLengthCheckConverter))]
+        [JsonConverter(typeof(HilariousMinMaxLengthCheckConverter))]
         public string progressNote { get; set; }
 
         [JsonPropertyName("workId")]
@@ -773,7 +883,7 @@ namespace Ofac.Protocol
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("reason")]
-        [JsonConverter(typeof(CunningMinMaxLengthCheckConverter))]
+        [JsonConverter(typeof(HilariousMinMaxLengthCheckConverter))]
         public string? reason { get; set; }
 
         [JsonPropertyName("status")]
@@ -788,7 +898,7 @@ namespace Ofac.Protocol
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("notes")]
-        [JsonConverter(typeof(AmbitiousMinMaxLengthCheckConverter))]
+        [JsonConverter(typeof(CunningMinMaxLengthCheckConverter))]
         public string? notes { get; set; }
 
         [JsonPropertyName("outputs")]
@@ -818,6 +928,8 @@ namespace Ofac.Protocol
 
     public enum SupportedTransport { HttpPoll, Signalr, Websocket };
 
+    public enum TrustMode { IsolatedExecutor, SeparateProcessSameHost, SharedRuntime };
+
     public enum PolicyLabel { EvidenceOnly, FacilitatorVisible, Private, TeamOnly };
 
     public enum Scope { Private, Project, Team, Workspace };
@@ -841,6 +953,7 @@ namespace Ofac.Protocol
                 DecisionConverter.Singleton,
                 ControlFrameKindConverter.Singleton,
                 SupportedTransportConverter.Singleton,
+                TrustModeConverter.Singleton,
                 PolicyLabelConverter.Singleton,
                 ScopeConverter.Singleton,
                 WorkspaceHeartbeatEventV1DataStatusConverter.Singleton,
@@ -1317,6 +1430,72 @@ namespace Ofac.Protocol
         public static readonly SupportedTransportConverter Singleton = new SupportedTransportConverter();
     }
 
+    internal class HilariousMinMaxLengthCheckConverter : JsonConverter<string>
+    {
+        public override bool CanConvert(Type t) => t == typeof(string);
+
+        public override string Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            var value = reader.GetString();
+            if (value.Length >= 1 && value.Length <= 4096)
+            {
+                return value;
+            }
+            throw new Exception("Cannot unmarshal type string");
+        }
+
+        public override void Write(Utf8JsonWriter writer, string value, JsonSerializerOptions options)
+        {
+            if (value.Length >= 1 && value.Length <= 4096)
+            {
+                JsonSerializer.Serialize(writer, value, options);
+                return;
+            }
+            throw new Exception("Cannot marshal type string");
+        }
+
+        public static readonly HilariousMinMaxLengthCheckConverter Singleton = new HilariousMinMaxLengthCheckConverter();
+    }
+
+    internal class TrustModeConverter : JsonConverter<TrustMode>
+    {
+        public override bool CanConvert(Type t) => t == typeof(TrustMode);
+
+        public override TrustMode Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            var value = reader.GetString();
+            switch (value)
+            {
+                case "isolated-executor":
+                    return TrustMode.IsolatedExecutor;
+                case "separate-process-same-host":
+                    return TrustMode.SeparateProcessSameHost;
+                case "shared-runtime":
+                    return TrustMode.SharedRuntime;
+            }
+            throw new Exception("Cannot unmarshal type TrustMode");
+        }
+
+        public override void Write(Utf8JsonWriter writer, TrustMode value, JsonSerializerOptions options)
+        {
+            switch (value)
+            {
+                case TrustMode.IsolatedExecutor:
+                    JsonSerializer.Serialize(writer, "isolated-executor", options);
+                    return;
+                case TrustMode.SeparateProcessSameHost:
+                    JsonSerializer.Serialize(writer, "separate-process-same-host", options);
+                    return;
+                case TrustMode.SharedRuntime:
+                    JsonSerializer.Serialize(writer, "shared-runtime", options);
+                    return;
+            }
+            throw new Exception("Cannot marshal type TrustMode");
+        }
+
+        public static readonly TrustModeConverter Singleton = new TrustModeConverter();
+    }
+
     internal class DecodeArrayConverter : JsonConverter<string[]>
     {
         public override bool CanConvert(Type t) => t == typeof(string[]);
@@ -1350,33 +1529,6 @@ namespace Ofac.Protocol
         public static readonly DecodeArrayConverter Singleton = new DecodeArrayConverter();
     }
 
-    internal class HilariousMinMaxLengthCheckConverter : JsonConverter<string>
-    {
-        public override bool CanConvert(Type t) => t == typeof(string);
-
-        public override string Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
-        {
-            var value = reader.GetString();
-            if (value.Length >= 16 && value.Length <= 128)
-            {
-                return value;
-            }
-            throw new Exception("Cannot unmarshal type string");
-        }
-
-        public override void Write(Utf8JsonWriter writer, string value, JsonSerializerOptions options)
-        {
-            if (value.Length >= 16 && value.Length <= 128)
-            {
-                JsonSerializer.Serialize(writer, value, options);
-                return;
-            }
-            throw new Exception("Cannot marshal type string");
-        }
-
-        public static readonly HilariousMinMaxLengthCheckConverter Singleton = new HilariousMinMaxLengthCheckConverter();
-    }
-
     internal class AmbitiousMinMaxLengthCheckConverter : JsonConverter<string>
     {
         public override bool CanConvert(Type t) => t == typeof(string);
@@ -1384,7 +1536,7 @@ namespace Ofac.Protocol
         public override string Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             var value = reader.GetString();
-            if (value.Length <= 4096)
+            if (value.Length >= 16 && value.Length <= 128)
             {
                 return value;
             }
@@ -1393,7 +1545,7 @@ namespace Ofac.Protocol
 
         public override void Write(Utf8JsonWriter writer, string value, JsonSerializerOptions options)
         {
-            if (value.Length <= 4096)
+            if (value.Length >= 16 && value.Length <= 128)
             {
                 JsonSerializer.Serialize(writer, value, options);
                 return;
@@ -1411,7 +1563,7 @@ namespace Ofac.Protocol
         public override string Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             var value = reader.GetString();
-            if (value.Length >= 1 && value.Length <= 4096)
+            if (value.Length <= 4096)
             {
                 return value;
             }
@@ -1420,7 +1572,7 @@ namespace Ofac.Protocol
 
         public override void Write(Utf8JsonWriter writer, string value, JsonSerializerOptions options)
         {
-            if (value.Length >= 1 && value.Length <= 4096)
+            if (value.Length <= 4096)
             {
                 JsonSerializer.Serialize(writer, value, options);
                 return;

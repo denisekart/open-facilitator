@@ -2,7 +2,7 @@
 
 **Portable, pluggable, multi-workspace orchestration of autonomous, assisted, and deterministic workloads across independently operated execution environments.**
 
-> **Status: first slice landed.** Plans 00–02 are real: buildable monorepo, frozen v1 wire contract (`protocol/`), and the transactional kernel in `src/facilitator` — Postgres schema, Work state machines, transactional inbox/outbox, HTTP + CLI ingress. Everything else named in the specs (modules, endpoints, CLIs, compose services) remains a target, not a reality.
+> **Status: first slice landed.** Plans 00–03 are real: buildable monorepo, frozen v1 wire contract (`protocol/`), the transactional kernel in `src/facilitator` — Postgres schema, Work state machines, transactional inbox/outbox, HTTP + CLI ingress — and the Link server: enrollment with per-endpoint link tokens, the SignalR hub at `/hubs/link`, the HTTP fallback, and the durable delivery ledger. Everything else named in the specs (modules, endpoints, CLIs, compose services) remains a target, not a reality.
 
 ## The idea in one paragraph
 
@@ -40,7 +40,7 @@ Key properties, normatively defined in the specs:
 |---|---|
 | [`docs/specs/open_facilitator_framework_architecture.md`](docs/specs/open_facilitator_framework_architecture.md) | Normative architecture: domain model, wire contract, scaling, packaging, identity, policy, adapters, memory, artifacts, data model, reference Compose, delivery slices, conformance suite |
 | [`docs/specs/open-facilitator-appendix.md`](docs/specs/open-facilitator-appendix.md) | Normative clarifications: trust modes, evidence validation, approval canonicalization (RFC 8785), outbox/inbox patterns, memory ACLs, acceptance checklist |
-| [`docs/protocol.md`](docs/protocol.md) | As-built v1 wire contract: envelope, type registry, namespacing/versioning rules, conformance fixtures, payload limits, kernel ingress endpoints and error contract |
+| [`docs/protocol.md`](docs/protocol.md) | As-built v1 wire contract: envelope, type registry, namespacing/versioning rules, conformance fixtures, payload limits, kernel ingress endpoints and error contract, Link transport (handshake, Deliver/receipt, HTTP fallback table, error URIs, config keys) |
 | [`docs/security.md`](docs/security.md) | Trust vs data-plane split, interim bootstrap-token auth, Plan 07 OIDC cutover seam, ingress hard limits |
 | [`docs/getting-started.md`](docs/getting-started.md) | Contributor loop: build/test, running the Facilitator against Postgres 17, CLI examples |
 

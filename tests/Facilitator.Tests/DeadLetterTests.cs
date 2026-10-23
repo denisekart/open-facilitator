@@ -30,6 +30,15 @@ public class DeadLetterTests(PostgresFixture fixture)
         var (workId, _) = await KernelOps.CreateWorkAsync(client, "dead letter path");
         await KernelOps.WalkToCompletedAsync(client, workId, 1);
 
+        // Cross-test isolation: a prior suite's link_sessions row stays live
+        // until its DB lease expires (90 s default), and the global claim
+        // would hand those link.* rows to the LinkSink (delivered > 0).
+        // Expire every lease first: link rows then answer no-route (Plan 02
+        // requeue, never a delivery) and only the poisoned kernel.log rows
+        // burn attempts here.
+        await fixture.ExecuteAsync(
+            "UPDATE facilitator.link_sessions SET lease_until = now() - interval '1 second'");
+
         var dispatcher = factory.Services.GetRequiredService<IEventDispatcher>();
         for (var attempt = 0; attempt < 5; attempt++)
         {

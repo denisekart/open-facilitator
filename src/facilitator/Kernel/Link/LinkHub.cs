@@ -1,0 +1,255 @@
+using System.Security.Claims;
+using System.Text.Json;
+
+using Facilitator.Kernel.Dispatch;
+
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.SignalR;
+
+using Ofac.Protocol.Validation;
+
+namespace Facilitator.Kernel.Link;
+
+/// <summary>Server→client <c>welcome</c> frame (control.v1.json, exact fields).</summary>
+public sealed record WelcomeFrame(
+    [property: System.Text.Json.Serialization.JsonPropertyName("kind")] string Kind,
+    [property: System.Text.Json.Serialization.JsonPropertyName("sessionId")] string SessionId,
+    [property: System.Text.Json.Serialization.JsonPropertyName("leaseEpoch")] long LeaseEpoch,
+    [property: System.Text.Json.Serialization.JsonPropertyName("maxInFlight")] int MaxInFlight,
+    [property: System.Text.Json.Serialization.JsonPropertyName("heartbeatSeconds")] int HeartbeatSeconds,
+    [property: System.Text.Json.Serialization.JsonPropertyName("protocolVersion")] string ProtocolVersion);
+
+/// <summary>Server→client <c>goodbye</c> frame (Disconnect client-method payload).</summary>
+public sealed record GoodbyeFrame(
+    [property: System.Text.Json.Serialization.JsonPropertyName("kind")] string Kind,
+    [property: System.Text.Json.Serialization.JsonPropertyName("sessionId")] string SessionId,
+    [property: System.Text.Json.Serialization.JsonPropertyName("reason")] string Reason);
+
+/// <summary>Server→client <c>flow_control</c> frame (pause = maxInFlight 0).</summary>
+public sealed record FlowControlFrame(
+    [property: System.Text.Json.Serialization.JsonPropertyName("kind")] string Kind,
+    [property: System.Text.Json.Serialization.JsonPropertyName("sessionId")] string SessionId,
+    [property: System.Text.Json.Serialization.JsonPropertyName("maxInFlight")] int MaxInFlight);
+
+/// <summary>Result of the hub Envelope method (mirrors the HTTP /events codes).</summary>
+/// <param name="Status">accepted | duplicate | rejected.</param>
+/// <param name="DeliveryId">Inbox row id (identity the receipt would reference), when admitted.</param>
+/// <param name="Problem">Typed problem document when refused (422/400/413 equivalents).</param>
+public sealed record EnvelopeAck(string Status, string? DeliveryId = null, Microsoft.AspNetCore.Mvc.ProblemDetails? Problem = null);
+
+/// <summary>
+/// The Workspace Link hub: thin transport, no work execution. Server methods
+/// <c>Hello</c>/<c>Envelope</c>/<c>Receipt</c>/<c>Heartbeat</c>/<c>Goodbye</c>;
+/// client methods <c>Welcome</c> (Hello's return value), <c>Deliver</c>,
+/// <c>FlowControl</c>, <c>Disconnect</c> (spec S:294). Authoritative liveness
+/// is the <c>link_sessions</c> lease, not socket state; this replica's
+/// registry only knows its own sockets (§7.3). Bearer auth runs through the
+/// <c>link</c> authentication scheme, which shares the
+/// <see cref="ILinkTokenValidator"/> seam with the HTTP surface.
+/// </summary>
+[Authorize(AuthenticationSchemes = LinkBearerHandler.SchemeName)]
+public sealed class LinkHub(
+    LinkService sessions,
+    LinkConnectionRegistry registry,
+    LinkLedger ledger,
+    LinkIngress ingress,
+    LinkDeliveryPump pump,
+    ControlFrameValidator frames,
+    LinkOptions options,
+    ILogger<LinkHub> logger) : Hub
+{
+    /// <summary>Claim types minted by <see cref="LinkBearerHandler"/>.</summary>
+    public const string TeamClaim = "facilitator.team";
+
+    /// <summary>Claim type carrying the declared trust mode.</summary>
+    public const string TrustModeClaim = "facilitator.trust_mode";
+
+    /// <summary>
+    /// Handshake (spec §5.3): validate the hello frame, intersect
+    /// protocolVersions with the server's <c>["v1"]</c> — empty intersection
+    /// mints a session id WITHOUT a link_sessions row and returns null after
+    /// pushing the frozen goodbye frame — else bump the epoch (superseding +
+    /// notifying any live connection), lease now + heartbeatSeconds*3, reply
+    /// welcome, then immediately drain pending deliveries from the DB ledger
+    /// (the client's lastKnownAck is a hint, logged, never trusted).
+    /// </summary>
+    public async Task<WelcomeFrame?> Hello(JsonElement hello)
+    {
+        var principal = RequirePrincipal();
+        var verdict = frames.ValidateControlFrame(hello);
+        if (!verdict.Ok)
+        {
+            throw new HubException($"hello frame rejected: {verdict.Message}");
+        }
+
+        var endpointId = hello.GetProperty("endpointId").GetString()!;
+        if (!string.Equals(endpointId, principal.EndpointId, StringComparison.Ordinal))
+        {
+            throw new HubException($"hello endpointId '{endpointId}' does not match the authenticated principal");
+        }
+
+        var offered = hello.GetProperty("protocolVersions").EnumerateArray()
+            .Select(v => v.GetString()!)
+            .ToHashSet(StringComparer.Ordinal);
+        var negotiated = LinkOptions.SupportedProtocolVersions.FirstOrDefault(offered.Contains);
+        var instanceId = hello.GetProperty("instanceId").GetString()!;
+        var lastKnownAck = hello.TryGetProperty("lastKnownAck", out var lka) && lka.ValueKind == JsonValueKind.String
+            ? lka.GetString()
+            : null;
+
+        // appendix §4: trustMode MUST be logged at every reconnect.
+        logger.LogInformation(
+            "link hello endpoint={EndpointId} instance={InstanceId} trustMode={TrustMode} lastKnownAck={LastKnownAck} (hint only)",
+            endpointId, instanceId, principal.TrustMode, lastKnownAck ?? "-");
+
+        using var span = KernelActivity.Source.StartActivity("link.handshake");
+        span?.SetTag("facilitator.endpoint_id", endpointId);
+
+        if (negotiated is null)
+        {
+            // v9-only client: mint an ephemeral session id, no row, typed goodbye.
+            var ephemeral = Guid.NewGuid().ToString("N");
+            span?.SetTag("facilitator.protocol_version", string.Empty);
+            await Clients.Caller.SendAsync("Disconnect",
+                new GoodbyeFrame("goodbye", ephemeral, "no-compatible-protocol-version"), Context.ConnectionAborted);
+            return null;
+        }
+
+        var digest = hello.TryGetProperty("capabilityManifestDigest", out var d) && d.ValueKind == JsonValueKind.String
+            ? d.GetString()
+            : null;
+        var epoch = await sessions.OpenSessionAsync(endpointId, instanceId, digest, options.HeartbeatSeconds, Context.ConnectionAborted);
+
+        // Supersede: a live connection on THIS replica for the same endpoint
+        // (older epoch) gets the goodbye; the DB epoch bump fences every other
+        // replica's socket regardless.
+        foreach (var stale in registry.ForEndpoint(endpointId))
+        {
+            await Clients.Client(stale.ConnectionId).SendAsync("Disconnect",
+                new GoodbyeFrame("goodbye", stale.ConnectionId, "session-superseded"), CancellationToken.None);
+            registry.Unregister(stale.ConnectionId);
+        }
+
+        registry.Register(new LinkConnection(Context.ConnectionId, endpointId, epoch, principal.TrustMode));
+        span?.SetTag("facilitator.session_epoch", epoch);
+        span?.SetTag("facilitator.protocol_version", negotiated);
+
+        // §5.3 step 4: pending deliveries come from the ledger, immediately.
+        await pump.PumpEndpointAsync(endpointId, options.MaxInFlight, Context.ConnectionAborted);
+        registry.Wake(endpointId);
+
+        return new WelcomeFrame("welcome", Guid.NewGuid().ToString("N"), epoch, options.MaxInFlight, options.HeartbeatSeconds, negotiated);
+    }
+
+    /// <summary>Link-originated CloudEvent — the SAME admission path as POST /api/link/v1/events.</summary>
+    public async Task<EnvelopeAck> Envelope(JsonElement envelope)
+    {
+        RequirePrincipal();
+        var admission = await ingress.AdmitAsync(envelope.GetRawText(), Context.ConnectionAborted);
+        return admission.Problem is not null
+            ? new EnvelopeAck("rejected", null, admission.Problem)
+            : new EnvelopeAck(admission.Status!, admission.InboxId!.Value.ToString("N"));
+    }
+
+    /// <summary>
+    /// Receipt for a delivered envelope: the ledger is truth (S:291). The
+    /// caller's endpoint must own the delivery; a receipt for an already-acked
+    /// delivery is idempotent (it answers the latest attempt). Acking frees
+    /// in-flight capacity ⇒ FlowControl resume + the waiting half of the pump.
+    /// </summary>
+    public async Task Receipt(JsonElement receipt)
+    {
+        var principal = RequirePrincipal();
+        var verdict = frames.ValidateReceipt(receipt);
+        if (!verdict.Ok)
+        {
+            throw new HubException($"receipt frame rejected: {verdict.Message}");
+        }
+
+        if (!Guid.TryParse(receipt.GetProperty("deliveryId").GetString(), out var deliveryId))
+        {
+            throw new HubException("deliveryId must be the delivery's uuid");
+        }
+
+        await AckAsync(principal, deliveryId, receipt.GetRawText());
+    }
+
+    /// <summary>Refresh the lease for a matching (endpoint, leaseEpoch); stale ⇒ goodbye + false.</summary>
+    public async Task<bool> Heartbeat(JsonElement heartbeat)
+    {
+        var principal = RequirePrincipal();
+        var verdict = frames.ValidateControlFrame(heartbeat);
+        if (!verdict.Ok)
+        {
+            throw new HubException($"heartbeat frame rejected: {verdict.Message}");
+        }
+
+        var epoch = heartbeat.GetProperty("leaseEpoch").GetInt64();
+        var refreshed = await sessions.TouchSessionAsync(principal.EndpointId, epoch, options.HeartbeatSeconds, Context.ConnectionAborted);
+        if (!refreshed)
+        {
+            await Clients.Caller.SendAsync("Disconnect",
+                new GoodbyeFrame("goodbye", heartbeat.GetProperty("sessionId").GetString() ?? string.Empty, "session-superseded"),
+                Context.ConnectionAborted);
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>Client-initiated goodbye: revokes the session row, acks nothing.</summary>
+    public async Task Goodbye(JsonElement goodbye)
+    {
+        var principal = RequirePrincipal();
+        var verdict = frames.ValidateControlFrame(goodbye);
+        if (!verdict.Ok)
+        {
+            throw new HubException($"goodbye frame rejected: {verdict.Message}");
+        }
+
+        var live = await sessions.TryGetLiveAsync(principal.EndpointId, Context.ConnectionAborted);
+        if (live is not null)
+        {
+            await sessions.CloseSessionAsync(principal.EndpointId, live.SessionEpoch, Context.ConnectionAborted);
+        }
+
+        registry.Unregister(Context.ConnectionId);
+    }
+
+    /// <inheritdoc />
+    public override Task OnDisconnectedAsync(Exception? exception)
+    {
+        registry.Unregister(Context.ConnectionId);
+        return base.OnDisconnectedAsync(exception);
+    }
+
+    /// <summary>Record the receipt + flip the outbox row (shared with the HTTP receipt endpoint).</summary>
+    internal async Task AckAsync(LinkPrincipal principal, Guid deliveryId, string receiptJson)
+    {
+        var state = await ledger.StateAsync(deliveryId, Context.ConnectionAborted);
+        if (state is null || state.Value.EndpointId != principal.EndpointId)
+        {
+            throw new HubException($"delivery {deliveryId} not found for endpoint {principal.EndpointId}");
+        }
+
+        // state='acked' receipts are idempotent: AckAsync re-records the jsonb
+        // and answers success (the loop terminates at the ledger).
+        var acked = await ledger.AckAsync(deliveryId, principal.EndpointId, receiptJson, Context.ConnectionAborted);
+        if (!acked)
+        {
+            throw new HubException($"delivery {deliveryId} not found for endpoint {principal.EndpointId}");
+        }
+
+        await pump.PumpEndpointAsync(principal.EndpointId, options.MaxInFlight, Context.ConnectionAborted);
+        registry.Wake(principal.EndpointId);
+    }
+
+    private LinkPrincipal RequirePrincipal()
+    {
+        var user = Context.User ?? throw new HubException("unauthenticated hub connection");
+        var endpointId = user.FindFirstValue(ClaimTypes.Name) ?? throw new HubException("missing endpoint identity");
+        var team = Guid.Parse(user.FindFirstValue(TeamClaim) ?? throw new HubException("missing team claim"));
+        var trustMode = user.FindFirstValue(TrustModeClaim) ?? throw new HubException("missing trust mode claim");
+        return new LinkPrincipal(endpointId, team, trustMode);
+    }
+}

@@ -18,6 +18,7 @@ export {
   validateEnvelope,
   validateReceipt,
   validateControlFrame,
+  validateAgainstSchemaId,
   enforceSizeLimit,
   negotiateProtocolVersion,
   KNOWN_COMMAND_TYPES,

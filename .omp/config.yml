@@ -1,0 +1,83 @@
+# Project-level omp settings (model roles, local-model providers, subagent knobs).
+# User-owned: bootstrap writes it only when absent — edit freely; rebuilds and
+# re-bootstrap never overwrite.
+# Arrays REPLACE (not merge) — restate the full list if overriding extensions
+
+stack: dotnet-aspire-svelte
+adefaultThinkingLevel: "medium"
+
+# Model Role Mapping — this workspace overrides ALL model roles to
+# litellm/qwen3.8-flash-next (single local model; no fleet). Models are defined
+# in the workspace .omp/models.yml — omp reads model definitions ONLY from
+# ~/.omp/agent/models.yml, which seed-omp-home.sh maintains as a symlink to
+# this workspace's .omp/models.yml (the user layer stores no model bytes).
+# The explicit providers.<id>.baseUrl there outranks LITELLM_BASE_URL and the
+# built-in http://localhost:4000/v1 default. The fleet-ideal role mapping
+# (27b primary / 35b worker / coder-4b smol) lives in the bootstrap.sh
+# OMP_CONFIG template (build/scripts/bootstrap.sh).
+modelRoles:
+  default: "litellm/qwen3.8-flash-next"
+  slow: "litellm/qwen3.8-flash-next"
+  plan: "litellm/qwen3.8-flash-next"
+  task: "litellm/qwen3.8-flash-next"
+  advisor: "litellm/qwen3.8-flash-next"
+  smol: "litellm/qwen3.8-flash-next"
+  memory: "litellm/qwen3.8-flash-next"
+  tiny: "litellm/qwen3.8-flash-next"
+
+# Advisor (passive reviewer): second model (qwen3.6 worker) reviews the
+# primary transcript and can inject advice. OFF by default; knobs:
+#   per session:    /advisor on          (also: /advisor off | status | dump)
+#   single run:     omp -p --advisor "task"
+# Reviewer guidance: WATCHDOG.md (.omp/ or the user agent dir) for review
+# priorities, WATCHDOG.yml for a named advisor roster.
+advisor:
+  enabled: false
+
+# Retry / Fallback Chains (retry.fallbackChains — settings key). Fleet-ideal
+# only (3-model chains); inactive in this single-model workspace. Applied on
+# provider errors; model selector = chain key; every role running the keyed
+# model follows the chain. Chains reference catalog models only; the
+# on-device lfm2-1.2b offline backstop is NOT a catalog model — it serves
+# side tasks via the task-specific tiny-worker providers (providers.tinyModel/
+# memoryModel/autoThinkingModel below) and is always available offline. When
+# litellm is down the chains end at the last online link (session still
+# starts; roles degrade); side tasks keep running on-device.
+#retry:
+#  fallbackChains:
+#    "litellm/qwen3.8-27b":
+#      - "litellm/qwen3.6-35b"
+#      - "litellm/qwen3-coder-4b"
+#    "litellm/qwen3.6-35b":
+#      - "litellm/qwen3-coder-4b"
+#    "litellm/qwen3-coder-4b": []
+
+# Local Tiny-Model Providers (Task-specific)
+# Reference: https://github.com/can1357/oh-my-pi/blob/main/docs/local-models.md
+# Task-specific local side tasks (session titles, mnemopi
+# extraction/consolidation, auto-thinking difficulty) run on the ONNX
+# tiny-worker lfm2-1.2b — fully offline, independent of the online models.
+# Set any entry to "online" to route through the role model instead.
+providers:
+  tinyModel: "lfm2-1.2b"          # e.g., "gemma-270m" or "lfm2-350m" for faster titles
+  memoryModel: "lfm2-1.2b"        # recommended local memory model
+  autoThinkingModel: "lfm2-1.2b"  # dynamic thinking-difficulty classifier
+  tinyModelDevice: "cpu"     # cpu (default), gpu, auto, metal, cuda, dml, wasm
+  tinyModelDtype: "q4"       # q4 (default), fp16
+
+# Subagent Concurrency & Parallelism
+# Engine limits: qwen3.8-27b serves --max-num-seqs 2 (big-model slots); the
+# qwen3.6-35b worker serves --max-num-seqs 6 (vLLM queues overflow beyond 6).
+subagents:
+  globalConcurrencyLimit: 6    # Combined limit (2 big + 18 small sessions)
+  maxSubagentDepth: 2           # Prevent unbounded nesting
+  forceTopLevelAsync: true      # Background tasks by default
+  parallel:
+    concurrency: 2              # Max parallel slots for 'big' model tasks (qwen3.8 --max-num-seqs 2)
+
+task:
+  isolation:
+    mode: "auto"
+
+tools:
+  format: "native"

@@ -1,0 +1,23 @@
+# OS / editors
+.DS_Store
+*.swp
+.idea/
+
+# Build outputs (once implementation starts)
+bin/
+obj/
+dist/
+node_modules/
+coverage/
+TestResults/
+
+# Local environment & generated secrets (spec §22: never commit)
+.env
+.env.*
+!.env.example
+secrets/
+*.pem
+*.jwt
+
+# omp session-local artifacts
+.omp/plans/*.local.md

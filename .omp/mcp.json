@@ -1,0 +1,31 @@
+{
+  "$schema": "https://raw.githubusercontent.com/can1357/oh-my-pi/main/packages/coding-agent/src/config/mcp-schema.json",
+  "mcpServers": {
+    "postgres": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-postgres",
+        "postgresql://demo:${DEMO_POSTGRES_PASSWORD}@localhost:5432/facilitator"
+      ],
+      "enabled": false,
+      "_comment": "Facilitator reference database inspection. Enable once `referencectl up slim` has seeded Postgres (spec ch.22); set DEMO_POSTGRES_PASSWORD or edit the DSN. Read-only query tool."
+    },
+    "playwright": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@playwright/mcp@latest",
+        "--headless",
+        "--browser",
+        "chromium",
+        "--executable-path",
+        "/usr/bin/chromium"
+      ],
+      "timeout": 120000,
+      "_comment": "Admin SPA + reference services (Keycloak/Mattermost/Forgejo at .localhost) E2E verification. Image pre-installs Chromium."
+    }
+  }
+}

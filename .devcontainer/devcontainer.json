@@ -1,0 +1,91 @@
+{
+  "name": "open-facilitator",
+  "image": "ghcr.io/denisekart/omp-devcontainer-base:latest",
+
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker": {
+      "version": "latest",
+      "enableNonRootDocker": true,
+      "moby": false
+    }
+  },
+
+  "remoteUser": "vscode",
+
+  "updateRemoteUserUID": true,
+
+  "remoteEnv": {
+    "PATH": "${containerEnv:PATH}:/home/vscode/.dotnet/tools:/home/vscode/.local/bin"
+  },
+
+  "mounts": [
+    "source=open-facilitator-omp-home,target=/home/vscode/.omp,type=volume",
+    "source=open-facilitator-hindsight-data,target=/home/vscode/.hindsight,type=volume",
+    "source=open-facilitator-ssh,target=/home/vscode/.ssh,type=volume",
+    "source=open-facilitator-gh-config,target=/home/vscode/.config/gh,type=volume",
+    "source=open-facilitator-persisted-git,target=/home/vscode/.persisted-git,type=volume",
+    "source=open-facilitator-zsh-history,target=/home/vscode/.zsh_history_vol,type=volume",
+    "source=open-facilitator-pnpm-store,target=/home/vscode/.local/share/pnpm,type=volume",
+    "source=open-facilitator-nuget,target=/home/vscode/.nuget/packages,type=volume",
+    "source=open-facilitator-uv-cache,target=/home/vscode/.cache/uv,type=volume",
+    "source=open-facilitator-pi-lens,target=/home/vscode/.pi-lens,type=volume",
+    "source=open-facilitator-expensehub-storage,target=/home/vscode/.local/share/expensehub-storage,type=volume"
+  ],
+
+  "forwardPorts": [8888, 8080, 8088, 3000, 8065, 8333, 9092, 11434, 18888, 18890],
+
+  "portsAttributes": {
+    "8888": {
+      "label": "Hindsight Memory",
+      "onAutoForward": "notify"
+    },
+    "8080": { "label": "Keycloak (reference IdP)", "onAutoForward": "ignore" },
+    "8088": { "label": "Facilitator", "onAutoForward": "ignore" },
+    "3000": { "label": "Forgejo (reference Git/Issues)", "onAutoForward": "ignore" },
+    "8065": { "label": "Mattermost (reference Chat)", "onAutoForward": "ignore" },
+    "8333": { "label": "SeaweedFS S3 (artifacts)", "onAutoForward": "ignore" },
+    "9092": { "label": "Kafka (reference event source)", "onAutoForward": "ignore" },
+    "11434": { "label": "Ollama (local model)", "onAutoForward": "ignore" },
+    "18888": { "label": "Aspire Dashboard (OTLP UI)", "onAutoForward": "ignore" },
+    "18890": { "label": "Aspire OTLP ingest", "onAutoForward": "ignore" },
+    "0-65535": { "onAutoForward": "notify" }
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-dotnettools.csharp",
+        "ms-dotnettools.csdevkit",
+        "ms-dotnettools.vscode-dotnet-runtime",
+        "svelte.svelte-vscode",
+        "esbenp.prettier-vscode",
+        "dbaeumer.vscode-eslint",
+        "ms-python.python",
+        "bradlc.vscode-tailwindcss",
+        "ms-azuretools.vscode-docker",
+        "GitHub.vscode-pull-request-github",
+        "christian-kohler.path-intellisense",
+        "mikestead.dotenv",
+        "EditorConfig.EditorConfig",
+        "eamodio.gitlens",
+        "tamasfe.even-better-toml",
+        "rust-lang.rust-analyzer",
+        "redhat.vscode-yaml"
+      ],
+      "settings": {
+        "editor.formatOnSave": true,
+        "terminal.integrated.defaultProfile.linux": "zsh",
+        "terminal.integrated.gpuAcceleration": "off",
+        "files.insertFinalNewline": true,
+        "files.trimTrailingWhitespace": true,
+        "files.associations": {
+          "*.yml": "yaml",
+          "*.env": "dotenv"
+        }
+      }
+    }
+  },
+
+  "postCreateCommand": "sudo mkdir -p /home/vscode/.npm /home/vscode/.omp /home/vscode/.hindsight /home/vscode/.ssh /home/vscode/.config/gh /home/vscode/.persisted-git /home/vscode/.zsh_history_vol /home/vscode/.local/share/pnpm /home/vscode/.nuget /home/vscode/.cache/uv /home/vscode/.pi-lens /home/vscode/.local/share/expensehub-storage && sudo chown -R vscode:vscode /home/vscode/.npm /home/vscode/.omp /home/vscode/.hindsight /home/vscode/.ssh /home/vscode/.config/gh /home/vscode/.persisted-git /home/vscode/.zsh_history_vol /home/vscode/.local/share/pnpm /home/vscode/.nuget /home/vscode/.cache/uv /home/vscode/.pi-lens /home/vscode/.local/share/expensehub-storage && bash /usr/local/share/omp-scripts/link-gitconfig.sh && bash /usr/local/share/omp-scripts/seed-omp-home.sh && bash /usr/local/share/omp-scripts/install-omp-plugins.sh && bash /usr/local/share/omp-scripts/bootstrap.sh",
+  "postStartCommand": "bash /usr/local/share/omp-scripts/seed-omp-home.sh; (sudo HOME=/home/vscode BUN_INSTALL=/usr/local omp update >/tmp/omp-update.log 2>&1 || true); tmux has-session -t hindsight 2>/dev/null || tmux new-session -d -s hindsight 'bash /usr/local/share/omp-scripts/hindsight-supervisor.sh || exec bash'"
+}

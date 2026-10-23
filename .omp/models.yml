@@ -1,0 +1,72 @@
+# oh-my-pi — Model and Provider Configuration
+
+providers:
+  litellm:
+    api: openai-completions
+    baseUrl: "http://spark.orca-hue.ts.net:4000/v1"
+    apiKey: "sk-anything"
+
+    models:
+      - id: "qwen3.8-flash-next"
+        name: "Qwen3.8 Flash Next (DGX Spark)"
+
+        reasoning: true
+        input: ["text", "image"]
+
+        # Matches your vLLM max_model_len
+        contextWindow: 262144
+
+        # Conservative value. Increase later if you raise max_tokens server-side.
+        maxTokens: 16384
+
+        thinking:
+          mode: effort
+          efforts:
+            - "low"
+            - "medium"
+            - "xhigh"
+          defaultLevel: medium
+
+        compat:
+          thinkingFormat: "qwen-chat-template"
+
+          qwenTemplateReasoningEffort: true
+          supportsReasoningEffort: true
+
+          reasoningEffortMap:
+            low: "low"
+            medium: "medium"
+            xhigh: "xhigh"
+
+          reasoningContentField: "reasoning_content"
+
+          supportsToolChoice: true
+          supportsForcedToolChoice: true
+          requiresReasoningContentForToolCalls: false
+
+          # Qwen3.8-Flash-Next recommended non-thinking settings
+          extraBody:
+            temperature: 0.7
+            top_p: 0.80
+            top_k: 20
+            min_p: 0.0
+            presence_penalty: 1.5
+            repetition_penalty: 1.0
+
+            chat_template_kwargs:
+              enable_thinking: false
+              preserve_thinking: true
+
+          # Qwen3.8-Flash-Next recommended thinking settings
+          whenThinking:
+            extraBody:
+              temperature: 1.0
+              top_p: 0.95
+              top_k: 20
+              min_p: 0.0
+              presence_penalty: 0.0
+              repetition_penalty: 1.0
+
+              chat_template_kwargs:
+                enable_thinking: true
+                preserve_thinking: true

@@ -67,7 +67,7 @@ Events carry identity in the envelope (`source` + `id` + `time`), so their `data
 ## Payload limits and canonical serialization
 
 - The serialized envelope MUST NOT exceed 262144 bytes. The single source of truth is `limits.maxEnvelopeBytes` in `protocol/conformance-fixtures/index.json`; both harnesses read it, and `protocol/openapi/link-v1.yaml` documents it in prose. Large artifacts travel by reference (`artifactRef`, appendix §8), never inline.
-- Approval hashing uses RFC 8785 JSON canonicalization (appendix §16.1): sorted keys, shortest-form numbers, NFC strings, no insignificant whitespace. The golden payload `protocol/conformance-fixtures/canonical/approval-prehash.json` and its digest `approval-prehash.sha256` cross-check the two independent implementations (`canonicalize` in the TS harness, the hand-rolled writer in the .NET harness) against each other and the committed value.
+- Approval hashing uses RFC 8785 JSON canonicalization (appendix §16.1): sorted keys, shortest-form numbers, NFC strings, no insignificant whitespace. The golden payload `protocol/conformance-fixtures/canonical/approval-prehash.json` and its digest `approval-prehash.sha256` cross-check the two independent implementations (`canonicalize` in the TS harness, `Jcs.Net` in the .NET harness) against each other and the committed value.
 - `date-time` strings are validated against RFC 3339 by both harnesses (fixture `invalid/event.bad-time.json` proves month `13` is rejected).
 
 ## Conformance fixtures

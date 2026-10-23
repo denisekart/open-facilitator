@@ -1,6 +1,6 @@
 # Plan 01 — Protocol contract package: schemas, envelope, conformance fixtures (refined detail design)
 
-**Status:** 🟡 in-progress — all artifacts landed on branch `plan-00-skeleton` (stacked; Plan 00 unmerged) with every local gate green (40/40 fixtures both harnesses, 42 vitest, drift-clean codegen, OpenAPI validates, lint/format clean). 🟢 flips when this branch's CI is green on `main`.
+**Status:** 🟡 in-progress — all artifacts landed on branch `plan-01-protocol-contract` (8b2b5ec + d128f72, stacked on `plan-00-skeleton`; Plan 00 unmerged) with every local gate green (40/40 fixtures both harnesses, 42 vitest, drift-clean codegen, OpenAPI validates, lint/format clean). 🟢 flips when this branch's CI is green on `main`.
 **Depends on:** 00 (🟡 in-progress on `plan-00-skeleton`; root props, slnx, pnpm workspace, CI spine must be on `main` first — if Plan 00 has not merged, block).
 **Size judgment:** kept as ONE plan. The schemas, fixtures, validators, and codegen are one frozen artifact set — splitting would ship a half-frozen contract. Steps below are independently verifiable checkpoints.
 
@@ -147,7 +147,7 @@ OpenAPI 3.1. Paths (spec §5.3 verbatim surface): `POST /api/link/v1/enroll` (bo
 
 ## Implementation Status
 
-All steps complete on branch `plan-00-skeleton` (commit 8b2b5ec, stacked on Plan 00); local gates green. 🟢 flips when this branch's CI is green on `main`.
+All steps complete on branch `plan-01-protocol-contract` (8b2b5ec + d128f72, stacked on `plan-00-skeleton`); local gates green. 🟢 flips when this branch's CI is green on `main`.
 
 |Step|State|
 |---|---|

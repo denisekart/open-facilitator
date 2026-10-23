@@ -6,9 +6,15 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "import": "./dist/index.js"
+    },
+    "./node": {
+      "types": "./dist/node/index.d.ts",
+      "import": "./dist/node/index.js"
     }
+  },
+  "bin": {
+    "ofac-linkd": "./dist/bin/linkd.js"
   },
   "files": [
     "dist"
@@ -22,10 +28,17 @@
     "directory": "src/workspace-link"
   },
   "scripts": {
-    "build": "tsup src/index.ts --format esm,cjs --dts",
-    "test": "vitest run"
+    "build": "tsup src/index.ts src/node/index.ts src/bin/linkd.ts --format esm --dts --target node22 --silent",
+    "test": "vitest run --exclude '**/*.e2e.test.ts'",
+    "test:e2e": "vitest run --include '**/*.e2e.test.ts'"
+  },
+  "dependencies": {
+    "@microsoft/signalr": "catalog:",
+    "@ofac/protocol": "workspace:*",
+    "better-sqlite3": "catalog:"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "catalog:",
     "tsup": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

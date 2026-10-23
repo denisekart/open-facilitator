@@ -67,7 +67,7 @@ The repo is spec-only: `docs/specs/open_facilitator_framework_architecture.md` (
 **Additional resources:** spec §5.3/§5.4/§6, §7.3, appendix §5.6, §10.1 (must-have handshake tests), §16.3 envelope example; SignalR .NET docs (connection affinity, streaming).
 
 ### Plan 04 — Workspace Link SDK and runtime (TypeScript)
-**Status:** ⬜ not-started
+**Status:** 🟡 in progress
 **Objective:** Ship `@ofac/workspace-link`: the official TypeScript Link client — SignalR primary with HTTP long-poll fallback, token-factory auth, receipt ledger, envelope helpers — plus a small runtime binary (`linkd`) that connects a workspace outbound, registers a capability manifest, executes injected command handlers, and survives disconnect/reconnect with replay.
 **Replanning gate:** pin `@microsoft/signalr` version + fallback polling loop against Plan 03's actual endpoints; decide SDK vs runtime package split (recommend: one package, two entry points); confirm `@ofac/protocol` generated types are consumable by the client without re-mapping.
 **Scope:** client state machine (connecting→hello→welcome→ready, heartbeat lease refresh, epoch bump per reconnect), durable local delivery ledger (SQLite via `better-sqlite3`) so a crashed process reconciles receipts on restart, handler interface `onCommand(cmd) => Promise<Accept|Reject>`, `flow_control` honoring maxInFlight, test mode simulating dropped receipts/partitions (appendix §12.3).

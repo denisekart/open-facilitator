@@ -4,7 +4,12 @@ packages:
   - "src/workspace-link"
 
 allowBuilds:
+  better-sqlite3: set this to true or false
   esbuild: true
+  # better-sqlite3 13 is deliberately NOT allow-built: its published install
+  # script (`node-gyp rebuild`) needs node-gyp + a SQLite source download,
+  # while the tarball ships prebuilds/ for linux+darwin+win x64/arm64 that
+  # lib/binding.js loads directly. Skipping the script uses the prebuild.
 
 catalog:
   # versions resolved by `pnpm add -Dw` (Plan 00 Step 3). TS 6.x: tsup 9 and
@@ -17,3 +22,7 @@ catalog:
   ajv-formats: "^3.0.1"
   canonicalize: "^2.1.0"
   "@types/node": "^22.9.0"
+  # @ofac/workspace-link runtime deps (Plan 04), resolved via npm registry 2026-11.
+  "@microsoft/signalr": "^10.0.11"
+  better-sqlite3: "^13.0.3"
+  "@types/better-sqlite3": "^9.6.0"

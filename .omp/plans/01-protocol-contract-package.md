@@ -147,20 +147,20 @@ OpenAPI 3.1. Paths (spec §5.3 verbatim surface): `POST /api/link/v1/enroll` (bo
 
 ## Implementation Status
 
-Updated by the implementer in-place as steps complete (states: Not started | In progress | Partially implemented | Fully implemented | Blocked — reason). Initial:
+All steps complete on branch `plan-00-skeleton` (commit 8b2b5ec, stacked on Plan 00); local gates green. 🟢 flips when this branch's CI is green on `main`.
 
 |Step|State|
 |---|---|
-|0 Inspection|Not started|
-|1 json-schema|Not started|
-|2 envelope|Not started|
-|3 fixtures|Not started|
-|4 @ofac/protocol (TS)|Not started|
-|5 Ofac.Protocol + Validate.Fixtures (.NET)|Not started|
-|6 codegen + drift|Not started|
-|7 openapi stub|Not started|
-|8 CI|Not started|
-|9 docs/skill/status|Not started|
+|0 Inspection|Fully implemented|
+|1 json-schema|Fully implemented — 22 payload schemas + common defs, `$id` under `https://schemas.openfacilitator.org/v1/`|
+|2 envelope|Fully implemented — base + command/event envelopes; 4 README stubs updated|
+|3 fixtures|Fully implemented — 28 valid, 12 invalid, canonical goldens, index with limits.maxEnvelopeBytes=262144|
+|4 @ofac/protocol (TS)|Fully implemented — ajv validators, schema registry, KNOWN_COMMAND_TYPES, 42 vitest pass|
+|5 Ofac.Protocol + Validate.Fixtures (.NET)|Fully implemented — JsonSchema.Net 9.4.1, Jcs.Net 0.1.1 (passes RFC 8785 vectors), 40 fixture cases pass, corruption test fails as designed|
+|6 codegen + drift|Fully implemented — quicktype 26 via protocol/tools/codegen.mjs; drift gate in Makefile + CI protocol job|
+|7 openapi stub|Fully implemented — link-v1.yaml, swagger-cli 4.0.4 validation in CI|
+|8 CI|Fully implemented — fixture CLI in dotnet job, protocol job (codegen drift + OpenAPI validate)|
+|9 docs/skill/status|Fully implemented — docs/protocol.md, facilitator-protocol skill, README, contributing, this status block|
 
 ## Critical files & anchors
 

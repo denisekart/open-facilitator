@@ -55,7 +55,7 @@ The repo is spec-only: `docs/specs/open_facilitator_framework_architecture.md` (
 **Additional resources:** spec §4/§7/§19/§20, appendix §5.2–5.3; `Npgsql` docs on `FOR UPDATE SKIP LOCKED`; EF Core 10 + `Testcontainers.PostgreSql`; OTLP wiring baseline (`OpenTelemetry.AspNetCore`) so Plan 11's Aspire step is config-only.
 
 ### Plan 03 — Link server: SignalR hub and HTTP fallback
-**Status:** ⬜ not-started
+**Status:** 🟡 in-progress (detail design + Implementation Status: `03-link-server.md`; 🟢 when CI is green on `main`)
 **Objective:** Expose the Facilitator side of the Workspace Link: SignalR hub (`Hello`, `Envelope`, `Receipt`, `Heartbeat` server methods; `Welcome`, `Deliver`, `FlowControl`, `Disconnect` client methods) plus the provider-neutral HTTP fallback (`POST /api/link/v1/events`, `GET /api/link/v1/deliveries?wait&limit`, `POST /api/link/v1/deliveries/{id}/receipt`, `GET /api/link/v1/capabilities`, `POST /api/link/v1/enroll`), handshake/version negotiation, `link_sessions` lease records, and outbox→delivery wiring with `maxInFlight` backpressure.
 **Replanning gate:** decide auth interim (Plan 07 lands OIDC; interim: static enrollment tokens bound to a team record) vs building 03 after 07 — recommended: 03 first with pluggable `ILinkAuthenticator`; token-validation swap in 07. Decide delivery-cursor semantics (appendix: resume cursor is a hint, receipt ledger is truth).
 **Scope:** hub per §5.3 with authenticated principal → endpoint/team binding; session epoch/`leaseUntil` in `link_sessions`; delivery rows generated from outbox for online sessions only (owner-replica routing via LISTEN/NOTIFY hint, §7.3 — single-replica path now, lease fields ready); HTTP fallback identical semantics; dead-letter visibility endpoint.

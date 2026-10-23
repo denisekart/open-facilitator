@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Spec §26.1 item 1's .NET conformance harness: validates every fixture in
+       protocol/conformance-fixtures against the shipped schemas. Plan 02 reuses
+       this as its inbox fixture source. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Ofac.Protocol.ValidateFixtures</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="JsonSchema.Net" />
+    <PackageReference Include="Jcs.Net" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../dotnet/Ofac.Protocol/Ofac.Protocol.csproj" />
+  </ItemGroup>
+</Project>

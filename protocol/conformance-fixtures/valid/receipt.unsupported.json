@@ -1,0 +1,5 @@
+{
+  "deliveryId": "del-125",
+  "status": "unsupported",
+  "reason": "Command type not in fail-closed registry."
+}

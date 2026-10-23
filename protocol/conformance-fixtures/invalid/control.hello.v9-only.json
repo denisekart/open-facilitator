@@ -1,0 +1,15 @@
+{
+  "kind": "hello",
+  "protocolVersions": [
+    "v9"
+  ],
+  "supportedTransports": [
+    "signalr",
+    "websocket",
+    "http-poll"
+  ],
+  "endpointId": "gw-team-alpha",
+  "instanceId": "inst-01",
+  "capabilityManifestDigest": "sha256:abababababababababababababababababababababababababababababababab",
+  "lastKnownAck": "del-100"
+}

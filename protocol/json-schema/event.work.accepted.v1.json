@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openfacilitator.org/v1/event.work.accepted.v1.json",
+  "title": "WorkAcceptedEventV1Data",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "workId",
+    "assignmentId",
+    "acceptedAt"
+  ],
+  "properties": {
+    "workId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "assignmentId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "acceptedAt": {
+      "$ref": "common.v1.json#/$defs/rfc3339DateTime"
+    }
+  }
+}

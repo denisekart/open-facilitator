@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openfacilitator.org/v1/event.memory.used.v1.json",
+  "title": "MemoryUsedEventV1Data",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "memoryId",
+    "consumer",
+    "justification"
+  ],
+  "properties": {
+    "memoryId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "consumer": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "justification": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024
+    }
+  }
+}

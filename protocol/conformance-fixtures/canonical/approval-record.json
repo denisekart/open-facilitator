@@ -1,0 +1,10 @@
+{
+  "approvalId": "appr-123",
+  "actionHash": "sha256:abababababababababababababababababababababababababababababababab",
+  "eligibleActors": [
+    "user:alice",
+    "group:team-leads"
+  ],
+  "expiresAt": "2026-10-23T18:00:00Z",
+  "createdAt": "2026-10-22T18:00:00Z"
+}

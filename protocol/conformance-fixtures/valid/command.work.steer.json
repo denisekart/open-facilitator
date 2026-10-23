@@ -1,0 +1,20 @@
+{
+  "specversion": "1.0",
+  "id": "01JCOMMAND-work-steer",
+  "source": "urn:facilitator:instance:main",
+  "type": "org.facilitator.command.work.steer.v1",
+  "subject": "work/work-123/assignment/analysis-1",
+  "time": "2026-10-22T18:00:00Z",
+  "datacontenttype": "application/json",
+  "dataschema": "https://schemas.openfacilitator.org/v1/command.work.steer.v1.json",
+  "data": {
+    "commandId": "cmd-124",
+    "workId": "work-123",
+    "assignmentId": "analysis-1",
+    "targetId": "gateway-team-alpha",
+    "actorEvidenceRef": "identity-evidence:ref-123",
+    "deadline": "2026-10-23T18:00:00Z",
+    "directive": "Focus on cost comparisons only.",
+    "expectedContextVersion": 4
+  }
+}

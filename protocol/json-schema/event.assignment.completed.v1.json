@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openfacilitator.org/v1/event.assignment.completed.v1.json",
+  "title": "AssignmentCompletedEventV1Data",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "workId",
+    "assignmentId",
+    "executionId",
+    "executionGeneration",
+    "resultManifest"
+  ],
+  "properties": {
+    "workId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "assignmentId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "executionId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "executionGeneration": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "resultManifest": {
+      "$ref": "result-manifest.v1.json"
+    }
+  }
+}

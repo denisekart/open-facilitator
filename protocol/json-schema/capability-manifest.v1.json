@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openfacilitator.org/v1/capability-manifest.v1.json",
+  "title": "CapabilityManifestV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "apiVersion",
+    "kind",
+    "ownerTeam",
+    "capabilities"
+  ],
+  "properties": {
+    "apiVersion": {
+      "const": "facilitator.framework/v1"
+    },
+    "kind": {
+      "const": "CapabilityManifest"
+    },
+    "ownerTeam": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "capabilities": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "version",
+          "execution"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "common.v1.json#/$defs/idToken"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "execution": {
+            "type": "string",
+            "enum": [
+              "synchronous",
+              "asynchronous"
+            ]
+          },
+          "inputSchema": {
+            "type": "string",
+            "format": "uri"
+          },
+          "acceptedContexts": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "uri-reference",
+                "inline-text",
+                "artifact-reference"
+              ]
+            }
+          },
+          "outputKinds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "outputMediaTypes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "supportsSteering": {
+            "type": "boolean"
+          },
+          "supportsCancellation": {
+            "type": "boolean"
+          },
+          "supportsNudge": {
+            "type": "boolean"
+          }
+        },
+        "title": "CapabilityDescriptor"
+      }
+    }
+  }
+}

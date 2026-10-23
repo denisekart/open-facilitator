@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openfacilitator.org/v1/receipt.v1.json",
+  "title": "ReceiptV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "deliveryId",
+    "status"
+  ],
+  "properties": {
+    "deliveryId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "accepted",
+        "duplicate",
+        "rejected",
+        "unsupported"
+      ]
+    },
+    "processedAt": {
+      "$ref": "common.v1.json#/$defs/rfc3339DateTime"
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096
+    },
+    "detail": {
+      "type": "object"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "enum": [
+              "accepted",
+              "duplicate"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "required": [
+          "processedAt"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "enum": [
+              "rejected",
+              "unsupported"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "required": [
+          "reason"
+        ]
+      }
+    }
+  ]
+}

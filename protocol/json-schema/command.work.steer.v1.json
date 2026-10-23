@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openfacilitator.org/v1/command.work.steer.v1.json",
+  "title": "WorkSteerCommandV1Data",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "commandId",
+    "workId",
+    "targetId",
+    "actorEvidenceRef",
+    "deadline",
+    "assignmentId",
+    "directive",
+    "expectedContextVersion"
+  ],
+  "properties": {
+    "commandId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "workId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "targetId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "actorEvidenceRef": {
+      "$ref": "common.v1.json#/$defs/evidenceRef"
+    },
+    "deadline": {
+      "$ref": "common.v1.json#/$defs/rfc3339DateTime"
+    },
+    "assignmentId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "directive": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 16384
+    },
+    "expectedContextVersion": {
+      "$ref": "common.v1.json#/$defs/contextVersion"
+    }
+  }
+}

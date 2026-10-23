@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openfacilitator.org/v1/command.approval.respond.v1.json",
+  "title": "ApprovalRespondCommandV1Data",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "commandId",
+    "approvalId",
+    "decision",
+    "actorEvidenceRef"
+  ],
+  "properties": {
+    "commandId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "approvalId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "decision": {
+      "type": "string",
+      "enum": [
+        "approved",
+        "denied"
+      ]
+    },
+    "actorEvidenceRef": {
+      "$ref": "common.v1.json#/$defs/evidenceRef"
+    },
+    "comment": {
+      "type": "string",
+      "maxLength": 1024
+    }
+  }
+}

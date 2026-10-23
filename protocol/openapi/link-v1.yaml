@@ -1,0 +1,214 @@
+openapi: 3.1.0
+info:
+  title: Open Facilitator — Workspace Link HTTP surface (v1)
+  version: 1.0.0
+  description: |
+    Provider-neutral HTTP fallback for the Workspace Link contract (spec §5.3).
+    SignalR is the default reference transport; these endpoints carry identical
+    application semantics and MUST pass the same conformance suite
+    (protocol/conformance-fixtures/).
+
+    Wire limits: the full serialized CloudEvents envelope MUST NOT exceed
+    262144 bytes (256 KiB; the fixture index `limits.maxEnvelopeBytes` is the
+    single source of truth). Artifacts never travel inline — they move through
+    scoped artifact storage and are referenced by digest
+    (appendix §8.1, components ArtifactRefV1).
+
+    Authentication: bearer workload token (short-lived OIDC/mTLS-anchored
+    principal per spec §5.3); the authenticated principal — not a JSON field —
+    determines allowed team/Gateway/workspace identity.
+
+    Implemented in Plan 03 (Link server); Plan 12 extends the admin surface.
+servers:
+  - url: /
+security:
+  - bearerAuth: []
+paths:
+  /api/link/v1/enroll:
+    post:
+      operationId: enroll
+      summary: Bootstrap enrollment for a Gateway/Workspace Link endpoint
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnrollRequest"
+      responses:
+        "201":
+          description: Enrollment accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnrollResponse"
+        "401":
+          description: Missing or invalid bearer principal
+  /api/link/v1/events:
+    post:
+      operationId: postEvent
+      summary: Submit a CloudEvents envelope (equivalent to the SignalR Envelope method)
+      description: |
+        Receiver persists the inbox row before returning `accepted`
+        (appendix §5.3). Duplicate `(source, id)` or `commandId` replays return
+        a `duplicate` receipt without re-applying the command. Unknown command
+        types fail closed with an `unsupported` receipt (spec §5.5).
+      requestBody:
+        required: true
+        content:
+          application/cloudevents+json:
+            schema:
+              $ref: "../cloudevents-schemas/envelope.json"
+      responses:
+        "202":
+          description: Admission decision (receipt — inbox admission, not work completion)
+          content:
+            application/json:
+              schema:
+                $ref: "../json-schema/receipt.v1.json"
+        "401":
+          description: Missing or invalid bearer principal
+        "413":
+          description: Serialized envelope exceeds 262144 bytes
+  /api/link/v1/deliveries:
+    get:
+      operationId: getDeliveries
+      summary: Long-poll pending deliveries for the authenticated principal
+      parameters:
+        - name: wait
+          in: query
+          description: Long-poll wait in seconds (0 = immediate)
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 60
+        - name: limit
+          in: query
+          description: Maximum deliveries returned per call (bounded by maxInFlight)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 64
+      responses:
+        "200":
+          description: Pending deliveries (may be empty on poll timeout)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Delivery"
+        "401":
+          description: Missing or invalid bearer principal
+  /api/link/v1/deliveries/{deliveryId}/receipt:
+    post:
+      operationId: postReceipt
+      summary: Acknowledge a delivered envelope with a receipt
+      parameters:
+        - name: deliveryId
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReceiptWithoutDeliveryId"
+      responses:
+        "204":
+          description: Receipt recorded against the delivery ledger
+        "401":
+          description: Missing or invalid bearer principal
+        "404":
+          description: Unknown deliveryId
+  /api/link/v1/capabilities:
+    get:
+      operationId: getCapabilities
+      summary: The endpoint's advertised CapabilityManifest
+      responses:
+        "200":
+          description: Capability manifest (spec §15.6)
+          content:
+            application/json:
+              schema:
+                $ref: "../json-schema/capability-manifest.v1.json"
+        "401":
+          description: Missing or invalid bearer principal
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Placeholder — Plan 05 (identity) pins issuer/audience/claims validation.
+  schemas:
+    EnrollRequest:
+      type: object
+      additionalProperties: false
+      required: [token, endpointId, instanceId, trustMode]
+      properties:
+        token:
+          type: string
+          minLength: 1
+          maxLength: 4096
+        endpointId:
+          type: string
+          minLength: 1
+          maxLength: 128
+        instanceId:
+          type: string
+          minLength: 1
+          maxLength: 128
+        trustMode:
+          type: string
+          enum: [shared-runtime, separate-process-same-host, isolated-executor]
+    EnrollResponse:
+      type: object
+      additionalProperties: false
+      required: [enrollmentId, trustMode]
+      properties:
+        enrollmentId:
+          type: string
+          minLength: 1
+          maxLength: 128
+        trustMode:
+          type: string
+          enum: [shared-runtime, separate-process-same-host, isolated-executor]
+    Delivery:
+      type: object
+      additionalProperties: false
+      required: [deliveryId, envelope, deliveredAt]
+      properties:
+        deliveryId:
+          type: string
+          minLength: 1
+          maxLength: 128
+        envelope:
+          $ref: "../cloudevents-schemas/envelope.json"
+        deliveredAt:
+          type: string
+          format: date-time
+    ReceiptWithoutDeliveryId:
+      description: >
+        receipt.v1 without deliveryId — the delivery identity travels in the
+        path. `processedAt` is required for accepted|duplicate and `reason`
+        for rejected|unsupported, as in the full receipt schema.
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [accepted, duplicate, rejected, unsupported]
+        processedAt:
+          type: string
+          format: date-time
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 4096
+        detail:
+          type: object

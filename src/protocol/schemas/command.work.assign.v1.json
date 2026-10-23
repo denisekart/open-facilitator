@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openfacilitator.org/v1/command.work.assign.v1.json",
+  "title": "WorkAssignCommandV1Data",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "commandId",
+    "workId",
+    "targetId",
+    "actorEvidenceRef",
+    "deadline",
+    "assignmentId",
+    "capabilityId",
+    "expectedContextVersion",
+    "inputs",
+    "expectedDeliverables"
+  ],
+  "properties": {
+    "commandId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "workId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "targetId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "actorEvidenceRef": {
+      "$ref": "common.v1.json#/$defs/evidenceRef"
+    },
+    "deadline": {
+      "$ref": "common.v1.json#/$defs/rfc3339DateTime"
+    },
+    "assignmentId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "capabilityId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "expectedContextVersion": {
+      "$ref": "common.v1.json#/$defs/contextVersion"
+    },
+    "inputs": {
+      "type": "object"
+    },
+    "expectedDeliverables": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "common.v1.json#/$defs/deliverable"
+      }
+    }
+  }
+}

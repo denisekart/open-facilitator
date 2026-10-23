@@ -1,0 +1,15 @@
+{
+  "specversion": "1.0",
+  "id": "01JEVENT-workspace-heartbeat",
+  "source": "urn:workspace:ws-01",
+  "type": "org.facilitator.event.workspace.heartbeat.v1",
+  "subject": "work/work-123/assignment/analysis-1",
+  "time": "2026-10-22T18:00:00Z",
+  "datacontenttype": "application/json",
+  "dataschema": "https://schemas.openfacilitator.org/v1/event.workspace.heartbeat.v1.json",
+  "data": {
+    "workspaceId": "ws-01",
+    "status": "idle",
+    "activeAssignments": 0
+  }
+}

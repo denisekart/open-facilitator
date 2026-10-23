@@ -1,0 +1,8 @@
+{
+  "deliveryId": "del-124",
+  "status": "rejected",
+  "reason": "Target workspace unknown.",
+  "detail": {
+    "targetId": "gateway-ghost"
+  }
+}

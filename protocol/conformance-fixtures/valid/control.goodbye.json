@@ -1,0 +1,5 @@
+{
+  "kind": "goodbye",
+  "sessionId": "sess-1",
+  "reason": "Gateway draining for upgrade."
+}

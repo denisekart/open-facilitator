@@ -1,0 +1,8 @@
+{
+  "kind": "welcome",
+  "sessionId": "sess-1",
+  "leaseEpoch": 1,
+  "maxInFlight": 16,
+  "heartbeatSeconds": 30,
+  "protocolVersion": "v1"
+}

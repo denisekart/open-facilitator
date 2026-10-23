@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openfacilitator.org/v1/common.v1.json",
+  "title": "SharedDefinitions",
+  "$defs": {
+    "idToken": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "evidenceRef": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+:.{1,256}$"
+    },
+    "contextVersion": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "rfc3339DateTime": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "artifactRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifactId",
+        "mediaType",
+        "size",
+        "digest",
+        "storageUrl",
+        "createdBy",
+        "createdAt"
+      ],
+      "properties": {
+        "artifactId": {
+          "$ref": "common.v1.json#/$defs/idToken"
+        },
+        "mediaType": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "storageUrl": {
+          "type": "string",
+          "format": "uri"
+        },
+        "createdBy": {
+          "$ref": "common.v1.json#/$defs/idToken"
+        },
+        "createdAt": {
+          "$ref": "common.v1.json#/$defs/rfc3339DateTime"
+        }
+      },
+      "title": "ArtifactRef"
+    },
+    "deliverable": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "mediaType"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "mediaType": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
+      "title": "Deliverable"
+    }
+  }
+}

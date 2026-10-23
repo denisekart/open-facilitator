@@ -1,0 +1,17 @@
+{
+  "specversion": "1.0",
+  "id": "01JEVENT-artifact-available",
+  "source": "urn:workspace:ws-01",
+  "type": "org.facilitator.event.artifact.available.v1",
+  "subject": "work/work-123/assignment/analysis-1",
+  "time": "2026-10-22T18:00:00Z",
+  "datacontenttype": "application/json",
+  "dataschema": "https://schemas.openfacilitator.org/v1/event.artifact.available.v1.json",
+  "data": {
+    "artifactId": "artifact-123",
+    "mediaType": "text/markdown",
+    "size": 10240,
+    "digest": "sha256:abababababababababababababababababababababababababababababababab",
+    "workId": "work-123"
+  }
+}

@@ -7,14 +7,17 @@
   },
   "scripts": {
     "build": "pnpm -r build",
+    "protocol:codegen": "node protocol/tools/codegen.mjs",
     "test": "pnpm -r test",
     "lint": "eslint . && prettier --check \"src/**/*.ts\" \"*.{json,mjs,yaml,yml}\"",
     "format": "prettier --write \"src/**/*.ts\" \"*.{json,mjs,yaml,yml}\""
   },
   "devDependencies": {
+    "@apidevtools/swagger-cli": "4.0.4",
     "@eslint/js": "^10.0.1",
     "eslint": "^10.13.0",
     "prettier": "^3.9.10",
+    "quicktype": "^26.0.0",
     "tsup": "^9.0.0",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.72.0",

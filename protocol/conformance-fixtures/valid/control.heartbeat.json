@@ -1,0 +1,5 @@
+{
+  "kind": "heartbeat",
+  "sessionId": "sess-1",
+  "leaseEpoch": 1
+}

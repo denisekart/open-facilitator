@@ -1,0 +1,5 @@
+{
+  "kind": "goodbye",
+  "sessionId": "sess-2",
+  "reason": "no-compatible-protocol-version"
+}

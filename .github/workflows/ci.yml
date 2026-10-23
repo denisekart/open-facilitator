@@ -15,6 +15,8 @@ jobs:
           cache: true
       - run: dotnet build OpenFacilitator.slnx -c Release
       - run: dotnet test OpenFacilitator.slnx -c Release --no-build
+      - name: conformance fixtures (.NET harness)
+        run: dotnet run --project protocol/tools/Validate.Fixtures -c Release
 
   typescript:
     runs-on: ubuntu-latest
@@ -29,6 +31,23 @@ jobs:
       - run: pnpm lint
       - run: pnpm -r build
       - run: pnpm -r test
+
+  protocol:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: codegen drift gate
+        run: |
+          pnpm protocol:codegen
+          git diff --exit-code -- src/protocol/src/generated protocol/dotnet/Ofac.Protocol/Generated src/protocol/schemas
+      - name: openapi stub validates
+        run: npx swagger-cli validate protocol/openapi/link-v1.yaml
 
   meta:
     runs-on: ubuntu-latest

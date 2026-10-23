@@ -1,4 +1,11 @@
 <Solution>
+  <Folder Name="/protocol/" />
+  <Folder Name="/protocol/dotnet/">
+    <Project Path="protocol/dotnet/Ofac.Protocol/Ofac.Protocol.csproj" />
+  </Folder>
+  <Folder Name="/protocol/tools/">
+    <Project Path="protocol/tools/Validate.Fixtures/Validate.Fixtures.csproj" />
+  </Folder>
   <Folder Name="/src/" />
   <Folder Name="/src/facilitator/">
     <Project Path="src/facilitator/Facilitator.csproj" />

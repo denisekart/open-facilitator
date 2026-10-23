@@ -1,0 +1,241 @@
+{
+  "version": 1,
+  "limits": {
+    "maxEnvelopeBytes": 262144
+  },
+  "cases": [
+    {
+      "file": "valid/command.work.assign.json",
+      "expect": "valid",
+      "class": "command",
+      "type": "org.facilitator.command.work.assign.v1"
+    },
+    {
+      "file": "valid/command.work.steer.json",
+      "expect": "valid",
+      "class": "command",
+      "type": "org.facilitator.command.work.steer.v1"
+    },
+    {
+      "file": "valid/command.work.cancel.json",
+      "expect": "valid",
+      "class": "command",
+      "type": "org.facilitator.command.work.cancel.v1"
+    },
+    {
+      "file": "valid/command.work.status.request.json",
+      "expect": "valid",
+      "class": "command",
+      "type": "org.facilitator.command.work.status.request.v1"
+    },
+    {
+      "file": "valid/command.work.nudge.json",
+      "expect": "valid",
+      "class": "command",
+      "type": "org.facilitator.command.work.nudge.v1"
+    },
+    {
+      "file": "valid/command.context.fetch.json",
+      "expect": "valid",
+      "class": "command",
+      "type": "org.facilitator.command.context.fetch.v1"
+    },
+    {
+      "file": "valid/command.approval.respond.json",
+      "expect": "valid",
+      "class": "command",
+      "type": "org.facilitator.command.approval.respond.v1"
+    },
+    {
+      "file": "valid/event.work.accepted.json",
+      "expect": "valid",
+      "class": "event",
+      "type": "org.facilitator.event.work.accepted.v1"
+    },
+    {
+      "file": "valid/event.work.progress.json",
+      "expect": "valid",
+      "class": "event",
+      "type": "org.facilitator.event.work.progress.v1"
+    },
+    {
+      "file": "valid/event.work.input_required.json",
+      "expect": "valid",
+      "class": "event",
+      "type": "org.facilitator.event.work.input_required.v1"
+    },
+    {
+      "file": "valid/event.assignment.completed.json",
+      "expect": "valid",
+      "class": "event",
+      "type": "org.facilitator.event.assignment.completed.v1"
+    },
+    {
+      "file": "valid/event.assignment.failed.json",
+      "expect": "valid",
+      "class": "event",
+      "type": "org.facilitator.event.assignment.failed.v1"
+    },
+    {
+      "file": "valid/event.workspace.heartbeat.json",
+      "expect": "valid",
+      "class": "event",
+      "type": "org.facilitator.event.workspace.heartbeat.v1"
+    },
+    {
+      "file": "valid/event.artifact.available.json",
+      "expect": "valid",
+      "class": "event",
+      "type": "org.facilitator.event.artifact.available.v1"
+    },
+    {
+      "file": "valid/event.memory.candidate.json",
+      "expect": "valid",
+      "class": "event",
+      "type": "org.facilitator.event.memory.candidate.v1"
+    },
+    {
+      "file": "valid/event.approval.required.json",
+      "expect": "valid",
+      "class": "event",
+      "type": "org.facilitator.event.approval.required.v1"
+    },
+    {
+      "file": "valid/event.approval.revoked.json",
+      "expect": "valid",
+      "class": "event",
+      "type": "org.facilitator.event.approval.revoked.v1"
+    },
+    {
+      "file": "valid/event.memory.used.json",
+      "expect": "valid",
+      "class": "event",
+      "type": "org.facilitator.event.memory.used.v1"
+    },
+    {
+      "file": "valid/receipt.accepted.json",
+      "expect": "valid",
+      "class": "receipt"
+    },
+    {
+      "file": "valid/receipt.duplicate.json",
+      "expect": "valid",
+      "class": "receipt"
+    },
+    {
+      "file": "valid/receipt.rejected.json",
+      "expect": "valid",
+      "class": "receipt"
+    },
+    {
+      "file": "valid/receipt.unsupported.json",
+      "expect": "valid",
+      "class": "receipt"
+    },
+    {
+      "file": "valid/control.hello.json",
+      "expect": "valid",
+      "class": "control"
+    },
+    {
+      "file": "valid/control.welcome.json",
+      "expect": "valid",
+      "class": "control"
+    },
+    {
+      "file": "valid/control.heartbeat.json",
+      "expect": "valid",
+      "class": "control"
+    },
+    {
+      "file": "valid/control.flow_control.json",
+      "expect": "valid",
+      "class": "control"
+    },
+    {
+      "file": "valid/control.goodbye.json",
+      "expect": "valid",
+      "class": "control"
+    },
+    {
+      "file": "valid/command.work.assign.large.json",
+      "expect": "valid",
+      "class": "command",
+      "type": "org.facilitator.command.work.assign.v1"
+    },
+    {
+      "file": "invalid/envelope.specversion.json",
+      "expect": "invalid",
+      "class": "command",
+      "errorClass": "envelope-violation"
+    },
+    {
+      "file": "invalid/envelope.missing-subject.json",
+      "expect": "invalid",
+      "class": "command",
+      "errorClass": "envelope-violation"
+    },
+    {
+      "file": "invalid/command.assign.no-command-id.json",
+      "expect": "invalid",
+      "class": "command",
+      "errorClass": "schema-violation"
+    },
+    {
+      "file": "invalid/command.assign.no-evidence.json",
+      "expect": "invalid",
+      "class": "command",
+      "errorClass": "schema-violation"
+    },
+    {
+      "file": "invalid/command.assign.unknown-field.json",
+      "expect": "invalid",
+      "class": "command",
+      "errorClass": "schema-violation"
+    },
+    {
+      "file": "invalid/event.progress.zero-generation.json",
+      "expect": "invalid",
+      "class": "event",
+      "errorClass": "schema-violation"
+    },
+    {
+      "file": "invalid/receipt.bad-status.json",
+      "expect": "invalid",
+      "class": "receipt",
+      "errorClass": "schema-violation"
+    },
+    {
+      "file": "invalid/receipt.unsupported-no-reason.json",
+      "expect": "invalid",
+      "class": "receipt",
+      "errorClass": "schema-violation"
+    },
+    {
+      "file": "invalid/payload.too-large.json",
+      "expect": "invalid",
+      "class": "command",
+      "errorClass": "payload-too-large"
+    },
+    {
+      "file": "invalid/event.bad-time.json",
+      "expect": "invalid",
+      "class": "event",
+      "errorClass": "schema-violation"
+    },
+    {
+      "file": "invalid/command.unknown.v1.json",
+      "expect": "invalid",
+      "class": "command",
+      "errorClass": "unknown-command",
+      "receipt": "valid/receipt.unsupported.json"
+    },
+    {
+      "file": "invalid/control.hello.v9-only.json",
+      "expect": "invalid",
+      "class": "control",
+      "errorClass": "no-common-version",
+      "receipt": "valid/control.goodbye.incompatible.json"
+    }
+  ]
+}

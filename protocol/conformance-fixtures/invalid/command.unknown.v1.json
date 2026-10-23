@@ -1,0 +1,13 @@
+{
+  "specversion": "1.0",
+  "id": "01JCOMMAND-NOVEL",
+  "source": "urn:facilitator:instance:main",
+  "type": "org.facilitator.command.novel.thing.v1",
+  "subject": "work/work-999",
+  "time": "2026-10-22T18:00:00Z",
+  "datacontenttype": "application/json",
+  "dataschema": "https://schemas.openfacilitator.org/v1/command.novel.thing.v1.json",
+  "data": {
+    "anything": true
+  }
+}

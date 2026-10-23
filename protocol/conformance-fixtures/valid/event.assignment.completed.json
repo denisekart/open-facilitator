@@ -1,0 +1,30 @@
+{
+  "specversion": "1.0",
+  "id": "01JEVENT-assignment-completed",
+  "source": "urn:workspace:ws-01",
+  "type": "org.facilitator.event.assignment.completed.v1",
+  "subject": "work/work-123/assignment/analysis-1",
+  "time": "2026-10-22T18:00:00Z",
+  "datacontenttype": "application/json",
+  "dataschema": "https://schemas.openfacilitator.org/v1/event.assignment.completed.v1.json",
+  "data": {
+    "workId": "work-123",
+    "assignmentId": "analysis-1",
+    "executionId": "exec-9",
+    "executionGeneration": 3,
+    "resultManifest": {
+      "manifestId": "man-1",
+      "outputs": [
+        {
+          "artifactId": "artifact-123",
+          "mediaType": "text/markdown",
+          "size": 10240,
+          "digest": "sha256:abababababababababababababababababababababababababababababababab",
+          "storageUrl": "s3://example-bucket/artifact-123",
+          "createdBy": "workspace:ws-01",
+          "createdAt": "2026-10-22T18:00:00Z"
+        }
+      ]
+    }
+  }
+}

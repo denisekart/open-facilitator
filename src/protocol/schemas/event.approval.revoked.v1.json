@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openfacilitator.org/v1/event.approval.revoked.v1.json",
+  "title": "ApprovalRevokedEventV1Data",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "approvalId",
+    "revokedBy",
+    "reason"
+  ],
+  "properties": {
+    "approvalId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "revokedBy": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024
+    }
+  }
+}

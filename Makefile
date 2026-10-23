@@ -1,4 +1,4 @@
-.PHONY: restore build test lint format compose-slim compose-full clean
+.PHONY: restore build test lint format protocol compose-slim compose-full clean
 
 restore:
 	dotnet restore OpenFacilitator.slnx
@@ -11,6 +11,7 @@ build: restore
 test: build
 	dotnet test OpenFacilitator.slnx -c Release --no-build
 	pnpm -r test
+	dotnet run --project protocol/tools/Validate.Fixtures -c Release --no-build
 
 lint:
 	dotnet format OpenFacilitator.slnx --verify-no-changes
@@ -19,6 +20,11 @@ lint:
 format:
 	dotnet format OpenFacilitator.slnx
 	pnpm format
+
+protocol:
+	pnpm protocol:codegen
+	npx swagger-cli validate protocol/openapi/link-v1.yaml
+	git diff --exit-code -- src/protocol/src/generated protocol/dotnet/Ofac.Protocol/Generated src/protocol/schemas
 
 compose-slim compose-full:
 	@echo "Reference environment lands in Plan 11: cd reference && ./referencectl up slim|full"

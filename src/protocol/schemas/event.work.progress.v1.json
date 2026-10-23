@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openfacilitator.org/v1/event.work.progress.v1.json",
+  "title": "WorkProgressEventV1Data",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "workId",
+    "assignmentId",
+    "executionGeneration",
+    "progressNote"
+  ],
+  "properties": {
+    "workId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "assignmentId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "executionGeneration": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "progressNote": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096
+    }
+  }
+}

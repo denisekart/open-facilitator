@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Generated wire DTOs (Generated/) plus hand-written envelope helpers.
+       No runtime deps: DTOs are System.Text.Json attributes only. -->
+  <PropertyGroup>
+    <RootNamespace>Ofac.Protocol</RootNamespace>
+    <!-- Generated DTOs use `?` syntax without non-nullable-init noise. -->
+    <Nullable>annotations</Nullable>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+</Project>

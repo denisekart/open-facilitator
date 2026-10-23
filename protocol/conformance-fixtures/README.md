@@ -1,4 +1,6 @@
 # Conformance fixtures
 
-Golden wire-format fixtures consumed by the conformance suite (spec §26).
-Lands with Plan 01; the suite itself arrives with quality-assurance tooling.
+Golden wire-format fixtures consumed by both conformance harnesses (spec §26).
+Implemented in Plan 01: `index.json` is the arbiter (limits + per-case expectations);
+`pnpm --filter @ofac/protocol test` and
+`dotnet run --project protocol/tools/Validate.Fixtures` run the same suite.

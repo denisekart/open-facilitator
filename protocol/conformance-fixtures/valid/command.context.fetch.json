@@ -1,0 +1,20 @@
+{
+  "specversion": "1.0",
+  "id": "01JCOMMAND-ctx",
+  "source": "urn:facilitator:instance:main",
+  "type": "org.facilitator.command.context.fetch.v1",
+  "subject": "work/work-123",
+  "time": "2026-10-22T18:00:00Z",
+  "datacontenttype": "application/json",
+  "dataschema": "https://schemas.openfacilitator.org/v1/command.context.fetch.v1.json",
+  "data": {
+    "commandId": "cmd-129",
+    "workId": "work-123",
+    "targetId": "workspace-ws-01",
+    "actorEvidenceRef": "identity-evidence:ref-123",
+    "deadline": "2026-10-23T18:00:00Z",
+    "contextRefs": [
+      "artifact://sources/brief-1"
+    ]
+  }
+}

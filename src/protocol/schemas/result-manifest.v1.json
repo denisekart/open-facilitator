@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openfacilitator.org/v1/result-manifest.v1.json",
+  "title": "ResultManifestV1",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "manifestId",
+    "outputs"
+  ],
+  "properties": {
+    "manifestId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "outputs": {
+      "type": "array",
+      "items": {
+        "$ref": "common.v1.json#/$defs/artifactRef"
+      }
+    },
+    "revisionOf": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "notes": {
+      "type": "string",
+      "maxLength": 4096
+    }
+  }
+}

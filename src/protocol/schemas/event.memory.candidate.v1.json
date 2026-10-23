@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openfacilitator.org/v1/event.memory.candidate.v1.json",
+  "title": "MemoryCandidateEventV1Data",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "scope",
+    "contentSummary",
+    "provenance"
+  ],
+  "properties": {
+    "scope": {
+      "type": "string",
+      "enum": [
+        "project",
+        "team",
+        "workspace",
+        "private"
+      ]
+    },
+    "contentSummary": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "evidenceRef",
+        "createdBy",
+        "createdAt"
+      ],
+      "properties": {
+        "source": {
+          "$ref": "common.v1.json#/$defs/idToken"
+        },
+        "evidenceRef": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "createdBy": {
+          "$ref": "common.v1.json#/$defs/idToken"
+        },
+        "createdAt": {
+          "$ref": "common.v1.json#/$defs/rfc3339DateTime"
+        }
+      }
+    },
+    "policyLabel": {
+      "type": "string",
+      "enum": [
+        "private",
+        "team-only",
+        "facilitator-visible",
+        "evidence-only"
+      ]
+    }
+  }
+}

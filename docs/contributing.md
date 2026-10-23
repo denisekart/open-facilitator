@@ -16,6 +16,10 @@ Repo root **is** the spec §22.1 `framework/` tree — no `framework/` subdirect
 |`make compose-slim` / `compose-full`|Placeholder (exit 2) until Plan 11 ships `reference/referencectl`|
 |`make clean`|`dotnet clean` + remove TS dist outputs and node_modules|
 
+## Protocol changes
+
+The wire contract is schema-first: edit the JSON Schema under `protocol/`, add valid+invalid fixtures registered in `protocol/conformance-fixtures/index.json`, then run `pnpm protocol:codegen` and commit the regenerated trees (`src/protocol/src/generated/`, `protocol/dotnet/Ofac.Protocol/Generated/`, `src/protocol/schemas/`). `make protocol` runs codegen, the OpenAPI stub validation, and the `git diff --exit-code` drift gate; CI's `protocol` job enforces the same, and both fixture harnesses (`dotnet run --project protocol/tools/Validate.Fixtures`, `pnpm -r test`) must pass. Full rules: [docs/protocol.md](protocol.md).
+
 ## PR gate
 
 `ci.yml` must be green on the PR: `dotnet` (build + test on the `global.json` SDK), `typescript` (lint + build + test on Node 22), `meta` (actionlint, yamllint, `reference/versions.env` key completeness), `docker-build` (Facilitator image compiles). Release jobs run only on `v*` tags — see `.github/workflows/README.md`.

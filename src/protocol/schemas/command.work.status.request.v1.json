@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openfacilitator.org/v1/command.work.status.request.v1.json",
+  "title": "WorkStatusRequestCommandV1Data",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "commandId",
+    "workId",
+    "targetId",
+    "actorEvidenceRef",
+    "deadline",
+    "assignmentId"
+  ],
+  "properties": {
+    "commandId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "workId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "targetId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "actorEvidenceRef": {
+      "$ref": "common.v1.json#/$defs/evidenceRef"
+    },
+    "deadline": {
+      "$ref": "common.v1.json#/$defs/rfc3339DateTime"
+    },
+    "assignmentId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    }
+  }
+}

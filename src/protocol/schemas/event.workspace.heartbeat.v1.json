@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openfacilitator.org/v1/event.workspace.heartbeat.v1.json",
+  "title": "WorkspaceHeartbeatEventV1Data",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "workspaceId",
+    "status"
+  ],
+  "properties": {
+    "workspaceId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "idle",
+        "busy",
+        "draining",
+        "error"
+      ]
+    },
+    "activeAssignments": {
+      "type": "integer",
+      "minimum": 0
+    }
+  }
+}

@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openfacilitator.org/v1/envelope.json",
+  "title": "Envelope",
+  "type": "object",
+  "required": [
+    "specversion",
+    "id",
+    "source",
+    "type",
+    "time",
+    "datacontenttype",
+    "dataschema",
+    "subject"
+  ],
+  "properties": {
+    "specversion": {
+      "const": "1.0"
+    },
+    "id": {
+      "$ref": "#/$defs/idToken"
+    },
+    "source": {
+      "type": "string",
+      "format": "uri-reference",
+      "pattern": "^(urn:|https?:)"
+    },
+    "type": {
+      "type": "string",
+      "pattern": "^org\\.facilitator\\.(command|event)\\.[a-z0-9._]+\\.v[0-9]+$"
+    },
+    "subject": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024
+    },
+    "time": {
+      "$ref": "#/$defs/rfc3339DateTime"
+    },
+    "datacontenttype": {
+      "const": "application/json"
+    },
+    "dataschema": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://schemas\\.openfacilitator\\.org/v[0-9]+/.+\\.json$"
+    },
+    "data": {
+      "type": "object"
+    },
+    "traceparent": {
+      "type": "string",
+      "pattern": "^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$"
+    },
+    "correlationid": {
+      "$ref": "#/$defs/idToken"
+    },
+    "causationid": {
+      "$ref": "#/$defs/idToken"
+    }
+  },
+  "$defs": {
+    "idToken": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "rfc3339DateTime": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

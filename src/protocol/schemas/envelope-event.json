@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openfacilitator.org/v1/envelope-event.json",
+  "title": "EnvelopeEvent",
+  "allOf": [
+    {
+      "$ref": "envelope.json"
+    },
+    {
+      "properties": {
+        "type": {
+          "pattern": "^org\\.facilitator\\.event\\.[a-z0-9._]+\\.v[0-9]+$"
+        }
+      }
+    }
+  ]
+}

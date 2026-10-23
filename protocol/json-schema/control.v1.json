@@ -1,0 +1,163 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openfacilitator.org/v1/control.v1.json",
+  "title": "ControlFrame",
+  "oneOf": [
+    {
+      "title": "HelloFrame",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "protocolVersions",
+        "supportedTransports",
+        "endpointId",
+        "instanceId",
+        "capabilityManifestDigest"
+      ],
+      "properties": {
+        "kind": {
+          "const": "hello"
+        },
+        "protocolVersions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "pattern": "^v[0-9]+$"
+          }
+        },
+        "supportedTransports": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "enum": [
+              "signalr",
+              "websocket",
+              "http-poll"
+            ]
+          }
+        },
+        "endpointId": {
+          "$ref": "common.v1.json#/$defs/idToken"
+        },
+        "instanceId": {
+          "$ref": "common.v1.json#/$defs/idToken"
+        },
+        "capabilityManifestDigest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "lastKnownAck": {
+          "$ref": "common.v1.json#/$defs/idToken"
+        }
+      }
+    },
+    {
+      "title": "WelcomeFrame",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "sessionId",
+        "leaseEpoch",
+        "maxInFlight",
+        "heartbeatSeconds",
+        "protocolVersion"
+      ],
+      "properties": {
+        "kind": {
+          "const": "welcome"
+        },
+        "sessionId": {
+          "$ref": "common.v1.json#/$defs/idToken"
+        },
+        "leaseEpoch": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxInFlight": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "heartbeatSeconds": {
+          "type": "integer",
+          "minimum": 5,
+          "maximum": 600
+        },
+        "protocolVersion": {
+          "type": "string",
+          "pattern": "^v[0-9]+$"
+        }
+      }
+    },
+    {
+      "title": "HeartbeatFrame",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "sessionId",
+        "leaseEpoch"
+      ],
+      "properties": {
+        "kind": {
+          "const": "heartbeat"
+        },
+        "sessionId": {
+          "$ref": "common.v1.json#/$defs/idToken"
+        },
+        "leaseEpoch": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    {
+      "title": "FlowControlFrame",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "sessionId",
+        "maxInFlight"
+      ],
+      "properties": {
+        "kind": {
+          "const": "flow_control"
+        },
+        "sessionId": {
+          "$ref": "common.v1.json#/$defs/idToken"
+        },
+        "maxInFlight": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    {
+      "title": "GoodbyeFrame",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "sessionId",
+        "reason"
+      ],
+      "properties": {
+        "kind": {
+          "const": "goodbye"
+        },
+        "sessionId": {
+          "$ref": "common.v1.json#/$defs/idToken"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "specversion": "1.0",
+  "id": "01JEVENT-badgen",
+  "source": "urn:workspace:ws-01",
+  "type": "org.facilitator.event.work.progress.v1",
+  "subject": "work/work-123/assignment/analysis-1",
+  "time": "2026-10-22T18:00:00Z",
+  "datacontenttype": "application/json",
+  "dataschema": "https://schemas.openfacilitator.org/v1/event.work.progress.v1.json",
+  "data": {
+    "workId": "work-123",
+    "assignmentId": "analysis-1",
+    "executionGeneration": 0,
+    "progressNote": "Collected 12 sources; drafting report."
+  }
+}

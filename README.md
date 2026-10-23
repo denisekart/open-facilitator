@@ -40,6 +40,7 @@ Key properties, normatively defined in the specs:
 |---|---|
 | [`docs/specs/open_facilitator_framework_architecture.md`](docs/specs/open_facilitator_framework_architecture.md) | Normative architecture: domain model, wire contract, scaling, packaging, identity, policy, adapters, memory, artifacts, data model, reference Compose, delivery slices, conformance suite |
 | [`docs/specs/open-facilitator-appendix.md`](docs/specs/open-facilitator-appendix.md) | Normative clarifications: trust modes, evidence validation, approval canonicalization (RFC 8785), outbox/inbox patterns, memory ACLs, acceptance checklist |
+| [`docs/protocol.md`](docs/protocol.md) | As-built v1 wire contract: envelope, type registry, namespacing/versioning rules, conformance fixtures, payload limits |
 | [`AGENTS.md`](AGENTS.md) | Agent working rules: stack decisions, spec pointers, delegation routing, repository layout |
 
 ## Repository layout

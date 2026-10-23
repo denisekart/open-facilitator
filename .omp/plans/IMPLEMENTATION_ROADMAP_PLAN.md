@@ -19,7 +19,7 @@ The repo is spec-only: `docs/specs/open_facilitator_framework_architecture.md` (
 ## Phase A — Architecture foundations
 
 ### Plan 00 — Repository skeleton, build system, and CI spine
-**Status:** ⬜ not-started
+**Status:** 🟡 in-progress (detail design: `00-repository-skeleton-build-ci.md`; 🟢 when CI is green on `main`)
 **Objective:** Turn the spec-only repo into a buildable monorepo matching spec §22.1 (`framework/` tree: `src/facilitator`, `src/gateway`, `src/workspace-link`, `src/adapters`, `protocol/`, `features/`, `examples/`, `reference/`, `docs/`, `Makefile`) with green CI on an empty-but-compiling codebase.
 **Replanning gate:** run `/scaffold` (stack `dotnet-aspire-svelte`) and reconcile its output against §22.1; decide sln/csproj granularity (one `Facilitator.sln`, projects `Facilitator`, `Facilitator.Tests`; pnpm workspace for TS packages `@ofac/gateway`, `@ofac/workspace-link`), TS toolchain (Node 22 LTS, vitest, tsup), .NET 10 SDK pin in `global.json`.
 **Scope:** directory tree with stub projects/packages that compile; `versions.env` pinning Postgres 17, Keycloak 26.x, SeaweedFS digest, Aspire dashboard release, Kafka 4.2.x, Forgejo 16.x, Mattermost TE, Ollama (§22.4); `Makefile` targets `build|test|lint|compose-slim|compose-full` placeholders; GitHub Actions per §22.6 (build .NET + TS, validate configs, unit tests; compose jobs gated until Plan 11); `.editorconfig`, NuGet/npm config, `.gitignore` additions (`reference/secrets/`, `bin/`, `obj/`, `dist/`, `node_modules/`).

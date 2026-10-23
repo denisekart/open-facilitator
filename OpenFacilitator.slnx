@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/" />
+  <Folder Name="/src/facilitator/">
+    <Project Path="src/facilitator/Facilitator.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Facilitator.Tests/Facilitator.Tests.csproj" />
+  </Folder>
+</Solution>

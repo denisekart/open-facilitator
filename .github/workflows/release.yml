@@ -1,0 +1,49 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  containers:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      # Add gateway / workspace-link image entries here (Plans 04/05), same pattern:
+      #   tags: ${{ vars.OCI_REGISTRY ... }}/<name>:${{ github.ref_name }} + :latest
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: src/facilitator/Dockerfile
+          tags: |
+            ghcr.io/denisekart/open-facilitator/facilitator:${{ github.ref_name }}
+            ghcr.io/denisekart/open-facilitator/facilitator:latest
+          platforms: linux/amd64,linux/arm64
+          push: true
+
+  # npm publish seam (inert until Plan 01 ships a consumable @ofac/protocol):
+  # packages flip private:false, then `npm pkg set version` + `npm publish` to
+  # https://npm.pkg.github.com/denisekart via GITHUB_TOKEN.
+  publish-npm:
+    # Inert until Plan 01: set the ENABLE_NPM_PUBLISH repo variable to activate.
+    if: ${{ vars.ENABLE_NPM_PUBLISH == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - run: echo "inert seam — see comment in job definition"
+
+  # Plan 18 (spec §22.6): SBOM generation + digest pinning into
+  # reference/versions.env (*_DIGEST keys) + green conformance matrix gate.
+  # sbom: cyclonedx-gomod/npm/dotnet per artifact, attached to the GitHub release.
+  # digest-pin: resolve pushed digests, PR or commit them back to versions.env.

@@ -1,0 +1,13 @@
+packages:
+  - "src/gateway"
+  - "src/workspace-link"
+
+allowBuilds:
+  esbuild: true
+
+catalog:
+  # versions resolved by `pnpm add -Dw` (Plan 00 Step 3). TS 6.x: tsup 9 and
+  # typescript-eslint 8 do not support the TypeScript 7 native compiler yet.
+  typescript: "^6.0.3"
+  tsup: "^9.0.0"
+  vitest: "^5.0.5"

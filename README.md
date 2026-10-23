@@ -40,27 +40,28 @@ Key properties, normatively defined in the specs:
 |---|---|
 | [`docs/specs/open_facilitator_framework_architecture.md`](docs/specs/open_facilitator_framework_architecture.md) | Normative architecture: domain model, wire contract, scaling, packaging, identity, policy, adapters, memory, artifacts, data model, reference Compose, delivery slices, conformance suite |
 | [`docs/specs/open-facilitator-appendix.md`](docs/specs/open-facilitator-appendix.md) | Normative clarifications: trust modes, evidence validation, approval canonicalization (RFC 8785), outbox/inbox patterns, memory ACLs, acceptance checklist |
-| [`AGENTS.md`](AGENTS.md) | Agent working rules: stack decisions, spec pointers, delegation routing, planned repository layout |
+| [`AGENTS.md`](AGENTS.md) | Agent working rules: stack decisions, spec pointers, delegation routing, repository layout |
 
-## Planned repository layout
+## Repository layout
 
-Outline from spec §22.1 — created as implementation slices land, not before:
+Repo root **is** the spec §22.1 `framework/` tree (Plan 00). Every directory carries a README stating what lands there and in which plan:
 
 ```text
-framework/
 ├── src/
-│   ├── facilitator/       # .NET 10: HTTP, SignalR Link hub, event loop, admin SPA
-│   ├── gateway/           # TypeScript runtime, connectors, provisioner ports
-│   ├── workspace-link/    # TypeScript Link runtime + SDK
-│   └── adapters/          # mattermost / forgejo / kafka + harnesses/
-├── protocol/              # JSON Schema, OpenAPI, CloudEvents schemas, conformance fixtures
-├── features/              # Dev Container Features: gateway, workspace-link, harness-adapter
-├── examples/              # deterministic research worker, coding worker, research worker
-├── reference/             # slim + full Compose, versions.env, seeds, bootstrap, checks
-└── Makefile
+│   ├── facilitator/       # .NET 10: /health stub now; HTTP, SignalR Link hub, event loop (Plans 02-03); admin SPA wwwroot embed (Plan 12)
+│   ├── gateway/           # @ofac/gateway stub now; runtime, connectors, provisioner ports (Plan 05)
+│   ├── workspace-link/    # @ofac/workspace-link stub now; Link runtime + SDK (Plan 04)
+│   └── adapters/          # mattermost (13) / forgejo (14) / kafka (15) + harnesses/ (06+)
+├── protocol/              # CloudEvents schemas, JSON Schema, OpenAPI, conformance fixtures (Plan 01)
+├── features/              # Dev Container Features: gateway, workspace-link, harness-adapter (Plan 06)
+├── examples/              # slim/deterministic-research-worker (06); full/coding-worker (14), research-worker + seed-repositories (14/15)
+├── reference/             # versions.env + .env.example now; Compose, referencectl, seeds, checks (Plan 11)
+├── docs/specs/            # normative architecture (single source of truth)
+├── .github/workflows/     # CI + release spine (see workflows/README.md)
+└── Makefile               # restore/build/test/lint/format + compose placeholders
 ```
 
-Delivery is vertical slices with runnable exit tests (spec §26): transactional kernel → workspace link → gateway/adapters → identity/policy → artifacts/memory → slim reference → full providers → multi-work provisioning → horizontal replicas → hardening.
+Delivery is vertical slices with runnable exit tests (spec §26): transactional kernel → workspace link → gateway/adapters → identity/policy → artifacts/memory → slim reference → full providers → multi-work provisioning → horizontal replicas → hardening. Track via `.omp/plans/IMPLEMENTATION_ROADMAP_PLAN.md`.
 
 ## Technology stack
 
@@ -73,19 +74,20 @@ Delivery is vertical slices with runnable exit tests (spec §26): transactional 
 | Identity | OIDC/OAuth 2.0 — Keycloak in the reference, provider-swappable |
 | Reference infra | Docker Compose (slim/full), SeaweedFS artifacts, Aspire dashboard, Mattermost, Forgejo, Kafka, Ollama |
 
-## Working in this workspace
+## Development environment
 
-This repo is set up as an omp agent workspace:
+1. **Recommended: devcontainer.** Open the repo in the included `.devcontainer` — Docker-in-Docker, .NET SDK 10, Node 24, pnpm 12 preinstalled; nothing to install.
+2. **Manual path:** .NET SDK per `global.json` (`10.0.40x`), Node ≥ 22, then `corepack enable && corepack install` (honors `packageManager: pnpm@12.5.1`). Docker is optional, for image builds.
+3. **Daily loop:** `make restore` → `make build` → `make test` → `make lint`; `make format` before committing.
+4. **Running tests:** .NET — `dotnet test OpenFacilitator.slnx [-c Release] [--filter FullyQualifiedName~HealthEndpointTests]`; TypeScript — per package `pnpm --filter @ofac/gateway test`, workspace-wide `pnpm -r test`, single file `pnpm --filter @ofac/workspace-link exec vitest run test/package.test.ts`. Behavior/integration tests (Testcontainers, dockerized Facilitator) appear from Plan 02 onward.
+5. **CI is the merge gate** — see [`.github/workflows/README.md`](.github/workflows/README.md). Release = push a `v*` tag → images to GHCR.
 
-- **Project skills** in `.omp/skills/` (`facilitator-architecture`, `facilitator-protocol`, `facilitator-workspace-packaging`, `facilitator-reference-env`) encode the spec rules agents must not violate. They are spec-derived projections of unbuilt code — every implementation slice updates the matching skill in the same change.
-- **MCP servers** in `.omp/mcp.json`: Playwright for admin-UI/reference-service E2E; a read-only Postgres inspector, enabled once the slim reference environment is seeded.
-- **Plans** land in `.omp/plans/`; demo secrets and generated credentials are never committed (`.env`, `secrets/` are gitignored).
+This repo is also an omp agent workspace: project skills in `.omp/skills/` encode the spec rules agents must not violate (every implementation slice updates the matching skill in the same change), MCP servers are declared in `.omp/mcp.json`, plans land in `.omp/plans/`, and demo secrets are never committed (`.env`, `secrets/` are gitignored).
 
-Once the reference environment exists, the entry point will be:
+Once the slim reference environment exists (Plan 11), the demo entry point will be:
 
 ```bash
 cd reference && cp .env.example .env
-./bootstrap/generate-secrets.sh
 ./referencectl up slim && ./referencectl seed slim && ./referencectl verify slim
 ```
 

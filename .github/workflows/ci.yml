@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  dotnet:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v6
+        with:
+          cache: true
+      - run: dotnet build OpenFacilitator.slnx -c Release
+      - run: dotnet test OpenFacilitator.slnx -c Release --no-build
+
+  typescript:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm -r build
+      - run: pnpm -r test
+
+  meta:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: actionlint
+        run: docker run --rm -v "$PWD:/work" -w /work rhysd/actionlint:latest
+      - name: yamllint
+        run: |
+          pip install yamllint
+          yamllint -d "{extends: relaxed, rules: {line-length: disable}}" .github
+      - name: versions.env completeness
+        run: |
+          missing=0
+          for key in POSTGRES_TAG KEYCLOAK_TAG KAFKA_TAG FORGEJO_TAG MATTERMOST_TAG SEAWEEDFS_TAG ASPIRE_TAG OLLAMA_TAG OCI_REGISTRY FACILITATOR_DIGEST; do
+            grep -q "^${key}=" reference/versions.env || { echo "missing ${key}"; missing=1; }
+          done
+          exit $missing
+
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: docker build -t facilitator:ci src/facilitator/

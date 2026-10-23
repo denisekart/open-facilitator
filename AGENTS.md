@@ -54,12 +54,11 @@ Project-level overrides can be placed in .omp/skills/ and .omp/agents/.
 - Route by work type: research (incl. external/docs/API) → `scout` + `web_search`, codebase research → `scout`, code review → `reviewer`, Facilitator/.NET → `backend-expert`, admin SPA/UI → `frontend-expert`, Aspire/OTLP → `dotnet-aspire`, tests/QA + conformance suite → `quality-assurance`, protocol/architecture decisions → `oracle`, docs → `documentation-specialist`.
 - TypeScript Gateway/Link/Features have no dedicated user-level agent yet — route to `task`/general agents referencing `facilitator-protocol` + `facilitator-workspace-packaging` skills, or add a project-level agent under `.omp/agents/` when this area gets busy.
 
-## Planned repository layout (spec §22.1 — outline only; create when implementing)
+## Repository layout (spec §22.1 — **repo root IS the `framework/` tree**; no `framework/` subdir)
 
 ```text
-framework/
 ├── src/
-│   ├── facilitator/              # .NET: HTTP, SignalR Link hub, event loop, admin SPA
+│   ├── facilitator/              # .NET: HTTP, SignalR Link hub, event loop, admin SPA (wwwroot embed, Plan 12)
 │   ├── gateway/                  # TypeScript runtime, connectors, provisioner ports
 │   ├── workspace-link/           # TypeScript Link runtime + SDK
 │   └── adapters/                 # mattermost / forgejo / kafka + harnesses/
@@ -67,7 +66,7 @@ framework/
 ├── features/                     # gateway, workspace-link, harness-adapter (Dev Container Features)
 ├── examples/                     # slim/deterministic-research-worker, full/coding-worker, full/research-worker
 ├── reference/                    # compose.slim.yaml, compose.full.yaml, versions.env, keycloak realm, seeds, checks
-├── docs/                         # getting-started, protocol, security, advanced, contributing (+ specs/ here today)
+├── docs/                         # getting-started, protocol, security, advanced, contributing (+ specs/ = normative source of truth)
 └── Makefile
 ```
 

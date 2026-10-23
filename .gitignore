@@ -10,6 +10,7 @@ dist/
 node_modules/
 coverage/
 TestResults/
+.vitest/
 
 # Local environment & generated secrets (spec §22: never commit)
 .env

@@ -247,13 +247,13 @@ importers:
       ajv-formats:
         specifier: 'catalog:'
         version: 3.0.1(ajv@8.20.0)
-      canonicalize:
-        specifier: 'catalog:'
-        version: 2.1.0
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
         version: 22.20.5
+      canonicalize:
+        specifier: 'catalog:'
+        version: 2.1.0
       tsup:
         specifier: 'catalog:'
         version: 9.0.0(postcss@8.5.31)(typescript@6.0.3)(yaml@2.9.1)

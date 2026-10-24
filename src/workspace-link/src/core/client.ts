@@ -52,7 +52,7 @@ export interface LinkClientOptions {
   /** sha256:<64hex> over the EXACT manifest bytes POSTed to /capabilities. */
   capabilityManifestDigest: string;
   token: LinkTokenProvider;
-  handler?: LinkHandler;
+  handler?: LinkHandler | undefined;
   logger?: LinkLogger;
   /** 0 (default) = retry forever. */
   maxReconnectAttempts?: number;

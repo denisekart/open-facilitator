@@ -1,5 +1,3 @@
-type SharedDefinitions = unknown;
-
 export interface EnvelopeCommand {
   causationid?: string;
   correlationid?: string;

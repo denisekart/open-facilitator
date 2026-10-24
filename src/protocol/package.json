@@ -24,15 +24,16 @@
   },
   "scripts": {
     "build": "tsup src/index.ts --format esm,cjs --dts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
     "ajv": "catalog:",
-    "ajv-formats": "catalog:",
-    "canonicalize": "catalog:"
+    "ajv-formats": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",
+    "canonicalize": "catalog:",
     "tsup": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

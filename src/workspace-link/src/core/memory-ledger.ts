@@ -6,7 +6,7 @@ interface MemRow {
   deliveryId: string;
   state: LedgerState;
   envelope: unknown;
-  error?: string;
+  error?: string | undefined;
   updatedAt: number;
 }
 

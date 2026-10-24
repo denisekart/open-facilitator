@@ -30,7 +30,7 @@ export class ProtocolMismatchError extends LinkError {
 
 /** A superseding session (newer leaseEpoch) fenced this one's session. */
 export class SessionSupersededError extends LinkError {
-  readonly problem?: ProblemDetails;
+  readonly problem?: ProblemDetails | undefined;
 
   constructor(problem?: ProblemDetails) {
     super(
@@ -60,7 +60,7 @@ export class EnrollmentError extends LinkError {
 /** A client-sent envelope was refused by the Facilitator (ack status rejected). */
 export class DeliveryRejectedError extends LinkError {
   readonly errorClass: ErrorClass | "rejected";
-  readonly problem?: ProblemDetails;
+  readonly problem?: ProblemDetails | undefined;
 
   constructor(errorClass: ErrorClass | "rejected", problem?: ProblemDetails) {
     const suffix = problem?.type ? ` (${problem.type})` : "";
@@ -72,7 +72,7 @@ export class DeliveryRejectedError extends LinkError {
 
 /** Transport-level failure (connect/send). `unauthorized` ⇒ token refresh path. */
 export class TransportError extends LinkError {
-  readonly problem?: ProblemDetails;
+  readonly problem?: ProblemDetails | undefined;
 
   constructor(message: string, opts: { unauthorized?: boolean; problem?: ProblemDetails } = {}) {
     super(opts.unauthorized ? "unauthorized" : "transport", message);

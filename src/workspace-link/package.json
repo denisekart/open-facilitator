@@ -29,7 +29,7 @@
   },
   "scripts": {
     "build": "tsup src/index.ts src/node/index.ts src/bin/linkd.ts --format esm --dts --target node22 --silent",
-    "test": "vitest run --exclude '**/*.e2e.test.ts'",
+    "test": "vitest run",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
     "typecheck": "tsc --noEmit -p tsconfig.test.json"
   },

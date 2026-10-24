@@ -5,8 +5,9 @@
        cannot read protocol/ at runtime still validate). -->
   <PropertyGroup>
     <RootNamespace>Ofac.Protocol</RootNamespace>
-    <!-- Generated DTOs use `?` syntax without non-nullable-init noise. -->
-    <Nullable>annotations</Nullable>
+    <!-- Full flow analysis for the hand-written validators; the generated
+         WireTypes.cs carries its own `#nullable restore`. -->
+    <Nullable>enable</Nullable>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
   <ItemGroup>

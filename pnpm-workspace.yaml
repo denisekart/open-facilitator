@@ -28,3 +28,5 @@ catalog:
   # v13 ships NO bundled .d.ts (verified against 13.0.3: no `types` field),
   # so the DefinitelyTyped package is genuinely required — keep them paired.
   "@types/better-sqlite3": "^9.6.0"
+  # @ofac/gateway runtime deps (Plan 05), yaml resolved via npm registry 2026-11 (latest 2.9.1).
+  yaml: "^2.9.1"

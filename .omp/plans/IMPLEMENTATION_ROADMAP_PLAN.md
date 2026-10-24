@@ -85,7 +85,7 @@ The repo is spec-only: `docs/specs/open_facilitator_framework_architecture.md` (
 **Reorganized 2026-10-24 against Phase A reality** (plans 00–04 as-built). The two original entries were too coarse for single-autonomous-unit execution, so Phase B is four plans, each with its own detail-design file. **Downstream roadmap numbers shift by +2:** roadmap 07 Identity → Plan 09, 08 Policy → Plan 10, 09 Artifacts → Plan 11, 10 Memory → Plan 12, 11 Slim ref-env → Plan 13, 12 Admin SPA → Plan 14, 13–18 → Plans 15–20. Their content is unchanged; later detail-design passes re-derive internals as always.
 
 ### Plan 05 — Gateway runtime core: single embedded child
-**Status:** ⬜ not-started (detail design: `05-gateway-runtime-core.md`)
+**Status:** 🟡 in-progress (detail design: `05-gateway-runtime-core.md`)
 **Objective:** `@ofac/gateway` composing `@ofac/workspace-link`: one Gateway endpoint (`gw.<slug>`), one embedded child through a serializable executor interface, execution ledger + binding tuple (§6.1) + reconcile-on-restart (§6.3), deny-by-default policy seam. First leg of the original 05.
 
 ### Plan 06 — Gateway multiplexing: child transport, shared + standalone modes

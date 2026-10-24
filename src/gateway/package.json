@@ -6,9 +6,11 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "import": "./dist/index.js"
     }
+  },
+  "bin": {
+    "ofac-gateway": "./dist/bin/gateway.js"
   },
   "files": [
     "dist"
@@ -22,11 +24,20 @@
     "directory": "src/gateway"
   },
   "scripts": {
-    "build": "tsup src/index.ts --format esm,cjs --dts",
+    "build": "tsup src/index.ts src/bin/gateway.ts --format esm --dts --target node22 --silent",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "test:e2e": "vitest run --config vitest.e2e.config.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.test.json"
+  },
+  "dependencies": {
+    "@ofac/protocol": "workspace:*",
+    "@ofac/workspace-link": "workspace:*",
+    "better-sqlite3": "catalog:",
+    "yaml": "catalog:"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "catalog:",
+    "@types/node": "catalog:",
     "tsup": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

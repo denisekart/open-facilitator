@@ -15,6 +15,8 @@ export class FrameEmitter<T> {
   }
 
   emit(frame: T): void {
-    for (const cb of this.callbacks) cb(frame);
+    // Snapshot: a listener that detaches (itself or a peer) mid-emit must not
+    // shift the callbacks still to run.
+    for (const cb of [...this.callbacks]) cb(frame);
   }
 }

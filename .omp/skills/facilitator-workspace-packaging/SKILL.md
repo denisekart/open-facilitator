@@ -3,7 +3,7 @@ name: facilitator-workspace-packaging
 description: Dev Container Features (workspace-link, gateway, harness-adapter), Gateway modes and trust reporting, HarnessAdapter lifecycle contract, and team configuration layout for the Open Facilitator Framework.
 ---
 
-> **Status:** the framework is unimplemented. Features, runtimes, and paths named below are spec-proposed targets, not existing code. Update this skill the moment a slice lands so implemented reality replaces spec proposals.
+> **Status:** the Link client runtime is IMPLEMENTED (Plan 04): `src/workspace-link` (`@ofac/workspace-link`) + the `ofac-linkd` bin — the headless supervisor entrypoint (spec S:409/§8.2): enroll → capabilities POST → connect → serve, SQLite state file for replay, echo/stub handler modes, `--transport signalr|http-poll`, exit codes 0/2/3/4. Plan 06's workspace-link Feature MUST start the Link from the entrypoint/supervisor via `ofac-linkd run` (or the SDK as a library), never rely on `postStartCommand`, and mount the enrollment secret / link token at runtime. Features, Gateway runtimes, and HarnessAdapters named below remain spec-proposed targets, not existing code. Update this skill the moment a slice lands so implemented reality replaces spec proposals.
 
 # Workspace Packaging & Gateways
 

@@ -1,6 +1,6 @@
 # Wire protocol (v1)
 
-This document describes the implemented wire contract: the JSON Schemas under `protocol/`, the conformance fixtures, and the rules both endpoints MUST follow. It is the as-built companion to spec §5 (`docs/specs/open_facilitator_framework_architecture.md`) and appendix §16 (`docs/specs/open-facilitator-appendix.md`); where the spec proposes and this document records, this document reflects the shipped artifacts. The framework runtime consumes the contract today: the Plan 02 transactional kernel (Kernel ingress below) and the Plan 03 Link server (Link transport below). The Workspace Link SDK (Plan 04) is the next consumer.
+This document describes the implemented wire contract: the JSON Schemas under `protocol/`, the conformance fixtures, and the rules both endpoints MUST follow. It is the as-built companion to spec §5 (`docs/specs/open_facilitator_framework_architecture.md`) and appendix §16 (`docs/specs/open-facilitator-appendix.md`); where the spec proposes and this document records, this document reflects the shipped artifacts. The framework runtime consumes the contract on both sides: the Plan 02 transactional kernel (Kernel ingress below), the Plan 03 Link server (Link transport below), and the Plan 04 Workspace Link SDK (client half below).
 
 ## Message classes and envelopes
 
@@ -243,3 +243,13 @@ The receipt timestamp is the frozen `processedAt` — the spec §5.2 example's `
 |`Link:MaxInFlight`|16|Per-session in-flight window (≥1); advertised in `welcome`, enforced at claim|
 |`Link:HeartbeatSeconds`|30 (5..600)|Client heartbeat cadence in `welcome`; SignalR keepalive = this, client timeout = 2×|
 |`Link:InFlightLeaseSeconds`|120|Redelivery deadline after each claim|
+
+## Client half — Workspace Link SDK (implemented, Plan 04)
+
+`src/workspace-link` (`@ofac/workspace-link`) is the reference client of the surface above. Entry points: package root (stack-agnostic core: `createLinkClient`, `enroll`, handler/transport interfaces, `FaultInjector`), `/node` (`SignalrTransport`, `HttpPollTransport`, `SqliteLedger`, `postCapabilities`), and the `ofac-linkd` bin (headless supervisor: enroll → capabilities → connect → serve; exit codes 0 clean, 2 config, 3 protocol mismatch, 4 enrollment rejected).
+
+Delivery pipeline law (spec S:301–302, enforced in `src/core/client.ts`): an inbound delivery is validated against the frozen schemas BEFORE persisting — an unknown COMMAND type enters the ledger and answers `unsupported`, any other violation answers `rejected` with no ledger row; a fresh, valid delivery is persisted to the durable ledger BEFORE its receipt leaves the process, and a failed receipt send never suppresses the handler result (redelivery converges on `duplicate` without re-running the handler). Outbound events sent while disconnected buffer in the same ledger (`ctx.publishEvent` resolves `accepted`; the buffer drains on the next `ready`).
+
+As-built asymmetry on the HTTP fallback: the server gives HTTP principals no WelcomeFrame and no lease row of its own — enrollment plus bearer token is the whole bootstrap, and every deliveries GET implicitly refreshes the session lease. The SDK's `HttpPollTransport` therefore maintains a hidden SignalR "session keeper" (connect + hello) to hold the `link_sessions` row; a `404 session-not-found` re-runs keeper connect + hello before the next poll. Because the keeper socket is a tracked hub connection, the server may push `Deliver` to it (the pump claims for any live socket, §7.3), so the transport forwards keeper frames into the same client pipeline as poll results — the ledger dedupes either arrival. `linkd --transport http-poll` wires this automatically.
+
+The e2e tier (`src/workspace-link/test/e2e/`, env-gated on `FACILITATOR_URL` + `FACILITATOR_PG`) boots its own Facilitator per file and proves handshake/supersede, delivery+dedupe, receipt-loss redelivery (`duplicate` termination), partition buffering + drain, HTTP-poll keeper revival, and linkd crash replay (SIGSTOP/SIGKILL, un-acked-only replay). CI runs it as the `link-e2e` job; locally `make link-e2e`.

@@ -30,6 +30,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm -r build
+      - run: pnpm -r --if-present typecheck
       - run: pnpm -r test
 
   protocol:
@@ -72,3 +73,40 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - run: docker build -t facilitator:ci -f src/facilitator/Dockerfile .
+
+  link-e2e:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v6
+        with:
+          cache: true
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r build
+      - name: build Facilitator (the e2e harness spawns its own server per file)
+        run: dotnet build src/facilitator -c Release
+      - name: workspace link e2e
+        env:
+          # Gate URL only: each e2e file boots its OWN Facilitator on an
+          # OS-assigned port (lease-epoch timing determinism), so the gate
+          # value never gets dialed.
+          FACILITATOR_URL: http://gate-only
+          FACILITATOR_PG: postgresql://postgres:postgres@localhost:5432/postgres
+        run: pnpm -C src/workspace-link test:e2e

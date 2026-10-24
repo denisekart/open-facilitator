@@ -1,4 +1,4 @@
-.PHONY: restore build test lint format protocol db-update compose-slim compose-full clean
+.PHONY: restore build test lint format protocol db-update compose-slim compose-full clean link-e2e
 
 restore:
 	dotnet restore OpenFacilitator.slnx
@@ -25,6 +25,13 @@ protocol:
 	pnpm protocol:codegen
 	npx swagger-cli validate protocol/openapi/link-v1.yaml
 	git diff --exit-code -- src/protocol/src/generated protocol/dotnet/Ofac.Protocol/Generated src/protocol/schemas
+
+link-e2e:
+	@echo "E2E tier: needs Postgres at FACILITATOR_PG (default: facilitator-dev on 5433);"
+	@echo "no psql binary on PATH? PG_ADMIN_CMD='docker exec facilitator-dev psql' PG_ADMIN_URL=postgresql://postgres:postgres@localhost:5432/postgres"
+	FACILITATOR_URL=$${FACILITATOR_URL:-http://gate-only} \
+	FACILITATOR_PG=$${FACILITATOR_PG:-postgresql://postgres:postgres@127.0.0.1:5433/postgres} \
+	pnpm -C src/workspace-link test:e2e
 
 db-update:
 	dotnet tool restore

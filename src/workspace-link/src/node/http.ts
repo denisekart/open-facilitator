@@ -5,7 +5,11 @@
 // GET refreshes the lease (no HTTP heartbeat endpoint). A pure-HTTP mode would
 // need a server session-mint endpoint (future additive OpenAPI change, not in
 // this plan), so this transport keeps a hidden SignalR connection that does
-// hello + heartbeats ONLY; deliveries flow through the frozen HTTP surface.
+// hello + heartbeats; deliveries flow through the frozen HTTP surface.
+// Because the keeper socket is a tracked hub connection, the pump MAY push
+// Deliver to it instead of leaving rows for the poll (§7.3: any live socket
+// claims) — the transport forwards keeper frames into the client pipeline,
+// and the ledger dedupes either arrival surface.
 //
 // Consequence: on 404 session-not-found the keeper reconnects and re-hellos
 // (fresh epoch — lease expiry, not TCP, ends a session), and the next GET
@@ -64,6 +68,20 @@ export class HttpPollTransport implements LinkTransport {
     this.keeper =
       options.keeper ??
       new SignalrTransport({ baseUrl: options.baseUrl, token: this.token as never });
+    // The keeper socket is a tracked hub connection, so the server may
+    // legitimately push Deliver/FlowControl/Disconnect to it (the pump
+    // claims for ANY live socket, §7.3). Forwarding keeps both arrival
+    // surfaces feeding the same client pipeline — the ledger dedupes, so
+    // a push-then-poll race can never double-run a delivery.
+    this.keeper.onDeliver((d) => {
+      for (const cb of this.deliverCbs) cb(d);
+    });
+    this.keeper.onFlow((f) => {
+      for (const cb of this.flowCbs) cb(f);
+    });
+    this.keeper.onDisconnect((g) => {
+      for (const cb of this.disconnectCbs) cb(g);
+    });
   }
 
   async connect(): Promise<void> {

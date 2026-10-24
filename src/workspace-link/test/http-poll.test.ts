@@ -6,7 +6,7 @@ import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
 import type { LinkDeliveryV1 } from "@ofac/protocol";
 import { HttpPollTransport } from "../src/node/index.js";
-import type { EnvelopeAck, LinkTransport, WelcomeFrame } from "../src/index.js";
+import type { EnvelopeAck, HelloFrame, LinkTransport, WelcomeFrame } from "../src/index.js";
 
 class ScriptedKeeper implements LinkTransport {
   connectCount = 0;
@@ -22,7 +22,9 @@ class ScriptedKeeper implements LinkTransport {
   async connect(): Promise<void> {
     this.connectCount += 1;
   }
-  async hello(): Promise<WelcomeFrame> {
+  lastHelloFrame: HelloFrame | null = null;
+  async hello(frame: HelloFrame): Promise<WelcomeFrame> {
+    this.lastHelloFrame = frame;
     this.helloCount += 1;
     return this.welcome;
   }
@@ -182,7 +184,7 @@ describe("HttpPollTransport", () => {
     harness = await startServer({ sessionAlive: () => alive });
     const keeper = harness.keeper;
     const originalHello = keeper.hello.bind(keeper);
-    keeper.hello = async (frame: Parameters<ScriptedKeeper["hello"]>[0]) => {
+    keeper.hello = async (frame: HelloFrame) => {
       const w = await originalHello(frame);
       helloSeen += 1;
       if (helloSeen >= 2) alive = true; // the resuscitation re-hello revives it

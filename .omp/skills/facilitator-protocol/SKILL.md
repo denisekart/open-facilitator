@@ -25,8 +25,23 @@ description: Workspace Link wire contract — CloudEvents envelope, command/even
 > `team-mismatch` 403, `enrollment-secret-invalid` 401 (`session-superseded` 409 and
 > `no-common-version` 409 are reserved HTTP shapes; as-built those arrive as SignalR
 > `Disconnect` goodbyes). Interim auth: `ILinkTokenValidator` seam — Plan 07 swaps in
-> OIDC + `principal_mappings`, call sites unchanged. Gateways and adapters are still
-> unbuilt. Update this skill the moment a slice lands.
+> OIDC + `principal_mappings`, call sites unchanged. The client half is IMPLEMENTED
+> (Plan 04, `src/workspace-link` = `@ofac/workspace-link`): core `createLinkClient`
+> (state machine idle→connecting→handshaking→ready→reconnecting, delivery pipeline
+> law S:301–302 — validate → persist-before-answer → receipt, redelivery converges on
+> `duplicate`), consumed hub methods `Hello`/`Envelope`/`Receipt`/`Heartbeat`/`Goodbye`
+> + client handlers `Deliver`/`FlowControl`/`Disconnect`; `/node` exports
+> `SignalrTransport` (negotiate + WS, bearer header), `HttpPollTransport` (long-poll
+> `wait=25` + hidden SignalR session keeper: HTTP principals get no WelcomeFrame, the
+> keeper holds the `link_sessions` lease row, a 404 `session-not-found` re-hellos
+> before the next poll, and keeper-pushed `Deliver` frames are forwarded into the
+> client pipeline — the ledger dedupes push-vs-poll arrival), `SqliteLedger` (replay
+> ledger + client outbox buffer),
+> `postCapabilities` (digest over exact POSTed bytes, `sha256:` prefix re-added for
+> hello). `ofac-linkd` bin: enroll→capabilities→serve, exit codes 0/2/3/4. Client-side
+> fixture gate: `test/fixtures.test.ts` runs the same `index.json`. E2E tier:
+> `test/e2e/` (env-gated, CI job `link-e2e`, `make link-e2e`). Gateways and adapters
+> are still unbuilt. Update this skill the moment a slice lands.
 
 # Facilitator Protocol
 

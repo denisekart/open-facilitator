@@ -66,6 +66,15 @@ curl -s -X POST localhost:8088/api/link/v1/capabilities -H "Authorization: Beare
 curl -s "localhost:8088/api/link/v1/deliveries?wait=2&limit=16" -H "Authorization: Bearer <linkToken>"  # 404 session-not-found until a hub hello opens a session
 ```
 
+The client half (Plan 04) is the `@ofac/workspace-link` SDK + the `ofac-linkd` supervisor — one command does enroll, capabilities POST, connect, and serve (echo-mode receipts); the state file replays un-acked work after a crash:
+
+```bash
+pnpm -r build   # once, builds dist/bin/linkd.js
+node src/workspace-link/dist/bin/linkd.js run \
+  --url http://localhost:8088 --secret enroll-dev \
+  --endpoint gw-dev --team default --manifest manifest.json   # prints "linkd ready ..."
+```
+
 The same assembly doubles as its own client, riding the public HTTP API only (defaults `--url http://localhost:8088`, token from env `FACILITATOR_TOKEN` else `dev-token`):
 
 ```bash

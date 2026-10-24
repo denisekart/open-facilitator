@@ -30,7 +30,8 @@
   "scripts": {
     "build": "tsup src/index.ts src/node/index.ts src/bin/linkd.ts --format esm --dts --target node22 --silent",
     "test": "vitest run --exclude '**/*.e2e.test.ts'",
-    "test:e2e": "vitest run --include '**/*.e2e.test.ts'"
+    "test:e2e": "vitest run --config vitest.e2e.config.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.test.json"
   },
   "dependencies": {
     "@microsoft/signalr": "catalog:",
@@ -38,6 +39,7 @@
     "better-sqlite3": "catalog:"
   },
   "devDependencies": {
+    "@types/node": "catalog:",
     "@types/better-sqlite3": "catalog:",
     "tsup": "catalog:",
     "typescript": "catalog:",

@@ -1,10 +1,8 @@
 using System.Diagnostics;
-using System.Text.Json;
 
 using Facilitator.Kernel.Shared.Persistence;
 
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Facilitator.Kernel.Dispatch;
 
@@ -23,39 +21,17 @@ public interface IEventDispatcher
 }
 
 /// <summary>
-/// Postgres-backed outbox dispatcher. Claim runs <c>FOR UPDATE SKIP LOCKED</c>
-/// inside a short tx (expired leases are claimable by the same predicate);
-/// sinks are called OUTSIDE any tx (spec §19.3). Failures requeue with capped
-/// exponential backoff; five charged attempts dead-letter the row with the
-/// original envelope snapshot (appendix §5.2/§5.6). Every outbox-state SET
-/// runs through <see cref="OutboxRepository"/>.
+/// Postgres-backed outbox dispatcher. The claim runs <c>FOR UPDATE SKIP LOCKED</c>
+/// inside a short tx (expired leases are claimable by the same predicate) and
+/// lives in <see cref="OutboxRepository"/>; sinks are called OUTSIDE any tx
+/// (spec §19.3). Failures requeue with capped exponential backoff; five charged
+/// attempts dead-letter the row with the original envelope snapshot (appendix
+/// §5.2/§5.6). Every outbox-state SET runs through <see cref="OutboxRepository"/>.
 /// </summary>
 public sealed class DbEventDispatcher : IEventDispatcher
 {
     private const int MaxAttempts = 5;
-    private const int BatchSize = 20;
-    private static readonly TimeSpan LeaseDuration = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan GaugeCache = TimeSpan.FromSeconds(5);
-
-    private readonly string _claimSql = $"""
-        WITH claim AS (
-          SELECT outbox_id
-            FROM facilitator.outbox
-           WHERE (status = 'pending' AND available_at <= now())
-              OR (status = 'leased' AND leased_until < now())
-           ORDER BY available_at
-           LIMIT {BatchSize}
-           FOR UPDATE SKIP LOCKED
-        )
-        UPDATE facilitator.outbox o
-           SET status = 'leased',
-               lease_owner = @owner,
-               leased_until = now() + interval '{(int)LeaseDuration.TotalSeconds} seconds',
-               attempts = o.attempts + 1
-          FROM claim
-         WHERE o.outbox_id = claim.outbox_id
-        RETURNING o.outbox_id, o.recipient_endpoint_id, o.event_type, o.command_id, o.envelope, o.attempts
-        """;
 
     private readonly IDbContextFactory<Persistence.FacilitatorDbContext> _contextFactory;
     private readonly OutboxRepository _outbox;
@@ -89,7 +65,7 @@ public sealed class DbEventDispatcher : IEventDispatcher
     {
         await RefreshGaugesAsync(ct);
 
-        var claimed = await ClaimAsync(ct);
+        var claimed = await _outbox.ClaimAsync(_replicaId, ct);
         if (claimed.Count == 0)
         {
             return 0;
@@ -143,39 +119,6 @@ public sealed class DbEventDispatcher : IEventDispatcher
     {
         var dot = recipientEndpointId.IndexOf('.', StringComparison.Ordinal);
         return dot < 0 ? recipientEndpointId : recipientEndpointId[..dot];
-    }
-
-    private async Task<List<OutboxRow>> ClaimAsync(CancellationToken ct)
-    {
-        await using var db = await _contextFactory.CreateDbContextAsync(ct);
-        await using var tx = await db.Database.BeginTransactionAsync(ct);
-        var connection = db.Database.GetDbConnection();
-
-        var rows = new List<OutboxRow>();
-        await using (var command = connection.CreateCommand())
-        {
-            command.Transaction = db.Database.CurrentTransaction!.GetDbTransaction();
-            command.CommandText = _claimSql;
-            var owner = command.CreateParameter();
-            owner.ParameterName = "@owner";
-            owner.Value = _replicaId;
-            command.Parameters.Add(owner);
-
-            await using var reader = await command.ExecuteReaderAsync(ct);
-            while (await reader.ReadAsync(ct))
-            {
-                rows.Add(new OutboxRow(
-                    reader.GetGuid(0),
-                    reader.GetString(1),
-                    reader.GetString(2),
-                    reader.GetString(3),
-                    JsonDocument.Parse(reader.GetString(4)).RootElement.Clone(),
-                    reader.GetInt32(5)));
-            }
-        }
-
-        await tx.CommitAsync(ct);
-        return rows;
     }
 
     private async Task HandleFailureAsync(OutboxRow row, string error, bool noRoute, CancellationToken ct)

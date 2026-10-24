@@ -1,8 +1,10 @@
 using System.Text.Json;
 
+using Facilitator.Kernel.Dispatch;
 using Facilitator.Kernel.Persistence;
 
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Facilitator.Kernel.Shared.Persistence;
 
@@ -15,15 +17,73 @@ namespace Facilitator.Kernel.Shared.Persistence;
 public sealed record DeadLetterRow(Guid DeadLetterId, Guid OutboxId, string Reason, string Envelope, DateTime CreatedAt);
 
 /// <summary>
-/// Every <c>facilitator.outbox</c> state SET in one place: claim-expired
-/// reclaim, mark-delivered, requeue-with-backoff, dead-letter, and the dev
-/// test-affordance insert (+wake). Raw SQL only where the stance allows it
-/// (lease reclaim, backoff arithmetic); EF for the plain inserts.
+/// Every <c>facilitator.outbox</c> state SET in one place: the SKIP LOCKED
+/// claim, claim-expired reclaim, mark-delivered, requeue-with-backoff,
+/// dead-letter, and the dev test-affordance insert (+wake). Raw SQL only where
+/// the stance allows it (claim, lease reclaim, backoff arithmetic); EF for the
+/// plain inserts.
 /// </summary>
 public sealed class OutboxRepository(
     IDbContextFactory<FacilitatorDbContext> contextFactory,
     TimeProvider timeProvider)
 {
+    private const int ClaimBatchSize = 20;
+    private static readonly TimeSpan ClaimLease = TimeSpan.FromSeconds(30);
+
+    private static readonly string ClaimSql = $"""
+        WITH claim AS (
+          SELECT outbox_id
+            FROM facilitator.outbox
+           WHERE (status = 'pending' AND available_at <= now())
+              OR (status = 'leased' AND leased_until < now())
+           ORDER BY available_at
+           LIMIT {ClaimBatchSize}
+           FOR UPDATE SKIP LOCKED
+        )
+        UPDATE facilitator.outbox o
+           SET status = 'leased',
+               lease_owner = @owner,
+               leased_until = now() + interval '{(int)ClaimLease.TotalSeconds} seconds',
+               attempts = o.attempts + 1
+          FROM claim
+         WHERE o.outbox_id = claim.outbox_id
+        RETURNING o.outbox_id, o.recipient_endpoint_id, o.event_type, o.command_id, o.envelope, o.attempts
+        """;
+
+    /// <summary>Claim one batch of due rows under <c>FOR UPDATE SKIP LOCKED</c> and lease them to <paramref name="owner"/>.</summary>
+    public async Task<List<OutboxRow>> ClaimAsync(string owner, CancellationToken ct)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(ct);
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        var connection = db.Database.GetDbConnection();
+
+        var rows = new List<OutboxRow>();
+        await using (var command = connection.CreateCommand())
+        {
+            command.Transaction = db.Database.CurrentTransaction!.GetDbTransaction();
+            command.CommandText = ClaimSql;
+            var p = command.CreateParameter();
+            p.ParameterName = "@owner";
+            p.Value = owner;
+            command.Parameters.Add(p);
+
+            await using var reader = await command.ExecuteReaderAsync(ct);
+            while (await reader.ReadAsync(ct))
+            {
+                rows.Add(new OutboxRow(
+                    reader.GetGuid(0),
+                    reader.GetString(1),
+                    reader.GetString(2),
+                    reader.GetString(3),
+                    JsonDocument.Parse(reader.GetString(4)).RootElement.Clone(),
+                    reader.GetInt32(5)));
+            }
+        }
+
+        await tx.CommitAsync(ct);
+        return rows;
+    }
+
     /// <summary>Flip a delivered row out of the claim set (dispatcher success path).</summary>
     public async Task MarkDeliveredAsync(Guid outboxId, CancellationToken ct)
     {

@@ -1,6 +1,6 @@
 using System.Diagnostics.Metrics;
 
-namespace Facilitator.Kernel.Dispatch;
+namespace Facilitator.Kernel.Shared.Dispatch;
 
 /// <summary>
 /// The <c>facilitator</c> meter's instruments (appendix §9.1). Queue-depth

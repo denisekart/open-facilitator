@@ -1,13 +1,17 @@
 using System.Data.Common;
 using System.Text.Json;
 
-using Facilitator.Kernel.Persistence;
+using Facilitator.Kernel.Shared.Dispatch;
 
 using Microsoft.EntityFrameworkCore;
 
 using Microsoft.EntityFrameworkCore.Storage;
 
-namespace Facilitator.Kernel.Link;
+using Facilitator.Kernel.Link;
+
+using LinkOptions = Facilitator.Kernel.Link.LinkOptions;
+
+namespace Facilitator.Kernel.Shared.Persistence;
 
 /// <summary>A claimed delivery ready to be offered to the endpoint.</summary>
 /// <param name="Delivery">Wire payload (deliveryId + envelope + deliveredAt).</param>
@@ -27,7 +31,7 @@ public sealed class LinkLedger(
     IDbContextFactory<FacilitatorDbContext> contextFactory,
     LinkOptions options,
     TimeProvider timeProvider,
-    Facilitator.Kernel.Dispatch.KernelMetrics metrics)
+    KernelMetrics metrics)
 {
     /// <summary>
     /// Materialize link-addressed outbox rows into the ledger while a live
@@ -237,7 +241,7 @@ public sealed class LinkLedger(
             return false;
         }
 
-        await Facilitator.Kernel.Shared.Persistence.OutboxRepository.MarkDeliveredOnAsync(db, deliveryId, now, ct);
+        await OutboxRepository.MarkDeliveredOnAsync(db, deliveryId, now, ct);
         await tx.CommitAsync(ct);
         return true;
     }

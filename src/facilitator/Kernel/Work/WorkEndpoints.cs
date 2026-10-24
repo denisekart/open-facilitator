@@ -1,39 +1,38 @@
-using System.Text;
 using System.Text.Json;
 
-using Facilitator.Kernel.Dispatch;
-using Facilitator.Kernel.Persistence;
+using Facilitator.Kernel.Shared;
+using Facilitator.Kernel.Shared.Dispatch;
+using Facilitator.Kernel.Shared.Persistence;
 
-using Microsoft.AspNetCore.Http.Features;
-
-namespace Facilitator.Kernel.Ingress;
+namespace Facilitator.Kernel.Work;
 
 /// <summary>
 /// `/api` surface (bootstrap-auth'd, all JSON camelCase). Endpoints stay
-/// thin: read the raw body, then delegate to <see cref="IngressProcessor"/>.
+/// thin: read the raw body, then delegate to <see cref="IngressProcessor"/>
+/// / <see cref="CloudEventIngress"/>.
 /// </summary>
-public static class KernelEndpoints
+public static class WorkEndpoints
 {
-    /// <summary>Map the kernel API group.</summary>
-    public static IEndpointRouteBuilder MapKernelApi(this IEndpointRouteBuilder app, IHostEnvironment environment)
+    /// <summary>Map the kernel work-API group.</summary>
+    public static IEndpointRouteBuilder MapWorkApi(this IEndpointRouteBuilder app, IHostEnvironment environment)
     {
         var group = app.MapGroup("/api");
 
         group.MapPost("/works", async (HttpRequest request, IngressProcessor processor, CancellationToken ct) =>
         {
-            var body = await ReadBodyAsync(request, ct);
+            var body = await RequestBodies.ReadAsync(request, ct);
             if (body.TooLarge)
             {
                 return Results.Problem(ProblemErrors.PayloadTooLarge(body.Bytes));
             }
 
-            return await Parse(body, document => processor.CreateWorkAsync(document.RootElement.Clone(), ct));
+            return await RequestBodyJson.ParseAsync(body, document => processor.CreateWorkAsync(document.RootElement.Clone(), ct));
         });
 
         group.MapGet("/works", async (IngressStore store, CancellationToken ct) =>
         {
             var works = await store.ListRecentAsync(ct);
-            return Results.Ok(works.Select(IngressProcessor.ToDto).ToArray());
+            return Results.Ok(works.Select(WorkDtoMapper.ToDto).ToArray());
         });
 
         group.MapGet("/works/{id:guid}", async (Guid id, ICoordinationStore store, CancellationToken ct) =>
@@ -41,29 +40,29 @@ public static class KernelEndpoints
             var work = await store.GetAsync(id, ct);
             return work is null
                 ? Results.Problem(ProblemErrors.WorkNotFound(id))
-                : Results.Ok(IngressProcessor.ToDto(work));
+                : Results.Ok(WorkDtoMapper.ToDto(work));
         });
 
         group.MapPost("/works/{id:guid}/steer", async (Guid id, HttpRequest request, IngressProcessor processor, CancellationToken ct) =>
         {
-            var body = await ReadBodyAsync(request, ct);
+            var body = await RequestBodies.ReadAsync(request, ct);
             if (body.TooLarge)
             {
                 return Results.Problem(ProblemErrors.PayloadTooLarge(body.Bytes));
             }
 
-            return await Parse(body, document => processor.SteerAsync(id, document.RootElement.Clone(), ct));
+            return await RequestBodyJson.ParseAsync(body, document => processor.SteerAsync(id, document.RootElement.Clone(), ct));
         });
 
         group.MapPost("/works/{id:guid}/transitions", async (Guid id, HttpRequest request, IngressProcessor processor, CancellationToken ct) =>
         {
-            var body = await ReadBodyAsync(request, ct);
+            var body = await RequestBodies.ReadAsync(request, ct);
             if (body.TooLarge)
             {
                 return Results.Problem(ProblemErrors.PayloadTooLarge(body.Bytes));
             }
 
-            return await Parse(body, document => processor.TransitionAsync(id, document.RootElement.Clone(), ct));
+            return await RequestBodyJson.ParseAsync(body, document => processor.TransitionAsync(id, document.RootElement.Clone(), ct));
         });
 
         group.MapGet("/works/{id:guid}/timeline", async (Guid id, ICoordinationStore store, CancellationToken ct) =>
@@ -72,15 +71,15 @@ public static class KernelEndpoints
             return Results.Ok(rows.ToArray());
         });
 
-        group.MapPost("/ingress/events", async (HttpRequest request, IngressProcessor processor, CancellationToken ct) =>
+        group.MapPost("/ingress/events", async (HttpRequest request, CloudEventIngress ingress, CancellationToken ct) =>
         {
-            var body = await ReadBodyAsync(request, ct);
+            var body = await RequestBodies.ReadAsync(request, ct);
             if (body.TooLarge)
             {
                 return Results.Problem(ProblemErrors.PayloadTooLarge(body.Bytes));
             }
 
-            return await processor.IngestEventAsync(body.Text, ct);
+            return await ingress.IngestEventAsync(body.Text, ct);
         });
 
         if (environment.IsDevelopment())
@@ -92,48 +91,5 @@ public static class KernelEndpoints
         }
 
         return app;
-    }
-
-    private sealed record Body(string Text, int Bytes, bool TooLarge);
-
-    private static async Task<Body> ReadBodyAsync(HttpRequest request, CancellationToken ct)
-    {
-        const int limit = IngressProcessor.MaxBodyBytes;
-        var sizeFeature = request.HttpContext.Features.Get<IHttpMaxRequestBodySizeFeature>();
-        if (sizeFeature is { IsReadOnly: false })
-        {
-            sizeFeature.MaxRequestBodySize = limit;
-        }
-        if (request.ContentLength > limit)
-        {
-            return new Body(string.Empty, (int)request.ContentLength!.Value, true);
-        }
-
-        try
-        {
-            using var reader = new StreamReader(request.Body, Encoding.UTF8, leaveOpen: true);
-            var text = await reader.ReadToEndAsync(ct);
-            var bytes = Encoding.UTF8.GetByteCount(text);
-            return new Body(text, bytes, bytes > limit);
-        }
-        catch (BadHttpRequestException)
-        {
-            // Chunked body exceeded the enforced request limit mid-read.
-            return new Body(string.Empty, limit + 1, true);
-        }
-    }
-
-    /// <summary>Parse a request body to JSON, 400 schema-violation when malformed.</summary>
-    private static async Task<IResult> Parse(Body body, Func<JsonDocument, Task<IResult>> handler)
-    {
-        try
-        {
-            using var document = JsonDocument.Parse(body.Text.Length == 0 ? "{}" : body.Text);
-            return await handler(document);
-        }
-        catch (JsonException)
-        {
-            return Results.Problem(ProblemErrors.SchemaViolation("body is not valid JSON"));
-        }
     }
 }

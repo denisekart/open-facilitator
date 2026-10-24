@@ -1,10 +1,14 @@
 using System.Data.Common;
 
-using Facilitator.Kernel.Persistence;
+using Facilitator.Kernel.Shared.Persistence;
 
 using Microsoft.EntityFrameworkCore;
 
-namespace Facilitator.Kernel.Link;
+using Facilitator.Kernel.Link;
+
+using LinkOptions = Facilitator.Kernel.Link.LinkOptions;
+
+namespace Facilitator.Kernel.Shared.Persistence;
 
 /// <summary>A live (lease-unexpired) session view.</summary>
 /// <param name="EndpointId">Logical endpoint.</param>
@@ -29,7 +33,7 @@ public sealed class LinkService(
     IConfiguration configuration,
     TimeProvider timeProvider)
 {
-    private readonly string _replicaId = Facilitator.Kernel.Shared.KernelOptions.ReplicaId(configuration);
+    private readonly string _replicaId = KernelOptions.ReplicaId(configuration);
 
     /// <summary>Replica identity stamped on every session row (spec §7.3 placement).</summary>
     public string ReplicaId => _replicaId;

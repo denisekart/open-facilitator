@@ -43,3 +43,30 @@ public sealed record EnrollResponseDto(
 /// <param name="Envelope">Original CloudEvent snapshot.</param>
 /// <param name="CreatedAt">Dead-letter time (UTC).</param>
 public sealed record DeadLetterDto(Guid DeadLetterId, Guid OutboxId, string Reason, JsonElement Envelope, DateTime CreatedAt);
+
+/// <summary>Server→client <c>welcome</c> frame (control.v1.json, exact fields).</summary>
+public sealed record WelcomeFrame(
+    [property: JsonPropertyName("kind")] string Kind,
+    [property: JsonPropertyName("sessionId")] string SessionId,
+    [property: JsonPropertyName("leaseEpoch")] long LeaseEpoch,
+    [property: JsonPropertyName("maxInFlight")] int MaxInFlight,
+    [property: JsonPropertyName("heartbeatSeconds")] int HeartbeatSeconds,
+    [property: JsonPropertyName("protocolVersion")] string ProtocolVersion);
+
+/// <summary>Server→client <c>goodbye</c> frame (Disconnect client-method payload).</summary>
+public sealed record GoodbyeFrame(
+    [property: JsonPropertyName("kind")] string Kind,
+    [property: JsonPropertyName("sessionId")] string SessionId,
+    [property: JsonPropertyName("reason")] string Reason);
+
+/// <summary>Server→client <c>flow_control</c> frame (pause = maxInFlight 0).</summary>
+public sealed record FlowControlFrame(
+    [property: JsonPropertyName("kind")] string Kind,
+    [property: JsonPropertyName("sessionId")] string SessionId,
+    [property: JsonPropertyName("maxInFlight")] int MaxInFlight);
+
+/// <summary>Result of the hub Envelope method (mirrors the HTTP /events codes).</summary>
+/// <param name="Status">accepted | duplicate | rejected.</param>
+/// <param name="DeliveryId">Inbox row id (identity the receipt would reference), when admitted.</param>
+/// <param name="Problem">Typed problem document when refused (422/400/413 equivalents).</param>
+public sealed record EnvelopeAck(string Status, string? DeliveryId = null, Microsoft.AspNetCore.Mvc.ProblemDetails? Problem = null);

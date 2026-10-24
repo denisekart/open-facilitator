@@ -1,12 +1,12 @@
 using System.Text.Json;
 
-using Facilitator.Kernel.Domain;
+using Facilitator.Kernel.Shared.Persistence;
 
 using Microsoft.EntityFrameworkCore;
 
 using Ofac.Protocol.Validation;
 
-namespace Facilitator.Kernel.Persistence;
+namespace Facilitator.Kernel.Work;
 
 /// <summary>
 /// EF Core implementation of the §20 coordination seam. Each mutation opens

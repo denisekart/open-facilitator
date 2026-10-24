@@ -1,4 +1,4 @@
-namespace Facilitator.Kernel.Persistence;
+namespace Facilitator.Kernel.Shared.Persistence;
 
 // Table-backed entity classes (schema `facilitator`, see FacilitatorDbContext
 // for the ADR header). Guid ids are generated client-side; all timestamps are

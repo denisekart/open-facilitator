@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 
 using Facilitator.Kernel.Link;
+using Facilitator.Kernel.Shared.Persistence;
 
 using Microsoft.Extensions.DependencyInjection;
 

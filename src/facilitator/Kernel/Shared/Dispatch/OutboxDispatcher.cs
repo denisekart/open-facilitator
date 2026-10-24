@@ -1,6 +1,6 @@
 using Facilitator.Kernel.Shared.Persistence;
 
-namespace Facilitator.Kernel.Dispatch;
+namespace Facilitator.Kernel.Shared.Dispatch;
 
 /// <summary>
 /// Thin timer over <see cref="IEventDispatcher"/> (no new container, spec

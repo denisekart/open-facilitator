@@ -1,8 +1,6 @@
 using System.Text.Json;
 
-using Facilitator.Kernel.Dispatch;
-using Facilitator.Kernel.Persistence;
-
+using Facilitator.Kernel.Shared.Dispatch;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 

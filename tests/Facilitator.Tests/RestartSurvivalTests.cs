@@ -1,6 +1,6 @@
 using System.Net;
 
-using Facilitator.Kernel.Dispatch;
+using Facilitator.Kernel.Shared.Dispatch;
 
 using Microsoft.Extensions.DependencyInjection;
 

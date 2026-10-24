@@ -1,4 +1,4 @@
-namespace Facilitator.Kernel.Domain;
+namespace Facilitator.Kernel.Work;
 
 /// <summary>Canonical Work states (spec §4.1).</summary>
 public enum WorkState

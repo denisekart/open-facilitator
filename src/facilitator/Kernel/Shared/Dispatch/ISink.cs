@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
 
-namespace Facilitator.Kernel.Dispatch;
+namespace Facilitator.Kernel.Shared.Dispatch;
 
 /// <summary>Delivery view of an outbox row, handed to sinks outside any tx.</summary>
 /// <param name="OutboxId">Outbox row identity (delivery id).</param>

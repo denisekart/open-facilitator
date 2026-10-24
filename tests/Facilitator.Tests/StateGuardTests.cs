@@ -1,4 +1,4 @@
-using Facilitator.Kernel.Domain;
+using Facilitator.Kernel.Work;
 
 namespace Facilitator.Tests;
 

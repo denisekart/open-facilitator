@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 
-namespace Facilitator.Kernel.Persistence;
+namespace Facilitator.Kernel.Shared.Persistence;
 
 /// <summary>
 /// Design-time factory for <c>dotnet ef</c> (migrations add / database update)

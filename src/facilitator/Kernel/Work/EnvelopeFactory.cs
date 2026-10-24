@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.Text.Json.Nodes;
 
-namespace Facilitator.Kernel.Domain;
+namespace Facilitator.Kernel.Work;
 
 /// <summary>
 /// Builds CloudEvents 1.0 envelopes for kernel-emitted events. Every envelope

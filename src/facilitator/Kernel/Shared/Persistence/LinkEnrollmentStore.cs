@@ -1,11 +1,16 @@
 using System.Security.Cryptography;
 using System.Text;
 
-using Facilitator.Kernel.Persistence;
+using Facilitator.Kernel.Shared.Persistence;
 
 using Microsoft.EntityFrameworkCore;
 
-namespace Facilitator.Kernel.Link;
+using Facilitator.Kernel.Shared.Auth;
+using Facilitator.Kernel.Link;
+
+using LinkOptions = Facilitator.Kernel.Link.LinkOptions;
+
+namespace Facilitator.Kernel.Shared.Persistence;
 
 /// <summary>Successful enrollment (the wire response minus nothing: token included).</summary>
 /// <param name="EnrollmentId">Enrollment record identity.</param>

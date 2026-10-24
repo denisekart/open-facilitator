@@ -1,4 +1,5 @@
-using Facilitator.Kernel.Dispatch;
+using Facilitator.Kernel.Shared.Dispatch;
+using Facilitator.Kernel.Shared.Persistence;
 
 namespace Facilitator.Kernel.Link;
 

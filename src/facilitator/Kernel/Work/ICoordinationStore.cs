@@ -1,6 +1,4 @@
-using Facilitator.Kernel.Domain;
-
-namespace Facilitator.Kernel.Persistence;
+namespace Facilitator.Kernel.Work;
 
 /// <summary>Read projection of a Work for API responses.</summary>
 /// <param name="WorkId">Work identity.</param>

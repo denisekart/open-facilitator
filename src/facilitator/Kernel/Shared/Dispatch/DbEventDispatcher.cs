@@ -4,7 +4,7 @@ using Facilitator.Kernel.Shared.Persistence;
 
 using Microsoft.EntityFrameworkCore;
 
-namespace Facilitator.Kernel.Dispatch;
+namespace Facilitator.Kernel.Shared.Dispatch;
 
 /// <summary>
 /// §20 dispatcher surface: claim + deliver one batch, and reclaim expired
@@ -57,7 +57,7 @@ public sealed class DbEventDispatcher : IEventDispatcher
             .ToDictionary(g => g.Key, g => g.Last(), StringComparer.Ordinal);
         _metrics = metrics;
         _logger = logger;
-        _replicaId = Facilitator.Kernel.Shared.KernelOptions.ReplicaId(configuration);
+        _replicaId = KernelOptions.ReplicaId(configuration);
     }
 
     /// <inheritdoc />

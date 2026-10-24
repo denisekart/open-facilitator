@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 
-namespace Facilitator.Kernel.Ingress;
+namespace Facilitator.Kernel.Shared;
 
 /// <summary>
 /// RFC 9457 ProblemDetails factory; every API error carries a

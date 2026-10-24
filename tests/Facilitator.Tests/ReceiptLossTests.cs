@@ -29,7 +29,7 @@ public sealed class ReceiptLossTests(PostgresFixture fixture)
         // a live session row is the delivery-read precondition (locked rule):
         // a hub handshake would insert it; an HTTP-only principal refreshes it
         // implicitly — open one directly through the session service.
-        var sessions = factory.Services.GetRequiredService<Facilitator.Kernel.Link.LinkService>();
+        var sessions = factory.Services.GetRequiredService<Facilitator.Kernel.Shared.Persistence.LinkService>();
         await sessions.OpenSessionAsync(endpoint, "http-1", null, 300, CancellationToken.None);
 
         await LinkTestHarness.QueueLinkOutboxAsync(kernel, endpoint, LinkTestHarness.AssignEnvelopeFor(endpoint));
@@ -77,7 +77,7 @@ public sealed class ReceiptLossTests(PostgresFixture fixture)
         var endpoint = "gw-rl-" + Guid.NewGuid().ToString("N")[..8];
         var token = await LinkTestHarness.EnrollAsync(kernel, endpoint);
         var link = factory.CreateLinkClient(token);
-        var sessions = factory.Services.GetRequiredService<Facilitator.Kernel.Link.LinkService>();
+        var sessions = factory.Services.GetRequiredService<Facilitator.Kernel.Shared.Persistence.LinkService>();
         await sessions.OpenSessionAsync(endpoint, "http-1", null, 300, CancellationToken.None);
 
         var started = Stopwatch.GetTimestamp();

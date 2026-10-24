@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace Facilitator.Kernel.Persistence;
+namespace Facilitator.Kernel.Shared.Persistence;
 
 /// <summary>Applies pending EF migrations at startup, serialized across replicas.</summary>
 public interface IDatabaseInitializer

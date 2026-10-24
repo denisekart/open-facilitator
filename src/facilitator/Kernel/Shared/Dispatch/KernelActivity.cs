@@ -1,6 +1,6 @@
 using System.Diagnostics;
 
-namespace Facilitator.Kernel.Dispatch;
+namespace Facilitator.Kernel.Shared.Dispatch;
 
 /// <summary>Activity source for kernel spans (<c>Facilitator.Kernel</c>).</summary>
 public static class KernelActivity

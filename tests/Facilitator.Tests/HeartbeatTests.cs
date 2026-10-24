@@ -1,4 +1,5 @@
 using Facilitator.Kernel.Link;
+using Facilitator.Kernel.Shared.Persistence;
 
 using Microsoft.Extensions.DependencyInjection;
 

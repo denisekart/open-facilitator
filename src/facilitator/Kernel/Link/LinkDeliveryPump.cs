@@ -1,4 +1,4 @@
-using Facilitator.Kernel.Dispatch;
+using Facilitator.Kernel.Shared.Dispatch;
 using Facilitator.Kernel.Shared.Persistence;
 
 using Microsoft.AspNetCore.SignalR;

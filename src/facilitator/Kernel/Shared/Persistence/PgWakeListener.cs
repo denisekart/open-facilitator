@@ -1,5 +1,3 @@
-using Facilitator.Kernel.Persistence;
-
 using Microsoft.EntityFrameworkCore;
 
 using Npgsql;

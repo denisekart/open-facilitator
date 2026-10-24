@@ -1,9 +1,9 @@
 using Facilitator.Kernel;
-using Facilitator.Kernel.Auth;
-using Facilitator.Kernel.Cli;
-using Facilitator.Kernel.Ingress;
+using Facilitator.Kernel.Shared.Auth;
+using Facilitator.Kernel.Shared.Cli;
+using Facilitator.Kernel.Work;
 using Facilitator.Kernel.Link;
-using Facilitator.Kernel.Persistence;
+using Facilitator.Kernel.Shared.Persistence;
 
 if (args.Length > 0 && args[0] == "cli")
 {
@@ -30,7 +30,7 @@ app.UseMiddleware<LinkAuthMiddleware>();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseRateLimiter();
-app.MapKernelApi(app.Environment);
+app.MapWorkApi(app.Environment);
 app.MapLinkApi(app.Environment);
 
 await app.RunAsync();

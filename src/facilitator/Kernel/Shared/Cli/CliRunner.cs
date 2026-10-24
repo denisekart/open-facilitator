@@ -2,7 +2,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 
-namespace Facilitator.Kernel.Cli;
+namespace Facilitator.Kernel.Shared.Cli;
 
 /// <summary>
 /// The Facilitator doubles as its own client: <c>cli</c> mode talks to the

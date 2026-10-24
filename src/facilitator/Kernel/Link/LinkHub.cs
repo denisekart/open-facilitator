@@ -1,7 +1,10 @@
 using System.Security.Claims;
 using System.Text.Json;
 
-using Facilitator.Kernel.Dispatch;
+using Facilitator.Kernel.Shared;
+using Facilitator.Kernel.Shared.Auth;
+using Facilitator.Kernel.Shared.Persistence;
+using Facilitator.Kernel.Shared.Dispatch;
 
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
@@ -10,33 +13,6 @@ using Ofac.Protocol.Validation;
 
 namespace Facilitator.Kernel.Link;
 
-/// <summary>Server→client <c>welcome</c> frame (control.v1.json, exact fields).</summary>
-public sealed record WelcomeFrame(
-    [property: System.Text.Json.Serialization.JsonPropertyName("kind")] string Kind,
-    [property: System.Text.Json.Serialization.JsonPropertyName("sessionId")] string SessionId,
-    [property: System.Text.Json.Serialization.JsonPropertyName("leaseEpoch")] long LeaseEpoch,
-    [property: System.Text.Json.Serialization.JsonPropertyName("maxInFlight")] int MaxInFlight,
-    [property: System.Text.Json.Serialization.JsonPropertyName("heartbeatSeconds")] int HeartbeatSeconds,
-    [property: System.Text.Json.Serialization.JsonPropertyName("protocolVersion")] string ProtocolVersion);
-
-/// <summary>Server→client <c>goodbye</c> frame (Disconnect client-method payload).</summary>
-public sealed record GoodbyeFrame(
-    [property: System.Text.Json.Serialization.JsonPropertyName("kind")] string Kind,
-    [property: System.Text.Json.Serialization.JsonPropertyName("sessionId")] string SessionId,
-    [property: System.Text.Json.Serialization.JsonPropertyName("reason")] string Reason);
-
-/// <summary>Server→client <c>flow_control</c> frame (pause = maxInFlight 0).</summary>
-public sealed record FlowControlFrame(
-    [property: System.Text.Json.Serialization.JsonPropertyName("kind")] string Kind,
-    [property: System.Text.Json.Serialization.JsonPropertyName("sessionId")] string SessionId,
-    [property: System.Text.Json.Serialization.JsonPropertyName("maxInFlight")] int MaxInFlight);
-
-/// <summary>Result of the hub Envelope method (mirrors the HTTP /events codes).</summary>
-/// <param name="Status">accepted | duplicate | rejected.</param>
-/// <param name="DeliveryId">Inbox row id (identity the receipt would reference), when admitted.</param>
-/// <param name="Problem">Typed problem document when refused (422/400/413 equivalents).</param>
-public sealed record EnvelopeAck(string Status, string? DeliveryId = null, Microsoft.AspNetCore.Mvc.ProblemDetails? Problem = null);
-
 /// <summary>
 /// The Workspace Link hub: thin transport, no work execution. Server methods
 /// <c>Hello</c>/<c>Envelope</c>/<c>Receipt</c>/<c>Heartbeat</c>/<c>Goodbye</c>;
@@ -44,14 +20,14 @@ public sealed record EnvelopeAck(string Status, string? DeliveryId = null, Micro
 /// <c>FlowControl</c>, <c>Disconnect</c> (spec S:294). Authoritative liveness
 /// is the <c>link_sessions</c> lease, not socket state; this replica's
 /// registry only knows its own sockets (§7.3). Bearer auth runs through the
-/// <c>link</c> authentication scheme, which shares the
+/// <c>facilitator-link</c> scheme, which shares the
 /// <see cref="ILinkTokenValidator"/> seam with the HTTP surface.
 /// </summary>
 [Authorize(AuthenticationSchemes = LinkBearerHandler.SchemeName)]
 public sealed class LinkHub(
     LinkService sessions,
     LinkConnectionRegistry registry,
-    LinkLedger ledger,
+    LinkReceipts receipts,
     LinkIngress ingress,
     LinkDeliveryPump pump,
     ControlFrameValidator frames,
@@ -152,10 +128,9 @@ public sealed class LinkHub(
     }
 
     /// <summary>
-    /// Receipt for a delivered envelope: the ledger is truth (S:291). The
-    /// caller's endpoint must own the delivery; a receipt for an already-acked
-    /// delivery is idempotent (it answers the latest attempt). Acking frees
-    /// in-flight capacity ⇒ FlowControl resume + the waiting half of the pump.
+    /// Receipt for a delivered envelope: the ledger is truth (S:291) and
+    /// <see cref="LinkReceipts.CommitAsync"/> is the single commit path shared
+    /// with the HTTP receipt endpoint.
     /// </summary>
     public async Task Receipt(JsonElement receipt)
     {
@@ -171,7 +146,10 @@ public sealed class LinkHub(
             throw new HubException("deliveryId must be the delivery's uuid");
         }
 
-        await AckAsync(principal, deliveryId, receipt.GetRawText());
+        if (!await receipts.CommitAsync(principal, deliveryId, receipt.GetRawText(), Context.ConnectionAborted))
+        {
+            throw new HubException($"delivery {deliveryId} not found for endpoint {principal.EndpointId}");
+        }
     }
 
     /// <summary>Refresh the lease for a matching (endpoint, leaseEpoch); stale ⇒ goodbye + false.</summary>
@@ -221,27 +199,6 @@ public sealed class LinkHub(
     {
         registry.Unregister(Context.ConnectionId);
         return base.OnDisconnectedAsync(exception);
-    }
-
-    /// <summary>Record the receipt + flip the outbox row (shared with the HTTP receipt endpoint).</summary>
-    internal async Task AckAsync(LinkPrincipal principal, Guid deliveryId, string receiptJson)
-    {
-        var state = await ledger.StateAsync(deliveryId, Context.ConnectionAborted);
-        if (state is null || state.Value.EndpointId != principal.EndpointId)
-        {
-            throw new HubException($"delivery {deliveryId} not found for endpoint {principal.EndpointId}");
-        }
-
-        // state='acked' receipts are idempotent: AckAsync re-records the jsonb
-        // and answers success (the loop terminates at the ledger).
-        var acked = await ledger.AckAsync(deliveryId, principal.EndpointId, receiptJson, Context.ConnectionAborted);
-        if (!acked)
-        {
-            throw new HubException($"delivery {deliveryId} not found for endpoint {principal.EndpointId}");
-        }
-
-        await pump.PumpEndpointAsync(principal.EndpointId, options.MaxInFlight, Context.ConnectionAborted);
-        registry.Wake(principal.EndpointId);
     }
 
     private LinkPrincipal RequirePrincipal()

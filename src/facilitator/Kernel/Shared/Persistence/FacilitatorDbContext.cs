@@ -13,7 +13,7 @@ using Microsoft.EntityFrameworkCore;
 //    Plan 08, communication_bindings → Plan 13, teams/projects/assignments
 //    partially) land in the SAME InitialCreate baseline so no later plan needs
 //    a disruptive re-baseline.
-namespace Facilitator.Kernel.Persistence;
+namespace Facilitator.Kernel.Shared.Persistence;
 
 /// <summary>The single transactional foundation (spec §19), schema <c>facilitator</c>.</summary>
 public class FacilitatorDbContext(DbContextOptions<FacilitatorDbContext> options) : DbContext(options)

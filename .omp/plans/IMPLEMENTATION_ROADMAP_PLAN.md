@@ -89,7 +89,7 @@ The repo is spec-only: `docs/specs/open_facilitator_framework_architecture.md` (
 **Objective:** `@ofac/gateway` composing `@ofac/workspace-link`: one Gateway endpoint (`gw.<slug>`), one embedded child through a serializable executor interface, execution ledger + binding tuple (§6.1) + reconcile-on-restart (§6.3), deny-by-default policy seam. First leg of the original 05.
 
 ### Plan 06 — Gateway multiplexing: child transport, shared + standalone modes
-**Status:** ⬜ not-started (detail design: `06-gateway-multiplexing-child-transport.md`)
+**Status:** 🟡 implemented locally — unit + e2e tiers green locally, flips green on CI (detail design: `06-gateway-multiplexing-child-transport.md`)
 **Objective:** Unix-socket/localhost child transport, N children, union capability manifest, generation fencing, all three §9.1 modes from one codebase; completes the original 05's "one Gateway serves two children" exit state (§26.1 item 7).
 
 ### Plan 07 — HarnessAdapter contract + deterministic worker harness

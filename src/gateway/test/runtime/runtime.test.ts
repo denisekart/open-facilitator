@@ -20,6 +20,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { parseConfig, type GatewayConfig } from "../../src/config.js";
 import { ExecutionLedger, type BindingRow, type GatewayPaths } from "../../src/ledger.js";
 import { createGatewayRuntime, type GatewayRuntime } from "../../src/runtime.js";
+import type { PolicyEvaluator } from "../../src/policy.js";
 
 class MockTransport implements LinkTransport {
   connectCount = 0;
@@ -198,6 +199,7 @@ async function booted(
   options: {
     paths?: GatewayPaths;
     handlerFactory?: () => LinkHandler;
+    policy?: PolicyEvaluator;
   } = {},
 ): Promise<Booted> {
   const cfg = config();
@@ -211,6 +213,7 @@ async function booted(
     ledgerFactory: () => paths,
     logger,
     ...(options.handlerFactory !== undefined ? { handlerFactory: options.handlerFactory } : {}),
+    ...(options.policy !== undefined ? { policy: options.policy } : {}),
   });
   live = { rt, mock, server, lines: logger.lines, paths };
   await rt.start();
@@ -297,12 +300,22 @@ describe("work.assign routing", () => {
     });
   });
 
-  it("policy deny: rejected receipt `policy-denied: <cap>`, NO bindings row", async () => {
+  it("no advertiser: unsupported `no-child-advertises`, NO bindings row", async () => {
     const { rt, mock } = await booted();
     mock.pushDeliver(assignDelivery({ commandId: "cmd-d", capabilityId: "not.advertised" }));
     const receipt = await waitFor("reject receipt", () => mock.receipts[0] ?? false);
+    expect(receipt.status).toBe("unsupported");
+    expect(receipt.reason).toBe("no-child-advertises: not.advertised");
+    expect(rt.executionLedger.all()).toHaveLength(0);
+  });
+
+  it("policy deny over an advertised capability: rejected `policy-denied`, NO row", async () => {
+    // Advertised everywhere, denied everywhere: the policy seam decides.
+    const { rt, mock } = await booted({ policy: { evaluate: () => "deny" } });
+    mock.pushDeliver(assignDelivery({ commandId: "cmd-p" }));
+    const receipt = await waitFor("reject receipt", () => mock.receipts[0] ?? false);
     expect(receipt.status).toBe("rejected");
-    expect(receipt.reason).toBe("policy-denied: not.advertised");
+    expect(receipt.reason).toBe("policy-denied: research.analyze");
     expect(rt.executionLedger.all()).toHaveLength(0);
   });
 
@@ -337,6 +350,7 @@ describe("reconcile-on-restart (§6.3)", () => {
       executionId: "exec-seed-1",
       workId: "work-seed",
       connectionGeneration: 1,
+      childGeneration: 0, // embedded child: no transport, no fence
     });
     const mock = new MockTransport();
     const logger = createMemoryLogger();

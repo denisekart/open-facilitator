@@ -52,6 +52,8 @@ export interface GatewayHandleConfig {
   stateDir: string;
   gatewayId: string;
   diagnosticsPort: number;
+  /** Absolute unix socket path (fleet modes); undefined for embedded. */
+  socketPath?: string;
 }
 
 let idCounter = 0;
@@ -62,6 +64,10 @@ export async function gatewayConfig(options: {
   mode?: "echo" | "stub";
   childName?: string;
   heartbeatSeconds?: number;
+  /** Fleet children (shared/standalone): name + token; socket auto-configured. */
+  fleet?: { name: string; token?: string; maxInFlight?: number }[];
+  /** Gateway role for fleet YAML (default: shared). */
+  gatewayMode?: "shared" | "standalone";
 }): Promise<GatewayHandleConfig> {
   idCounter += 1;
   const gatewayId = `gw.e2e-${Math.random().toString(36).slice(2, 8)}${idCounter}`;
@@ -76,16 +82,43 @@ facilitatorUrl: ${options.facilitatorUrl}
 enrollmentSecret: ${ENROLL_SECRET}
 trustMode: shared-runtime
 stateDir: ${stateDir}
-child:
+${
+  options.fleet === undefined
+    ? `child:
   name: ${options.childName ?? "echo"}
-  mode: ${options.mode ?? "echo"}
+  mode: ${options.mode ?? "echo"}`
+    : `children${
+        options.fleet.length === 0
+          ? ": []"
+          : `:
+${options.fleet
+  .map(
+    (c) =>
+      `  - name: ${c.name}
+    token: ${c.token ?? "tok"}
+    maxInFlight: ${String(c.maxInFlight ?? 1)}
+    timeoutSeconds: 120`,
+  )
+  .join("\n")}`
+      }
+childTransport:
+  socket:
+    path: child.sock
+mode: ${options.gatewayMode ?? "shared"}`
+}
 diagnostics:
   port: ${diagnosticsPort}
 heartbeatSeconds: ${options.heartbeatSeconds ?? 5}
 `;
   const configPath = join(stateDir, "gateway.yaml");
   writeFileSync(configPath, yaml);
-  return { configPath, stateDir, gatewayId, diagnosticsPort };
+  return {
+    configPath,
+    stateDir,
+    gatewayId,
+    diagnosticsPort,
+    ...(options.fleet === undefined ? {} : { socketPath: join(stateDir, "child.sock") }),
+  };
 }
 
 export interface GatewayHandle {
@@ -93,7 +126,7 @@ export interface GatewayHandle {
   /** stdout+stderr, for log-law assertions. */
   log(): string;
   /** Resolves on the next `gateway ready` line. */
-  ready(): Promise<{ epoch: number; line: string }>;
+  ready(): Promise<{ epoch: number; children: number; line: string }>;
   kill(signal?: NodeJS.Signals): Promise<number | null>;
 }
 
@@ -109,7 +142,7 @@ export function startGateway(configPath: string): GatewayHandle {
     log += c.toString();
   });
   let buffer = "";
-  const readyWaits: ((v: { epoch: number; line: string }) => void)[] = [];
+  const readyWaits: ((v: { epoch: number; children: number; line: string }) => void)[] = [];
   child.stdout?.on("data", (chunk: Buffer) => {
     buffer += chunk.toString();
     for (;;) {
@@ -117,9 +150,9 @@ export function startGateway(configPath: string): GatewayHandle {
       if (newline < 0) break;
       const line = buffer.slice(0, newline);
       buffer = buffer.slice(newline + 1);
-      const match = /^gateway ready endpointId=\S+ epoch=(\d+)/.exec(line);
+      const match = /^gateway ready endpointId=\S+ epoch=(\d+) children=(\d+)/.exec(line);
       if (match) {
-        const ready = { epoch: Number(match[1]), line };
+        const ready = { epoch: Number(match[1]), children: Number(match[2]), line };
         readyWaits.shift()?.(ready);
       }
     }
@@ -146,6 +179,7 @@ export function gatewayToken(stateDir: string): string {
 export interface GatewayStatusDoc {
   gatewayId: string;
   state: string;
+  mode: string;
   reconciled: boolean;
   session?: { leaseEpoch: number; sessionId: string; state: string } | undefined;
   executions: { running: number; completed: number; failed: number; lost: number };
@@ -154,6 +188,15 @@ export interface GatewayStatusDoc {
     executionId: string;
     state: string;
     connectionGeneration: number;
+    childId: string;
+    childGeneration: number;
+  }[];
+  children?: {
+    childWorkspaceId: string;
+    state: string;
+    childGeneration: number;
+    manifestDigest: string;
+    inFlight: number;
   }[];
 }
 
@@ -181,5 +224,47 @@ export async function inboxRowsByType(
       state: line.slice(first + 1, second),
       payload: line.slice(second + 1),
     };
+  });
+}
+
+/** Spawn a real child process (test/e2e/child-runner.mjs) against a socket. */
+export function startChild(options: {
+  childWorkspaceId: string;
+  socket: string;
+  token?: string;
+  mode?: "complete" | "silent";
+  capability?: string;
+}): ChildProcess {
+  const runner = join(new URL(".", import.meta.url).pathname, "child-runner.mjs");
+  const child = spawn(
+    "node",
+    [
+      runner,
+      "--child",
+      options.childWorkspaceId,
+      "--socket",
+      options.socket,
+      "--token",
+      options.token ?? "tok",
+      "--mode",
+      options.mode ?? "silent",
+      "--capability",
+      options.capability ?? "research.analyze",
+    ],
+    { stdio: ["ignore", "pipe", "pipe"] },
+  );
+  return child;
+}
+
+/** Resolves when the child process prints its `child ready` line. */
+export function childReady(child: ChildProcess): Promise<string> {
+  return new Promise((resolve, reject) => {
+    let buffer = "";
+    child.stdout?.on("data", (c: Buffer) => {
+      buffer += c.toString();
+      const line = buffer.split("\n")[0];
+      if (line !== undefined && line.startsWith("child ready")) resolve(line);
+    });
+    child.once("exit", (code) => reject(new Error(`child exited early: ${String(code)}`)));
   });
 }

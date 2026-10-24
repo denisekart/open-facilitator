@@ -41,8 +41,11 @@ export interface LinkClientOptions {
   transport: LinkTransport;
   ledger: Ledger;
   endpointId: string;
-  /** sha256:<64hex> over the EXACT manifest bytes POSTed to /capabilities. */
-  capabilityManifestDigest: string;
+  /** sha256:<64hex> over the EXACT manifest bytes POSTed to /capabilities.
+   * A provider is sampled fresh on every hello (a Gateway that re-POSTs a
+   * union manifest mid-session wants the NEXT reconnect to carry the new
+   * digest; a plain string keeps the historical fixed-value behavior). */
+  capabilityManifestDigest: string | (() => string);
   token: LinkTokenProvider;
   handler?: LinkHandler | undefined;
   logger?: LinkLogger;

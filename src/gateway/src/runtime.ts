@@ -1,23 +1,25 @@
 // GatewayRuntime: the team-side composition over @ofac/workspace-link.
 // Startup order (mirrors linkd's template, extended with the reconcile law):
-// enroll-or-mount token → POST aggregated capabilities → ledgers → transport
-// → embedded child → gateway handler → createLinkClient → start() → first
-// welcome ⇒ RECONCILE (§6.3) → ready line (CLI prints it) → heartbeats.
+// enroll-or-mount token → capabilities POST (embedded fleet-of-one; fleet
+// modes POST on child churn, never at boot) → ledgers → transport → gateway
+// handler → createLinkClient → start() → first welcome ⇒ RECONCILE (§6.3) →
+// child listener (shared|standalone) → ready line → heartbeats.
 //
 // Stamp law: a binding row's connectionGeneration is the leaseEpoch of the
-// session that accepted the command. A delivery frame can be dispatched
-// before start()'s welcome continuation lands (frames flow the moment the
-// transport connects), so onAssign AWAITS the first welcome rather than
-// reading a possibly-null session — an unstamped (epoch 0) row would make
-// the reconcile generation-freshness law lie.
+// session that accepted the command, its childGeneration the link's fence
+// at insert time (embedded: 0 — no transport, no re-register). A delivery
+// frame can be dispatched before start()'s welcome continuation lands, so
+// onAssign AWAITS the first welcome rather than reading a possibly-null
+// session — an unstamped (epoch 0) row would make the reconcile
+// generation-freshness law lie.
 //
-// Command routing: work.assign = policy → binding row (running, current
-// leaseEpoch as connectionGeneration) → child start → receipt follows the
-// child's answer. steer/cancel route to the child when a running binding
-// exists and the capability supports the interaction; every other known
-// command passes through (single child — the child answers, the SDK's
-// outcome mapping ships the receipt). Unknown command types never reach
-// this handler: the SDK answers `unsupported` fail-closed (S:309).
+// Routing law (S:318): work.assign = capability lookup over the fleet —
+// nobody advertises ⇒ unsupported (no row, mirror of the policy-deny
+// no-row law); the advertised child is offline ⇒ rejected child-disconnected
+// (honest, retryable upstream); quota full ⇒ rejected child-busy; then
+// policy → binding row → child start → receipt follows the child's answer.
+// steer/cancel route to the row's child (bound-child law); with no row the
+// embedded fleet-of-one passes through (05) and a fleet rejects no-binding.
 import { createHash, randomBytes } from "node:crypto";
 import { join } from "node:path";
 import { parse } from "yaml";
@@ -45,7 +47,7 @@ import {
   type LinkTransport,
 } from "@ofac/workspace-link";
 import { SignalrTransport, SqliteLedger, postCapabilities } from "@ofac/workspace-link/node";
-import type { GatewayConfig } from "./config.js";
+import type { GatewayConfig, GatewayMode } from "./config.js";
 import { tokenFilePath } from "./config.js";
 import { EmbeddedChild, builtinChildManifest, newExecutionId, type ChildReply } from "./child.js";
 import {
@@ -55,6 +57,16 @@ import {
   type GatewayPaths,
 } from "./ledger.js";
 import { DefaultPolicy, type PolicyEvaluator } from "./policy.js";
+import {
+  ChildFleet,
+  ChildLink,
+  ChildTransportError,
+  EmbeddedMember,
+  digestOf,
+  type ChildStatusRow,
+  type FleetMember,
+} from "./child-link.js";
+import { startChildListener, type ChildListener } from "./listen.js";
 
 const ASSIGN = "org.facilitator.command.work.assign.v1";
 const STEER = "org.facilitator.command.work.steer.v1";
@@ -63,11 +75,15 @@ const COMPLETED = "org.facilitator.event.assignment.completed.v1";
 const FAILED = "org.facilitator.event.assignment.failed.v1";
 const HEARTBEAT = "org.facilitator.event.workspace.heartbeat.v1";
 
+/** Union re-POST debounce: child churn settles before the kernel sees it. */
+const UNION_POST_DEBOUNCE_MS = 1000;
+
 export type GatewayRuntimeState = "starting" | "ready" | "draining" | "closed";
 
 export interface GatewayStatus {
   gatewayId: string;
   state: GatewayRuntimeState;
+  mode: GatewayMode;
   reconciled: boolean;
   session?: { leaseEpoch: number; sessionId: string; state: string } | undefined;
   executions: { running: number; completed: number; failed: number; lost: number };
@@ -76,8 +92,11 @@ export interface GatewayStatus {
     executionId: string;
     state: string;
     connectionGeneration: number;
+    childId: string;
+    childGeneration: number;
   }[];
-  child: { childWorkspaceId: string; mode: string };
+  /** Every known child (live + durable offline), childWorkspaceId-sorted. */
+  children: ChildStatusRow[];
   linkStats: LinkStats;
 }
 
@@ -89,25 +108,60 @@ export interface CreateGatewayRuntimeDeps {
   handlerFactory?: () => LinkHandler;
   logger?: LinkLogger;
   fetchImpl?: typeof fetch;
-  /** Override the policy seam (defaults to DefaultPolicy over the child manifest). */
+  /** Override the policy seam (defaults to DefaultPolicy over the live fleet union). */
   policy?: PolicyEvaluator;
 }
 
-/** The team Gateway: one endpoint, one embedded child, the execution truth. */
+/** Live view of the fleet's advertised descriptors (online first, offline honest). */
+class FleetCapabilities implements ReadonlyMap<string, CapabilityDescriptor> {
+  constructor(private readonly fleet: ChildFleet) {}
+  get(key: string): CapabilityDescriptor | undefined {
+    return this.fleet.descriptorOf(key);
+  }
+  has(key: string): boolean {
+    return this.fleet.descriptorOf(key) !== undefined;
+  }
+  // Iteration is not part of the DefaultPolicy seam.
+  forEach(): void {
+    /* unsupported view */
+  }
+  get size(): number {
+    return 0;
+  }
+  [Symbol.iterator](): MapIterator<[string, CapabilityDescriptor]> {
+    return [][Symbol.iterator]() as MapIterator<[string, CapabilityDescriptor]>;
+  }
+  entries(): MapIterator<[string, CapabilityDescriptor]> {
+    return [][Symbol.iterator]() as MapIterator<[string, CapabilityDescriptor]>;
+  }
+  keys(): MapIterator<string> {
+    return [][Symbol.iterator]() as MapIterator<string>;
+  }
+  values(): MapIterator<CapabilityDescriptor> {
+    return [][Symbol.iterator]() as MapIterator<CapabilityDescriptor>;
+  }
+}
+
+/** The team Gateway: one endpoint, a fleet of children, the execution truth. */
 export class GatewayRuntime {
+  /** Embedded mode only: the in-process child's id ("" in fleet modes). */
   readonly childWorkspaceId: string;
-  /** The POSTed manifest: the child's, verbatim except the team owns it. */
-  readonly aggregatedManifest: CapabilityManifestV1;
 
   private readonly config: GatewayConfig;
   private readonly deps: CreateGatewayRuntimeDeps;
   private readonly logger: LinkLogger;
   private readonly paths: GatewayPaths;
-  private readonly child: EmbeddedChild;
+  private readonly fleet: ChildFleet;
+  private readonly embedded: EmbeddedChild | null;
   private readonly policy: PolicyEvaluator;
   private readonly capabilityByExecution = new Map<string, string>();
   private client: LinkClient | null = null;
-  private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  private listener: ChildListener | null = null;
+  private heartbeatTimer: ReturnType<typeof setInterval> | undefined;
+  private unionTimer: ReturnType<typeof setTimeout> | undefined;
+  private tokenProvider: LinkTokenProvider | null = null;
+  /** Digest of the manifest bytes the kernel last accepted (hello carries it). */
+  private currentDigest: string;
   private _state: GatewayRuntimeState = "starting";
   private _reconciled = false;
   private childError = false;
@@ -116,25 +170,31 @@ export class GatewayRuntime {
     this.config = config;
     this.deps = deps;
     this.logger = deps.logger ?? createConsoleLogger();
-    this.childWorkspaceId = `${config.gatewayId}/${config.child.name}`;
     mkdirSync(config.stateDir, { recursive: true, mode: 0o700 });
     this.paths = deps.ledgerFactory?.(config.stateDir) ?? defaultLedgers(config.stateDir);
-    const childManifest = loadChildManifest(config, this.logger);
-    this.child = new EmbeddedChild({
-      childWorkspaceId: this.childWorkspaceId,
-      mode: config.child.mode,
-      manifest: childManifest,
-      ...(deps.handlerFactory !== undefined ? { handler: deps.handlerFactory() } : {}),
-      logger: this.logger,
-    });
-    const capabilities = new Map<string, CapabilityDescriptor>();
-    for (const capability of childManifest.capabilities) {
-      capabilities.set(capability.id, capability);
+    this.fleet = new ChildFleet(this.logger);
+    for (const entry of config.children ?? []) {
+      this.fleet.entries.set(`${config.gatewayId}/${entry.name}`, entry);
     }
-    this.policy = deps.policy ?? new DefaultPolicy(capabilities);
-    // One manifest per endpoint server-side; ownerTeam MUST equal the stored
-    // team slug or POST /capabilities answers 403 team-mismatch.
-    this.aggregatedManifest = { ...childManifest, ownerTeam: config.team };
+    // Durable fleet shadow: generations persist, every child starts offline.
+    this.fleet.seed(this.paths.execution.children());
+    if (config.mode === "embedded" && config.child !== undefined) {
+      const childManifest = loadChildManifest(config, this.logger);
+      this.embedded = new EmbeddedChild({
+        childWorkspaceId: `${config.gatewayId}/${config.child.name}`,
+        mode: config.child.mode,
+        manifest: childManifest,
+        ...(deps.handlerFactory !== undefined ? { handler: deps.handlerFactory() } : {}),
+        logger: this.logger,
+      });
+      this.childWorkspaceId = this.embedded.childWorkspaceId;
+      this.fleet.register(new EmbeddedMember(this.childWorkspaceId, childManifest, this.embedded));
+    } else {
+      this.embedded = null;
+      this.childWorkspaceId = "";
+    }
+    this.policy = deps.policy ?? new DefaultPolicy(new FleetCapabilities(this.fleet));
+    this.currentDigest = digestOf(this.fleet.unionManifest(config.team));
   }
 
   get state(): GatewayRuntimeState {
@@ -153,17 +213,30 @@ export class GatewayRuntime {
     return this.paths.execution;
   }
 
+  /** The manifest the kernel holds: live fleet union, ownerTeam overridden. */
+  get aggregatedManifest(): CapabilityManifestV1 {
+    return this.fleet.unionManifest(this.config.team);
+  }
+
   /**
-   * Enroll/mount → capabilities POST → connect → reconcile. Resolves AFTER
-   * the reconcile pass with the ready-line parts (the CLI prints the line).
+   * Enroll/mount → capabilities POST (embedded) → connect → reconcile →
+   * child listener. Resolves AFTER the reconcile pass with the ready-line
+   * parts (the CLI prints the line).
    */
-  async start(): Promise<{ leaseEpoch: number }> {
+  async start(): Promise<{ leaseEpoch: number; children: number }> {
     const token = await this.acquireToken();
-    const posted = await postCapabilities(this.aggregatedManifest, {
-      baseUrl: this.config.facilitatorUrl,
-      getToken: token.getToken,
-      ...(this.deps.fetchImpl !== undefined ? { fetchImpl: this.deps.fetchImpl } : {}),
-    });
+    this.tokenProvider = token;
+    if (this.embedded !== null) {
+      // 05 fleet-of-one: the single child's union POSTs before first hello.
+      const posted = await postCapabilities(this.aggregatedManifest, {
+        baseUrl: this.config.facilitatorUrl,
+        getToken: token.getToken,
+        ...(this.deps.fetchImpl !== undefined ? { fetchImpl: this.deps.fetchImpl } : {}),
+      });
+      this.currentDigest = posted.digest;
+    }
+    // Fleet modes POST NOTHING at boot: hello carries the placeholder until
+    // a child registers and the debounced union POST lands.
 
     const transport =
       this.deps.transportFactory?.(token, this.config) ??
@@ -172,7 +245,8 @@ export class GatewayRuntime {
       transport,
       ledger: this.paths.link,
       endpointId: this.config.gatewayId,
-      capabilityManifestDigest: posted.digest,
+      // A getter: a reconnect after child churn carries the CURRENT digest.
+      capabilityManifestDigest: () => this.currentDigest,
       token,
       handler: this.gatewayHandler(),
       logger: this.logger,
@@ -182,32 +256,56 @@ export class GatewayRuntime {
     const session = await client.start();
 
     // Child events flow live from here on; anything queued pre-welcome ships too.
-    this.child.setPublisher((env) => this.forwardEvent(env));
-    await this.forwardQueued();
+    if (this.embedded !== null) {
+      this.embedded.setPublisher((env) => this.forwardEvent(env, this.embeddedMember()));
+      await this.forwardQueued();
+    }
 
     await this.reconcile();
     this._reconciled = true;
+
+    if (this.config.childTransport !== undefined) {
+      this.listener = await startChildListener(this.config.childTransport, {
+        fleet: this.fleet,
+        logger: this.logger,
+        gatewayId: this.config.gatewayId,
+        heartbeatSeconds: this.config.heartbeatSeconds,
+        ...(this.config.childSecret !== undefined ? { childSecret: this.config.childSecret } : {}),
+        onRegistered: (link) => this.onChildRegistered(link),
+        onDisconnected: (childId) => this.onChildDisconnected(childId),
+      });
+    }
+
     this._state = "ready";
     this.heartbeatTimer = setInterval(
       () => void this.publishHeartbeat("periodic"),
       this.config.heartbeatSeconds * 1000,
     );
-    return { leaseEpoch: session.leaseEpoch };
+    return { leaseEpoch: session.leaseEpoch, children: this.fleet.size };
   }
 
   /** SIGTERM path: one draining heartbeat, goodbye, close everything. */
   async stop(): Promise<void> {
     this._state = "draining";
-    if (this.heartbeatTimer !== null) {
-      clearInterval(this.heartbeatTimer);
-      this.heartbeatTimer = null;
-    }
+    clearInterval(this.heartbeatTimer);
+    this.heartbeatTimer = undefined;
+    clearTimeout(this.unionTimer);
+    this.unionTimer = undefined;
     const client = this.client;
     if (client !== null) {
       await this.publishHeartbeat("shutdown");
       await client.stop("gateway-shutdown");
     }
-    await this.child.close();
+    if (this.listener !== null) {
+      await this.listener.close(); // goaways every socket child
+      this.listener = null;
+    }
+    for (const member of this.fleet.members()) member.goaway("gateway-shutdown");
+    await this.embedded?.close();
+    // Honest durable state: after this process dies, no child is connected.
+    for (const row of this.paths.execution.children()) {
+      this.paths.execution.setChildState(row.childId, "offline");
+    }
     this.paths.link.close();
     this.paths.execution.close();
     this._state = "closed";
@@ -216,9 +314,14 @@ export class GatewayRuntime {
   gatewayStatus(): GatewayStatus {
     const client = this.client;
     const session = client?.session ?? null;
+    const runningByChild = new Map<string, number>();
+    for (const row of this.paths.execution.byState("running")) {
+      runningByChild.set(row.childId, (runningByChild.get(row.childId) ?? 0) + 1);
+    }
     return {
       gatewayId: this.config.gatewayId,
       state: this._state,
+      mode: this.config.mode,
       reconciled: this._reconciled,
       ...(session !== null
         ? {
@@ -235,8 +338,10 @@ export class GatewayRuntime {
         executionId: row.executionId,
         state: row.state as string,
         connectionGeneration: row.connectionGeneration,
+        childId: row.childId,
+        childGeneration: row.childGeneration,
       })),
-      child: { childWorkspaceId: this.childWorkspaceId, mode: this.config.child.mode },
+      children: this.fleet.statusRows(runningByChild),
       linkStats:
         client?.stats ??
         ({
@@ -250,7 +355,7 @@ export class GatewayRuntime {
     };
   }
 
-  /** Heartbeat `error` latch: set when the child closed abnormally. */
+  /** Heartbeat `error` latch: set when a child closed abnormally. */
   markChildError(): void {
     this.childError = true;
   }
@@ -278,6 +383,114 @@ export class GatewayRuntime {
         cause,
         reason: error instanceof Error ? error.message : String(error),
       });
+    }
+  }
+
+  // ── child fleet lifecycle ────────────────────────────────────────────────
+
+  private embeddedMember(): FleetMember {
+    const member = this.fleet.member(this.childWorkspaceId);
+    if (member === undefined) throw new Error("embedded member vanished");
+    return member;
+  }
+
+  /**
+   * Accepted register-ack: wire the event publisher, persist the fleet
+   * shadow (the generation bump IS the fence), re-POST the union, and — for
+   * a child the ledger already knows — probe its `running` rows (a child
+   * that died and came back forgot its executions; the rows must not lie).
+   */
+  private onChildRegistered(link: ChildLink): void {
+    if (this._state === "closed" || this._state === "draining") return;
+    link.setPublisher((env) => this.forwardEvent(env, link));
+    for (const env of link.drainEvents()) void this.forwardEvent(env, link);
+    const known = this.paths.execution.children().some((row) => row.childId === link.childId);
+    this.paths.execution.upsertChild(
+      link.childId,
+      digestOf(link.manifest),
+      JSON.stringify(link.manifest),
+      true,
+    );
+    this.scheduleUnionPost();
+    if (known) void this.probeChild(link.childId);
+    else
+      this.logger.info("child registered", {
+        childId: link.childId,
+        childGeneration: link.generation,
+      });
+  }
+
+  private onChildDisconnected(childId: string): void {
+    if (this._state === "closed" || this._state === "draining") return;
+    this.paths.execution.setChildState(childId, "offline");
+    this.scheduleUnionPost();
+    this.logger.info("child offline", { childId });
+  }
+
+  /**
+   * Union re-POST on child churn (debounced): the kernel holds ONE manifest
+   * per endpoint, so the fleet's total is what travels. A failure retries on
+   * the next churn (or a lone retry here) — hello keeps the old digest.
+   */
+  private scheduleUnionPost(): void {
+    if (this.config.mode === "embedded") return; // 05: static manifest, no churn
+    clearTimeout(this.unionTimer);
+    this.unionTimer = setTimeout(() => {
+      this.unionTimer = undefined;
+      void this.postUnion();
+    }, UNION_POST_DEBOUNCE_MS);
+    this.unionTimer.unref?.();
+  }
+
+  private async postUnion(): Promise<void> {
+    const manifest = this.fleet.unionManifest(this.config.team);
+    // An all-offline fleet has no legal manifest (schema: >=1 capability):
+    // the kernel keeps the last one; routes answer child-disconnected anyway.
+    if (manifest.capabilities.length === 0) return;
+    const digest = digestOf(manifest);
+    if (digest === this.currentDigest) return; // churn cancelled out
+    try {
+      const posted = await postCapabilities(manifest, {
+        baseUrl: this.config.facilitatorUrl,
+        getToken: async () => this.tokenProvider?.getToken() ?? "",
+        ...(this.deps.fetchImpl !== undefined ? { fetchImpl: this.deps.fetchImpl } : {}),
+      });
+      this.currentDigest = posted.digest;
+      this.logger.info("capabilities re-posted", {
+        capabilities: manifest.capabilities.length,
+        digest: posted.digest.slice(0, 18),
+      });
+    } catch (error) {
+      this.logger.warn("capabilities re-post failed (will retry on next churn)", {
+        reason: error instanceof Error ? error.message : String(error),
+      });
+      this.scheduleUnionPost(); // lone retry: the union MUST converge
+    }
+  }
+
+  /**
+   * Re-register probe: the reconnected child's `running` rows are checked
+   * against its own memory — `unknown` means it died mid-flight: lost +
+   * ONE honest retryable assignment.failed (never re-executed).
+   */
+  private async probeChild(childId: string): Promise<void> {
+    const member = this.fleet.member(childId);
+    if (member === undefined) return; // went offline again mid-probe
+    for (const row of this.paths.execution.byChildState(childId, "running")) {
+      let settled = false;
+      try {
+        const reply = await member.executor.send({ kind: "status", executionId: row.executionId });
+        if (reply.kind === "status" && (reply.state === "completed" || reply.state === "failed")) {
+          this.paths.execution.markState(row.executionId, reply.state);
+          settled = true;
+        } else if (reply.kind === "status") {
+          settled = true; // child still runs it: the row stands
+        }
+      } catch {
+        /* transport-dead mid-probe: falls through to lost */
+      }
+      if (settled) continue;
+      await this.reportLost(row, "child-lost-execution");
     }
   }
 
@@ -369,15 +582,32 @@ export class GatewayRuntime {
 
   private async onAssign(cmd: EnvelopeCommand, deliveryId: string): Promise<CommandOutcome> {
     const data = cmd.data as unknown as WorkAssignCommandV1Data;
+    const route = this.fleet.route(data.capabilityId);
+    if (route === undefined) {
+      // Nobody advertises the capability: no row (the policy-deny no-row law
+      // mirrored) — a stale kernel route is answered, never executed blind.
+      return { kind: "unsupported", reason: `no-child-advertises: ${data.capabilityId}` };
+    }
+    if (!route.online) {
+      // S:318 honesty: the advertiser is known and gone; retry upstream.
+      return { kind: "rejected", reason: "child-disconnected" };
+    }
+    const member = this.fleet.member(route.childId);
+    if (member === undefined) return { kind: "rejected", reason: "child-disconnected" };
     if (
       this.policy.evaluate("command.forward", {
         commandType: cmd.type,
         capabilityId: data.capabilityId,
-        childWorkspaceId: this.childWorkspaceId,
+        childWorkspaceId: member.childId,
       }) === "deny"
     ) {
       // Policy rejection is not an execution: no ledger row.
       return { kind: "rejected", reason: `policy-denied: ${data.capabilityId}` };
+    }
+    // Quota: the live count of running rows routed to this child.
+    const maxInFlight = this.fleet.entries.get(member.childId)?.maxInFlight ?? 1;
+    if (this.paths.execution.byChildState(member.childId, "running").length >= maxInFlight) {
+      return { kind: "rejected", reason: `child-busy: ${member.childId}` };
     }
     const epoch = await this.awaitSessionEpoch();
     const executionId = newExecutionId();
@@ -386,11 +616,12 @@ export class GatewayRuntime {
         deliveryId,
         dedupeKey: data.commandId,
         gatewayId: this.config.gatewayId,
-        childId: this.childWorkspaceId,
+        childId: member.childId,
         assignmentId: data.assignmentId,
         executionId,
         workId: data.workId,
         connectionGeneration: epoch,
+        childGeneration: member.generation,
       });
     } catch (error) {
       if (error instanceof BindingConflictError) {
@@ -400,12 +631,21 @@ export class GatewayRuntime {
       throw error;
     }
     this.capabilityByExecution.set(executionId, data.capabilityId);
-    const reply = await this.child.send({
-      kind: "start",
-      executionId,
-      connectionGeneration: epoch,
-      command: cmd,
-    });
+    let reply: ChildReply;
+    try {
+      reply = await member.executor.send({
+        kind: "start",
+        executionId,
+        connectionGeneration: epoch,
+        command: cmd,
+      });
+    } catch (error) {
+      // Transport-dead (disconnect mid-send / reply timeout): the command
+      // never demonstrably ran — honest failure, the row carries the reason.
+      const reason = error instanceof ChildTransportError ? error.reason : "child-disconnected";
+      this.paths.execution.markState(executionId, "failed", reason);
+      return { kind: "rejected", reason };
+    }
     return this.settleStart(executionId, reply);
   }
 
@@ -433,40 +673,57 @@ export class GatewayRuntime {
   ): Promise<CommandOutcome> {
     const data = cmd.data as unknown as WorkCancelCommandV1Data;
     const row = this.paths.execution.byAssignment(data.assignmentId);
-    const capabilityId = row !== null ? this.capabilityByExecution.get(row.executionId) : undefined;
-    const routed =
-      row !== null &&
-      row.state === "running" &&
+    if (row === null || row.state !== "running") {
+      if (this.embedded !== null && row === null) return this.passthrough(cmd);
+      return { kind: "rejected", reason: "no-binding" };
+    }
+    // Bound-child law: a running row decides the target, not the union.
+    const member = this.fleet.member(row.childId);
+    if (member === undefined) {
+      return { kind: "rejected", reason: "child-disconnected" };
+    }
+    const capabilityId = this.capabilityByExecution.get(row.executionId);
+    if (
       capabilityId !== undefined &&
       this.policy.evaluate("command.forward", {
         commandType: cmd.type,
         capabilityId,
-        childWorkspaceId: this.childWorkspaceId,
-      }) === "allow";
-    if (row === null || capabilityId === undefined || !routed) {
-      // No running binding / capability forbids it: single-child
-      // pass-through — the child answers, the receipt follows the reply.
-      return this.passthrough(cmd);
+        childWorkspaceId: member.childId,
+      }) === "deny"
+    ) {
+      // 05 law kept: the descriptor forbids it — the child's own answer
+      // decides for the embedded fleet-of-one, a fleet refuses honestly.
+      if (this.embedded !== null && member === this.embeddedMember()) return this.passthrough(cmd);
+      return { kind: "rejected", reason: `policy-denied: ${capabilityId}` };
     }
-    const executionId = row.executionId;
-    const reply = await this.child.send(
-      kind === "steer"
-        ? { kind: "steer", executionId, command: cmd }
-        : { kind: "stop", executionId, reason: data.reason },
-    );
+    let reply: ChildReply;
+    try {
+      reply = await member.executor.send(
+        kind === "steer"
+          ? { kind: "steer", executionId: row.executionId, command: cmd }
+          : { kind: "stop", executionId: row.executionId, reason: data.reason },
+      );
+    } catch (error) {
+      const reason = error instanceof ChildTransportError ? error.reason : "child-disconnected";
+      return { kind: "rejected", reason };
+    }
     if (kind === "cancel" && reply.kind === "accepted") {
       if (this.fence(row, "cancel") === "fresh") {
-        this.paths.execution.markState(executionId, "completed");
+        this.paths.execution.markState(row.executionId, "completed");
       }
     }
     return childOutcome(reply);
   }
 
   private async passthrough(cmd: EnvelopeCommand): Promise<CommandOutcome> {
+    if (this.embedded === null) {
+      // Fleet modes have no "the" child: without a row, nothing to route to.
+      return { kind: "rejected", reason: "no-binding" };
+    }
     // Single-child pass-through: the child's own answer decides the receipt
     // (echo answers `unsupported` off-assign, the stub accepts commands).
     return childOutcome(
-      await this.child.send({
+      await this.embedded.send({
         kind: "steer",
         executionId: `exec-na-${createHash("sha256").update(cmd.id).digest("hex").slice(0, 12)}`,
         command: cmd,
@@ -477,17 +734,29 @@ export class GatewayRuntime {
   // ── event forwarding + reconcile ─────────────────────────────────────────
 
   private async forwardQueued(): Promise<void> {
-    for (const env of this.child.drainEvents()) {
-      await this.forwardEvent(env);
+    const member = this.embeddedMember();
+    for (const env of this.embedded?.drainEvents() ?? []) {
+      await this.forwardEvent(env, member);
     }
   }
 
-  /** Forward the CHILD's event bytes, stamping nothing (S:329 fence first). */
-  private async forwardEvent(env: EnvelopeEvent): Promise<void> {
+  /**
+   * Forward the CHILD's event bytes, stamping nothing (S:329 fence first).
+   * The child-generation fence precedes everything: a frame on a superseded
+   * connection changes NOTHING (no settle, no forward).
+   */
+  private async forwardEvent(env: EnvelopeEvent, source: FleetMember): Promise<void> {
+    if (source.generation > 0 && source.generation !== this.fleet.generationOf(source.childId)) {
+      this.logger.warn("stale-child-generation", {
+        childId: source.childId,
+        frameGeneration: source.generation,
+      });
+      return;
+    }
     if (
       this.policy.evaluate("event.forward", {
         commandType: env.type,
-        childWorkspaceId: this.childWorkspaceId,
+        childWorkspaceId: source.childId,
       }) === "deny"
     ) {
       return;
@@ -505,54 +774,71 @@ export class GatewayRuntime {
   }
 
   /**
-   * §6.3 reconcile, right after the FIRST welcome: query the child for every
-   * `running` row; the child's answer is the truth, `unknown` ⇒ lost (never
-   * re-executed, never silently deleted, reported via ONE retryable
-   * assignment.failed). Redelivered commands cannot race this: the SDK
-   * delivery ledger answers `duplicate` without touching bindings.
+   * §6.3 reconcile, right after the FIRST welcome: every `running` row goes
+   * to ITS child (embedded / live link); a child that is not here cannot
+   * answer — lost (never re-executed, never silently deleted, reported via
+   * ONE retryable assignment.failed). Rows of children that reconnect LATER
+   * are lost the same way (they will not survive the offline pass below).
+   * Redelivered commands cannot race this: the SDK delivery ledger answers
+   * `duplicate` without touching bindings.
    */
   private async reconcile(): Promise<void> {
     for (const row of this.paths.execution.byState("running")) {
-      const reply = await this.child.send({ kind: "status", executionId: row.executionId });
-      if (reply.kind === "status") {
-        // The child's own truth: running/lost rows stand; terminal answers settle.
-        if (reply.state === "completed" || reply.state === "failed") {
-          this.paths.execution.markState(row.executionId, reply.state);
-        }
+      const member = this.fleet.member(row.childId);
+      if (member === undefined) {
+        await this.reportLost(row, "gateway-restart-lost");
         continue;
       }
-      // unknown / transport-dead: lost + ONE honest assignment.failed. The
-      // Gateway is the reporting authority — the child published nothing.
-      this.paths.execution.markState(row.executionId, "lost", "gateway-restart-lost");
+      let settled = false;
       try {
-        await this.client?.publishEvent(
-          buildEvent(FAILED, {
-            source: `urn:workspace:${this.config.gatewayId}`,
-            subject: `work/${row.workId}/assignment/${row.assignmentId}`,
-            data: {
-              workId: row.workId,
-              assignmentId: row.assignmentId,
-              executionId: row.executionId,
-              // The leaseEpoch the execution ran under is the honest
-              // generation (schema minimum is 1; epoch 0 ⇒ pre-session row).
-              executionGeneration: Math.max(1, row.connectionGeneration),
-              reason: "gateway-restart-lost",
-              retryable: true,
-            },
-          }),
-        );
-      } catch (error) {
-        this.logger.warn("reconcile failed-event dropped", {
-          executionId: row.executionId,
-          reason: error instanceof Error ? error.message : String(error),
-        });
+        const reply = await member.executor.send({ kind: "status", executionId: row.executionId });
+        if (reply.kind === "status") {
+          // The child's own truth: running/lost rows stand; terminal answers settle.
+          if (reply.state === "completed" || reply.state === "failed") {
+            this.paths.execution.markState(row.executionId, reply.state);
+          }
+          settled = true;
+        }
+      } catch {
+        /* transport-dead: falls through to lost */
       }
-      this.logger.info("reconcile: execution lost", {
+      if (settled) continue;
+      await this.reportLost(row, "gateway-restart-lost");
+    }
+  }
+
+  /** lost + ONE honest retryable assignment.failed (the Gateway is the authority). */
+  private async reportLost(row: BindingRow, reason: string): Promise<void> {
+    this.paths.execution.markState(row.executionId, "lost", reason);
+    try {
+      await this.client?.publishEvent(
+        buildEvent(FAILED, {
+          source: `urn:workspace:${this.config.gatewayId}`,
+          subject: `work/${row.workId}/assignment/${row.assignmentId}`,
+          data: {
+            workId: row.workId,
+            assignmentId: row.assignmentId,
+            executionId: row.executionId,
+            // The leaseEpoch the execution ran under is the honest
+            // generation (schema minimum is 1; epoch 0 ⇒ pre-session row).
+            executionGeneration: Math.max(1, row.connectionGeneration),
+            reason,
+            retryable: true,
+          },
+        }),
+      );
+    } catch (error) {
+      this.logger.warn("reconcile failed-event dropped", {
         executionId: row.executionId,
-        assignmentId: row.assignmentId,
-        connectionGeneration: row.connectionGeneration,
+        reason: error instanceof Error ? error.message : String(error),
       });
     }
+    this.logger.info("reconcile: execution lost", {
+      executionId: row.executionId,
+      assignmentId: row.assignmentId,
+      childId: row.childId,
+      reason,
+    });
   }
 
   /** S:329: work recorded under a dead connection cannot settle or forward. */
@@ -578,7 +864,8 @@ function defaultLedgers(stateDir: string): GatewayPaths {
 }
 
 function loadChildManifest(config: GatewayConfig, logger: LinkLogger): CapabilityManifestV1 {
-  if (config.child.manifestFile === undefined) return builtinChildManifest(config.child.mode);
+  if (config.child?.manifestFile === undefined)
+    return builtinChildManifest(config.child?.mode ?? "echo");
   const doc = parse(readFileSync(config.child.manifestFile, "utf8")) as {
     capabilities?: CapabilityManifestV1["capabilities"];
   };

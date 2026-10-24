@@ -1,55 +1,199 @@
 # Plan 06 — Gateway multiplexing: child transport, shared + standalone modes
 
-**Status:** ⬜ not-started — implementation begins ONLY after its replanning gate flips this to 🔵.
-**Phase:** B. **Depends on:** 05 (Gateway runtime core 🟢).
-**Completes:** roadmap entry 05's full scope — this plan is the multiplexing + multi-mode half, split out to keep 05 a single-child slice.
+**Status:** 🟡 implemented locally — unit + e2e tiers green locally; flips 🟢 when CI green on `main`.
+**Phase:** B. **Depends on:** 05 (Gateway runtime core — 🟡, near-🟢; Step 0 re-verifies as-built, the code wins).
+**Branching:** work and commit **directly on `main`** (standing directive from Plans 03/04/05). Do not push.
+**Size judgment:** kept as ONE plan — the transport is meaningless without the runtime that multiplexes over it, and the mode matrix is proven only by the e2e tier. Split candidate if execution drags: Steps 6–7 (e2e + CI + docs) as a 06b, decidable only once the unit tier (Steps 1–5) is green.
 
-## Normalization from prior plans (assumed state)
+> Questions may be asked during planning, but not during implementation. Every design decision is locked below; the implementer executes top-to-bottom. Missing detail → infer from `docs/specs/open_facilitator_framework_architecture.md` (the "spec", S:line), `docs/specs/open-facilitator-appendix.md` (the "appendix", A:line), `.omp/skills/facilitator-protocol/SKILL.md` + `.omp/skills/facilitator-workspace-packaging/SKILL.md`, the as-built Gateway (`src/gateway/`), and the frozen contract in `protocol/` — do not stall. If a Node API is unclear (`node:net` socket options, `SO_PEERCRED` via `getSocketCredentials`, `parseArgs`, vitest), consult the official Node docs or search for the standard pattern; never guess a flag and never ask mid-implementation. When an approach fails after a coherent couple of iterations, step back: re-read the seam you are bending (`child.ts` vocabulary, `runtime.ts` single-child sites) and prefer the simpler re-wiring over layered complexity.
 
-Plan 05's Gateway serves one embedded child through a serializable `ChildExecutor` message interface and owns the execution ledger + binding tuple + policy port. This plan assumes that interface is the exact message vocabulary the socket transport will carry — replanning verifies the 05 detail design landed socket-compatible (if 05 chose a non-serializable seam, widening it is this plan's first step). Assumes SDK `linkd` exists as the counter-example runtime (one process = one worker, no Gateway) and the `gateway-e2e` CI tier exists.
+## Context
 
-## Objective
+Plan 05 shipped `@ofac/gateway`: one Link endpoint, ONE embedded child behind the serializable `ChildMessage`/`ChildReply` vocabulary (`src/gateway/src/child.ts:32-53`, header comment: "Plan 06 carries it over a socket"), an execution ledger holding the §6.1 binding tuple with `child_id` already a column, reconcile-on-restart, policy seam, diagnostics. This plan makes the Gateway the true team-side multiplexer of spec §6.1 (S:318): children connect as separate processes over a **local child transport** (Unix domain socket primary, **localhost TCP carrying the identical frame protocol** as fallback for containers without socket mounts), register capability manifests, and receive routed commands; the Gateway serves N children concurrently, POSTs the union manifest upstream, fences per-connection generations, and runs all three §9.1 modes from one codebase: `embedded` (05's, kept), `shared` (Gateway + N children, one config), `standalone` (zero children at boot, children attach later — S:330 "A Gateway stopped with zero workers can receive new assignments" makes zero-child boot legal). After this plan: roadmap 06 objective fully landed, §26.1 item 7 ("One Gateway handles two different adapters", S:1996 slice-3) e2e-proven, and Plan 07's adapter SDK has a socket-addressable child endpoint + frozen frame vocabulary to profile.
 
-Make the Gateway a true team-side multiplexer: child workspaces connect to the Gateway over a local child transport (Unix domain socket primary, localhost HTTP fallback for containers without socket mounts), register capability manifests, and receive routed commands; the Gateway serves N children concurrently, advertises the union capability manifest, enforces per-child quotas (`maxInFlight` fan-out), and runs in all three §9.1 modes from one codebase: `embedded` (05's, kept), `shared` (multiple children in one Gateway process via the socket), `standalone` (Gateway process with zero children at boot, children attach later — the zero-to-N preview for roadmap-era Plan 16).
+**Deviation from the original thin plan (locked):** the "localhost HTTP fallback" becomes **localhost TCP with the same length-framed NDJSON protocol** — justification: HTTP would require a second server stack plus a push channel (long-poll/SSE) for Gateway→child delivery; TCP over the identical framing keeps ONE protocol implementation, is bidirectional like the socket, and the spec never mandates HTTP for the child leg (S:318 names "Unix socket, localhost or authenticated team-private endpoint"; the `GATEWAY_URL: http://…` literal at S:1732 belongs to the Plan 08 compose wire — accepted as a Plan 08 integration point, see Contingencies).
 
-## Replanning gate (mandatory initial research)
+## Step 0 — Mandatory inspection before writing any file
 
-1. Spec §6.1 (binding tuple + routing law), §9.1 (mode semantics incl. what `shared` promises about isolation), §9.3 (Gateway restart law), appendix §4.2 (trustMode per child enrollment record — in `shared` mode children are NOT separately enrolled; the Gateway's enrollment carries the mode).
-2. Plan 05 detail design + Implementation Status: the actual `ChildExecutor` message vocabulary, ledger schema, config format, diagnostics surface.
-3. Child-transport research: Unix socket framing (length-prefixed JSON vs newline-delimited — pick boring), auth between child and Gateway on a shared host (peer-cred `SO_PEERCRED` vs shared-secret file; decision + rationale at gate), reconnection semantics child↔Gateway (Gateway restart: children reconnect and re-register, reconcile from Gateway ledger; child restart mid-execution: Gateway marks execution `lost` and reports honestly — §6.3).
-4. Decide: manifest union + conflict rules (two children claiming the same `capabilityId` → precedence or rejection, deny-ambiguity), per-child capacity config, how a child disconnect mid-assignment behaves observably (execution `lost`, no silent re-route at Gateway level — re-decision is kernel routing's job).
+Execute all; record findings in the first commit message body. The facts below were verified during planning (2026-10-24) — re-verify, do not re-decide; if code diverges, **the code wins** and the divergence goes in the Implementation Status table.
 
-## Scope
+1. Gateway as-built (`src/gateway/src/`): `child.ts` (`ChildMessage`/`ChildReply`/`ChildExecutor` at :32-53; `EmbeddedChild` :78-198 with `setPublisher`/`drainEvents`/`settleFromEvent`; `newExecutionId`, `builtinChildManifest`, `MANIFEST_SCHEMA_ID`); `runtime.ts` (`GatewayRuntime` :99+, exactly ONE `private readonly child: EmbeddedChild` touched at 6 sites: constructor build, `setPublisher`+`forwardQueued` in `start()` :159-199, `onAssign` :370-410, `onInteraction` :430-463, `reconcile` :501-546, `stop()` :202-217; `gatewayHandler()` :332-346, `awaitSessionEpoch()` :353-368, `fence()` :549-560, `passthrough()` :465-475, `forwardEvent` :480-499, `publishHeartbeat` :253-279, `gatewayStatus()` :219-249, `capabilityByExecution` map); `config.ts` (`GatewayConfig` :19-49, whitelists `TOP_LEVEL_KEYS`/`CHILD_KEYS`/`DIAGNOSTICS_KEYS` :69-84, `GATEWAY_ID_RE` :65, env overlay :196-206); `ledger.ts` (`bindings` DDL :21-36, `SCHEMA_VERSION = 1`, `user_version` mismatch throw, `ExecutionLedger` methods :103+: `insert`/`markState`/`byState`/`byAssignment`/`byExecution`/`all`/`counts`/`close`, `BindingConflictError`); `diagnostics.ts` (`startDiagnostics(runtime, port)`, 404 `{"error":"not-found"}`, bind-failure throw); `bin/gateway.ts` (single verb `run`, exit-code map :130-146, ready line :82-84 `gateway ready endpointId=<id> epoch=<n> child=<id>`); `test/e2e/gateway-harness.ts` (`freePort`, `gatewayConfig({facilitatorUrl, mode?, childName?, heartbeatSeconds?})`, `startGateway`, ready regex `/^gateway ready endpointId=\S+ epoch=(\d+)/`, `gatewayToken`, `gatewayStatus(port)`, `inboxRowsByType`, harness re-export from `"../../../workspace-link/test/e2e/harness.js"`).
+2. Server semantics unchanged (Plan 05 list still current): `LinkEndpoints.Enroll.cs` capabilities POST (`CapabilityManifestValidator.Validate` — schema + shape gate, then `ownerTeam` vs stored team ⇒ 403 `team-mismatch`); `LinkHub.cs:52-118` (hello stores digest opaquely — the server does NOT compare it against the stored capabilities digest, only records it; supersede bumps `session_epoch`); `LinkOptions.cs` (`Link:MaxInFlight` 16 is per-connection at the Facilitator — no per-child quota exists server-side, so the per-child quota this plan adds is Gateway-local).
+3. Spec anchors re-read: S:316-330 (§6.1 tuple + routing law "capability ID, accepted assignment, available capacity and policy"; §6.3 five bullets incl. stale-generation S:329 and zero-worker boot S:330), S:471-481 (§9.1 mode table; isolation promise conditional), S:444-462 (§8.4 layout), S:411-419 (§8.2 `gateway serve` verb + "identical package" law), S:1694-1750 (compose wire literals: `GATEWAY_MODE`, `GATEWAY_LISTEN: http://0.0.0.0:8090`, `GATEWAY_URL: http://team-gateway:8090`, `GATEWAY_MODE: shared-child`), S:1325 (SQLite "child delivery ledgers" sanctioned), S:1996 (slice-3 exit: "One Gateway handles two different adapters"). Appendix: A:44 (trustMode per Gateway AND Workspace enrollment), A:85-97 (mode guarantees — honesty), A:99-109 (enrollment record is gateway-only ⇒ shared children are NOT separately enrolled at the Facilitator; the Gateway's enrollment carries the fleet — decision below).
+4. Downstream consumers re-read: `.omp/plans/07-harness-adapter-deterministic-worker.md` (expects: socket-addressable child endpoint, this plan's frame vocabulary as its profile base, a frozen event-relay shape, `lost`-reconcile parity with `ChildReply.status.state:"lost"`); `.omp/plans/08-devcontainer-features-slim-example.md` (expects: documented, **configurable** socket path for volume mounts; `mode` feature option passing through to a config mode field).
+5. Node docs lookups if needed: `node:net` `Socket.getAddress({encoding})` / `server.getConnections`, `socket.getSocketCredentials()` (Linux `SO_PEERCRED`: `{uid, gid, pid}`), path-length limit of Unix sockets (~108 bytes, `sun_path`).
+6. CI/Make as-built: `ci.yml` `link-e2e` + `gateway-e2e` jobs (Postgres service, per-file Facilitator boot), `Makefile:32-45` targets — Plan 06 EXTENDS `gateway-e2e`, no new job.
 
-- Child transport server in Gateway: register/connect/disconnect lifecycle, heartbeat child→Gateway, framed command/event delivery both ways.
-- CLI additions: `ofac-gateway serve` (standalone/shared), child-side connect helpers exported from `@ofac/gateway` (children are plain Node processes; Plan 07's adapter SDK will consume this, not reinvent it).
-- Routing: `work.assign` → capability match → child binding; steer/cancel/status/nudge → bound child; unmatched → typed `unsupported` receipt.
-- Aggregated capability manifest (union, digests per child recorded in Gateway state) POSTed to Facilitator; re-POST on child register/deregister.
-- Ledger extension: `connectionGeneration` bump per child connection; a stale-generation message from a reconnected child cannot mutate a live execution.
-- Mode matrix tested from one codebase; `linkd` path untouched.
+## Locked decisions (no implementer choice)
 
-## State after implementation
+### Child transport wire (`childwire.ts` + `transport.ts` + `listen.ts`)
 
-One Gateway serves two child workers with different handlers and capability manifests (e2e-proven); a child killed mid-assignment leaves the assignment honestly `lost` (visible via diagnostics + kernel dead-letter/timeline), the other child keeps flowing; a Gateway restart reconciles its ledger and reports real status for both children (roadmap 05's "State after", §26.1 item 7 fully landed; slice-3 exit behavior per §6.3).
+- **Framing: NDJSON.** One JSON object per line, single trailing `\n`; frames ≤ `MAX_CHILD_FRAME_BYTES = 262144` (same byte gate as `MAX_ENVELOPE_BYTES` since frames embed envelopes); oversized line ⇒ `error` frame then socket destroy. Boring, debuggable (`jq`-able), matches the repo's JSON-everywhere idiom. (Original plan's open question "length-prefixed vs newline-delimited" → decided: newline-delimited.)
+- **Endpoints:** Unix socket at the configured path (`childTransport.socket.path`, see config) **and** optional TCP at `127.0.0.1:<childTransport.tcp.port>`. Identical protocol on both; a child picks one. Socket file: Gateway `chmod 0o600` in `stateDir`, unlinks a stale file at boot (fails if a live Gateway answers it — see Step 3); parent dirs created `0o700`; on Windows/macOS (no `SO_PEERCRED`) fall back to the 0o600 file permission as the auth boundary and log `peer-cred-unavailable` once.
+- **Frame vocabulary — wire envelope is versioned, payloads reuse 05's vocabulary verbatim.** Every frame: `{ "v": 1, "type": <literal>, ...}`. Child→Gateway (`type` ∈):
+  - `"hello"` `{v:1, type:"hello", childWorkspaceId, token, manifest: CapabilityManifestV1}` — first frame, must arrive < 5s (`handshakeTimeoutSeconds`) else socket closed with no reply.
+  - `"register-ack"` `{v:1, type:"register-ack", accepted: true} | {v:1, type:"register-ack", accepted: false, reason: string}` — reasons: `"duplicate-id"` (another LIVE connection holds the id), `"denied: peer-uid-mismatch"`, `"denied: bad-token"`, `"denied: child-id-namespace"` (id not `^[a-z0-9]([a-z0-9-]*[a-z0-9])?$`, ≤128 chars), `"manifest-conflict"`, `"too-many-children"`.
+  - `"reply"` `{v:1, type:"reply", requestId, reply: ChildReply}` — `ChildReply` exactly as `child.ts:38-43` (import, do not redefine).
+  - `"event"` `{v:1, type:"event", requestId, envelope: EnvelopeEvent}` — the child→Gateway **event relay** (Plan 07's `event.publish` profiles this); the Gateway forwards `envelope` bytes unmodified (05 law).
+  - `"heartbeat"` `{v:1, type:"heartbeat", childWorkspaceId}` — child→Gateway, every `heartbeatSeconds` from the child's side; refreshes the Gateway-side lease only.
+- Gateway→child (`type` ∈):
+  - `"command"` `{v:1, type:"command", requestId, message: ChildMessage-minus-register}` — i.e. `start`/`steer`/`status`/`stop` exactly as `child.ts:33-37` (the child sees 05's vocabulary; `connectionGeneration` rides inside `start`).
+  - `"goaway"` `{v:1, type:"goaway", reason: string}` — Gateway graceful-close notice (reasons: `"gateway-shutdown"`, `"replaced"` on duplicate-id takeover), sent best-effort before socket close.
+- **Request/response pairing:** every `command` carries `requestId` = `"ch-" + randomBytes(8).hex`; the matching `reply` carries the same `requestId`. One in-flight command per child connection at the Gateway (commands to a busy child queue FIFO behind the in-flight one — a child that must interleave steer while executing runs the steer handling inside its own handler, as 05's echo does). `reply` timeouts: the Gateway's `send()` rejects after `timeoutSeconds` (below) ⇒ treated as transport-dead ⇒ binding `lost` law.
+- **Dedup law on the wire:** the child dedupes `command` frames by `message.command.data.commandId` (assign) / `executionId` (steer/stop/status) — a re-delivered frame after a reconnect gap must not re-execute; a child that forgot answers `{kind:"unknown"}` (reconcile law, S:328).
+- **No schema in `protocol/`:** child frames are Gateway-internal (S:318 is a Gateway-side law; no cross-implementation consumer exists yet — when a non-Node adapter needs the wire, propose a contract amendment per §5.5 discipline). Schema home for the vocabulary: exported TS types + the JSON literal block in `src/gateway/README.md`.
+- **Auth between child and Gateway (decision + rationale):** shared-secret bearer token in `hello.token`, checked against a per-child `token` config or `OFAC_CHILD_SECRET` (Gateway validates constant-time; empty config ⇒ any child accepted with `warn child-auth-disabled` — honest dev default). Plus `SO_PEERCRED` check when configured: `childTransport.socket.allowedUid` (number) — mismatch ⇒ `register-ack accepted:false reason:"denied: peer-uid-mismatch"`. Rationale: the socket/TCP binds to a 0o600 file / loopback, so the OS already gates access to same-UID processes; peer-uid adds defense against a same-UID rogue only when the team opts in; a shared secret keeps TCP-fallback children honest without an OS boundary. Full per-child identity is Plan 10's (OIDC engine); do not build it here.
 
-## Testing
+### Child connection generation (`childGeneration`, distinct from Link `connectionGeneration`)
 
-- vitest unit: routing table, union manifest construction + conflict denial, generation fencing, quota enforcement (mock children).
-- e2e (extend `gateway-e2e`): two real child processes over the socket, kill/reattach one, Gateway SIGKILL/restart reconcile, zero-children idle heartbeat (standalone boot).
-- Shared fixtures: no new wire types expected; if child-transport frames need schemas, they are Gateway-internal (NOT protocol/) — keep them out of `protocol/` unless replanning finds a cross-implementation need (then propose a contract amendment, §5.5 discipline).
+- The bindings ledger keeps 05's law: `connection_generation` column = **Link** leaseEpoch (fences against the Facilitator — S:329). A child connection counter lives in a new `child_state` table (below): `child_generation INTEGER NOT NULL DEFAULT 0`, bumped on every child re-register. `SocketChild` stamps each outbound `start` with the Link epoch (unchanged 05 law) and validates on every inbound `reply`/`event` frame that the frame arrived on the connection whose generation == the stored `child_generation` for that child id; stale ⇒ log `stale-child-generation`, drop the frame, do NOT settle/forward. Rationale: `connectionGeneration` is reserved by the spec tuple for the Link session; child reconnects are a Gateway-internal fence.
+- Child disconnect mid-execution: bindings row stays `running` (S:318 "children can disconnect or be replaced without renaming the durable Work"); commands to a disconnected child ⇒ immediate `CommandOutcome {kind:"rejected", reason:"child-disconnected"}` (honest, retryable by kernel re-route — re-decision is kernel routing's job, no silent Gateway-level re-route); heartbeat lease expiry (2 missed cadences ⇒ connection considered dead ⇒ drop socket, mark child offline). Child restart re-registers: its in-flight execution is gone from the child's memory ⇒ the reconcile-style status probe on re-register (below) surfaces `unknown` ⇒ row `lost` + one `assignment.failed` (retryable) — the 05 law, triggered by a different path.
+- Re-register probe: when a child with bindings rows `running` at its (re-)register, the Gateway immediately sends `status` for each such row: `running` ⇒ keep; `unknown`/timeout ⇒ `lost` + `assignment.failed` `{workId, assignmentId, executionId, executionGeneration: Math.max(1, row.connectionGeneration), reason: "child-lost-execution", retryable: true}` published as 05's reconcile publishes it.
 
-## Documentation
+### Mode semantics + config
 
-- `docs/advanced.md`: Gateway modes completed (all three as-built), child-transport protocol reference, restart/reconcile semantics.
-- `src/gateway/README.md`: multi-child config sample, child connect example.
-- `.omp/skills/facilitator-workspace-packaging`: modes → implemented reality; child transport spec pointer.
+- **One binary, one verb:** keep `ofac-gateway run --config <path>` (spec §8.2 names `serve`; the as-built verb is `run`, 05's e2e/README/CI greps it — renaming is churn with no behavior gain). Mode comes from config, NOT a flag — Plan 08's feature option `mode` renders the config.
+- **Config v2** (`config.ts` — extend the hand-rolled validator; NO YAML-schema library, one validator stays boring). New/changed keys (exact literals):
+  ```yaml
+  apiVersion: facilitator.framework/v1
+  kind: Gateway
+  gatewayId: gw.team-alpha
+  team: default
+  facilitatorUrl: http://localhost:8088
+  enrollmentSecret: enroll-dev        # unchanged semantics
+  linkToken: <tok>
+  trustMode: shared-runtime           # unchanged
+  stateDir: ./.ofac-gateway
+  mode: embedded                      # NEW: embedded | shared | standalone (the §9.1 deployment mode)
+  children:                           # NEW; exactly ONE of `child:` / `children:` (both or neither ⇒ config error)
+    - name: echo                      # childWorkspaceId = "<gatewayId>/<name>"; name regex ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$
+      mode: echo                      # embedded-mode builtins only (echo|stub); ignored in shared/standalone
+      manifestFile: ./capabilities.yaml
+      token: child-secret-1           # shared/standalone: expected hello.token (optional per-child; OFAC_CHILD_SECRET wins)
+      maxInFlight: 2                  # per-child fan-out quota, integer ≥1, default 1
+      timeoutSeconds: 120             # reply/event timeout before transport-dead, 1..86400, default 120
+  childTransport:                     # NEW; required in shared/standalone, forbidden in embedded
+    socket:
+      path: ./child.sock              # resolved relative to stateDir; required in shared/standalone
+      allowedUid: 1000                # optional SO_PEERCRED pin
+    tcp:
+      port: 8090                      # optional 127.0.0.1 fallback listener (same protocol)
+    handshakeTimeoutSeconds: 5        # hello deadline
+    leaseMissedBeats: 2               # heartbeat cadences before child marked offline
+  child: { name, mode, manifestFile } # 05 block, KEPT for `mode: embedded`
+  diagnostics: { port }
+  heartbeatSeconds: 30
+  ```
+  Validation laws: `mode: embedded` ⇒ `child:` block + NO `childTransport` (embedded = 05 exactly, zero regression); `mode: shared` ⇒ `children:` non-empty, every entry WITHOUT `mode` builtin (children are real processes), `childTransport` present; `mode: standalone` ⇒ `children:` MAY be absent/empty ⇒ zero-children boot, `childTransport` required. Unknown-key rejection extends to `children[*]` and `childTransport[.*]` whitelists; every error names the bad key (`GatewayConfigError("<key>: <msg>")`, 05 law). `GatewayConfig` type mirrors this shape; `TOP_LEVEL_KEYS` gains `mode`, `children`, `childTransport`; `CHILD_KEYS` gains `token`, `maxInFlight`, `timeoutSeconds` (shared entries) — the validator keeps builtin-only keys (`mode`, `manifestFile`) embedded-only.
+- **trustMode honesty per mode (A:85-97):** config `trustMode` remains a single gateway-level declaration (A:44 — the Facilitator sees one enrollment). `mode: shared|standalone` with `trustMode: shared-runtime` is legal (children share the Gateway's OS realm — honest); validator REJECTS `mode: embedded` + `trustMode: isolated-executor` (no isolation exists in-process) with `"trustMode: embedded gateway cannot claim isolated-executor"`.
+- **Manifest sources:** embedded builtins per 05 (`builtinChildManifest(mode)`); shared/standalone children send their full `CapabilityManifestV1` in `hello.manifest` (schema-validated Gateway-side via the SDK's `validateAgainstSchemaId` pattern already used for `manifestFile` — reuse, path `src/workspace-link` validation seam, else the gateway-local `MANIFEST_SCHEMA_ID` + ajv from `@ofac/protocol`; check what 05 used for `manifestFile` and reuse THAT).
+- **Union manifest + conflict law (deny-ambiguity):** union = `{apiVersion, kind, ownerTeam: <gateway team>, capabilities: concat}`; per-child digest recorded (`child_state.manifest_digest`, child's own `ownerTeam` in the row). **Conflict:** two connected children where the same `(id, version)` appears with NON-identical descriptor JSON ⇒ the LATER registration is refused `register-ack reason:"manifest-conflict"` (first-come, deny-ambiguity — silently preferring one child's descriptor would route work to the wrong capability semantics); identical duplicates (same descriptor bytes) dedupe to one entry. Union re-POST: `postCapabilities(aggregated, …)` on every child register/deregister (debounced: coalesce bursts within 1s, latest-wins), then re-POST succeeded ⇒ update `client`'s hello digest for the NEXT reconnect (05 law: digest in hello == digest last POSTed; the connected session keeps its original digest — the server stores opaque digests, no live re-hello needed). A shared/standalone Gateway with ZERO connected children POSTs an "empty fleet" manifest ONCE at boot ONLY if at least one child has never registered yet (capabilities schema requires `minItems: 1` ⇒ an empty union CANNOT be POSTed; so: standalone boot POSTs nothing, GET /capabilities keeps 404 until the first child registers; the hello frame's `capabilityManifestDigest` at standalone boot = `digestOfManifest("")`-of-placeholder: use `digestOfManifest(JSON.stringify({apiVersion,kind,ownerTeam,capabilities:[]}))` — the server stores digests opaquely (verified, `LinkHub.cs:94-97`), so a not-yet-meaningful digest is honest: document it in code comment).
+- **Routing law (S:318, `runtime.ts` rework):** `onAssign`: capability lookup over the union `capabilityId → childId` map (built from registered manifests; builtins in embedded mode) — no child advertises it ⇒ `CommandOutcome {kind:"unsupported", reason:"no-child-advertises: <capabilityId>"}` and NO ledger row (mirror of policy-denied law); policy check as 05 with the bound child's id; row insert `childId = <bound child>`; `send start` to that child. `onInteraction` (steer/cancel): row lookup by `assignmentId` ⇒ route to `row.childId` (bound-child law replaces 05's single-child pass-through when a row exists); no row ⇒ 05's pass-through ONLY in embedded mode; in shared/standalone no-row ⇒ `{kind:"rejected", reason:"no-binding"}` (deny-ambiguity: no child to ask). Quota: bound child's in-flight (`child_state` live count of rows `running` routed to it) ≥ `maxInFlight` ⇒ `CommandOutcome {kind:"rejected", reason:"child-busy: <childId>"}` (kernel re-decides; retryable at kernel level) and NO ledger row.
+- **Ledger v2 (`ledger.ts`):** `SCHEMA_VERSION = 2`. Migration in constructor: `user_version == 1` ⇒ `ALTER TABLE bindings ADD COLUMN child_generation INTEGER NOT NULL DEFAULT 0` + `CREATE TABLE child_state` + `PRAGMA user_version = 2`; `user_version == 0` ⇒ fresh v2 DDL (full `bindings` incl. `child_generation` + `child_state`); anything else ⇒ throw (05 message pattern). New table:
+  ```sql
+  CREATE TABLE child_state (
+    child_id         TEXT PRIMARY NULL-free,   -- "<gatewayId>/<name>"
+    manifest_digest  TEXT NOT NULL,
+    manifest_json    TEXT NOT NULL,            -- child's own manifest, ownerTeam as sent
+    child_generation INTEGER NOT NULL,
+    state            TEXT NOT NULL CHECK (state IN ('connected','offline')),
+    connected_at     TEXT,
+    offline_at       TEXT
+  );
+  ```
+  (`child_id TEXT PRIMARY KEY` — write the plain form.) `ExecutionLedger` new methods: `upsertChild(childId, manifestDigest, manifestJson, bumpGeneration: boolean)`, `setChildState(childId, "connected"|"offline")`, `children(): ChildStateRow[]`, `childGeneration(childId): number`, plus `byChildState(childId, state)` (rows `running` for a child — the re-register probe needs them). `markState` gains the `child_generation` stamp on insert (`NewBinding.childGeneration`).
+- **Diagnostics (`GatewayStatus` v2):** 05 shape, `child: {childWorkspaceId, mode}` REPLACED by `children: [{childWorkspaceId, state: "connected"|"offline", childGeneration, manifestDigest, inFlight: <running count>}],` and top-level `mode` added. `/status` otherwise unchanged; the 05 harness `GatewayStatusDoc` mirror updates.
+- **Ready line:** `gateway ready endpointId=<id> epoch=<n> children=<k>` (embedded boot prints `children=1`; standalone boot prints `children=0`). BREAKING for 05's e2e regex `/^gateway ready endpointId=\S+ epoch=(\d+)/` — that regex still MATCHES the new line (prefix-compatible: `children=` trailing; the regex doesn't anchor the end). Verified-compatible; 05's e2e needs no edit, but re-run them (Step 6 includes 05's three e2e files).
+- **CLI child-side (Plan 07 consumes, not reinvents):** export from `@ofac/gateway`: `connectChild(opts): Promise<ChildConnection>` where `ChildConnection = ChildExecutor`-compatible:
+  ```ts
+  export interface ConnectChildOptions {
+    transport: "unix" | "tcp";
+    path?: string;                 // unix
+    port?: number;                 // tcp, host fixed 127.0.0.1
+    childWorkspaceId: string;
+    token?: string;
+    manifest: CapabilityManifestV1;
+    handler: { onMessage(msg: ChildMessage): Promise<ChildReply>; onEventPublish?(env: EnvelopeEvent): void }; // events the handler publishes ride as "event" frames
+    heartbeatSeconds?: number;     // default 30
+    reconnectBackoffMs?: readonly number[]; // default [100, 250, 500, 1000, 2000, 5000] cap-loop
+    logger?: LinkLogger;
+  }
+  export interface ChildConnection {
+    readonly connected: boolean;
+    registerAck(): Promise<{ accepted: true }>;  // rejects with reason on denial
+    close(): Promise<void>;                      // sends goaway-aware close
+  }
+  ```
+  `connectChild` implements: connect, hello, ack, NDJSON codec, request/response pairing (`command` → handler → `reply`), a pending-event queue flushed with `event` frames, auto-reconnect + re-register with the locked backoff, `close()` = graceful. `ChildExecutor` interface, `EmbeddedChild`, config v1 files keep working untouched (embedded path is 05 verbatim).
+- **Runtime rework (`runtime.ts`, the 6 single-child sites):** `private readonly child: EmbeddedChild` ⇒ `private readonly children: Map<string, ChildExecutor>` (embedded: one `EmbeddedChild` entry — 05's wiring moves behind the SAME code path, single-child is a fleet of one, no special-case branches except builtin construction). `setPublisher` equivalent for `SocketChild`: the connection's `event` frames ARE the relay (no publisher injection needed; embedded keeps 05's). `forwardQueued` drains only embedded queues. `reconcile()`: iterate rows, group by `childId`; connected ⇒ probe (05 law); offline/embedded-missing ⇒ `lost` + `assignment.failed` reason `"gateway-restart-lost"` (unchanged literal). Heartbeat: 05 law unchanged (gateway-level event with `activeAssignments` = total running). `gatewayStatus()`: children array from `child_state` + live connection map.
+- **`SocketChild` (gateway-side executor, `child-link.ts`):** implements `ChildExecutor` over an established connection: `send()` pairs requestId/reply (timeout ⇒ reject ⇒ caller marks `lost` per law — `onAssign` maps send-failure to row `failed` reason `"child-timeout"` + receipt `rejected`; reconcile-timeout ⇒ `lost`); `drainEvents()` pulls from the frame-arrival queue; generation fencing per locked law.
+- **Public exports (`src/index.ts` additions):** `ChildWireFrame` union + `MAX_CHILD_FRAME_BYTES`, `startChildListener(runtime, cfg): Promise<ChildListener>` (`ChildListener { socketPath?: string; port?: number; close(): Promise<void> }`), `connectChild`/`ConnectChildOptions`/`ChildConnection`, `GatewayMode = "embedded"|"shared"|"standalone"`. `GatewayMode` flows through `GatewayConfig.mode`; `mode` appears in `GET /status`.
 
-## Architecture fit
+## Steps (build order; each ends green)
 
-§6.1–6.3 in full: the Facilitator sees one endpoint; the Gateway owns fan-out, per-child bindings, and reconcile. This is what makes the "team-owned execution authority" (§2.1) concrete: children can come and go, the Gateway's ledger is the execution truth the kernel reconciles against. Prerequisite for Plan 07 (adapters are the first real children) and the packaging story (Plan 08 Features run exactly these processes).
+### Step 1 — `childwire.ts`: NDJSON codec + frame types (pure)
+New `src/gateway/src/childwire.ts` per locks: `encodeFrame(frame): string` (single line + `\n`), `createFrameParser(onFrame, onError)` fed socket data (buffer concat, split `\n`, oversized ⇒ error once), discriminated `ChildWireFrame` union with exact literals above. Tests: split-across-chunks, two-frames-one-chunk, oversize, malformed-JSON line ⇒ `parse-error` (log + drop line, connection survives), round-trip every frame type. No runtime/socket deps.
 
-## Additional resources
+### Step 2 — Config v2 + mode matrix (pure)
+`config.ts` per locks; v1 configs (`child:` block, no `mode`) load as `mode: "embedded"` (back-compat law — 05 sample files must keep parsing). Tests: every validation law above (each-by-name error assertion), v1 back-compat, embedded⇄childTransport cross rules, children name regex, both-blocks/neither-blocks, `isolated-executor`+embedded rejection, whitelist extensions. Existing 05 config tests keep passing (they exercise the embedded path).
 
-- Spec §6.1–6.3, §9; appendix §4, §5.4–5.5; `.omp/skills/facilitator-workspace-packaging`.
-- As-built: Plan 05 code (`src/gateway/`), SDK transport seam patterns (`src/workspace-link/src/node/`), `link-e2e`/`gateway-e2e` CI jobs.
-- External: Node `net`/Unix socket + `SO_PEERCRED` docs (`node:net` `getSndBufSize`… concretely the `node-ipc`/`abstract-socket` prior-art discussion; decide boring).
+### Step 3 — Listener: `listen.ts` + auth + generation (socket-pair unit tests)
+`startChildListener` per locks: `node:net` server on unix path (+ optional TCP), stale-socket takeover probe (`net.connect` to path: connect succeeds ⇒ live Gateway exists ⇒ fail-fast throw `"child socket in use: <path>"`; ECONNREFUSED/ENOENT ⇒ unlink, bind, `chmod 0o600` — for TCP: bind failure throws, 05 diagnostics law). hello parsing, auth (token const-time via `timingSafeEqual` after length-pad, peer-uid when configured), id-namespace validation, duplicate-id takeover (live holder ⇒ `register-ack denied "duplicate-id"`; the holder's socket is NOT touched — first-wins), `too-many-children` (cap = 32, a boring hard bound, const `MAX_CHILDREN`), heartbeat lease tracking (`leaseMissedBeats` ⇒ mark offline, destroy socket), goaway on `close()`. Tests: real unix-socket pairs in a temp dir (vitest, no fake timers for socket I/O — use short timeouts), both auth paths (skip peer-uid assert on non-Linux: `process.platform === "linux"` guard + assert the warn instead), duplicate-id denial, lease expiry, stale-socket takeover (bind, close, rebind).
+### Step 4 — Ledger v2 + migration (pure, temp files)
+`ledger.ts` per locks: v2 fresh DDL, v1→v2 migration (`user_version=1` file seeded by copying 05's DDL, open, assert column+table+version, old rows readable with `child_generation = 0`), new methods + conflict cases. 05's ledger tests keep passing (they open fresh v1-equivalent… confirm: 05 tests seed via constructor ⇒ they now get v2 — assert `bindings` semantics unchanged).
+### Step 5 — Runtime rework + `child-link.ts` + `connectChild` + CLI/ready line
+The 6 sites + routing/quota/conflict/re-register-probe per locks; `SocketChild`; `connectChild` (client side, own module `connect.ts`, tested against the real listener from Step 3 in-process); diagnostics v2; ready line `children=<k>`; `bin/gateway.ts` unchanged otherwise. Tests: 05's runtime suite MIGRATES to embedded-mode config (assert identical behaviors — policy deny, reconcile, fencing, stale-generation, SIGTERM) PLUS new: assign routes by capability union to child B of two registered mock children (`connectChild` handlers as fakes, real listener), steer/cancel follow `row.childId`, no-advertiser ⇒ `unsupported` + no row, child-busy quota ⇒ `rejected` + no row, disconnect-mid-exec ⇒ next assign `child-disconnected`, re-register probe ⇒ `lost` + exactly one `assignment.failed` (`retryable: true`), manifest-conflict denial + first-come keep, union re-POST digest flow (captured fake fetch: assert POST bodies + debounce coalescing), child-generation fencing (frame from old generation dropped, `stale-child-generation` log).
+### Step 6 — E2E + CI + 05 regression
+Extend `test/e2e/gateway-harness.ts`: `gatewayConfig` gains `children: [{name, token?, maxInFlight?}]` + `childTransport: {socketPath?, tcpPort?}` modes → YAML; `startChild(name, opts): ChildHandle` — spawns a tiny local script `test/e2e/child-boot.mjs` (`node dist connect-child`-style: import `dist/index.js` `connectChild` + SDK `createEchoHandler`/`createStubHandler`, no new bin needed) with `{echo,stub}` builtin handlers; readiness line `child connected <id>`; reuse `freePort`, `gatewayStatus`, `inboxRowsByType`. New files (each own `useFacilitator()`, `describe.skipIf(!E2E)`):
+1. `multiplex.e2e.test.ts`: standalone boot (`children: []`, ready line `children=0`, GET /capabilities 404 via `gatewayToken`+`linkGet`-style fetch) → start child echo-A (`echo`) + child stub-B (`stub`) with a DIFFERENT manifest each (B advertises `research.analyze` v2-or-other-id: give B `makeManifest`'s `research.analyze` with `outputKinds` distinct? NO — distinct id: use capability id `report.render` v1 for B; the kernel's dev seeding doesn't validate capability ids server-side) over the unix socket → poll `/status` until both `connected` and the POSTed union (`GET /api/link/v1/capabilities`) contains BOTH ids with `ownerTeam: "default"` → seed `work.assign` for `research.analyze` (→A) and for `report.render` (→B): `waitFor` `/status` `executions` + A completes (`inboxRowsByType` `assignment.completed`), B sits `running` (stub). Concrete input→observable: two seeded assigns, two children, receipts `delivered` via `linkRow`, `/status` children array shows `inFlight` 1 on B.
+2. `child-kill.e2e.test.ts`: continue-the-story — kill A (SIGKILL the child process) mid nothing-else: `/status` A goes `offline` after lease expiry (config `leaseMissedBeats: 1`, `heartbeatSeconds: 2` for speed); seed another `research.analyze` assign ⇒ receipt `rejected` reason contains `child-disconnected`, `deadLetters`/`kernelDeliveries` show the rejection honestly (B unaffected: stub still `running`); re-spawn A ⇒ re-registers ⇒ its old A-execution rows probe `unknown` ⇒ `lost` + exactly ONE new `assignment.failed` row (`retryable: true`, reason `child-lost-execution`).
+3. `gateway-restart-multi.e2e.test.ts`: SIGKILL the GATEWAY (stub execution running, children A/B connected) → restart same stateDir+gatewayId ⇒ ready `children=0` → children auto-reconnect (backoff) + re-register ⇒ `/status` shows both connected, stub row `lost` + one `assignment.failed`, echo row (completed pre-kill) intact, 05's `restart-reconcile` law holds fleet-wide.
+4. Regression: 05's three e2e files UNCHANGED and green (embedded path + prefix-compatible ready line).
+CI/Make: `gateway-e2e` job + target already run the whole `test:e2e` glob ⇒ no wiring change; add the new files only. Verify: `make gateway-e2e` locally (facilitator-dev postgres:5433 pattern).
+### Step 7 — Docs, skills, roadmap bookkeeping
+- `src/gateway/README.md`: multi-child config sample (the locked YAML), child connect example (`connectChild` snippet), child-transport protocol reference (frame table + NDJSON law + auth + goaway), modes section (embedded/shared/standalone as-built semantics + what each promises per A:85-97), updated `/status` shape + ready line.
+- `docs/advanced.md` Gateway chapter: modes COMPLETED (drop 05's "Plan 06 scope" markers), child-transport section, restart/reconcile fleet semantics.
+- `.omp/skills/facilitator-workspace-packaging/SKILL.md`: modes → implemented reality; child-transport spec pointer (frame vocabulary location, socket-path config key) — Plan 08 gate input.
+- `src/gateway/AGENTS.md`: invariants gained: fleet-of-one law (no embedded special cases beyond construction), child-generation vs connectionGeneration split, deny-ambiguity on conflicts, quota-before-row law.
+- Roadmap 06 entry ⬜→🟡 at first commit, →🟢 on CI green; THIS file's Implementation Status table per step, same commit; first implementation commit copies this content over `.omp/plans/06-gateway-multiplexing-child-transport.md` verbatim (05's precedent).
+
+## Implementation Status
+
+|Step|State|
+|---|---|
+|0 Inspection|Fully implemented: re-verified against as-built; divergence: CLI lives at `src/bin/gateway.ts` (package `bin` maps `dist/bin/gateway.js`)|
+|1 childwire.ts|Fully implemented: NDJSON codec + discriminated frame union; `test/childwire/` green (split chunks, multi-frame chunks, oversize, malformed-line drop, round-trip)|
+|2 Config v2|Fully implemented: mode matrix + `children:` + `childTransport:` validators, v1 back-compat (no `mode` ⇒ embedded), trustMode honesty rule; config suite green|
+|3 Listener|Fully implemented: `listen.ts` (stale-socket takeover, const-time auth, namespace, duplicate-id first-wins, manifest-conflict deny-ambiguity, too-many-children, lease, goaway); `test/listen/` 14 wire-behavior tests green|
+|4 Ledger v2|Fully implemented: v1→v2 migration (`child_generation` + `child_state`), new methods + conflict cases; ledger suite green|
+|5 Runtime rework|Fully implemented: `child-link.ts` (fleet routing/quota/union/digests), `connect.ts` (`connectChild`), embedded = fleet-of-one, union debounced re-POST, re-register probe, `/status` v2 (`mode` + `children[]`), ready line `children=<k>`; runtime suite migrated + `test/fleet/` shared-mode suite green (127 unit tests total)|
+|6 E2E + CI + 05 regression|Fully implemented: harness `fleet:` YAML + `startChild`/`childReady` (real child processes on built dist via `child-runner.mjs`); new `fleet-assign` (idle boot → 404 → union POST → per-advertiser routing), `child-kill` (SIGKILL → offline honesty → survivor flows → re-register probe ⇒ lost + ONE retryable `child-lost-execution`), `standalone` (`children: []` boot, late child accepted); 05 trio unchanged + green; SDK touch: `capabilityManifestDigest` accepts a getter (reconnect must carry the CURRENT union digest)|
+|7 Docs, skills, roadmap|Fully implemented: README fleet sample + lifecycle + `/status` v2 + ledgers; `docs/advanced.md` fleet chapter + config table; AGENTS.md invariants (admission/union/probe law); packaging skill modes → implemented; roadmap + this table synced; `make docs-check` green|
+
+## Critical files & anchors
+
+|File / anchor|Why|
+|---|---|
+|`src/gateway/src/runtime.ts`|The 6 single-child sites → children Map; routing/quota/union/reconcile rework lives here|
+|`src/gateway/src/child.ts:32-53`|Frozen vocabulary the wire payloads reuse verbatim — import, never redefine|
+|`src/gateway/src/config.ts:19-84`|v1 validator/whitelists being extended; the `child:` block stays embedded-only|
+|`src/gateway/src/ledger.ts:21-36`|v1 DDL the v2 migration must ALTER from; `user_version` pattern|
+|`src/gateway/test/e2e/gateway-harness.ts`|`gatewayConfig` YAML writer + ready regex every new e2e builds on|
+
+## Verification
+
+Repo root, in order; each gates its step:
+1. Steps 1–5: `pnpm install && pnpm -r build && pnpm -r test && make lint && pnpm -C src/gateway typecheck`. Unit tier must prove concretely: malformed NDJSON line kills nothing but itself; v1 config file loads as embedded (back-compat); `mode: shared` without `childTransport` exits config-error naming the key; assign for a capability only child B advertises lands a binding row with `child_id = …/B`; quota hit ⇒ receipt `rejected child-busy`, ZERO rows; manifest-conflict keeps first child, denies second with the exact reason literal; a frame on a generation-stale connection never mutates a bindings row.
+2. Step 6 concrete input → observable output: `make gateway-e2e` — standalone Gateway boots `children=0`; two children attach over the socket; `/api/link/v1/capabilities` shows the UNION with `ownerTeam: "default"`; two seeded assigns route to different children (psql `link_deliveries` `delivered`, `/status` per-child `inFlight`); SIGKILL one child ⇒ next assign honestly `rejected child-disconnected`, other child keeps flowing, re-spawn probes the orphaned execution to `lost` with exactly one `assignment.failed` in `facilitator.inbox`; SIGKILL the Gateway ⇒ both children auto-reconnect after restart and reconcile reports real state for both.
+3. Full gate: `make build && make test && make lint && make docs-check`; 05's e2e trio green inside the same job ⇒ no embedded regression; CI green = roadmap 06 🟢.
+
+## Assumptions & contingencies
+
+- Plan 05 lands 🟢 on `main` with the as-built surface verified at Step 0. If reality diverges, **the code wins**: conform, record in the status table. If 05's `ChildExecutor` seam turned out non-serializable (it is serializable as of 2026-10-24), widening it is this plan's first step, not a redesign.
+- If the `GET /capabilities` 404-before-first-child assert breaks because the dev kernel stores a placeholder manifest on enroll: assert "union appears" instead of "404 then appears" — the load-bearing check is the union POST.
+- If `SO_PEERCRED` proves unavailable in the CI environment (ubuntu-latest supports it — [unverified at plan time]): peer-uid tests are Linux-gated in-file (`process.platform === "linux"`), CI asserts the auth-disabled warn path; the secret-token auth is the primary gate everywhere.
+- Plan 08's compose wire (`GATEWAY_LISTEN: http://…8090`, `GATEWAY_URL: http://…`) presumes an HTTP child leg across containers. This plan ships unix-socket + localhost-TCP. Contingency pre-decided: Plan 08 maps `GATEWAY_LISTEN` host/port onto `childTransport.tcp.port` bound `0.0.0.0` (config already carries the port; binding host becomes the only delta) OR sidecars gateway+child per container sharing a socket volume. Do NOT build a third transport here; raise the bind-address option in Plan 08's replanning.
+- If the 1s debounced union re-POST races a reconnect hello digest in a test: assert final-consistency (last POST digest == current session digest) not ordering.
+- Vitest + real unix sockets: keep per-test tmpdirs (`mkdtempSync`) + `finally` close to avoid cross-file socket-file collisions; the 108-byte `sun_path` limit means tmpdir paths must stay short — if `$TMPDIR` is deep, fall back to `/tmp/gw-<pid>-<n>.sock` literals in tests.
+- No new wire types in `protocol/`, no server changes, no new deps (all stdlib: `node:net`, `node:crypto`). No connector-table work (A:142-157 stays a non-goal).
+- **Implementation posture:** prefer the boring branch — a special case that grows past one call-site is a fleet-of-one violation, re-wire instead; when stuck after a couple of iterations, re-read this plan's locked section rather than adding a layer.

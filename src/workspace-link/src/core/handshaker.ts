@@ -15,7 +15,7 @@ export class Handshaker {
       transport: LinkTransport;
       ledger: Ledger;
       endpointId: string;
-      capabilityManifestDigest: string;
+      capabilityManifestDigest: string | (() => string);
       logger: LinkLogger;
       bus: LinkEventBus;
       /** Applied to the client's window/heartbeat inputs before `ready`. */
@@ -45,7 +45,10 @@ export class Handshaker {
       endpointId: this.deps.endpointId,
       // Transient per attempt (S:1246): fresh random hex on every hello.
       instanceId: `lnk-${randomBytes(8).toString("hex")}`,
-      capabilityManifestDigest: this.deps.capabilityManifestDigest,
+      capabilityManifestDigest:
+        typeof this.deps.capabilityManifestDigest === "function"
+          ? this.deps.capabilityManifestDigest()
+          : this.deps.capabilityManifestDigest,
       ...(lastKnownAck !== undefined ? { lastKnownAck } : {}),
     };
     const verdict = validateControlFrame(hello);

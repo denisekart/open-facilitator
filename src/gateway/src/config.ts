@@ -1,9 +1,11 @@
 // Gateway config: `.facilitator/gateway.yaml` (spec §8.4 layout) parsed +
 // validated field-by-field. The spec is silent on the key set, so THIS file
-// is the lock (Plan 06 extends it with a `children:` block, at which point a
-// YAML-schema file may replace the hand-rolled validator). Unknown top-level
-// keys are config errors — fail loud on typos rather than silently ignoring
-// an identity or credential.
+// is the lock. Config v2 (Plan 06): the deployment `mode`
+// (embedded | shared | standalone, spec §9.1), the `children:` fleet block
+// and the `childTransport:` block; the 05 embedded path (`child:`) stays
+// exactly as shipped — a v1 file (no `mode`) loads as `mode: "embedded"`.
+// Unknown top-level keys are config errors — fail loud on typos rather than
+// silently ignoring an identity or credential.
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { parse } from "yaml";
@@ -20,6 +22,37 @@ export type TrustMode = (typeof TRUST_MODES)[number];
 
 export type ChildMode = "echo" | "stub";
 
+/** §9.1 deployment mode; one binary, mode comes from config, not a flag. */
+export type GatewayMode = "embedded" | "shared" | "standalone";
+
+/** One entry of the shared/standalone `children:` fleet block. */
+export interface ChildEntryConfig {
+  /** childWorkspaceId = "<gatewayId>/<name>". */
+  name: string;
+  /** Expected hello.token; the OFAC_CHILD_SECRET env overlay wins. */
+  token?: string | undefined;
+  /** Per-child fan-out quota (Gateway-local); int >= 1. */
+  maxInFlight: number;
+  /** Reply/event timeout before transport-dead; 1..86400. */
+  timeoutSeconds: number;
+}
+
+/** Local child transport (unix socket primary, localhost TCP same-protocol fallback). */
+export interface ChildTransportConfig {
+  socket: {
+    /** Resolved against stateDir: resolve(stateDir, configuredPath). */
+    path: string;
+    /** Optional SO_PEERCRED uid pin. */
+    allowedUid?: number | undefined;
+  };
+  /** Optional 127.0.0.1 fallback listener carrying the identical frames. */
+  tcp?: { port: number } | undefined;
+  /** hello deadline. */
+  handshakeTimeoutSeconds: number;
+  /** Heartbeat cadences before a child connection is marked offline. */
+  leaseMissedBeats: number;
+}
+
 export interface GatewayConfig {
   apiVersion: typeof GATEWAY_API_VERSION;
   kind: "Gateway";
@@ -35,12 +68,23 @@ export interface GatewayConfig {
   trustMode: TrustMode;
   /** Ledger + token live here; created 0o700 when missing. */
   stateDir: string;
-  child: {
-    name: string;
-    mode: ChildMode;
-    /** Optional YAML `{capabilities: [...]}` overriding the builtin manifest. */
-    manifestFile?: string | undefined;
-  };
+  /** Deployment mode; absent in the file ⇒ "embedded" (v1 back-compat). */
+  mode: GatewayMode;
+  /** Present iff embedded — 05's single in-process child block. */
+  child?:
+    | {
+        name: string;
+        mode: ChildMode;
+        /** Optional YAML `{capabilities: [...]}` overriding the builtin manifest. */
+        manifestFile?: string | undefined;
+      }
+    | undefined;
+  /** Present iff shared|standalone — the fleet (shared: non-empty). */
+  children?: ChildEntryConfig[] | undefined;
+  /** Present iff shared|standalone — the local child transport. */
+  childTransport?: ChildTransportConfig | undefined;
+  /** Env overlay: OFAC_CHILD_SECRET (same law as OFAC_ENROLL_SECRET). */
+  childSecret?: string | undefined;
   diagnostics: {
     /** 0 ⇒ diagnostics disabled; >0 binds 127.0.0.1:port (fail-fast on clash). */
     port: number;
@@ -57,13 +101,16 @@ export class GatewayConfigError extends Error {
 }
 
 export interface ParseConfigOptions {
-  /** Env overlay (OFAC_ENROLL_SECRET / OFAC_LINK_TOKEN win over the file). */
+  /** Env overlay (OFAC_ENROLL_SECRET / OFAC_LINK_TOKEN / OFAC_CHILD_SECRET win over the file). */
   env?: Record<string, string | undefined>;
   /** Test seam for the stored-token escape hatch (default: fs existence). */
   hasStoredToken?: (stateDir: string) => boolean;
 }
 
 const GATEWAY_ID_RE = /^gw\.[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
+const CHILD_NAME_RE = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
+const CHILD_NAME_MAX = 128;
+const GATEWAY_MODES: readonly GatewayMode[] = ["embedded", "shared", "standalone"];
 const TOP_LEVEL_KEYS: Record<string, true> = {
   apiVersion: true,
   kind: true,
@@ -74,11 +121,29 @@ const TOP_LEVEL_KEYS: Record<string, true> = {
   linkToken: true,
   trustMode: true,
   stateDir: true,
+  mode: true,
   child: true,
+  children: true,
+  childTransport: true,
   diagnostics: true,
   heartbeatSeconds: true,
 };
 const CHILD_KEYS: Record<string, true> = { name: true, mode: true, manifestFile: true };
+/** Builtin-only keys (`mode`, `manifestFile`) are embedded-only, NOT fleet keys. */
+const CHILD_ENTRY_KEYS: Record<string, true> = {
+  name: true,
+  token: true,
+  maxInFlight: true,
+  timeoutSeconds: true,
+};
+const CHILD_TRANSPORT_KEYS: Record<string, true> = {
+  socket: true,
+  tcp: true,
+  handshakeTimeoutSeconds: true,
+  leaseMissedBeats: true,
+};
+const CHILD_SOCKET_KEYS: Record<string, true> = { path: true, allowedUid: true };
+const CHILD_TCP_KEYS: Record<string, true> = { port: true };
 const DIAGNOSTICS_KEYS: Record<string, true> = { port: true };
 
 function fail(key: string, message: string): never {
@@ -133,6 +198,100 @@ function requireInt(
   return value;
 }
 
+function optionalInt(
+  doc: Record<string, unknown>,
+  key: string,
+  min: number,
+  max: number,
+  fallback: number,
+  label = key,
+): number {
+  return doc[key] === undefined ? fallback : requireInt(doc, key, min, max, label);
+}
+
+/** `children:` fleet block; every error names `children[i]` or `children[i].<key>`. */
+function parseChildren(list: readonly unknown[]): ChildEntryConfig[] {
+  const seen = new Set<string>();
+  return list.map((raw, index): ChildEntryConfig => {
+    const where = `children[${index}]`;
+    const entry = asRecord(raw, where);
+    rejectUnknown(entry, CHILD_ENTRY_KEYS, where);
+    const name = requireString(entry, "name", `${where}.name`);
+    if (!CHILD_NAME_RE.test(name) || name.length > CHILD_NAME_MAX) {
+      fail(
+        `${where}.name`,
+        `must match ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$ and be at most ${CHILD_NAME_MAX} characters`,
+      );
+    }
+    if (seen.has(name)) fail(`${where}.name`, `duplicate child name '${name}'`);
+    seen.add(name);
+    const token = optionalString(entry, "token", `${where}.token`);
+    return {
+      name,
+      ...(token !== undefined ? { token } : {}),
+      maxInFlight: optionalInt(entry, "maxInFlight", 1, 2147483647, 1, `${where}.maxInFlight`),
+      timeoutSeconds: optionalInt(
+        entry,
+        "timeoutSeconds",
+        1,
+        86400,
+        120,
+        `${where}.timeoutSeconds`,
+      ),
+    };
+  });
+}
+
+/** `childTransport:` block; socket path is resolved relative to stateDir. */
+function parseChildTransport(doc: Record<string, unknown>, stateDir: string): ChildTransportConfig {
+  rejectUnknown(doc, CHILD_TRANSPORT_KEYS, "childTransport");
+  if (doc["socket"] === undefined) fail("childTransport.socket", "required");
+  const socketDoc = asRecord(doc["socket"], "childTransport.socket");
+  rejectUnknown(socketDoc, CHILD_SOCKET_KEYS, "childTransport.socket");
+  const path = requireString(socketDoc, "path", "childTransport.socket.path");
+  const allowedUidRaw = socketDoc["allowedUid"];
+  let allowedUid: number | undefined;
+  if (allowedUidRaw !== undefined && allowedUidRaw !== null) {
+    if (
+      typeof allowedUidRaw !== "number" ||
+      !Number.isInteger(allowedUidRaw) ||
+      allowedUidRaw < 0
+    ) {
+      fail("childTransport.socket.allowedUid", "must be an integer >= 0");
+    }
+    allowedUid = allowedUidRaw;
+  }
+  let tcp: { port: number } | undefined;
+  if (doc["tcp"] !== undefined) {
+    const tcpDoc = asRecord(doc["tcp"], "childTransport.tcp");
+    rejectUnknown(tcpDoc, CHILD_TCP_KEYS, "childTransport.tcp");
+    tcp = { port: requireInt(tcpDoc, "port", 1, 65535, "childTransport.tcp.port") };
+  }
+  return {
+    socket: {
+      path: resolve(stateDir, path),
+      ...(allowedUid !== undefined ? { allowedUid } : {}),
+    },
+    ...(tcp !== undefined ? { tcp } : {}),
+    handshakeTimeoutSeconds: optionalInt(
+      doc,
+      "handshakeTimeoutSeconds",
+      1,
+      3600,
+      5,
+      "childTransport.handshakeTimeoutSeconds",
+    ),
+    leaseMissedBeats: optionalInt(
+      doc,
+      "leaseMissedBeats",
+      1,
+      100,
+      2,
+      "childTransport.leaseMissedBeats",
+    ),
+  };
+}
+
 /** `<stateDir>/token` written by enrollment; a restart may mount it without a secret. */
 export function tokenFilePath(stateDir: string): string {
   return join(stateDir, "token");
@@ -174,12 +333,70 @@ export function parseConfig(yamlText: string, options: ParseConfigOptions = {}):
 
   const stateDir = resolve(requireString(root, "stateDir"));
 
-  const childDoc = asRecord(root["child"] ?? {}, "child");
-  rejectUnknown(childDoc, CHILD_KEYS, "child");
-  const childName = requireString(childDoc, "name", "child.name");
-  const mode = requireString(childDoc, "mode", "child.mode");
-  if (mode !== "echo" && mode !== "stub") fail("child.mode", "must be 'echo' or 'stub'");
-  const manifestFile = optionalString(childDoc, "manifestFile", "child.manifestFile");
+  // Deployment mode: absent ⇒ "embedded" — the v1 back-compat law (05 sample
+  // files carry no `mode` and must keep parsing).
+  let mode: GatewayMode = "embedded";
+  if (root["mode"] !== undefined) {
+    const rawMode = requireString(root, "mode");
+    if (!GATEWAY_MODES.includes(rawMode as GatewayMode)) {
+      fail("mode", `must be one of ${GATEWAY_MODES.join(", ")}`);
+    }
+    mode = rawMode as GatewayMode;
+  }
+  // trustMode honesty (appendix): an in-process embedded child has no
+  // isolation boundary to claim.
+  if (mode === "embedded" && trustMode === "isolated-executor") {
+    fail("trustMode", "embedded gateway cannot claim isolated-executor");
+  }
+
+  const hasChild = root["child"] !== undefined;
+  const hasChildren = root["children"] !== undefined;
+  const hasTransport = root["childTransport"] !== undefined;
+  // Exactly ONE of `child:` / `children:` — the mode picks the block.
+  if (hasChild && hasChildren) {
+    fail("child", "cannot use 'child' together with 'children'");
+  }
+
+  let child: GatewayConfig["child"];
+  let children: ChildEntryConfig[] | undefined;
+  let childTransport: ChildTransportConfig | undefined;
+
+  if (mode === "embedded") {
+    if (hasChildren) fail("children", "not allowed when mode is 'embedded'");
+    // embedded = 05 exactly: the in-process child needs no transport.
+    if (hasTransport) fail("childTransport", "not allowed when mode is 'embedded'");
+    if (!hasChild) fail("child", "required when mode is 'embedded'");
+    const childDoc = asRecord(root["child"], "child");
+    rejectUnknown(childDoc, CHILD_KEYS, "child");
+    const childName = requireString(childDoc, "name", "child.name");
+    const childMode = requireString(childDoc, "mode", "child.mode");
+    if (childMode !== "echo" && childMode !== "stub")
+      fail("child.mode", "must be 'echo' or 'stub'");
+    const manifestFile = optionalString(childDoc, "manifestFile", "child.manifestFile");
+    child = {
+      name: childName,
+      mode: childMode as ChildMode,
+      ...(manifestFile !== undefined ? { manifestFile } : {}),
+    };
+  } else {
+    if (hasChild) fail("child", `not allowed when mode is '${mode}'`);
+    if (hasChildren) {
+      const list = root["children"];
+      if (!Array.isArray(list)) fail("children", "must be a sequence");
+      children = parseChildren(list);
+      // standalone may boot with zero children (spec S:330); shared may not.
+      if (mode === "shared" && children.length === 0) {
+        fail("children", "must be non-empty when mode is 'shared'");
+      }
+    } else if (mode === "shared") {
+      fail("children", "required (non-empty) when mode is 'shared'");
+    }
+    if (!hasTransport) fail("childTransport", `required when mode is '${mode}'`);
+    childTransport = parseChildTransport(
+      asRecord(root["childTransport"], "childTransport"),
+      stateDir,
+    );
+  }
 
   const diagDoc = asRecord(root["diagnostics"] ?? { port: 0 }, "diagnostics");
   rejectUnknown(diagDoc, DIAGNOSTICS_KEYS, "diagnostics");
@@ -193,6 +410,7 @@ export function parseConfig(yamlText: string, options: ParseConfigOptions = {}):
   // is the weaker carrier), same law as linkd's OFAC_* handling.
   const enrollmentSecret = env["OFAC_ENROLL_SECRET"] ?? optionalString(root, "enrollmentSecret");
   const linkToken = env["OFAC_LINK_TOKEN"] ?? optionalString(root, "linkToken");
+  const childSecret = env["OFAC_CHILD_SECRET"];
   const hasStoredToken =
     options.hasStoredToken ?? ((dir: string) => existsSync(tokenFilePath(dir)));
   if (linkToken === undefined && enrollmentSecret === undefined && !hasStoredToken(stateDir)) {
@@ -212,11 +430,11 @@ export function parseConfig(yamlText: string, options: ParseConfigOptions = {}):
     ...(linkToken !== undefined ? { linkToken } : {}),
     trustMode: trustMode as TrustMode,
     stateDir,
-    child: {
-      name: childName,
-      mode: mode as ChildMode,
-      ...(manifestFile !== undefined ? { manifestFile } : {}),
-    },
+    mode,
+    ...(child !== undefined ? { child } : {}),
+    ...(children !== undefined ? { children } : {}),
+    ...(childTransport !== undefined ? { childTransport } : {}),
+    ...(childSecret !== undefined ? { childSecret } : {}),
     diagnostics: { port },
     heartbeatSeconds,
   };

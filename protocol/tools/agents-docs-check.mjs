@@ -26,8 +26,9 @@ function referencedPaths(text) {
   const skip = (t) =>
     !t.includes("/") || // a bare word or a bare `bin/`-style token is layout noise
     !/[^/]+\/[^/]+/.test(t.replace(/\/+$/, "")) ||
+    /[*?$<>=()|{}]/.test(t) || // placeholders and globs are not concrete paths
     /^[a-zA-Z]+:\/\//.test(t) ||
-    /^[#/~]/.test(t); // anchors, route literals, home paths
+    /^[#~./@]/.test(t); // anchors, route literals, home/relative paths, npm scopes
   for (const [, tok] of text.matchAll(/`([^`\s]+)`/g)) {
     if (!skip(tok)) paths.push(tok.replace(/\/+$/, ""));
   }
@@ -57,9 +58,10 @@ for (const doc of docs) {
 const rootDoc = join(ROOT, "AGENTS.md");
 if (existsSync(rootDoc) && readFileSync(rootDoc, "utf8").includes("Status: greenfield"))
   failures.push('AGENTS.md: contains "Status: greenfield" (stale status prose)');
-
-for (const area of ["tests", "reference", "features", "protocol"]) {
-  if (!EXEMPT.has(area) && !existsSync(join(ROOT, area, "AGENTS.md")))
+// Areas whose signpost lives one level down: protocol/ is covered by
+// src/protocol, and tests/ is covered by its single test project.
+for (const area of ["tests/Facilitator.Tests", "reference", "features"]) {
+  if (!existsSync(join(ROOT, area, "AGENTS.md")))
     failures.push(`${area}/: no AGENTS.md and no EXEMPT entry`);
 }
 if (existsSync(join(ROOT, "src")))

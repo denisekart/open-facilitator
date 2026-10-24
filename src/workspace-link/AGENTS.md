@@ -20,7 +20,7 @@ the Facilitator, with a durable SQLite ledger and SignalR/HTTP-poll transports.
   `pnpm -C src/workspace-link typecheck`, `pnpm -C src/workspace-link build`.
 - e2e tier (`test:e2e`): needs `FACILITATOR_URL` + `FACILITATOR_PG`; each test
   file boots its own Facilitator, files run serially (timing determinism).
-- `test/client.test.ts` is the client's behavior oracle — prefer making it
+- `test/client/client.test.ts` is the client's behavior oracle — prefer making it
   pass unchanged over editing its assertions.
 
 ## Invariants

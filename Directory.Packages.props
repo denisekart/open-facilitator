@@ -17,7 +17,7 @@
     <PackageVersion Include="Testcontainers.PostgreSql" Version="4.16.0" />
     <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.4" />
-    <PackageVersion Include="coverlet.collector" Version="6.0.4" />
+    <PackageVersion Include="coverlet.collector" Version="10.1.0" />
     <!-- Plan 01 protocol harness (nuget flat container, 2026-10):
          JsonSchema.Net 9.4.1 (draft 2020-12, RequireFormatValidation),
          Jcs.Net 0.1.1 (RFC 8785; passes the golden + numeric/sort/NFC vectors). -->

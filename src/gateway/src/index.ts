@@ -30,3 +30,13 @@ export {
   type BindingState,
   type NewBinding,
 } from "./ledger.js";
+export {
+  MANIFEST_SCHEMA_ID,
+  EmbeddedChild,
+  builtinChildManifest,
+  newExecutionId,
+  type ChildExecutor,
+  type ChildMessage,
+  type ChildReply,
+  type EmbeddedChildOptions,
+} from "./child.js";

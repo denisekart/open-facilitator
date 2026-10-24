@@ -80,15 +80,19 @@ public static class KernelServiceCollection
     {
         var linkOptions = Facilitator.Kernel.Link.LinkOptions.FromConfiguration(builder.Configuration);
         builder.Services.AddSingleton(linkOptions);
-        builder.Services.AddRateLimiter(options => options.AddPolicy<string>("enroll", context =>
-            RateLimitPartition.GetFixedWindowLimiter(
-                partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "anonymous",
-                factory: _ => new FixedWindowRateLimiterOptions
-                {
-                    PermitLimit = 30,
-                    Window = TimeSpan.FromMinutes(1),
-                    AutoReplenishment = true,
-                })));
+        builder.Services.AddRateLimiter(options =>
+        {
+            options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+            options.AddPolicy<string>("enroll", context =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "anonymous",
+                    factory: _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 30,
+                        Window = TimeSpan.FromMinutes(1),
+                        AutoReplenishment = true,
+                    }));
+        });
         builder.Services.AddSingleton<LinkEnrollmentSecret>();
         builder.Services.AddSingleton<LinkEnrollmentStartupCheck>();
         builder.Services.AddHostedService(sp => sp.GetRequiredService<LinkEnrollmentStartupCheck>());

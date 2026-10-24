@@ -47,20 +47,41 @@ public static class CliRunner
         using var client = new HttpClient { BaseAddress = new Uri(url) };
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-
-        var (method, path, json) = positional switch
+        string method, path;
+        string? json;
+        switch (positional)
         {
-            ["work", "create"] => ("POST", "/api/works", Serialise(new Dictionary<string, object> { ["objective"] = Required(options, "objective") })),
-            ["work", "get", var id] => ("GET", $"/api/works/{id}", null),
-            ["work", "timeline", var id] => ("GET", $"/api/works/{id}/timeline", null),
-            ["work", "steer", var id] => ("POST", $"/api/works/{id}/steer", Serialise(new Dictionary<string, object>
-            {
-                ["directive"] = Required(options, "directive"),
-                ["commandId"] = Guid.NewGuid().ToString("N"),
-                ["expectedVersion"] = long.Parse(Required(options, "expect-version")),
-            })),
-            _ => Usage(),
-        };
+            case ["work", "create"]:
+                if (!TryRequired(options, "objective", out var objective))
+                {
+                    return 2;
+                }
+
+                (method, path, json) = ("POST", "/api/works", Serialise(new Dictionary<string, object> { ["objective"] = objective }));
+                break;
+            case ["work", "get", var id]:
+                (method, path, json) = ("GET", $"/api/works/{id}", null);
+                break;
+            case ["work", "timeline", var id]:
+                (method, path, json) = ("GET", $"/api/works/{id}/timeline", null);
+                break;
+            case ["work", "steer", var id]:
+                if (!TryRequired(options, "directive", out var directive)
+                    || !TryRequired(options, "expect-version", out var expectVersion))
+                {
+                    return 2;
+                }
+
+                (method, path, json) = ("POST", $"/api/works/{id}/steer", Serialise(new Dictionary<string, object>
+                {
+                    ["directive"] = directive,
+                    ["commandId"] = Guid.NewGuid().ToString("N"),
+                    ["expectedVersion"] = long.Parse(expectVersion),
+                }));
+                break;
+            default:
+                return Usage();
+        }
 
         using var request = new HttpRequestMessage(new HttpMethod(method), path);
         if (json is not null)
@@ -87,22 +108,23 @@ public static class CliRunner
         return (int)response.StatusCode is >= 200 and < 300 ? 0 : 1;
     }
 
-    private static string Required(Dictionary<string, string> options, string key)
+    private static bool TryRequired(Dictionary<string, string> options, string key, out string value)
     {
-        if (!options.TryGetValue(key, out var value))
+        if (options.TryGetValue(key, out var found))
         {
-            Console.Error.WriteLine($"--{key} is required");
-            Environment.Exit(2);
+            value = found;
+            return true;
         }
 
-        return value;
+        Console.Error.WriteLine($"--{key} is required");
+        value = string.Empty;
+        return false;
     }
 
-    private static (string, string, string?) Usage()
+    private static int Usage()
     {
         Console.Error.WriteLine("usage: cli [--url URL] [--token TOKEN] work create --objective \"...\" | work steer <id> --directive \"...\" --expect-version N | work get <id> | work timeline <id>");
-        Environment.Exit(2);
-        return ("GET", "/health", null);
+        return 2;
     }
 
     private static string Serialise(IDictionary<string, object> payload)

@@ -197,16 +197,20 @@ public sealed class EfCoordinationStore(
     public async Task<IReadOnlyList<WorkEventRow>> TimelineAsync(Guid workId, CancellationToken ct)
     {
         await using var db = await contextFactory.CreateDbContextAsync(ct);
-        return await db.WorkEvents.AsNoTracking()
+        // Bound to the newest 1000 rows, then served chronologically.
+        var rows = await db.WorkEvents.AsNoTracking()
             .Where(e => e.WorkId == workId)
-            .OrderBy(e => e.CreatedAt).ThenBy(e => e.EventId)
+            .OrderByDescending(e => e.CreatedAt).ThenByDescending(e => e.EventId)
+            .Take(1000)
             .Select(e => new WorkEventRow(e.EventId, e.WorkId, e.WorkVersion, e.Kind, e.Actor, e.Detail, e.CorrelationId, e.CreatedAt))
             .ToListAsync(ct);
+        rows.Reverse();
+        return rows;
     }
 
     private static async Task WorkLockAsync(FacilitatorDbContext db, Guid workId, CancellationToken ct) =>
         await db.Database.ExecuteSqlInterpolatedAsync(
-            $"SELECT pg_advisory_xact_lock(hashtext({workId}::text))", ct);
+            $"SELECT pg_advisory_xact_lock(hashtextextended({workId}::text, 0))", ct);
 
     private async Task<int> BumpVersionAsync(FacilitatorDbContext db, Guid workId, string newState, long expectedVersion, CancellationToken ct)
     {
@@ -258,6 +262,6 @@ public sealed class EfCoordinationStore(
         return row;
     }
 
-    private static async Task NotifyAsync(FacilitatorDbContext db, Guid workId, CancellationToken ct) =>
-        await db.Database.ExecuteSqlRawAsync("SELECT pg_notify('facilitator_outbox', {0})", [workId.ToString()], ct);
+    private static Task NotifyAsync(FacilitatorDbContext db, Guid workId, CancellationToken ct) =>
+        Facilitator.Kernel.Shared.Persistence.PostgresNotifications.NotifyOutboxAsync(db, workId.ToString(), ct);
 }

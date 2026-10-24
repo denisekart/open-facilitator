@@ -29,8 +29,9 @@ app.UseMiddleware<BootstrapTokenMiddleware>();
 app.UseMiddleware<LinkAuthMiddleware>();
 app.UseAuthentication();
 app.UseAuthorization();
-app.MapKernelApi();
-app.MapLinkApi();
+app.UseRateLimiter();
+app.MapKernelApi(app.Environment);
+app.MapLinkApi(app.Environment);
 
 await app.RunAsync();
 

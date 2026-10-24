@@ -1,0 +1,129 @@
+using System.Text.Json;
+
+using Facilitator.Kernel.Persistence;
+
+using Microsoft.EntityFrameworkCore;
+
+namespace Facilitator.Kernel.Shared.Persistence;
+
+/// <summary>One dead-letter row for admin visibility (raw columns, DTO mapping at the edge).</summary>
+/// <param name="DeadLetterId">Dead-letter row identity.</param>
+/// <param name="OutboxId">Dead-lettered outbox row.</param>
+/// <param name="Reason">Why the row dead-lettered.</param>
+/// <param name="Envelope">Original CloudEvent snapshot (jsonb text).</param>
+/// <param name="CreatedAt">Dead-letter time (UTC).</param>
+public sealed record DeadLetterRow(Guid DeadLetterId, Guid OutboxId, string Reason, string Envelope, DateTime CreatedAt);
+
+/// <summary>
+/// Every <c>facilitator.outbox</c> state SET in one place: claim-expired
+/// reclaim, mark-delivered, requeue-with-backoff, dead-letter, and the dev
+/// test-affordance insert (+wake). Raw SQL only where the stance allows it
+/// (lease reclaim, backoff arithmetic); EF for the plain inserts.
+/// </summary>
+public sealed class OutboxRepository(
+    IDbContextFactory<FacilitatorDbContext> contextFactory,
+    TimeProvider timeProvider)
+{
+    /// <summary>Flip a delivered row out of the claim set (dispatcher success path).</summary>
+    public async Task MarkDeliveredAsync(Guid outboxId, CancellationToken ct)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(ct);
+        await MarkDeliveredOnAsync(db, outboxId, timeProvider.GetUtcNow().UtcDateTime, ct);
+    }
+
+    /// <summary>Mark-delivered on a caller-owned context (participates in its tx — the link ack).</summary>
+    public static async Task MarkDeliveredOnAsync(FacilitatorDbContext db, Guid outboxId, DateTime now, CancellationToken ct) =>
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+             UPDATE facilitator.outbox
+                SET status = 'delivered', processed_at = {now}, lease_owner = NULL, leased_until = NULL, last_error = NULL
+              WHERE outbox_id = {outboxId}
+             """, ct);
+
+    /// <summary>Requeue a failed row with capped exponential backoff (charged attempts stay).</summary>
+    public async Task RequeueAsync(Guid outboxId, string error, CancellationToken ct)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(ct);
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+             UPDATE facilitator.outbox
+                SET status = 'pending',
+                    available_at = now() + make_interval(secs => LEAST(power(2, attempts) * 2, 300)),
+                    last_error = {error},
+                    lease_owner = NULL,
+                    leased_until = NULL
+              WHERE outbox_id = {outboxId}
+             """, ct);
+    }
+
+    /// <summary>Dead-letter a row: snapshot + status flip in ONE transaction.</summary>
+    public async Task DeadLetterAsync(Guid outboxId, string error, JsonElement envelope, CancellationToken ct)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(ct);
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        db.DeadLetters.Add(new DeadLetterEntity
+        {
+            DeadLetterId = Guid.NewGuid(),
+            OutboxId = outboxId,
+            Reason = error,
+            Envelope = envelope.GetRawText(),
+            CreatedAt = timeProvider.GetUtcNow().UtcDateTime,
+        });
+        await db.SaveChangesAsync(ct);
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+             UPDATE facilitator.outbox
+                SET status = 'dead_letter', last_error = {error}, lease_owner = NULL, leased_until = NULL
+              WHERE outbox_id = {outboxId}
+             """, ct);
+        await tx.CommitAsync(ct);
+    }
+
+    /// <summary>Flip expired leases back to pending; returns reclaimed count.</summary>
+    public async Task<int> ReclaimExpiredLeasesAsync(CancellationToken ct)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(ct);
+        return await db.Database.ExecuteSqlRawAsync(
+            """
+            UPDATE facilitator.outbox
+               SET status = 'pending', lease_owner = NULL, leased_until = NULL
+             WHERE status = 'leased' AND leased_until < now()
+            """, ct);
+    }
+
+    /// <summary>Dev/test affordance: insert one outbox row and send the wake.</summary>
+    public async Task<Guid> AppendAsync(string recipientEndpointId, string eventType, string commandId, string envelopeJson, CancellationToken ct)
+    {
+        var now = timeProvider.GetUtcNow().UtcDateTime;
+        var row = new OutboxEntity
+        {
+            OutboxId = Guid.NewGuid(),
+            RecipientEndpointId = recipientEndpointId,
+            AggregateType = "work",
+            EventType = eventType,
+            CommandId = commandId,
+            Envelope = envelopeJson,
+            Status = "pending",
+            AvailableAt = now,
+            Attempts = 0,
+            CreatedAt = now,
+        };
+        await using var db = await contextFactory.CreateDbContextAsync(ct);
+        db.Outbox.Add(row);
+        await db.SaveChangesAsync(ct);
+        await PostgresNotifications.NotifyOutboxAsync(db, null, ct);
+        return row.OutboxId;
+    }
+
+    /// <summary>Newest dead letters (admin visibility, appendix §5.6).</summary>
+    public async Task<IReadOnlyList<DeadLetterRow>> ListDeadLettersAsync(int limit, CancellationToken ct)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(ct);
+        var rows = await db.DeadLetters.AsNoTracking()
+            .OrderByDescending(d => d.CreatedAt)
+            .Take(limit)
+            .Select(d => new DeadLetterRow(d.DeadLetterId, d.OutboxId, d.Reason, d.Envelope, d.CreatedAt))
+            .ToListAsync(ct);
+        return rows;
+    }
+}

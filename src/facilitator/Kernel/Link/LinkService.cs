@@ -29,8 +29,7 @@ public sealed class LinkService(
     IConfiguration configuration,
     TimeProvider timeProvider)
 {
-    private readonly string _replicaId = configuration["Kernel:ReplicaId"]
-        ?? $"{Environment.MachineName}/{Guid.NewGuid():N}";
+    private readonly string _replicaId = Facilitator.Kernel.Shared.KernelOptions.ReplicaId(configuration);
 
     /// <summary>Replica identity stamped on every session row (spec §7.3 placement).</summary>
     public string ReplicaId => _replicaId;

@@ -237,12 +237,7 @@ public sealed class LinkLedger(
             return false;
         }
 
-        await db.Database.ExecuteSqlInterpolatedAsync(
-            $"""
-             UPDATE facilitator.outbox
-                SET status = 'delivered', processed_at = {now}, lease_owner = NULL, leased_until = NULL, last_error = NULL
-              WHERE outbox_id = {deliveryId}
-             """, ct);
+        await Facilitator.Kernel.Shared.Persistence.OutboxRepository.MarkDeliveredOnAsync(db, deliveryId, now, ct);
         await tx.CommitAsync(ct);
         return true;
     }

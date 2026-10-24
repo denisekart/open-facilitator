@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using System.Text.Json;
 
+using Facilitator.Kernel.Shared.Persistence;
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 
@@ -25,7 +27,8 @@ public interface IEventDispatcher
 /// inside a short tx (expired leases are claimable by the same predicate);
 /// sinks are called OUTSIDE any tx (spec §19.3). Failures requeue with capped
 /// exponential backoff; five charged attempts dead-letter the row with the
-/// original envelope snapshot (appendix §5.2/§5.6).
+/// original envelope snapshot (appendix §5.2/§5.6). Every outbox-state SET
+/// runs through <see cref="OutboxRepository"/>.
 /// </summary>
 public sealed class DbEventDispatcher : IEventDispatcher
 {
@@ -55,31 +58,30 @@ public sealed class DbEventDispatcher : IEventDispatcher
         """;
 
     private readonly IDbContextFactory<Persistence.FacilitatorDbContext> _contextFactory;
+    private readonly OutboxRepository _outbox;
     private readonly IReadOnlyDictionary<string, ISink> _sinks;
     private readonly KernelMetrics _metrics;
     private readonly ILogger<DbEventDispatcher> _logger;
     private readonly string _replicaId;
-    private readonly TimeProvider _timeProvider;
     private long _lastGaugeRefreshTicks = -1;
 
     /// <summary>Create the dispatcher.</summary>
     public DbEventDispatcher(
         IDbContextFactory<Persistence.FacilitatorDbContext> contextFactory,
+        OutboxRepository outbox,
         IEnumerable<ISink> sinks,
         KernelMetrics metrics,
         IConfiguration configuration,
-        ILogger<DbEventDispatcher> logger,
-        TimeProvider timeProvider)
+        ILogger<DbEventDispatcher> logger)
     {
         _contextFactory = contextFactory;
+        _outbox = outbox;
         // Last registration per channel wins so tests can replace a sink.
         _sinks = sinks.GroupBy(s => s.Channel, StringComparer.Ordinal)
             .ToDictionary(g => g.Key, g => g.Last(), StringComparer.Ordinal);
         _metrics = metrics;
         _logger = logger;
-        _timeProvider = timeProvider;
-        _replicaId = configuration["Kernel:ReplicaId"]
-            ?? $"{Environment.MachineName}/{Guid.NewGuid():N}";
+        _replicaId = Facilitator.Kernel.Shared.KernelOptions.ReplicaId(configuration);
     }
 
     /// <inheritdoc />
@@ -109,7 +111,7 @@ public sealed class DbEventDispatcher : IEventDispatcher
                     // No route (e.g. link.* until Plan 03 session routing):
                     // requeue with backoff, never dead-letter (locked decision).
                     _metrics.DeliveryLatency(stopwatch.Elapsed.TotalMilliseconds);
-                    await HandleFailureAsync(row, $"no sink registered for channel '{ChannelOf(row.RecipientEndpointId)}'", noRoute: true, ct);
+                    await _outbox.RequeueAsync(row.OutboxId, $"no sink registered for channel '{ChannelOf(row.RecipientEndpointId)}'", ct);
                     continue;
                 }
 
@@ -117,7 +119,7 @@ public sealed class DbEventDispatcher : IEventDispatcher
                 _metrics.DeliveryLatency(stopwatch.Elapsed.TotalMilliseconds);
                 if (ok)
                 {
-                    await MarkDeliveredAsync(row.OutboxId, ct);
+                    await _outbox.MarkDeliveredAsync(row.OutboxId, ct);
                     delivered++;
                     continue;
                 }
@@ -135,16 +137,7 @@ public sealed class DbEventDispatcher : IEventDispatcher
     }
 
     /// <inheritdoc />
-    public async Task<int> ReclaimExpiredLeasesAsync(CancellationToken ct)
-    {
-        await using var db = await _contextFactory.CreateDbContextAsync(ct);
-        return await db.Database.ExecuteSqlRawAsync(
-            """
-            UPDATE facilitator.outbox
-               SET status = 'pending', lease_owner = NULL, leased_until = NULL
-             WHERE status = 'leased' AND leased_until < now()
-            """, ct);
-    }
+    public Task<int> ReclaimExpiredLeasesAsync(CancellationToken ct) => _outbox.ReclaimExpiredLeasesAsync(ct);
 
     private static string ChannelOf(string recipientEndpointId)
     {
@@ -185,82 +178,34 @@ public sealed class DbEventDispatcher : IEventDispatcher
         return rows;
     }
 
-    private async Task MarkDeliveredAsync(Guid outboxId, CancellationToken ct)
-    {
-        await using var db = await _contextFactory.CreateDbContextAsync(ct);
-        var now = _timeProvider.GetUtcNow().UtcDateTime;
-        await db.Database.ExecuteSqlInterpolatedAsync(
-            $"""
-            UPDATE facilitator.outbox
-               SET status = 'delivered', processed_at = {now}, lease_owner = NULL, leased_until = NULL, last_error = NULL
-             WHERE outbox_id = {outboxId}
-            """, ct);
-    }
-
     private async Task HandleFailureAsync(OutboxRow row, string error, bool noRoute, CancellationToken ct)
     {
-        await using var db = await _contextFactory.CreateDbContextAsync(ct);
         // "No route" (link.* before Plan 03 routing exists) requeues forever
         // with backoff — never dead-letters (locked decision).
         if (row.Attempts >= MaxAttempts && !noRoute)
         {
-            await using var tx = await db.Database.BeginTransactionAsync(ct);
-            db.DeadLetters.Add(new Persistence.DeadLetterEntity
-            {
-                DeadLetterId = Guid.NewGuid(),
-                OutboxId = row.OutboxId,
-                Reason = error,
-                Envelope = row.Envelope.GetRawText(),
-                CreatedAt = _timeProvider.GetUtcNow().UtcDateTime,
-            });
-            await db.SaveChangesAsync(ct);
-            await db.Database.ExecuteSqlInterpolatedAsync(
-                $"""
-                UPDATE facilitator.outbox
-                   SET status = 'dead_letter', last_error = {error}, lease_owner = NULL, leased_until = NULL
-                 WHERE outbox_id = {row.OutboxId}
-                """, ct);
-            await tx.CommitAsync(ct);
+            await _outbox.DeadLetterAsync(row.OutboxId, error, row.Envelope, ct);
             _logger.LogWarning("dead-lettered outbox row {OutboxId} after {Attempts} attempts: {Error}", row.OutboxId, row.Attempts, error);
             return;
         }
 
-        await db.Database.ExecuteSqlInterpolatedAsync(
-            $"""
-            UPDATE facilitator.outbox
-               SET status = 'pending',
-                   available_at = now() + make_interval(secs => LEAST(power(2, attempts) * 2, 300)),
-                   last_error = {error},
-                   lease_owner = NULL,
-                   leased_until = NULL
-             WHERE outbox_id = {row.OutboxId}
-            """, ct);
+        await _outbox.RequeueAsync(row.OutboxId, error, ct);
     }
 
     private async Task RefreshGaugesAsync(CancellationToken ct)
     {
-        var now = _timeProvider.GetUtcNow();
+        var now = DateTime.UtcNow;
         var last = Interlocked.Read(ref _lastGaugeRefreshTicks);
-        if (last >= 0 && now.UtcDateTime - new DateTime(last, DateTimeKind.Utc) < GaugeCache)
+        if (last >= 0 && now - new DateTime(last, DateTimeKind.Utc) < GaugeCache)
         {
             return;
         }
 
-        Interlocked.Exchange(ref _lastGaugeRefreshTicks, now.UtcDateTime.Ticks);
+        Interlocked.Exchange(ref _lastGaugeRefreshTicks, now.Ticks);
         await using var db = await _contextFactory.CreateDbContextAsync(ct);
         var outboxDepth = await db.Outbox.CountAsync(o => o.Status == "pending", ct);
         var inboxDepth = await db.Inbox.CountAsync(i => i.State == "pending", ct);
         var deadLetters = await db.DeadLetters.CountAsync(ct);
         _metrics.SetGauges(outboxDepth, inboxDepth, deadLetters);
     }
-}
-
-/// <summary>Activity source for kernel spans (<c>Facilitator.Kernel</c>).</summary>
-public static class KernelActivity
-{
-    /// <summary>Source name (locked contract).</summary>
-    public const string SourceName = "Facilitator.Kernel";
-
-    /// <summary>The kernel activity source.</summary>
-    public static readonly ActivitySource Source = new(SourceName);
 }

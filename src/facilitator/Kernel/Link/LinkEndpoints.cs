@@ -26,7 +26,7 @@ public static class LinkEndpoints
     private static readonly JsonSerializerOptions Web = new(JsonSerializerDefaults.Web);
 
     /// <summary>Map <c>/api/link/v1</c> (link-token auth via LinkAuthMiddleware) and kernel-token extras.</summary>
-    public static IEndpointRouteBuilder MapLinkApi(this IEndpointRouteBuilder app)
+    public static IEndpointRouteBuilder MapLinkApi(this IEndpointRouteBuilder app, IHostEnvironment environment)
     {
         var group = app.MapGroup("/api/link/v1");
 
@@ -60,10 +60,24 @@ public static class LinkEndpoints
                 return Results.Problem(ProblemErrors.SchemaViolation("token, endpointId, instanceId and trustMode are required"));
             }
 
+            // $defs/idToken bound, server-side: both identity fields are idTokens.
+            if (dto.EndpointId.Length > 128 || dto.InstanceId.Length > 128)
+            {
+                return Results.Problem(ProblemErrors.SchemaViolation("endpointId and instanceId must be at most 128 characters"));
+            }
             EnrollmentResult? result;
             try
             {
-                result = await store.EnrollAsync(dto.EndpointId, dto.InstanceId, dto.TrustMode, dto.Token, ct);
+                try
+                {
+                    result = await store.EnrollAsync(dto.EndpointId, dto.InstanceId, dto.TrustMode, dto.Token, ct);
+                }
+                catch (Microsoft.EntityFrameworkCore.DbUpdateException)
+                {
+                    // Concurrent first-enroll for the same endpoint: the unique
+                    // endpoint_id index lost the race; the retry hits the UPDATE arm.
+                    result = await store.EnrollAsync(dto.EndpointId, dto.InstanceId, dto.TrustMode, dto.Token, ct);
+                }
             }
             catch (ArgumentException ex)
             {
@@ -77,7 +91,8 @@ public static class LinkEndpoints
 
             return Results.Created($"/api/link/v1/capabilities",
                 new EnrollResponseDto(result.EnrollmentId.ToString("N"), result.TrustMode, result.LinkToken, result.ExpiresAt));
-        });
+        })
+        .RequireRateLimiting("enroll");
 
         group.MapPost("/events", async (HttpRequest request, LinkIngress ingress, TimeProvider time, CancellationToken ct) =>
         {
@@ -240,60 +255,43 @@ public static class LinkEndpoints
 
         // Kernel-token surface (BootstrapTokenMiddleware still guards /api/*
         // outside /api/link/v1): dead-letter visibility (appendix §5.6).
-        app.MapGroup("/api").MapGet("/dead-letters", async (FacilitatorDbContext db, CancellationToken ct) =>
+        app.MapGroup("/api").MapGet("/dead-letters", async (Shared.Persistence.OutboxAdminStore admin, CancellationToken ct) =>
         {
-            // Newest 50, envelope jsonb parsed client-side (EF can't project
-            // JsonDocument inside the SQL translation).
-            var rows = await db.DeadLetters.AsNoTracking()
-                .OrderByDescending(d => d.CreatedAt)
-                .Take(50)
-                .Select(d => new { d.DeadLetterId, d.OutboxId, d.Reason, d.Envelope, d.CreatedAt })
-                .ToListAsync(ct);
+            var rows = await admin.ListDeadLettersAsync(50, ct);
             return Results.Ok(rows
                 .Select(d => new DeadLetterDto(d.DeadLetterId, d.OutboxId, d.Reason, JsonDocument.Parse(d.Envelope).RootElement.Clone(), d.CreatedAt))
                 .ToArray());
         });
 
-        // Test affordance (bootstrap-kernel-token auth, ~20 lines): insert a
-        // link-addressed outbox row so link delivery flows are provable
-        // end-to-end without a full assignment slice. Mirrors /api/dev/deliveries.
-        app.MapGroup("/api").MapPost("/dev/link-outbox", async (HttpRequest request, FacilitatorDbContext db, TimeProvider time, CancellationToken ct) =>
+        // Test affordance (bootstrap-kernel-token auth, Development only):
+        // insert a link-addressed outbox row so link delivery flows are
+        // provable end-to-end without a full assignment slice.
+        if (environment.IsDevelopment())
         {
-            var body = await ReadBodyAsync(request, ct);
-            if (body.TooLarge)
+            app.MapGroup("/api").MapPost("/dev/link-outbox", async (HttpRequest request, Shared.Persistence.OutboxAdminStore admin, CancellationToken ct) =>
             {
-                return Results.Problem(ProblemErrors.PayloadTooLarge(body.Bytes));
-            }
+                var body = await ReadBodyAsync(request, ct);
+                if (body.TooLarge)
+                {
+                    return Results.Problem(ProblemErrors.PayloadTooLarge(body.Bytes));
+                }
 
-            using var doc = JsonDocument.Parse(body.Text.Length == 0 ? "{}" : body.Text);
-            var root = doc.RootElement;
-            var endpointId = root.TryGetProperty("endpointId", out var e) ? e.GetString() : null;
-            if (string.IsNullOrWhiteSpace(endpointId) || !root.TryGetProperty("envelope", out var envelope))
-            {
-                return Results.Problem(ProblemErrors.SchemaViolation("endpointId and envelope are required"));
-            }
+                using var doc = JsonDocument.Parse(body.Text.Length == 0 ? "{}" : body.Text);
+                var root = doc.RootElement;
+                var endpointId = root.TryGetProperty("endpointId", out var e) ? e.GetString() : null;
+                if (string.IsNullOrWhiteSpace(endpointId) || !root.TryGetProperty("envelope", out var envelope))
+                {
+                    return Results.Problem(ProblemErrors.SchemaViolation("endpointId and envelope are required"));
+                }
 
-            var type = envelope.TryGetProperty("type", out var t) ? t.GetString() ?? "org.facilitator.command.work.assign.v1" : "org.facilitator.command.work.assign.v1";
-            var commandId = envelope.TryGetProperty("data", out var data) && data.TryGetProperty("commandId", out var cid)
-                ? cid.GetString() ?? Guid.NewGuid().ToString("N")
-                : Guid.NewGuid().ToString("N");
-            var now = time.GetUtcNow().UtcDateTime;
-            var row = new OutboxEntity
-            {
-                OutboxId = Guid.NewGuid(),
-                RecipientEndpointId = $"link.{endpointId}",
-                AggregateType = "work",
-                EventType = type,
-                CommandId = commandId,
-                Envelope = envelope.GetRawText(),
-                AvailableAt = now,
-                CreatedAt = now,
-            };
-            db.Outbox.Add(row);
-            await db.SaveChangesAsync(ct);
-            await db.Database.ExecuteSqlRawAsync("NOTIFY facilitator_outbox", ct);
-            return Results.Accepted(null, new { outboxId = row.OutboxId });
-        });
+                var type = envelope.TryGetProperty("type", out var t) ? t.GetString() ?? "org.facilitator.command.work.assign.v1" : "org.facilitator.command.work.assign.v1";
+                var commandId = envelope.TryGetProperty("data", out var data) && data.TryGetProperty("commandId", out var cid)
+                    ? cid.GetString() ?? Guid.NewGuid().ToString("N")
+                    : Guid.NewGuid().ToString("N");
+                var outboxId = await admin.AppendDevWorkAsync($"link.{endpointId}", type, commandId, envelope.GetRawText(), ct);
+                return Results.Accepted(null, new { outboxId });
+            });
+        }
 
         return app;
     }

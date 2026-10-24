@@ -38,6 +38,18 @@ public static class KernelServiceCollection
         builder.Services.AddSingleton<DeliveryLedger>();
         builder.Services.AddSingleton<ISink, KernelLogSink>();
         builder.Services.AddSingleton<IDatabaseInitializer, DatabaseInitializer>();
+        builder.Services.AddSingleton<Facilitator.Kernel.Shared.Persistence.PgWakeListener>();
+        builder.Services.AddSingleton<Facilitator.Kernel.Shared.Persistence.OutboxRepository>();
+        builder.Services.AddSingleton<Facilitator.Kernel.Shared.Persistence.OutboxAdminStore>();
+        builder.Services.AddRateLimiter(options => options.AddPolicy<string>("enroll", context =>
+            System.Threading.RateLimiting.RateLimitPartition.GetFixedWindowLimiter(
+                partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "anonymous",
+                factory: _ => new System.Threading.RateLimiting.FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = 30,
+                    Window = TimeSpan.FromMinutes(1),
+                    AutoReplenishment = true,
+                })));
         builder.Services.AddScoped<ICoordinationStore, EfCoordinationStore>();
         builder.Services.AddSingleton<IngressStore>();
         builder.Services.AddScoped<IngressProcessor>();

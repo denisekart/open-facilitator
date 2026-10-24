@@ -1,10 +1,7 @@
 using Facilitator.Kernel.Dispatch;
+using Facilitator.Kernel.Shared.Persistence;
 
 using Microsoft.AspNetCore.SignalR;
-
-using Microsoft.EntityFrameworkCore;
-
-using Npgsql;
 
 namespace Facilitator.Kernel.Link;
 
@@ -26,13 +23,18 @@ public sealed class LinkDeliveryPump(
     LinkService sessions,
     LinkConnectionRegistry registry,
     IHubContext<LinkHub> hub,
+    PgWakeListener wakeListener,
     KernelMetrics metrics,
     LinkOptions options,
-    IDbContextFactory<Persistence.FacilitatorDbContext> contextFactory,
     ILogger<LinkDeliveryPump> logger) : BackgroundService
 {
     private static readonly TimeSpan SafetyPoll = TimeSpan.FromSeconds(2);
-    private readonly HashSet<string> _paused = new(StringComparer.Ordinal);
+    private static readonly TimeSpan GaugeCache = TimeSpan.FromSeconds(5);
+
+    // Mutated concurrently from hub Hello/Receipt, HTTP receipt/claim, the
+    // pump loop, and LinkSink.DeliverAsync — hence a concurrent dictionary.
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte> _paused = new(StringComparer.Ordinal);
+    private long _lastGaugeRefreshTicks = -1;
 
     /// <summary>
     /// One pump pass for an endpoint: materialize, and — only when a socket
@@ -57,13 +59,13 @@ public sealed class LinkDeliveryPump(
         var connections = registry.ForEndpoint(endpointId);
         if (connections.Count == 0)
         {
-            metrics.SetLinkSessions(await sessions.CountLiveAsync(ct));
+            await RefreshSessionGaugeAsync(ct);
             return;
         }
 
         var inFlight = await ledger.CountInFlightAsync(endpointId, ct);
         var capacity = maxInFlight - inFlight;
-        if (capacity > 0 && _paused.Remove(endpointId))
+        if (capacity > 0 && _paused.TryRemove(endpointId, out _))
         {
             await FlowControlAsync(endpointId, maxInFlight, connections, ct); // resume hint
         }
@@ -82,12 +84,12 @@ public sealed class LinkDeliveryPump(
             inFlight = await ledger.CountInFlightAsync(endpointId, ct);
         }
 
-        if (inFlight >= maxInFlight && connections.Count > 0 && _paused.Add(endpointId))
+        if (inFlight >= maxInFlight && connections.Count > 0 && _paused.TryAdd(endpointId, 0))
         {
             await FlowControlAsync(endpointId, 0, connections, ct); // pause hint (frozen schema allows 0)
         }
 
-        metrics.SetLinkSessions(await sessions.CountLiveAsync(ct));
+        await RefreshSessionGaugeAsync(ct);
     }
 
     /// <summary>
@@ -103,7 +105,7 @@ public sealed class LinkDeliveryPump(
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         using var wake = new SemaphoreSlim(0, 1);
-        var listenerTask = ListenAsync(wake, stoppingToken);
+        var listenerTask = wakeListener.ListenAsync(wake, stoppingToken);
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -158,7 +160,7 @@ public sealed class LinkDeliveryPump(
             await PumpEndpointAsync(endpointId, options.MaxInFlight, ct);
         }
 
-        metrics.SetLinkSessions(await sessions.CountLiveAsync(ct));
+        await RefreshSessionGaugeAsync(ct);
     }
 
     private async Task SweepAsync(CancellationToken ct)
@@ -173,51 +175,24 @@ public sealed class LinkDeliveryPump(
                 registry.Unregister(connection.ConnectionId);
             }
 
-            _paused.Remove(session.EndpointId);
+            _paused.TryRemove(session.EndpointId, out _);
         }
     }
 
-    private async Task ListenAsync(SemaphoreSlim wake, CancellationToken ct)
+    /// <summary>
+    /// Refresh the live-session gauge from a 5 s cache so a pump pass never
+    /// pays a COUNT per endpoint (same pattern as the dispatcher's gauges).
+    /// </summary>
+    private async Task RefreshSessionGaugeAsync(CancellationToken ct)
     {
-        try
+        var now = DateTime.UtcNow;
+        var last = Interlocked.Read(ref _lastGaugeRefreshTicks);
+        if (last >= 0 && now - new DateTime(last, DateTimeKind.Utc) < GaugeCache)
         {
-            await using var db = await contextFactory.CreateDbContextAsync(CancellationToken.None);
-            var connection = (NpgsqlConnection)db.Database.GetDbConnection();
-            connection.Notification += (_, e) =>
-            {
-                if (e.Channel == "facilitator_outbox")
-                {
-                    try
-                    {
-                        wake.Release();
-                    }
-                    catch (SemaphoreFullException)
-                    {
-                        // a wake is already pending
-                    }
-                }
-            };
+            return;
+        }
 
-            await connection.OpenAsync(ct);
-            await using (var command = connection.CreateCommand())
-            {
-                command.CommandText = "LISTEN facilitator_outbox";
-                await command.ExecuteNonQueryAsync(ct);
-            }
-
-            while (!ct.IsCancellationRequested)
-            {
-                await connection.WaitAsync(ct);
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            // shutdown
-        }
-        catch (Exception ex)
-        {
-            // NOTIFY is a hint: losing the listener only costs latency (§7.3).
-            logger.LogWarning(ex, "link pump LISTEN wake lost; pump continues polling");
-        }
+        Interlocked.Exchange(ref _lastGaugeRefreshTicks, now.Ticks);
+        metrics.SetLinkSessions(await sessions.CountLiveAsync(ct));
     }
 }

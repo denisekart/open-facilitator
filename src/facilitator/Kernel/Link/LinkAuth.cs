@@ -168,7 +168,9 @@ public sealed class LinkBearerHandler(
         const string prefix = "Bearer ";
         var token = header is not null && header.StartsWith(prefix, StringComparison.Ordinal)
             ? header[prefix.Length..].Trim()
-            : Request.Query["access_token"].FirstOrDefault();
+            : Context.WebSockets.IsWebSocketRequest
+                ? Request.Query["access_token"].FirstOrDefault()
+                : null;
         if (string.IsNullOrEmpty(token))
         {
             return AuthenticateResult.NoResult();

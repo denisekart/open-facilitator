@@ -28,13 +28,30 @@ public interface ISink
 /// <param name="DeliveredAt">Delivery time (UTC).</param>
 public sealed record Delivery(Guid DeliveryId, int Attempts, DateTime DeliveredAt);
 
-/// <summary>In-memory ledger of successful stub-sink deliveries (restart/dedup proof surface).</summary>
+/// <summary>
+/// In-memory ledger of successful stub-sink deliveries (restart/dedup proof
+/// surface). An assertion aid, not state: bounded at 10 000 entries, evicting
+/// an arbitrary key on overflow.
+/// </summary>
 public sealed class DeliveryLedger
 {
+    private const int Capacity = 10_000;
     private readonly ConcurrentDictionary<Guid, Delivery> _deliveries = new();
 
     /// <summary>Record a successful delivery (last write wins per outbox id).</summary>
-    public void Record(Delivery delivery) => _deliveries[delivery.DeliveryId] = delivery;
+    public void Record(Delivery delivery)
+    {
+        if (_deliveries.Count >= Capacity && !_deliveries.ContainsKey(delivery.DeliveryId))
+        {
+            foreach (var key in _deliveries.Keys)
+            {
+                _deliveries.TryRemove(key, out _);
+                break;
+            }
+        }
+
+        _deliveries[delivery.DeliveryId] = delivery;
+    }
 
     /// <summary>All recorded deliveries.</summary>
     public IReadOnlyList<Delivery> Snapshot() => _deliveries.Values.OrderBy(d => d.DeliveredAt).ToArray();

@@ -15,7 +15,7 @@ namespace Facilitator.Kernel.Ingress;
 public static class KernelEndpoints
 {
     /// <summary>Map the kernel API group.</summary>
-    public static IEndpointRouteBuilder MapKernelApi(this IEndpointRouteBuilder app)
+    public static IEndpointRouteBuilder MapKernelApi(this IEndpointRouteBuilder app, IHostEnvironment environment)
     {
         var group = app.MapGroup("/api");
 
@@ -83,10 +83,13 @@ public static class KernelEndpoints
             return await processor.IngestEventAsync(body.Text, ct);
         });
 
-        group.MapGet("/dev/deliveries", (DeliveryLedger ledger) =>
-            Results.Ok(ledger.Snapshot()
-                .Select(d => new { deliveryId = d.DeliveryId, attempts = d.Attempts, deliveredAt = d.DeliveredAt })
-                .ToArray()));
+        if (environment.IsDevelopment())
+        {
+            group.MapGet("/dev/deliveries", (DeliveryLedger ledger) =>
+                Results.Ok(ledger.Snapshot()
+                    .Select(d => new { deliveryId = d.DeliveryId, attempts = d.Attempts, deliveredAt = d.DeliveredAt })
+                    .ToArray()));
+        }
 
         return app;
     }

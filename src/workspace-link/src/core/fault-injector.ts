@@ -3,6 +3,7 @@
 // deliveries. No env-var magic: the consumer (or a test) composes the faults.
 import type { EnvelopeObject, LinkDeliveryV1, ReceiptV1 } from "@ofac/protocol";
 import { TransportError } from "./errors.js";
+import { FrameEmitter } from "./frame-emitter.js";
 import type {
   EnvelopeAck,
   FlowControlFrame,
@@ -23,9 +24,9 @@ export interface FaultPolicy {
 }
 
 export class FaultInjector implements LinkTransport {
-  private deliverCbs: ((d: LinkDeliveryV1) => void)[] = [];
-  private flowCbs: ((f: FlowControlFrame) => void)[] = [];
-  private disconnectCbs: ((g: GoodbyeFrame) => void)[] = [];
+  private readonly deliver = new FrameEmitter<LinkDeliveryV1>();
+  private readonly flow = new FrameEmitter<FlowControlFrame>();
+  private readonly disconnect = new FrameEmitter<GoodbyeFrame>();
 
   constructor(
     private readonly inner: LinkTransport,
@@ -76,7 +77,7 @@ export class FaultInjector implements LinkTransport {
   }
 
   onDeliver(cb: (d: LinkDeliveryV1) => void): void {
-    this.deliverCbs.push(cb);
+    this.deliver.subscribe(cb);
     this.inner.onDeliver((d) => {
       cb(d);
       if (this.policy.duplicateDeliver?.(d.deliveryId)) cb(d);
@@ -84,12 +85,12 @@ export class FaultInjector implements LinkTransport {
   }
 
   onFlow(cb: (f: FlowControlFrame) => void): void {
-    this.flowCbs.push(cb);
+    this.flow.subscribe(cb);
     this.inner.onFlow(cb);
   }
 
   onDisconnect(cb: (g: GoodbyeFrame) => void): void {
-    this.disconnectCbs.push(cb);
+    this.disconnect.subscribe(cb);
     this.inner.onDisconnect(cb);
   }
 }

@@ -29,6 +29,9 @@ OFAC_LINK_TOKEN=... node dist/bin/linkd.js run \
   --state ./linkd.sqlite --mode stub --transport http-poll
 ```
 
+`OFAC_ENROLL_SECRET` replaces `--secret` and is consulted FIRST — argv is
+world-readable via `ps`, the environment is not.
+
 `--mode echo` answers every command with an `accepted` receipt echoing the
 envelope; `--mode stub` logs and accepts. SIGINT sends a goodbye and exits 0.
 Exit codes: `0` clean · `2` config error · `3` protocol mismatch (terminal) ·

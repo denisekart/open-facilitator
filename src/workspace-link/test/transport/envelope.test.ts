@@ -1,7 +1,7 @@
 // Outbound envelope builder + enrollment helper (mock fetch) proofs.
 import { describe, expect, it } from "vitest";
 import { validateEnvelope } from "@ofac/protocol";
-import { buildEvent, dataschemaFor, enroll, EnrollmentError } from "../src/index.js";
+import { buildEvent, dataschemaFor, enroll, EnrollmentError } from "../../src/index.js";
 
 describe("buildEvent", () => {
   it("produces a schema-valid CloudEvent with derived dataschema", () => {

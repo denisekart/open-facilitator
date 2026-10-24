@@ -127,6 +127,14 @@ export interface LinkHandler {
  */
 export type WorkspaceCapabilityManifest = CapabilityManifestV1;
 
+/** The live session as the welcome advertises it; surfaced via LinkClient.session. */
+export interface LinkSession {
+  sessionId: string;
+  leaseEpoch: number;
+  maxInFlight: number;
+  heartbeatSeconds: number;
+  protocolVersion: string;
+}
 export type LinkState = "idle" | "connecting" | "handshaking" | "ready" | "reconnecting" | "closed";
 
 export interface LinkStats {

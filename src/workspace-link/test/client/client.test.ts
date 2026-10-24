@@ -15,8 +15,8 @@ import {
   ProtocolMismatchError,
   createMemoryLogger,
   type LinkHandler,
-} from "../src/index.js";
-import { MockTransport, flush } from "./mock-transport.js";
+} from "../../src/index.js";
+import { MockTransport, flush } from "../transport/mock-transport.js";
 
 const ASSIGN = "org.facilitator.command.work.assign.v1";
 const PROGRESS = "org.facilitator.event.work.progress.v1";

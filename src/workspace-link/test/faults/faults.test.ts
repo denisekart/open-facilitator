@@ -2,8 +2,13 @@
 // Deliver pushes — against the real client state machine + MemoryLedger.
 import { describe, expect, it } from "vitest";
 import type { LinkDeliveryV1 } from "@ofac/protocol";
-import { createLinkClient, FaultInjector, MemoryLedger, createMemoryLogger } from "../src/index.js";
-import { MockTransport, flush } from "./mock-transport.js";
+import {
+  createLinkClient,
+  FaultInjector,
+  MemoryLedger,
+  createMemoryLogger,
+} from "../../src/index.js";
+import { MockTransport, flush } from "../transport/mock-transport.js";
 
 const ENVELOPE = {
   specversion: "1.0" as const,

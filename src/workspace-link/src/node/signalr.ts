@@ -16,6 +16,7 @@ import {
 import type { EnvelopeObject, LinkDeliveryV1, ReceiptV1 } from "@ofac/protocol";
 import { trimSlash } from "../core/enroll.js";
 import { TransportError } from "../core/errors.js";
+import { FrameEmitter } from "../core/frame-emitter.js";
 import type {
   EnvelopeAck,
   FlowControlFrame,
@@ -38,9 +39,9 @@ export class SignalrTransport implements LinkTransport {
     "signalr",
     "http-poll",
   ];
-  private readonly deliverCbs: ((d: LinkDeliveryV1) => void)[] = [];
-  private readonly flowCbs: ((f: FlowControlFrame) => void)[] = [];
-  private readonly disconnectCbs: ((g: GoodbyeFrame) => void)[] = [];
+  private readonly deliver = new FrameEmitter<LinkDeliveryV1>();
+  private readonly flow = new FrameEmitter<FlowControlFrame>();
+  private readonly disconnect = new FrameEmitter<GoodbyeFrame>();
   /** Set when the server pushed a goodbye; distinguishes policy drops from network loss. */
   private lastGoodbye: GoodbyeFrame | null = null;
   private connection: HubConnection;
@@ -64,15 +65,11 @@ export class SignalrTransport implements LinkTransport {
       .build();
     // Handlers BEFORE start: the server pumps Deliver frames immediately
     // inside Hello, so registering later races a lost frame.
-    connection.on("Deliver", (frame: LinkDeliveryV1) => {
-      for (const cb of this.deliverCbs) cb(frame);
-    });
-    connection.on("FlowControl", (frame: FlowControlFrame) => {
-      for (const cb of this.flowCbs) cb(frame);
-    });
+    connection.on("Deliver", (frame: LinkDeliveryV1) => this.deliver.emit(frame));
+    connection.on("FlowControl", (frame: FlowControlFrame) => this.flow.emit(frame));
     connection.on("Disconnect", (frame: GoodbyeFrame) => {
       this.lastGoodbye = frame;
-      for (const cb of this.disconnectCbs) cb(frame);
+      this.disconnect.emit(frame);
     });
     return connection;
   }
@@ -134,15 +131,15 @@ export class SignalrTransport implements LinkTransport {
   }
 
   onDeliver(cb: (d: LinkDeliveryV1) => void): void {
-    this.deliverCbs.push(cb);
+    this.deliver.subscribe(cb);
   }
 
   onFlow(cb: (f: FlowControlFrame) => void): void {
-    this.flowCbs.push(cb);
+    this.flow.subscribe(cb);
   }
 
   onDisconnect(cb: (g: GoodbyeFrame) => void): void {
-    this.disconnectCbs.push(cb);
+    this.disconnect.subscribe(cb);
   }
 }
 

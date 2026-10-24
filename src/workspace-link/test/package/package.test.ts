@@ -3,6 +3,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildEvent,
+  ConfigError,
   createEchoHandler,
   createLinkClient,
   createStubHandler,
@@ -12,18 +13,17 @@ import {
   LINK_PACKAGE,
   MAX_ENVELOPE_BYTES,
   MemoryLedger,
+  parseArgv,
   ProtocolMismatchError,
-  SessionSupersededError,
   TransportError,
-} from "../src/index.js";
+} from "../../src/index.js";
 import {
   digestOfManifest,
   HttpPollTransport,
   postCapabilities,
   SignalrTransport,
   SqliteLedger,
-} from "../src/node/index.js";
-import { parseArgsv, ConfigError } from "../src/bin/linkd.js";
+} from "../../src/node/index.js";
 
 describe("workspace-link package surface", () => {
   it("exports the SDK core from '.'", () => {
@@ -37,8 +37,8 @@ describe("workspace-link package surface", () => {
       enroll,
       FaultInjector,
       MemoryLedger,
+      parseArgv,
       ProtocolMismatchError,
-      SessionSupersededError,
       TransportError,
     ]) {
       expect(typeof value).toBe("function");
@@ -60,9 +60,9 @@ describe("workspace-link package surface", () => {
   });
 
   it("linkd CLI parses and reports config errors", () => {
-    expect(() => parseArgsv(["run", "--url", "http://x", "--secret", "s"])).toThrow(/--endpoint/);
-    expect(() => parseArgsv(["run"])).toThrow(ConfigError);
-    const config = parseArgsv([
+    expect(() => parseArgv(["run", "--url", "http://x", "--secret", "s"])).toThrow(/--endpoint/);
+    expect(() => parseArgv(["run"])).toThrow(ConfigError);
+    const config = parseArgv([
       "run",
       "--url",
       "http://x",

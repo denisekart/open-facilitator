@@ -5,8 +5,8 @@ import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
 import type { LinkDeliveryV1 } from "@ofac/protocol";
-import { HttpPollTransport } from "../src/node/index.js";
-import type { EnvelopeAck, HelloFrame, LinkTransport, WelcomeFrame } from "../src/index.js";
+import { HttpPollTransport } from "../../src/node/index.js";
+import type { EnvelopeAck, HelloFrame, LinkTransport, WelcomeFrame } from "../../src/index.js";
 
 class ScriptedKeeper implements LinkTransport {
   connectCount = 0;

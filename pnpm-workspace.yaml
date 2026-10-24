@@ -25,4 +25,6 @@ catalog:
   # @ofac/workspace-link runtime deps (Plan 04), resolved via npm registry 2026-11.
   "@microsoft/signalr": "^10.0.11"
   better-sqlite3: "^13.0.3"
+  # v13 ships NO bundled .d.ts (verified against 13.0.3: no `types` field),
+  # so the DefinitelyTyped package is genuinely required — keep them paired.
   "@types/better-sqlite3": "^9.6.0"

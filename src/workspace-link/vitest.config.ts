@@ -5,7 +5,13 @@ import { defineConfig } from "vitest/config";
 // runs only via `pnpm test:e2e` / the CI link-e2e job.
 export default defineConfig({
   test: {
-    include: ["test/**/*.test.ts"],
+    include: [
+      "test/client/**/*.test.ts",
+      "test/ledger/**/*.test.ts",
+      "test/transport/**/*.test.ts",
+      "test/faults/**/*.test.ts",
+      "test/package/**/*.test.ts",
+    ],
     exclude: ["**/node_modules/**", "**/dist/**", "**/*.e2e.test.ts"],
   },
 });

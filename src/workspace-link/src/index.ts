@@ -6,12 +6,8 @@ export const LINK_PACKAGE = "@ofac/workspace-link";
 
 export * from "./core/types.js";
 export * from "./core/errors.js";
-export {
-  LinkClient,
-  createLinkClient,
-  type LinkClientOptions,
-  type LinkSession,
-} from "./core/client.js";
+export { LinkClient, createLinkClient, type LinkClientOptions } from "./core/client.js";
+export { parseArgv, ConfigError, type LinkdConfig } from "./core/config.js";
 export {
   dedupeKeyOf,
   type InsertResult,
@@ -27,7 +23,7 @@ export {
   type EnrollOptions,
 } from "./core/enroll.js";
 export { buildEvent, dataschemaFor, SCHEMA_BASE, type BuildEventOptions } from "./core/envelope.js";
-export { FaultInjector, type FaultPolicy } from "./core/faults.js";
+export { FaultInjector, type FaultPolicy } from "./core/fault-injector.js";
 export { createEchoHandler, createStubHandler, type EchoHandlerOptions } from "./core/handlers.js";
 export {
   createConsoleLogger,

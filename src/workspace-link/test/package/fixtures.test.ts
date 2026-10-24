@@ -22,9 +22,9 @@ import {
   createConsoleLogger,
   createEchoHandler,
   createLinkClient,
-} from "../src/index.js";
-import { digestOfManifest } from "../src/node/index.js";
-import { MockTransport, flush } from "./mock-transport.js";
+} from "../../src/index.js";
+import { digestOfManifest } from "../../src/node/index.js";
+import { MockTransport, flush } from "../transport/mock-transport.js";
 
 interface FixtureCase {
   file: string;
@@ -36,7 +36,7 @@ interface FixtureCase {
   schemaFile?: string;
 }
 
-const fixturesRoot = new URL("../../../protocol/conformance-fixtures/", import.meta.url);
+const fixturesRoot = new URL("../../../../protocol/conformance-fixtures/", import.meta.url);
 const index = JSON.parse(readFileSync(new URL("index.json", fixturesRoot), "utf8")) as FixtureIndex;
 
 interface FixtureIndex {

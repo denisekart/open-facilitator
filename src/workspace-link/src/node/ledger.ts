@@ -2,6 +2,7 @@
 // Synchronous API = the persist-before-`accepted` law (S:301) is one
 // BEGIN IMMEDIATE transaction, no await gaps. Schema version 1 via
 // PRAGMA user_version; WAL + busy_timeout for the linkd/CLI co-existence.
+import { chmodSync, existsSync } from "node:fs";
 import Database from "better-sqlite3";
 import type { InsertResult, Ledger, LedgerRow, LedgerState } from "../core/ledger.js";
 
@@ -30,8 +31,10 @@ export class SqliteLedger implements Ledger {
 
   constructor(path: string) {
     this.db = new Database(path);
+    // The ledger carries envelope payloads (work objectives, artifact refs):
+    // owner-only from the first byte.
+    if (existsSync(path)) chmodSync(path, 0o600);
     this.db.pragma("journal_mode = WAL");
-    this.db.pragma("busy_timeout = 5000");
     const version = this.db.pragma("user_version", { simple: true }) as number;
     if (version === 0) {
       this.db.exec(`BEGIN IMMEDIATE;${DDL}PRAGMA user_version = ${SCHEMA_VERSION};COMMIT;`);

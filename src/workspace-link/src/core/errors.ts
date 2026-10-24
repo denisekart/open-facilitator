@@ -11,10 +11,46 @@ export interface ProblemDetails {
   [key: string]: unknown;
 }
 
-export class LinkError extends Error {
-  readonly code: string;
+/**
+ * Every code `LinkError` and its subclasses can carry: the validator taxonomy
+ * (ErrorClass), the client lifecycle, the transport surface, and the leaf
+ * names of the declared server ProblemDetails types.
+ */
+export type LinkErrorCode =
+  | ErrorClass
+  | "already-started"
+  | "closed"
+  | "reconnect-exhausted"
+  | "pipeline"
+  | "receipt-failed"
+  | "capabilities-refused"
+  | "unauthorized"
+  | "transport"
+  | "rejected"
+  | "unsupported"
+  | "session-not-found"
+  | "delivery-not-found"
+  | "capabilities-not-found"
+  | "team-mismatch"
+  | "enrollment-secret-invalid"
+  | "enrollment-failed";
 
-  constructor(code: string, message: string) {
+// ProblemDetails `type` URIs map to codes by leaf name; an undeclared type
+// falls back to the generic enrollment failure.
+const PROBLEM_TYPE_CODE: Record<string, LinkErrorCode | undefined> = {
+  unsupported: "unsupported",
+  "session-not-found": "session-not-found",
+  "delivery-not-found": "delivery-not-found",
+  "capabilities-not-found": "capabilities-not-found",
+  "team-mismatch": "team-mismatch",
+  "enrollment-secret-invalid": "enrollment-secret-invalid",
+  "no-common-version": "no-common-version",
+};
+
+export class LinkError extends Error {
+  readonly code: LinkErrorCode;
+
+  constructor(code: LinkErrorCode, message: string) {
     super(message);
     this.name = new.target.name;
     this.code = code;
@@ -28,19 +64,6 @@ export class ProtocolMismatchError extends LinkError {
   }
 }
 
-/** A superseding session (newer leaseEpoch) fenced this one's session. */
-export class SessionSupersededError extends LinkError {
-  readonly problem?: ProblemDetails | undefined;
-
-  constructor(problem?: ProblemDetails) {
-    super(
-      "session-superseded",
-      `session superseded by a newer connection${problem?.type ? ` (${problem.type})` : ""}`,
-    );
-    this.problem = problem;
-  }
-}
-
 /** POST /api/link/v1/enroll refused the enrollment secret (401) or the body (400). */
 export class EnrollmentError extends LinkError {
   readonly status: number;
@@ -49,7 +72,9 @@ export class EnrollmentError extends LinkError {
   constructor(status: number, problem: ProblemDetails) {
     const suffix = problem.type ? ` (${problem.type})` : "";
     super(
-      problem.type?.split("/").pop() ?? "enrollment-failed",
+      problem.type !== undefined
+        ? (PROBLEM_TYPE_CODE[problem.type.split("/").pop() ?? ""] ?? "enrollment-failed")
+        : "enrollment-failed",
       `enrollment refused with HTTP ${status}${suffix}: ${problem.detail ?? problem.title ?? "no detail"}`,
     );
     this.status = status;

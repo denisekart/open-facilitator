@@ -9,7 +9,7 @@ import type {
   HelloFrame,
   LinkTransport,
   WelcomeFrame,
-} from "../src/index.js";
+} from "../../src/index.js";
 
 export class MockTransport implements LinkTransport {
   connectCount = 0;

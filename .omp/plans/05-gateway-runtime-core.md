@@ -174,7 +174,7 @@ Verify: `make gateway-e2e` against a local postgres:5433 (`facilitator-dev` cont
 |4 GatewayRuntime + CLI|Fully implemented: runtime.ts (start order, token acquire/refresh, digest law, reconcile, forwarding, fencing) + bin/gateway.ts (exit-code law, ready line); runtime unit tests green|
 |5 Diagnostics|Fully implemented: diagnostics.ts `/status` (fatal bind, exact GatewayStatus shape); unit tests green|
 |6 E2E + CI + Makefile|Fully implemented: test/e2e (assign, restart-reconcile, dedupe-rotation) + harness.ts + CI `gateway-e2e` job + `make gateway-e2e`; all 3 files green locally (4 tests) — divergence: plan premise "next send 401s" is SignalR-invisible (hub claims frozen at upgrade, upgrade-401 surfaces without statusCode) so the rotation e2e verifies frozen-claims + revoke-reconnect-cannot-self-heal + restart-re-enroll instead; SDK mid-session 401 detection recorded as a Plan 06 gap|
-|7 Docs, skills, roadmap|In progress: README.md + docs/advanced.md + skill + status tables|
+|7 Docs, skills, roadmap|Fully implemented: README.md + AGENTS.md signpost + docs/advanced.md Gateway chapter + skill status flip + roadmap/this-table sync; `make docs-check` + actionlint + yamllint green|
 
 States: Not started / In progress / Partially implemented: <what>/ Fully implemented: <evidence>/ Blocked: <reason>. Update this table in the same commit as each step.
 

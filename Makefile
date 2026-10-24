@@ -1,4 +1,4 @@
-.PHONY: restore build test lint format protocol db-update compose-slim compose-full clean link-e2e
+.PHONY: restore build test lint format protocol db-update compose-slim compose-full clean link-e2e docs-check
 
 restore:
 	dotnet restore OpenFacilitator.slnx
@@ -20,6 +20,9 @@ lint:
 format:
 	dotnet format OpenFacilitator.slnx
 	pnpm format
+
+docs-check:
+	node protocol/tools/agents-docs-check.mjs
 
 protocol:
 	pnpm protocol:codegen

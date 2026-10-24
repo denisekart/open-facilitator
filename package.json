@@ -9,6 +9,7 @@
     "build": "pnpm -r build",
     "protocol:codegen": "node protocol/tools/codegen.mjs",
     "test": "pnpm -r test",
+    "docs-check": "node protocol/tools/agents-docs-check.mjs",
     "lint": "eslint --max-warnings 0 . && prettier --check \"src/**/*.ts\" \"*.{json,mjs,yaml,yml}\"",
     "format": "prettier --write \"src/**/*.ts\" \"*.{json,mjs,yaml,yml}\""
   },

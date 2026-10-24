@@ -3,16 +3,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import {
-  BindingConflictError,
-  ExecutionLedger,
-  type NewBinding,
-} from "../../src/ledger.js";
+import { BindingConflictError, ExecutionLedger, type NewBinding } from "../../src/ledger.js";
 
 let ledger: ExecutionLedger | null = null;
 
 function open(file?: string): ExecutionLedger {
-  ledger = new ExecutionLedger(file ?? join(mkdtempSync(join(tmpdir(), "gw-ledger-")), "gateway.sqlite3"));
+  ledger = new ExecutionLedger(
+    file ?? join(mkdtempSync(join(tmpdir(), "gw-ledger-")), "gateway.sqlite3"),
+  );
   return ledger;
 }
 
@@ -83,7 +81,10 @@ describe("ExecutionLedger binding tuple", () => {
 
     const again = open(file);
     expect(again.all()).toHaveLength(1);
-    expect(again.byAssignment("asg-1")).toMatchObject({ state: "completed", executionId: "exec-abc123" });
+    expect(again.byAssignment("asg-1")).toMatchObject({
+      state: "completed",
+      executionId: "exec-abc123",
+    });
   });
 
   it("dedupe_key UNIQUE conflict surfaces as a typed conflict", () => {

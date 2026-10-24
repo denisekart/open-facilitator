@@ -6,7 +6,6 @@
   "compilerOptions": {
     "noEmit": true,
     "lib": ["ES2024", "DOM"],
-    "rootDir": ".",
     "types": ["node"]
   },
   "include": ["src", "test", "vitest.config.ts", "vitest.e2e.config.ts"]

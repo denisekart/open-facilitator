@@ -7,7 +7,7 @@ import { join, dirname, resolve } from "node:path";
 const ROOT = resolve(new URL("../..", import.meta.url).pathname);
 const SKIP = new Set(["node_modules", "dist", "bin", "obj", "docs", ".git"]);
 // Areas without their own signpost file; remove an entry once a source file lands.
-const EXEMPT = new Set(["src/gateway"]);
+const EXEMPT = new Set([]);
 const MAX_LINES = 80;
 const failures = [];
 

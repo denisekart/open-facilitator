@@ -3,7 +3,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { GatewayConfigError, loadConfigFile, parseConfig, tokenFilePath } from "../../src/config.js";
+import {
+  GatewayConfigError,
+  loadConfigFile,
+  parseConfig,
+  tokenFilePath,
+} from "../../src/config.js";
 
 function stateDir(): string {
   return mkdtempSync(join(tmpdir(), "gw-config-"));
@@ -67,9 +72,11 @@ describe("parseConfig happy path", () => {
 });
 
 describe("parseConfig validation failures name the bad key", () => {
-  it("rejects a wrong apiVersion", () => expectKey("apiVersion: wrong\nkind: Gateway", "apiVersion"));
+  it("rejects a wrong apiVersion", () =>
+    expectKey("apiVersion: wrong\nkind: Gateway", "apiVersion"));
 
-  it("rejects a wrong kind", () => expectKey(BASE.replace("kind: Gateway", "kind: Worker"), "kind"));
+  it("rejects a wrong kind", () =>
+    expectKey(BASE.replace("kind: Gateway", "kind: Worker"), "kind"));
 
   it("rejects a missing required key", () =>
     expectKey(BASE.replace("team: default\n", ""), "team"));
@@ -104,13 +111,9 @@ describe("parseConfig validation failures name the bad key", () => {
   });
 
   it("errors when neither token nor secret is available", () =>
-    expectKey(
-      BASE.replace("enrollmentSecret: enroll-dev\n", ""),
-      "enrollmentSecret",
-    ));
+    expectKey(BASE.replace("enrollmentSecret: enroll-dev\n", ""), "enrollmentSecret"));
 
-  it("malformed YAML is a config error", () =>
-    expectKey("apiVersion: [unclosed", "yaml"));
+  it("malformed YAML is a config error", () => expectKey("apiVersion: [unclosed", "yaml"));
 });
 
 describe("parseConfig env overlay", () => {

@@ -4,9 +4,16 @@
 // concern); THIS table is the execution truth reconcile-on-restart reads.
 // Room preserved for a sibling `connector_actions` table (appendix §5.4) —
 // separate tables, no overloading (A:146).
+import type { Ledger } from "@ofac/workspace-link";
 import { chmodSync, existsSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import Database from "better-sqlite3";
+
+/** The two ledgers a Gateway mounts: SDK delivery dedupe + Gateway execution truth. */
+export interface GatewayPaths {
+  link: Ledger;
+  execution: ExecutionLedger;
+}
 
 const SCHEMA_VERSION = 1;
 
@@ -138,7 +145,7 @@ export class ExecutionLedger {
     }
   }
 
-  markState(executionId: string, state: BindingState, error?: string): void {
+  markState(executionId: string, state: BindingState, error?: string | null): void {
     this.db
       .prepare(
         `UPDATE bindings SET state = @state, error = @error, updated_at = @now
@@ -156,7 +163,9 @@ export class ExecutionLedger {
 
   byAssignment(assignmentId: string): BindingRow | null {
     const row = this.db
-      .prepare("SELECT * FROM bindings WHERE assignment_id = @assignmentId ORDER BY started_at DESC LIMIT 1")
+      .prepare(
+        "SELECT * FROM bindings WHERE assignment_id = @assignmentId ORDER BY started_at DESC LIMIT 1",
+      )
       .get({ assignmentId }) as DbRow | undefined;
     return row === undefined ? null : toBinding(row);
   }

@@ -40,3 +40,11 @@ export {
   type ChildReply,
   type EmbeddedChildOptions,
 } from "./child.js";
+export {
+  GatewayRuntime,
+  createGatewayRuntime,
+  type CreateGatewayRuntimeDeps,
+  type GatewayRuntimeState,
+  type GatewayStatus,
+} from "./runtime.js";
+export { startDiagnostics, type DiagnosticsHandle } from "./diagnostics.js";

@@ -187,9 +187,7 @@ export function parseConfig(yamlText: string, options: ParseConfigOptions = {}):
     diagDoc["port"] === undefined ? 0 : requireInt(diagDoc, "port", 0, 65535, "diagnostics.port");
 
   const heartbeatSeconds =
-    root["heartbeatSeconds"] === undefined
-      ? 30
-      : requireInt(root, "heartbeatSeconds", 1, 3600);
+    root["heartbeatSeconds"] === undefined ? 30 : requireInt(root, "heartbeatSeconds", 1, 3600);
 
   // Env overlay: the env is the deployment-time truth (ps-visible argv/file
   // is the weaker carrier), same law as linkd's OFAC_* handling.

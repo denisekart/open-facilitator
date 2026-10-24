@@ -1,4 +1,4 @@
-.PHONY: restore build test lint format protocol db-update compose-slim compose-full clean link-e2e docs-check
+.PHONY: restore build test lint format protocol db-update compose-slim compose-full clean link-e2e gateway-e2e docs-check
 
 restore:
 	dotnet restore OpenFacilitator.slnx
@@ -35,6 +35,13 @@ link-e2e:
 	FACILITATOR_URL=$${FACILITATOR_URL:-http://gate-only} \
 	FACILITATOR_PG=$${FACILITATOR_PG:-postgresql://postgres:postgres@127.0.0.1:5433/postgres} \
 	pnpm -C src/workspace-link test:e2e
+
+gateway-e2e:
+	@echo "Gateway E2E tier: needs Postgres at FACILITATOR_PG (default: facilitator-dev on 5433);"
+	@echo "no psql binary on PATH? PG_ADMIN_CMD='docker exec facilitator-dev psql' PG_ADMIN_URL=postgresql://postgres:postgres@localhost:5432/postgres"
+	FACILITATOR_URL=$${FACILITATOR_URL:-http://gate-only} \
+	FACILITATOR_PG=$${FACILITATOR_PG:-postgresql://postgres:postgres@127.0.0.1:5433/postgres} \
+	pnpm -C src/gateway test:e2e
 
 db-update:
 	dotnet tool restore

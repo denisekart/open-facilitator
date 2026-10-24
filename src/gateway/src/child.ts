@@ -176,7 +176,11 @@ export class EmbeddedChild implements ChildExecutor {
     executionId: string,
   ): Promise<ChildReply> {
     const outcome = await this.handler.onCommand(command, {
-      deliveryId: executionId,
+      // The embedded child sees the RAW execution token: the builtin echo
+      // handler re-publishes `exec-<ctx.deliveryId>`, which then equals the
+      // Gateway's `exec-<hex>` binding identity — the forwarded bytes map
+      // back to the row without the Gateway stamping anything.
+      deliveryId: executionId.replace(/^exec-/, ""),
       envelope: command,
       signal: new AbortController().signal,
       publishEvent: async (env) => {

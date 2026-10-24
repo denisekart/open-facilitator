@@ -51,8 +51,8 @@ Repo root **is** the spec §22.1 `framework/` tree (Plan 00). Every directory ca
 ```text
 ├── src/
 │   ├── facilitator/       # .NET 10: transactional kernel (schema, state machines, inbox/outbox, /api ingress + CLI, outbox dispatcher); SignalR Link hub (Plan 03); admin SPA wwwroot embed (Plan 12)
-│   ├── gateway/           # @ofac/gateway stub now; runtime, connectors, provisioner ports (Plan 05)
-│   ├── workspace-link/    # @ofac/workspace-link stub now; Link runtime + SDK (Plan 04)
+│   ├── gateway/           # @ofac/gateway: team Gateway runtime (one endpoint, embedded child, reconcile); connectors, provisioner ports later
+│   ├── workspace-link/    # @ofac/workspace-link: Link SDK + ofac-linkd supervisor (Plan 04)
 │   └── adapters/          # mattermost (13) / forgejo (14) / kafka (15) + harnesses/ (06+)
 ├── protocol/              # CloudEvents schemas, JSON Schema, OpenAPI, conformance fixtures (Plan 01)
 ├── features/              # Dev Container Features: gateway, workspace-link, harness-adapter (Plan 06)

@@ -109,7 +109,12 @@ describe("EmbeddedChild echo mode", () => {
 
   it("a second start for a running execution answers accepted (echo re-publishes)", async () => {
     const c = child("echo");
-    await c.send({ kind: "start", executionId: "exec-1", connectionGeneration: 1, command: assignCommand() });
+    await c.send({
+      kind: "start",
+      executionId: "exec-1",
+      connectionGeneration: 1,
+      command: assignCommand(),
+    });
     expect(c.drainEvents()).toHaveLength(2);
     const again = await c.send({
       kind: "start",
@@ -128,7 +133,12 @@ describe("EmbeddedChild echo mode", () => {
     c.setPublisher(async (env) => {
       sent.push(env.type);
     });
-    await c.send({ kind: "start", executionId: "exec-1", connectionGeneration: 1, command: assignCommand() });
+    await c.send({
+      kind: "start",
+      executionId: "exec-1",
+      connectionGeneration: 1,
+      command: assignCommand(),
+    });
     expect(sent).toEqual([
       "org.facilitator.event.work.progress.v1",
       "org.facilitator.event.assignment.completed.v1",
@@ -163,7 +173,12 @@ describe("EmbeddedChild stub mode + reconcile answers", () => {
 
   it("stop settles a running execution completed", async () => {
     const c = child("stub");
-    await c.send({ kind: "start", executionId: "exec-1", connectionGeneration: 1, command: assignCommand() });
+    await c.send({
+      kind: "start",
+      executionId: "exec-1",
+      connectionGeneration: 1,
+      command: assignCommand(),
+    });
     expect(await c.send({ kind: "stop", executionId: "exec-1", reason: "work.cancel" })).toEqual({
       kind: "accepted",
       executionId: "exec-1",
@@ -182,7 +197,12 @@ describe("EmbeddedChild stub mode + reconcile answers", () => {
     const c = child("echo");
     await c.close();
     expect(
-      await c.send({ kind: "start", executionId: "e", connectionGeneration: 1, command: assignCommand() }),
+      await c.send({
+        kind: "start",
+        executionId: "e",
+        connectionGeneration: 1,
+        command: assignCommand(),
+      }),
     ).toMatchObject({ kind: "rejected", reason: "child closed" });
   });
 });

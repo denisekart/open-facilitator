@@ -169,8 +169,8 @@ Verify: `make gateway-e2e` against a local postgres:5433 (`facilitator-dev` cont
 |---|---|
 |0 Inspection|Fully implemented: Step 0 re-verified against as-built (findings in first commit body)|
 |1 Package wiring + deps|Fully implemented: esm-only exports/bin/build, yaml catalog ^2.9.1, vitest unit+e2e configs, tsconfig.test.json; `pnpm -r build && pnpm -r test` green|
-|2 Config, policy, ledger|In progress|
-|3 ChildExecutor + EmbeddedChild|Not started|
+|2 Config, policy, ledger|Fully implemented: config.ts validator + policy.ts seam + ledger.ts bindings table; 33 unit tests green (`pnpm -C src/gateway test`)|
+|3 ChildExecutor + EmbeddedChild|In progress|
 |4 GatewayRuntime + CLI|Not started|
 |5 Diagnostics|Not started|
 |6 E2E + CI + Makefile|Not started|

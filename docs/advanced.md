@@ -78,3 +78,85 @@ The locked YAML surface (`loadConfigFile` rejects any other key, naming it):
 |`childTransport.handshakeTimeoutSeconds` `childTransport.leaseMissedBeats`|hello deadline; lease (default 5 / 2)|
 |`diagnostics.port`|localhost `/status` endpoint; `0` disables|
 |`heartbeatSeconds`|1..3600, default 30|
+
+## HarnessAdapter contract
+
+A HarnessAdapter is the thin translation layer between the Gateway's child
+transport and one harness execution engine (spec §8.3). Shipped as
+`@ofac/adapter` (`src/adapters/harnesses/adapter-sdk/`); the worked example
+is `@ofac/harness-deterministic`.
+
+### Lifecycle
+
+```mermaid
+sequenceDiagram
+    participant K as Kernel
+    participant G as Gateway
+    participant A as Adapter (@ofac/adapter)
+    participant H as Harness (hooks)
+    A->>G: hello (id + token + manifest)
+    G-->>A: register-ack accepted
+    K->>G: work.assign (command delivery)
+    G->>A: command{start}
+    A->>H: onExecute(ctx) detached
+    A-->>G: reply accepted (async law)
+    H->>A: ctx.publishProgress(...)
+    A->>G: event (full envelope, bytes unmodified)
+    K->>G: work.steer
+    G->>A: command{steer}
+    A->>H: onSteer(directive)
+    A-->>G: reply accepted | unsupported | unknown
+    H->>A: ctx.publishEvent(assignment.completed.v1)
+    A->>G: event (the harness's OWN terminal event)
+    Note over G: dedupe + settle the execution row
+```
+
+### Frames (adapter.v1.json)
+
+One NDJSON line per frame, every frame `{ v: 1, type }`, max 262 144 bytes
+— the profile of the shipped child wire, payload types imported, never
+redefined:
+
+|Frame|Direction|Payload|
+|---|---|---|
+|`hello`|adapter → Gateway|`childWorkspaceId`, `token`, capability manifest|
+|`register-ack`|Gateway → adapter|`accepted`, optional denial `reason`|
+|`command` (`start`/`steer`/`status`/`stop`)|Gateway → adapter|`requestId` + the command message|
+|`reply`|adapter → Gateway|`accepted` / `rejected` / `unsupported` / `status` / `unknown`|
+|`event`|adapter → Gateway|`requestId` + the FULL CloudEvent envelope (relay law: Gateway forwards bytes unmodified)|
+|`heartbeat`|adapter → Gateway|`childWorkspaceId` (lease keepalive)|
+|`goaway`|Gateway → adapter|drain `reason`|
+
+### Authority law (S:422)
+
+The adapter is thin translation; the **harness** is authoritative over
+execution state; the Gateway mediates. `assignment.completed.v1` is the
+harness's own publish — the SDK publishes only `assignment.failed.v1`
+(retryable) when `onExecute` fails/throws. A steer without a hook answers
+`unsupported` (report, don't reinterpret); an unknown execution answers
+`unknown` so the Gateway's reconcile probe can declare it lost, exactly
+once.
+
+### Artifacts: verified external refs (interim)
+
+Completion manifests reference outputs with absolute `file://` URLs plus
+`sha256:` digests (`common.v1.json#/$defs/artifactRef`). The consumer
+verifies by rehashing the bytes — an interim for the artifact-store era:
+when the store lands, `storageUrl` gains store schemes and the digest
+stays the integrity check.
+
+### Resume
+
+`invocation: "sdk"` only; resume is `restart-with-context`: a restarted
+adapter answers the reconcile probe from its in-memory registry (running
+executions survive a socket swap; amnesiac ones honestly answer `unknown`).
+`SessionStore` is the seam for a harness that can re-attach to a native run
+id — no in-repo implementation yet.
+
+### Conformance
+
+`@ofac/adapter/testing`'s `runAdapterLifecycleContract({...})` is the gate:
+it boots an in-process Gateway listener, drives the full lifecycle against
+your adapter, and schema-validates your terminal event. Wire-level fixtures
+live in `protocol/conformance-fixtures/` (class `adapter`). The no-Docker
+walkthrough: `examples/slim/deterministic-research-worker/`.

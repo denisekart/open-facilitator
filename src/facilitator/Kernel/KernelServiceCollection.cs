@@ -1,3 +1,5 @@
+using System.Threading.RateLimiting;
+
 using Facilitator.Kernel.Link;
 using Facilitator.Kernel.Shared.Auth;
 using Facilitator.Kernel.Shared.Dispatch;
@@ -14,8 +16,6 @@ using Ofac.Protocol.Validation;
 
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
-
-using System.Threading.RateLimiting;
 
 namespace Facilitator.Kernel;
 

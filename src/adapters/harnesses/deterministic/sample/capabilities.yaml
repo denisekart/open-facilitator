@@ -1,0 +1,17 @@
+# The manifest the deterministic worker advertises: the same
+# research.analyze v1 descriptor the e2e seeding targets (identical bytes
+# to 06's builtinChildManifest capability entry, so an embedded+fleet demo
+# dedupes per the conflict law instead of routing ambiguously).
+apiVersion: facilitator.framework/v1
+kind: CapabilityManifest
+ownerTeam: team-alpha
+capabilities:
+  - id: research.analyze
+    version: 1
+    execution: asynchronous
+    acceptedContexts: [uri-reference]
+    outputKinds: [analysis.report]
+    outputMediaTypes: [text/markdown]
+    supportsSteering: true
+    supportsCancellation: true
+    supportsNudge: false

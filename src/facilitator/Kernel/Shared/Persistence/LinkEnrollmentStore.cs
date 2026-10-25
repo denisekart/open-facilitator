@@ -1,12 +1,11 @@
 using System.Security.Cryptography;
 using System.Text;
 
+using Facilitator.Kernel.Link;
+using Facilitator.Kernel.Shared.Auth;
 using Facilitator.Kernel.Shared.Persistence;
 
 using Microsoft.EntityFrameworkCore;
-
-using Facilitator.Kernel.Shared.Auth;
-using Facilitator.Kernel.Link;
 
 using LinkOptions = Facilitator.Kernel.Link.LinkOptions;
 

@@ -1,9 +1,9 @@
 using Facilitator.Kernel;
+using Facilitator.Kernel.Link;
 using Facilitator.Kernel.Shared.Auth;
 using Facilitator.Kernel.Shared.Cli;
-using Facilitator.Kernel.Work;
-using Facilitator.Kernel.Link;
 using Facilitator.Kernel.Shared.Persistence;
+using Facilitator.Kernel.Work;
 
 if (args.Length > 0 && args[0] == "cli")
 {

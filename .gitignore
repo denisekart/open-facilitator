@@ -20,5 +20,9 @@ secrets/
 *.pem
 *.jwt
 
+# Example/gateway runtime state (walkthrough-created dirs)
+.ofac-gateway/
+.ofac-worker/
+
 # omp session-local artifacts
 .omp/plans/*.local.md

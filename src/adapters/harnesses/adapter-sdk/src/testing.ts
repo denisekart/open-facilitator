@@ -1,0 +1,440 @@
+// runAdapterLifecycleContract — the adapter lifecycle conformance kit
+// (`@ofac/adapter/testing`). A third-party adapter implementation proves
+// itself by pointing this suite at its own factory: an in-process
+// `startChildListener` (the real 06 Gateway side — no Facilitator needed)
+// drives the locked lifecycle law over the wire:
+//
+// - register: hello → accepted ack → the Gateway sees the child's manifest;
+// - start: accepted immediately; progress events ride the relay (full
+//   envelopes, Gateway stamps nothing); completion is the HARNESS's own
+//   published event with a result-manifest-valid payload;
+// - dedupe: the same commandId never executes twice;
+// - steer: lands on the running execution (or reports `unsupported`,
+//   never reinterpreted — flip `steerReply` for a no-steer adapter);
+// - stop: accepted, cooperative abort, NO terminal event after it;
+// - status: honest at every phase (running while held, completed after,
+//   `unknown` for a foreign execution);
+// - restart: a dead listener mid-run reconnects on the adapter's own
+//   schedule; the re-register probe gets `running` for a run that survived.
+//
+// Determinism contract: the kit hands `startAdapter` a RunGate. The
+// consumer's onExecute MUST `await Promise.race([gate.hold(ctx),
+// untilAborted(ctx.signal)])` before publishing its terminal event: tests
+// that need an in-flight execution hold it, the kit releases it, and a
+// cancelled run unwinds through the abort signal.
+//
+// Call inside a vitest file (it registers describe/it/beforeEach itself).
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { ChildFleet, startChildListener, type ChildLink, type ChildListener } from "@ofac/gateway";
+import { validateAgainstSchemaId } from "@ofac/protocol";
+import type { EnvelopeEvent } from "@ofac/protocol";
+import { createConsoleLogger } from "@ofac/workspace-link";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import type { AdapterHandle, RunContext } from "./types.js";
+
+/** The determinism seam the consumer's onExecute awaits. */
+export interface AdapterRunGate {
+  /** Resolves when the kit releases this run (immediately unless held). */
+  hold(ctx: RunContext): Promise<void>;
+}
+
+/** Resolves when `signal` aborts — the cooperative-cancel half of the race. */
+export function untilAborted(signal: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    if (signal.aborted) resolve();
+    else signal.addEventListener("abort", () => resolve(), { once: true });
+  });
+}
+
+export interface AdapterLifecycleContractOptions {
+  /** Boot the adapter-under-test against `opts.socketPath`. */
+  startAdapter(gate: AdapterRunGate): Promise<{ handle: AdapterHandle; stop(): Promise<void> }>;
+  socketPath: string;
+  gatewayId: string;
+  /** Expected steer answer for THIS adapter implementation (default: accepted). */
+  steerReply?: "accepted" | "unsupported";
+  /** Consumer-side proof the steer reached the harness (throw/expect inside). */
+  afterSteer?(directive: string): void | Promise<void>;
+  /** Consumer-side proof the stop aborted the run (throw/expect inside). */
+  afterCancel?(): void | Promise<void>;
+}
+
+const RESULT_MANIFEST_ID = "https://schemas.openfacilitator.org/v1/result-manifest.v1.json";
+const COMPLETED_PAYLOAD_ID =
+  "https://schemas.openfacilitator.org/v1/event.assignment.completed.v1.json";
+const PROGRESS_TYPE = "org.facilitator.event.work.progress.v1";
+const COMPLETED_TYPE = "org.facilitator.event.assignment.completed.v1";
+
+let caseCounter = 0;
+
+function assignEnvelope(
+  commandId: string,
+  workId: string,
+  assignmentId: string,
+): Record<string, unknown> {
+  return {
+    specversion: "1.0",
+    id: `kit-${commandId}`,
+    source: "urn:facilitator:instance:kit",
+    type: "org.facilitator.command.work.assign.v1",
+    subject: `work/${workId}/assignment/${assignmentId}`,
+    time: new Date().toISOString(),
+    datacontenttype: "application/json",
+    dataschema: "https://schemas.openfacilitator.org/v1/command.work.assign.v1.json",
+    traceparent: "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+    data: {
+      commandId,
+      actorEvidenceRef: "identity-evidence:kit",
+      workId,
+      targetId: "kit",
+      capabilityId: "research.analyze",
+      expectedContextVersion: 1,
+      inputs: { objective: "kit", sourceRefs: [] },
+      expectedDeliverables: [{ kind: "analysis.report", mediaType: "text/markdown" }],
+      deadline: "2036-10-23T18:00:00Z",
+      assignmentId,
+    },
+  };
+}
+
+function steerEnvelope(
+  commandId: string,
+  workId: string,
+  assignmentId: string,
+  directive: string,
+): Record<string, unknown> {
+  return {
+    specversion: "1.0",
+    id: `kit-${commandId}`,
+    source: "urn:facilitator:instance:kit",
+    type: "org.facilitator.command.work.steer.v1",
+    subject: `work/${workId}/assignment/${assignmentId}`,
+    time: new Date().toISOString(),
+    datacontenttype: "application/json",
+    dataschema: "https://schemas.openfacilitator.org/v1/command.work.steer.v1.json",
+    data: {
+      commandId,
+      workId,
+      assignmentId,
+      targetId: "kit",
+      actorEvidenceRef: "identity-evidence:kit",
+      deadline: "2036-10-23T18:00:00Z",
+      directive,
+      expectedContextVersion: 1,
+    },
+  };
+}
+
+async function waitFor<T>(
+  what: string,
+  probe: () => T | null | false | Promise<T | null | false>,
+  timeoutMs = 15_000,
+): Promise<T> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const value = await probe();
+    if (value) return value;
+    if (Date.now() > deadline) throw new Error(`timeout waiting for ${what}`);
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+}
+
+export function runAdapterLifecycleContract(opts: AdapterLifecycleContractOptions): void {
+  const steerExpectation = opts.steerReply ?? "accepted";
+
+  interface Harness {
+    listener: ChildListener;
+    link: ChildLink;
+    events: EnvelopeEvent[];
+  }
+
+  let harness: Harness | null = null;
+  let stops: (() => Promise<void>)[] = [];
+  let heldPrefix: string | null = null;
+  const resolvers = new Map<string, () => void>();
+
+  const gate: AdapterRunGate = {
+    hold(ctx: RunContext): Promise<void> {
+      if (heldPrefix === null || !ctx.executionId.startsWith(heldPrefix)) {
+        return Promise.resolve();
+      }
+      return new Promise<void>((resolve) => {
+        resolvers.set(ctx.executionId, resolve);
+      });
+    },
+  };
+
+  function holdRuns(prefix: string): void {
+    heldPrefix = prefix;
+  }
+
+  function release(executionId: string): void {
+    resolvers.get(executionId)?.();
+    resolvers.delete(executionId);
+  }
+
+  function releaseAll(): void {
+    for (const resolve of resolvers.values()) resolve();
+    resolvers.clear();
+    heldPrefix = null;
+  }
+
+  /** Boot listener + adapter together (the listener exists before hello). */
+  async function attached(): Promise<Harness> {
+    const linkReady = Promise.withResolvers<ChildLink>();
+    const listener = await startChildListener(
+      {
+        socket: { path: opts.socketPath },
+        handshakeTimeoutSeconds: 5,
+        leaseMissedBeats: 1000,
+      },
+      {
+        fleet: new ChildFleet(createConsoleLogger({ level: "error" })),
+        logger: createConsoleLogger({ level: "error" }),
+        gatewayId: opts.gatewayId,
+        heartbeatSeconds: 30,
+        onRegistered: (link) => linkReady.resolve(link),
+      },
+    );
+    const started = await opts.startAdapter(gate);
+    stops.push(started.stop);
+    await started.handle.ready();
+    const link = await linkReady.promise;
+    const events: EnvelopeEvent[] = [];
+    link.setPublisher(async (env) => {
+      events.push(env);
+    });
+    for (const env of link.drainEvents()) events.push(env);
+    harness = { listener, link, events };
+    return harness;
+  }
+
+  beforeEach(() => {
+    stops = [];
+    heldPrefix = null;
+  });
+
+  afterEach(async () => {
+    for (const stop of stops) await stop();
+    releaseAll();
+    await harness?.listener.close();
+    harness = null;
+  });
+
+  describe("adapter lifecycle contract", () => {
+    it("registers: the Gateway sees the child's manifest on hello", async () => {
+      const h = await attached();
+      expect(h.link.manifest.capabilities.length).toBeGreaterThan(0);
+      expect(h.link.connected).toBe(true);
+    });
+
+    it("start replies accepted, relays progress, and the harness's own completed event carries a valid manifest", async () => {
+      const h = await attached();
+      caseCounter += 1;
+      const executionId = `kit-exec-${caseCounter}`;
+      const workId = `kit-work-${caseCounter}`;
+      const assignmentId = `kit-assign-${caseCounter}`;
+      const reply = await h.link.send({
+        kind: "start",
+        executionId,
+        connectionGeneration: 7,
+        command: assignEnvelope(`kit-cmd-${caseCounter}`, workId, assignmentId) as never,
+      });
+      expect(reply).toEqual({ kind: "accepted", executionId });
+
+      const progress = await waitFor("progress event", () => {
+        const found = h.events.find((e) => e.type === PROGRESS_TYPE);
+        return found ?? false;
+      });
+      const progressData = progress.data as Record<string, unknown>;
+      expect(progressData["workId"]).toBe(workId);
+      expect(progressData["assignmentId"]).toBe(assignmentId);
+      // Locked: the stamp equals the START frame's connectionGeneration.
+      expect(progressData["executionGeneration"]).toBe(7);
+      expect(progress.source).toMatch(/^urn:workspace:/);
+
+      const completed = await waitFor("completed event", () => {
+        const found = h.events.find((e) => e.type === COMPLETED_TYPE);
+        return found ?? false;
+      });
+      const completedData = completed.data as Record<string, unknown>;
+      expect(
+        validateAgainstSchemaId(COMPLETED_PAYLOAD_ID, completedData).ok,
+        "completed payload validates against event.assignment.completed.v1",
+      ).toBe(true);
+      expect(
+        validateAgainstSchemaId(RESULT_MANIFEST_ID, completedData["resultManifest"]).ok,
+        "resultManifest validates against result-manifest.v1",
+      ).toBe(true);
+      expect(completedData["executionId"]).toBe(executionId);
+    });
+
+    it("duplicate start (same commandId, new delivery) executes once", async () => {
+      const h = await attached();
+      caseCounter += 1;
+      const commandId = `kit-dedupe-${caseCounter}`;
+      const workId = `kit-work-${caseCounter}`;
+      const assignmentId = `kit-assign-${caseCounter}`;
+      const envelope = assignEnvelope(commandId, workId, assignmentId);
+      const first = await h.link.send({
+        kind: "start",
+        executionId: `kit-exec-${caseCounter}a`,
+        connectionGeneration: 1,
+        command: envelope as never,
+      });
+      expect(first.kind).toBe("accepted");
+      const completedCount = () => h.events.filter((e) => e.type === COMPLETED_TYPE).length;
+      await waitFor("first completed", () => completedCount() >= 1);
+      const duplicate = await h.link.send({
+        kind: "start",
+        executionId: `kit-exec-${caseCounter}b`,
+        connectionGeneration: 1,
+        command: envelope as never,
+      });
+      expect(duplicate).toEqual({ kind: "accepted", executionId: `kit-exec-${caseCounter}b` });
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      expect(completedCount()).toBe(1); // the command never ran twice
+    });
+
+    it("steer lands on the running execution with the locked reply", async () => {
+      const h = await attached();
+      caseCounter += 1;
+      const executionId = `kit-steer-${caseCounter}`;
+      const workId = `kit-work-${caseCounter}`;
+      const assignmentId = `kit-assign-${caseCounter}`;
+      const directive = `focus-on-costs-${caseCounter}`;
+      holdRuns(executionId);
+      const reply = await h.link.send({
+        kind: "start",
+        executionId,
+        connectionGeneration: 2,
+        command: assignEnvelope(`kit-steercmd-${caseCounter}`, workId, assignmentId) as never,
+      });
+      expect(reply.kind).toBe("accepted");
+      const steerReply = await h.link.send({
+        kind: "steer",
+        executionId,
+        command: steerEnvelope(
+          `kit-steerdirective-${caseCounter}`,
+          workId,
+          assignmentId,
+          directive,
+        ) as never,
+      });
+      expect(steerReply.kind).toBe(steerExpectation);
+      if (steerExpectation === "accepted") await opts.afterSteer?.(directive);
+      const foreign = await h.link.send({
+        kind: "steer",
+        executionId: "kit-exec-never-seen",
+        command: steerEnvelope(`kit-foreign-${caseCounter}`, "w", "a", "x") as never,
+      });
+      expect(foreign).toEqual({ kind: "unknown", executionId: "kit-exec-never-seen" });
+      release(executionId);
+    });
+
+    it("stop aborts cooperatively: accepted, no terminal event, then unknown", async () => {
+      const h = await attached();
+      caseCounter += 1;
+      const executionId = `kit-stop-${caseCounter}`;
+      const workId = `kit-work-${caseCounter}`;
+      const assignmentId = `kit-assign-${caseCounter}`;
+      holdRuns(executionId);
+      const reply = await h.link.send({
+        kind: "start",
+        executionId,
+        connectionGeneration: 3,
+        command: assignEnvelope(`kit-stopcmd-${caseCounter}`, workId, assignmentId) as never,
+      });
+      expect(reply.kind).toBe("accepted");
+      const running = await h.link.send({ kind: "status", executionId });
+      expect(running).toEqual({ kind: "status", executionId, state: "running" });
+      const stop = await h.link.send({ kind: "stop", executionId, reason: "kit-cancel" });
+      expect(stop).toEqual({ kind: "accepted", executionId });
+      await opts.afterCancel?.();
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      // No terminal event after a cancel (the accepted stop reply settled the row).
+      expect(h.events.filter((e) => e.type === COMPLETED_TYPE).length).toBe(0);
+      const after = await h.link.send({ kind: "status", executionId });
+      expect(after).toEqual({ kind: "unknown", executionId });
+    });
+
+    it("status: running while held, completed after release, unknown for a foreign id", async () => {
+      const h = await attached();
+      caseCounter += 1;
+      const executionId = `kit-status-${caseCounter}`;
+      const workId = `kit-work-${caseCounter}`;
+      const assignmentId = `kit-assign-${caseCounter}`;
+      holdRuns(executionId);
+      await h.link.send({
+        kind: "start",
+        executionId,
+        connectionGeneration: 1,
+        command: assignEnvelope(`kit-statuscmd-${caseCounter}`, workId, assignmentId) as never,
+      });
+      const running = await h.link.send({ kind: "status", executionId });
+      expect(running).toEqual({ kind: "status", executionId, state: "running" });
+      release(executionId);
+      await waitFor("completion", () => h.events.some((e) => e.type === COMPLETED_TYPE));
+      const done = await h.link.send({ kind: "status", executionId });
+      expect(done).toEqual({ kind: "status", executionId, state: "completed" });
+      const foreign = await h.link.send({ kind: "status", executionId: "kit-foreign" });
+      expect(foreign).toEqual({ kind: "unknown", executionId: "kit-foreign" });
+    });
+
+    it("restart law: a dead listener mid-run reconnects; the probe gets running", async () => {
+      const h = await attached();
+      caseCounter += 1;
+      const executionId = `kit-restart-${caseCounter}`;
+      const workId = `kit-work-${caseCounter}`;
+      const assignmentId = `kit-assign-${caseCounter}`;
+      holdRuns(executionId);
+      const reply = await h.link.send({
+        kind: "start",
+        executionId,
+        connectionGeneration: 4,
+        command: assignEnvelope(`kit-restartcmd-${caseCounter}`, workId, assignmentId) as never,
+      });
+      expect(reply.kind).toBe("accepted");
+
+      // Kill the Gateway mid-run; the adapter must survive (its own policy).
+      await h.listener.close();
+      const linkReady = Promise.withResolvers<ChildLink>();
+      const listener2 = await startChildListener(
+        {
+          socket: { path: opts.socketPath },
+          handshakeTimeoutSeconds: 5,
+          leaseMissedBeats: 1000,
+        },
+        {
+          fleet: new ChildFleet(createConsoleLogger({ level: "error" })),
+          logger: createConsoleLogger({ level: "error" }),
+          gatewayId: opts.gatewayId,
+          heartbeatSeconds: 30,
+          onRegistered: (link) => linkReady.resolve(link),
+        },
+      );
+      stops.push(async () => {
+        await listener2.close();
+      });
+      const link2 = await linkReady.promise; // adapter re-registered on its own
+      const probe = await waitFor("re-register probe answer", async () => {
+        try {
+          return await link2.send({ kind: "status", executionId });
+        } catch {
+          return false;
+        }
+      });
+      // The run survived (same process, registry survived) ⇒ honest running.
+      expect(probe).toEqual({ kind: "status", executionId, state: "running" });
+      harness = { listener: listener2, link: link2, events: h.events };
+      release(executionId);
+    });
+  });
+}
+
+/** The temp-dir-per-suite socket the kit recommends (short enough for sun_path). */
+export function kitSocketPath(): string {
+  return join(mkdtempSync(join(tmpdir(), "ofac-kit-")), "child.sock");
+}

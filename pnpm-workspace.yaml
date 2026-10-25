@@ -1,5 +1,7 @@
 packages:
   - "src/gateway"
+  - "src/adapters/harnesses/adapter-sdk"
+  - "src/adapters/harnesses/deterministic"
   - "src/protocol"
   - "src/workspace-link"
 

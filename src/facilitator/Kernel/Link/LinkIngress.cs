@@ -4,9 +4,9 @@ using System.Text;
 using System.Text.Json;
 
 using Facilitator.Kernel.Shared;
-using Facilitator.Kernel.Work;
 using Facilitator.Kernel.Shared.Dispatch;
 using Facilitator.Kernel.Shared.Persistence;
+using Facilitator.Kernel.Work;
 
 using Microsoft.AspNetCore.Mvc;
 

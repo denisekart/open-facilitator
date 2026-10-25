@@ -2,22 +2,25 @@
 
 ## Purpose
 Home for communication adapters (Mattermost, Forgejo, Kafka) and harness
-adapters. Every subdirectory is a spec-derived stub today — a README stating
-its future role; no code has shipped.
+adapters. Communication subdirectories are spec-derived stubs — a README
+stating their future role. Harnesses have shipped: `harnesses/adapter-sdk`
+(the HarnessAdapter lifecycle library) and `harnesses/deterministic` (the
+worked-example worker).
 
 ## Truth anchors
 - `../../docs/specs/open_facilitator_framework_architecture.md` §13 —
   communication adapter requirements each directory implements.
-- `../../.omp/skills/facilitator-workspace-packaging/SKILL.md` —
-  HarnessAdapter contract for `harnesses/`.
+- `harnesses/adapter-sdk/README.md` — write-your-own-adapter walkthrough.
+- `../../protocol/json-schema/adapter.v1.json` — the normative child wire.
 
 ## Develop here
-- One directory per adapter; the first real implementation replaces the stub
-  README with a buildable package and updates this area's docs in the same
-  change.
+- One directory per adapter; a new harness copies `harnesses/deterministic`
+  and runs the conformance kit (`@ofac/adapter/testing`).
 
 ## Invariants
 - Adapters translate between an external system and the frozen wire contract
-  (`../../protocol/`); they never invent message types.
+  (`../../protocol/`); they never invent message types. Harnesses import
+  frame/payload types from the shipped contract, never redefine them.
 - Credentials stay team-side: an adapter holds outbound connections, not
-  execution authority.
+  execution authority. The harness — not the adapter, never the Gateway —
+  publishes `assignment.completed.v1`.

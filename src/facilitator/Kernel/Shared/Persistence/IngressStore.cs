@@ -1,6 +1,6 @@
-using Microsoft.EntityFrameworkCore;
-
 using Facilitator.Kernel.Work;
+
+using Microsoft.EntityFrameworkCore;
 
 namespace Facilitator.Kernel.Shared.Persistence;
 

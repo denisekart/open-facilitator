@@ -3,8 +3,8 @@ using System.Text.Json;
 
 using Facilitator.Kernel.Shared;
 using Facilitator.Kernel.Shared.Auth;
-using Facilitator.Kernel.Shared.Persistence;
 using Facilitator.Kernel.Shared.Dispatch;
+using Facilitator.Kernel.Shared.Persistence;
 
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;

@@ -1,10 +1,9 @@
 using System.Data.Common;
 
+using Facilitator.Kernel.Link;
 using Facilitator.Kernel.Shared.Persistence;
 
 using Microsoft.EntityFrameworkCore;
-
-using Facilitator.Kernel.Link;
 
 using LinkOptions = Facilitator.Kernel.Link.LinkOptions;
 

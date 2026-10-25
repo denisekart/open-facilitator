@@ -1,8 +1,8 @@
 using System.Diagnostics;
 
 using Facilitator.Kernel.Shared;
-using Facilitator.Kernel.Shared.Persistence;
 using Facilitator.Kernel.Shared.Dispatch;
+using Facilitator.Kernel.Shared.Persistence;
 
 using Microsoft.AspNetCore.Mvc;
 

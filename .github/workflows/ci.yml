@@ -149,3 +149,8 @@ jobs:
           FACILITATOR_URL: http://gate-only
           FACILITATOR_PG: postgresql://postgres:postgres@localhost:5432/postgres
         run: pnpm -C src/gateway test:e2e
+      - name: harness worker e2e (plan 07 deterministic worker vs standalone gateway)
+        env:
+          FACILITATOR_URL: http://gate-only
+          FACILITATOR_PG: postgresql://postgres:postgres@localhost:5432/postgres
+        run: pnpm -C src/adapters/harnesses/deterministic test:e2e

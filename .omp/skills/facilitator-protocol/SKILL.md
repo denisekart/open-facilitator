@@ -3,8 +3,8 @@ name: facilitator-protocol
 description: Workspace Link wire contract — CloudEvents envelope, command/event/receipt/control classes, handshake, HTTP fallback endpoints, idempotency keys, fencing generations, and conformance rules for the Open Facilitator Framework.
 ---
 
-> **Status:** the contract layer is IMPLEMENTED (Plan 01, extended by Plan 03): 29 draft-2020-12 schemas in
-> `protocol/json-schema/` + `protocol/cloudevents-schemas/`, 45 fixture cases in
+> **Status:** the contract layer is IMPLEMENTED (Plan 01, extended by Plans 03+07): 30 draft-2020-12 schemas in
+> `protocol/json-schema/` + `protocol/cloudevents-schemas/`, 61 fixture cases (classes command/event/receipt/control/enroll/delivery + `adapter`) in
 > `protocol/conformance-fixtures/` (index.json = arbiter), generated DTOs in
 > `src/protocol/src/generated/` (TS) + `protocol/dotnet/Ofac.Protocol/Generated/` (C#),
 > `@ofac/protocol` validators, and the `Validate.Fixtures` CLI. The kernel
@@ -40,8 +40,14 @@ description: Workspace Link wire contract — CloudEvents envelope, command/even
 > `postCapabilities` (digest over exact POSTed bytes, `sha256:` prefix re-added for
 > hello). `ofac-linkd` bin: enroll→capabilities→serve, exit codes 0/2/3/4. Client-side
 > fixture gate: `test/fixtures.test.ts` runs the same `index.json`. E2E tier:
-> `test/e2e/` (env-gated, CI job `link-e2e`, `make link-e2e`). Gateways and adapters
-> are still unbuilt. Update this skill the moment a slice lands.
+> `test/e2e/` (env-gated, CI job `link-e2e`, `make link-e2e`). The Gateway is
+> implemented (Plans 05+06, `src/gateway`). The HarnessAdapter contract ships as
+> `protocol/json-schema/adapter.v1.json` — the normative profile of the 06 child wire
+> (NDJSON frames `v:1`+`type`, 256 KiB cap), fixture class `adapter` validated by BOTH
+> conformance harnesses; its DTO generation is skipped (`CODEGEN_SKIP` in
+> `protocol/tools/codegen.mjs`: quicktype flattens the frame `oneOf` past recovery).
+> Implementation: `@ofac/adapter` (`src/adapters/harnesses/adapter-sdk`). Update this
+> skill the moment a slice lands.
 
 # Facilitator Protocol
 

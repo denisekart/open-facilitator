@@ -93,7 +93,7 @@ The repo is spec-only: `docs/specs/open_facilitator_framework_architecture.md` (
 **Objective:** Unix-socket/localhost child transport, N children, union capability manifest, generation fencing, all three §9.1 modes from one codebase; completes the original 05's "one Gateway serves two children" exit state (§26.1 item 7).
 
 ### Plan 07 — HarnessAdapter contract + deterministic worker harness
-**Status:** 🟡 in progress — contract amendment landed, SDK + harness in flight (detail design: `07-harness-adapter-deterministic-worker.md`)
+**Status:** 🟡 implemented locally — all six steps landed: contract + SDK + harness + kit + worker e2e + docs, unit/e2e/docs-check/lint green locally, flips green on CI (detail design + status table: `07-harness-adapter-deterministic-worker.md`)
 **Objective:** Public adapter lifecycle contract (§8.3) as schemas + `@ofac/adapter` package + deterministic research-worker reference harness producing a Markdown artifact with result manifest, steer-aware; lifecycle test kit. First half of the original 06.
 
 ### Plan 08 — Dev Container Feature family + slim example workspace

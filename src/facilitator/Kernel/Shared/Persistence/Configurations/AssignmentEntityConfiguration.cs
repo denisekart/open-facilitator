@@ -1,5 +1,5 @@
-using Facilitator.Kernel.Work;
 using Facilitator.Kernel.Shared.Persistence;
+using Facilitator.Kernel.Work;
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

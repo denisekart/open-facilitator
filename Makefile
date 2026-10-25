@@ -43,6 +43,13 @@ gateway-e2e:
 	FACILITATOR_PG=$${FACILITATOR_PG:-postgresql://postgres:postgres@127.0.0.1:5433/postgres} \
 	pnpm -C src/gateway test:e2e
 
+worker-e2e:
+	@echo "Harness-worker E2E tier: standalone Gateway + real ofac-deterministic-worker binary;"
+	@echo "same Postgres gate as gateway-e2e."
+	FACILITATOR_URL=$${FACILITATOR_URL:-http://gate-only} \
+	FACILITATOR_PG=$${FACILITATOR_PG:-postgresql://postgres:postgres@127.0.0.1:5433/postgres} \
+	pnpm -C src/adapters/harnesses/deterministic test:e2e
+
 db-update:
 	dotnet tool restore
 	dotnet ef database update -p src/facilitator -s src/facilitator

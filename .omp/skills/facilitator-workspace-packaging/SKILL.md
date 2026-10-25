@@ -3,7 +3,7 @@ name: facilitator-workspace-packaging
 description: Dev Container Features (workspace-link, gateway, harness-adapter), Gateway modes and trust reporting, HarnessAdapter lifecycle contract, and team configuration layout for the Open Facilitator Framework.
 ---
 
-> **Status:** the Link client runtime is IMPLEMENTED (Plan 04): `src/workspace-link` (`@ofac/workspace-link`) + the `ofac-linkd` bin — the headless supervisor entrypoint (spec S:409/§8.2): enroll → capabilities POST → connect → serve, SQLite state for replay, echo/stub handler modes, `--transport signalr|http-poll`, exit codes 0/2/3/4. Plan 06's workspace-link Feature MUST start the Link from the entrypoint/supervisor via `ofac-linkd run` (or the SDK as a library), never rely on `postStartCommand`, and mount the enrollment secret / link token at runtime. The Gateway runtime is IMPLEMENTED for ALL THREE modes (Plans 05+06): `src/gateway` (`@ofac/gateway`) + `ofac-gateway run --config gateway.yaml` — one endpoint `gw.<slug>`; `embedded` = one in-process child behind the serializable `ChildExecutor` seam; `shared`/`standalone` = a fleet of child PROCESSES over a unix socket (`childTransport.socket.path`, resolved against `stateDir` — the mount point Plan 08's gateway Feature must pass through) with localhost TCP carrying the identical NDJSON frame protocol (`src/gateway/src/childwire.ts`: hello/register-ack/command/reply/event/heartbeat/goaway; child-side client `connectChild` exported from `@ofac/gateway`). Per-child tokens (`children[].token`, fallback `OFAC_CHILD_SECRET`), heartbeat lease, admission law, union-manifest re-POST, per-child `maxInFlight` quota, re-register reconcile probe. `gateway.sqlite3` bindings + `child_state` ledgers, deny-by-default policy seam, `/status` diagnostics, exit codes 0/2/3/4 (linkd's law). Config keys, ledger schemas, and the trustMode table: `src/gateway/README.md` + `docs/advanced.md`. Features remain spec-proposed targets, not existing code. Update this skill the moment a slice lands so implemented reality replaces spec proposals.
+> **Status:** the Link client runtime is IMPLEMENTED (Plan 04): `src/workspace-link` (`@ofac/workspace-link`) + the `ofac-linkd` bin — the headless supervisor entrypoint (spec S:409/§8.2): enroll → capabilities POST → connect → serve, SQLite state for replay, echo/stub handler modes, `--transport signalr|http-poll`, exit codes 0/2/3/4. Plan 06's workspace-link Feature MUST start the Link from the entrypoint/supervisor via `ofac-linkd run` (or the SDK as a library), never rely on `postStartCommand`, and mount the enrollment secret / link token at runtime. The Gateway runtime is IMPLEMENTED for ALL THREE modes (Plans 05+06): `src/gateway` (`@ofac/gateway`) + `ofac-gateway run --config gateway.yaml` — one endpoint `gw.<slug>`; `embedded` = one in-process child behind the serializable `ChildExecutor` seam; `shared`/`standalone` = a fleet of child PROCESSES over a unix socket (`childTransport.socket.path`, resolved against `stateDir` — the mount point Plan 08's gateway Feature must pass through) with localhost TCP carrying the identical NDJSON frame protocol (`src/gateway/src/childwire.ts`: hello/register-ack/command/reply/event/heartbeat/goaway; child-side client `connectChild` exported from `@ofac/gateway`). Per-child tokens (`children[].token`, fallback `OFAC_CHILD_SECRET`), heartbeat lease, admission law, union-manifest re-POST, per-child `maxInFlight` quota, re-register reconcile probe. `gateway.sqlite3` bindings + `child_state` ledgers, deny-by-default policy seam, `/status` diagnostics, exit codes 0/2/3/4 (linkd's law). Config keys, ledger schemas, and the trustMode table: `src/gateway/README.md` + `docs/advanced.md`. The HarnessAdapter layer is IMPLEMENTED (Plan 07): `src/adapters/harnesses/adapter-sdk` (`@ofac/adapter`) implements the lifecycle law over that exact 06 wire, profiled normatively by `protocol/json-schema/adapter.v1.json` (fixture class `adapter`); the worked-example worker is `src/adapters/harnesses/deterministic` (`@ofac/harness-deterministic`, bin `ofac-deterministic-worker`, config `kind: HarnessAdapter`); no-Docker walkthrough `examples/slim/deterministic-research-worker/`. Features remain spec-proposed targets, not existing code. Update this skill the moment a slice lands so implemented reality replaces spec proposals.
 
 # Workspace Packaging & Gateways
 
@@ -36,20 +36,29 @@ Install scripts: idempotent, no first-use privileged enrollment, **never embed s
 
 Privileged action sequence (never short-circuit): authenticated command → exact capability/resource/actor extraction → policy check → approval evidence → credential ceiling check → scoped connector execution → action ledger + event. Gateway rejection of a routable request is a normal result.
 
-## HarnessAdapter contract (§8.3)
+## HarnessAdapter contract (§8.3) — as-built
 
-```ts
-interface HarnessAdapter {
-  start(request: StartRequest): Promise<{ nativeRunId: string }>;
-  steer(nativeRunId: string, msg: SteeringMessage): Promise<void>;   // unsupported → report, never silently reinvent
-  observe(nativeRunId: string): AsyncIterable<HarnessEvent>;
-  status(nativeRunId: string): Promise<HarnessStatus>;               // enables reconcile + nudge
-  interrupt(nativeRunId: string, reason: string): Promise<void>;     // cooperative; hard kill = provisioner
-  respond(nativeRunId: string, input: InputResponse): Promise<void>; // answer the outstanding question only
-}
-```
-
-Adapter owns **no AI configuration** — native harness keeps prompts/skills/tools/models/session. Persist `assignmentId/executionGeneration ↔ nativeRunId` in local SQLite where resume is supported; otherwise advertise `resume: restart-with-context`. Descriptor declares executable, invocation (`cli|stdio-jsonrpc|http|sdk`), lifecycle support, output schemas, tool *requests* (requests, not grants).
+The spec's six-method interface shipped as an ASYNC-CALLBACK API (the wire is
+command/reply, not RPC-per-method): `createAdapter(opts)` from `@ofac/adapter`
+wraps `connectChild` with the lifecycle law. You implement `HarnessHooks`:
+`onExecute(ctx)` (the detached run; resolving `completed` means the HARNESS
+already published `assignment.completed.v1` — the SDK publishes only
+`assignment.failed.v1` retryable on fail/throw), optional `onSteer` (no hook
+⇒ steer answers `unsupported`, report-don't-reinterpret), `onCancel`
+(cooperative; `ctx.signal` aborts for you). `RunContext` carries
+`executionId`/`executionGeneration`/assign envelope + `publishEvent` (relay
+law: the `event` frame carries the FULL CloudEvent envelope, Gateway forwards
+bytes unmodified) / `publishProgress` / `setSteered`. The in-memory execution
+registry dedupes duplicate `start` (matched by `command.data.commandId`) and
+answers `status` truthfully; terminal entries expire after `TERMINAL_TTL_MS`
+(60 s) ⇒ `unknown` ⇒ Gateway declares lost, exactly once. Restart ownership:
+`restartBackoffMs` loop (default `[100,250,500,1000,2000,5000]`, cap-loop;
+`[]` ⇒ exit for a supervisor). Descriptor: `invocation: "sdk"` ONLY (a
+library, not a spawned CLI); `resume: "restart-with-context"`; `SessionStore`
+is the unimplemented persistence seam. Conformance gate:
+`runAdapterLifecycleContract` from `@ofac/adapter/testing` (in-process
+listener, no Facilitator). Walkthrough: `src/adapters/harnesses/adapter-sdk/README.md`;
+frames/authority/interims: `docs/advanced.md`.
 
 ## Provisioning (§18)
 

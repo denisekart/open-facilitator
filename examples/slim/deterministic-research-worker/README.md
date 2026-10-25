@@ -89,14 +89,14 @@ curl -s -X POST localhost:8088/api/dev/link-outbox \
 
 ## 5. Watch it run
 
-The worker logs each lifecycle step (`execution accepted`, progress lines);
-the two `work.progress` events and the `assignment.completed` event flow
-child → Gateway → kernel. The kernel records each relayed envelope in the
-delivery ledger:
+The worker logs each lifecycle step (`worker-step` ×2, `worker-completed`
+with the report path); the two `work.progress` events and the
+`assignment.completed` event flow child → Gateway → kernel, deduped into the
+kernel's `facilitator.inbox` table:
 
 ```bash
-curl -s localhost:8088/api/dev/deliveries -H 'Authorization: Bearer dev-token' | jq '.[].deliveryId'
 curl -s http://127.0.0.1:8099/status | jq .bindings   # while running: the execution row, state "running"
+# the Gateway's linkStats (same document) count the relayed receipts
 ```
 
 With `stepMs: 800` the run completes ~1.6s after the assign.
@@ -110,10 +110,9 @@ The completion event's `resultManifest` carries the report's absolute
 REPORT=$(ls .ofac-worker/artifacts/*-report.md)
 sha256sum "$REPORT" | cut -d' ' -f1   # the hex
 docker exec ofac-pg psql -U demo -d facilitator -tA -c \
-  "SELECT payload FROM facilitator.inbox WHERE payload LIKE '%asg-demo-1%completion%'" 2>/dev/null || \
-docker exec ofac-pg psql -U demo -d facilitator -tA -c \
-  "SELECT payload FROM facilitator.inbox ORDER BY received_at DESC LIMIT 3"
-# the completed row's payload must contain "digest":"sha256:<the hex>"
+  "SELECT payload::text FROM facilitator.inbox WHERE payload->>'type' = 'org.facilitator.event.assignment.completed.v1'" \
+  | grep -oE 'sha256:[a-f0-9]{64}'   # jsonb pretty-prints key: value — match the hex, not the raw JSON
+# must equal "sha256:<the hex>"
 ```
 
 A mismatch means something rewrote the file between publish and read —
@@ -129,3 +128,7 @@ era lands.
   directory; the Gateway resolves it against its CWD, so start it here).
 - Capabilities POST 403 in the Gateway log — `team:` ≠ the kernel's team
   slug (the dev kernel seeds `default`).
+- Seed answered 202 but nothing ran, Gateway `/status` shows
+  `linkStats.unsupported: 1` — the assign arrived before the worker's
+  register landed (capabilities unknown ⇒ honest `unsupported`, retry the
+  seed after the `worker ready` line).

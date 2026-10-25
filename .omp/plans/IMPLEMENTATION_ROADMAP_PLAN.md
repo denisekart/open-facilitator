@@ -97,7 +97,7 @@ The repo is spec-only: `docs/specs/open_facilitator_framework_architecture.md` (
 **Objective:** Public adapter lifecycle contract (§8.3) as schemas + `@ofac/adapter` package + deterministic research-worker reference harness producing a Markdown artifact with result manifest, steer-aware; lifecycle test kit. First half of the original 06.
 
 ### Plan 08 — Dev Container Feature family + slim example workspace
-**Status:** ⬜ not-started (detail design: `08-devcontainer-features-slim-example.md`)
+**Status:** 🟡 implemented locally — Feature family + payload builder + supervisor + slim composed devcontainer E2E-proven; full Feature matrix is the CI first-run (status table: `08-devcontainer-features-slim-example.md`)
 **Objective:** `features/gateway|workspace-link|harness-adapter` (OCI/GHCR, idempotent install, headless supervisor) + `examples/slim/deterministic-research-worker` composed devcontainer; Feature matrix CI. Second half of the original 06; closes Phase B.
 
 **Normalized against Phase A as-built:** Gateway is a composition layer over the Plan 04 SDK (no forked Link client); children ride the Plan 03 server semantics (enrollment rotation, lease/epoch law, `link.*` routing) unchanged; interim trust seams (bootstrap token 02, `ILinkTokenValidator` 03, policy stub 05) are single-extension-point clean-cutover targets for Plans 09/10; `@ofac/*` GHCR/npm publish flip is a Plan 08 gate decision (packages still `private: true`).

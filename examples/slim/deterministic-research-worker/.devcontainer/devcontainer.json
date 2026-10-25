@@ -1,0 +1,35 @@
+{
+  // Slim composed example: one line per role, all three OFAC Features from
+  // repo source via the ./features symlink (the CLI requires local-path
+  // Features to sit under .devcontainer/). Teams consume the published form:
+  //   "ghcr.io/denisekart/open-facilitator/features/gateway:1" etc.
+  "name": "ofac-slim-deterministic-worker",
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:1-22-bookworm",
+  "remoteUser": "node",
+  "workspaceFolder": "/workspace",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind",
+  // The Feature-declared supervisor entrypoint becomes the container
+  // command: headless start without any lifecycle hooks (spec \u00a78.2).
+  "overrideCommand": false,
+  "initializeCommand": "mkdir -p .ofac-gateway .ofac-worker .ofac-logs && chmod a+rwX .ofac-gateway .ofac-worker .ofac-logs",
+  "features": {
+    "./features/gateway": {
+      "configPath": "/workspace/.facilitator/gateway.yaml"
+    },
+    "./features/harness-adapter": {
+      "configPath": "/workspace/.facilitator/harness.yaml"
+    },
+    "./features/workspace-link": {
+      "facilitatorUrl": "http://host.docker.internal:8088",
+      "endpointId": "ws.demo",
+      "manifest": "/workspace/.facilitator/capabilities.json"
+    }
+  },
+  "runArgs": ["--add-host", "host.docker.internal:host-gateway"],
+  "containerEnv": {
+    "OFAC_ENROLL_SECRET": "enroll-dev",
+    "OFAC_CHILD_SECRET": "child-secret-demo",
+    "OFAC_LOG_DIR": "/workspace/.ofac-logs",
+    "OFAC_LINKD_STATE": "/workspace/.ofac-linkd.sqlite3"
+  }
+}

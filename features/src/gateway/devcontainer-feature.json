@@ -1,0 +1,28 @@
+{
+  "id": "ofac-gateway",
+  "version": "1.0.0",
+  "name": "Open Facilitator Gateway",
+  "documentationURL": "https://github.com/denisekart/open-facilitator/tree/main/features/src/gateway",
+  "description": "Installs the ofac-gateway runtime (self-contained Node bundle), the headless supervisor entrypoint, and a unit that runs a team-owned Gateway against the workspace mount.",
+  "options": {
+    "configPath": {
+      "type": "string",
+      "default": ".facilitator/gateway.yaml",
+      "description": "Gateway config file the supervisor unit starts with. The OFAC_* env surface and GATEWAY_CONFIG still win at runtime; secrets never go through options."
+    },
+    "log": {
+      "type": "string",
+      "enum": [
+        "info",
+        "debug"
+      ],
+      "default": "info",
+      "description": "Gateway log level for the supervisor unit (OFAC_GATEWAY_LOG overrides at runtime)."
+    }
+  },
+  "containerEnv": {},
+  "installsAfter": [
+    "ghcr.io/devcontainers/features/node"
+  ],
+  "entrypoint": "/usr/local/share/openfacilitator/ofac-supervisor.sh"
+}

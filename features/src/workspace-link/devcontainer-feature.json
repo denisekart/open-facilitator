@@ -1,0 +1,43 @@
+{
+  "id": "ofac-workspace-link",
+  "version": "1.0.0",
+  "name": "Open Facilitator Workspace Link (linkd)",
+  "documentationURL": "https://github.com/denisekart/open-facilitator/tree/main/features/src/workspace-link",
+  "description": "Installs the ofac-linkd headless Link runtime (self-contained Node bundle), the headless supervisor entrypoint, and a unit that enrolls + connects the workspace directly to a Facilitator (no Gateway in between). Install order is irrelevant: units carry numeric prefixes and every Feature writes distinct files.",
+  "options": {
+    "facilitatorUrl": {
+      "type": "string",
+      "default": "http://localhost:8088",
+      "description": "Facilitator base URL the unit connects to."
+    },
+    "endpointId": {
+      "type": "string",
+      "default": "ws.dev",
+      "description": "Link endpoint identity for this workspace."
+    },
+    "team": {
+      "type": "string",
+      "default": "default",
+      "description": "Team slug the endpoint enrolls into (must match the manifest ownerTeam)."
+    },
+    "manifest": {
+      "type": "string",
+      "default": ".facilitator/capabilities.json",
+      "description": "Capability manifest JSON published at enroll. linkd requires a readable manifest; a missing file is a terminal config exit by design."
+    },
+    "mode": {
+      "type": "string",
+      "enum": [
+        "echo",
+        "stub"
+      ],
+      "default": "echo",
+      "description": "Delivery handler mode: echo replies, stub acks silently."
+    }
+  },
+  "containerEnv": {},
+  "entrypoint": "/usr/local/share/openfacilitator/ofac-supervisor.sh",
+  "installsAfter": [
+    "ghcr.io/devcontainers/features/node"
+  ]
+}

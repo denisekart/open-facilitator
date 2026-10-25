@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# ofac-harness-adapter Feature install: verify + extract the baked runtime
+# tarball, put ofac-deterministic-worker on PATH, drop the supervisor + this
+# Feature's unit. Idempotent: a second run with the same VERSION stamp is a
+# no-op. Options arrive as uppercase env: ADAPTER, CONFIGPATH.
+set -euo pipefail
+
+FEATURE_DIR=$(cd -- "$(dirname -- "$0")" && pwd)
+NAME=harness-adapter
+VERSION=1.0.0
+PREFIX=/usr/local/lib/openfacilitator/$NAME
+SHARE=/usr/local/share/openfacilitator
+
+if [ "${ADAPTER:-deterministic}" != "deterministic" ]; then
+  echo "ofac-$NAME: adapter '${ADAPTER}' not implemented; only 'deterministic' ships a binary today." >&2
+  exit 1
+fi
+
+if ! command -v node >/dev/null 2>&1; then
+  echo "ofac-$NAME: node not found on PATH. Use a base image shipping Node >= 22 (e.g. mcr.microsoft.com/devcontainers/base)." >&2
+  exit 1
+fi
+NODE_MAJOR=$(node -p 'process.versions.node.split(".")[0]')
+if [ "$NODE_MAJOR" -lt 22 ]; then
+  echo "ofac-$NAME: Node >= 22 required, found $(node --version). Choose a newer base image." >&2
+  exit 1
+fi
+
+mkdir -p "$PREFIX" "$SHARE/units"
+
+STAMP="$PREFIX/.installed-version"
+if [ ! -f "$STAMP" ] || [ "$(cat "$STAMP")" != "$VERSION" ]; then
+  ( cd "$FEATURE_DIR/pkg" && sha256sum -c runtime.tar.gz.sha256 )
+  tar -xzf "$FEATURE_DIR/pkg/runtime.tar.gz" -C "$PREFIX"
+  printf '%s' "$VERSION" > "$STAMP"
+fi
+
+cat > /usr/local/bin/ofac-deterministic-worker <<EOF
+#!/bin/sh
+exec node "$PREFIX/dist/bin/worker.js" "\$@"
+EOF
+chmod 0755 /usr/local/bin/ofac-deterministic-worker
+
+install -m 0755 "$FEATURE_DIR/pkg/ofac-supervisor.sh" "$SHARE/ofac-supervisor.sh"
+
+cat > "$SHARE/units/30-harness-adapter.sh" <<EOF
+#!/bin/sh
+# ofac-deterministic-worker unit (Feature-baked defaults; env still wins:
+# WORKER_CONFIG overrides the config path, OFAC_CHILD_SECRET the file token,
+# OFAC_ADAPTER_LOG the level).
+export WORKER_CONFIG=\${WORKER_CONFIG:-${CONFIGPATH:-.facilitator/harness.yaml}}
+# Exit-code law (worker): 0 clean · 1 runtime (restart: the Gateway may have
+# been down) · 2 config (terminal) · 3 register denied w/ backoff off (terminal).
+[ -f "\$WORKER_CONFIG" ] || { echo "unit: worker config \$WORKER_CONFIG not found"; exit 2; }
+restarts=0
+max=\${OFAC_SUPERVISOR_MAX_RESTARTS:-10}
+while true; do
+  ofac-deterministic-worker run --config "\$WORKER_CONFIG" &
+  child=\$!
+  trap 'kill -TERM "\$child" 2>/dev/null; exit 0' TERM INT
+  wait "\$child"; rc=\$?
+  trap - TERM INT
+  [ "\$rc" -ge 2 ] && exit \$rc
+  restarts=\$((restarts + 1))
+  [ "\$restarts" -gt "\$max" ] && { echo "unit: restart budget exhausted"; exit 1; }
+  sleep 2
+done
+EOF
+chmod 0755 "$SHARE/units/30-harness-adapter.sh"

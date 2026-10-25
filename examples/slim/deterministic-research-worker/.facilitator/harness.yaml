@@ -1,0 +1,16 @@
+# Deterministic worker for the devcontainer path. Relative paths in a worker
+# config resolve against THIS file's directory, so the socket and workDir are
+# absolute: the Gateway's child listener lives under its stateDir
+# (/workspace/.ofac-gateway), not relative to .facilitator/.
+apiVersion: facilitator.framework/v1
+kind: HarnessAdapter
+childWorkspaceId: gw.demo/deterministic
+token: child-secret-demo
+transport:
+  socket:
+    path: /workspace/.ofac-gateway/child.sock
+manifestFile: /workspace/capabilities.yaml
+workDir: /workspace/.ofac-worker
+stepMs: 800
+heartbeatSeconds: 5
+restartBackoffMs: [100, 250, 500, 1000, 2000, 5000]

@@ -30,6 +30,43 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
 
+  # Dev Container Features (OCI distribution): each features/src/<name>
+  # publishes as an OCI image under …/features/<name>, tagged with the
+  # feature version + major. Payload tarballs are built from source, so the
+  # install layer needs no npm registry (spec §8.2).
+  features:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - run: pnpm install --frozen-lockfile
+      - name: build runtime payloads
+        run: node features/build.mjs
+      - name: publish features
+        run: |
+          npx --yes @devcontainers/cli@^0.79 features publish \
+            --registry ghcr.io/denisekart/open-facilitator/features features/src
+      # Major tag (:1) per feature — consumers pin majors, not full versions.
+      - name: tag majors
+        run: |
+          for name in gateway workspace-link harness-adapter; do
+            docker buildx imagetools create \
+              -t ghcr.io/denisekart/open-facilitator/features/$name:1 \
+              ghcr.io/denisekart/open-facilitator/features/$name:1.0.0
+          done
+
   # npm publish seam (inert until Plan 01 ships a consumable @ofac/protocol):
   # packages flip private:false, then `npm pkg set version` + `npm publish` to
   # https://npm.pkg.github.com/denisekart via GITHUB_TOKEN.

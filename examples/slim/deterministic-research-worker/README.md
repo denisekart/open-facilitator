@@ -3,8 +3,9 @@
 The smallest real deployment: dev Facilitator + standalone Gateway + the
 deterministic harness worker, driven end-to-end by hand. This is the
 third-party implementability proof for the HarnessAdapter contract
-(`protocol/json-schema/adapter.v1.json`); Plan 08's devcontainer Features
-automate the same wiring, and this file stays as the manual path.
+(`protocol/json-schema/adapter.v1.json`). The `.devcontainer/` in this
+directory composes the same wiring from the OFAC Features — see "Devcontainer
+path" at the bottom; this file stays as the manual no-Docker path.
 
 All commands run from this directory and the repo root as marked. Prereqs:
 PostgreSQL 17 + .NET 10 + Node 22 (as `docs/getting-started.md`).
@@ -132,3 +133,47 @@ era lands.
   `linkStats.unsupported: 1` — the assign arrived before the worker's
   register landed (capabilities unknown ⇒ honest `unsupported`, retry the
   seed after the `worker ready` line).
+
+## Devcontainer path (Features)
+
+Same wiring, automated: the `.devcontainer/` adds the three OFAC Features
+(gateway, harness-adapter, workspace-link) from the repo source
+(`../../features/src/…` — teams use the published
+`ghcr.io/denisekart/open-facilitator/features/<name>:1` coordinates). The
+supervisor entrypoint boots a standalone Gateway + deterministic worker (the
+`.facilitator/` configs) **and** a direct `linkd` endpoint (`ws.demo`, echo)
+beside it — the coexistence proof.
+
+```bash
+# repo root — host kernel per §1 (dev mode: dev-token + enroll-dev)
+ConnectionStrings__Facilitator="Host=localhost;Database=facilitator;Username=demo;Password=demo" \
+  dotnet run --project src/facilitator &
+
+# Feature payloads (runtime tarballs) must exist before `devcontainer up`
+node features/build.mjs
+
+devcontainer up --workspace-folder examples/slim/deterministic-research-worker
+# or: make example-slim-up
+```
+
+Expect in the workspace-mounted logs (`OFAC_LOG_DIR=/workspace/.ofac-logs`):
+
+```bash
+grep 'gateway ready'  .ofac-logs/10-gateway.sh.log   # endpointId=gw.demo
+grep 'worker ready'   .ofac-logs/30-harness-adapter.sh.log
+grep 'linkd ready'    .ofac-logs/20-linkd.sh.log     # endpointId=ws.demo
+```
+
+Seed an assignment with §4's curl (it targets the host kernel on :8088),
+then:
+
+```bash
+devcontainer exec --workspace-folder examples/slim/deterministic-research-worker \
+  curl -s 127.0.0.1:8099/status | jq '.children[] | select(.state=="connected")'
+# → the gw.demo/deterministic child, online
+```
+
+The completion row lands in `facilitator.inbox` exactly as §6 verifies.
+Cleanup: `devcontainer rm --workspace-folder examples/slim/deterministic-research-worker`
+(state lives in the workspace mount: `.ofac-gateway/`, `.ofac-worker/`,
+`.ofac-logs/`, `.ofac-linkd.sqlite3` — all gitignored).

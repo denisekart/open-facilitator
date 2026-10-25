@@ -1,0 +1,31 @@
+{
+  "ubuntu": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+    "features": {
+      "ghcr.io/devcontainers/features/node:1": {
+        "version": "22"
+      },
+      "gateway": {}
+    }
+  },
+  "debian": {
+    "image": "mcr.microsoft.com/devcontainers/base:debian",
+    "features": {
+      "ghcr.io/devcontainers/features/node:1": {
+        "version": "22"
+      },
+      "gateway": {}
+    }
+  },
+  "combo": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+    "features": {
+      "ghcr.io/devcontainers/features/node:1": {
+        "version": "22"
+      },
+      "gateway": {},
+      "workspace-link": {},
+      "harness-adapter": {}
+    }
+  }
+}

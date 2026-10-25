@@ -23,6 +23,10 @@ secrets/
 # Example/gateway runtime state (walkthrough-created dirs)
 .ofac-gateway/
 .ofac-worker/
+.ofac-logs/
+.ofac-linkd.sqlite3
 
+# Generated Feature install payloads (features/build.mjs output)
+features/src/*/pkg/
 # omp session-local artifacts
 .omp/plans/*.local.md

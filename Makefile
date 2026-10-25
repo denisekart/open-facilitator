@@ -1,4 +1,4 @@
-.PHONY: restore build test lint format protocol db-update compose-slim compose-full clean link-e2e gateway-e2e docs-check
+.PHONY: restore build test lint format protocol db-update compose-slim compose-full clean link-e2e gateway-e2e worker-e2e example-slim-up docs-check
 
 restore:
 	dotnet restore OpenFacilitator.slnx
@@ -49,6 +49,12 @@ worker-e2e:
 	FACILITATOR_URL=$${FACILITATOR_URL:-http://gate-only} \
 	FACILITATOR_PG=$${FACILITATOR_PG:-postgresql://postgres:postgres@127.0.0.1:5433/postgres} \
 	pnpm -C src/adapters/harnesses/deterministic test:e2e
+
+example-slim-up:
+	@echo "Slim example devcontainer: needs Docker, @devcontainers/cli (npx @devcontainers/cli),"
+	@echo "a host Facilitator on :8088 (see examples/slim/.../README.md §1) and"
+	@echo "'node features/build.mjs' (Feature runtime tarballs) beforehand."
+	npx --yes @devcontainers/cli@^0.79 up --workspace-folder examples/slim/deterministic-research-worker
 
 db-update:
 	dotnet tool restore

@@ -1,0 +1,18 @@
+{
+  "apiVersion": "facilitator.framework/v1",
+  "kind": "CapabilityManifest",
+  "ownerTeam": "default",
+  "capabilities": [
+    {
+      "id": "research.analyze",
+      "version": 1,
+      "execution": "asynchronous",
+      "acceptedContexts": ["uri-reference"],
+      "outputKinds": ["analysis.report"],
+      "outputMediaTypes": ["text/markdown"],
+      "supportsSteering": true,
+      "supportsCancellation": true,
+      "supportsNudge": false
+    }
+  ]
+}

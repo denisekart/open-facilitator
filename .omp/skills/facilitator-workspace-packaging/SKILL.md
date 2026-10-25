@@ -3,7 +3,7 @@ name: facilitator-workspace-packaging
 description: Dev Container Features (workspace-link, gateway, harness-adapter), Gateway modes and trust reporting, HarnessAdapter lifecycle contract, and team configuration layout for the Open Facilitator Framework.
 ---
 
-> **Status:** the Link client runtime is IMPLEMENTED (Plan 04): `src/workspace-link` (`@ofac/workspace-link`) + the `ofac-linkd` bin — the headless supervisor entrypoint (spec S:409/§8.2): enroll → capabilities POST → connect → serve, SQLite state for replay, echo/stub handler modes, `--transport signalr|http-poll`, exit codes 0/2/3/4. Plan 06's workspace-link Feature MUST start the Link from the entrypoint/supervisor via `ofac-linkd run` (or the SDK as a library), never rely on `postStartCommand`, and mount the enrollment secret / link token at runtime. The Gateway runtime is IMPLEMENTED for ALL THREE modes (Plans 05+06): `src/gateway` (`@ofac/gateway`) + `ofac-gateway run --config gateway.yaml` — one endpoint `gw.<slug>`; `embedded` = one in-process child behind the serializable `ChildExecutor` seam; `shared`/`standalone` = a fleet of child PROCESSES over a unix socket (`childTransport.socket.path`, resolved against `stateDir` — the mount point Plan 08's gateway Feature must pass through) with localhost TCP carrying the identical NDJSON frame protocol (`src/gateway/src/childwire.ts`: hello/register-ack/command/reply/event/heartbeat/goaway; child-side client `connectChild` exported from `@ofac/gateway`). Per-child tokens (`children[].token`, fallback `OFAC_CHILD_SECRET`), heartbeat lease, admission law, union-manifest re-POST, per-child `maxInFlight` quota, re-register reconcile probe. `gateway.sqlite3` bindings + `child_state` ledgers, deny-by-default policy seam, `/status` diagnostics, exit codes 0/2/3/4 (linkd's law). Config keys, ledger schemas, and the trustMode table: `src/gateway/README.md` + `docs/advanced.md`. The HarnessAdapter layer is IMPLEMENTED (Plan 07): `src/adapters/harnesses/adapter-sdk` (`@ofac/adapter`) implements the lifecycle law over that exact 06 wire, profiled normatively by `protocol/json-schema/adapter.v1.json` (fixture class `adapter`); the worked-example worker is `src/adapters/harnesses/deterministic` (`@ofac/harness-deterministic`, bin `ofac-deterministic-worker`, config `kind: HarnessAdapter`); no-Docker walkthrough `examples/slim/deterministic-research-worker/`. Features remain spec-proposed targets, not existing code. Update this skill the moment a slice lands so implemented reality replaces spec proposals.
+> **Status:** the Link client runtime is IMPLEMENTED (Plan 04): `src/workspace-link` (`@ofac/workspace-link`) + the `ofac-linkd` bin — the headless supervisor entrypoint (spec S:409/§8.2): enroll → capabilities POST → connect → serve, SQLite state for replay, echo/stub handler modes, `--transport signalr|http-poll`, exit codes 0/2/3/4. The workspace-link Feature starts the Link from the supervisor unit via `ofac-linkd run`, never relies on `postStartCommand`, and mounts the enrollment secret / link token at runtime. The Gateway runtime is IMPLEMENTED for ALL THREE modes (Plans 05+06): `src/gateway` (`@ofac/gateway`) + `ofac-gateway run --config gateway.yaml` — one endpoint `gw.<slug>`; `embedded` = one in-process child behind the serializable `ChildExecutor` seam; `shared`/`standalone` = a fleet of child PROCESSES over a unix socket (`childTransport.socket.path`, resolved against `stateDir`) with localhost TCP carrying the identical NDJSON frame protocol (`src/gateway/src/childwire.ts`: hello/register-ack/command/reply/event/heartbeat/goaway; child-side client `connectChild` exported from `@ofac/gateway`). Per-child tokens (`children[].token`, fallback `OFAC_CHILD_SECRET`), heartbeat lease, admission law, union-manifest re-POST, per-child `maxInFlight` quota, re-register reconcile probe. `gateway.sqlite3` bindings + `child_state` ledgers, deny-by-default policy seam, `/status` diagnostics, exit codes 0/2/3/4 (linkd's law). Config keys, ledger schemas, and the trustMode table: `src/gateway/README.md` + `docs/advanced.md`. The HarnessAdapter layer is IMPLEMENTED (Plan 07): `src/adapters/harnesses/adapter-sdk` (`@ofac/adapter`) implements the lifecycle law over that exact 06 wire, profiled normatively by `protocol/json-schema/adapter.v1.json` (fixture class `adapter`); the worked-example worker is `src/adapters/harnesses/deterministic` (`@ofac/harness-deterministic`, bin `ofac-deterministic-worker`, config `kind: HarnessAdapter`); no-Docker walkthrough `examples/slim/deterministic-research-worker/`. The FEATURES are IMPLEMENTED (Plan 08): see "Feature family (as-built)" below — replace this paragraph's tail when a slice lands.
 
 # Workspace Packaging & Gateways
 
@@ -15,17 +15,39 @@ Normative source: `docs/specs/open_facilitator_framework_architecture.md` §3.2,
 - Deciding deployment topology for a team, or writing docs about trust/isolation.
 - Implementing a harness wrapper for Pi/OpenCode/Codex/Claude/custom/deterministic runtimes.
 
-## Feature family (each = `devcontainer-feature.json` + `install.sh`)
+## Feature family (as-built, Plan 08)
 
-| Feature | Installs | Use |
-|---|---|---|
-| `workspace-link` | TS Link runtime, CLI, event client, context/artifact helpers | Directly connected transient worker |
-| `gateway` | Link library + gateway mode, local policy engine, optional child listener, connector/provisioner ports | Embedded in any devcontainer or standalone controller |
-| `harness-adapter` | Auto-detection + adapter runner, language-neutral child protocol | Existing agent harnesses |
-| `memory-client` (opt) | recall/retain tools + MCP bridge | Workspace-scoped memory |
-| `artifact-client` (opt) | digest/manifest upload/download | Research/docs/datasets |
+Layout `features/src/<name>/{devcontainer-feature.json,install.sh}` +
+generated `pkg/runtime.tar.gz` (built by `features/build.mjs`: `pnpm deploy
+--prod` per package → tarball + sha256 baked into the Feature layer — no npm
+registry, no network, no toolchain at container-install time). Ids
+`ofac-gateway`, `ofac-workspace-link`, `ofac-harness-adapter`; version
+`1.0.0`; coordinates `ghcr.io/denisekart/open-facilitator/features/<name>:1`
+(major tag re-tagged by the release features job).
 
-Install scripts: idempotent, no first-use privileged enrollment, **never embed secrets at image build**; credentials mounted at runtime. Headless images start the Link/Gateway from the entrypoint/supervisor — do not assume `postStartCommand` runs. Publish pinned SemVer majors, `linux/amd64`+`arm64`, checksums, SBOMs; Feature version ≠ protocol major.
+| Feature | Installs | Options (startup defaults) | Unit |
+|---|---|---|---|
+| `gateway` | `ofac-gateway` bundle + supervisor | `configPath`, `log` | `units/10-gateway.sh` (exit >=2 terminal) |
+| `workspace-link` | `ofac-linkd` bundle + supervisor | `facilitatorUrl`, `endpointId`, `team`, `manifest`, `mode` | `units/20-linkd.sh` (exit 2 terminal, 0 stops, else restart) |
+| `harness-adapter` | `ofac-deterministic-worker` bundle + supervisor | `adapter` (=deterministic only), `configPath` | `units/30-harness-adapter.sh` (exit >=2 terminal) |
+
+Contract: each install.sh hard-fails without Node >= 22 (bring
+`ghcr.io/devcontainers/features/node` or a Node base image), checksums +
+extracts to `/usr/local/lib/openfacilitator/<name>`, writes a PATH shim, and
+is idempotent via `.installed-version`. ONE supervisor
+(`features/shared/ofac-supervisor.sh`, staged into each `pkg/` because OCI
+publish ships only the Feature subfolder) is every Feature's identical
+`entrypoint`; logs to `${OFAC_LOG_DIR:-/tmp/openfacilitator/logs}/<unit>.log`;
+units restart with 2 s backoff up to `OFAC_SUPERVISOR_MAX_RESTARTS` (10) and
+forward TERM to the runtime child. No lifecycle hooks are declared (§8.2).
+Options arrive as bare-UPPERCASE env (`configPath`→`CONFIGPATH` — the spec
+adds NO underscore) and bake unit defaults; the runtime env surface
+(`GATEWAY_CONFIG`, `WORKER_CONFIG`, `OFAC_*`) still wins at runtime; secrets
+are env-only, never options. Tests: `features/test/<name>/`
+(ubuntu+debian; Alpine excluded — better-sqlite3 musl prebuilds UNVERIFIED
+as of 2026-10, only the shipped `prebuilds/linuxmusl-*.node` files exist),
+combo scenario on gateway proves composition. Feature version ≠ protocol
+major (§8.5).
 
 ## Gateway modes & trust truth
 

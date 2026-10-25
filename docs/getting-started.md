@@ -90,13 +90,47 @@ Migration management: `make db-update` (`dotnet tool restore && dotnet ef databa
 ## 4. CI and releases
 
 - CI (`ci.yml`) is the merge gate: .NET build+test, TS lint+build+test, workflow/meta validation, and a Facilitator image build. Job-by-job scope: [`.github/workflows/README.md`](../.github/workflows/README.md).
-- Releases trigger on `v*` tags: the Facilitator image is pushed to GHCR for `linux/amd64` + `linux/arm64`.
+- Releases trigger on `v*` tags: the Facilitator image is pushed to GHCR for `linux/amd64` + `linux/arm64`, and the Dev Container Features are published as OCI artifacts under `…/features/<name>`.
 
 ## 5. Artifact registries
 
 | Artifact | Registry | Coordinate |
 |---|---|---|
-| OCI images (facilitator; later gateway, workspace-link, features, examples) | GHCR | `ghcr.io/denisekart/open-facilitator/<name>` |
+| OCI images (facilitator) | GHCR | `ghcr.io/denisekart/open-facilitator/<name>` |
 | npm packages `@ofac/*` | GitHub Packages npm | `https://npm.pkg.github.com/denisekart` (see repo `.npmrc`; publish flips in Plan 01) |
-| Dev Container Features (Plan 06, OCI per spec §8.5) | GHCR | `ghcr.io/denisekart/open-facilitator/features/<name>` |
+| Dev Container Features (OCI per spec §8.5; `gateway`, `workspace-link`, `harness-adapter`) | GHCR | `ghcr.io/denisekart/open-facilitator/features/<name>:1` |
 | NuGet | — (public deps from nuget.org; first internal package → `https://nuget.pkg.github.com/denisekart/index.json`) | — |
+
+## 6. Connect an existing workspace: add one Feature
+
+An existing team container becomes a linked, headless workspace by adding
+ONE Feature to its `devcontainer.json` (spec §28's onboarding law) — no base
+image change, no build-time secrets:
+
+```jsonc
+// .devcontainer/devcontainer.json of any Node >= 22 workspace container
+{
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": { "version": "22" },
+    "ghcr.io/denisekart/open-facilitator/features/gateway:1": {
+      "configPath": ".facilitator/gateway.yaml"
+    }
+  },
+  // Secrets arrive at runtime via env — never as Feature options:
+  "containerEnv": { "OFAC_ENROLL_SECRET": "${localEnv:OFAC_ENROLL_SECRET}" }
+}
+```
+
+The Feature's supervisor entrypoint starts the Gateway headless (IDE and
+`devcontainer up` alike); the container log then carries the ready line:
+
+```
+gateway ready endpointId=gw.demo epoch=1 children=0
+```
+
+Per-Feature options, the 1:1 env surface, state law, and troubleshooting:
+[`features/src/gateway/README.md`](../features/src/gateway/README.md) (and
+the sibling `workspace-link` / `harness-adapter` READMEs). A fully composed
+three-Feature example with an end-to-end walkthrough:
+[`examples/slim/deterministic-research-worker`](../examples/slim/deterministic-research-worker/README.md).

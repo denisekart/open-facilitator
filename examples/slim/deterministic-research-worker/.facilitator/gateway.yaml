@@ -1,0 +1,19 @@
+# Standalone Gateway for the devcontainer path: same identity as the
+# top-level gateway.yaml, pointed at a kernel on the container host and
+# state on the workspace mount. The Feature unit starts this file.
+apiVersion: facilitator.framework/v1
+kind: Gateway
+gatewayId: gw.demo
+team: default
+facilitatorUrl: http://host.docker.internal:8088
+enrollmentSecret: enroll-dev
+trustMode: isolated-executor
+stateDir: /workspace/.ofac-gateway
+mode: standalone
+children: []
+childTransport:
+  socket:
+    path: ./child.sock
+diagnostics:
+  port: 8099
+heartbeatSeconds: 5

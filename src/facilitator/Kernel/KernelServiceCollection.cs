@@ -61,6 +61,8 @@ public static class KernelServiceCollection
         builder.Services.AddHostedService(sp => sp.GetRequiredService<BootstrapAuthStartupCheck>());
         builder.Services.Configure<IdentityOptions>(
             builder.Configuration.GetSection(IdentityOptions.SectionName));
+        builder.Services.AddSingleton<AuditWriter>();
+        builder.Services.AddSingleton<RoleStore>();
         builder.Services.AddSingleton<IdentityStartupCheck>();
         builder.Services.AddHostedService(sp => sp.GetRequiredService<IdentityStartupCheck>());
         builder.Services.AddHostedService<OutboxDispatcher>();

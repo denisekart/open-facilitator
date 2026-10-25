@@ -14,6 +14,7 @@ public sealed class KernelMetrics
 
     private readonly Counter<long> _deliveryAttempts;
     private readonly Counter<long> _inboxProcessed;
+    private readonly Counter<long> _identityDecisions;
     private readonly Counter<long> _linkReceived;
     private readonly Histogram<double> _deliveryLatency;
     private readonly Histogram<double> _ingressLatency;
@@ -35,6 +36,7 @@ public sealed class KernelMetrics
         meter.CreateObservableGauge("facilitator.delivery.dead_letter_count", () => Volatile.Read(ref _deadLetters), description: "Dead-lettered rows");
         meter.CreateObservableGauge("facilitator.link.sessions", () => Volatile.Read(ref _linkSessions), description: "Live link sessions (appendix §9.1)");
         _linkReceived = meter.CreateCounter<long>("facilitator.link.received", description: "Envelopes admitted over the link surface");
+        _identityDecisions = meter.CreateCounter<long>("facilitator.identity.decisions", description: "Authorization-gate decisions (tag: decision)");
     }
 
     /// <summary>Record one charged delivery attempt.</summary>
@@ -48,6 +50,10 @@ public sealed class KernelMetrics
 
     /// <summary>Record one envelope admitted over the link surface (appendix §9.1).</summary>
     public void LinkReceived() => _linkReceived.Add(1);
+
+    /// <summary>Record one identity-gate decision (appendix §3.2 step 5).</summary>
+    /// <param name="decision">allow | deny.</param>
+    public void IdentityDecision(string decision) => _identityDecisions.Add(1, new KeyValuePair<string, object?>("decision", decision));
 
     /// <summary>Refresh the cached live-link-session gauge (served without hitting the DB).</summary>
     public void SetLinkSessions(long live) => Volatile.Write(ref _linkSessions, live);

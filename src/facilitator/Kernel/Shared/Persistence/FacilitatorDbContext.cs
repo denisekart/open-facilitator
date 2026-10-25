@@ -1,5 +1,5 @@
-using Microsoft.EntityFrameworkCore;
 
+using Microsoft.EntityFrameworkCore;
 // ADR (spec §7.2/§7.4, §19.3): Why this schema looks like this —
 //  * `inbox`/`outbox` carry their own lease + attempt columns so claims run as
 //    short `FOR UPDATE SKIP LOCKED` transactions; the dispatcher calls sinks
@@ -47,6 +47,10 @@ public class FacilitatorDbContext(DbContextOptions<FacilitatorDbContext> options
     public DbSet<ApprovalEntity> Approvals => Set<ApprovalEntity>();
 
     public DbSet<CommunicationBindingEntity> CommunicationBindings => Set<CommunicationBindingEntity>();
+
+    public DbSet<AuditEventEntity> Audit => Set<AuditEventEntity>();
+
+    public DbSet<IdentityRoleEntity> IdentityRoles => Set<IdentityRoleEntity>();
 
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder model)

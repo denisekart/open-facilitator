@@ -223,6 +223,57 @@ public sealed class TestDbProbe : IAsyncDisposable
         await ScalarBool("SELECT count(*) FROM facilitator.teams WHERE slug = $1",
             cmd => cmd.Parameters.AddWithValue(slug));
 
+    /// <summary>facilitator.audit rows, newest first, optionally fenced by actor/decision.</summary>
+    public async Task<List<AuditRow>> AuditRows(string? actor = null, string? decision = null)
+    {
+        var clauses = new List<string>();
+        var parameters = new List<object>();
+        if (actor is not null)
+        {
+            clauses.Add($"actor = ${parameters.Count + 1}");
+            parameters.Add(actor);
+        }
+
+        if (decision is not null)
+        {
+            clauses.Add($"decision = ${parameters.Count + 1}");
+            parameters.Add(decision);
+        }
+
+        var sql = "SELECT actor, action, decision, coalesce(reason, ''), detail::text, coalesce(policy_version, '') "
+            + "FROM facilitator.audit"
+            + (clauses.Count == 0 ? string.Empty : " WHERE " + string.Join(" AND ", clauses))
+            + " ORDER BY occurred_at DESC";
+        await using var connection = await _dataSource.OpenConnectionAsync();
+        await using var cmd = new NpgsqlCommand(sql, connection);
+        foreach (var p in parameters)
+        {
+            cmd.Parameters.AddWithValue(p);
+        }
+
+        await using var reader = await cmd.ExecuteReaderAsync();
+        var rows = new List<AuditRow>();
+        while (await reader.ReadAsync())
+        {
+            rows.Add(new AuditRow(
+                reader.GetFieldValue<string>(0),
+                reader.GetString(1),
+                reader.GetString(2),
+                reader.GetString(3),
+                reader.GetString(4),
+                reader.GetString(5)));
+        }
+
+        return rows;
+    }
+
+    /// <summary>Role names present in facilitator.identity_roles.</summary>
+    public Task<List<string>> IdentityRoleNames() =>
+        TextListRaw("SELECT role_name FROM facilitator.identity_roles ORDER BY role_name");
+
+    /// <summary>One audit assertion row (typed window, no raw SQL in tests).</summary>
+    public sealed record AuditRow(string? Actor, string Action, string Decision, string Reason, string Detail, string PolicyVersion);
+
     /// <inheritdoc />
     public async ValueTask DisposeAsync() => await _dataSource.DisposeAsync();
 

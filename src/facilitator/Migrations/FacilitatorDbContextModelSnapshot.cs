@@ -122,6 +122,73 @@ namespace Facilitator.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.AuditEventEntity", b =>
+                {
+                    b.Property<Guid>("AuditId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("audit_id");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("action");
+
+                    b.Property<string>("Actor")
+                        .HasColumnType("text")
+                        .HasColumnName("actor");
+
+                    b.Property<string>("CorrelationId")
+                        .HasColumnType("text")
+                        .HasColumnName("correlation_id");
+
+                    b.Property<string>("Decision")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("decision");
+
+                    b.Property<string>("Detail")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("detail");
+
+                    b.Property<string>("EvidenceRef")
+                        .HasColumnType("text")
+                        .HasColumnName("evidence_ref");
+
+                    b.Property<DateTime>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<string>("PolicyVersion")
+                        .HasColumnType("text")
+                        .HasColumnName("policy_version");
+
+                    b.Property<string>("Reason")
+                        .HasColumnType("text")
+                        .HasColumnName("reason");
+
+                    b.Property<string>("Resource")
+                        .HasColumnType("text")
+                        .HasColumnName("resource");
+
+                    b.Property<string>("TraceId")
+                        .HasColumnType("text")
+                        .HasColumnName("trace_id");
+
+                    b.HasKey("AuditId");
+
+                    b.HasIndex("OccurredAt")
+                        .HasDatabaseName("audit_occurred_at_idx");
+
+                    b.HasIndex("Actor", "OccurredAt")
+                        .HasDatabaseName("audit_actor_occurred_at_idx");
+
+                    b.ToTable("audit", "facilitator", t =>
+                        {
+                            t.HasCheckConstraint("audit_decision_check", "decision IN ('allow', 'deny')");
+                        });
+                });
+
             modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.CommunicationBindingEntity", b =>
                 {
                     b.Property<Guid>("BindingId")
@@ -228,6 +295,31 @@ namespace Facilitator.Migrations
                         {
                             t.HasCheckConstraint("execution_attempts_status_check", "status IN ('starting', 'ready', 'working', 'stopping', 'stopped', 'failed', 'lost')");
                         });
+                });
+
+            modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.IdentityRoleEntity", b =>
+                {
+                    b.Property<string>("RoleName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("role_name");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<string>("Rules")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("rules");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("RoleName");
+
+                    b.ToTable("identity_roles", "facilitator");
                 });
 
             modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.InboxEntity", b =>

@@ -139,7 +139,7 @@ Prereqs: Docker, `make build`, one shared Postgres reachable per existing e2e co
 |1 identity: config + staged validation + IdentityStartupCheck|Fully implemented: IdentityOptions.cs staged Validate() + IdentityStartupCheck hosted in KernelServiceCollection; dev appsettings identity: block; .env.example Identity__* keys; ConfigBinding/Validation tests green|
 |2 Claim pointers + FacilitatorPrincipal|Fully implemented: ClaimPointers.cs (RFC 6901, 3 shapes, deny-on-missing) + FacilitatorPrincipal/PrincipalMapper (oidc:iss\|sub actor); pointer/mapper tests green|
 |3 Role-rule engine + golden tests|Fully implemented: RoleRules.cs pure evaluator (equals/contains/exists, malformed skip never wildcard); 14 tests green via --filter Identity|
-|4 facilitator.audit + identity_roles + AuditWriter/RoleStore + metrics (migration AddIdentityFoundation)|Not started|
+|4 facilitator.audit + identity_roles + AuditWriter/RoleStore + metrics (migration AddIdentityFoundation)|Fully implemented: 20261025235208_AddIdentityFoundation (audit + identity_roles + CHECK + indexes); AuditWriter/RoleStore (seed-if-empty, TTL snapshot, rowVersion 409, audit-on-edit); facilitator.identity.decisions counter; TestDbProbe.AuditRows/IdentityRoleNames; full suite 141 green|
 |5 Kernel-edge cutover (JwtBearer, gate middleware, bootstrap auth deleted, roles API, CLI)|Not started|
 |6 reference/keycloak/realm.json + README|Not started|
 |7 Test/dev/e2e/CI/docs token cutover|Not started|

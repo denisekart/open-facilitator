@@ -4,7 +4,7 @@
 
 The repo is spec-only: `docs/specs/open_facilitator_framework_architecture.md` (normative architecture, §26 defines ten delivery slices) plus `docs/specs/open-facilitator-appendix.md` (normative clarifications: trustMode, actorEvidenceRef, RFC 8785 approval hashing, outbox/inbox, memory ACLs, conformance must-haves). Nothing is implemented. This roadmap is the top-level collection of numbered, autonomous implementation plans in execution order. Early plans establish architecture infrastructure (repo skeleton, protocol contracts, transactional kernel, transport); later plans deliver single vertical feature slices.
 
-**Deliverable of this plan:** create `docs/roadmap.md` containing exactly the plan catalogue below (sections "How to use" + plans 00–20), and nothing else. No code, no scaffold — implementation starts when Plan 00 is executed after its own replanning pass.
+**Deliverable of this plan:** create `docs/roadmap.md` containing exactly the plan catalogue below (sections "How to use" + plans 00–24), and nothing else. No code, no scaffold — implementation starts when Plan 00 is executed after its own replanning pass.
 
 ## How to use this roadmap
 
@@ -138,7 +138,7 @@ The repo is spec-only: `docs/specs/open_facilitator_framework_architecture.md` (
 **Status:** ⬜ not-started
 **Objective:** Implement `IArtifactStore` (`Put/Get/List/Delete/VerifyDigest`, §15.4) with local-FS and S3 (SeaweedFS) backends, signed upload-URL flow (appendix §8.2 `POST /api/artifacts/request-upload`), immutable Result Manifests with revision chains (§15.3), and typed outputs referenced from `assignment.completed`.
 **Replanning gate:** fix manifest schema fields against Plan 01 schemas (mediaType, size, digest, storageUrl, revisionOf); fix digest algorithm (SHA-256) and external-reference trust rules (verified external ref vs unverified URL, SSRF guard).
-**Scope:** artifact endpoints + Link command adapter for workers; outbox-linked `artifact.available` event; access-policy rows; large-payload rule: Links never carry artifacts inline.
+**Scope:** artifact endpoints + Link command adapter for workers; outbox-linked `artifact.available` event; access-policy rows; large-payload rule: Links never carry artifacts inline. `@ofac/adapter` grows the artifact client surface (upload-URL request, result-manifest builders) so every harness adapter — first-party or third-party — exposes artifacts to its harness without touching wire details.
 **State after:** a research assignment's Markdown report survives worker destruction, is retrievable by digest, and the Work timeline shows the manifest revision. Slice-5 exit (artifact half).
 **Testing:** digest verification, revision chain immutability, unauthorized access 403, invalid external URL + SSRF, upload-then-complete integration with 04/05 clients. §26.1 item 12.
 **Documentation:** `docs/protocol.md` artifacts section; appendix §8.3 manifest example promoted to fixture.
@@ -150,7 +150,7 @@ The repo is spec-only: `docs/specs/open_facilitator_framework_architecture.md` (
 **Status:** ⬜ not-started
 **Objective:** Implement the memory contract layer (§14.3 minimal ops `retain/recall/reflect/curate`) over PostgreSQL FTS with scope ownership + ACL intersections, policy labels (`private|team-only|facilitator-visible|evidence-only`), `memory.used` usage events (appendix §6.2), retention-per-Project, and memory-scope sharing grants — a broker, not a product; Hindsight stays an optional seam.
 **Replanning gate:** map §14.2 scope model + appendix §6.1 required entry fields onto 02's schema (new `memory_entries`/`memory_scopes` tables via migration); fix FTS strategy (tsvector + trigger, pgvector seam deferred); fix candidate→promoted lifecycle (§14.6) against the kernel's event loop.
-**Scope:** HTTP/OpenAPI + Link command adapter; `scopeSelectors` treated as hints intersected with verified grants; injection audit (§14.9: entries actually injected into a decision); cross-team private-memory block.
+**Scope:** HTTP/OpenAPI + Link command adapter; `scopeSelectors` treated as hints intersected with verified grants; injection audit (§14.9: entries actually injected into a decision); cross-team private-memory block. `@ofac/adapter` grows the memory client surface (retain/recall/reflect helpers + `memory.candidate` builder) on the same principle as the artifact helpers.
 **State after:** `memory.candidate` from Plan 07's worker becomes a promotable entry; cross-team recall cannot see private entries; deletion purges the FTS index. Slice-5 exit (memory half).
 **Testing:** scope-ACL matrix (home scope vs read grants), correction/revocation/delete lifecycle, `memory.used` emitted on every automated read, retention enforcement. §26.1 item 11.
 **Documentation:** `docs/advanced.md` memory model + Hindsight seam; `.omp/skills/facilitator-architecture` memory section update.
@@ -174,10 +174,10 @@ The repo is spec-only: `docs/specs/open_facilitator_framework_architecture.md` (
 **Depends on:** 08, 09, 10, 11, 12
 **Additional resources:** spec §21.1/§22.2/§22.5/§28, appendix §11 (one-command dev loop); compose `healthcheck`/`depends_on: condition` docs; Aspire dashboard OTLP ingestion docs.
 
-### Plan 14 — Admin SPA: embedded single-page inspector
+### Plan 14 — Admin surface: embedded operator inspector
 **Status:** ⬜ not-started
-**Objective:** Build the embedded Svelte 5 + Tailwind + shad/svelte admin app (§17): universal search, health strip, contextual inspector for Work/Gateway/workspace/artifact/memory objects, activity timeline, inline metrics (§17.2), `PATCH /api/admin/config/{resource}` with `If-Match` optimistic revision (§17.4), trustMode displayed per enrollment (appendix §4.3), dead-letter replay control (appendix §11.2).
-**Replanning gate:** confirm the read-model endpoints needed beyond §17.4's list (timeline, deliveries, metrics) against 02–12's actual tables and add them to the Facilitator in the same slice; fix build/embed pipeline (SPA built into the Facilitator's `wwwroot`, single deployable).
+**Objective:** Build the embedded Svelte 5 + Tailwind + shad/svelte operator surface (§17), optimized ruthlessly for simplicity — one coherent inspector, not a page-count target (multi-view is fine when it removes navigation). Universal search, health strip, contextual inspector for Work/Gateway/workspace/artifact/memory objects, activity timeline, inline metrics (§17.2), `PATCH /api/admin/config/{resource}` with `If-Match` optimistic revision (§17.4), trustMode displayed per enrollment (appendix §4.3), dead-letter replay control (appendix §11.2).
+**Replanning gate:** §17's "single-page" title is a simplicity constraint, not a requirement — operator-approved deviation, record it in the spec's errata/appendix note rather than silently diverging; confirm the read-model endpoints needed beyond §17.4's list (timeline, deliveries, metrics) against 02–12's actual tables and add them to the Facilitator in the same slice; fix build/embed pipeline (SPA built into the Facilitator's `wwwroot`, single deployable).
 **State after:** operator can trace a slim acceptance-run Work from search to artifact to trace link without psql.
 **Testing:** Playwright .NET E2E against slim Compose: search a Work, open timeline, replay a forced dead-letter, verify trustMode badge; API tests for If-Match conflicts.
 **Documentation:** `docs/getting-started.md` admin tour section; SPA README.
@@ -251,7 +251,7 @@ The repo is spec-only: `docs/specs/open_facilitator_framework_architecture.md` (
 **Status:** ⬜ not-started
 **Objective:** Close §26.1–26.2: complete the shared conformance suite as an executable package (all 15 items green across Facilitator/Gateway/Link), administration audit trail + versioned preference changes (§17.1), dead-letter UX (replay button wired in 14 verified here), full runbook set (§27), backup/restore + upgrade/rollback drills, and the incident exercise: DB restart, provider outage, invalid token replay.
 **Replanning gate:** diff §26.1's 15 items against fixtures/tests existing from 01–19; enumerate the gaps and assign each to a harness (conformance package vs E2E); fix what "production-eligible" checks become automatable (`referencectl verify --full`).
-**Scope:** conformance-suite CLI (run against any conformant implementation, not just this one), bad-provider fault-injection fixtures, SBOM + digest-pinned release job (§22.6), version-negotiation test (protocol v1 vs a simulated v2 link).
+**Scope:** conformance-suite CLI (run against any conformant implementation, not just this one), bad-provider fault-injection fixtures, SBOM + digest-pinned release job (§22.6), version-negotiation test (protocol v1 vs a simulated v2 link). Prose scrub: strip every plan-number/phase/stage reference from everything outside `.omp/` and `docs/specs/` (code comments, READMEs, docs/, protocol descriptions, test comments) and rewrite each sentence as a statement of fact — the existing corpus already carries stale numbers after the Phase B renumber, so this is a one-time sweep, then the cross-plan rule below keeps it clean.
 **State after:** `referencectl verify` full profile passes from empty volumes; conformance package publishes a machine-readable pass/fail report; runbooks validated by executing the incident drill.
 **Testing:** the suite itself is the deliverable; drill logged in runbooks.
 **Documentation:** `docs/security.md` + runbook chapter (§27) finalized; `docs/getting-started.md` re-verified word-for-word by a clean-clone run; all `.omp/skills/` updated to implemented reality (AGENTS.md maintenance rule).
@@ -261,8 +261,39 @@ The repo is spec-only: `docs/specs/open_facilitator_framework_architecture.md` (
 
 ---
 
+## Phase G — Ecosystem extensibility
+
+The framework's adoption thesis: first-party adapters are ordinary *implementations* of published contracts, not privileged code — anyone can build their own harness adapter, communication integration, or onboard an existing repo with their own LLM setup. This phase turns those seams into shippable, independently consumable products. Independent of 18/19/20; 21–22 depend on 11 (adapter client surface) and on 15/16 (worked provider/harness examples), 23 on 13.
+
+### Plan 21 — Communication adapter SDK: open protocol for third-party integrations
+**Status:** ⬜ not-started
+**Objective:** Publish the CommunicationAdapter contract (§13.5) the same way the harness side published `@ofac/adapter`: JSON Schemas for provider-inbound events and adapter capability manifests under `protocol/json-schema/`, a TS SDK package (ingest/reply/react/ack ops, echo suppression, dedupe helpers), and a lifecycle conformance kit. Mattermost/Forgejo/Kafka (15–17) are then demonstrably just first implementations — a user's Slack/Discord/GitHub/Jira integration ships as an external package, developed against the published contract, not against repo internals.
+**Replanning gate:** extract the de-facto interface from 15/16's two shipped adapters; fix which ops are core vs optional capability flags; fix the adapter↔kernel ingress path (inbox `provider_events` posting vs Link command) and its auth (workload identity from 09).
+**Testing:** 15/16's adapters cut over onto the SDK and pass its conformance kit unmodified-except-imports; a synthetic reference "toy provider" adapter written only against published docs+schemas passes the same suite.
+**Documentation:** `docs/advanced.md` "write your own integration" walkthrough mirroring the adapter-sdk one; SDK README with minimal example.
+**Depends on:** 15, 16
+
+### Plan 22 — Independently pullable harness adapters (Feature + registry story)
+**Status:** ⬜ not-started
+**Objective:** Each harness adapter is its own folder, its own package, and its own pullable artifact: the `ofac-harness-adapter` Feature's `adapter` option accepts an arbitrary adapter bundle (npm spec or OCI tarball digest) instead of only the baked-in `deterministic`, so any devcontainer composes any adapter — first-party or team-authored — without building this repo. First-party sibling adapters land as worked third-party-shaped implementations of `@ofac/adapter` (one folder each under `src/adapters/harnesses/`): the coding harness family (Pi, OpenCode, Codex-class CLIs) and one local-LLM harness (Ollama-backed) proving the "hook in your own model" story.
+**Replanning gate:** fix the bundle contract (entry binary, config env, supervisor unit expectations); decide the trust model for third-party bundles (digest pinning, no postinstall); pick the first two sibling adapters from 16/17's actual harness surfaces.
+**Testing:** Feature scenario test installs a non-baked adapter from a local tarball end-to-end; each sibling adapter passes `@ofac/adapter/testing` and a composed-devcontainer smoke.
+**Documentation:** `features/src/harness-adapter/README.md` rewrite for arbitrary bundles; each adapter folder's README as the copy-me template.
+**Depends on:** 11, 16
+
+### Plan 23 — Self-service onboarding: adopt-an-existing-repo skill + local-LLM hookup
+**Status:** ⬜ not-started
+**Objective:** A user (or their agent) onboard a repository by pointing any LLM at a shipped entry document: a canonical `ONBOARDING.md` + agent skill (repo root and published as a standalone pullable doc/skill) that walks enrollment, Dev Container Feature or standalone `linkd` wiring, capability manifest authoring, and hooking the team's own harness + local LLM (Ollama/vLLM/etc.) via the adapter contract. Runbook-driven: the skill drives the *user's* agent, the framework only ships instructions + CLI.
+**Replanning gate:** fix the exact onboarding sequence against 13's shipped `referencectl`/enrollment UX; decide skill packaging (in-repo file vs published doc vs both) so it's consumable without cloning.
+**Testing:** a fresh agent with only the skill document onboards a scratch repo against slim ref-env and completes one Work end-to-end.
+**Documentation:** the skill/`ONBOARDING.md` itself; `docs/getting-started.md` pointer; harness-adapter hookup section cross-linking Plan 22.
+**Depends on:** 13
+
+---
+
 ## Cross-plan rules
 - **Replanning before implementation is mandatory** — status ⬜ never jumps to 🟡; the 🔵 gate produces `.omp/plans/<slug>.md` detail design checked against this roadmap's objective + exit state.
 - **Skill/doc co-update:** every plan updates the `.omp/skills/` projections it invalidates in the same change.
 - **Fixtures-first testing:** anything asserted about wire behavior must exist as a `protocol/conformance-fixtures/` entry, run by both .NET and TS harnesses.
 - **No forward shims:** a later plan may replace an earlier interim (auth tokens in 02/03→09, policy stub in 05→10, local artifact FS→S3 in 11, FTS→optional vector seam) by clean cutover, not by keeping both paths.
+- **No plan prose outside the plan layer:** code, code comments, schemas, and shipped documentation state facts, never delivery sequencing — no plan numbers, phases, stages, or "lands with / until Plan NN" (`.omp/` and `docs/specs/` excepted). Forward-looking notes name the capability ("until admin views exist"), not the schedule.

@@ -1,0 +1,9 @@
+{
+  "v": 1,
+  "type": "command",
+  "requestId": "ch-04",
+  "message": {
+    "kind": "status",
+    "executionId": "exec-01"
+  }
+}

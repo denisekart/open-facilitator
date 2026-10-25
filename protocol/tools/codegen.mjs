@@ -12,9 +12,19 @@ import { fileURLToPath } from "node:url";
 
 const repo = fileURLToPath(new URL("../..", import.meta.url));
 const schemaDirs = [join(repo, "protocol/json-schema"), join(repo, "protocol/cloudevents-schemas")];
+// Documented skip list: schemas that SHIP (mirrored to the package, validated
+// by both fixture harnesses) but are excluded from the quicktype DTO pass.
+// adapter.v1.json is a oneOf frame union: flattened, quicktype merges the
+// variants into one interface whose `reason` union cannot carry a free-form
+// stop/reject reason, and its $ref into capability-manifest.v1.json renames
+// the published CapabilityDescriptor types. Contract consumers (fixture
+// harnesses, docs) validate against the schema, not the DTOs, so no generated
+// name is worth that churn.
+const CODEGEN_SKIP = new Set(["adapter.v1.json"]);
 const schemas = schemaDirs
   .flatMap((d) => readdirSync(d).filter((f) => f.endsWith(".json")).map((f) => join(d, f)))
   .sort();
+const dtoSchemas = schemas.filter((s) => !CODEGEN_SKIP.has(basename(s)));
 
 const TS_OUT = join(repo, "src/protocol/src/generated");
 const CS_OUT = join(repo, "protocol/dotnet/Ofac.Protocol/Generated");
@@ -41,7 +51,7 @@ for (const dir of [TS_OUT, CS_OUT]) {
 
 // TypeScript: interfaces only — runtime validation is ajv's job.
 quicktype([
-  "-s", "schema", ...schemas,
+  "-s", "schema", ...dtoSchemas,
   "--lang", "ts", "--just-types", "--no-date-times", "--alphabetize-properties", "--quiet",
   "-o", join(TS_OUT, "types.ts"),
 ]);
@@ -58,7 +68,7 @@ writeFileSync(
 
 // C#: System.Text.Json attributes, property names verbatim (wire is lowercase/camel as-is).
 quicktype([
-  "-s", "schema", ...schemas,
+  "-s", "schema", ...dtoSchemas,
   "--lang", "cs", "--framework", "SystemTextJson", "--features", "attributes-only",
   "--keep-property-name", "--csharp-version", "8", "--namespace", "Ofac.Protocol",
   "--no-date-times", "--quiet",

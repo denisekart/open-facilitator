@@ -34,6 +34,7 @@ import capabilityManifestV1 from "../schemas/capability-manifest.v1.json" with {
 import enrollRequestV1 from "../schemas/enroll-request.v1.json" with { type: "json" };
 import enrollResponseV1 from "../schemas/enroll-response.v1.json" with { type: "json" };
 import linkDeliveryV1 from "../schemas/link-delivery.v1.json" with { type: "json" };
+import adapterV1 from "../schemas/adapter.v1.json" with { type: "json" };
 
 export type JsonSchema = Record<string, unknown>;
 
@@ -70,6 +71,7 @@ const all: JsonSchema[] = [
   enrollRequestV1,
   enrollResponseV1,
   linkDeliveryV1,
+  adapterV1,
 ] as unknown as JsonSchema[];
 
 const byId = new Map<string, JsonSchema>(all.map((s) => [s["$id"] as string, s]));

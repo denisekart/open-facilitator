@@ -1,0 +1,256 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openfacilitator.org/v1/adapter.v1.json",
+  "title": "AdapterFrameV1",
+  "description": "One HarnessAdapter lifecycle frame (either direction of the Gateway<->adapter NDJSON wire, one JSON object per line). A verbatim profile of the shipped 06 child transport (src/gateway/src/childwire.ts + child.ts): the six-method HarnessAdapter contract (spec 8.3) maps start->command(start), steer->command(steer), status->command(status), interrupt->command(stop), observe->the push-based event relay; respond has no v1 frame (adapters advertise no input support). Frames are NOT CloudEvents: the version property is `v: 1`, the discriminator is `type`. The 262144-byte frame limit is a transport-level code constant (MAX_CHILD_FRAME_BYTES), not a schema keyword.",
+  "type": "object",
+  "required": ["v", "type"],
+  "properties": {
+    "v": {
+      "const": 1
+    }
+  },
+  "oneOf": [
+    { "$ref": "#/$defs/hello" },
+    { "$ref": "#/$defs/registerAck" },
+    { "$ref": "#/$defs/command" },
+    { "$ref": "#/$defs/reply" },
+    { "$ref": "#/$defs/eventFrame" },
+    { "$ref": "#/$defs/heartbeat" },
+    { "$ref": "#/$defs/goaway" }
+  ],
+  "$defs": {
+    "hello": {
+      "title": "AdapterHelloFrame",
+      "description": "child -> Gateway: identity + token + manifest; the register-ack decides.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["v", "type", "childWorkspaceId", "token", "manifest"],
+      "properties": {
+        "v": { "const": 1 },
+        "type": { "const": "hello" },
+        "childWorkspaceId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "token": { "type": "string", "minLength": 0, "maxLength": 4096 },
+        "manifest": { "$ref": "capability-manifest.v1.json" }
+      }
+    },
+    "registerAck": {
+      "title": "AdapterRegisterAckFrame",
+      "description": "Gateway -> child: admission verdict; a denial carries a locked reason.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["v", "type", "accepted"],
+      "properties": {
+        "v": { "const": 1 },
+        "type": { "const": "register-ack" },
+        "accepted": { "type": "boolean" },
+        "reason": {
+          "enum": [
+            "duplicate-id",
+            "denied: peer-uid-mismatch",
+            "denied: bad-token",
+            "denied: child-id-namespace",
+            "manifest-conflict",
+            "too-many-children"
+          ]
+        }
+      }
+    },
+    "command": {
+      "title": "AdapterCommandFrame",
+      "description": "Gateway -> child: one lifecycle message; the child's reply frame pairs by requestId.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["v", "type", "requestId", "message"],
+      "properties": {
+        "v": { "const": 1 },
+        "type": { "const": "command" },
+        "requestId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "message": { "$ref": "#/$defs/childMessage" }
+      }
+    },
+    "childMessage": {
+      "title": "AdapterChildMessage",
+      "description": "The 06 ChildMessage vocabulary minus `register` (registration rides hello).",
+      "oneOf": [
+        { "$ref": "#/$defs/startMessage" },
+        { "$ref": "#/$defs/steerMessage" },
+        { "$ref": "#/$defs/statusMessage" },
+        { "$ref": "#/$defs/stopMessage" }
+      ]
+    },
+    "startMessage": {
+      "title": "AdapterStartMessage",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "executionId", "connectionGeneration", "command"],
+      "properties": {
+        "kind": { "const": "start" },
+        "executionId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "connectionGeneration": { "type": "integer", "minimum": 1 },
+        "command": { "$ref": "envelope-command.json" }
+      }
+    },
+    "steerMessage": {
+      "title": "AdapterSteerMessage",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "executionId", "command"],
+      "properties": {
+        "kind": { "const": "steer" },
+        "executionId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "command": { "$ref": "envelope-command.json" }
+      }
+    },
+    "statusMessage": {
+      "title": "AdapterStatusMessage",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "executionId"],
+      "properties": {
+        "kind": { "const": "status" },
+        "executionId": { "type": "string", "minLength": 1, "maxLength": 128 }
+      }
+    },
+    "stopMessage": {
+      "title": "AdapterStopMessage",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "executionId", "reason"],
+      "properties": {
+        "kind": { "const": "stop" },
+        "executionId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "reason": { "type": "string", "minLength": 1, "maxLength": 4096 }
+      }
+    },
+    "reply": {
+      "title": "AdapterReplyFrame",
+      "description": "child -> Gateway: the answer to a command frame (its reply IS the law).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["v", "type", "requestId", "reply"],
+      "properties": {
+        "v": { "const": 1 },
+        "type": { "const": "reply" },
+        "requestId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "reply": { "$ref": "#/$defs/childReply" }
+      }
+    },
+    "childReply": {
+      "title": "AdapterChildReply",
+      "oneOf": [
+        { "$ref": "#/$defs/acceptedReply" },
+        { "$ref": "#/$defs/rejectedReply" },
+        { "$ref": "#/$defs/unsupportedReply" },
+        { "$ref": "#/$defs/statusReply" },
+        { "$ref": "#/$defs/unknownReply" }
+      ]
+    },
+    "acceptedReply": {
+      "title": "AdapterAcceptedReply",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "executionId"],
+      "properties": {
+        "kind": { "const": "accepted" },
+        "executionId": { "type": "string", "minLength": 1, "maxLength": 128 }
+      }
+    },
+    "rejectedReply": {
+      "title": "AdapterRejectedReply",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "reason"],
+      "properties": {
+        "kind": { "const": "rejected" },
+        "reason": { "type": "string", "minLength": 1, "maxLength": 4096 }
+      }
+    },
+    "unsupportedReply": {
+      "title": "AdapterUnsupportedReply",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": { "const": "unsupported" },
+        "reason": { "type": "string", "minLength": 1, "maxLength": 4096 }
+      }
+    },
+    "statusReply": {
+      "title": "AdapterStatusReply",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "executionId", "state"],
+      "properties": {
+        "kind": { "const": "status" },
+        "executionId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "state": { "enum": ["running", "completed", "failed", "lost"] }
+      }
+    },
+    "unknownReply": {
+      "title": "AdapterUnknownReply",
+      "description": "The reconcile answer: no such execution (the Gateway marks the row lost).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "executionId"],
+      "properties": {
+        "kind": { "const": "unknown" },
+        "executionId": { "type": "string", "minLength": 1, "maxLength": 128 }
+      }
+    },
+    "eventFrame": {
+      "title": "AdapterEventFrame",
+      "description": "child -> Gateway: the observe relay — a FULL CloudEvents envelope, forwarded upstream unmodified (05 law: the Gateway stamps nothing). A completed envelope's `data` must satisfy the frozen payload schema (artifact digests are checked here, not at the Gateway).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["v", "type", "requestId", "envelope"],
+      "properties": {
+        "v": { "const": 1 },
+        "type": { "const": "event" },
+        "requestId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "envelope": {
+          "allOf": [
+            { "$ref": "envelope-event.json" },
+            {
+              "if": {
+                "type": "object",
+                "properties": {
+                  "type": { "const": "org.facilitator.event.assignment.completed.v1" }
+                },
+                "required": ["type"]
+              },
+              "then": {
+                "properties": { "data": { "$ref": "event.assignment.completed.v1.json" } },
+                "required": ["data"]
+              }
+            }
+          ]
+        }
+      }
+    },
+    "heartbeat": {
+      "title": "AdapterHeartbeatFrame",
+      "description": "child -> Gateway: lease liveness on the Gateway's heartbeat cadence.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["v", "type", "childWorkspaceId"],
+      "properties": {
+        "v": { "const": 1 },
+        "type": { "const": "heartbeat" },
+        "childWorkspaceId": { "type": "string", "minLength": 1, "maxLength": 128 }
+      }
+    },
+    "goaway": {
+      "title": "AdapterGoawayFrame",
+      "description": "Gateway -> child: goodbye before the socket dies.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["v", "type", "reason"],
+      "properties": {
+        "v": { "const": 1 },
+        "type": { "const": "goaway" },
+        "reason": { "enum": ["gateway-shutdown", "replaced"] }
+      }
+    }
+  }
+}

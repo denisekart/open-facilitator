@@ -1,0 +1,10 @@
+{
+  "v": 1,
+  "type": "command",
+  "requestId": "ch-03",
+  "message": {
+    "kind": "stop",
+    "executionId": "exec-01",
+    "reason": "user requested cancellation"
+  }
+}

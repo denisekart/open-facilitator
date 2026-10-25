@@ -267,6 +267,22 @@
       "expect": "invalid",
       "class": "receipt",
       "errorClass": "schema-violation"
-    }
+    },
+    { "file": "valid/adapter.hello.json", "expect": "valid", "class": "adapter", "schemaFile": "adapter.v1.json" },
+    { "file": "valid/adapter.command.start.json", "expect": "valid", "class": "adapter", "schemaFile": "adapter.v1.json" },
+    { "file": "valid/adapter.command.steer.json", "expect": "valid", "class": "adapter", "schemaFile": "adapter.v1.json" },
+    { "file": "valid/adapter.command.stop.json", "expect": "valid", "class": "adapter", "schemaFile": "adapter.v1.json" },
+    { "file": "valid/adapter.command.status.json", "expect": "valid", "class": "adapter", "schemaFile": "adapter.v1.json" },
+    { "file": "valid/adapter.reply.accepted.json", "expect": "valid", "class": "adapter", "schemaFile": "adapter.v1.json" },
+    { "file": "valid/adapter.reply.status.json", "expect": "valid", "class": "adapter", "schemaFile": "adapter.v1.json" },
+    { "file": "valid/adapter.reply.unknown.json", "expect": "valid", "class": "adapter", "schemaFile": "adapter.v1.json" },
+    { "file": "valid/adapter.event.completed.json", "expect": "valid", "class": "adapter", "schemaFile": "adapter.v1.json" },
+    { "file": "valid/adapter.heartbeat.json", "expect": "valid", "class": "adapter", "schemaFile": "adapter.v1.json" },
+    { "file": "valid/adapter.registerAck.denied.json", "expect": "valid", "class": "adapter", "schemaFile": "adapter.v1.json" },
+    { "file": "valid/adapter.goaway.json", "expect": "valid", "class": "adapter", "schemaFile": "adapter.v1.json" },
+    { "file": "invalid/adapter.no-version.json", "expect": "invalid", "class": "adapter", "schemaFile": "adapter.v1.json", "errorClass": "schema-violation" },
+    { "file": "invalid/adapter.event.publish.json", "expect": "invalid", "class": "adapter", "schemaFile": "adapter.v1.json", "errorClass": "schema-violation" },
+    { "file": "invalid/adapter.registerAck.bad-reason.json", "expect": "invalid", "class": "adapter", "schemaFile": "adapter.v1.json", "errorClass": "schema-violation" },
+    { "file": "invalid/adapter.event.completed.bad-digest.json", "expect": "invalid", "class": "adapter", "schemaFile": "adapter.v1.json", "errorClass": "schema-violation" }
   ]
 }

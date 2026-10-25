@@ -1,0 +1,21 @@
+{
+  "v": 1,
+  "type": "event.publish",
+  "requestId": "ev-1",
+  "envelope": {
+    "specversion": "1.0",
+    "id": "01JEVENT-progress-adapter",
+    "source": "urn:workspace:gw.team-alpha/deterministic",
+    "type": "org.facilitator.event.work.progress.v1",
+    "subject": "work/work-123/assignment/analysis-1",
+    "time": "2026-10-22T18:01:00Z",
+    "datacontenttype": "application/json",
+    "dataschema": "https://schemas.openfacilitator.org/v1/event.work.progress.v1.json",
+    "data": {
+      "workId": "work-123",
+      "assignmentId": "analysis-1",
+      "executionGeneration": 3,
+      "progressNote": "accepted: analyzing research.analyze for work-123"
+    }
+  }
+}

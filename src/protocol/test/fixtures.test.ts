@@ -20,11 +20,11 @@ import {
 interface FixtureCase {
   file: string;
   expect: "valid" | "invalid";
-  class: "command" | "event" | "receipt" | "control" | "enroll" | "delivery";
+  class: "command" | "event" | "receipt" | "control" | "enroll" | "delivery" | "adapter";
   type?: string;
   errorClass?: ErrorClass;
   receipt?: string;
-  /** For enroll/delivery classes: schema filename under the contract $id base. */
+  /** For enroll/delivery/adapter classes: schema filename under the contract $id base. */
   schemaFile?: string;
 }
 interface FixtureIndex {
@@ -51,7 +51,7 @@ function runCase(c: FixtureCase): ValidationResult {
       ? validateReceipt(payload)
       : c.class === "control"
         ? validateControlFrame(payload)
-        : c.class === "enroll" || c.class === "delivery"
+        : c.class === "enroll" || c.class === "delivery" || c.class === "adapter"
           ? validateAgainstSchemaId(
               `https://schemas.openfacilitator.org/v1/${c.schemaFile}`,
               payload,

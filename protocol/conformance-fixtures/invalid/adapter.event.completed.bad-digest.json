@@ -1,0 +1,35 @@
+{
+  "v": 1,
+  "type": "event",
+  "requestId": "ev-2",
+  "envelope": {
+    "specversion": "1.0",
+    "id": "01JEVENT-completed-adapter-bad",
+    "source": "urn:workspace:gw.team-alpha/deterministic",
+    "type": "org.facilitator.event.assignment.completed.v1",
+    "subject": "work/work-123/assignment/analysis-1",
+    "time": "2026-10-22T18:05:00Z",
+    "datacontenttype": "application/json",
+    "dataschema": "https://schemas.openfacilitator.org/v1/event.assignment.completed.v1.json",
+    "data": {
+      "workId": "work-123",
+      "assignmentId": "analysis-1",
+      "executionId": "exec-01",
+      "executionGeneration": 3,
+      "resultManifest": {
+        "manifestId": "man-exec-01",
+        "outputs": [
+          {
+            "artifactId": "art-exec-01-report",
+            "mediaType": "text/markdown",
+            "size": 512,
+            "digest": "sha512:0000000000000000000000000000000000000000000000000000000000000000",
+            "storageUrl": "file:///var/lib/ofac-worker/artifacts/exec-01-report.md",
+            "createdBy": "workspace:gw.team-alpha/deterministic",
+            "createdAt": "2026-10-22T18:05:00Z"
+          }
+        ]
+      }
+    }
+  }
+}

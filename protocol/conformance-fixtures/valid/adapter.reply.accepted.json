@@ -1,0 +1,9 @@
+{
+  "v": 1,
+  "type": "reply",
+  "requestId": "ch-01",
+  "reply": {
+    "kind": "accepted",
+    "executionId": "exec-01"
+  }
+}

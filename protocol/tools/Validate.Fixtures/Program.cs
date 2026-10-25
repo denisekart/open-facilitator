@@ -127,8 +127,10 @@ string? RunCase(string path, string messageClass, string? schemaFile = null)
     var root = doc.RootElement;
 
     // Non-envelope wire objects addressed by schema filename (enroll/delivery
-    // fixture classes): validate against the by-$id registry, strict.
-    if (messageClass is "enroll" or "delivery")
+    // fixture classes): validate against the by-$id registry, strict. Adapter
+    // lifecycle frames ride the same law — one frame, a $def profile of the
+    // shipped 06 child wire (protocol/json-schema/adapter.v1.json).
+    if (messageClass is "enroll" or "delivery" or "adapter")
     {
         return Schema($"https://schemas.openfacilitator.org/v1/{schemaFile}")
             .Evaluate(root, strict).IsValid

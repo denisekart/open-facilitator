@@ -1,0 +1,24 @@
+{
+  "v": 1,
+  "type": "hello",
+  "childWorkspaceId": "gw.team-alpha/deterministic",
+  "token": "child-secret-1",
+  "manifest": {
+    "apiVersion": "facilitator.framework/v1",
+    "kind": "CapabilityManifest",
+    "ownerTeam": "team-alpha",
+    "capabilities": [
+      {
+        "id": "research.analyze",
+        "version": 1,
+        "execution": "asynchronous",
+        "acceptedContexts": ["uri-reference"],
+        "outputKinds": ["analysis.report"],
+        "outputMediaTypes": ["text/markdown"],
+        "supportsSteering": true,
+        "supportsCancellation": true,
+        "supportsNudge": false
+      }
+    ]
+  }
+}

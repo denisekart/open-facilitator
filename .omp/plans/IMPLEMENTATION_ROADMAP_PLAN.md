@@ -109,7 +109,7 @@ The repo is spec-only: `docs/specs/open_facilitator_framework_architecture.md` (
 **Split 2026-10-25 against Phase B reality** (plans 00–08 as-built). The single 2026-10-24 entry pair was too coarse — identity alone spans two distinct auth planes (human ingress vs workload link edge), and approvals span two runtimes (kernel ledger vs Gateway flow) — so Phase C is four plans, each with its own detail-design file:
 
 ### Plan 09 — Identity foundation: Keycloak realm, claim-pointer mapper, kernel-edge human identity
-**Status:** ⬜ not-started (detail design: `09-identity-foundation-oidc.md`)
+**Status:** 🟡 in-progress (detail design: `09_IDENTITY_FOUNDATION_OIDC_PLAN.md`)
 **Objective:** OIDC cutover of the kernel-token surface (`Auth:BootstrapToken` → Keycloak 26 realm `reference/keycloak/realm.json` + `identity:` claim-pointer config per §11.2 + `(iss, sub)` human identity + `facilitator.audit` spine). Human plane of §11/appendix §3.
 **Depends on:** 03
 

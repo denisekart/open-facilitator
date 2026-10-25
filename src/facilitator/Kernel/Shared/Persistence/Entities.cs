@@ -351,3 +351,54 @@ public sealed class CommunicationBindingEntity
 
     public DateTime CreatedAt { get; set; }
 }
+
+/// <summary>facilitator.audit — every authorization-gate decision, allow and deny (appendix §3.2 step 5).</summary>
+public sealed class AuditEventEntity
+{
+    public Guid AuditId { get; set; }
+
+    public DateTime OccurredAt { get; set; }
+
+    /// <summary>Normalized actor ("oidc:iss|sub"); null when the caller was unauthenticated (never for gate rows).</summary>
+    public string? Actor { get; set; }
+
+    /// <summary>Decision subject, e.g. "authorization.evaluated:work.write" or "identity.role.upsert".</summary>
+    public required string Action { get; set; }
+
+    /// <summary>Request path/route the decision covered.</summary>
+    public string? Resource { get; set; }
+
+    /// <summary>allow | deny</summary>
+    public required string Decision { get; set; }
+
+    /// <summary>Machine-readable reason (e.g. no-role-match, no-binding, audit-unavailable).</summary>
+    public string? Reason { get; set; }
+
+    /// <summary>Pointer to corroborating evidence (approval id, ledger row).</summary>
+    public string? EvidenceRef { get; set; }
+
+    /// <summary>Role-rule policy version at decision time (row-version epoch).</summary>
+    public string? PolicyVersion { get; set; }
+
+    /// <summary>jsonb decision context — never a raw token.</summary>
+    public required string Detail { get; set; }
+
+    public string? TraceId { get; set; }
+
+    public string? CorrelationId { get; set; }
+}
+
+/// <summary>facilitator.identity_roles — runtime-mutable role rule sets (config seeds once, DB is truth).</summary>
+public sealed class IdentityRoleEntity
+{
+    /// <summary>Role name (PK).</summary>
+    public required string RoleName { get; set; }
+
+    /// <summary>jsonb array of {all:[{claim,op,value}]} rules.</summary>
+    public required string Rules { get; set; }
+
+    /// <summary>Optimistic-concurrency counter (PUT mismatch -> 409).</summary>
+    public long RowVersion { get; set; }
+
+    public DateTime UpdatedAt { get; set; }
+}

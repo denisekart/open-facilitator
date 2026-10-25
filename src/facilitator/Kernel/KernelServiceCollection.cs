@@ -3,6 +3,7 @@ using System.Threading.RateLimiting;
 using Facilitator.Kernel.Link;
 using Facilitator.Kernel.Shared.Auth;
 using Facilitator.Kernel.Shared.Dispatch;
+using Facilitator.Kernel.Shared.Identity;
 using Facilitator.Kernel.Shared.Persistence;
 using Facilitator.Kernel.Work;
 
@@ -58,6 +59,10 @@ public static class KernelServiceCollection
         builder.Services.AddSingleton<IIngressTokenValidator, BootstrapTokenValidator>();
         builder.Services.AddSingleton<BootstrapAuthStartupCheck>();
         builder.Services.AddHostedService(sp => sp.GetRequiredService<BootstrapAuthStartupCheck>());
+        builder.Services.Configure<IdentityOptions>(
+            builder.Configuration.GetSection(IdentityOptions.SectionName));
+        builder.Services.AddSingleton<IdentityStartupCheck>();
+        builder.Services.AddHostedService(sp => sp.GetRequiredService<IdentityStartupCheck>());
         builder.Services.AddHostedService<OutboxDispatcher>();
 
         builder.Services.AddProblemDetails();

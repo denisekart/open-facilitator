@@ -7,11 +7,15 @@ import { EnrollmentError, type ProblemDetails } from "./errors.js";
 
 export interface EnrollOptions {
   baseUrl: string;
-  /** Enrollment secret (config Link:EnrollmentToken; dev: `enroll-dev`). */
+  /** Mode (a): enrollment secret (config Link:EnrollmentToken; dev: `enroll-dev`). Mode (b): an OIDC client-credentials JWT. */
   token: string;
   endpointId: string;
   instanceId: string;
   trustMode: EnrollRequestV1["trustMode"];
+  /** Workload role claim (plan 10); the kernel rejects contradictions with a mode-(b) binding or the gw. prefix law. */
+  role?: "gateway" | "child";
+  /** Team roster slug to bind (required for mode (a); a mode-(b) binding's team wins). */
+  team?: string;
 }
 
 export const ENROLL_SCHEMA_ID = "https://schemas.openfacilitator.org/v1/enroll-request.v1.json";
@@ -27,6 +31,8 @@ export async function enroll(
     endpointId: opts.endpointId,
     instanceId: opts.instanceId,
     trustMode: opts.trustMode,
+    ...(opts.role ? { role: opts.role } : {}),
+    ...(opts.team ? { team: opts.team } : {}),
   };
   const verdict = validateAgainstSchemaId(ENROLL_SCHEMA_ID, body);
   if (!verdict.ok) {

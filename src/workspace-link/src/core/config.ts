@@ -12,6 +12,8 @@ export interface LinkdConfig {
   team: string;
   manifestPath: string;
   trustMode: TrustMode;
+  /** Workload role for enrollment (plan 10); linkd is a standalone child workspace by default. */
+  role: "gateway" | "child";
   transport: "signalr" | "http-poll";
   statePath: string;
   mode: "echo" | "stub";
@@ -39,6 +41,7 @@ export function parseArgv(
       team: { type: "string" },
       manifest: { type: "string" },
       "trust-mode": { type: "string", default: "isolated-executor" },
+      role: { type: "string", default: "child" },
       transport: { type: "string", default: "signalr" },
       state: { type: "string" },
       mode: { type: "string", default: "echo" },
@@ -67,6 +70,8 @@ export function parseArgv(
   }
   const mode = values.mode as LinkdConfig["mode"];
   if (!["echo", "stub"].includes(mode)) throw new ConfigError(`unknown --mode '${mode}'`);
+  const role = values.role as LinkdConfig["role"];
+  if (!["gateway", "child"].includes(role)) throw new ConfigError(`unknown --role '${role}'`);
   return {
     url,
     ...(values.token !== undefined ? { token: values.token } : {}),
@@ -75,6 +80,7 @@ export function parseArgv(
     team: values.team ?? missing("team"),
     manifestPath: values.manifest ?? missing("manifest"),
     trustMode,
+    role,
     transport,
     statePath: values.state ?? "ofac-linkd.sqlite3",
     mode,

@@ -60,6 +60,16 @@ export interface GatewayConfig {
   gatewayId: string;
   /** ownerTeam; the kernel answers 403 team-mismatch on a wrong slug. */
   team: string;
+  /** Workload role sent at enrollment (plan 10); a `gw.` endpoint must be gateway (kernel 403 role-mismatch). */
+  role?: "gateway" | "child" | undefined;
+  /** Present ⇒ mode-(b) enrollment: mint an OIDC client-credentials JWT instead of using the enrollment secret. */
+  workload?:
+    | {
+        tokenUrl: string;
+        clientId: string;
+        clientSecret: string;
+      }
+    | undefined;
   facilitatorUrl: string;
   /** Present ⇒ the Gateway enrolls itself and rotates on 401. */
   enrollmentSecret?: string | undefined;
@@ -115,6 +125,8 @@ const TOP_LEVEL_KEYS: Record<string, true> = {
   apiVersion: true,
   kind: true,
   gatewayId: true,
+  role: true,
+  workload: true,
   team: true,
   facilitatorUrl: true,
   enrollmentSecret: true,
@@ -331,6 +343,46 @@ export function parseConfig(yamlText: string, options: ParseConfigOptions = {}):
     fail("trustMode", `must be one of ${TRUST_MODES.join(", ")}`);
   }
 
+  // Workload role (plan 10): gateway|child; absent ⇒ the callsite defaults
+  // to gateway (the gw. prefix law makes child meaningless here anyway).
+  let role: "gateway" | "child" | undefined;
+  if (root["role"] !== undefined) {
+    const rawRole = requireString(root, "role");
+    if (rawRole !== "gateway" && rawRole !== "child") {
+      fail("role", "must be 'gateway' or 'child'");
+    }
+    role = rawRole;
+  }
+
+  // Mode-(b) workload block: env overlay wins per-key, same law as
+  // OFAC_ENROLL_SECRET (secrets never weaker in env than on disk).
+  let workload: GatewayConfig["workload"];
+  if (root["workload"] !== undefined) {
+    const doc = asRecord(root["workload"], "workload");
+    rejectUnknown(doc, { tokenUrl: true, clientId: true, clientSecret: true }, "workload");
+    workload = {
+      tokenUrl: env["OFAC_OIDC_TOKEN_URL"] ?? requireString(doc, "tokenUrl", "workload.tokenUrl"),
+      clientId: env["OFAC_OIDC_CLIENT_ID"] ?? requireString(doc, "clientId", "workload.clientId"),
+      clientSecret:
+        env["OFAC_OIDC_CLIENT_SECRET"] ??
+        requireString(doc, "clientSecret", "workload.clientSecret"),
+    };
+  } else if (
+    env["OFAC_OIDC_TOKEN_URL"] !== undefined ||
+    env["OFAC_OIDC_CLIENT_ID"] !== undefined ||
+    env["OFAC_OIDC_CLIENT_SECRET"] !== undefined
+  ) {
+    // Env-only mode-(b): the deployment supplies the whole triple.
+    for (const key of ["OFAC_OIDC_TOKEN_URL", "OFAC_OIDC_CLIENT_ID", "OFAC_OIDC_CLIENT_SECRET"]) {
+      if (env[key] === undefined) fail("workload", `${key} set without the full OIDC triple`);
+    }
+    workload = {
+      tokenUrl: env["OFAC_OIDC_TOKEN_URL"] as string,
+      clientId: env["OFAC_OIDC_CLIENT_ID"] as string,
+      clientSecret: env["OFAC_OIDC_CLIENT_SECRET"] as string,
+    };
+  }
+
   const stateDir = resolve(requireString(root, "stateDir"));
 
   // Deployment mode: absent ⇒ "embedded" — the v1 back-compat law (05 sample
@@ -413,7 +465,7 @@ export function parseConfig(yamlText: string, options: ParseConfigOptions = {}):
   const childSecret = env["OFAC_CHILD_SECRET"];
   const hasStoredToken =
     options.hasStoredToken ?? ((dir: string) => existsSync(tokenFilePath(dir)));
-  if (linkToken === undefined && enrollmentSecret === undefined && !hasStoredToken(stateDir)) {
+  if (linkToken === undefined && enrollmentSecret === undefined && workload === undefined && !hasStoredToken(stateDir)) {
     fail(
       "enrollmentSecret",
       `neither linkToken/OFAC_LINK_TOKEN nor enrollmentSecret/OFAC_ENROLL_SECRET is set and no token file exists in '${stateDir}'`,
@@ -424,6 +476,8 @@ export function parseConfig(yamlText: string, options: ParseConfigOptions = {}):
     apiVersion: GATEWAY_API_VERSION,
     kind: "Gateway",
     gatewayId,
+    ...(role !== undefined ? { role } : {}),
+    ...(workload !== undefined ? { workload } : {}),
     team,
     facilitatorUrl,
     ...(enrollmentSecret !== undefined ? { enrollmentSecret } : {}),

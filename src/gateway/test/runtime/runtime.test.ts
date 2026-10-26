@@ -97,15 +97,25 @@ interface FakeKernel {
   calls: string[];
   fetchImpl: typeof fetch;
   capabilitiesBody: () => string;
+  enrollBody: () => string;
 }
 
 function fakeKernel(): FakeKernel {
   const calls: string[] = [];
   let capabilitiesBody = "";
+  let enrollBody = "";
   const fetchImpl = (async (url: unknown, init?: RequestInit) => {
     const path = String(url);
+    if (path.endsWith("/token")) {
+      calls.push("token");
+      return new Response(JSON.stringify({ access_token: "cc-jwt", expires_in: 300 }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }
     if (path.endsWith("/api/link/v1/enroll")) {
       calls.push("enroll");
+      enrollBody = String(init?.body ?? "");
       return new Response(
         JSON.stringify({
           enrollmentId: "enr-1",
@@ -122,7 +132,7 @@ function fakeKernel(): FakeKernel {
     }
     return new Response("no route", { status: 500 });
   }) as typeof fetch;
-  return { calls, fetchImpl, capabilitiesBody: () => capabilitiesBody };
+  return { calls, fetchImpl, capabilitiesBody: () => capabilitiesBody, enrollBody: () => enrollBody };
 }
 
 function config(): GatewayConfig {
@@ -200,9 +210,10 @@ async function booted(
     paths?: GatewayPaths;
     handlerFactory?: () => LinkHandler;
     policy?: PolicyEvaluator;
+    configYaml?: string;
   } = {},
 ): Promise<Booted> {
-  const cfg = config();
+  const cfg = options.configYaml !== undefined ? parseConfig(options.configYaml, { env: {} }) : config();
   const mock = new MockTransport();
   const server = fakeKernel();
   const logger = createMemoryLogger();
@@ -256,6 +267,42 @@ describe("GatewayRuntime startup", () => {
       state: "ready",
     });
     expect(paths.execution.all()).toHaveLength(0);
+  });
+
+  it("workload block: mode-(b) boot mints a CC JWT and sends it as the enroll credential", async () => {
+    const { server } = await booted({
+      configYaml: `
+apiVersion: facilitator.framework/v1
+kind: Gateway
+gatewayId: gw.unit-test
+team: team-alpha
+facilitatorUrl: http://kernel.test
+workload:
+  tokenUrl: http://kernel.test/token
+  clientId: gw-unit
+  clientSecret: cc
+trustMode: shared-runtime
+stateDir: ${mkdtempSync(join(tmpdir(), "gw-modeb-"))}
+child:
+  name: echo
+  mode: echo
+heartbeatSeconds: 3600
+`,
+    });
+    expect(server.calls.slice(0, 2)).toEqual(["token", "enroll"]);
+    const body = JSON.parse(server.enrollBody()) as Record<string, unknown>;
+    expect(body).toMatchObject({
+      token: "cc-jwt",
+      endpointId: "gw.unit-test",
+      role: "gateway",
+      team: "team-alpha",
+    });
+  });
+
+  it("mode-(a) enroll body carries role + team", async () => {
+    const { server } = await booted();
+    const body = JSON.parse(server.enrollBody()) as Record<string, unknown>;
+    expect(body).toMatchObject({ token: "enroll-dev", role: "gateway", team: "default" });
   });
 });
 

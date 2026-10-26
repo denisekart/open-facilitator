@@ -17,8 +17,17 @@
     },
     "team": {
       "type": "string",
-      "default": "default",
-      "description": "Team slug the endpoint enrolls into (must match the manifest ownerTeam)."
+      "default": "team-alpha",
+      "description": "Kernel team roster slug (config Link:Teams) the enrollment binds to; the kernel answers 403 team-unknown for an unroled slug (must match the manifest ownerTeam)."
+    },
+    "role": {
+      "type": "string",
+      "enum": [
+        "child",
+        "gateway"
+      ],
+      "default": "child",
+      "description": "Workload role sent at enrollment; a gw.-prefixed endpointId must be gateway (kernel 403 role-mismatch)."
     },
     "manifest": {
       "type": "string",

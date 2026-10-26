@@ -3,7 +3,7 @@
 # tarball, put ofac-linkd on PATH, drop the supervisor + this Feature's unit.
 # Idempotent: a second run with the same VERSION stamp is a no-op.
 # Options arrive as uppercase env per the Features spec: FACILITATORURL,
-# ENDPOINTID, TEAM, MANIFEST, MODE.
+# ENDPOINTID, TEAM, ROLE, MANIFEST, MODE.
 set -euo pipefail
 
 FEATURE_DIR=$(cd -- "$(dirname -- "$0")" && pwd)
@@ -44,7 +44,8 @@ cat > "$SHARE/units/20-linkd.sh" <<EOF
 # OFAC_ENROLL_SECRET / OFAC_LINK_TOKEN are the credential surface, OFAC_LINKD_LOG=debug the log level).
 URL=\${OFAC_LINKD_URL:-${FACILITATORURL:-http://localhost:8088}}
 ENDPOINT=\${OFAC_LINKD_ENDPOINT:-${ENDPOINTID:-ws.dev}}
-TEAM=\${OFAC_LINKD_TEAM:-${TEAM:-default}}
+TEAM=\${OFAC_LINKD_TEAM:-${TEAM:-team-alpha}}
+ROLE=\${OFAC_LINKD_ROLE:-${ROLE:-child}}
 MANIFEST=\${OFAC_LINKD_MANIFEST:-${MANIFEST:-.facilitator/capabilities.json}}
 MODE=\${OFAC_LINKD_MODE:-${MODE:-echo}}
 STATE=\${OFAC_LINKD_STATE:-.ofac-linkd.sqlite3}
@@ -55,7 +56,7 @@ STATE=\${OFAC_LINKD_STATE:-.ofac-linkd.sqlite3}
 restarts=0
 max=\${OFAC_SUPERVISOR_MAX_RESTARTS:-10}
 while true; do
-  ofac-linkd run --url "\$URL" --endpoint "\$ENDPOINT" --team "\$TEAM" \\
+  ofac-linkd run --url "\$URL" --endpoint "\$ENDPOINT" --team "\$TEAM" --role "\$ROLE" \\
     --manifest "\$MANIFEST" --mode "\$MODE" --state "\$STATE" &
   child=\$!
   trap 'kill -TERM "\$child" 2>/dev/null; exit 0' TERM INT

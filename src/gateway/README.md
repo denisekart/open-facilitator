@@ -14,9 +14,14 @@ Gateway is the multiplexer seam: per-child routing, quota, union manifests.
 apiVersion: facilitator.framework/v1
 kind: Gateway
 gatewayId: gw.team-a          # ^gw\.[a-z0-9]([a-z0-9-]*[a-z0-9])?$
-team: default                 # must equal the kernel's enrollment team slug
+team: team-alpha              # kernel roster slug (config Link:Teams); 403 team-unknown otherwise
 facilitatorUrl: http://localhost:8080
 enrollmentSecret: enroll-dev  # or OFAC_ENROLL_SECRET (env wins); optional once <stateDir>/token exists
+role: gateway                 # sent at enrollment (default gateway; gw.* endpoints MUST be gateway)
+# workload:                     # mode-(b) enrollment: OIDC client-credentials instead of the secret
+#   tokenUrl: https://idp/realms/facilitator/protocol/openid-connect/token
+#   clientId: gw-team-a           # kernel must pre-register this client's issuer|subject
+#   clientSecret: s3cret        # OFAC_OIDC_TOKEN_URL/CLIENT_ID/CLIENT_SECRET env wins per-key
 trustMode: shared-runtime
 stateDir: ./gw-state          # link.sqlite3 + gateway.sqlite3 + token, mode 0700
 mode: embedded                # embedded | shared | standalone (default: embedded)

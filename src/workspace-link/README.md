@@ -18,14 +18,15 @@ ledger) + the `ofac-linkd` headless supervisor.
 
 ```bash
 # 1. enroll (bootstrap secret, NOT a bearer token) — prints the minted token
+# --team is a kernel roster slug (config Link:Teams); --role defaults to child.
 node dist/bin/linkd.js run \
   --url http://localhost:8080 --secret enroll-dev \
-  --endpoint worker-1 --team default --manifest manifest.json
+  --endpoint worker-1 --team team-alpha --manifest manifest.json
 
 # 2. restart with the minted token (no re-enroll)
 OFAC_LINK_TOKEN=... node dist/bin/linkd.js run \
   --url http://localhost:8080 --token "$OFAC_LINK_TOKEN" \
-  --endpoint worker-1 --team default --manifest manifest.json \
+  --endpoint worker-1 --team team-alpha --manifest manifest.json \
   --state ./linkd.sqlite --mode stub --transport http-poll
 ```
 

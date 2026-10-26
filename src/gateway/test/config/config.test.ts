@@ -115,6 +115,66 @@ describe("parseConfig validation failures name the bad key", () => {
   it("malformed YAML is a config error", () => expectKey("apiVersion: [unclosed", "yaml"));
 });
 
+const WORKLOAD = `
+workload:
+  tokenUrl: http://localhost:8081/realms/facilitator/protocol/openid-connect/token
+  clientId: gw-team-a
+  clientSecret: cc-secret
+`;
+
+describe("parseConfig plan-10 identity keys", () => {
+  it("parses role and the workload block", () => {
+    const config = parseConfig(`${BASE}${WORKLOAD}`, { hasStoredToken: () => false });
+    expect(config.workload).toEqual({
+      tokenUrl: "http://localhost:8081/realms/facilitator/protocol/openid-connect/token",
+      clientId: "gw-team-a",
+      clientSecret: "cc-secret",
+    });
+    expect(config.role).toBeUndefined();
+  });
+
+  it("accepts role: gateway and rejects a role off the enum", () => {
+    expect(parseConfig(`${BASE}role: gateway\n`, { hasStoredToken: () => false }).role).toBe("gateway");
+    expectKey(`${BASE}role: operator\n`, "role");
+  });
+
+  it("workload alone satisfies the first-boot credential check", () => {
+    const yaml = BASE.replace("enrollmentSecret: enroll-dev\n", "") + WORKLOAD;
+    const config = parseConfig(yaml);
+    expect(config.workload?.clientId).toBe("gw-team-a");
+    expect(config.enrollmentSecret).toBeUndefined();
+  });
+
+  it("OFAC_OIDC_* env overlay wins per-key and completes a file block", () => {
+    const config = parseConfig(`${BASE}${WORKLOAD}`, {
+      env: { OFAC_OIDC_CLIENT_SECRET: "from-env" },
+      hasStoredToken: () => false,
+    });
+    expect(config.workload?.clientSecret).toBe("from-env");
+    expect(config.workload?.clientId).toBe("gw-team-a");
+  });
+
+  it("env-only workload needs the full triple", () => {
+    const yaml = BASE.replace("enrollmentSecret: enroll-dev\n", "");
+    expectKey(yaml, "workload", {
+      OFAC_OIDC_TOKEN_URL: "http://idp/token",
+      OFAC_OIDC_CLIENT_ID: "gw-team-a",
+    });
+    const config = parseConfig(yaml, {
+      env: {
+        OFAC_OIDC_TOKEN_URL: "http://idp/token",
+        OFAC_OIDC_CLIENT_ID: "gw-team-a",
+        OFAC_OIDC_CLIENT_SECRET: "s",
+      },
+    });
+    expect(config.workload?.tokenUrl).toBe("http://idp/token");
+  });
+
+  it("rejects unknown workload keys", () => {
+    expectKey(`${BASE}${WORKLOAD}  scope: offline_access\n`, "unknown key 'scope'");
+  });
+});
+
 const SHARED = `
 apiVersion: facilitator.framework/v1
 kind: Gateway

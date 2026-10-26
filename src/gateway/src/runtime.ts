@@ -38,6 +38,7 @@ import {
   createConsoleLogger,
   createLinkClient,
   enroll,
+  oidcClientCredentialsTokenProvider,
   type CommandOutcome,
   type LinkClient,
   type LinkHandler,
@@ -508,15 +509,24 @@ export class GatewayRuntime {
     const { config, deps, logger } = this;
     const secret = config.enrollmentSecret;
     const activeToken = { value: config.linkToken ?? readStoredToken(config.stateDir) ?? "" };
+    const workload =
+      config.workload === undefined
+        ? undefined
+        : oidcClientCredentialsTokenProvider(config.workload, deps.fetchImpl ?? fetch);
     const refresh = async (): Promise<void> => {
-      if (secret === undefined) return; // static mount: nothing to rotate
+      // Mode (b): a fresh OIDC CC JWT per enroll; mode (a): the shared
+      // enrollment secret. Neither ⇒ static mount, nothing to rotate.
+      const credential = workload !== undefined ? await workload.getToken() : secret;
+      if (credential === undefined) return;
       const response = await enroll(
         {
           baseUrl: config.facilitatorUrl,
-          token: secret,
+          token: credential,
           endpointId: config.gatewayId,
           instanceId: `gw-${randomBytes(8).toString("hex")}`,
           trustMode: config.trustMode,
+          role: config.role ?? "gateway",
+          team: config.team,
         },
         deps.fetchImpl ?? fetch,
       );
@@ -527,7 +537,7 @@ export class GatewayRuntime {
       activeToken.value = response.linkToken;
     };
     if (config.linkToken === undefined) {
-      if (secret === undefined) {
+      if (secret === undefined && workload === undefined) {
         if (activeToken.value === "") {
           throw new EnrollmentError(401, { detail: "no token available at first boot" });
         }

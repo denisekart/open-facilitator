@@ -22,6 +22,10 @@ export {
   ENROLL_RESPONSE_SCHEMA_ID,
   type EnrollOptions,
 } from "./core/enroll.js";
+export {
+  oidcClientCredentialsTokenProvider,
+  type OidcClientCredentialsOptions,
+} from "./core/oidc-token-provider.js";
 export { buildEvent, dataschemaFor, SCHEMA_BASE, type BuildEventOptions } from "./core/envelope.js";
 export { FaultInjector, type FaultPolicy } from "./core/fault-injector.js";
 export { createEchoHandler, createStubHandler, type EchoHandlerOptions } from "./core/handlers.js";

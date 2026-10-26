@@ -41,7 +41,8 @@ public sealed class LinkIngress(
     IngressStore inbox,
     ICoordinationStore store,
     KernelMetrics metrics,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    Facilitator.Kernel.Work.ApprovalIngress approvals)
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
@@ -67,6 +68,38 @@ public sealed class LinkIngress(
 
         if (!screen.IsCommand)
         {
+            if (screen.Type is "org.facilitator.event.approval.required.v1" or "org.facilitator.event.approval.revoked.v1")
+            {
+                var arm = await approvals.HandleEventAsync(root, screen.Type, ct);
+                if (arm.Refused)
+                {
+                    await inbox.MarkProcessedAsync(inboxId, arm.Status, ct);
+                    return new LinkAdmission(arm.Problem, null, null);
+                }
+
+                metrics.InboxProcessed();
+                return new LinkAdmission(null, "accepted", inboxId);
+            }
+
+            metrics.InboxProcessed();
+            return new LinkAdmission(null, "accepted", inboxId);
+        }
+
+        if (screen.Type == "org.facilitator.command.approval.respond.v1")
+        {
+            // The gate already evaluated the evidence + audited
+            // authorization.evaluated:link; the ledger requires a delegated
+            // human identity (law D4) — workload-only denies 403.
+            var delegated = screen.Principal?.Delegated;
+            var arm = await approvals.HandleRespondAsync(
+                root, delegated?.Subject, delegated?.Groups, null, mintEvidence: false, ct);
+            if (arm.Refused)
+            {
+                await inbox.MarkProcessedAsync(inboxId, arm.Status, ct);
+                return new LinkAdmission(arm.Problem, null, null);
+            }
+
+            await inbox.MarkProcessedAsync(inboxId, null, ct);
             metrics.InboxProcessed();
             return new LinkAdmission(null, "accepted", inboxId);
         }

@@ -21,7 +21,8 @@ public sealed class CloudEventIngress(
     IngressPipeline pipeline,
     EnvelopeValidator validator,
     KernelMetrics metrics,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    ApprovalIngress approvals)
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
@@ -81,6 +82,19 @@ public sealed class CloudEventIngress(
 
         if (!isCommand)
         {
+            if (type is "org.facilitator.event.approval.required.v1" or "org.facilitator.event.approval.revoked.v1")
+            {
+                var arm = await approvals.HandleEventAsync(root, type, ct);
+                if (arm.Refused)
+                {
+                    return await pipeline.SettleAsync(
+                        inboxId, arm.Status, ct, () => IngressPipeline.Problem(arm.Problem!));
+                }
+
+                metrics.InboxProcessed();
+                return Results.Accepted(null, new { status = arm.Status, approvalId = arm.ApprovalId, inboxId });
+            }
+
             metrics.InboxProcessed();
             return Results.Accepted(null, new { status = "accepted", inboxId });
         }
@@ -98,6 +112,23 @@ public sealed class CloudEventIngress(
                 work => Results.Ok(new { status = "accepted", inboxId, work = WorkDtoMapper.ToDto(work) }),
                 () => Results.Ok(new { status = "duplicate", inboxId }),
                 ct);
+        }
+
+        if (type == "org.facilitator.command.approval.respond.v1")
+        {
+            // No AdmissionGate on this surface: the human identity rides the
+            // command's actorEvidenceRef, evaluated inline (law D4).
+            var (actor, groups) = await approvals.ResolveWireActorAsync(root, ct);
+            var arm = await approvals.HandleRespondAsync(root, actor, groups, null, mintEvidence: false, ct);
+            if (arm.Refused)
+            {
+                return await pipeline.SettleAsync(
+                    inboxId, arm.Status, ct, () => IngressPipeline.Problem(arm.Problem!));
+            }
+
+            return await pipeline.SettleAsync(
+                inboxId, null, ct,
+                () => Results.Ok(new { status = arm.Status, approvalId = arm.ApprovalId, inboxId }));
         }
 
         // Known command with no Plan 02 business effect: processed + a

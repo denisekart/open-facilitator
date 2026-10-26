@@ -32,6 +32,7 @@ app.UseAuthorization();
 app.UseMiddleware<IngressRoleGateMiddleware>();
 app.UseRateLimiter();
 app.MapWorkApi(app.Environment);
+app.MapApprovalsApi();
 app.MapLinkApi(app.Environment);
 app.MapIdentityApi();
 

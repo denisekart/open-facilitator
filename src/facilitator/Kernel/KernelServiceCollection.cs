@@ -88,6 +88,7 @@ public static class KernelServiceCollection
         builder.Services.AddSingleton<IngressPipeline>();
         builder.Services.AddScoped<IngressProcessor>();
         builder.Services.AddScoped<CloudEventIngress>();
+        builder.Services.AddScoped<ApprovalIngress>();
         return builder;
     }
 

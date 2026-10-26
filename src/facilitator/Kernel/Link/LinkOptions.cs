@@ -22,6 +22,15 @@ public sealed class LinkOptions
     /// <summary>Protocol versions this server supports (handshake intersection).</summary>
     public static IReadOnlyList<string> SupportedProtocolVersions { get; } = ["v1"];
 
+    /// <summary>Team roster slugs (Link:Teams) seeded into facilitator.teams at startup.</summary>
+    public required IReadOnlyList<string> Teams { get; init; }
+
+    /// <summary>Mode-(b) workload pre-registrations (Link:WorkloadIdentities).</summary>
+    public required IReadOnlyList<WorkloadIdentityBinding> WorkloadIdentities { get; init; }
+
+    /// <summary>Required audience of oidc: evidence JWTs (Link:Evidence:Audience).</summary>
+    public required string EvidenceAudience { get; init; }
+
     /// <summary>Read + validate the <c>Link:*</c> keys.</summary>
     public static LinkOptions FromConfiguration(IConfiguration configuration)
     {
@@ -43,6 +52,28 @@ public sealed class LinkOptions
             MaxInFlight = maxInFlight,
             HeartbeatSeconds = heartbeat,
             InFlightLeaseSeconds = configuration.GetValue("Link:InFlightLeaseSeconds", 120),
+            Teams = configuration.GetSection("Link:Teams").Get<string[]>() ?? [],
+            WorkloadIdentities = configuration.GetSection("Link:WorkloadIdentities").Get<WorkloadIdentityBinding[]>() ?? [],
+            EvidenceAudience = configuration.GetValue("Link:Evidence:Audience", "facilitator-link"),
         };
     }
+}
+
+/// <summary>Link:WorkloadIdentities element — one mode-(b) enrollment pre-registration.</summary>
+public sealed class WorkloadIdentityBinding
+{
+    /// <summary>OIDC client id (the token's azp) allowed to enroll.</summary>
+    public required string ClientId { get; init; }
+
+    /// <summary>Logical endpoint this client may bind.</summary>
+    public required string EndpointId { get; init; }
+
+    /// <summary>Team slug the enrollment binds to.</summary>
+    public required string Team { get; init; }
+
+    /// <summary>gateway | child, fixed by the binding.</summary>
+    public required string Role { get; init; }
+
+    /// <summary>Whether validated oidc: evidence may extend this endpoint's principal.</summary>
+    public bool AcceptsDelegatedClaims { get; init; }
 }

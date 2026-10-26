@@ -51,7 +51,9 @@ public sealed class LinkBearerHandler(
         [
             new Claim(ClaimTypes.Name, principal.EndpointId),
             new Claim(LinkHub.TeamClaim, principal.TeamId.ToString()),
+            new Claim(LinkHub.TeamSlugClaim, principal.TeamSlug),
             new Claim(LinkHub.TrustModeClaim, principal.TrustMode),
+            new Claim(LinkHub.RoleClaim, principal.Role),
         ], SchemeName);
         return AuthenticateResult.Success(new AuthenticationTicket(new ClaimsPrincipal(identity), SchemeName));
     }

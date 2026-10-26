@@ -40,6 +40,12 @@ public sealed class LinkHub(
     /// <summary>Claim type carrying the declared trust mode.</summary>
     public const string TrustModeClaim = "facilitator.trust_mode";
 
+    /// <summary>Claim type carrying the enrollment-bound workload role.</summary>
+    public const string RoleClaim = "facilitator.role";
+
+    /// <summary>Claim type carrying the team slug (minted by the enrollment-time validator join).</summary>
+    public const string TeamSlugClaim = "facilitator.team_slug";
+
     /// <summary>
     /// Handshake (spec §5.3): validate the hello frame, intersect
     /// protocolVersions with the server's <c>["v1"]</c> — empty intersection
@@ -207,6 +213,8 @@ public sealed class LinkHub(
         var endpointId = user.FindFirstValue(ClaimTypes.Name) ?? throw new HubException("missing endpoint identity");
         var team = Guid.Parse(user.FindFirstValue(TeamClaim) ?? throw new HubException("missing team claim"));
         var trustMode = user.FindFirstValue(TrustModeClaim) ?? throw new HubException("missing trust mode claim");
-        return new LinkPrincipal(endpointId, team, trustMode);
+        var role = user.FindFirstValue(RoleClaim) ?? throw new HubException("missing role claim");
+        return new LinkPrincipal(endpointId, team,
+            user.FindFirstValue(TeamSlugClaim) ?? throw new HubException("missing team slug claim"), trustMode, role);
     }
 }

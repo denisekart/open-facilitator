@@ -3,8 +3,10 @@ namespace Facilitator.Kernel.Shared.Auth;
 /// <summary>Authenticated Workspace Link principal.</summary>
 /// <param name="EndpointId">Logical endpoint identity (stable across reconnects).</param>
 /// <param name="TeamId">Owning team.</param>
+/// <param name="TeamSlug">Team slug (audit/manifest checks read it; no second query).</param>
 /// <param name="TrustMode">Declared trust mode (immutable for the session, appendix §4).</param>
-public sealed record LinkPrincipal(string EndpointId, Guid TeamId, string TrustMode);
+/// <param name="Role">gateway | child, bound at enrollment (Plan 10).</param>
+public sealed record LinkPrincipal(string EndpointId, Guid TeamId, string TeamSlug, string TrustMode, string Role);
 
 /// <summary>
 /// The link-authentication seam (clean-cutover point for OIDC): validates

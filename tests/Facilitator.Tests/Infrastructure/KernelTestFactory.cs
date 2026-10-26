@@ -85,6 +85,9 @@ public sealed class KernelTestFactory : WebApplicationFactory<Program>
         builder.UseSetting("Identity:Oidc:Authority", KeycloakFixture.Issuer);
         builder.UseSetting("Identity:Oidc:Audience", "facilitator-api");
         builder.UseSetting("Identity:Oidc:RequireHttps", "false");
+        builder.UseSetting("Link:Teams:0", "team-alpha");
+        builder.UseSetting("Link:Teams:1", "team-beta");
+        builder.UseSetting("Link:Evidence:Audience", "facilitator-link");
         if (_settings is not null)
         {
             foreach (var (key, value) in _settings)

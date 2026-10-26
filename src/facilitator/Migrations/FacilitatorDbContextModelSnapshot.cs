@@ -260,6 +260,39 @@ namespace Facilitator.Migrations
                     b.ToTable("dead_letters", "facilitator");
                 });
 
+            modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.EvidenceEntity", b =>
+                {
+                    b.Property<string>("EvidenceId")
+                        .HasColumnType("text")
+                        .HasColumnName("evidence_id");
+
+                    b.Property<string>("Claims")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("claims");
+
+                    b.Property<DateTime?>("ConsumedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("consumed_at");
+
+                    b.Property<DateTime?>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<DateTime>("IssuedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("issued_at");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("subject");
+
+                    b.HasKey("EvidenceId");
+
+                    b.ToTable("evidence", "facilitator");
+                });
+
             modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.ExecutionAttemptEntity", b =>
                 {
                     b.Property<Guid>("ExecutionId")
@@ -480,6 +513,10 @@ namespace Facilitator.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("enrollment_id");
 
+                    b.Property<bool>("AcceptsDelegatedClaims")
+                        .HasColumnType("boolean")
+                        .HasColumnName("accepts_delegated_claims");
+
                     b.Property<string>("CapabilitiesDigest")
                         .HasColumnType("text")
                         .HasColumnName("capabilities_digest");
@@ -505,6 +542,11 @@ namespace Facilitator.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("revoked_at");
 
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("role");
+
                     b.Property<Guid>("TeamId")
                         .HasColumnType("uuid")
                         .HasColumnName("team_id");
@@ -519,6 +561,14 @@ namespace Facilitator.Migrations
                         .HasColumnType("text")
                         .HasColumnName("trust_mode");
 
+                    b.Property<string>("WorkloadIssuer")
+                        .HasColumnType("text")
+                        .HasColumnName("workload_issuer");
+
+                    b.Property<string>("WorkloadSubject")
+                        .HasColumnType("text")
+                        .HasColumnName("workload_subject");
+
                     b.HasKey("EnrollmentId");
 
                     b.HasIndex("EndpointId")
@@ -529,6 +579,8 @@ namespace Facilitator.Migrations
 
                     b.ToTable("link_enrollments", "facilitator", t =>
                         {
+                            t.HasCheckConstraint("link_enrollments_role_check", "role IN ('gateway', 'child')");
+
                             t.HasCheckConstraint("link_enrollments_trust_mode_check", "trust_mode IN ('shared-runtime', 'separate-process-same-host', 'isolated-executor')");
                         });
                 });

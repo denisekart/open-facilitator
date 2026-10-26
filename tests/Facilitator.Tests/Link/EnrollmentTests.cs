@@ -6,7 +6,7 @@ namespace Facilitator.Tests.Link;
 /// §26.1 item 2 (enrollment half) + appendix §4: enrollment mints a per-endpoint
 /// link token, wrong bootstrap secret is 401 <c>enrollment-secret-invalid</c>,
 /// re-enrollment rotates the token (the old one stops validating immediately),
-/// trustMode is carried, and a first team is seeded on demand with slug "default".
+/// trustMode is carried, and the enrollment binds to the config-seeded team roster.
 /// </summary>
 [Collection("postgres:dispatch-link")]
 public sealed class EnrollmentTests(PostgresFixture fixture)
@@ -44,8 +44,8 @@ public sealed class EnrollmentTests(PostgresFixture fixture)
         var body = await probe.Content.ReadAsStringAsync();
         Assert.Contains("capabilities-not-found", body);
 
-        // Plan 11 replaces this seeding; the FK binds to the on-demand default team.
-        Assert.True(await fixture.Db.TeamExists("default"));
+        // The FK binds to the roster-seeded team (Link:Teams config, no on-demand default).
+        Assert.True(await fixture.Db.TeamExists("team-alpha"));
     }
 
     [Fact]

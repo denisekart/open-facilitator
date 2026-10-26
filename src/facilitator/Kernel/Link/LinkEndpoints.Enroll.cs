@@ -43,17 +43,20 @@ public static partial class LinkEndpoints
             }
 
             EnrollmentResult? result;
+            async Task<EnrollmentResult?> Enroll() => await store.EnrollAsync(
+                dto.EndpointId, dto.InstanceId, dto.TrustMode, dto.Token,
+                teamSlug: "team-alpha", role: "gateway", acceptsDelegatedClaims: false, workload: null, ct);
             try
             {
                 try
                 {
-                    result = await store.EnrollAsync(dto.EndpointId, dto.InstanceId, dto.TrustMode, dto.Token, ct);
+                    result = await Enroll();
                 }
                 catch (Microsoft.EntityFrameworkCore.DbUpdateException)
                 {
                     // Concurrent first-enroll for the same endpoint: the unique
                     // endpoint_id index lost the race; the retry hits the UPDATE arm.
-                    result = await store.EnrollAsync(dto.EndpointId, dto.InstanceId, dto.TrustMode, dto.Token, ct);
+                    result = await Enroll();
                 }
             }
             catch (ArgumentException ex)

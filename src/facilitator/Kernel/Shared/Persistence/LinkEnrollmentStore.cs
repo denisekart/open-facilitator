@@ -16,9 +16,13 @@ namespace Facilitator.Kernel.Shared.Persistence;
 /// <param name="EndpointId">Logical endpoint.</param>
 /// <param name="TeamId">Bound team.</param>
 /// <param name="TrustMode">Declared trust mode.</param>
-/// <param name="LinkToken">Freshly minted opaque bearer token.</param>
+/// <param name="LinkToken">Freshly minted opaque bearer token (empty on a role-mismatch signal).</param>
 /// <param name="ExpiresAt">Token expiry (UTC).</param>
-public sealed record EnrollmentResult(Guid EnrollmentId, string EndpointId, Guid TeamId, string TrustMode, string LinkToken, DateTime ExpiresAt);
+public sealed record EnrollmentResult(Guid EnrollmentId, string EndpointId, Guid TeamId, string TrustMode, string LinkToken, DateTime ExpiresAt)
+{
+    /// <summary>True when a rotation tried to change the endpoint's immutable role (caller answers 403).</summary>
+    public bool RoleMismatch { get; init; }
+}
 
 /// <summary>
 /// Enrollment + link-token store (appendix §4): validates the bootstrap
@@ -35,15 +39,30 @@ public sealed class LinkEnrollmentStore(
 {
     private static readonly string[] TrustModes = ["shared-runtime", "separate-process-same-host", "isolated-executor"];
 
+    /// <summary>Roles an enrollment may carry; a `gw.`-prefixed endpoint requires gateway.</summary>
+    public static readonly string[] Roles = ["gateway", "child"];
+
     /// <summary>
-    /// Enroll (or rotate): the request secret must match
-    /// <c>Link:EnrollmentToken</c>; the endpoint binds to the <c>default</c>
-    /// team, seeded on demand when the table is still empty.
+    /// Enroll (or rotate): mode (a) requires the request secret to match
+    /// <c>Link:EnrollmentToken</c>; the endpoint binds to a roster-present team
+    /// (seeded from <c>Link:Teams</c> — no on-demand default). Role/team are
+    /// immutable across rotation; a role change needs re-enrollment after revoke.
     /// </summary>
+    /// <param name="endpointId">Logical endpoint.</param>
+    /// <param name="instanceId">Process instance (audit only).</param>
+    /// <param name="trustMode">Declared trust mode.</param>
+    /// <param name="requestSecret">Mode-(a) bootstrap secret; ignored when <paramref name="workload"/> is set.</param>
+    /// <param name="teamSlug">Team the endpoint binds to (must exist in the roster).</param>
+    /// <param name="role">gateway | child (validated by the caller against <see cref="Roles"/>).</param>
+    /// <param name="acceptsDelegatedClaims">Delegation acceptance (mode (b) binding; false for mode (a)).</param>
+    /// <param name="workload">Mode-(b) workload identity (issuer+subject); null for mode (a).</param>
+    /// <param name="ct">Cancellation.</param>
     public async Task<EnrollmentResult?> EnrollAsync(
-        string endpointId, string instanceId, string trustMode, string? requestSecret, CancellationToken ct)
+        string endpointId, string instanceId, string trustMode, string? requestSecret,
+        string teamSlug, string role, bool acceptsDelegatedClaims,
+        (string Issuer, string Subject)? workload, CancellationToken ct)
     {
-        if (!secret.Matches(requestSecret))
+        if (workload is null && !secret.Matches(requestSecret))
         {
             return null;
         }
@@ -59,12 +78,11 @@ public sealed class LinkEnrollmentStore(
         var expiresAt = now.AddHours(options.TokenLifetimeHours);
         await using var db = await contextFactory.CreateDbContextAsync(ct);
 
-        // Plan 11: replace default-team seeding (proper team provisioning).
-        var team = await db.Teams.AsNoTracking().FirstOrDefaultAsync(t => t.Slug == "default", ct);
+        // No on-demand default team: the roster (Link:Teams, seeded at startup) is truth.
+        var team = await db.Teams.AsNoTracking().FirstOrDefaultAsync(t => t.Slug == teamSlug, ct);
         if (team is null)
         {
-            team = new TeamEntity { TeamId = Guid.NewGuid(), Slug = "default", CreatedAt = now };
-            db.Teams.Add(team);
+            return null;
         }
 
         var existing = await db.LinkEnrollments.FirstOrDefaultAsync(e => e.EndpointId == endpointId, ct);
@@ -79,23 +97,37 @@ public sealed class LinkEnrollmentStore(
                 TrustMode = trustMode,
                 EnrolledAt = now,
                 ExpiresAt = expiresAt,
+                Role = role,
+                AcceptsDelegatedClaims = acceptsDelegatedClaims,
+                WorkloadIssuer = workload?.Issuer,
+                WorkloadSubject = workload?.Subject,
             });
         }
         else
         {
+            if (!string.Equals(existing.Role, role, StringComparison.Ordinal))
+            {
+                // Rotation may not re-role: signal the mismatch, rotate nothing.
+                return new EnrollmentResult(existing.EnrollmentId, endpointId, existing.TeamId, trustMode, string.Empty, existing.ExpiresAt)
+                { RoleMismatch = true };
+            }
+
             existing.TokenSha256 = Sha256(token); // rotation: the old token stops validating immediately
             existing.TrustMode = trustMode;
             existing.RevokedAt = null;
             existing.EnrolledAt = now;
             existing.ExpiresAt = expiresAt;
+            existing.AcceptsDelegatedClaims = acceptsDelegatedClaims;
+            existing.WorkloadIssuer = workload?.Issuer;
+            existing.WorkloadSubject = workload?.Subject;
         }
 
         await db.SaveChangesAsync(ct);
 
         // appendix §4: trustMode MUST be logged at enrollment (and every Hello).
         logger.LogInformation(
-            "link endpoint enrolled endpoint={EndpointId} instance={InstanceId} trustMode={TrustMode} team={TeamId}",
-            endpointId, instanceId, trustMode, team.TeamId);
+            "link endpoint enrolled endpoint={EndpointId} instance={InstanceId} trustMode={TrustMode} team={TeamId} role={Role}",
+            endpointId, instanceId, trustMode, team.TeamId, role);
 
         return new EnrollmentResult(enrollmentId, endpointId, team.TeamId, trustMode, token, expiresAt);
     }
@@ -146,8 +178,8 @@ public sealed class LinkEnrollmentStore(
 
 /// <summary>
 /// Store-backed <see cref="ILinkTokenValidator"/>: SHA-256 the bearer token and
-/// look it up in <c>link_enrollments</c> (active + not expired + not revoked).
-/// Plan 07 replaces this with OIDC validation + <c>principal_mappings</c>.
+/// look it up in <c>link_enrollments</c> (active + not expired + not revoked),
+/// joining <c>teams</c> so the principal carries the team slug and role.
 /// </summary>
 public sealed class StoreLinkTokenValidator(
     IDbContextFactory<FacilitatorDbContext> contextFactory,
@@ -161,8 +193,11 @@ public sealed class StoreLinkTokenValidator(
         var now = timeProvider.GetUtcNow().UtcDateTime;
         var row = await db.LinkEnrollments.AsNoTracking()
             .Where(e => e.TokenSha256 == hash && e.RevokedAt == null && e.ExpiresAt > now)
-            .Select(e => new { e.EndpointId, e.TeamId, e.TrustMode })
+            .Join(db.Teams.AsNoTracking(), e => e.TeamId, t => t.TeamId,
+                (e, t) => new { e.EndpointId, e.TeamId, t.Slug, e.TrustMode, e.Role })
             .FirstOrDefaultAsync(ct);
-        return row is null ? null : new LinkPrincipal(row.EndpointId, row.TeamId, row.TrustMode);
+        return row is null
+            ? null
+            : new LinkPrincipal(row.EndpointId, row.TeamId, row.Slug, row.TrustMode, row.Role);
     }
 }

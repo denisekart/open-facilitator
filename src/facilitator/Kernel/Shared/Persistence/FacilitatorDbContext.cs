@@ -52,6 +52,8 @@ public class FacilitatorDbContext(DbContextOptions<FacilitatorDbContext> options
 
     public DbSet<IdentityRoleEntity> IdentityRoles => Set<IdentityRoleEntity>();
 
+    public DbSet<EvidenceEntity> Evidence => Set<EvidenceEntity>();
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder model)
     {

@@ -29,13 +29,13 @@ public sealed class HttpFallbackParityTests(PostgresFixture fixture)
 
         // capabilities works WITHOUT any handshake (locked: 204 on POST).
         using (var post = await link.PostAsync("/api/link/v1/capabilities",
-                   new StringContent(LinkTestHarness.Manifest("default"), Encoding.UTF8, "application/json")))
+                   new StringContent(LinkTestHarness.Manifest("team-alpha"), Encoding.UTF8, "application/json")))
         {
             Assert.Equal(HttpStatusCode.NoContent, post.StatusCode);
         }
 
         var stored = await KernelOps.GetJsonAsync(link, "/api/link/v1/capabilities", HttpStatusCode.OK);
-        Assert.Equal("default", stored.GetProperty("ownerTeam").GetString());
+        Assert.Equal("team-alpha", stored.GetProperty("ownerTeam").GetString());
 
         // ... but the delivery read demands a live link_sessions row (locked rule).
         using var probe = await link.GetAsync("/api/link/v1/deliveries?limit=1");

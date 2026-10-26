@@ -282,6 +282,18 @@ public sealed class LinkEnrollmentEntity
     public DateTime ExpiresAt { get; set; }
 
     public DateTime? RevokedAt { get; set; }
+
+    /// <summary>gateway | child — role bound at enrollment; rotation never re-roles (Plan 10).</summary>
+    public required string Role { get; set; }
+
+    /// <summary>True when this enrollment accepts oidc: delegated evidence claims (mode (b) bindings only).</summary>
+    public bool AcceptsDelegatedClaims { get; set; }
+
+    /// <summary>Mode (b): issuer of the workload token that enrolled this endpoint (null for mode (a)).</summary>
+    public string? WorkloadIssuer { get; set; }
+
+    /// <summary>Mode (b): subject (client id / service account) of the workload token.</summary>
+    public string? WorkloadSubject { get; set; }
 }
 
 /// <summary>facilitator.link_deliveries — Plan 03 durable delivery/receipt ledger (S:1336 delivery_receipts).</summary>
@@ -401,4 +413,24 @@ public sealed class IdentityRoleEntity
     public long RowVersion { get; set; }
 
     public DateTime UpdatedAt { get; set; }
+}
+
+/// <summary>facilitator.evidence — kernel-issued evidence references (Plan 10 validation, Plan 11 mint/consume).</summary>
+public sealed class EvidenceEntity
+{
+    /// <summary>The id after the <c>kernel:</c> scheme (PK).</summary>
+    public required string EvidenceId { get; set; }
+
+    /// <summary>Canonical subject the evidence was minted for.</summary>
+    public required string Subject { get; set; }
+
+    /// <summary>jsonb claim snapshot taken at mint time.</summary>
+    public required string Claims { get; set; }
+
+    public DateTime IssuedAt { get; set; }
+
+    public DateTime? ExpiresAt { get; set; }
+
+    /// <summary>Set once consumed (replay law: a second use fails validation).</summary>
+    public DateTime? ConsumedAt { get; set; }
 }

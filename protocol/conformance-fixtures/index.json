@@ -101,6 +101,12 @@
       "type": "org.facilitator.event.approval.required.v1"
     },
     {
+      "file": "valid/event.approval.required.with-action.json",
+      "expect": "valid",
+      "class": "event",
+      "type": "org.facilitator.event.approval.required.v1"
+    },
+    {
       "file": "valid/event.approval.revoked.json",
       "expect": "valid",
       "class": "event",
@@ -221,6 +227,18 @@
       "file": "invalid/event.bad-time.json",
       "expect": "invalid",
       "class": "event",
+      "errorClass": "schema-violation"
+    },
+    {
+      "file": "invalid/event.approval.required.bad-digest.json",
+      "expect": "invalid",
+      "class": "event",
+      "errorClass": "schema-violation"
+    },
+    {
+      "file": "invalid/command.approval.respond.bad-decision.json",
+      "expect": "invalid",
+      "class": "command",
       "errorClass": "schema-violation"
     },
     {

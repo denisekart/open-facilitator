@@ -46,7 +46,7 @@ All payload schemas live in `protocol/json-schema/`; `$id` = `https://schemas.op
 |`org.facilitator.event.workspace.heartbeat.v1`|event|`event.workspace.heartbeat.v1.json`|`workspaceId`, `status` (`idle|busy|draining|error`)|
 |`org.facilitator.event.artifact.available.v1`|event|`event.artifact.available.v1.json`|`artifactId`, `mediaType`, `size`, `digest`|
 |`org.facilitator.event.memory.candidate.v1`|event|`event.memory.candidate.v1.json`|`scope`, `contentSummary`, `provenance`|
-|`org.facilitator.event.approval.required.v1`|event|`event.approval.required.v1.json`|`approvalId`, `actionDigest`, `eligibleActors`, `nonce`, `expiresAt`, `createdAt`|
+|`org.facilitator.event.approval.required.v1`|event|`event.approval.required.v1.json`|`approvalId`, `actionDigest`, `eligibleActors`, `nonce`, `expiresAt`, `createdAt`; optional 1.1: `action` (the exact payload `actionDigest` covers — the kernel re-digests it), `workId` (the Work the approval belongs to, when one exists)|
 |`org.facilitator.event.approval.revoked.v1`|event|`event.approval.revoked.v1.json`|`approvalId`, `revokedBy`, `reason`|
 |`org.facilitator.event.memory.used.v1`|event|`event.memory.used.v1.json`|`memoryId`, `consumer`, `justification`|
 
@@ -67,8 +67,8 @@ Events carry identity in the envelope (`source` + `id` + `time`), so their `data
 ## Payload limits and canonical serialization
 
 - The serialized envelope MUST NOT exceed 262144 bytes. The single source of truth is `limits.maxEnvelopeBytes` in `protocol/conformance-fixtures/index.json`; both harnesses read it, and `protocol/openapi/link-v1.yaml` documents it in prose. Large artifacts travel by reference (`artifactRef`, appendix §8), never inline.
-- Approval hashing uses RFC 8785 JSON canonicalization (appendix §16.1): sorted keys, shortest-form numbers, NFC strings, no insignificant whitespace. The golden payload `protocol/conformance-fixtures/canonical/approval-prehash.json` and its digest `approval-prehash.sha256` cross-check the two independent implementations (`canonicalize` in the TS harness, `Jcs.Net` in the .NET harness) against each other and the committed value.
 - `date-time` strings are validated against RFC 3339 by both harnesses (fixture `invalid/event.bad-time.json` proves month `13` is rejected).
+- Approval hashing uses RFC 8785 JSON canonicalization (appendix §16.1): sorted keys, shortest-form numbers, NFC strings, no insignificant whitespace. Two goldens in `protocol/conformance-fixtures/canonical/` cross-check the independent implementations (`canonicalize` in the TS harness, `Jcs.Net` in the .NET harness + kernel `ApprovalDigest`) against each other and the committed digests: `approval-prehash.json` (raw canonicalization) and `approval-record-1.json` + `.sha256` (the full appendix §7.2 record digest over `{approvalId, action, eligibleActors, expiresAt, createdAt}` — the value the ledger stores as `action_digest`; both harnesses also digest key-reordered and NFD-variant clones to the same digest). The shared helpers: kernel `ApprovalDigest.Compute`, `computeActionDigest` in `@ofac/protocol`.
 
 ## Conformance fixtures
 
@@ -104,6 +104,8 @@ The Facilitator kernel (`src/facilitator`, namespace `Facilitator.Kernel`) consu
 |`POST /api/works/{id}/transitions`|Operator-driven state walk (`{"to", "expectedVersion", "reason?"}`), guarded by the §4.1 transition table|`200` `WorkDto`|
 |`GET /api/works/{id}/timeline`|`work_events` rows, ascending|`200` array|
 |`POST /api/ingress/events`|Raw CloudEvents 1.0 structured-JSON envelope (any type in the registry above)|`200 {"status":"accepted","inboxId":...}` or `200 {"status":"duplicate",...}`|
+|`GET /api/works/{id}/approvals`|Work's approval ledger rows (lazy expiry applied to each row read; gated `approvals.read`)|`200` array of `ApprovalDto`|
+|`POST /api/works/{id}/approvals/{approvalId}/respond`|Human decision (`{"decision":"approved"|"denied", "comment"?: ≤1024}`; gated `approvals.respond`); a minted consumed `kernel:` evidence receipt rides the approve response as `evidenceRef`|`200` `{status:"decided", approvalId, state, evidenceRef?}`|
 |`GET /api/dev/deliveries`|Outbox delivery ledger dump (Plan 12 replaces with admin views)|`200` array|
 
 ### Error contract
@@ -118,6 +120,15 @@ The Facilitator kernel (`src/facilitator`, namespace `Facilitator.Kernel`) consu
 |`payload-too-large`|`413`|Serialized body exceeds 262144 bytes|
 |`unauthorized`|`401`|Missing/wrong bearer token|
 |`work-not-found`|`404`|Unknown Work id|
+|`approval-digest-mismatch`|`422`|`approval.required` carried an `action`: the kernel's own RFC 8785 recompute of `{approvalId, action, eligibleActors, expiresAt, createdAt}` differs from the declared `actionDigest` (inbox row `failed`)|
+|`approval-id-invalid`|`422`|`approvalId` is not a GUID — the ledger keys on `uuid`|
+|`approval-not-found`|`404`|Unknown approval, or (on the work-scoped surface) another work's approval — no cross-work existence leak|
+|`approval-already-consumed`|`409`|Replay: the row is already `approved`/`consumed`/`denied` — atomic single use (spec §12.2), denied even for byte-identical command JSON|
+|`approval-expired`|`409`|Past `expiresAt`; the lazy state flip applied first, so the row reads `expired` afterwards|
+|`approval-revoked`|`409`|`approval.revoked` landed before the respond/consume (revocation-before-apply, appendix §7.3)|
+|`approval-not-pending`|`409`|Consume attempted against a still-`pending` row|
+|`approval-actor-ineligible`|`403`|The deciding principal does not intersect `eligibleActors` (law D4: `group:` — raw path or `/teams/`-stripped, case-sensitive — then `user:` display name, then `oidc:` canonical actor); audited `deny`|
+|`approval-actor-unknown`|`403`|Respond arrived with no verified human behind it (non-repudiation, spec §12.1 step 4)|
 
 A duplicate admission is **not** an error: `200 {"status":"duplicate"}`.
 
@@ -137,7 +148,7 @@ A duplicate returns `200 {"status":"duplicate"}` with zero reprocessing — no s
 
 ### Validation at ingress
 
-`POST /api/ingress/events` validates against the exact same schema files as the harnesses: `protocol/json-schema/*` and `protocol/cloudevents-schemas/*`, shipped as `EmbeddedResource`s of `Ofac.Protocol` (the container image can't read `protocol/` at runtime) and enforced by the shared `EnvelopeValidator` in `protocol/dotnet/Ofac.Protocol/Validation/EnvelopeValidator.cs`. It returns the same `errorClass` taxonomy as the fixture index (`envelope-violation | schema-violation | payload-too-large | unknown-command`). Commands outside the fail-closed 7-type known-command table (`Validation/KnownCommands.cs`, derived from the same list as `KNOWN_COMMAND_TYPES` in `src/protocol/src/validate.ts`) are rejected `422` and audited in the inbox. Of the seven known commands, `work.steer.v1` is the only one with a business effect this slice; the rest admit (`202`-path, inbox row `processed`) without side effects, typed rather than silent.
+`POST /api/ingress/events` validates against the exact same schema files as the harnesses: `protocol/json-schema/*` and `protocol/cloudevents-schemas/*`, shipped as `EmbeddedResource`s of `Ofac.Protocol` (the container image can't read `protocol/` at runtime) and enforced by the shared `EnvelopeValidator` in `protocol/dotnet/Ofac.Protocol/Validation/EnvelopeValidator.cs`. It returns the same `errorClass` taxonomy as the fixture index (`envelope-violation | schema-violation | payload-too-large | unknown-command`). Commands outside the fail-closed 7-type known-command table (`Validation/KnownCommands.cs`, derived from the same list as `KNOWN_COMMAND_TYPES` in `src/protocol/src/validate.ts`) are rejected `422` and audited in the inbox. Of the seven known commands, `work.steer.v1` and `approval.respond.v1` have business effects (the latter decides the ledger row when the envelope's `actorEvidenceRef` verifies as `oidc:`/`kernel:` — a workload-only respond is `403 approval-actor-unknown`); of the event types, `approval.required.v1` records a ledger row (kernel digest recompute when `action` is present, `digest-unverified` otherwise) and `approval.revoked.v1` marks one revoked; the rest admit (`202`-path, inbox row `processed`) without side effects, typed rather than silent.
 
 The kernel's own emission path builds outbox envelopes with the same validator before insert — the kernel emits conformant envelopes by construction. Kernel integration tests consume real files from `protocol/conformance-fixtures/` as live inputs to `/api/ingress/events` (e.g. `valid/command.work.steer.json` posted twice proves the duplicate path; `invalid/command.unknown.v1.json` proves fail-closed `unknown-command`; `invalid/envelope.specversion.json` proves `400 envelope-violation`), so the fixtures gate the runtime, not just the harnesses.
 

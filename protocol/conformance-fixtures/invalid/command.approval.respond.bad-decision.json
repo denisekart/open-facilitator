@@ -1,0 +1,16 @@
+{
+  "specversion": "1.0",
+  "id": "01JCOMMAND-appr-bad-decision",
+  "source": "urn:user:alice",
+  "type": "org.facilitator.command.approval.respond.v1",
+  "subject": "approval/appr-123",
+  "time": "2026-10-22T18:00:00Z",
+  "datacontenttype": "application/json",
+  "dataschema": "https://schemas.openfacilitator.org/v1/command.approval.respond.v1.json",
+  "data": {
+    "commandId": "cmd-131",
+    "approvalId": "appr-123",
+    "decision": "maybe",
+    "actorEvidenceRef": "identity-evidence:ref-124"
+  }
+}

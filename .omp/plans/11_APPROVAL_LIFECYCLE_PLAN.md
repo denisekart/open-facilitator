@@ -1,6 +1,6 @@
 # Plan 11 — Approval lifecycle: ledger, action digest, atomic single use, revocation
 
-**Status:** 🔵 replanned (2026-10-26, decision-complete). Execution flips states via the Implementation Status table below.
+**Status:** 🟢 done (🔵 replanning → 🟡 in-progress → 🟢 done via the Implementation Status table below). Execution flips states via the Implementation Status table below.
 **Phase:** C. **Depends on:** 09 (human principal, audit spine — landed 🟢) + 10 (`kernel:` evidence, effective principal — landed 🟢). Plan 12 (Gateway policy `confirm` effect) is the first producer/consumer of this lifecycle.
 **Branching:** work and commit **directly on `main`** (standing directive). Do not push. Copy this plan (title through Implementation Status) over `.omp/plans/11-approval-lifecycle.md` verbatim as the first commit, before any code.
 **Size judgment:** kept as ONE plan — ledger, digest, dispatch, and the human REST pair are one vertical: an approval nobody can answer proves nothing. The digest + `@ofac/protocol` export (Steps 1–2) is a clean early-checkpoint commit; if execution drags after it, Steps 5–6 (REST pair + evidence) can ship as a second commit of the same plan, not a split plan.
@@ -112,13 +112,13 @@ Verify per step with the test suite below.
 
 |Step|State|
 |---|---|
-|0 Research|Not started|
-|1 Schema 1.1 + codegen|Not started|
-|2 Digest helpers + goldens|Not started|
-|3 ApprovalLedger + migration|Not started|
-|4 Ingress arms + REST pair + evidence|Not started|
-|5 Tests|Not started|
-|6 Fixtures + docs|Not started|
+|0 Research|Fully implemented: all anchors re-verified; divergences: generated C# DTOs live at `protocol/dotnet/Ofac.Protocol/Generated/WireTypes.cs` (known fact 2 cited bare filename), configurations under `Kernel/Shared/Persistence/Configurations/`; gate binding config precedent is `src/facilitator/appsettings.Development.json` (`identity:authorization:operations`)|
+|1 Schema 1.1 + codegen|Fully implemented: `event.approval.required.v1.json` gains optional `action` (object) + `workId` (idToken); codegen renders `action?: {[k:string]:unknown}`/`Dictionary<string,object>?` + `workId?` in both languages; both harnesses green, `make protocol` drift clean (commit 95e416d)|
+|2 Digest helpers + goldens|Fully implemented: `Kernel/Shared/ApprovalDigest.cs` (Jcs.Net, added to kernel csproj) + `src/protocol/src/digest.ts` (`computeActionDigest`, canonicalize moved to deps, exported from package root); golden `canonical/approval-record-1.json|.sha256` = `sha256:573315ec...38b11` verified identical in .NET (harness compiles the helper source directly — a ProjectReference to the web app caused EF Core MSB3277 conflicts) and TS, incl. reordered-key + NFD-variant property twins in both harnesses (helper NFC-normalizes per appendix §7.1)|
+|3 ApprovalLedger + migration|Fully implemented: `Shared/Persistence/ApprovalLedger.cs` (`IApprovalLedger`, conditional-UPDATE state machine per D3, D4 eligibility incl. `/teams/`-stripped group spellings, D5 consumed-receipt mint, lazy expire on every touch, `ConsumeAsync`/`RevokeAsync`/`Get`/`ListForWork`); migration `AddApprovalLifecycle` (decided_by/actor_evidence_ref/comment/decided_at + ix_approvals_work_id + `approval.decided` kind); scoped next to `IEvidenceStore` (commit 6daa4c5). Divergence: respond-approve sets `consumed_at` at decision time; `ConsumeAsync` flips `approved→consumed` on state alone — the plan's consume WHERE-clause and its respond-approve SQL are mutually contradictory, state stays the single arbiter of single use|
+|4 Ingress arms + REST pair + evidence|Fully implemented: `Kernel/Work/ApprovalIngress.cs` shared arms (record/revoke events, respond via `actorEvidenceRef` verified `oidc:`/`kernel:`, workload-only ⇒ 403 `approval-actor-unknown`) wired into `CloudEventIngress` + `LinkIngress` (gate-screened delegated principal); REST pair `Kernel/Work/ApprovalEndpoints.cs` (work-scope 404 before eligibility, mint on approve); gate bindings `approvals.read`/`approvals.respond` in appsettings.Development.json (commit c262101)|
+|5 Tests|Fully implemented: `tests/Facilitator.Tests/Approvals/` — digest golden + reorder/NFD twins (pure), record/mismatch/unverified/duplicate, race `Task.WhenAll`, replay 409, lazy expiry (FakeTimeProvider), revoke↔respond both orders, D4 eligibility matrix (name/group-both-spellings/oidc, case-sensitivity), REST approve ⇒ consumed `kernel:` receipt + audit + timeline, wire-surface respond rides evidence, `ConsumeAsync` once + revoked-before-apply (15 tests, collection postgres:work; commit 4dbb30c). Test-infra fix uncovered here: realm `groups-claim` mappers lacked `claim.name` — KC 26.7 imports emit no claim without it, so the `/groups` claim never reached any token (realm.json patched)|
+|6 Fixtures + docs|Fully implemented: fixtures `valid/event.approval.required.with-action.json` (digest = golden, cross-verifies §7.2 ↔ envelope shape), `invalid/event.approval.required.bad-digest.json`, `invalid/command.approval.respond.bad-decision.json`, registered in index.json, both harnesses green; docs: protocol.md (1.1 registry row, REST pair, 8 approval error rows, golden paragraph, ingress-effects), security.md (lifecycle section: digest law/single use/lazy expiry/D4/non-repudiation/receipt/revocation + exposure rows), skills facilitator-protocol law 8 + facilitator-architecture (status, schema line, approvals bullet, still-target pruned)|
 
 States: Not started / In progress / Partially implemented: <what>/ Fully implemented: <evidence>/ Blocked: <reason>. Update this table in the same commit as each step; flip the roadmap Plan 11 row ⬜→🟡 at the first commit, 🟢 on CI green.
 

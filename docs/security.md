@@ -96,6 +96,8 @@ deny ⇒ `403 forbidden` (both RFC 9457, camelCase).
 | `GET /health` | anonymous | liveness |
 | `/api/works*`, `/api/works/{id}/*` | OIDC bearer; POSTs gated `work.write` | Work CRUD, steer, transitions, timeline |
 | `POST /api/ingress/events` | OIDC bearer; gated `work.write` | CloudEvents 1.0 envelope ingress; fail-closed validation |
+| `GET /api/works/{id}/approvals` | OIDC bearer; gated `approvals.read` (kernel-operator ∣ framework-admin) | Work's ledger rows, lazy expiry on read |
+| `POST /api/works/{id}/approvals/{approvalId}/respond` | OIDC bearer; gated `approvals.respond` | Human decision; eligibility + single use below |
 | `/api/identity/roles*` | OIDC bearer; PUT/DELETE gated `identity.roles.manage` | runtime role rules |
 | `/api/dev/*`, `/api/dead-letters` | OIDC bearer (read surface) | dev-time ledger dumps; Plan 12 replaces with admin views |
 | `/api/link/v1*`, `/hubs/link` | link plane (`linkToken`) | enrollment + evidence, below |
@@ -146,6 +148,52 @@ principal, reason = `delegation-validated` / `delegation-refused` /
 path ⇒ `503 auth-unavailable` (fail closed). The effective principal (always
 workload + optional validated human) is what Plan 12's policy engine will
 authorize against.
+
+## Approval lifecycle (spec §12.1–12.2, appendix §7)
+
+`facilitator.approvals` is the lifecycle authority:
+`pending → approved|denied|expired|revoked → consumed`.
+
+- **Digest law**: when `approval.required` carries an `action`, the kernel
+  recomputes the appendix §7.2 digest (RFC 8785 over
+  `{approvalId, action, eligibleActors, expiresAt, createdAt}`) and compares
+  to the declared `actionDigest` — a mismatch denies `422
+  approval-digest-mismatch` and the row is never recorded; the kernel never
+  trusts a digest it didn't recompute. Events without `action` (1.0 senders)
+  record the declared digest verbatim, flagged `digest-unverified` + audited.
+- **Single use**: a respond decides via one conditional
+  `UPDATE ... WHERE state='pending'` — exactly one concurrent decider wins,
+  every replay denies `409 approval-already-consumed` even for byte-identical
+  command JSON (§12.2). Consume (`approved→consumed`, Plan 12's hook) is the
+  same conditional-update shape.
+- **Lazy expiry**: no timer. Every read/respond first applies
+  `UPDATE ... SET state='expired' WHERE state='pending' AND expires_at<=now`
+  (audited `deny reason=expired`), then evaluates — an expired-but-not-yet-
+  flipped row still denies, and it can never come back.
+- **Eligibility (law D4)**: the deciding principal must intersect
+  `eligibleActors`: `group:<path>` (case-sensitive; raw or `/teams/`-stripped
+  — the token's `/groups` claim), then `user:<displayName>`, then
+  `oidc:<iss>|<sub>` (canonical actor, verbatim). Deny ⇒ `403
+  approval-actor-ineligible` + audit `deny reason=actor-ineligible`.
+- **Non-repudiation (§12.1 step 4)**: a respond needs a verified human —
+  the REST pair takes the OIDC bearer principal; the wire/Link surfaces
+  require `actorEvidenceRef` verifying as `oidc:`/`kernel:`. A workload-only
+  respond denies `403 approval-actor-unknown`.
+- **Receipt**: a REST approve mints a `kernel:<id>` evidence row already
+  `consumed` (receipt semantics: it proves the decision happened, it is not
+  re-spent), rides the response as `evidenceRef`, and lands in the audit
+  row + an `approval.decided` timeline note.
+- **Revocation-before-apply (appendix §7.3)**: `approval.revoked` flips
+  `pending→revoked` (terminal states no-op, 202 + audit); every consumer
+  (respond, consume) checks the row state first, so a revoked approval denies
+  `409 approval-revoked` even when the command JSON is identical to what
+  would have succeeded.
+
+Every decision/denial writes a `facilitator.audit` row
+(`authorization.evaluated:approval`, allow **and** deny, `detail` carrying
+approvalId/digest/decision/actor, `policy_version` `approval-v1`; gate
+evaluations on the REST pair ride `authorization.evaluated:approvals.read`/
+`:approvals.respond`) — never a raw token.
 
 ## Deferred to later plans
 

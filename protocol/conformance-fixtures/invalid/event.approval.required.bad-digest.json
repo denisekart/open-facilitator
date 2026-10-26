@@ -1,0 +1,18 @@
+{
+  "specversion": "1.0",
+  "id": "01JEVENT-approval-required-bad-digest",
+  "source": "urn:workspace:ws-01",
+  "type": "org.facilitator.event.approval.required.v1",
+  "subject": "work/work-123/assignment/analysis-1",
+  "time": "2026-10-22T18:00:00Z",
+  "datacontenttype": "application/json",
+  "dataschema": "https://schemas.openfacilitator.org/v1/event.approval.required.v1.json",
+  "data": {
+    "approvalId": "appr-123",
+    "actionDigest": "sha256:ZZZ",
+    "eligibleActors": ["user:alice"],
+    "nonce": "n-123-abcdefghijklmnop",
+    "expiresAt": "2026-10-23T18:00:00Z",
+    "createdAt": "2026-10-22T18:00:00Z"
+  }
+}

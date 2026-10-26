@@ -126,8 +126,8 @@ public sealed class LinkHub(
     /// <summary>Link-originated CloudEvent — the SAME admission path as POST /api/link/v1/events.</summary>
     public async Task<EnvelopeAck> Envelope(JsonElement envelope)
     {
-        RequirePrincipal();
-        var admission = await ingress.AdmitAsync(envelope.GetRawText(), Context.ConnectionAborted);
+        var principal = RequirePrincipal();
+        var admission = await ingress.AdmitAsync(envelope.GetRawText(), principal, Context.ConnectionAborted);
         return admission.Problem is not null
             ? new EnvelopeAck("rejected", null, admission.Problem)
             : new EnvelopeAck(admission.Status!, admission.InboxId!.Value.ToString("N"));

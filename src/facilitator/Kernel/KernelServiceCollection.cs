@@ -3,6 +3,7 @@ using System.Threading.RateLimiting;
 using Facilitator.Kernel.Link;
 using Facilitator.Kernel.Shared.Auth;
 using Facilitator.Kernel.Shared.Dispatch;
+using Facilitator.Kernel.Shared.Evidence;
 using Facilitator.Kernel.Shared.Identity;
 using Facilitator.Kernel.Shared.Persistence;
 using Facilitator.Kernel.Work;
@@ -120,6 +121,7 @@ public static class KernelServiceCollection
         builder.Services.AddSingleton<LinkLedger>();
         builder.Services.AddSingleton<LinkDeliveryPump>();
         builder.Services.AddHostedService(sp => sp.GetRequiredService<LinkDeliveryPump>());
+        builder.Services.AddSingleton<EvidenceValidator>();
         builder.Services.AddSingleton<AdmissionGate>();
         builder.Services.AddSingleton<LinkReceipts>();
         builder.Services.AddScoped<LinkIngress>();

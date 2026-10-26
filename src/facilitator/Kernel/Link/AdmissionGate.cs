@@ -2,7 +2,10 @@ using System.Text;
 using System.Text.Json;
 
 using Facilitator.Kernel.Shared;
+using Facilitator.Kernel.Shared.Auth;
 using Facilitator.Kernel.Shared.Dispatch;
+using Facilitator.Kernel.Shared.Evidence;
+using Facilitator.Kernel.Shared.Identity;
 using Facilitator.Kernel.Shared.Persistence;
 
 using Microsoft.AspNetCore.Mvc;
@@ -17,23 +20,32 @@ namespace Facilitator.Kernel.Link;
 /// <param name="Type">Envelope <c>type</c> (empty when absent/non-string).</param>
 /// <param name="IsCommand">Type is a command-class CloudEvent.</param>
 /// <param name="CommandId"><c>data.commandId</c> for commands.</param>
-public sealed record AdmissionVerdict(ProblemDetails? Problem, JsonElement Root, string Type, bool IsCommand, string? CommandId);
+/// <param name="Principal">The authority admitted commands act under (plan 10 audit actor).</param>
+public sealed record AdmissionVerdict(ProblemDetails? Problem, JsonElement Root, string Type, bool IsCommand, string? CommandId, EffectivePrincipal? Principal = null);
 
 /// <summary>
 /// The validation prefix of link admission, shared by the hub <c>Envelope</c>
 /// method and <c>POST /api/link/v1/events</c> via <see cref="LinkIngress"/>:
 /// size gate → parse → receipt-class refusal → envelope validation →
-/// known-command gate → assign-forbidden. Fail-closed refusals persist their
-/// failed audit inbox row (S:305) here; dedupe + dispatch stay in
+/// known-command gate → assign-forbidden → evidence evaluation +
+/// <c>authorization.evaluated:link</c> audit (commands only, plan 10).
+/// Fail-closed refusals persist their failed audit inbox row (S:305) here;
+/// an <c>oidc:</c>/<c>kernel:</c> ref that fails validation denies admission
+/// (422 <c>evidence-invalid</c>), any other scheme records a non-authoritative
+/// workload-only outcome, and a failed audit write on an allow path is 503
+/// <c>auth-unavailable</c> — the human-plane law. Dedupe + dispatch stay in
 /// <see cref="LinkIngress"/>.
 /// </summary>
 public sealed class AdmissionGate(
     IngressStore inbox,
     EnvelopeValidator validator,
-    KernelMetrics metrics)
+    KernelMetrics metrics,
+    EvidenceValidator evidence,
+    LinkEnrollmentStore enrollments,
+    AuditWriter audit)
 {
-    /// <summary>Screen one raw envelope; the verdict carries either a refusal or the parsed fields.</summary>
-    public async Task<AdmissionVerdict> ScreenAsync(string rawBody, CancellationToken ct)
+    /// <summary>Screen one raw envelope under an authenticated workload principal.</summary>
+    public async Task<AdmissionVerdict> ScreenAsync(string rawBody, LinkPrincipal workload, CancellationToken ct)
     {
         var bytes = Encoding.UTF8.GetByteCount(rawBody);
         if (bytes > RequestBodies.MaxBodyBytes)
@@ -98,8 +110,61 @@ public sealed class AdmissionGate(
             && cid.ValueKind == JsonValueKind.String
             ? cid.GetString()
             : null;
-        return new AdmissionVerdict(null, root, type, isCommand, commandId);
+        if (!isCommand)
+        {
+            // Events/receipts carry no delegation claim: workload-only, no audit row.
+            return new AdmissionVerdict(null, root, type, isCommand, commandId);
+        }
+
+        // appendix §3.2: evidence evaluation + authorization.evaluated:link, commands only.
+        var evidenceRef = root.GetProperty("data").TryGetProperty("actorEvidenceRef", out var er)
+            && er.ValueKind == JsonValueKind.String ? er.GetString() : null;
+        var outcome = await evidence.EvaluateAsync(evidenceRef, ct);
+        var accepts = outcome.State == EvidenceState.Valid
+            && await enrollments.AcceptsDelegatedClaimsAsync(workload.EndpointId, ct);
+        var effective = EffectivePrincipal.Derive(workload, outcome, accepts);
+        var decision = outcome.State == EvidenceState.Invalid ? "deny" : "allow";
+        var reason = outcome.State == EvidenceState.Invalid
+            ? $"evidence-invalid:{outcome.InvalidReason}"
+            : effective.Outcome;
+        metrics.LinkEvidence(outcome.Scheme, reason);
+        try
+        {
+            await audit.WriteAsync(new AuditRecord(
+                Actor: $"link:{workload.EndpointId}",
+                Action: "authorization.evaluated:link",
+                Resource: type,
+                Decision: decision,
+                Reason: reason,
+                EvidenceRef: evidenceRef,
+                PolicyVersion: "identity-v1",
+                Detail: AuditDetail(workload, outcome, effective)), ct);
+        }
+        catch
+        {
+            // Audit-fail law (human plane): an allow path that cannot record is a 503.
+            return new AdmissionVerdict(IdentityAuthentication.AuthUnavailable(), root, type, isCommand, commandId);
+        }
+
+        if (outcome.State == EvidenceState.Invalid)
+        {
+            return new AdmissionVerdict(ProblemErrors.EvidenceInvalid(outcome.InvalidReason!), root, type, isCommand, commandId);
+        }
+
+        return new AdmissionVerdict(null, root, type, isCommand, commandId, effective);
     }
+
+    private static string AuditDetail(LinkPrincipal workload, EvidenceOutcome outcome, EffectivePrincipal effective) =>
+        JsonSerializer.Serialize(new Dictionary<string, object?>
+        {
+            ["team"] = workload.TeamSlug,
+            ["role"] = workload.Role,
+            ["scheme"] = outcome.Scheme,
+            ["outcome"] = effective.Outcome,
+            ["delegatedSubject"] = effective.Delegated?.Subject,
+            ["groups"] = effective.Delegated?.Groups,
+            ["endpointId"] = workload.EndpointId,
+        });
 
     private async Task AuditAsync(JsonElement root, string rawBody, CancellationToken ct)
     {

@@ -223,6 +223,19 @@ public sealed class TestDbProbe : IAsyncDisposable
         await ScalarBool("SELECT count(*) FROM facilitator.teams WHERE slug = $1",
             cmd => cmd.Parameters.AddWithValue(slug));
 
+    /// <summary>Hand-mint a facilitator.evidence row (Plan 11 owns minting; tests seed validation paths).</summary>
+    public Task SeedEvidence(string evidenceId, string subject, DateTime? expiresAt, DateTime? consumedAt) =>
+        NonQuery(
+            "INSERT INTO facilitator.evidence (evidence_id, subject, claims, issued_at, expires_at, consumed_at) "
+            + "VALUES ($1, $2, '{\"groups\": [\"/teams/team-alpha\"]}', now(), $3, $4)",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(evidenceId);
+                cmd.Parameters.AddWithValue(subject);
+                cmd.Parameters.AddWithValue((object?)expiresAt ?? DBNull.Value);
+                cmd.Parameters.AddWithValue((object?)consumedAt ?? DBNull.Value);
+            });
+
     /// <summary>facilitator.audit rows, newest first, optionally fenced by actor/decision.</summary>
     public async Task<List<AuditRow>> AuditRows(string? actor = null, string? decision = null)
     {

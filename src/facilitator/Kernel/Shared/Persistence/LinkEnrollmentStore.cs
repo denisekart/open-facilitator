@@ -139,6 +139,16 @@ public sealed class LinkEnrollmentStore(
         return await db.Teams.AsNoTracking().AnyAsync(t => t.Slug == slug, ct);
     }
 
+    /// <summary>True when the endpoint's enrollment accepts oidc: delegated evidence claims.</summary>
+    public async Task<bool> AcceptsDelegatedClaimsAsync(string endpointId, CancellationToken ct)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(ct);
+        return await db.LinkEnrollments.AsNoTracking()
+            .Where(e => e.EndpointId == endpointId)
+            .Select(e => e.AcceptsDelegatedClaims)
+            .FirstOrDefaultAsync(ct);
+    }
+
     /// <summary>Store an advertised capability manifest (+ SHA-256 digest) for an endpoint.</summary>
     public async Task StoreCapabilitiesAsync(string endpointId, string manifestJson, string digest, CancellationToken ct)
     {

@@ -16,6 +16,7 @@ public sealed class KernelMetrics
     private readonly Counter<long> _inboxProcessed;
     private readonly Counter<long> _identityDecisions;
     private readonly Counter<long> _linkReceived;
+    private readonly Counter<long> _linkEvidence;
     private readonly Histogram<double> _deliveryLatency;
     private readonly Histogram<double> _ingressLatency;
     private long _outboxDepth;
@@ -37,6 +38,7 @@ public sealed class KernelMetrics
         meter.CreateObservableGauge("facilitator.link.sessions", () => Volatile.Read(ref _linkSessions), description: "Live link sessions (appendix §9.1)");
         _linkReceived = meter.CreateCounter<long>("facilitator.link.received", description: "Envelopes admitted over the link surface");
         _identityDecisions = meter.CreateCounter<long>("facilitator.identity.decisions", description: "Authorization-gate decisions (tag: decision)");
+        _linkEvidence = meter.CreateCounter<long>("facilitator.link.evidence", description: "actorEvidenceRef evaluations on link admission (tags: scheme, outcome)");
     }
 
     /// <summary>Record one charged delivery attempt.</summary>
@@ -50,6 +52,12 @@ public sealed class KernelMetrics
 
     /// <summary>Record one envelope admitted over the link surface (appendix §9.1).</summary>
     public void LinkReceived() => _linkReceived.Add(1);
+
+    /// <summary>Record one evidence evaluation on the link plane (tags per appendix §9.1).</summary>
+    /// <param name="scheme">Evidence scheme ("" for absent/malformed).</param>
+    /// <param name="outcome">workload-only | delegation-validated | evidence-unverified:* | evidence-malformed | delegation-refused | evidence-invalid:*.</param>
+    public void LinkEvidence(string scheme, string outcome) => _linkEvidence.Add(1,
+        new KeyValuePair<string, object?>("scheme", scheme), new KeyValuePair<string, object?>("outcome", outcome));
 
     /// <summary>Record one identity-gate decision (appendix §3.2 step 5).</summary>
     /// <param name="decision">allow | deny.</param>

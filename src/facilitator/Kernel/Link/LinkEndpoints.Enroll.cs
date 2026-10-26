@@ -154,7 +154,7 @@ public static partial class LinkEndpoints
         .RequireRateLimiting("enroll");
 
     private static void MapEvents(RouteGroupBuilder group) =>
-        group.MapPost("/events", async (HttpRequest request, LinkIngress ingress, TimeProvider time, CancellationToken ct) =>
+        group.MapPost("/events", async (HttpRequest request, HttpContext http, LinkIngress ingress, TimeProvider time, CancellationToken ct) =>
         {
             var body = await RequestBodies.ReadAsync(request, ct);
             if (body.TooLarge)
@@ -162,7 +162,7 @@ public static partial class LinkEndpoints
                 return Results.Problem(ProblemErrors.PayloadTooLarge(body.Bytes));
             }
 
-            var admission = await ingress.AdmitAsync(body.Text, ct);
+            var admission = await ingress.AdmitAsync(body.Text, LinkAuthMiddleware.RequirePrincipal(http), ct);
             return admission.ToResult(time.GetUtcNow().UtcDateTime);
         });
 

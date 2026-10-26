@@ -45,10 +45,10 @@ public sealed class LinkIngress(
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
-    /// <summary>Validate + admit one raw envelope (gate → dedupe insert → dispatch).</summary>
-    public async Task<LinkAdmission> AdmitAsync(string rawBody, CancellationToken ct)
+    /// <summary>Validate + admit one raw envelope (gate → dedupe insert → dispatch) under a workload principal.</summary>
+    public async Task<LinkAdmission> AdmitAsync(string rawBody, Facilitator.Kernel.Shared.Auth.LinkPrincipal workload, CancellationToken ct)
     {
-        var screen = await gate.ScreenAsync(rawBody, ct);
+        var screen = await gate.ScreenAsync(rawBody, workload, ct);
         if (screen.Problem is not null)
         {
             return new LinkAdmission(screen.Problem, null, null);

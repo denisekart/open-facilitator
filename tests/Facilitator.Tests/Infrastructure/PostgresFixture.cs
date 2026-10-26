@@ -83,7 +83,7 @@ public sealed class PostgresFixture : IAsyncLifetime
         data["workId"] = workId.ToString();
         data["assignmentId"] = "kernel";
         data["targetId"] = "kernel";
-        data["actorEvidenceRef"] = "kernel:test";
+        data["actorEvidenceRef"] = "identity-evidence:test"; // unverified scheme: workload-only, admitted
         data["expectedContextVersion"] = expectedContextVersion;
         return root.ToJsonString();
     }

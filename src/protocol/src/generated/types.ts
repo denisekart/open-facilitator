@@ -231,12 +231,21 @@ export interface EnrollResponseV1 {
 }
 
 export interface ApprovalRequiredEventV1Data {
+  /**
+   * The exact action payload covered by actionDigest; the kernel digests its canonical form
+   * (appendix §7.2).
+   */
+  action?: { [key: string]: unknown };
   actionDigest: string;
   approvalId: string;
   createdAt: string;
   eligibleActors: [string, ...string[]];
   expiresAt: string;
   nonce: string;
+  /**
+   * Work the approval belongs to, when one exists.
+   */
+  workId?: string;
 }
 
 export interface ApprovalRevokedEventV1Data {

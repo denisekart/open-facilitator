@@ -599,6 +599,14 @@ namespace Ofac.Protocol
 
     public partial class ApprovalRequiredEventV1Data
     {
+        /// <summary>
+        /// The exact action payload covered by actionDigest; the kernel digests its canonical form
+        /// (appendix §7.2).
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("action")]
+        public Dictionary<string, object>? action { get; set; }
+
         [JsonPropertyName("actionDigest")]
         public string actionDigest { get; set; }
 
@@ -619,6 +627,14 @@ namespace Ofac.Protocol
         [JsonPropertyName("nonce")]
         [JsonConverter(typeof(AmbitiousMinMaxLengthCheckConverter))]
         public string nonce { get; set; }
+
+        /// <summary>
+        /// Work the approval belongs to, when one exists.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("workId")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string? workId { get; set; }
     }
 
     public partial class ApprovalRevokedEventV1Data

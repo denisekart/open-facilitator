@@ -161,6 +161,8 @@ describe("approval-record digest golden (appendix §7.2)", () => {
       }
       return value;
     };
-    expect(computeActionDigest({ ...record, action: flip(record.action) as Record<string, unknown> })).toBe(golden);
+    expect(
+      computeActionDigest({ ...record, action: flip(record.action) as Record<string, unknown> }),
+    ).toBe(golden);
   });
 });

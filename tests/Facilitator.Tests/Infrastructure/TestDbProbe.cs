@@ -236,6 +236,33 @@ public sealed class TestDbProbe : IAsyncDisposable
                 cmd.Parameters.AddWithValue((object?)consumedAt ?? DBNull.Value);
             });
 
+    /// <summary>The approvals ledger row for one approval (null when never recorded).</summary>
+    public async Task<ApprovalRow?> Approval(Guid approvalId)
+    {
+        await using var connection = await _dataSource.OpenConnectionAsync();
+        await using var cmd = new NpgsqlCommand(
+            "SELECT state, action_digest, digest_verification, coalesce(work_id::text, ''), coalesce(decided_by, ''), "
+            + "expires_at, created_at FROM facilitator.approvals WHERE approval_id = $1", connection);
+        cmd.Parameters.AddWithValue(approvalId);
+        await using var reader = await cmd.ExecuteReaderAsync();
+        return await reader.ReadAsync()
+            ? new ApprovalRow(
+                reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3),
+                reader.GetString(4), reader.GetFieldValue<DateTime>(5), reader.GetFieldValue<DateTime>(6))
+            : null;
+    }
+
+    /// <summary>True when the facilitator.evidence row exists and is already consumed.</summary>
+    public Task<bool> EvidenceConsumed(string evidenceId) =>
+        ScalarBool(
+            "SELECT count(*) FROM facilitator.evidence WHERE evidence_id = $1 AND consumed_at IS NOT NULL",
+            cmd => cmd.Parameters.AddWithValue(evidenceId));
+
+    /// <summary>One approvals ledger assertion row (typed window, no raw SQL in tests).</summary>
+    public sealed record ApprovalRow(
+        string State, string ActionDigest, string DigestVerification, string WorkId,
+        string DecidedBy, DateTime ExpiresAt, DateTime CreatedAt);
+
     /// <summary>facilitator.audit rows, newest first, optionally fenced by actor/decision.</summary>
     public async Task<List<AuditRow>> AuditRows(string? actor = null, string? decision = null)
     {
@@ -253,7 +280,7 @@ public sealed class TestDbProbe : IAsyncDisposable
             parameters.Add(decision);
         }
 
-        var sql = "SELECT actor, action, decision, coalesce(reason, ''), detail::text, coalesce(policy_version, '') "
+        var sql = "SELECT actor, action, decision, coalesce(reason, ''), detail::text, coalesce(policy_version, ''), coalesce(evidence_ref, '') "
             + "FROM facilitator.audit"
             + (clauses.Count == 0 ? string.Empty : " WHERE " + string.Join(" AND ", clauses))
             + " ORDER BY occurred_at DESC";
@@ -269,12 +296,13 @@ public sealed class TestDbProbe : IAsyncDisposable
         while (await reader.ReadAsync())
         {
             rows.Add(new AuditRow(
-                reader.GetFieldValue<string>(0),
+                reader.IsDBNull(0) ? null : reader.GetString(0),
                 reader.GetString(1),
                 reader.GetString(2),
                 reader.GetString(3),
                 reader.GetString(4),
-                reader.GetString(5)));
+                reader.GetString(5),
+                reader.GetString(6)));
         }
 
         return rows;
@@ -285,7 +313,7 @@ public sealed class TestDbProbe : IAsyncDisposable
         TextListRaw("SELECT role_name FROM facilitator.identity_roles ORDER BY role_name");
 
     /// <summary>One audit assertion row (typed window, no raw SQL in tests).</summary>
-    public sealed record AuditRow(string? Actor, string Action, string Decision, string Reason, string Detail, string PolicyVersion);
+    public sealed record AuditRow(string? Actor, string Action, string Decision, string Reason, string Detail, string PolicyVersion, string EvidenceRef);
 
     /// <inheritdoc />
     public async ValueTask DisposeAsync() => await _dataSource.DisposeAsync();

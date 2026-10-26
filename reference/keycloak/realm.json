@@ -50,12 +50,8 @@
       "publicClient": true,
       "directAccessGrantsEnabled": true,
       "standardFlowEnabled": true,
-      "redirectUris": [
-        "*"
-      ],
-      "webOrigins": [
-        "*"
-      ],
+      "redirectUris": ["*"],
+      "webOrigins": ["*"],
       "protocolMappers": [
         {
           "name": "groups-claim",
@@ -65,7 +61,8 @@
             "full.path": "true",
             "id.token.claim": "false",
             "access.token.claim": "true",
-            "userinfo.token.claim": "false"
+            "userinfo.token.claim": "false",
+            "claim.name": "groups"
           }
         },
         {
@@ -100,7 +97,8 @@
             "full.path": "true",
             "id.token.claim": "false",
             "access.token.claim": "true",
-            "userinfo.token.claim": "false"
+            "userinfo.token.claim": "false",
+            "claim.name": "groups"
           }
         },
         {
@@ -203,7 +201,8 @@
             "full.path": "true",
             "id.token.claim": "false",
             "access.token.claim": "true",
-            "userinfo.token.claim": "false"
+            "userinfo.token.claim": "false",
+            "claim.name": "groups"
           }
         },
         {
@@ -252,12 +251,8 @@
       "publicClient": true,
       "directAccessGrantsEnabled": false,
       "standardFlowEnabled": false,
-      "redirectUris": [
-        "*"
-      ],
-      "webOrigins": [
-        "*"
-      ]
+      "redirectUris": ["*"],
+      "webOrigins": ["*"]
     }
   ],
   "users": [
@@ -265,13 +260,8 @@
       "username": "alice",
       "enabled": true,
       "firstName": "Alice",
-      "realmRoles": [
-        "default-roles-facilitator",
-        "framework-admin"
-      ],
-      "groups": [
-        "/teams/team-alpha"
-      ],
+      "realmRoles": ["default-roles-facilitator", "framework-admin"],
+      "groups": ["/teams/team-alpha"],
       "credentials": [
         {
           "type": "password",
@@ -280,9 +270,7 @@
         }
       ],
       "requiredActions": [],
-      "disableableCredentialTypes": [
-        "password"
-      ],
+      "disableableCredentialTypes": ["password"],
       "lastName": "Anderson",
       "email": "alice@example.test",
       "emailVerified": true
@@ -291,12 +279,8 @@
       "username": "bob",
       "enabled": true,
       "firstName": "Bob",
-      "realmRoles": [
-        "default-roles-facilitator"
-      ],
-      "groups": [
-        "/teams/team-beta"
-      ],
+      "realmRoles": ["default-roles-facilitator"],
+      "groups": ["/teams/team-beta"],
       "credentials": [
         {
           "type": "password",
@@ -305,9 +289,7 @@
         }
       ],
       "requiredActions": [],
-      "disableableCredentialTypes": [
-        "password"
-      ],
+      "disableableCredentialTypes": ["password"],
       "lastName": "Brown",
       "email": "bob@example.test",
       "emailVerified": true
@@ -316,9 +298,7 @@
       "username": "carol",
       "enabled": true,
       "firstName": "Carol",
-      "realmRoles": [
-        "default-roles-facilitator"
-      ],
+      "realmRoles": ["default-roles-facilitator"],
       "credentials": [
         {
           "type": "password",
@@ -327,9 +307,7 @@
         }
       ],
       "requiredActions": [],
-      "disableableCredentialTypes": [
-        "password"
-      ],
+      "disableableCredentialTypes": ["password"],
       "lastName": "Cartwright",
       "email": "carol@example.test",
       "emailVerified": true
@@ -337,11 +315,7 @@
     {
       "username": "service-account-facilitator-cli",
       "enabled": true,
-      "realmRoles": [
-        "default-roles-facilitator",
-        "kernel-operator",
-        "e2e-operator"
-      ],
+      "realmRoles": ["default-roles-facilitator", "kernel-operator", "e2e-operator"],
       "requiredActions": [],
       "serviceAccountClientId": "facilitator-cli"
     }

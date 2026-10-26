@@ -341,8 +341,8 @@ public sealed class ApprovalLedger(
         await using var db = await contextFactory.CreateDbContextAsync(ct);
         var now = timeProvider.GetUtcNow().UtcDateTime;
         var rows = await db.Approvals
-            .Where(a => a.ApprovalId == approvalId && a.State == "approved" && a.ConsumedAt == null)
-            .ExecuteUpdateAsync(s => s.SetProperty(a => a.ConsumedAt, now), ct);
+            .Where(a => a.ApprovalId == approvalId && a.State == "approved")
+            .ExecuteUpdateAsync(s => s.SetProperty(a => a.State, "consumed"), ct);
         var row = await FindViewAsync(db, approvalId, ct);
         if (row is null)
         {

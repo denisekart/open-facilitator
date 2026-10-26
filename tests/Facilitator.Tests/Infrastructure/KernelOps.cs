@@ -16,7 +16,7 @@ internal static class KernelOps
     {
         using var response = await client.PostAsync(path, new StringContent(payload, Encoding.UTF8, "application/json"));
         var body = await JsonWire.ReadJsonAsync(response.Content);
-        Assert.Equal(expected, response.StatusCode);
+        Assert.True(expected == response.StatusCode, $"{(int)expected} expected for POST {path}, got {(int)response.StatusCode}: {body.GetRawText()}");
         return body;
     }
 

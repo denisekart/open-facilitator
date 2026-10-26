@@ -1,6 +1,6 @@
 # Plan 09 — Identity foundation: OIDC kernel edge, claim-pointer extraction, runtime-mutable role rules, audit spine
 
-**Status:** 🟡 in-progress (🔵 replanning → 🟡 in-progress → 🟢 done via the Implementation Status table below)
+**Status:** 🟢 done (🔵 replanning → 🟡 in-progress → 🟢 done via the Implementation Status table below)
 **Phase:** C (first). **Depends on:** 03 (Link server, as-built). Plan 10 consumes this plan's IdP realm fixture, role-rule engine, and audit spine; Plan 11 consumes the human principal (`oidc:<iss>|<sub>` actor form).
 **Branching:** work and commit **directly on `main`** (standing directive from Plans 03–08). Do not push.
 **Questions may be asked during planning, but not during implementation.** In implementation, prefer straightforward fixes consistent with this plan; if several iterations fail, step back and simplify that part rather than adding machinery.

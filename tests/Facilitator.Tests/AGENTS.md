@@ -8,7 +8,9 @@ internals.
 
 ## Truth anchors
 - `Infrastructure/` — the collections, `KernelTestFactory` (in-proc server),
-  and `TestDbProbe` (the only sanctioned DB-state accessor).
+  `KeycloakFixture` (one shared realm container minting every test bearer —
+  never mint tokens any other way), and `TestDbProbe` (the only sanctioned
+  DB-state accessor).
 - Feature folders mirror `../../src/facilitator/Kernel/<Feature>`; a kernel
   feature and its test folder change together.
 - Wire assertions reuse `@ofac/protocol` fixtures/conformance verdicts rather

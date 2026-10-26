@@ -17,7 +17,7 @@ public static class CliRunner
     public static async Task<int> RunAsync(string[] args, CancellationToken ct)
     {
         var url = "http://localhost:8088";
-        var token = Environment.GetEnvironmentVariable("FACILITATOR_TOKEN") ?? "dev-token";
+        var token = Environment.GetEnvironmentVariable("FACILITATOR_TOKEN");
         var positional = new List<string>();
         var options = new Dictionary<string, string>(StringComparer.Ordinal);
 
@@ -42,6 +42,12 @@ public static class CliRunner
                     positional.Add(args[i]);
                     break;
             }
+        }
+
+        if (string.IsNullOrEmpty(token))
+        {
+            Console.Error.WriteLine("FACILITATOR_TOKEN (an OIDC access token) or --token is required — the kernel speaks OIDC only.");
+            return 2;
         }
 
         using var client = new HttpClient { BaseAddress = new Uri(url) };

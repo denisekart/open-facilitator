@@ -3,28 +3,6 @@ using Facilitator.Kernel.Link;
 namespace Facilitator.Kernel.Shared.Auth;
 
 /// <summary>
-/// Fail-closed startup gates: a non-Development environment without a
-/// configured auth secret must not serve traffic or enrollments at all.
-/// </summary>
-public sealed class BootstrapAuthStartupCheck(IIngressTokenValidator validator) : IHostedService
-{
-    /// <inheritdoc />
-    public Task StartAsync(CancellationToken cancellationToken)
-    {
-        if (validator is BootstrapTokenValidator bootstrap && !bootstrap.IsConfigured)
-        {
-            throw new InvalidOperationException(
-                "Auth:BootstrapToken is unset and the environment is not Development — refusing to start (fail closed).");
-        }
-
-        return Task.CompletedTask;
-    }
-
-    /// <inheritdoc />
-    public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
-}
-
-/// <summary>
 /// Fail-closed startup gate: a non-Development environment without
 /// <c>Link:EnrollmentToken</c> must not serve enrollments at all.
 /// </summary>

@@ -2,6 +2,7 @@ using Facilitator.Kernel;
 using Facilitator.Kernel.Link;
 using Facilitator.Kernel.Shared.Auth;
 using Facilitator.Kernel.Shared.Cli;
+using Facilitator.Kernel.Shared.Identity;
 using Facilitator.Kernel.Shared.Persistence;
 using Facilitator.Kernel.Work;
 
@@ -25,13 +26,14 @@ await app.Services.GetRequiredService<IDatabaseInitializer>().InitializeAsync(Ca
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 
-app.UseMiddleware<BootstrapTokenMiddleware>();
 app.UseMiddleware<LinkAuthMiddleware>();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseMiddleware<IngressRoleGateMiddleware>();
 app.UseRateLimiter();
 app.MapWorkApi(app.Environment);
 app.MapLinkApi(app.Environment);
+app.MapIdentityApi();
 
 await app.RunAsync();
 

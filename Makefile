@@ -30,10 +30,12 @@ protocol:
 	git diff --exit-code -- src/protocol/src/generated protocol/dotnet/Ofac.Protocol/Generated src/protocol/schemas
 
 link-e2e:
-	@echo "E2E tier: needs Postgres at FACILITATOR_PG (default: facilitator-dev on 5433);"
+	@echo "E2E tier: needs Postgres at FACILITATOR_PG (default: facilitator-dev on 5433)"
+	@echo "and the dev IdP at KEYCLOAK_URL (default: http://localhost:8480, see docs/getting-started.md §2);"
 	@echo "no psql binary on PATH? PG_ADMIN_CMD='docker exec facilitator-dev psql' PG_ADMIN_URL=postgresql://postgres:postgres@localhost:5432/postgres"
 	FACILITATOR_URL=$${FACILITATOR_URL:-http://gate-only} \
 	FACILITATOR_PG=$${FACILITATOR_PG:-postgresql://postgres:postgres@127.0.0.1:5433/postgres} \
+	KEYCLOAK_URL=$${KEYCLOAK_URL:-http://localhost:8480} \
 	pnpm -C src/workspace-link test:e2e
 
 gateway-e2e:
@@ -41,6 +43,7 @@ gateway-e2e:
 	@echo "no psql binary on PATH? PG_ADMIN_CMD='docker exec facilitator-dev psql' PG_ADMIN_URL=postgresql://postgres:postgres@localhost:5432/postgres"
 	FACILITATOR_URL=$${FACILITATOR_URL:-http://gate-only} \
 	FACILITATOR_PG=$${FACILITATOR_PG:-postgresql://postgres:postgres@127.0.0.1:5433/postgres} \
+	KEYCLOAK_URL=$${KEYCLOAK_URL:-http://localhost:8480} \
 	pnpm -C src/gateway test:e2e
 
 worker-e2e:
@@ -48,6 +51,7 @@ worker-e2e:
 	@echo "same Postgres gate as gateway-e2e."
 	FACILITATOR_URL=$${FACILITATOR_URL:-http://gate-only} \
 	FACILITATOR_PG=$${FACILITATOR_PG:-postgresql://postgres:postgres@127.0.0.1:5433/postgres} \
+	KEYCLOAK_URL=$${KEYCLOAK_URL:-http://localhost:8480} \
 	pnpm -C src/adapters/harnesses/deterministic test:e2e
 
 example-slim-up:

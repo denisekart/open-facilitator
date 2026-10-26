@@ -11,11 +11,13 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Facilitator.Tests.Infrastructure;
 
 /// <summary>
-/// WebApplicationFactory over the real kernel composition: Development env
-/// (bearer <c>dev-token</c>), migrations on, connection string pointed at the
-/// shared container. Variants disable the OutboxDispatcher background timer
-/// (outbox rows stay <c>pending</c> until a test drives DrainOnceAsync) or
-/// replace the <c>kernel.log</c> stub sink (dead-lettering, refusing sinks).
+/// WebApplicationFactory over the real kernel composition: Development env,
+/// migrations on, connection string pointed at the shared container, and the
+/// OIDC human plane pointed at the shared <see cref="KeycloakFixture"/>
+/// (identity:oidc settings below; every authed request carries a
+/// realm-minted bearer). Variants disable the OutboxDispatcher background
+/// timer (outbox rows stay <c>pending</c> until a test drives DrainOnceAsync)
+/// or replace the <c>kernel.log</c> stub sink (dead-lettering, refusing sinks).
 /// </summary>
 public sealed class KernelTestFactory : WebApplicationFactory<Program>
 {
@@ -80,6 +82,9 @@ public sealed class KernelTestFactory : WebApplicationFactory<Program>
         builder.UseEnvironment("Development");
         builder.UseSetting("Database:AutoMigrate", "true");
         builder.UseSetting("ConnectionStrings:Facilitator", _fixture.ConnectionString);
+        builder.UseSetting("Identity:Oidc:Authority", KeycloakFixture.Issuer);
+        builder.UseSetting("Identity:Oidc:Audience", "facilitator-api");
+        builder.UseSetting("Identity:Oidc:RequireHttps", "false");
         if (_settings is not null)
         {
             foreach (var (key, value) in _settings)
@@ -120,11 +125,11 @@ public sealed class KernelTestFactory : WebApplicationFactory<Program>
         });
     }
 
-    /// <summary>An authenticated client (bearer <c>dev-token</c>, JSON accepts).</summary>
+    /// <summary>An authenticated client (bearer = the shared CLI service-account token, JSON accepts).</summary>
     public HttpClient CreateAuthedClient()
     {
         var client = CreateClient();
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "dev-token");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", KeycloakFixture.CliToken);
         client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         return client;
     }

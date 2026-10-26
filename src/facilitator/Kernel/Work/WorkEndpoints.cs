@@ -2,6 +2,7 @@ using System.Text.Json;
 
 using Facilitator.Kernel.Shared;
 using Facilitator.Kernel.Shared.Dispatch;
+using Facilitator.Kernel.Shared.Identity;
 using Facilitator.Kernel.Shared.Persistence;
 
 namespace Facilitator.Kernel.Work;
@@ -18,7 +19,7 @@ public static class WorkEndpoints
     {
         var group = app.MapGroup("/api");
 
-        group.MapPost("/works", async (HttpRequest request, IngressProcessor processor, CancellationToken ct) =>
+        group.MapPost("/works", async (HttpRequest request, IngressProcessor processor, HttpContext http, CancellationToken ct) =>
         {
             var body = await RequestBodies.ReadAsync(request, ct);
             if (body.TooLarge)
@@ -26,7 +27,7 @@ public static class WorkEndpoints
                 return Results.Problem(ProblemErrors.PayloadTooLarge(body.Bytes));
             }
 
-            return await RequestBodyJson.ParseAsync(body, document => processor.CreateWorkAsync(document.RootElement.Clone(), ct));
+            return await RequestBodyJson.ParseAsync(body, document => processor.CreateWorkAsync(document.RootElement.Clone(), ActorOf(http), ct));
         });
 
         group.MapGet("/works", async (IngressStore store, CancellationToken ct) =>
@@ -43,7 +44,7 @@ public static class WorkEndpoints
                 : Results.Ok(WorkDtoMapper.ToDto(work));
         });
 
-        group.MapPost("/works/{id:guid}/steer", async (Guid id, HttpRequest request, IngressProcessor processor, CancellationToken ct) =>
+        group.MapPost("/works/{id:guid}/steer", async (Guid id, HttpRequest request, IngressProcessor processor, HttpContext http, CancellationToken ct) =>
         {
             var body = await RequestBodies.ReadAsync(request, ct);
             if (body.TooLarge)
@@ -54,7 +55,7 @@ public static class WorkEndpoints
             return await RequestBodyJson.ParseAsync(body, document => processor.SteerAsync(id, document.RootElement.Clone(), ct));
         });
 
-        group.MapPost("/works/{id:guid}/transitions", async (Guid id, HttpRequest request, IngressProcessor processor, CancellationToken ct) =>
+        group.MapPost("/works/{id:guid}/transitions", async (Guid id, HttpRequest request, IngressProcessor processor, HttpContext http, CancellationToken ct) =>
         {
             var body = await RequestBodies.ReadAsync(request, ct);
             if (body.TooLarge)
@@ -62,7 +63,7 @@ public static class WorkEndpoints
                 return Results.Problem(ProblemErrors.PayloadTooLarge(body.Bytes));
             }
 
-            return await RequestBodyJson.ParseAsync(body, document => processor.TransitionAsync(id, document.RootElement.Clone(), ct));
+            return await RequestBodyJson.ParseAsync(body, document => processor.TransitionAsync(id, document.RootElement.Clone(), ActorOf(http), ct));
         });
 
         group.MapGet("/works/{id:guid}/timeline", async (Guid id, ICoordinationStore store, CancellationToken ct) =>
@@ -92,4 +93,7 @@ public static class WorkEndpoints
 
         return app;
     }
+
+    private static string ActorOf(HttpContext http) =>
+        http.GetFacilitatorPrincipal()?.Actor ?? "http-operator";
 }

@@ -1,6 +1,8 @@
 # Security posture
 
-Status: reflects Plan 02 (transactional kernel). The credential model is final; the authentication mechanism is interim and cuts over in Plan 07.
+Status: reflects Plan 09 (OIDC identity foundation). The human plane federates
+to any OIDC IdP; roles are operator-defined claim rules; every gate decision
+audits.
 
 ## Trust vs data-plane split (spec §3.3, D-10)
 
@@ -15,26 +17,91 @@ The Facilitator is a coordination kernel, not a privilege holder. It authorizes 
 
 Anything that writes outside the framework runs under team-owned credentials behind team policy. See `.omp/skills/facilitator-architecture/SKILL.md` (Ownership law) for the normative table.
 
-## Ingress authentication (interim: bootstrap token)
+## Three identities
 
-Every `/api/*` endpoint requires `Authorization: Bearer <token>`, checked by middleware in `src/facilitator/Kernel/Auth` against config `Auth:BootstrapToken` — a shared secret, appropriate for single-operator development only.
+| Identity | Carried by | Validated by |
+|---|---|---|
+| **Human/operator** (this doc) | OIDC access token (`Authorization: Bearer`) on `/api/*` except `/api/link/v1*` | JwtBearer: signature (JWKS from `identity:oidc:authority`), issuer, audience; RS256/ES256 only |
+| **Workspace Link endpoint** | Per-endpoint `linkToken` from enrollment + `Link:EnrollmentToken` secret | `LinkBearerHandler` — a fully separate seam (`/api/link/v1*`, `/hubs/link`) |
+| **Machine-to-machine ingress** (providers) | CloudEvents envelope identity (`event_source`/`event_id`, commandId, provider delivery id) | Dedupe + envelope validation, behind the same bearer gate |
 
-- `Auth:BootstrapToken` unset + Development environment: the literal `dev-token` is accepted, so the dev loop needs no secret management.
-- `Auth:BootstrapToken` unset + non-Development: fail-closed — the process refuses to serve (`503`).
-- Missing or wrong bearer token: `401` with type `https://errors.openfacilitator.org/v1/unauthorized` (RFC 9457 ProblemDetails).
+The kernel is **vendor-neutral**: it consumes OIDC discovery, bearer tokens,
+and RFC 6901 JSON pointers only. Vendors (Keycloak in dev/test) appear only
+in fixtures (`reference/keycloak/`) and docs.
 
-**Plan 07 cutover:** token validation sits behind a single seam, `IIngressTokenValidator`. Plan 07 replaces the implementation with Keycloak OIDC validation (signature/issuer/expiry + claims) without touching any call site or endpoint. Until then, treat any network that can reach `/api` as trusted-equal.
+## Human plane: OIDC + claim pointers (spec §11)
 
-`GET /health` stays anonymous — liveness only, no data-plane exposure.
+Identity is the verified pair `(iss, sub)` — the canonical audit/timeline
+actor is `oidc:<iss>|<sub>`. Display names never enter the actor. Which
+token claims mean "subject", "groups", "scopes", … is operator config
+(`identity:claims`, RFC 6901 pointers + a value shape per source); a
+missing/misconfigured pointer yields **no** context, never a wildcard.
+Extra issuers (e.g. a direct Google federation) are listed in
+`identity:oidc:trustedIssuers` and matched by rules on `sub`/`amr` — no
+claim mapping required beyond the pointers.
+
+### Worked examples
+
+Keycloak dev realm (`reference/keycloak/realm.json`): map `/sub`,
+`/preferred_username`, `/groups`, `/realm_access/roles` (see
+`appsettings.Development.json`) and gate on
+`{"claim": "/realm_access/roles", "op": "contains", "value": "kernel-operator"}`.
+
+Raw Google-account tokens (no group claims, `hd` only on Workspace tokens):
+`trustedIssuers: ["https://accounts.google.com"]`, pointer `subject: "/sub"`,
+and a rule keyed on the verified subject instead of realm roles —
+`{"claim": "/sub", "op": "equals", "value": "<google-subject-id>"}` optionally
+ANDed with `{"claim": "/amr", "op": "contains", "value": "mfa"}`.
+Operator-verifiable against a live token; the realm does not broker Google.
+
+
+### Roles: runtime-mutable claim rules
+
+A role is an OR-list of AND-rules over arbitrary claim pointers:
+`{"all": [{"claim": "/realm_access/roles", "op": "contains", "value": "kernel-operator"}]}`.
+Ops: `equals` (string leaf), `contains` (string-array leaf or
+space-delimited token), `exists` (pointer resolves). Malformed rules are
+skipped (deny, logged) — never wildcard.
+
+- Seed: config `identity:roles:<name>` bootstraps the `identity_roles` table
+  only when it is empty; **the DB is truth thereafter**.
+- Mutate: `GET/PUT/DELETE /api/identity/roles[/{name}]` — PUT carries the
+  full replacement rule list + the `rowVersion` the writer saw (omit to
+  force); a stale/absent version ⇒ `409 role-version-conflict`. The manage
+  surface itself is gated by the `identity.roles.manage` operation binding.
+- Effective within `identity:rolesRefreshSeconds` (default 5 s — the
+  cross-replica staleness bound); the writing replica sees its edit instantly.
+
+### Operation gates + audit
+
+`identity:authorization:operations` binds `methods × route-template paths →
+rolesAnyOf`. The gate middleware (after authorization, so the resolved
+endpoint is known) evaluates the matched binding — or passes any
+authenticated principal when no binding matches (read/dev surface). Every
+binding evaluation writes a row to `facilitator.audit` (allow **and** deny):
+normalized actor, action `authorization.evaluated:<operationId>`, decision,
+reason (`role-match` / `no-role-match` / `audit-unavailable`), policy version
+(row-version epoch), trace id, and a small `detail` jsonb — never a raw
+token. An audit failure on an allow path fails closed (`503
+auth-unavailable`). Role edits and the config seed also audit
+(`identity.role.upsert/remove`).
+
+Failure wire contract: missing/invalid bearer ⇒ `401 unauthorized`; gate
+deny ⇒ `403 forbidden` (both RFC 9457, camelCase).
 
 ## Endpoint exposure
 
 | Surface | Auth | Notes |
 |---|---|---|
 | `GET /health` | anonymous | liveness |
-| `/api/works*`, `/api/works/{id}/*` | bearer | Work CRUD, steer, transitions, timeline |
-| `POST /api/ingress/events` | bearer | CloudEvents 1.0 envelope ingress; fail-closed validation |
-| `GET /api/dev/deliveries` | bearer | dev-time outbox ledger dump; Plan 12 replaces with admin views |
+| `/api/works*`, `/api/works/{id}/*` | OIDC bearer; POSTs gated `work.write` | Work CRUD, steer, transitions, timeline |
+| `POST /api/ingress/events` | OIDC bearer; gated `work.write` | CloudEvents 1.0 envelope ingress; fail-closed validation |
+| `/api/identity/roles*` | OIDC bearer; PUT/DELETE gated `identity.roles.manage` | runtime role rules |
+| `/api/dev/*`, `/api/dead-letters` | OIDC bearer (read surface) | dev-time ledger dumps; Plan 12 replaces with admin views |
+| `/api/link/v1*`, `/hubs/link` | link plane (`linkToken`) | untouched by the identity plane |
+
+The kernel refuses to boot at all with an invalid/incomplete `identity:`
+block (`IdentityStartupCheck`, fail closed in every environment).
 
 ## Ingress hard limits
 
@@ -46,7 +113,6 @@ Every `/api/*` endpoint requires `Authorization: Bearer <token>`, checked by mid
 
 | Concern | Plan |
 |---|---|
-| Keycloak OIDC replacing the bootstrap token (same `IIngressTokenValidator` seam) | 07 |
-| Principal mappings, per-team authorization, approval nonces/digests enforced on transitions | 07/08 |
-| Link-session authentication (fencing epochs, `link_sessions` table exists schema-only since Plan 02) | 03 |
+| Refresh-token / session lifecycle for interactive UIs | 12 |
 | Admin surface authorization (replacing `/api/dev/*`) | 12 |
+| Link-plane token rotation (replaces enrollment-secret model) | 10 |

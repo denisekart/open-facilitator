@@ -17,9 +17,38 @@ import { afterAll, beforeAll } from "vitest";
 
 export const FACILITATOR_URL = process.env["FACILITATOR_URL"] ?? "";
 export const PG_URL = process.env["FACILITATOR_PG"] ?? "";
-export const KERNEL_TOKEN = "dev-token";
+export const KEYCLOAK_URL = process.env["KEYCLOAK_URL"] ?? "";
 export const ENROLL_SECRET = "enroll-dev";
-export const E2E = FACILITATOR_URL !== "" && PG_URL !== "";
+export const E2E = FACILITATOR_URL !== "" && PG_URL !== "" && KEYCLOAK_URL !== "";
+
+let cachedToken: { value: string; expiresAtMs: number } | null = null;
+
+/**
+ * Kernel bearer: a client-credentials token for the `facilitator-cli`
+ * service account (realm roles carry the operator mapping), cached until 30 s
+ * before `exp` — the realm's 300 s lifespan keeps rotation exercised on long
+ * files.
+ */
+export async function kernelToken(): Promise<string> {
+  const now = Date.now();
+  if (cachedToken && now < cachedToken.expiresAtMs) return cachedToken.value;
+  const response = await fetch(`${KEYCLOAK_URL}/realms/facilitator/protocol/openid-connect/token`, {
+    method: "post",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "client_credentials",
+      client_id: "facilitator-cli",
+      client_secret: "e2e-cli-secret",
+    }),
+  });
+  if (!response.ok) throw new Error(`keycloak token mint failed: ${response.status}`);
+  const body = (await response.json()) as { access_token: string; expires_in: number };
+  cachedToken = {
+    value: body.access_token,
+    expiresAtMs: now + (body.expires_in - 30) * 1000,
+  };
+  return body.access_token;
+}
 
 const REPO_ROOT = new URL("../../../../", import.meta.url).pathname;
 
@@ -90,6 +119,9 @@ export function useFacilitator(config: ServerConfig = {}): Harness {
           ASPNETCORE_URLS: "http://127.0.0.1:0",
           ConnectionStrings__Facilitator: `Host=${pgHost()};Port=${pgPort()};Database=${dbName};Username=${pgUser()};Password=${pgPassword()}`,
           DOTNET_ENVIRONMENT: "Development",
+          Identity__Oidc__Authority: `${KEYCLOAK_URL}/realms/facilitator`,
+          Identity__Oidc__Audience: "facilitator-api",
+          Identity__Oidc__RequireHttps: "false",
           ...Object.fromEntries(Object.entries(config).map(([k, v]) => [`Link__${k}`, v])),
           OFAC_E2E_PORTFILE: portFile,
         },
@@ -189,13 +221,17 @@ function scrapeUrl(child: ChildProcess): Promise<string> {
       const match = /Now listening on: (http:\/\/[^\s]+)/.exec(buffer);
       if (match) {
         child.stdout?.off("data", onData);
+        child.stderr?.off("data", onData);
         void fetch(`${match[1]}/health`)
           .then((r) => (r.ok ? resolve(match[1]!) : reject(new Error("health not ok"))))
           .catch(reject);
       }
     };
     child.stdout?.on("data", onData);
-    child.once("exit", (code) => reject(new Error(`facilitator exited early: ${code}\n${buffer}`)));
+    child.stderr?.on("data", onData);
+    child.once("exit", (code, signal) =>
+      reject(new Error(`facilitator exited early: code=${code} signal=${signal}\n${buffer}`)),
+    );
     setTimeout(() => reject(new Error(`no listening URL in 60s\n${buffer}`)), 60_000);
   });
 }
@@ -225,7 +261,7 @@ export async function seedDelivery(
   endpointId: string,
   envelope: unknown,
 ): Promise<string> {
-  const response = await post(baseUrl, "/api/dev/link-outbox", KERNEL_TOKEN, {
+  const response = await post(baseUrl, "/api/dev/link-outbox", await kernelToken(), {
     endpointId,
     envelope,
   });
@@ -237,14 +273,14 @@ export async function seedDelivery(
 
 /** Kernel-side ack ledger rows (link acks land there too, LinkHub.AckAsync). */
 export async function kernelDeliveries(baseUrl: string): Promise<{ deliveryId: string }[]> {
-  const response = await get(baseUrl, "/api/dev/deliveries", KERNEL_TOKEN);
+  const response = await get(baseUrl, "/api/dev/deliveries", await kernelToken());
   return response.body as { deliveryId: string }[];
 }
 
 export async function deadLetters(
   baseUrl: string,
 ): Promise<{ outboxId: string; reason: string }[]> {
-  const response = await get(baseUrl, "/api/dead-letters", KERNEL_TOKEN);
+  const response = await get(baseUrl, "/api/dead-letters", await kernelToken());
   return response.body as { outboxId: string; reason: string }[];
 }
 

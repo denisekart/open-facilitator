@@ -23,7 +23,10 @@ public sealed class IngressProcessor(
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
     /// <summary>Create a Work (synthetic inbox row participates in dedupe).</summary>
-    public async Task<IResult> CreateWorkAsync(JsonElement body, CancellationToken ct)
+    /// <param name="body">Request body.</param>
+    /// <param name="actor">Canonical actor of the requesting principal.</param>
+    /// <param name="ct">Cancellation.</param>
+    public async Task<IResult> CreateWorkAsync(JsonElement body, string actor, CancellationToken ct)
     {
         var objective = body.TryGetProperty("objective", out var o) ? o.GetString() : null;
         if (string.IsNullOrWhiteSpace(objective))
@@ -51,14 +54,14 @@ public sealed class IngressProcessor(
         }
 
         var work = await pipeline.WithSpanAsync("ingress.process", async () =>
-            await store.CreateWorkAsync(objective, projectId, "http-operator", ct));
+            await store.CreateWorkAsync(objective, projectId, actor, ct));
         await inbox.MarkProcessedAsync(inboxId, null, ct);
         metrics.InboxProcessed();
         return Results.Created($"/api/works/{work.WorkId}", WorkDtoMapper.ToDto(work));
     }
 
     /// <summary>Guard-checked transition.</summary>
-    public async Task<IResult> TransitionAsync(Guid workId, JsonElement body, CancellationToken ct)
+    public async Task<IResult> TransitionAsync(Guid workId, JsonElement body, string actor, CancellationToken ct)
     {
         var toWire = body.TryGetProperty("to", out var t) ? t.GetString() : null;
         if (toWire is null || !StateGuard.TryParseWork(toWire, out var to))
@@ -73,7 +76,6 @@ public sealed class IngressProcessor(
         }
 
         var reason = body.TryGetProperty("reason", out var r) && r.ValueKind == JsonValueKind.String ? r.GetString() : null;
-        var actor = "http-operator";
 
         var result = await pipeline.WithSpanAsync("ingress.process", async () =>
             await store.ApplyTransitionAsync(workId, to, expected, actor, reason, ct));

@@ -40,21 +40,32 @@ make format    # auto-fix .NET + TS/JSON/YAML formatting
 docker run -d --name ofac-pg -e POSTGRES_USER=demo -e POSTGRES_PASSWORD=demo \
   -e POSTGRES_DB=facilitator -p 5432:5432 postgres:17-alpine
 
-# 2. Start the kernel — auto-migrates on boot (Database:AutoMigrate, default true);
-#    with Auth:BootstrapToken unset in Development the literal dev-token is accepted
+# 2. Dev IdP (Keycloak realm fixture, tag pinned in reference/versions.env)
+docker run -d --name facilitator-idp -p 8480:8080 \
+  -v "$PWD/reference/keycloak/realm.json:/opt/keycloak/data/import/realm.json:ro" \
+  "quay.io/keycloak/keycloak:$(grep '^KEYCLOAK_TAG=' reference/versions.env | cut -d= -f2)" \
+  start-dev --import-realm
+
+# 3. Start the kernel — auto-migrates on boot (Database:AutoMigrate, default
+#    true); the identity: block (appsettings.Development.json) points at the IdP
 ConnectionStrings__Facilitator="Host=localhost;Database=facilitator;Username=demo;Password=demo" \
   dotnet run --project src/facilitator
 
-# 3. Create a Work and walk it through the state machine
+# 4. Mint a bearer (facilitator-cli service account holds the operator roles)
+KERNEL_TOKEN=$(curl -s localhost:8480/realms/facilitator/protocol/openid-connect/token \
+  -d grant_type=client_credentials -d client_id=facilitator-cli \
+  -d client_secret=e2e-cli-secret | jq -r .access_token)
+
+# 5. Create a Work and walk it through the state machine
 curl -s -X POST localhost:8088/api/works \
-  -H 'Authorization: Bearer dev-token' -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $KERNEL_TOKEN" -H 'Content-Type: application/json' \
   -d '{"objective":"kernel check"}'
 curl -s -X POST localhost:8088/api/works/<workId>/transitions \
-  -H 'Authorization: Bearer dev-token' -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $KERNEL_TOKEN" -H 'Content-Type: application/json' \
   -d '{"to":"planning","expectedVersion":1}'
 ```
 
-Responses and errors follow the kernel error contract ([`docs/protocol.md`](protocol.md#kernel-ingress-implemented-plan-02)); a wrong bearer token yields a `401` ProblemDetails.
+Responses and errors follow the kernel error contract ([`docs/protocol.md`](protocol.md#kernel-ingress-implemented-plan-02)); a missing or invalid bearer yields a `401` ProblemDetails, a role denial a `403` (identity model: [`docs/security.md`](security.md)).
 
 The Link server (Plan 03) rides the same process — enroll an endpoint with the dev enrollment secret, then use its `linkToken` as a bearer (contract: [`docs/protocol.md`](protocol.md#link-transport-implemented-plan-03); the scripted fake client lives in `tests/Facilitator.Tests/LinkTestHarness.cs`):
 
@@ -75,10 +86,11 @@ node src/workspace-link/dist/bin/linkd.js run \
   --endpoint gw-dev --team default --manifest manifest.json   # prints "linkd ready ..."
 ```
 
-The same assembly doubles as its own client, riding the public HTTP API only (defaults `--url http://localhost:8088`, token from env `FACILITATOR_TOKEN` else `dev-token`):
+The same assembly doubles as its own client, riding the public HTTP API only (defaults `--url http://localhost:8088`, bearer from env `FACILITATOR_TOKEN` — required, an OIDC access token):
 
 ```bash
-FACILITATOR_TOKEN=dev-token dotnet run --project src/facilitator -- cli \
+export FACILITATOR_TOKEN=$KERNEL_TOKEN   # re-mint after ~4.5 min (300 s lifespan)
+dotnet run --project src/facilitator -- cli \
   work create --objective "kernel check"
 dotnet run --project src/facilitator -- cli work get <workId>
 dotnet run --project src/facilitator -- cli work steer <workId> --directive "focus on tests" --expect-version 1

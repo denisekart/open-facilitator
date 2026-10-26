@@ -41,8 +41,8 @@ public static partial class LinkEndpoints
         return app;
     }
 
-    // Kernel-token surface (BootstrapTokenMiddleware still guards /api/*
-    // outside /api/link/v1): dead-letter visibility (appendix §5.6).
+    // Identity-gated surface (the role gate guards /api/* outside
+    // /api/link/v1): dead-letter visibility (appendix §5.6).
     private static void MapAdmin(IEndpointRouteBuilder app, IHostEnvironment environment)
     {
         app.MapGroup("/api").MapGet("/dead-letters", async (OutboxAdminStore admin, CancellationToken ct) =>

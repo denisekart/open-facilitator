@@ -5,16 +5,17 @@ using Facilitator.Kernel.Shared.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
+using Npgsql;
+
 namespace Facilitator.Kernel.Shared.Identity;
 
 /// <summary>Role-rule mutation outcome for the management API.</summary>
-public enum RoleUpsertResult
+/// <param name="Stored">True when the write landed.</param>
+/// <param name="RowVersion">Stored version after the write (0 for remove).</param>
+public sealed record RoleMutation(bool Stored, long RowVersion)
 {
-    /// <summary>Stored (inserted or updated) and the local snapshot refreshed.</summary>
-    Stored,
-
-    /// <summary>rowVersion mismatch (or absence) against the stored row (409).</summary>
-    Conflict,
+    /// <summary>Version/absence mismatch — caller answers 409.</summary>
+    public bool Mismatch => !Stored;
 }
 
 /// <summary>
@@ -66,58 +67,61 @@ public sealed class RoleStore(
     /// <param name="expectedRowVersion">Stored row version the writer saw; null forces the write.</param>
     /// <param name="actor">Canonical actor for the audit row.</param>
     /// <param name="ct">Cancellation.</param>
-    public async Task<RoleUpsertResult> UpsertAsync(string roleName, IReadOnlyList<RoleRule> rules, long? expectedRowVersion, string? actor, CancellationToken ct)
+    public async Task<RoleMutation> UpsertAsync(string roleName, IReadOnlyList<RoleRule> rules, long? expectedRowVersion, string? actor, CancellationToken ct)
     {
         await using var db = await contextFactory.CreateDbContextAsync(ct);
         var existing = await db.IdentityRoles.FirstOrDefaultAsync(r => r.RoleName == roleName, ct);
         var now = timeProvider.GetUtcNow().UtcDateTime;
+        long storedVersion;
         if (existing is null)
         {
             if (expectedRowVersion > 0)
             {
-                return RoleUpsertResult.Conflict;
+                return new RoleMutation(false, 0);
             }
 
+            storedVersion = 1;
             db.IdentityRoles.Add(new IdentityRoleEntity
             {
                 RoleName = roleName,
                 Rules = RoleRuleJson.Serialize(rules),
-                RowVersion = 1,
+                RowVersion = storedVersion,
                 UpdatedAt = now,
             });
         }
         else if (expectedRowVersion is not null && existing.RowVersion != expectedRowVersion)
         {
-            return RoleUpsertResult.Conflict;
+            return new RoleMutation(false, 0);
         }
         else
         {
+            storedVersion = existing.RowVersion + 1;
             existing.Rules = RoleRuleJson.Serialize(rules);
-            existing.RowVersion += 1;
+            existing.RowVersion = storedVersion;
             existing.UpdatedAt = now;
         }
 
         await db.SaveChangesAsync(ct);
         await RefreshNowAsync(ct);
-        await audit.WriteAsync(RoleEditAudit("upsert", roleName, rules.Count, actor), ct);
-        return RoleUpsertResult.Stored;
+        await audit.WriteAsync(RoleEditAudit("upsert", roleName, rules.Count, storedVersion, actor), ct);
+        return new RoleMutation(true, storedVersion);
     }
 
     /// <summary>Remove a role (409 semantics on absence or rowVersion mismatch).</summary>
-    public async Task<RoleUpsertResult> RemoveAsync(string roleName, long? expectedRowVersion, string? actor, CancellationToken ct)
+    public async Task<RoleMutation> RemoveAsync(string roleName, long? expectedRowVersion, string? actor, CancellationToken ct)
     {
         await using var db = await contextFactory.CreateDbContextAsync(ct);
         var existing = await db.IdentityRoles.FirstOrDefaultAsync(r => r.RoleName == roleName, ct);
         if (existing is null || (expectedRowVersion is not null && existing.RowVersion != expectedRowVersion))
         {
-            return RoleUpsertResult.Conflict;
+            return new RoleMutation(false, 0);
         }
 
         db.IdentityRoles.Remove(existing);
         await db.SaveChangesAsync(ct);
         await RefreshNowAsync(ct);
-        await audit.WriteAsync(RoleEditAudit("remove", roleName, 0, actor), ct);
-        return RoleUpsertResult.Stored;
+        await audit.WriteAsync(RoleEditAudit("remove", roleName, 0, 0, actor), ct);
+        return new RoleMutation(true, 0);
     }
 
     /// <summary>All stored rows for the management API (name, rules, rowVersion).</summary>
@@ -128,8 +132,8 @@ public sealed class RoleStore(
         return rows.Select(r => (r.RoleName, RoleRuleJson.ParseRules(r.Rules) ?? [], r.RowVersion)).ToList();
     }
 
-    private static AuditRecord RoleEditAudit(string verb, string roleName, int ruleCount, string? actor) =>
-        new(actor, $"identity.role.{verb}", $"/api/identity/roles/{roleName}", "allow", null, null, null,
+    private static AuditRecord RoleEditAudit(string verb, string roleName, int ruleCount, long rowVersion, string? actor) =>
+        new(actor, $"identity.role.{verb}", $"/api/identity/roles/{roleName}", "allow", null, null, $"rv{rowVersion}",
             JsonSerializer.Serialize(new { role = roleName, ruleCount }));
 
     private bool IsStale(Snapshot snapshot) =>
@@ -197,8 +201,20 @@ public sealed class RoleStore(
             });
         }
 
-        await db.SaveChangesAsync(ct);
-        logger.LogInformation("identity_roles seeded from identity:roles config ({Count} roles) — DB is truth thereafter", configRules.Count);
+        try
+        {
+            // One tx inserts the whole seed set: a concurrent boot either
+            // committed first (we lose on the PK and simply adopt its rows)
+            // or not at all. Seed content is boot-time config, so "winner's
+            // rows" is the same set for every replica of a given deployment.
+            await db.SaveChangesAsync(ct);
+            logger.LogInformation("identity_roles seeded from identity:roles config ({Count} roles) — DB is truth thereafter", configRules.Count);
+        }
+        catch (DbUpdateException e) when (e.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+        {
+            db.ChangeTracker.Clear();
+            logger.LogInformation("identity_roles seed lost the race to a concurrent boot — adopting its rows");
+        }
     }
 
     private sealed record Snapshot(IReadOnlyList<RoleRuleSet> Rules, string PolicyVersion, DateTime NextRefresh);

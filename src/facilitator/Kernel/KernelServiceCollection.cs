@@ -33,6 +33,7 @@ public static class KernelServiceCollection
     public static WebApplicationBuilder AddKernel(this WebApplicationBuilder builder)
     {
         builder.AddSharedKernel();
+        builder.AddIdentityFeature();
         builder.AddWorkFeature();
         builder.AddLinkFeature();
         return builder;
@@ -56,19 +57,25 @@ public static class KernelServiceCollection
         builder.Services.AddSingleton<IngressStore>();
         builder.Services.AddSingleton<ISink, KernelLogSink>();
         builder.Services.AddSingleton<IEventDispatcher, DbEventDispatcher>();
-        builder.Services.AddSingleton<IIngressTokenValidator, BootstrapTokenValidator>();
-        builder.Services.AddSingleton<BootstrapAuthStartupCheck>();
-        builder.Services.AddHostedService(sp => sp.GetRequiredService<BootstrapAuthStartupCheck>());
+        builder.Services.AddHostedService<OutboxDispatcher>();
+
+        builder.Services.AddProblemDetails();
+        builder.AddOpenTelemetry();
+        return builder;
+    }
+
+    /// <summary>Human-plane identity: JwtBearer (OIDC), role store, audit spine, startup gate.</summary>
+    private static WebApplicationBuilder AddIdentityFeature(this WebApplicationBuilder builder)
+    {
+        var identity = builder.Configuration.GetSection(IdentityOptions.SectionName).Get<IdentityOptions>() ?? new IdentityOptions();
         builder.Services.Configure<IdentityOptions>(
             builder.Configuration.GetSection(IdentityOptions.SectionName));
         builder.Services.AddSingleton<AuditWriter>();
         builder.Services.AddSingleton<RoleStore>();
         builder.Services.AddSingleton<IdentityStartupCheck>();
         builder.Services.AddHostedService(sp => sp.GetRequiredService<IdentityStartupCheck>());
-        builder.Services.AddHostedService<OutboxDispatcher>();
-
-        builder.Services.AddProblemDetails();
-        builder.AddOpenTelemetry();
+        builder.Services.AddAuthentication(IdentityAuthentication.Scheme)
+            .AddJwtBearer(IdentityAuthentication.Scheme, options => IdentityJwt.Configure(options, identity));
         return builder;
     }
 

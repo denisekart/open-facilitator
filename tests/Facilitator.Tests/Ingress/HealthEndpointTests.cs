@@ -17,7 +17,6 @@ public class HealthEndpointNoDatabaseFactory : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseSetting("Database:AutoMigrate", "false");
-        builder.UseSetting("Auth:BootstrapToken", "health-test-token");
     }
 }
 

@@ -81,7 +81,7 @@ public static class ClaimPointers
     internal static IReadOnlyList<string> ExtractStrings(JsonElement value, string shape) => shape switch
     {
         ClaimShape.StringArray => value.ValueKind == JsonValueKind.Array ? StringArray(value) : [],
-        ClaimShape.SpaceDelimited => value.ValueKind == JsonValueKind.String ? SpaceDelimited(value.GetString()! ) : [],
+        ClaimShape.SpaceDelimited => value.ValueKind == JsonValueKind.String ? SpaceDelimited(value.GetString()!) : [],
         ClaimShape.StringArrayOrSpaceDelimited => value.ValueKind switch
         {
             JsonValueKind.Array => StringArray(value),

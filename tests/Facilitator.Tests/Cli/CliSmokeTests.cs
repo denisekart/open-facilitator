@@ -32,6 +32,9 @@ public class CliSmokeTests(PostgresFixture fixture)
         startInfo.Environment["ASPNETCORE_ENVIRONMENT"] = "Development";
         startInfo.Environment["ConnectionStrings__Facilitator"] = fixture.ConnectionString;
         startInfo.Environment["Database__AutoMigrate"] = "true"; // advisory-lock serialized, idempotent
+        startInfo.Environment["Identity__Oidc__Authority"] = KeycloakFixture.Issuer;
+        startInfo.Environment["Identity__Oidc__Audience"] = "facilitator-api";
+        startInfo.Environment["Identity__Oidc__RequireHttps"] = "false";
 
         using var server = Process.Start(startInfo)!;
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
@@ -83,7 +86,7 @@ public class CliSmokeTests(PostgresFixture fixture)
 
     private static async Task<(int ExitCode, string Stdout)> RunCliAsync(string assembly, int port, string[] args, CancellationToken ct)
     {
-        var argv = new List<string> { "--url", $"http://127.0.0.1:{port}", "--token", "dev-token" };
+        var argv = new List<string> { "--url", $"http://127.0.0.1:{port}", "--token", KeycloakFixture.CliToken };
         argv.AddRange(args);
         var startInfo = new ProcessStartInfo("dotnet", $"\"{assembly}\" cli {string.Join(' ', argv.Select(a => a.Contains(' ') ? $"\"{a}\"" : a))}")
         {
@@ -92,7 +95,6 @@ public class CliSmokeTests(PostgresFixture fixture)
             RedirectStandardError = true,
             UseShellExecute = false,
         };
-        startInfo.Environment["FACILITATOR_TOKEN"] = "dev-token";
 
         using var process = Process.Start(startInfo)!;
         var stdout = await process.StandardOutput.ReadToEndAsync(ct);

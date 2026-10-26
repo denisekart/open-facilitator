@@ -104,6 +104,15 @@ jobs:
       - run: pnpm -r build
       - name: build Facilitator (the e2e harness spawns its own server per file)
         run: dotnet build src/facilitator -c Release
+      - name: start Keycloak (identity IdP for kernel bearers)
+        run: |
+          docker run -d --name idp -p 8480:8080 \
+            -v "$GITHUB_WORKSPACE/reference/keycloak/realm.json:/opt/keycloak/data/import/realm.json:ro" \
+            "quay.io/keycloak/keycloak:$(grep '^KEYCLOAK_TAG=' reference/versions.env | cut -d= -f2)" \
+            start-dev --import-realm
+          for _ in $(seq 1 90); do
+            curl -sf http://localhost:8480/realms/facilitator/.well-known/openid-configuration >/dev/null && exit 0; sleep 1
+          done; docker logs idp; exit 1
       - name: workspace link e2e
         env:
           # Gate URL only: each e2e file boots its OWN Facilitator on an
@@ -111,6 +120,7 @@ jobs:
           # value never gets dialed.
           FACILITATOR_URL: http://gate-only
           FACILITATOR_PG: postgresql://postgres:postgres@localhost:5432/postgres
+          KEYCLOAK_URL: http://localhost:8480
         run: pnpm -C src/workspace-link test:e2e
 
   gateway-e2e:
@@ -141,6 +151,15 @@ jobs:
       - run: pnpm -r build
       - name: build Facilitator (the e2e harness spawns its own server per file)
         run: dotnet build src/facilitator -c Release
+      - name: start Keycloak (identity IdP for kernel bearers)
+        run: |
+          docker run -d --name idp -p 8480:8080 \
+            -v "$GITHUB_WORKSPACE/reference/keycloak/realm.json:/opt/keycloak/data/import/realm.json:ro" \
+            "quay.io/keycloak/keycloak:$(grep '^KEYCLOAK_TAG=' reference/versions.env | cut -d= -f2)" \
+            start-dev --import-realm
+          for _ in $(seq 1 90); do
+            curl -sf http://localhost:8480/realms/facilitator/.well-known/openid-configuration >/dev/null && exit 0; sleep 1
+          done; docker logs idp; exit 1
       - name: gateway e2e
         env:
           # Gate URL only: each e2e file boots its OWN Facilitator on an
@@ -148,11 +167,13 @@ jobs:
           # value never gets dialed.
           FACILITATOR_URL: http://gate-only
           FACILITATOR_PG: postgresql://postgres:postgres@localhost:5432/postgres
+          KEYCLOAK_URL: http://localhost:8480
         run: pnpm -C src/gateway test:e2e
       - name: harness worker e2e (plan 07 deterministic worker vs standalone gateway)
         env:
           FACILITATOR_URL: http://gate-only
           FACILITATOR_PG: postgresql://postgres:postgres@localhost:5432/postgres
+          KEYCLOAK_URL: http://localhost:8480
         run: pnpm -C src/adapters/harnesses/deterministic test:e2e
 
   features:
@@ -213,11 +234,23 @@ jobs:
         run: node features/build.mjs
       - name: build Facilitator
         run: dotnet build src/facilitator -c Release
-      - name: boot Facilitator (Development mode, dev-token + enroll-dev)
+      - name: start Keycloak (identity IdP for kernel bearers)
+        run: |
+          docker run -d --name idp -p 8480:8080 \
+            -v "$GITHUB_WORKSPACE/reference/keycloak/realm.json:/opt/keycloak/data/import/realm.json:ro" \
+            "quay.io/keycloak/keycloak:$(grep '^KEYCLOAK_TAG=' reference/versions.env | cut -d= -f2)" \
+            start-dev --import-realm
+          for _ in $(seq 1 90); do
+            curl -sf http://localhost:8480/realms/facilitator/.well-known/openid-configuration >/dev/null && exit 0; sleep 1
+          done; docker logs idp; exit 1
+      - name: boot Facilitator (Development mode, OIDC + enroll-dev)
         run: |
           ASPNETCORE_ENVIRONMENT=Development \
           ASPNETCORE_URLS=http://0.0.0.0:8088 \
           ConnectionStrings__Facilitator="Host=localhost;Database=postgres;Username=postgres;Password=postgres" \
+          Identity__Oidc__Authority=http://localhost:8480/realms/facilitator \
+          Identity__Oidc__Audience=facilitator-api \
+          Identity__Oidc__RequireHttps=false \
           nohup dotnet run --project src/facilitator -c Release --no-build > /tmp/kernel.log 2>&1 &
           for _ in $(seq 1 60); do
             curl -sf http://localhost:8088/health >/dev/null && exit 0; sleep 1
@@ -238,8 +271,10 @@ jobs:
       - name: seed assignment + verify completion
         run: |
           W=examples/slim/deterministic-research-worker
+          KERNEL_TOKEN=$(curl -sf http://localhost:8480/realms/facilitator/protocol/openid-connect/token \
+            -d grant_type=client_credentials -d client_id=facilitator-cli -d client_secret=e2e-cli-secret | jq -r .access_token)
           curl -sf -X POST localhost:8088/api/dev/link-outbox \
-            -H 'Authorization: Bearer dev-token' -H 'Content-Type: application/json' \
+            -H "Authorization: Bearer $KERNEL_TOKEN" -H 'Content-Type: application/json' \
             -d "{\"endpointId\":\"gw.demo\",\"envelope\":{\"specversion\":\"1.0\",\"id\":\"ci-cmd-1\",\"source\":\"urn:facilitator:instance:demo\",\"type\":\"org.facilitator.command.work.assign.v1\",\"subject\":\"work/work-ci-1/assignment/asg-ci-1\",\"time\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"datacontenttype\":\"application/json\",\"dataschema\":\"https://schemas.openfacilitator.org/v1/command.work.assign.v1.json\",\"data\":{\"commandId\":\"ci-cmd-1\",\"actorEvidenceRef\":\"identity-evidence:demo\",\"workId\":\"work-ci-1\",\"targetId\":\"demo\",\"capabilityId\":\"research.analyze\",\"expectedContextVersion\":1,\"inputs\":{\"objective\":\"cost model\",\"sourceRefs\":[]},\"expectedDeliverables\":[{\"kind\":\"analysis.report\",\"mediaType\":\"text/markdown\"}],\"deadline\":\"2036-10-23T18:00:00Z\",\"assignmentId\":\"asg-ci-1\"}}}"
           for _ in $(seq 1 30); do
             PGPASSWORD=postgres psql -h localhost -U postgres -d postgres -tA -c \

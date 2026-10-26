@@ -13,11 +13,11 @@ PostgreSQL 17 + .NET 10 + Node 22 (as `docs/getting-started.md`).
 ## 1. Kernel
 
 ```bash
-# repo root — dev Postgres per getting-started
+# repo root — dev Postgres + dev IdP per getting-started §3
 docker run -d --name ofac-pg -e POSTGRES_USER=demo -e POSTGRES_PASSWORD=demo \
   -e POSTGRES_DB=facilitator -p 5432:5432 postgres:17-alpine
 ConnectionStrings__Facilitator="Host=localhost;Database=facilitator;Username=demo;Password=demo" \
-  dotnet run --project src/facilitator   # Development: dev-token + enroll-dev
+  dotnet run --project src/facilitator   # Development: OIDC IdP + enroll-dev
 ```
 
 ## 2. Build the worker + Gateway, then boot both
@@ -58,8 +58,10 @@ planned; for a direct worker smoke, the Development-only dev affordance
 inserts a link-addressed outbox row (exactly what the e2e tier seeds):
 
 ```bash
+KERNEL_TOKEN=$(curl -s localhost:8480/realms/facilitator/protocol/openid-connect/token \
+  -d grant_type=client_credentials -d client_id=facilitator-cli -d client_secret=e2e-cli-secret | jq -r .access_token)
 curl -s -X POST localhost:8088/api/dev/link-outbox \
-  -H 'Authorization: Bearer dev-token' -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $KERNEL_TOKEN" -H 'Content-Type: application/json' \
   -d '{
     "endpointId": "gw.demo",
     "envelope": {
@@ -145,7 +147,7 @@ supervisor entrypoint boots a standalone Gateway + deterministic worker (the
 beside it — the coexistence proof.
 
 ```bash
-# repo root — host kernel per §1 (dev mode: dev-token + enroll-dev)
+# repo root — host kernel per §1 (dev mode: OIDC IdP + enroll-dev)
 ConnectionStrings__Facilitator="Host=localhost;Database=facilitator;Username=demo;Password=demo" \
   dotnet run --project src/facilitator &
 

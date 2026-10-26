@@ -1,6 +1,8 @@
 using System.Text;
 using System.Text.Json.Nodes;
 
+namespace Facilitator.Tests.Link;
+
 /// <summary>
 /// Plan 10 evidence law on link admission (appendix §3.2): a kernel-checkable
 /// ref that FAILS validation denies admission (422 evidence-invalid + audit

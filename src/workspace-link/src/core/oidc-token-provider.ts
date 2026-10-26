@@ -27,7 +27,11 @@ export function oidcClientCredentialsTokenProvider(
   let cached: { token: string; expiresAtMs: number } | null = null;
 
   async function mint(): Promise<string> {
-    const form = new URLSearchParams({ grant_type: "client_credentials", client_id: opts.clientId, client_secret: opts.clientSecret });
+    const form = new URLSearchParams({
+      grant_type: "client_credentials",
+      client_id: opts.clientId,
+      client_secret: opts.clientSecret,
+    });
     if (opts.scope) form.set("scope", opts.scope);
     if (opts.audience) form.set("audience", opts.audience);
     const response = await fetchImpl(opts.tokenUrl, {

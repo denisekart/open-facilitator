@@ -6,7 +6,15 @@
 // while the first hello after a graceful goodbye re-INSERTs and restarts at 1.
 import { describe, expect, it } from "vitest";
 import { enroll } from "../../src/index.js";
-import { ENROLL_SECRET, E2E, linkGet, sdkClient, useFacilitator, waitFor } from "./harness.js";
+import {
+  ENROLL_SECRET,
+  E2E,
+  TEAM,
+  linkGet,
+  sdkClient,
+  useFacilitator,
+  waitFor,
+} from "./harness.js";
 
 const h = useFacilitator();
 
@@ -30,6 +38,7 @@ describe.skipIf(!E2E)("link handshake", () => {
       endpointId: `${endpointId}-bare`,
       instanceId: "e2e-bare",
       trustMode: "shared-runtime",
+      team: TEAM,
     });
     const missing = await linkGet(h.baseUrl, "/api/link/v1/capabilities", bare.linkToken ?? "");
     expect(missing.status).toBe(404);

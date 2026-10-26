@@ -19,12 +19,13 @@
 //       the text — proven against the dist/cjs transport), so
 //       TransportError.unauthorized never fires and the SDK cannot detect
 //       rotation mid-reconnect. Recorded gap for the SDK/Plan 06.
-//     · Recovery law: a restart re-enrolls at startup (secret configured)
-//       and writes the token file BEFORE any connect, then flows.
+//     · Recovery law: a restart re-enrolls at startup (workload block
+//       configured — mode (b)) and writes the token file BEFORE any
+//       connect, then flows.
 import { beforeAll, describe, expect, it } from "vitest";
 import {
   E2E,
-  ENROLL_SECRET,
+  TEAM,
   assignEnvelope,
   gatewayConfig,
   gatewayStatus,
@@ -39,6 +40,7 @@ import {
   type Harness,
 } from "./gateway-harness.js";
 import { enroll } from "../../../workspace-link/src/index.js";
+import { workloadToken } from "../../../workspace-link/test/e2e/harness.js";
 
 describe.skipIf(!E2E)("gateway dedupe + rotation e2e", () => {
   // Link__HeartbeatSeconds=5: the welcome-advertised lease cadence, so a
@@ -127,14 +129,16 @@ describe.skipIf(!E2E)("gateway dedupe + rotation e2e", () => {
       await gateway.ready();
       const tokenBefore = gatewayToken(gw.stateDir);
 
-      // Out-of-band re-enroll, same endpointId: the stored hash is replaced
-      // ⇒ the gateway's token is dead for any NEW authentication.
+      // Out-of-band mode-(b) re-enroll, same endpointId: a fresh OIDC CC
+      // JWT for the bound client, the stored hash is replaced ⇒ the
+      // gateway's token is dead for any NEW authentication.
       const rotated = await enroll({
         baseUrl: harness.baseUrl,
-        token: ENROLL_SECRET,
+        token: await workloadToken(),
         endpointId: gw.gatewayId,
         instanceId: `rotate-${Math.random().toString(36).slice(2, 10)}`,
         trustMode: "shared-runtime",
+        team: TEAM,
       });
       expect(rotated.linkToken).toBeDefined();
       expect(rotated.linkToken).not.toBe(tokenBefore);

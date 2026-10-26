@@ -51,7 +51,8 @@ public sealed class OidcJwks(IOptions<IdentityOptions> identity)
     }
 
     /// <summary>Verify signature + issuer + audience + lifetime; the reason names the failed check.</summary>
-    public async Task<OidcVerifyResult> ValidateAsync(string token, string audience, CancellationToken ct)
+    /// <param name="clockSkewSeconds">Lifetime-check tolerance; evidence tests pin it to 0 so a 1s-lifespan token expires deterministically.</param>
+    public async Task<OidcVerifyResult> ValidateAsync(string token, string audience, CancellationToken ct, int clockSkewSeconds = 30)
     {
         if (!TryRead(token, out var jwt))
         {
@@ -77,7 +78,7 @@ public sealed class OidcJwks(IOptions<IdentityOptions> identity)
             ValidAudience = audience,
             ValidateIssuerSigningKey = true,
             ValidAlgorithms = IdentityAuthentication.ValidAlgorithms,
-            ClockSkew = TimeSpan.FromSeconds(30),
+            ClockSkew = TimeSpan.FromSeconds(clockSkewSeconds),
             IssuerSigningKeys = keys,
         };
 

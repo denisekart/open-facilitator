@@ -46,7 +46,7 @@ describe.skipIf(!E2E)("gateway assign e2e", () => {
         ownerTeam: string;
         capabilities: { id: string }[];
       };
-      expect(manifest.ownerTeam).toBe("default");
+      expect(manifest.ownerTeam).toBe("team-alpha");
       expect(manifest.capabilities.map((c) => c.id)).toEqual(["research.analyze"]);
 
       // Seed a work.assign for this endpoint and watch it flow end to end.

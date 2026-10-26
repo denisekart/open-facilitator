@@ -7,13 +7,13 @@ import { createServer } from "node:net";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { ENROLL_SECRET, psql, waitExit } from "../../../workspace-link/test/e2e/harness.js";
+import { KEYCLOAK_URL, psql, waitExit } from "../../../workspace-link/test/e2e/harness.js";
 
 export {
   E2E,
-  ENROLL_SECRET,
   FACILITATOR_URL,
   PG_URL,
+  TEAM,
   assignEnvelope,
   kernelDeliveries,
   linkRow,
@@ -21,6 +21,7 @@ export {
   seedDelivery,
   useFacilitator,
   waitFor,
+  workloadToken,
   type ServerConfig,
 } from "../../../workspace-link/test/e2e/harness.js";
 
@@ -56,9 +57,11 @@ export interface GatewayHandleConfig {
   socketPath?: string;
 }
 
-let idCounter = 0;
-
-/** Fresh gatewayId + stateDir + explicit diagnostics port; writes the YAML. */
+/**
+ * Mode-(b) e2e gateway law: every file gets its OWN database, so all files
+ * may share the dev-config-bound id `gw.team-alpha` (realm client
+ * `ofac-gateway-alpha`, team-alpha, accepts-delegation) without collision.
+ */
 export async function gatewayConfig(options: {
   facilitatorUrl: string;
   mode?: "echo" | "stub";
@@ -69,17 +72,20 @@ export async function gatewayConfig(options: {
   /** Gateway role for fleet YAML (default: shared). */
   gatewayMode?: "shared" | "standalone";
 }): Promise<GatewayHandleConfig> {
-  idCounter += 1;
-  const gatewayId = `gw.e2e-${Math.random().toString(36).slice(2, 8)}${idCounter}`;
+  const gatewayId = "gw.team-alpha";
   const stateDir = mkdtempSync(join(tmpdir(), "gw-e2e-"));
   const diagnosticsPort = await freePort();
   const yaml = `
 apiVersion: facilitator.framework/v1
 kind: Gateway
 gatewayId: ${gatewayId}
-team: default
+team: team-alpha
+role: gateway
 facilitatorUrl: ${options.facilitatorUrl}
-enrollmentSecret: ${ENROLL_SECRET}
+workload:
+  tokenUrl: ${KEYCLOAK_URL}/realms/facilitator/protocol/openid-connect/token
+  clientId: ofac-gateway-alpha
+  clientSecret: gateway-alpha-secret
 trustMode: shared-runtime
 stateDir: ${stateDir}
 ${

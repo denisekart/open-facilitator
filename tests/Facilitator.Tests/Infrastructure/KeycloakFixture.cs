@@ -81,12 +81,32 @@ public sealed class KeycloakFixture : IAsyncLifetime
     /// <summary>Access token for the <c>facilitator-cli</c> service account (holds the operator realm roles).</summary>
     public static Task<string> TokenForClientAsync() => Task.FromResult(CliToken);
 
+    /// <summary>Client-credentials token for any realm client (plan 10 mode-(b) enrollment + evidence).</summary>
+    public static Task<string> TokenForClientAsync(string clientId, string clientSecret) =>
+        MintAsync(new Dictionary<string, string>
+        {
+            ["grant_type"] = "client_credentials",
+            ["client_id"] = clientId,
+            ["client_secret"] = clientSecret,
+        }).ContinueWith(t => t.Result.Token);
+
     /// <summary>Access token via the direct grant (e.g. alice / bob / carol).</summary>
     public static async Task<string> TokenForUserAsync(string user, string password) =>
         (await MintAsync(new Dictionary<string, string>
         {
             ["grant_type"] = "password",
             ["client_id"] = "facilitator-api",
+            ["username"] = user,
+            ["password"] = password,
+        })).Token;
+
+    /// <summary>Direct grant against a confidential client (evidence issuers carry mappers the public client lacks).</summary>
+    public static async Task<string> TokenForUserAsync(string user, string password, string clientId, string clientSecret) =>
+        (await MintAsync(new Dictionary<string, string>
+        {
+            ["grant_type"] = "password",
+            ["client_id"] = clientId,
+            ["client_secret"] = clientSecret,
             ["username"] = user,
             ["password"] = password,
         })).Token;

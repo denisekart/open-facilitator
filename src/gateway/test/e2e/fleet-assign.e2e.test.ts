@@ -99,7 +99,7 @@ describe.skipIf(!E2E)("gateway fleet assign e2e", () => {
         const m = r.body as { capabilities: { id: string }[]; ownerTeam: string };
         return m.capabilities.length === 2 ? m : false;
       });
-      expect(caps.ownerTeam).toBe("default");
+      expect(caps.ownerTeam).toBe("team-alpha");
       expect(caps.capabilities.map((c) => c.id).sort()).toEqual([
         "report.render",
         "research.analyze",

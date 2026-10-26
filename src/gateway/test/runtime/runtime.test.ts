@@ -132,7 +132,12 @@ function fakeKernel(): FakeKernel {
     }
     return new Response("no route", { status: 500 });
   }) as typeof fetch;
-  return { calls, fetchImpl, capabilitiesBody: () => capabilitiesBody, enrollBody: () => enrollBody };
+  return {
+    calls,
+    fetchImpl,
+    capabilitiesBody: () => capabilitiesBody,
+    enrollBody: () => enrollBody,
+  };
 }
 
 function config(): GatewayConfig {
@@ -213,7 +218,8 @@ async function booted(
     configYaml?: string;
   } = {},
 ): Promise<Booted> {
-  const cfg = options.configYaml !== undefined ? parseConfig(options.configYaml, { env: {} }) : config();
+  const cfg =
+    options.configYaml !== undefined ? parseConfig(options.configYaml, { env: {} }) : config();
   const mock = new MockTransport();
   const server = fakeKernel();
   const logger = createMemoryLogger();

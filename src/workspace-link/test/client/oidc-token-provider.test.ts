@@ -40,7 +40,13 @@ describe("oidcClientCredentialsTokenProvider", () => {
   it("refresh() forces a re-mint and forwards scope/audience", async () => {
     const calls: RequestInit[] = [];
     const provider = oidcClientCredentialsTokenProvider(
-      { tokenUrl: "http://idp/token", clientId: "cid", clientSecret: "sec", scope: "s", audience: "a" },
+      {
+        tokenUrl: "http://idp/token",
+        clientId: "cid",
+        clientSecret: "sec",
+        scope: "s",
+        audience: "a",
+      },
       fakeIdp(calls),
     );
     await provider.getToken();

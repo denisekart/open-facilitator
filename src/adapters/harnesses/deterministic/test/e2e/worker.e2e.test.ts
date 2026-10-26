@@ -166,7 +166,7 @@ describe.skipIf(!E2E)("deterministic worker e2e", () => {
         const m = r.body as { capabilities: { id: string }[]; ownerTeam: string };
         return m.capabilities.some((c) => c.id === "research.analyze") ? m : false;
       });
-      expect(caps.ownerTeam).toBe("default");
+      expect(caps.ownerTeam).toBe("team-alpha");
       const online = await waitFor("worker connected", async () => {
         const s = await gatewayStatus(gw.diagnosticsPort);
         return s.children?.some((c) => c.state === "connected") ? s : false;

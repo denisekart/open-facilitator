@@ -21,7 +21,10 @@ export const KEYCLOAK_URL = process.env["KEYCLOAK_URL"] ?? "";
 export const ENROLL_SECRET = "enroll-dev";
 export const E2E = FACILITATOR_URL !== "" && PG_URL !== "" && KEYCLOAK_URL !== "";
 
+export const TEAM = "team-alpha";
+
 let cachedToken: { value: string; expiresAtMs: number } | null = null;
+let cachedWorkloadToken: { value: string; expiresAtMs: number } | null = null;
 
 /**
  * Kernel bearer: a client-credentials token for the `facilitator-cli`
@@ -44,6 +47,34 @@ export async function kernelToken(): Promise<string> {
   if (!response.ok) throw new Error(`keycloak token mint failed: ${response.status}`);
   const body = (await response.json()) as { access_token: string; expires_in: number };
   cachedToken = {
+    value: body.access_token,
+    expiresAtMs: now + (body.expires_in - 30) * 1000,
+  };
+  return body.access_token;
+}
+
+/**
+ * Mode-(b) enrollment credential: a client-credentials JWT for
+ * `ofac-gateway-alpha` (realm audience mappers carry `facilitator-link`;
+ * the kernel dev config binds this client to `gw.team-alpha`). Cached like
+ * the kernel bearer — the credential is only checked at enroll time.
+ */
+export async function workloadToken(): Promise<string> {
+  const now = Date.now();
+  if (cachedWorkloadToken && now < cachedWorkloadToken.expiresAtMs)
+    return cachedWorkloadToken.value;
+  const response = await fetch(`${KEYCLOAK_URL}/realms/facilitator/protocol/openid-connect/token`, {
+    method: "post",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "client_credentials",
+      client_id: "ofac-gateway-alpha",
+      client_secret: "gateway-alpha-secret",
+    }),
+  });
+  if (!response.ok) throw new Error(`keycloak workload token mint failed: ${response.status}`);
+  const body = (await response.json()) as { access_token: string; expires_in: number };
+  cachedWorkloadToken = {
     value: body.access_token,
     expiresAtMs: now + (body.expires_in - 30) * 1000,
   };
@@ -504,11 +535,12 @@ export async function sdkClient(
         endpointId: options.endpointId,
         instanceId: `e2e-${Math.random().toString(36).slice(2, 10)}`,
         trustMode: "isolated-executor",
+        team: TEAM,
       })
     ).linkToken;
   if (token === undefined) throw new Error("enroll issued no linkToken");
   const provider: LinkTokenProvider = { getToken: async () => token };
-  const manifest = makeManifest("default") as unknown as CapabilityManifestV1;
+  const manifest = makeManifest(TEAM) as unknown as CapabilityManifestV1;
   const posted = await postCapabilities(manifest, {
     baseUrl: harness.baseUrl,
     getToken: async () => token,

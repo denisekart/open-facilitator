@@ -465,7 +465,12 @@ export function parseConfig(yamlText: string, options: ParseConfigOptions = {}):
   const childSecret = env["OFAC_CHILD_SECRET"];
   const hasStoredToken =
     options.hasStoredToken ?? ((dir: string) => existsSync(tokenFilePath(dir)));
-  if (linkToken === undefined && enrollmentSecret === undefined && workload === undefined && !hasStoredToken(stateDir)) {
+  if (
+    linkToken === undefined &&
+    enrollmentSecret === undefined &&
+    workload === undefined &&
+    !hasStoredToken(stateDir)
+  ) {
     fail(
       "enrollmentSecret",
       `neither linkToken/OFAC_LINK_TOKEN nor enrollmentSecret/OFAC_ENROLL_SECRET is set and no token file exists in '${stateDir}'`,

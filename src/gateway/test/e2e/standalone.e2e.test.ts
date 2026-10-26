@@ -70,7 +70,7 @@ describe.skipIf(!E2E)("gateway standalone e2e", () => {
         );
         return r.status === 200 ? (r.body as { ownerTeam: string }) : false;
       });
-      expect(caps.ownerTeam).toBe("default");
+      expect(caps.ownerTeam).toBe("team-alpha");
     } finally {
       child?.kill("SIGKILL");
       await gateway.kill("SIGTERM");

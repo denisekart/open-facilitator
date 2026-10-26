@@ -30,7 +30,7 @@ describe.skipIf(!E2E)("linkd crash replay", () => {
   it("restarts from the state file and replays only the un-acked delivery", async () => {
     const endpointId = `e2e-replay-${Math.random().toString(36).slice(2, 8)}`;
     const state = tempFile("replay.sqlite");
-    const manifest = manifestFile(makeManifest("default"));
+    const manifest = manifestFile(makeManifest("team-alpha"));
 
     const first = startLinkd([
       "run",
@@ -41,7 +41,7 @@ describe.skipIf(!E2E)("linkd crash replay", () => {
       "--endpoint",
       endpointId,
       "--team",
-      "default",
+      "team-alpha",
       "--manifest",
       manifest,
       "--state",
@@ -109,7 +109,7 @@ describe.skipIf(!E2E)("linkd crash replay", () => {
       "--endpoint",
       endpointId,
       "--team",
-      "default",
+      "team-alpha",
       "--manifest",
       manifest,
       "--state",

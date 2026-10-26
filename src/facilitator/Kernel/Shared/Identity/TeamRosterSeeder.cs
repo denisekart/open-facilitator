@@ -14,7 +14,12 @@ using LinkOptions = Facilitator.Kernel.Link.LinkOptions;
 /// the roster lacks is a 403, never a silent new team. Idempotent under
 /// concurrent replicas via ON CONFLICT DO NOTHING on the unique slug index.
 /// </summary>
-public sealed class TeamRosterSeeder(LinkOptions options, IDbContextFactory<FacilitatorDbContext> contextFactory, TimeProvider timeProvider) : IHostedService
+public sealed class TeamRosterSeeder(
+    LinkOptions options,
+    IDbContextFactory<FacilitatorDbContext> contextFactory,
+    IConfiguration configuration,
+    ILogger<TeamRosterSeeder> logger,
+    TimeProvider timeProvider) : IHostedService
 {
     /// <inheritdoc />
     public async Task StartAsync(CancellationToken cancellationToken)
@@ -24,6 +29,13 @@ public sealed class TeamRosterSeeder(LinkOptions options, IDbContextFactory<Faci
             return;
         }
 
+        // Same gate as DatabaseInitializer: with AutoMigrate=false the schema
+        // is not ours to touch (health-only tests boot without a database).
+        if (configuration["Database:AutoMigrate"] == "false")
+        {
+            logger.LogInformation("Database:AutoMigrate=false — skipping team roster seeding");
+            return;
+        }
         await using var db = await contextFactory.CreateDbContextAsync(cancellationToken);
         var values = string.Join(", ", options.Teams.Select((_, i) => $"(@p{i}::uuid, @s{i}::text, @n::timestamptz)"));
         var parameters = options.Teams

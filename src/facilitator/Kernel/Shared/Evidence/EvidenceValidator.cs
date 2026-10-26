@@ -73,7 +73,7 @@ public sealed class EvidenceValidator(OidcJwks jwks, IEvidenceStore evidence, Li
 
     private async Task<EvidenceOutcome> OidcAsync(string jwt, CancellationToken ct)
     {
-        var verified = await jwks.ValidateAsync(jwt, options.EvidenceAudience, ct);
+        var verified = await jwks.ValidateAsync(jwt, options.EvidenceAudience, ct, options.EvidenceClockSkewSeconds);
         if (!verified.Valid)
         {
             return new EvidenceOutcome("oidc", EvidenceState.Invalid, null, [], verified.Reason);

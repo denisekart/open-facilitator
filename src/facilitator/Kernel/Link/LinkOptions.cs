@@ -31,6 +31,9 @@ public sealed class LinkOptions
     /// <summary>Required audience of oidc: evidence JWTs (Link:Evidence:Audience).</summary>
     public required string EvidenceAudience { get; init; }
 
+    /// <summary>Clock skew tolerated on oidc: evidence JWT lifetime checks (Link:Evidence:ClockSkewSeconds; default 30).</summary>
+    public required int EvidenceClockSkewSeconds { get; init; }
+
     /// <summary>Read + validate the <c>Link:*</c> keys.</summary>
     public static LinkOptions FromConfiguration(IConfiguration configuration)
     {
@@ -55,6 +58,7 @@ public sealed class LinkOptions
             Teams = configuration.GetSection("Link:Teams").Get<string[]>() ?? [],
             WorkloadIdentities = configuration.GetSection("Link:WorkloadIdentities").Get<WorkloadIdentityBinding[]>() ?? [],
             EvidenceAudience = configuration.GetValue("Link:Evidence:Audience", "facilitator-link"),
+            EvidenceClockSkewSeconds = configuration.GetValue("Link:Evidence:ClockSkewSeconds", 30),
         };
     }
 }

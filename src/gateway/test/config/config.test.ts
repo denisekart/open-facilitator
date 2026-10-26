@@ -134,7 +134,9 @@ describe("parseConfig plan-10 identity keys", () => {
   });
 
   it("accepts role: gateway and rejects a role off the enum", () => {
-    expect(parseConfig(`${BASE}role: gateway\n`, { hasStoredToken: () => false }).role).toBe("gateway");
+    expect(parseConfig(`${BASE}role: gateway\n`, { hasStoredToken: () => false }).role).toBe(
+      "gateway",
+    );
     expectKey(`${BASE}role: operator\n`, "role");
   });
 

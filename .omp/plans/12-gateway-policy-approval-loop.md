@@ -1,6 +1,6 @@
 # Plan 12 — Gateway team policy engine and confirm→approval round-trip (refined)
 
-**Status:** 🔵 replanning → flip per Implementation Status table below.
+**Status:** 🟡 in progress — kernel wire delta (Steps 0–2) landed; Gateway engine + loop next.
 **Phase:** C (closer). **Depends on:** 11 (kernel approval lifecycle, 🟢 done) and transitively 09/10. After this plan the full spec §12 loop (policy → confirm → `approval.required` → human responds → decided-push → consume → re-evaluate → execute once) runs across kernel + Gateway.
 **Branching:** work and commit **directly on `main`** (standing directive). Do not push.
 **Size judgment:** kept as ONE plan (approved at replanning): the evaluator is meaningless without the confirm flow, the flow untestable without a `confirm` policy, and the kernel wire delta has no observable behavior alone. Kernel-delta steps commit first so history bisects. Split fallback only if execution drags: 12a = kernel wire delta (Steps 1–2), 12b = Gateway engine + loop (Steps 3–7).
@@ -139,9 +139,9 @@ Update this table whenever a step's state changes (automatically, in the same co
 
 |Step|State|
 |---|---|
-|0 Research|Not started|
-|1 Kernel: schemas + decided-push + consume arm|Not started|
-|2 Kernel delta smoke|Not started|
+|0 Research|Fully implemented: 3-scout pass 2026-10-26; all 14 known facts re-verified; drift ≤8 lines, deltas absorbed into Steps 3/6 (config baseDir, child-runner multi-capability, assignEnvelope widening)|
+|1 Kernel: schemas + decided-push + consume arm|Fully implemented: commit 15bcd34 — two schemas + codegen, `requested_by_endpoint_id` + migration, same-tx decided-push on every terminal transition, Link consume arm; Approvals suite 22/22, 67 fixture cases|
+|2 Kernel delta smoke|Fully implemented: commit 4dbbfa2 — `DecidedPushReachesTheGatewayOverTheHttpFallback` proves pump routing + receipt terminality with zero pump delta|
 |3 Gateway policy engine + config|Not started|
 |4 Gateway audit lines|Not started|
 |5 Confirm lifecycle (pending ledger, ingest, consume)|Not started|

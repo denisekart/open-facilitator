@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openfacilitator.org/v1/event.approval.decided.v1.json",
+  "title": "ApprovalDecidedEventV1Data",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "approvalId",
+    "decision",
+    "decidedBy",
+    "evidenceRef",
+    "expiresAt",
+    "createdAt"
+  ],
+  "properties": {
+    "approvalId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "decision": {
+      "type": "string",
+      "enum": [
+        "approved",
+        "denied",
+        "expired",
+        "revoked"
+      ]
+    },
+    "decidedBy": {
+      "type": "string",
+      "maxLength": 256,
+      "description": "Canonical actor that decided; empty string for lazy expiry."
+    },
+    "evidenceRef": {
+      "type": "string",
+      "maxLength": 2048,
+      "description": "kernel: receipt on approved (law D5); empty string otherwise."
+    },
+    "expiresAt": {
+      "$ref": "common.v1.json#/$defs/rfc3339DateTime"
+    },
+    "createdAt": {
+      "$ref": "common.v1.json#/$defs/rfc3339DateTime",
+      "description": "Echo of the recorded createdAt so the Gateway can bind the push to its own pending row's exact digest record."
+    },
+    "workId": {
+      "$ref": "common.v1.json#/$defs/idToken",
+      "description": "Work the approval belongs to, when one exists."
+    }
+  }
+}

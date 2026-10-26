@@ -77,6 +77,10 @@ namespace Facilitator.Migrations
                         .HasColumnType("text")
                         .HasColumnName("nonce");
 
+                    b.Property<string>("RequestedByEndpointId")
+                        .HasColumnType("text")
+                        .HasColumnName("requested_by_endpoint_id");
+
                     b.Property<string>("State")
                         .IsRequired()
                         .HasColumnType("text")

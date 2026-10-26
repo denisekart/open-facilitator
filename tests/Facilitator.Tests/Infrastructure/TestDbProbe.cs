@@ -242,14 +242,38 @@ public sealed class TestDbProbe : IAsyncDisposable
         await using var connection = await _dataSource.OpenConnectionAsync();
         await using var cmd = new NpgsqlCommand(
             "SELECT state, action_digest, digest_verification, coalesce(work_id::text, ''), coalesce(decided_by, ''), "
-            + "expires_at, created_at FROM facilitator.approvals WHERE approval_id = $1", connection);
+            + "expires_at, created_at, coalesce(requested_by_endpoint_id, '') FROM facilitator.approvals WHERE approval_id = $1", connection);
         cmd.Parameters.AddWithValue(approvalId);
         await using var reader = await cmd.ExecuteReaderAsync();
         return await reader.ReadAsync()
             ? new ApprovalRow(
                 reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3),
-                reader.GetString(4), reader.GetFieldValue<DateTime>(5), reader.GetFieldValue<DateTime>(6))
+                reader.GetString(4), reader.GetFieldValue<DateTime>(5), reader.GetFieldValue<DateTime>(6),
+                reader.GetString(7))
             : null;
+    }
+
+    /// <summary>Decided-push outbox rows enqueued for one approval's terminal transitions
+    /// (Plan 12): recipient channel + envelope jsonb text, oldest first.</summary>
+    public async Task<List<(string Recipient, string Envelope)>> DecidedPushRows(Guid approvalId)
+    {
+        await using var connection = await _dataSource.OpenConnectionAsync();
+        await using var cmd = new NpgsqlCommand(
+            "SELECT recipient_endpoint_id, envelope::text FROM facilitator.outbox "
+            + "WHERE event_type = 'org.facilitator.event.approval.decided.v1' AND command_id = ANY($1) ORDER BY created_at", connection);
+        cmd.Parameters.AddWithValue(new[]
+        {
+            $"approval-decided:{approvalId}:approved", $"approval-decided:{approvalId}:denied",
+            $"approval-decided:{approvalId}:expired", $"approval-decided:{approvalId}:revoked",
+        });
+        await using var reader = await cmd.ExecuteReaderAsync();
+        var rows = new List<(string, string)>();
+        while (await reader.ReadAsync())
+        {
+            rows.Add((reader.GetString(0), reader.GetString(1)));
+        }
+
+        return rows;
     }
 
     /// <summary>True when the facilitator.evidence row exists and is already consumed.</summary>
@@ -261,7 +285,7 @@ public sealed class TestDbProbe : IAsyncDisposable
     /// <summary>One approvals ledger assertion row (typed window, no raw SQL in tests).</summary>
     public sealed record ApprovalRow(
         string State, string ActionDigest, string DigestVerification, string WorkId,
-        string DecidedBy, DateTime ExpiresAt, DateTime CreatedAt);
+        string DecidedBy, DateTime ExpiresAt, DateTime CreatedAt, string RequestedByEndpointId);
 
     /// <summary>facilitator.audit rows, newest first, optionally fenced by actor/decision.</summary>
     public async Task<List<AuditRow>> AuditRows(string? actor = null, string? decision = null)

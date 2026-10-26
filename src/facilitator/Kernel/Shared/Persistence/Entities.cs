@@ -356,6 +356,10 @@ public sealed class ApprovalEntity
 
     /// <summary>Digest provenance: recomputed | digest-unverified (1.0 senders without action).</summary>
     public string DigestVerification { get; set; } = "recomputed";
+
+    /// <summary>Plan 12: the Link endpoint (Gateway) that recorded this approval;
+    /// decided-push addressing + consume authorization. Null for non-Link recorders.</summary>
+    public string? RequestedByEndpointId { get; set; }
 }
 
 /// <summary>facilitator.communication_bindings — Plan 13 behaviour, schema now.</summary>

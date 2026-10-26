@@ -351,16 +351,16 @@ public sealed class ApprovalLifecycleTests(PostgresFixture fixture)
             """{"decision":"approved"}""", HttpStatusCode.OK);
 
         var ledger = CreateLedger(factory);
-        var first = await ledger.ConsumeAsync(approved.ToString(), "link:gw.consume", CancellationToken.None);
+        var first = await ledger.ConsumeAsync(approved.ToString(), "link:gw.consume", null, CancellationToken.None);
         Assert.Equal(Facilitator.Kernel.Shared.Persistence.ApprovalDecisionOutcome.Decided, first.Outcome);
-        var second = await ledger.ConsumeAsync(approved.ToString(), "link:gw.consume", CancellationToken.None);
+        var second = await ledger.ConsumeAsync(approved.ToString(), "link:gw.consume", null, CancellationToken.None);
         Assert.Equal(Facilitator.Kernel.Shared.Persistence.ApprovalDecisionOutcome.AlreadyConsumed, second.Outcome);
         Assert.Equal("consumed", (await fixture.Db.Approval(approved))!.State);
 
         // Revoked-before-consume: the consumer denial names the revocation (§7.3).
         await KernelOps.PostJsonAsync(kernel, "/api/ingress/events",
             RevokedEnvelope(revoked, "superseded"), HttpStatusCode.Accepted);
-        var revokedConsume = await ledger.ConsumeAsync(revoked.ToString(), "link:gw.consume", CancellationToken.None);
+        var revokedConsume = await ledger.ConsumeAsync(revoked.ToString(), "link:gw.consume", null, CancellationToken.None);
         Assert.Equal(Facilitator.Kernel.Shared.Persistence.ApprovalDecisionOutcome.Revoked, revokedConsume.Outcome);
     }
 

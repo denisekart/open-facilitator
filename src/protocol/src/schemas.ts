@@ -15,6 +15,7 @@ import commandWorkCancel from "../schemas/command.work.cancel.v1.json" with { ty
 import commandWorkStatusRequest from "../schemas/command.work.status.request.v1.json" with { type: "json" };
 import commandWorkNudge from "../schemas/command.work.nudge.v1.json" with { type: "json" };
 import commandContextFetch from "../schemas/command.context.fetch.v1.json" with { type: "json" };
+import commandApprovalConsume from "../schemas/command.approval.consume.v1.json" with { type: "json" };
 import commandApprovalRespond from "../schemas/command.approval.respond.v1.json" with { type: "json" };
 import eventWorkAccepted from "../schemas/event.work.accepted.v1.json" with { type: "json" };
 import eventWorkProgress from "../schemas/event.work.progress.v1.json" with { type: "json" };
@@ -24,6 +25,7 @@ import eventAssignmentFailed from "../schemas/event.assignment.failed.v1.json" w
 import eventWorkspaceHeartbeat from "../schemas/event.workspace.heartbeat.v1.json" with { type: "json" };
 import eventArtifactAvailable from "../schemas/event.artifact.available.v1.json" with { type: "json" };
 import eventMemoryCandidate from "../schemas/event.memory.candidate.v1.json" with { type: "json" };
+import eventApprovalDecided from "../schemas/event.approval.decided.v1.json" with { type: "json" };
 import eventApprovalRequired from "../schemas/event.approval.required.v1.json" with { type: "json" };
 import eventApprovalRevoked from "../schemas/event.approval.revoked.v1.json" with { type: "json" };
 import eventMemoryUsed from "../schemas/event.memory.used.v1.json" with { type: "json" };
@@ -52,6 +54,7 @@ const all: JsonSchema[] = [
   commandWorkStatusRequest,
   commandWorkNudge,
   commandContextFetch,
+  commandApprovalConsume,
   commandApprovalRespond,
   eventWorkAccepted,
   eventWorkProgress,
@@ -61,6 +64,7 @@ const all: JsonSchema[] = [
   eventWorkspaceHeartbeat,
   eventArtifactAvailable,
   eventMemoryCandidate,
+  eventApprovalDecided,
   eventApprovalRequired,
   eventApprovalRevoked,
   eventMemoryUsed,

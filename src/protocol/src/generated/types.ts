@@ -108,15 +108,26 @@ export type Execution = "synchronous" | "asynchronous";
 
 export type CapabilityManifestV1Kind = "CapabilityManifest";
 
+export interface ApprovalConsumeCommandV1Data {
+  /**
+   * The consuming workload's own evidence ref (e.g. workload:<gatewayId>); the kernel
+   * authorizes on the caller endpoint owning the approval, not on this claim.
+   */
+  actorEvidenceRef: string;
+  approvalId: string;
+  commandId: string;
+  comment?: string;
+}
+
 export interface ApprovalRespondCommandV1Data {
   actorEvidenceRef: string;
   approvalId: string;
   commandId: string;
   comment?: string;
-  decision: Decision;
+  decision: ApprovalRespondCommandV1DataDecision;
 }
 
-export type Decision = "approved" | "denied";
+export type ApprovalRespondCommandV1DataDecision = "approved" | "denied";
 
 export interface ContextFetchCommandV1Data {
   actorEvidenceRef: string;
@@ -229,6 +240,31 @@ export interface EnrollResponseV1 {
   linkToken?: string;
   trustMode: TrustMode;
 }
+
+export interface ApprovalDecidedEventV1Data {
+  approvalId: string;
+  /**
+   * Echo of the recorded createdAt so the Gateway can bind the push to its own pending row's
+   * exact digest record.
+   */
+  createdAt: string;
+  /**
+   * Canonical actor that decided; empty string for lazy expiry.
+   */
+  decidedBy: string;
+  decision: ApprovalDecidedEventV1DataDecision;
+  /**
+   * kernel: receipt on approved (law D5); empty string otherwise.
+   */
+  evidenceRef: string;
+  expiresAt: string;
+  /**
+   * Work the approval belongs to, when one exists.
+   */
+  workId?: string;
+}
+
+export type ApprovalDecidedEventV1DataDecision = "approved" | "denied" | "expired" | "revoked";
 
 export interface ApprovalRequiredEventV1Data {
   /**

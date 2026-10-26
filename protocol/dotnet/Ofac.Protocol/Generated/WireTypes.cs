@@ -276,6 +276,29 @@ namespace Ofac.Protocol
         public long version { get; set; }
     }
 
+    public partial class ApprovalConsumeCommandV1Data
+    {
+        /// <summary>
+        /// The consuming workload's own evidence ref (e.g. workload:&lt;gatewayId&gt;); the kernel
+        /// authorizes on the caller endpoint owning the approval, not on this claim.
+        /// </summary>
+        [JsonPropertyName("actorEvidenceRef")]
+        public string actorEvidenceRef { get; set; }
+
+        [JsonPropertyName("approvalId")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string approvalId { get; set; }
+
+        [JsonPropertyName("commandId")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string commandId { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("comment")]
+        [JsonConverter(typeof(TentacledMinMaxLengthCheckConverter))]
+        public string? comment { get; set; }
+    }
+
     public partial class ApprovalRespondCommandV1Data
     {
         [JsonPropertyName("actorEvidenceRef")]
@@ -295,7 +318,7 @@ namespace Ofac.Protocol
         public string? comment { get; set; }
 
         [JsonPropertyName("decision")]
-        public Decision decision { get; set; }
+        public ApprovalRespondCommandV1DataDecision decision { get; set; }
     }
 
     public partial class ContextFetchCommandV1Data
@@ -597,6 +620,48 @@ namespace Ofac.Protocol
         public TrustMode trustMode { get; set; }
     }
 
+    public partial class ApprovalDecidedEventV1Data
+    {
+        [JsonPropertyName("approvalId")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string approvalId { get; set; }
+
+        /// <summary>
+        /// Echo of the recorded createdAt so the Gateway can bind the push to its own pending row's
+        /// exact digest record.
+        /// </summary>
+        [JsonPropertyName("createdAt")]
+        public string createdAt { get; set; }
+
+        /// <summary>
+        /// Canonical actor that decided; empty string for lazy expiry.
+        /// </summary>
+        [JsonPropertyName("decidedBy")]
+        [JsonConverter(typeof(AmbitiousMinMaxLengthCheckConverter))]
+        public string decidedBy { get; set; }
+
+        [JsonPropertyName("decision")]
+        public ApprovalDecidedEventV1DataDecision decision { get; set; }
+
+        /// <summary>
+        /// kernel: receipt on approved (law D5); empty string otherwise.
+        /// </summary>
+        [JsonPropertyName("evidenceRef")]
+        [JsonConverter(typeof(CunningMinMaxLengthCheckConverter))]
+        public string evidenceRef { get; set; }
+
+        [JsonPropertyName("expiresAt")]
+        public string expiresAt { get; set; }
+
+        /// <summary>
+        /// Work the approval belongs to, when one exists.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("workId")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string? workId { get; set; }
+    }
+
     public partial class ApprovalRequiredEventV1Data
     {
         /// <summary>
@@ -625,7 +690,7 @@ namespace Ofac.Protocol
         public string expiresAt { get; set; }
 
         [JsonPropertyName("nonce")]
-        [JsonConverter(typeof(AmbitiousMinMaxLengthCheckConverter))]
+        [JsonConverter(typeof(MagentaMinMaxLengthCheckConverter))]
         public string nonce { get; set; }
 
         /// <summary>
@@ -716,7 +781,7 @@ namespace Ofac.Protocol
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("notes")]
-        [JsonConverter(typeof(CunningMinMaxLengthCheckConverter))]
+        [JsonConverter(typeof(FriskyMinMaxLengthCheckConverter))]
         public string? notes { get; set; }
 
         [JsonPropertyName("outputs")]
@@ -808,7 +873,7 @@ namespace Ofac.Protocol
         public string createdBy { get; set; }
 
         [JsonPropertyName("evidenceRef")]
-        [JsonConverter(typeof(MagentaMinMaxLengthCheckConverter))]
+        [JsonConverter(typeof(MischievousMinMaxLengthCheckConverter))]
         public string evidenceRef { get; set; }
 
         [JsonPropertyName("source")]
@@ -923,7 +988,7 @@ namespace Ofac.Protocol
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("notes")]
-        [JsonConverter(typeof(CunningMinMaxLengthCheckConverter))]
+        [JsonConverter(typeof(FriskyMinMaxLengthCheckConverter))]
         public string? notes { get; set; }
 
         [JsonPropertyName("outputs")]
@@ -947,7 +1012,7 @@ namespace Ofac.Protocol
 
     public enum CapabilityManifestV1Kind { CapabilityManifest };
 
-    public enum Decision { Approved, Denied };
+    public enum ApprovalRespondCommandV1DataDecision { Approved, Denied };
 
     public enum ControlFrameKind { FlowControl, Goodbye, Heartbeat, Hello, Welcome };
 
@@ -956,6 +1021,8 @@ namespace Ofac.Protocol
     public enum Role { Child, Gateway };
 
     public enum TrustMode { IsolatedExecutor, SeparateProcessSameHost, SharedRuntime };
+
+    public enum ApprovalDecidedEventV1DataDecision { Approved, Denied, Expired, Revoked };
 
     public enum PolicyLabel { EvidenceOnly, FacilitatorVisible, Private, TeamOnly };
 
@@ -977,11 +1044,12 @@ namespace Ofac.Protocol
                 AcceptedContextConverter.Singleton,
                 ExecutionConverter.Singleton,
                 CapabilityManifestV1KindConverter.Singleton,
-                DecisionConverter.Singleton,
+                ApprovalRespondCommandV1DataDecisionConverter.Singleton,
                 ControlFrameKindConverter.Singleton,
                 SupportedTransportConverter.Singleton,
                 RoleConverter.Singleton,
                 TrustModeConverter.Singleton,
+                ApprovalDecidedEventV1DataDecisionConverter.Singleton,
                 PolicyLabelConverter.Singleton,
                 ScopeConverter.Singleton,
                 WorkspaceHeartbeatEventV1DataStatusConverter.Singleton,
@@ -1255,38 +1323,38 @@ namespace Ofac.Protocol
         public static readonly TentacledMinMaxLengthCheckConverter Singleton = new TentacledMinMaxLengthCheckConverter();
     }
 
-    internal class DecisionConverter : JsonConverter<Decision>
+    internal class ApprovalRespondCommandV1DataDecisionConverter : JsonConverter<ApprovalRespondCommandV1DataDecision>
     {
-        public override bool CanConvert(Type t) => t == typeof(Decision);
+        public override bool CanConvert(Type t) => t == typeof(ApprovalRespondCommandV1DataDecision);
 
-        public override Decision Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        public override ApprovalRespondCommandV1DataDecision Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             var value = reader.GetString();
             switch (value)
             {
                 case "approved":
-                    return Decision.Approved;
+                    return ApprovalRespondCommandV1DataDecision.Approved;
                 case "denied":
-                    return Decision.Denied;
+                    return ApprovalRespondCommandV1DataDecision.Denied;
             }
-            throw new Exception("Cannot unmarshal type Decision");
+            throw new Exception("Cannot unmarshal type ApprovalRespondCommandV1DataDecision");
         }
 
-        public override void Write(Utf8JsonWriter writer, Decision value, JsonSerializerOptions options)
+        public override void Write(Utf8JsonWriter writer, ApprovalRespondCommandV1DataDecision value, JsonSerializerOptions options)
         {
             switch (value)
             {
-                case Decision.Approved:
+                case ApprovalRespondCommandV1DataDecision.Approved:
                     JsonSerializer.Serialize(writer, "approved", options);
                     return;
-                case Decision.Denied:
+                case ApprovalRespondCommandV1DataDecision.Denied:
                     JsonSerializer.Serialize(writer, "denied", options);
                     return;
             }
-            throw new Exception("Cannot marshal type Decision");
+            throw new Exception("Cannot marshal type ApprovalRespondCommandV1DataDecision");
         }
 
-        public static readonly DecisionConverter Singleton = new DecisionConverter();
+        public static readonly ApprovalRespondCommandV1DataDecisionConverter Singleton = new ApprovalRespondCommandV1DataDecisionConverter();
     }
 
     internal class StickyMinMaxLengthCheckConverter : JsonConverter<string>
@@ -1558,6 +1626,104 @@ namespace Ofac.Protocol
         public static readonly TrustModeConverter Singleton = new TrustModeConverter();
     }
 
+    internal class AmbitiousMinMaxLengthCheckConverter : JsonConverter<string>
+    {
+        public override bool CanConvert(Type t) => t == typeof(string);
+
+        public override string Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            var value = reader.GetString();
+            if (value.Length <= 256)
+            {
+                return value;
+            }
+            throw new Exception("Cannot unmarshal type string");
+        }
+
+        public override void Write(Utf8JsonWriter writer, string value, JsonSerializerOptions options)
+        {
+            if (value.Length <= 256)
+            {
+                JsonSerializer.Serialize(writer, value, options);
+                return;
+            }
+            throw new Exception("Cannot marshal type string");
+        }
+
+        public static readonly AmbitiousMinMaxLengthCheckConverter Singleton = new AmbitiousMinMaxLengthCheckConverter();
+    }
+
+    internal class ApprovalDecidedEventV1DataDecisionConverter : JsonConverter<ApprovalDecidedEventV1DataDecision>
+    {
+        public override bool CanConvert(Type t) => t == typeof(ApprovalDecidedEventV1DataDecision);
+
+        public override ApprovalDecidedEventV1DataDecision Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            var value = reader.GetString();
+            switch (value)
+            {
+                case "approved":
+                    return ApprovalDecidedEventV1DataDecision.Approved;
+                case "denied":
+                    return ApprovalDecidedEventV1DataDecision.Denied;
+                case "expired":
+                    return ApprovalDecidedEventV1DataDecision.Expired;
+                case "revoked":
+                    return ApprovalDecidedEventV1DataDecision.Revoked;
+            }
+            throw new Exception("Cannot unmarshal type ApprovalDecidedEventV1DataDecision");
+        }
+
+        public override void Write(Utf8JsonWriter writer, ApprovalDecidedEventV1DataDecision value, JsonSerializerOptions options)
+        {
+            switch (value)
+            {
+                case ApprovalDecidedEventV1DataDecision.Approved:
+                    JsonSerializer.Serialize(writer, "approved", options);
+                    return;
+                case ApprovalDecidedEventV1DataDecision.Denied:
+                    JsonSerializer.Serialize(writer, "denied", options);
+                    return;
+                case ApprovalDecidedEventV1DataDecision.Expired:
+                    JsonSerializer.Serialize(writer, "expired", options);
+                    return;
+                case ApprovalDecidedEventV1DataDecision.Revoked:
+                    JsonSerializer.Serialize(writer, "revoked", options);
+                    return;
+            }
+            throw new Exception("Cannot marshal type ApprovalDecidedEventV1DataDecision");
+        }
+
+        public static readonly ApprovalDecidedEventV1DataDecisionConverter Singleton = new ApprovalDecidedEventV1DataDecisionConverter();
+    }
+
+    internal class CunningMinMaxLengthCheckConverter : JsonConverter<string>
+    {
+        public override bool CanConvert(Type t) => t == typeof(string);
+
+        public override string Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            var value = reader.GetString();
+            if (value.Length <= 2048)
+            {
+                return value;
+            }
+            throw new Exception("Cannot unmarshal type string");
+        }
+
+        public override void Write(Utf8JsonWriter writer, string value, JsonSerializerOptions options)
+        {
+            if (value.Length <= 2048)
+            {
+                JsonSerializer.Serialize(writer, value, options);
+                return;
+            }
+            throw new Exception("Cannot marshal type string");
+        }
+
+        public static readonly CunningMinMaxLengthCheckConverter Singleton = new CunningMinMaxLengthCheckConverter();
+    }
+
     internal class DecodeArrayConverter : JsonConverter<string[]>
     {
         public override bool CanConvert(Type t) => t == typeof(string[]);
@@ -1591,7 +1757,7 @@ namespace Ofac.Protocol
         public static readonly DecodeArrayConverter Singleton = new DecodeArrayConverter();
     }
 
-    internal class AmbitiousMinMaxLengthCheckConverter : JsonConverter<string>
+    internal class MagentaMinMaxLengthCheckConverter : JsonConverter<string>
     {
         public override bool CanConvert(Type t) => t == typeof(string);
 
@@ -1615,10 +1781,10 @@ namespace Ofac.Protocol
             throw new Exception("Cannot marshal type string");
         }
 
-        public static readonly AmbitiousMinMaxLengthCheckConverter Singleton = new AmbitiousMinMaxLengthCheckConverter();
+        public static readonly MagentaMinMaxLengthCheckConverter Singleton = new MagentaMinMaxLengthCheckConverter();
     }
 
-    internal class CunningMinMaxLengthCheckConverter : JsonConverter<string>
+    internal class FriskyMinMaxLengthCheckConverter : JsonConverter<string>
     {
         public override bool CanConvert(Type t) => t == typeof(string);
 
@@ -1642,7 +1808,7 @@ namespace Ofac.Protocol
             throw new Exception("Cannot marshal type string");
         }
 
-        public static readonly CunningMinMaxLengthCheckConverter Singleton = new CunningMinMaxLengthCheckConverter();
+        public static readonly FriskyMinMaxLengthCheckConverter Singleton = new FriskyMinMaxLengthCheckConverter();
     }
 
     internal class PolicyLabelConverter : JsonConverter<PolicyLabel>
@@ -1689,7 +1855,7 @@ namespace Ofac.Protocol
         public static readonly PolicyLabelConverter Singleton = new PolicyLabelConverter();
     }
 
-    internal class MagentaMinMaxLengthCheckConverter : JsonConverter<string>
+    internal class MischievousMinMaxLengthCheckConverter : JsonConverter<string>
     {
         public override bool CanConvert(Type t) => t == typeof(string);
 
@@ -1713,7 +1879,7 @@ namespace Ofac.Protocol
             throw new Exception("Cannot marshal type string");
         }
 
-        public static readonly MagentaMinMaxLengthCheckConverter Singleton = new MagentaMinMaxLengthCheckConverter();
+        public static readonly MischievousMinMaxLengthCheckConverter Singleton = new MischievousMinMaxLengthCheckConverter();
     }
 
     internal class ScopeConverter : JsonConverter<Scope>

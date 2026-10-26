@@ -1,7 +1,12 @@
 using System.Globalization;
 using System.Text.Json;
+using System.Text.Json.Nodes;
+
+using Facilitator.Kernel.Work;
 
 using Microsoft.EntityFrameworkCore;
+
+using Ofac.Protocol.Validation;
 
 namespace Facilitator.Kernel.Shared.Persistence;
 
@@ -88,8 +93,11 @@ public sealed record ApprovalDecision(ApprovalDecisionOutcome Outcome, ApprovalV
 /// </summary>
 public interface IApprovalLedger
 {
-    /// <summary>Record an <c>approval.required</c> envelope (recompute + compare the digest when <c>data.action</c> is present).</summary>
-    Task<ApprovalRecordResult> RecordFromEventAsync(JsonElement envelopeRoot, string source, CancellationToken ct);
+    /// <summary>Record an <c>approval.required</c> envelope (recompute + compare the digest when <c>data.action</c> is present).
+    /// <paramref name="requestedByEndpointId"/> is the Link endpoint that recorded it (Plan 12: decided-push
+    /// addressing + consume authorization); null on non-Link recorders.</summary>
+    Task<ApprovalRecordResult> RecordFromEventAsync(
+        JsonElement envelopeRoot, string source, string? requestedByEndpointId, CancellationToken ct);
 
     /// <summary>Atomic respond: lazy-expire, terminal-state deny, eligibility, one conditional UPDATE; race losers observe the winner's state.</summary>
     Task<ApprovalDecision> RespondAsync(
@@ -103,8 +111,11 @@ public interface IApprovalLedger
         bool mintEvidence,
         CancellationToken ct);
 
-    /// <summary>Plan 12's hook: atomically consume an approved row (re-check-before-apply).</summary>
-    Task<ApprovalDecision> ConsumeAsync(string approvalIdRaw, string workloadActor, CancellationToken ct);
+    /// <summary>Atomically consume an approved row (re-check-before-apply). When
+    /// <paramref name="callerEndpointId"/> is set, only the endpoint that recorded the approval may
+    /// consume it — a foreign caller sees the row as absent (404, no existence leak).</summary>
+    Task<ApprovalDecision> ConsumeAsync(
+        string approvalIdRaw, string workloadActor, string? callerEndpointId, CancellationToken ct);
 
     /// <summary>Revoke a pending approval; a terminal row is an audited no-op.</summary>
     Task<ApprovalDecision> RevokeAsync(string approvalIdRaw, string revokedBy, string reason, CancellationToken ct);
@@ -120,10 +131,16 @@ public interface IApprovalLedger
 public sealed class ApprovalLedger(
     IDbContextFactory<FacilitatorDbContext> contextFactory,
     Identity.AuditWriter audit,
-    TimeProvider timeProvider) : IApprovalLedger
+    TimeProvider timeProvider,
+    EnvelopeValidator envelopeValidator) : IApprovalLedger
 {
+    /// <summary>Envelope type of the Plan 12 decided-push event.</summary>
+    public const string DecidedType = "org.facilitator.event.approval.decided.v1";
+
+    private const string DecidedSchemaId = "https://schemas.openfacilitator.org/v1/event.approval.decided.v1.json";
     /// <inheritdoc />
-    public async Task<ApprovalRecordResult> RecordFromEventAsync(JsonElement envelopeRoot, string source, CancellationToken ct)
+    public async Task<ApprovalRecordResult> RecordFromEventAsync(
+        JsonElement envelopeRoot, string source, string? requestedByEndpointId, CancellationToken ct)
     {
         var data = envelopeRoot.GetProperty("data");
         var approvalIdRaw = data.TryGetProperty("approvalId", out var id) && id.ValueKind == JsonValueKind.String
@@ -173,6 +190,7 @@ public sealed class ApprovalLedger(
             ExpiresAt = expiresAt,
             CreatedAt = createdAt,
             DigestVerification = verification,
+            RequestedByEndpointId = requestedByEndpointId,
         });
         if (verification == "digest-unverified")
         {
@@ -324,6 +342,11 @@ public sealed class ApprovalLedger(
             }
         }
 
+        // Plan 12 decided-push: the terminal-ish transition and its link-addressed
+        // push row commit in one transaction (outbox law). No-op for approvals the
+        // Gateway didn't record (REST/CloudEvent-plane recorders).
+        await AppendDecidedAsync(db, row, decision, decidedBy: actorActor,
+            evidenceRef: decision == "approved" ? (minted ? $"kernel:{evidenceId}" : evidenceRef ?? string.Empty) : string.Empty, ct);
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
         var after = await FindViewAsync(db, approvalId, ct);
@@ -331,7 +354,8 @@ public sealed class ApprovalLedger(
     }
 
     /// <inheritdoc />
-    public async Task<ApprovalDecision> ConsumeAsync(string approvalIdRaw, string workloadActor, CancellationToken ct)
+    public async Task<ApprovalDecision> ConsumeAsync(
+        string approvalIdRaw, string workloadActor, string? callerEndpointId, CancellationToken ct)
     {
         if (!Guid.TryParse(approvalIdRaw, out var approvalId))
         {
@@ -339,16 +363,23 @@ public sealed class ApprovalLedger(
         }
 
         await using var db = await contextFactory.CreateDbContextAsync(ct);
-        var now = timeProvider.GetUtcNow().UtcDateTime;
-        var rows = await db.Approvals
-            .Where(a => a.ApprovalId == approvalId && a.State == "approved")
-            .ExecuteUpdateAsync(s => s.SetProperty(a => a.State, "consumed"), ct);
-        var row = await FindViewAsync(db, approvalId, ct);
+        var row = await db.Approvals.AsNoTracking().FirstOrDefaultAsync(a => a.ApprovalId == approvalId, ct);
         if (row is null)
         {
             return new ApprovalDecision(ApprovalDecisionOutcome.NotFound);
         }
 
+        if (callerEndpointId is not null &&
+            !string.Equals(row.RequestedByEndpointId, callerEndpointId, StringComparison.Ordinal))
+        {
+            // Another endpoint's (or the REST plane's) approval: answer absent —
+            // no existence leak across gateway boundaries.
+            return new ApprovalDecision(ApprovalDecisionOutcome.NotFound);
+        }
+
+        var rows = await db.Approvals
+            .Where(a => a.ApprovalId == approvalId && a.State == "approved")
+            .ExecuteUpdateAsync(s => s.SetProperty(a => a.State, "consumed"), ct);
         if (rows == 1)
         {
             audit.Append(db, new Identity.AuditRecord(
@@ -375,7 +406,7 @@ public sealed class ApprovalLedger(
             "expired" => ApprovalDecisionOutcome.Expired,
             "pending" => ApprovalDecisionOutcome.NotPending,
             _ => ApprovalDecisionOutcome.AlreadyConsumed,
-        }, row);
+        }, Map(row));
     }
 
     /// <inheritdoc />
@@ -387,15 +418,16 @@ public sealed class ApprovalLedger(
         }
 
         await using var db = await contextFactory.CreateDbContextAsync(ct);
-        var rows = await db.Approvals
-            .Where(a => a.ApprovalId == approvalId && a.State == "pending")
-            .ExecuteUpdateAsync(s => s.SetProperty(a => a.State, "revoked"), ct);
-        var row = await FindViewAsync(db, approvalId, ct);
-        if (row is null)
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        var entity = await db.Approvals.AsNoTracking().FirstOrDefaultAsync(a => a.ApprovalId == approvalId, ct);
+        if (entity is null)
         {
             return new ApprovalDecision(ApprovalDecisionOutcome.NotFound);
         }
 
+        var rows = await db.Approvals
+            .Where(a => a.ApprovalId == approvalId && a.State == "pending")
+            .ExecuteUpdateAsync(s => s.SetProperty(a => a.State, "revoked"), ct);
         var noOp = rows == 0;
         audit.Append(db, new Identity.AuditRecord(
             Actor: revokedBy,
@@ -410,38 +442,50 @@ public sealed class ApprovalLedger(
                 ["approvalId"] = approvalIdRaw,
                 ["revokedBy"] = revokedBy,
                 ["reason"] = reason,
-                ["state"] = row.State,
+                ["state"] = entity.State,
             })));
+        if (!noOp)
+        {
+            // Plan 12 decided-push (revoked): same-tx, link-addressed.
+            await AppendDecidedAsync(db, entity, "revoked", decidedBy: revokedBy, evidenceRef: string.Empty, ct);
+        }
+
         await db.SaveChangesAsync(ct);
-        return new ApprovalDecision(noOp ? ApprovalDecisionOutcome.NoOp : ApprovalDecisionOutcome.Decided, row);
+        await tx.CommitAsync(ct);
+        return new ApprovalDecision(noOp ? ApprovalDecisionOutcome.NoOp : ApprovalDecisionOutcome.Decided, Map(entity));
     }
 
     /// <inheritdoc />
     public async Task<ApprovalView?> GetAsync(Guid approvalId, CancellationToken ct)
     {
         await using var db = await contextFactory.CreateDbContextAsync(ct);
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
         await LazyExpireAsync(db, approvalId: approvalId, ct);
         await db.SaveChangesAsync(ct);
-        return await FindViewAsync(db, approvalId, ct);
+        var view = await FindViewAsync(db, approvalId, ct);
+        await tx.CommitAsync(ct);
+        return view;
     }
 
     /// <inheritdoc />
     public async Task<IReadOnlyList<ApprovalView>> ListForWorkAsync(Guid workId, CancellationToken ct)
     {
         await using var db = await contextFactory.CreateDbContextAsync(ct);
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
         var now = timeProvider.GetUtcNow().UtcDateTime;
-        var flipped = await db.Approvals
+        var due = await db.Approvals.AsNoTracking()
             .Where(a => a.WorkId == workId && a.State == "pending" && a.ExpiresAt <= now)
-            .Select(a => a.ApprovalId)
             .ToListAsync(ct);
-        if (flipped.Count > 0)
+        if (due.Count > 0)
         {
+            var ids = due.Select(a => a.ApprovalId).ToArray();
             await db.Approvals
-                .Where(a => flipped.Contains(a.ApprovalId) && a.State == "pending")
+                .Where(a => ids.Contains(a.ApprovalId) && a.State == "pending")
                 .ExecuteUpdateAsync(s => s.SetProperty(a => a.State, "expired"), ct);
-            foreach (var id in flipped)
+            foreach (var entity in due)
             {
-                audit.Append(db, ExpiredAudit(id));
+                audit.Append(db, ExpiredAudit(entity.ApprovalId));
+                await AppendDecidedAsync(db, entity, "expired", decidedBy: string.Empty, evidenceRef: string.Empty, ct);
             }
 
             await db.SaveChangesAsync(ct);
@@ -451,6 +495,7 @@ public sealed class ApprovalLedger(
             .Where(a => a.WorkId == workId)
             .OrderByDescending(a => a.CreatedAt)
             .ToListAsync(ct);
+        await tx.CommitAsync(ct);
         return rows.Select(Map).ToArray();
     }
 
@@ -459,11 +504,10 @@ public sealed class ApprovalLedger(
     private async Task LazyExpireAsync(FacilitatorDbContext db, Guid approvalId, CancellationToken ct)
     {
         var now = timeProvider.GetUtcNow().UtcDateTime;
-        var expired = await db.Approvals
+        var entity = await db.Approvals.AsNoTracking()
             .Where(a => a.ApprovalId == approvalId && a.State == "pending" && a.ExpiresAt <= now)
-            .Select(a => a.ApprovalId)
-            .ToListAsync(ct);
-        if (expired.Count == 0)
+            .FirstOrDefaultAsync(ct);
+        if (entity is null)
         {
             return;
         }
@@ -472,6 +516,82 @@ public sealed class ApprovalLedger(
             .Where(a => a.ApprovalId == approvalId && a.State == "pending")
             .ExecuteUpdateAsync(s => s.SetProperty(a => a.State, "expired"), ct);
         audit.Append(db, ExpiredAudit(approvalId));
+        // Plan 12 decided-push (lazy expiry, decidedBy ""): same-tx as the flip.
+        await AppendDecidedAsync(db, entity, "expired", decidedBy: string.Empty, evidenceRef: string.Empty, ct);
+    }
+
+    // Plan 12: decided-push (spec §12.1 step 5's other half). One link-addressed
+    // outbox row per terminal transition, staged on the caller's context so the
+    // flip and its push commit atomically (outbox law). Deterministic
+    // command_id ("approval-decided:<id>:<decision>") makes a re-decision of the
+    // same approval impossible to double-enqueue (each approval reaches each
+    // terminal state at most once under the conditional-UPDATE law). No-op when
+    // no Link endpoint recorded the approval (REST/CloudEvent-plane rows).
+    private async Task AppendDecidedAsync(
+        FacilitatorDbContext db,
+        ApprovalEntity row,
+        string decision,
+        string decidedBy,
+        string evidenceRef,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrEmpty(row.RequestedByEndpointId))
+        {
+            return;
+        }
+
+        var now = timeProvider.GetUtcNow().UtcDateTime;
+        var data = new JsonObject
+        {
+            ["approvalId"] = row.ApprovalId.ToString(),
+            ["decision"] = decision,
+            ["decidedBy"] = decidedBy,
+            ["evidenceRef"] = evidenceRef,
+            ["expiresAt"] = row.ExpiresAt.ToString("yyyy-MM-ddTHH:mm:ssZ"),
+            ["createdAt"] = row.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ssZ"),
+        };
+        if (row.WorkId is { } decidedWork)
+        {
+            data["workId"] = decidedWork.ToString();
+        }
+
+        var envelope = new JsonObject
+        {
+            ["specversion"] = "1.0",
+            ["id"] = Guid.NewGuid().ToString("N"),
+            ["source"] = EnvelopeFactory.KernelSource,
+            ["type"] = DecidedType,
+            ["subject"] = $"approval/{row.ApprovalId}",
+            ["time"] = now.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
+            ["datacontenttype"] = "application/json",
+            ["dataschema"] = DecidedSchemaId,
+            ["data"] = data,
+        };
+        var json = envelope.ToJsonString();
+        var verdict = envelopeValidator.Validate(json);
+        if (!verdict.Ok)
+        {
+            // Kernel-emitted envelopes must be contract-valid; fail closed at
+            // insert rather than poison the outbox (locked decision, Plan 02).
+            throw new InvalidOperationException($"kernel envelope rejected by the validator: {verdict.ErrorClass}: {verdict.Message}");
+        }
+
+        db.Outbox.Add(new OutboxEntity
+        {
+            OutboxId = Guid.NewGuid(),
+            RecipientEndpointId = $"link.{row.RequestedByEndpointId}",
+            AggregateType = "work",
+            AggregateId = row.WorkId,
+            EventType = DecidedType,
+            CommandId = $"approval-decided:{row.ApprovalId}:{decision}",
+            Envelope = json,
+            WorkId = row.WorkId,
+            Status = "pending",
+            AvailableAt = now,
+            Attempts = 0,
+            CreatedAt = now,
+        });
+        await PostgresNotifications.NotifyOutboxAsync(db, row.WorkId?.ToString(), ct);
     }
 
     private Identity.AuditRecord ExpiredAudit(Guid approvalId) => new(

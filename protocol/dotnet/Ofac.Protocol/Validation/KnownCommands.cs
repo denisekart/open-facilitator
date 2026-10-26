@@ -1,7 +1,7 @@
 namespace Ofac.Protocol.Validation;
 
 /// <summary>
-/// Fail-closed command table: the exact seven <c>org.facilitator.command.*.v1</c>
+/// Fail-closed command table: the exact eight <c>org.facilitator.command.*.v1</c>
 /// types the v1 contract accepts. Mirrors KNOWN_COMMAND_TYPES in
 /// <c>src/protocol/src/validate.ts</c> and the schema-derived set in
 /// <c>protocol/tools/Validate.Fixtures</c>; a command type outside this set is
@@ -12,6 +12,7 @@ public static class KnownCommands
     /// <summary>All command envelope <c>type</c> values the contract knows.</summary>
     public static IReadOnlySet<string> All { get; } = new HashSet<string>(StringComparer.Ordinal)
     {
+        "org.facilitator.command.approval.consume.v1",
         "org.facilitator.command.approval.respond.v1",
         "org.facilitator.command.context.fetch.v1",
         "org.facilitator.command.work.assign.v1",

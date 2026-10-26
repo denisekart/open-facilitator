@@ -70,7 +70,7 @@ public sealed class LinkIngress(
         {
             if (screen.Type is "org.facilitator.event.approval.required.v1" or "org.facilitator.event.approval.revoked.v1")
             {
-                var arm = await approvals.HandleEventAsync(root, screen.Type, ct);
+                var arm = await approvals.HandleEventAsync(root, screen.Type, workload.EndpointId, ct);
                 if (arm.Refused)
                 {
                     await inbox.MarkProcessedAsync(inboxId, arm.Status, ct);
@@ -102,6 +102,24 @@ public sealed class LinkIngress(
             await inbox.MarkProcessedAsync(inboxId, null, ct);
             metrics.InboxProcessed();
             return new LinkAdmission(null, "accepted", inboxId);
+        }
+
+        if (screen.Type == "org.facilitator.command.approval.consume.v1")
+        {
+            // Plan 12: the Gateway that recorded the approval consumes it
+            // before applying; the ledger gates on row ownership (a foreign
+            // endpoint sees 404), non-gateway roles deny 403.
+            var arm = await approvals.HandleConsumeAsync(
+                root, workload.EndpointId, string.Equals(workload.Role, "gateway", StringComparison.Ordinal), ct);
+            if (arm.Refused)
+            {
+                await inbox.MarkProcessedAsync(inboxId, arm.Status, ct);
+                return new LinkAdmission(arm.Problem, null, null);
+            }
+
+            await inbox.MarkProcessedAsync(inboxId, null, ct);
+            metrics.InboxProcessed();
+            return new LinkAdmission(null, "consumed", inboxId);
         }
 
         var workId = EnvelopeReader.WorkIdOf(root);

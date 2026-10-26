@@ -38,8 +38,11 @@ public sealed class ApprovalIngress(
     EvidenceValidator evidence,
     AuditWriter audit)
 {
-    /// <summary>Event-class arm: record a required / mark a revoked approval.</summary>
-    public async Task<ApprovalArm> HandleEventAsync(JsonElement root, string type, CancellationToken ct)
+    /// <summary>Event-class arm: record a required / mark a revoked approval.
+    /// <paramref name="requestedByEndpointId"/> is the Link endpoint that sent a required event
+    /// (Plan 12: decided-push addressing + consume authorization); null on the CloudEvent plane.</summary>
+    public async Task<ApprovalArm> HandleEventAsync(
+        JsonElement root, string type, string? requestedByEndpointId, CancellationToken ct)
     {
         var data = root.GetProperty("data");
         var approvalId = data.TryGetProperty("approvalId", out var id) && id.ValueKind == JsonValueKind.String
@@ -47,7 +50,7 @@ public sealed class ApprovalIngress(
             : string.Empty;
         if (type == "org.facilitator.event.approval.required.v1")
         {
-            var result = await ledger.RecordFromEventAsync(root, EnvelopeReader.SourceOf(root), ct);
+            var result = await ledger.RecordFromEventAsync(root, EnvelopeReader.SourceOf(root), requestedByEndpointId, ct);
             return result.Outcome switch
             {
                 ApprovalRecordOutcome.DigestMismatch => new ApprovalArm(ProblemErrors.ApprovalDigestMismatch(approvalId), "failed"),
@@ -64,6 +67,42 @@ public sealed class ApprovalIngress(
         {
             ApprovalDecisionOutcome.NotFound => new ApprovalArm(ProblemErrors.ApprovalNotFound(approvalId), "failed"),
             _ => new ApprovalArm(null, revoked.Outcome == ApprovalDecisionOutcome.NoOp ? "no-op" : "revoked", approvalId),
+        };
+    }
+
+    /// <summary>
+    /// Command arm (Plan 12): a Link-plane workload (the Gateway that recorded the
+    /// approval) consumes an approved row before applying it (spec §12.1 step 5).
+    /// Authorization is the ledger's caller-endpoint gate (row ownership), not a
+    /// human identity — a foreign or non-gateway caller sees 404/403 per the plan.
+    /// </summary>
+    public async Task<ApprovalArm> HandleConsumeAsync(
+        JsonElement root, string callerEndpointId, bool callerIsGateway, CancellationToken ct)
+    {
+        var data = root.GetProperty("data");
+        var approvalId = data.TryGetProperty("approvalId", out var id) && id.ValueKind == JsonValueKind.String
+            ? id.GetString() ?? string.Empty
+            : string.Empty;
+        if (!callerIsGateway)
+        {
+            await AuditAsync(approvalId, "deny", "consume-caller-not-gateway", null, ct);
+            return new ApprovalArm(ProblemErrors.ApprovalActorUnknown(), "failed");
+        }
+
+        var result = await ledger.ConsumeAsync(
+            approvalId, workloadActor: $"endpoint:{callerEndpointId}", callerEndpointId, ct);
+        await AuditAsync(approvalId,
+            result.Outcome == ApprovalDecisionOutcome.Decided ? "allow" : "deny",
+            result.Outcome == ApprovalDecisionOutcome.Decided ? "consumed" : result.Outcome.ToString(),
+            null, ct);
+        return result.Outcome switch
+        {
+            ApprovalDecisionOutcome.Decided => new ApprovalArm(null, "consumed", approvalId),
+            ApprovalDecisionOutcome.NotFound => new ApprovalArm(ProblemErrors.ApprovalNotFound(approvalId), "failed"),
+            ApprovalDecisionOutcome.Revoked => new ApprovalArm(ProblemErrors.ApprovalRevoked(approvalId), "failed"),
+            ApprovalDecisionOutcome.Expired => new ApprovalArm(ProblemErrors.ApprovalExpired(approvalId), "failed"),
+            ApprovalDecisionOutcome.NotPending => new ApprovalArm(ProblemErrors.ApprovalNotPending(approvalId), "failed"),
+            _ => new ApprovalArm(ProblemErrors.ApprovalAlreadyConsumed(approvalId), "failed"),
         };
     }
 

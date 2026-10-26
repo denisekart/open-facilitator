@@ -84,7 +84,7 @@ public sealed class CloudEventIngress(
         {
             if (type is "org.facilitator.event.approval.required.v1" or "org.facilitator.event.approval.revoked.v1")
             {
-                var arm = await approvals.HandleEventAsync(root, type, ct);
+                var arm = await approvals.HandleEventAsync(root, type, null, ct);
                 if (arm.Refused)
                 {
                     return await pipeline.SettleAsync(

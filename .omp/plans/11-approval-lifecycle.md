@@ -1,6 +1,6 @@
 # Plan 11 — Approval lifecycle: ledger, action digest, atomic single use, revocation
 
-**Status:** 🟡 in-progress (replanned 2026-10-26, decision-complete). Execution flips states via the Implementation Status table below.
+**Status:** 🟢 done (🔵 replanning → 🟡 in-progress → 🟢 done via the Implementation Status table below).
 **Phase:** C. **Depends on:** 09 (human principal, audit spine — landed 🟢) + 10 (`kernel:` evidence, effective principal — landed 🟢). Plan 12 (Gateway policy `confirm` effect) is the first producer/consumer of this lifecycle.
 **Branching:** work and commit **directly on `main`** (standing directive). Do not push. Copy this plan (title through Implementation Status) over `.omp/plans/11-approval-lifecycle.md` verbatim as the first commit, before any code.
 **Size judgment:** kept as ONE plan — ledger, digest, dispatch, and the human REST pair are one vertical: an approval nobody can answer proves nothing. The digest + `@ofac/protocol` export (Steps 1–2) is a clean early-checkpoint commit; if execution drags after it, Steps 5–6 (REST pair + evidence) can ship as a second commit of the same plan, not a split plan.

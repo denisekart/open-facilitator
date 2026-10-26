@@ -119,7 +119,7 @@ The repo is spec-only: `docs/specs/open_facilitator_framework_architecture.md` (
 **Depends on:** 09
 
 ### Plan 11 — Approval lifecycle: ledger, action digest, atomic single use, revocation
-**Status:** ⬜ not-started (detail design: `11-approval-lifecycle.md`)
+**Status:** 🟡 in-progress (detail design + status table: `11-approval-lifecycle.md`)
 **Objective:** Kernel half of §12.1/appendix §7: `facilitator.approvals` schema-only → lifecycle authority (record/respond/consume/revoke, kernel-recomputed RFC 8785 digest, lazy expiry, minimal human REST pair, `kernel:` evidence mint).
 **Depends on:** 09, 10
 

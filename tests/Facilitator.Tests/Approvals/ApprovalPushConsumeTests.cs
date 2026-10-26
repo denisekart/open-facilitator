@@ -69,6 +69,40 @@ public sealed class ApprovalPushConsumeTests(PostgresFixture fixture)
     }
 
     [Fact]
+    public async Task DecidedPushReachesTheGatewayOverTheHttpFallback()
+    {
+        using var factory = new KernelTestFactory(fixture, noDispatcher: true);
+        var kernel = factory.CreateAuthedClient();
+        var endpoint = "gw-p12-" + Guid.NewGuid().ToString("N")[..8];
+        var token = await LinkTestHarness.EnrollAsync(kernel, endpoint);
+        var link = factory.CreateLinkClient(token);
+        var sessions = factory.Services.GetRequiredService<Facilitator.Kernel.Shared.Persistence.LinkService>();
+        await sessions.OpenSessionAsync(endpoint, "http-1", null, 300, CancellationToken.None);
+        var (workId, _) = await KernelOps.CreateWorkAsync(kernel, "push delivery leg");
+        var approvalId = Guid.NewGuid();
+        await KernelOps.PostJsonAsync(link, "/api/link/v1/events",
+            RequiredEnvelope(approvalId, workId, ["user:alice"], TimeSpan.FromHours(1)), HttpStatusCode.Accepted);
+        var alice = await CreateUserClientAsync(factory, "alice");
+        await KernelOps.PostJsonAsync(alice, $"/api/works/{workId}/approvals/{approvalId}/respond",
+            """{"decision":"approved"}""", HttpStatusCode.OK);
+
+        // The pump's row-selection routes link.<endpoint> rows to that
+        // endpoint's session over the HTTP fallback (Step 0: zero pump delta).
+        var claimed = await KernelOps.GetJsonAsync(link, "/api/link/v1/deliveries?wait=2&limit=16", HttpStatusCode.OK);
+        var delivery = Assert.Single(claimed.EnumerateArray());
+        var deliveryId = Guid.Parse(delivery.GetProperty("deliveryId").GetString()!);
+        var envelope = delivery.GetProperty("envelope");
+        Assert.Equal("org.facilitator.event.approval.decided.v1", envelope.GetProperty("type").GetString());
+        Assert.Equal("approved", envelope.GetProperty("data").GetProperty("decision").GetString());
+
+        // Acking terminates redelivery and marks the outbox row delivered.
+        using var receipt = await link.PostAsync($"/api/link/v1/deliveries/{deliveryId}/receipt",
+            new StringContent(LinkTestHarness.ReceiptBody("accepted"), Encoding.UTF8, "application/json"));
+        Assert.Equal(HttpStatusCode.NoContent, receipt.StatusCode);
+        Assert.True(await fixture.Db.OutboxDelivered(deliveryId));
+    }
+
+    [Fact]
     public async Task ConsumeFlipsApprovedRowOnceAndAudits()
     {
         using var factory = new KernelTestFactory(fixture, noDispatcher: true);

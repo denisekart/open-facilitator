@@ -1,8 +1,8 @@
 # Security posture
 
-Status: reflects Plan 09 (OIDC identity foundation). The human plane federates
-to any OIDC IdP; roles are operator-defined claim rules; every gate decision
-audits.
+Status: reflects Plans 09–10 (OIDC identity foundation + workload identity).
+The human plane federates to any OIDC IdP; roles are operator-defined claim
+rules; every gate decision audits.
 
 ## Trust vs data-plane split (spec §3.3, D-10)
 
@@ -22,7 +22,7 @@ Anything that writes outside the framework runs under team-owned credentials beh
 | Identity | Carried by | Validated by |
 |---|---|---|
 | **Human/operator** (this doc) | OIDC access token (`Authorization: Bearer`) on `/api/*` except `/api/link/v1*` | JwtBearer: signature (JWKS from `identity:oidc:authority`), issuer, audience; RS256/ES256 only |
-| **Workspace Link endpoint** | Per-endpoint `linkToken` from enrollment + `Link:EnrollmentToken` secret | `LinkBearerHandler` — a fully separate seam (`/api/link/v1*`, `/hubs/link`) |
+| **Workspace Link endpoint** | Per-endpoint `linkToken` from enrollment — mode (a) shared secret or mode (b) OIDC workload identity | `LinkBearerHandler` — a fully separate seam (`/api/link/v1*`, `/hubs/link`) |
 | **Machine-to-machine ingress** (providers) | CloudEvents envelope identity (`event_source`/`event_id`, commandId, provider delivery id) | Dedupe + envelope validation, behind the same bearer gate |
 
 The kernel is **vendor-neutral**: it consumes OIDC discovery, bearer tokens,
@@ -98,7 +98,7 @@ deny ⇒ `403 forbidden` (both RFC 9457, camelCase).
 | `POST /api/ingress/events` | OIDC bearer; gated `work.write` | CloudEvents 1.0 envelope ingress; fail-closed validation |
 | `/api/identity/roles*` | OIDC bearer; PUT/DELETE gated `identity.roles.manage` | runtime role rules |
 | `/api/dev/*`, `/api/dead-letters` | OIDC bearer (read surface) | dev-time ledger dumps; Plan 12 replaces with admin views |
-| `/api/link/v1*`, `/hubs/link` | link plane (`linkToken`) | untouched by the identity plane |
+| `/api/link/v1*`, `/hubs/link` | link plane (`linkToken`) | enrollment + evidence, below |
 
 The kernel refuses to boot at all with an invalid/incomplete `identity:`
 block (`IdentityStartupCheck`, fail closed in every environment).
@@ -109,10 +109,48 @@ block (`IdentityStartupCheck`, fail closed in every environment).
 - Envelopes fail closed: schema/envelope violations ⇒ `400`, command types outside the 7-type known-command table ⇒ `422 unknown-command`, and the rejected envelope is still persisted to the `inbox` as an audit record (state `failed`).
 - Duplicate admission (same `(event_source, event_id)`, `command_id`, or `(provider, provider_delivery_id)`) returns `200 {"status":"duplicate"}` and reprocesses nothing — replay is cheap and side-effect-free by construction.
 
+## Workload plane: enrollment + delegation evidence (appendix §3.2)
+
+**Enrollment** (`POST /api/link/v1/enroll`) minting a per-endpoint
+`linkToken` comes in two modes, told apart by the shape of the presented
+credential (`token` field):
+
+| Mode | Credential | Identity source |
+|---|---|---|
+| (a) shared secret | `Link:EnrollmentToken` | body must name `team` (roster `Link:Teams`; absent/unknown ⇒ `403 team-unknown` — no default-team fallback); `role` defaults to gateway |
+| (b) workload OIDC | an `aud`-`facilitator-link` access token | the `Link:WorkloadIdentities` binding matching `(azp, endpointId)` fixes team, role, and delegation acceptance; an unregistered pair ⇒ `403 workload-not-registered` |
+
+Laws (both modes): the `gw.` endpointId prefix is reserved for `role:
+gateway` (`403 role-mismatch` otherwise); a body `role` that contradicts the
+mode-(b) binding also `403 role-mismatch`; **role is immutable across
+rotation** — re-role needs revoke + re-enroll; rotation replaces the stored
+hash, so the old link token stops validating immediately.
+
+**Delegation evidence**: a command may carry `actorEvidenceRef`. Validation
+is scheme-split — the deny-vs-unverified rule:
+
+| Ref state | Outcome |
+|---|---|
+| absent | `workload-only` — the enrollment acts for itself |
+| `oidc:<jwt>` | verify signature/iss/aud/exp/nbf against the realm JWKS + require `delegation: true`; **failure ⇒ `422 evidence-invalid` deny** (failed evidence never silently downgrades); pass + enrollment accepts ⇒ principal extends with `oidc:<iss>|<sub>` (`delegation-validated`); pass + enrollment refuses ⇒ `delegation-refused` (allowed, workload-only) |
+| `kernel:<id>` | resolved through `facilitator.evidence` (pre-registered human assertions); unknown/expired/consumed ⇒ deny |
+| any other scheme (e.g. `identity-evidence:`) | recorded `evidence-unverified:<scheme>`, workload-only — an opaque pointer the kernel has no oracle for neither denies nor authorizes |
+
+Every command admission writes one `facilitator.audit` row
+(`authorization.evaluated:link`, allow **and** deny): actor = the workload
+principal, reason = `delegation-validated` / `delegation-refused` /
+`evidence-unverified:<scheme>` / `evidence-malformed` /
+`evidence-invalid:<cause>` (`signature`, `expired`, `missing-delegation`,
+`wrong-audience`, `unknown-id`, `consumed`, …), and `detail` jsonb carrying
+`delegatedSubject` + team/role — never a raw token. Audit failure on an allow
+path ⇒ `503 auth-unavailable` (fail closed). The effective principal (always
+workload + optional validated human) is what Plan 12's policy engine will
+authorize against.
+
 ## Deferred to later plans
 
 | Concern | Plan |
 |---|---|
 | Refresh-token / session lifecycle for interactive UIs | 12 |
 | Admin surface authorization (replacing `/api/dev/*`) | 12 |
-| Link-plane token rotation (replaces enrollment-secret model) | 10 |
+| Scope-level evidence enforcement (groups→policy) | 12 |

@@ -4,7 +4,7 @@
 apiVersion: facilitator.framework/v1
 kind: Gateway
 gatewayId: gw.demo
-team: default
+team: team-alpha
 facilitatorUrl: http://host.docker.internal:8088
 enrollmentSecret: enroll-dev
 trustMode: isolated-executor

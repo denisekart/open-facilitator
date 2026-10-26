@@ -114,7 +114,7 @@ The repo is spec-only: `docs/specs/open_facilitator_framework_architecture.md` (
 **Depends on:** 03
 
 ### Plan 10 — Workload identity: enrollment binding, client-credentials option, actorEvidenceRef → effective principal
-**Status:** ⬜ not-started (detail design: `10-workload-identity-evidence.md`)
+**Status:** 🟢 implemented (detail design + status table: `10_WORKLOAD_IDENTITY_EVIDENCE_PLAN.md`)
 **Objective:** Link-edge trust: real team rosters (no `default` seeding), Gateway-vs-child enrollment roles (§11.3), appendix §3.2 evidence validation producing the effective principal admission audits.
 **Depends on:** 09
 

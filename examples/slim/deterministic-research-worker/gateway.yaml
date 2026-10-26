@@ -1,11 +1,11 @@
 # Standalone Gateway for the deterministic-worker walkthrough.
 # `children: []`: the fleet listener boots on ./child.sock and waits — the
 # worker attaches itself (Plan 07's spawn-before-Gateway restart law covers
-# either order). `team` must match the kernel's enrollment team slug.
+# either order). `team` must match an enrolled team slug (Link:Teams roster).
 apiVersion: facilitator.framework/v1
 kind: Gateway
 gatewayId: gw.demo
-team: default
+team: team-alpha
 facilitatorUrl: http://localhost:8088
 enrollmentSecret: enroll-dev
 trustMode: isolated-executor

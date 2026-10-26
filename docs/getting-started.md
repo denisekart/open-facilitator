@@ -67,13 +67,13 @@ curl -s -X POST localhost:8088/api/works/<workId>/transitions \
 
 Responses and errors follow the kernel error contract ([`docs/protocol.md`](protocol.md#kernel-ingress-implemented-plan-02)); a missing or invalid bearer yields a `401` ProblemDetails, a role denial a `403` (identity model: [`docs/security.md`](security.md)).
 
-The Link server (Plan 03) rides the same process — enroll an endpoint with the dev enrollment secret, then use its `linkToken` as a bearer (contract: [`docs/protocol.md`](protocol.md#link-transport-implemented-plan-03); the scripted fake client lives in `tests/Facilitator.Tests/LinkTestHarness.cs`):
+The Link server (Plan 03) rides the same process — enroll an endpoint with the dev enrollment secret (Plan 10: mode-(a) enrollment MUST name a roster team — dev config seeds `team-alpha`/`team-beta`), then use its `linkToken` as a bearer (contract: [`docs/protocol.md`](protocol.md#link-transport-implemented-plan-03); the scripted fake client lives in `tests/Facilitator.Tests/LinkTestHarness.cs`):
 
 ```bash
 curl -s -X POST localhost:8088/api/link/v1/enroll -H 'Content-Type: application/json' \
-  -d '{"token":"enroll-dev","endpointId":"gw-dev","instanceId":"i1","trustMode":"isolated-executor"}'   # 201 → linkToken
+  -d '{"token":"enroll-dev","endpointId":"gw-dev","instanceId":"i1","trustMode":"isolated-executor","team":"team-alpha"}'   # 201 → linkToken
 curl -s -X POST localhost:8088/api/link/v1/capabilities -H "Authorization: Bearer <linkToken>" \
-  -H 'Content-Type: application/json' -d '{"apiVersion":"facilitator.framework/v1","kind":"CapabilityManifest","ownerTeam":"default","capabilities":[{"id":"research.analyze","version":1,"execution":"asynchronous"}]}'   # 204
+  -H 'Content-Type: application/json' -d '{"apiVersion":"facilitator.framework/v1","kind":"CapabilityManifest","ownerTeam":"team-alpha","capabilities":[{"id":"research.analyze","version":1,"execution":"asynchronous"}]}'   # 204
 curl -s "localhost:8088/api/link/v1/deliveries?wait=2&limit=16" -H "Authorization: Bearer <linkToken>"  # 404 session-not-found until a hub hello opens a session
 ```
 
@@ -83,7 +83,7 @@ The client half (Plan 04) is the `@ofac/workspace-link` SDK + the `ofac-linkd` s
 pnpm -r build   # once, builds dist/bin/linkd.js
 node src/workspace-link/dist/bin/linkd.js run \
   --url http://localhost:8088 --secret enroll-dev \
-  --endpoint gw-dev --team default --manifest manifest.json   # prints "linkd ready ..."
+  --endpoint gw-dev --team team-alpha --manifest manifest.json   # prints "linkd ready ..."
 ```
 
 The same assembly doubles as its own client, riding the public HTTP API only (defaults `--url http://localhost:8088`, bearer from env `FACILITATOR_TOKEN` — required, an OIDC access token):

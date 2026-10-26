@@ -87,7 +87,7 @@ Events carry identity in the envelope (`source` + `id` + `time`), so their `data
 
 ## Transport neutrality
 
-The contract is transport-independent: the same fixtures MUST validate identically over the SignalR reference transport and the HTTP long-poll fallback, both implemented in the Facilitator (Link transport below; `protocol/openapi/link-v1.yaml` 1.0.1 is the frozen HTTP surface — enroll, events, deliveries, receipts, capabilities GET+POST). Consumers should use the `@ofac/protocol` package (`src/protocol/`): `schemaById` resolves a `dataschema` URI to its schema, `KNOWN_COMMAND_TYPES` is the fail-closed command table, and `validateEnvelope` / `validateReceipt` / `validateControlFrame` return the same `errorClass` taxonomy as the fixtures index.
+The contract is transport-independent: the same fixtures MUST validate identically over the SignalR reference transport and the HTTP long-poll fallback, both implemented in the Facilitator (Link transport below; `protocol/openapi/link-v1.yaml` 1.0.2 is the frozen HTTP surface — enroll, events, deliveries, receipts, capabilities GET+POST). Consumers should use the `@ofac/protocol` package (`src/protocol/`): `schemaById` resolves a `dataschema` URI to its schema, `KNOWN_COMMAND_TYPES` is the fail-closed command table, and `validateEnvelope` / `validateReceipt` / `validateControlFrame` return the same `errorClass` taxonomy as the fixtures index.
 
 ## Kernel ingress (implemented, Plan 02)
 
@@ -143,13 +143,52 @@ The kernel's own emission path builds outbox envelopes with the same validator b
 
 ## Link transport (implemented, Plan 03)
 
-The Facilitator serves the Workspace Link contract over two transports with identical application semantics (`src/facilitator/Kernel/Link/`): the SignalR hub at `/hubs/link` (reference transport) and the HTTP surface frozen in `protocol/openapi/link-v1.yaml` 1.0.1 (fallback, every language first-class). Outbox rows addressed `link.<endpointId>` are materialized into the durable delivery ledger `facilitator.link_deliveries` and offered to the endpoint over whichever transport it is speaking.
+The Facilitator serves the Workspace Link contract over two transports with identical application semantics (`src/facilitator/Kernel/Link/`): the SignalR hub at `/hubs/link` (reference transport) and the HTTP surface frozen in `protocol/openapi/link-v1.yaml` 1.0.2 (fallback, every language first-class). Outbox rows addressed `link.<endpointId>` are materialized into the durable delivery ledger `facilitator.link_deliveries` and offered to the endpoint over whichever transport it is speaking.
 
-### Auth (interim; Plan 07 cutover seam)
+### Enrollment: dual modes (Plan 10)
 
-`POST /api/link/v1/enroll` is guarded by the **bootstrap enrollment secret** sent in the request body (`token`), not a bearer header: config `Link:EnrollmentToken` (env `Link__EnrollmentToken`); unset + Development accepts the literal `enroll-dev`; unset + non-Development refuses startup (fail closed, mirroring `Auth:BootstrapToken`). Every other `/api/link/v1/*` request and every hub connection carries `Authorization: Bearer <linkToken>`; invalid/expired/revoked tokens yield `401 unauthorized` with no oracle for whether an enrollment exists. The kernel bearer still guards `/api/*` **except** `/api/link/v1/*` (`BootstrapTokenMiddleware` has the one path exclusion). All resolution flows through the `ILinkTokenValidator` seam (`Kernel/Link/LinkAuth.cs`) — Plan 07 replaces the store-backed implementation (`StoreLinkTokenValidator`: SHA-256 lookup in `link_enrollments`) with OIDC + `principal_mappings`; call sites never change.
+`POST /api/link/v1/enroll` presents its credential in the request body
+(`token`), not a bearer header, and the kernel tells the two modes apart by
+the credential's shape:
 
-Enrollment is an upsert by `endpointId` and **rotates the token**: the previous `linkToken` stops validating immediately. The response always includes the additive 1.0.1 fields — `linkToken` (opaque 256-bit base64url) and `expiresAt` (now + `Link:TokenLifetimeHours`, default 720 h). `trustMode` (`shared-runtime` | `separate-process-same-host` | `isolated-executor`) is echoed and MUST be logged at enrollment and at every `hello` (appendix §4). The enrollment record (endpoint, team, token hash, manifest + digest, timestamps) is stored server-side; an unknown team binds to a `default` team seeded on demand (Plan 11 replaces the seeding).
+- **Mode (a) shared secret**: `token` = `Link:EnrollmentToken` (env
+  `Link__EnrollmentToken`); unset + Development accepts the literal
+  `enroll-dev`; unset + non-Development refuses startup (fail closed). The
+  body MUST name `team` — a roster slug (`Link:Teams`, seeded at startup);
+  absent or unknown ⇒ `403 team-unknown`, no on-demand default. `role`
+  (`gateway` | `child`) is optional, default `gateway`.
+- **Mode (b) workload OIDC**: `token` = an access token whose `aud` contains
+  `Link:Evidence:Audience` (default `facilitator-link`), verified against the
+  realm JWKS. The `Link:WorkloadIdentities` binding matching `(azp,
+  endpointId)` fixes team, role, and delegation acceptance; no binding ⇒ `403
+  workload-not-registered`; a body `role` contradicting the binding ⇒ `403
+  role-mismatch`.
+
+Both modes: a `gw.`-prefixed `endpointId` requires `role: gateway` (`403
+role-mismatch`); every other `/api/link/v1/*` request and hub connection
+carries `Authorization: Bearer <linkToken>`; invalid/expired/revoked tokens
+yield `401 unauthorized` with no oracle for whether an enrollment exists.
+All resolution flows through the `ILinkTokenValidator` seam
+(`Kernel/Shared/Auth/ILinkTokenValidator.cs`).
+
+Enrollment is an upsert by `endpointId` and **rotates the token**: the
+previous `linkToken` stops validating immediately; **role is immutable
+across rotation** (re-role = revoke + re-enroll, else `403 role-mismatch`).
+The response always includes the additive 1.0.1 fields — `linkToken` (opaque
+256-bit base64url) and `expiresAt` (now + `Link:TokenLifetimeHours`, default
+720 h). `trustMode` (`shared-runtime` | `separate-process-same-host` |
+`isolated-executor`) is echoed and MUST be logged at enrollment and at every
+`hello` (appendix §4). The enrollment record (endpoint, team, role, workload
+subject, token hash, manifest + digest, timestamps) is stored server-side.
+
+**Delegation evidence**: commands may carry `actorEvidenceRef` (schema
+`common.v1.json#evidenceRef`, ≤ 2048 chars — amended in 1.0.2 so an
+`oidc:<jwt>` fits). Kernel-checked schemes (`oidc`, `kernel`) that FAIL
+validation deny the admission `422 evidence-invalid`; any other scheme is
+recorded non-authoritative. Valid evidence extends the effective principal
+only when the enrollment accepts delegated claims. See
+[`security.md`](security.md) (Workload plane) for the full algorithm and
+audit shape.
 
 ### Handshake
 
@@ -197,11 +236,11 @@ Over SignalR the receipt posts via the `Receipt` method with the full `receipt.v
 
 **Redelivery:** an `in_flight` row whose `redeliver_after` (= claim + `Link:InFlightLeaseSeconds`, default 120 s) has passed is claimable again — that IS the dropped-receipt mechanism (S:302). Delivery identity = the outbox row id, so a receipt arriving for an already-`acked` delivery answers the latest attempt idempotently and the dropped-receipt loop terminates. A `duplicate` receipt terminates redelivery exactly like `accepted` — the client saw the command.
 
-### HTTP fallback surface (link-v1.yaml 1.0.1)
+### HTTP fallback surface (link-v1.yaml 1.0.2)
 
 |Endpoint|Auth|Success|Errors|
 |---|---|---|---|
-|`POST /api/link/v1/enroll`|enrollment secret in body|`201` `EnrollResponse {enrollmentId, trustMode, linkToken, expiresAt}`|`400 schema-violation` (missing field, bad JSON), `401 enrollment-secret-invalid`, `413`|
+|`POST /api/link/v1/enroll`|enrollment secret or workload OIDC token in body|`201` `EnrollResponse {enrollmentId, trustMode, linkToken, expiresAt}`|`400 schema-violation` (missing field, bad JSON), `401 enrollment-secret-invalid` / `workload-token-invalid`, `403 workload-not-registered` / `role-mismatch` / `team-unknown`, `413`|
 |`POST /api/link/v1/events`|link bearer|`202` receipt `{deliveryId, status, processedAt}` (`deliveryId` = inbox row id); duplicate ⇒ `200 {"status":"duplicate","inboxId":…}`|`400 envelope-violation`/`schema-violation` (receipt-class frames in an envelope ⇒ `400`), `409 version-conflict` / `422 invalid-state-transition` / `404 work-not-found` (steer effects), `422 unsupported` (unknown command, `work.assign` FROM a link), `413`|
 |`GET /api/link/v1/deliveries?wait=0..60&limit=1..64`|link bearer|`200` array of `Delivery` (empty on poll timeout)|`404 session-not-found`, `400 schema-violation` (bad `wait`/`limit`)|
 |`POST /api/link/v1/deliveries/{deliveryId}/receipt`|link bearer|`204` (idempotent re-receipt answers `204` again, overwriting the stored receipt jsonb)|`404 delivery-not-found` (unknown id or another endpoint's delivery), `400 schema-violation`, `413`|
@@ -220,7 +259,12 @@ Over SignalR the receipt posts via the `Receipt` method with the full `receipt.v
 |`delivery-not-found`|`404`|Unknown receipt `deliveryId` or a delivery of another endpoint|
 |`capabilities-not-found`|`404`|Enrollment never advertised a manifest|
 |`team-mismatch`|`403`|Manifest `ownerTeam` ≠ principal's team|
-|`enrollment-secret-invalid`|`401`|Enroll body `token` ≠ `Link:EnrollmentToken`|
+|`enrollment-secret-invalid`|`401`|Mode-(a) enroll body `token` ≠ `Link:EnrollmentToken`|
+|`workload-token-invalid`|`401`|Mode-(b) enroll credential fails JWKS/iss/aud/exp validation|
+|`workload-not-registered`|`403`|No `Link:WorkloadIdentities` binding for the token's `(azp, endpointId)`|
+|`role-mismatch`|`403`|Body `role` contradicts the binding, a `gw.` endpoint enrolled non-gateway, or rotation tried to re-role|
+|`team-unknown`|`403`|Mode-(a) body `team` absent or not in the `Link:Teams` roster|
+|`evidence-invalid`|`422`|Command `actorEvidenceRef` of a kernel-checked scheme (`oidc`, `kernel`) failed validation (deny, audited)|
 |`session-superseded`|`409`|Reserved HTTP shape; as-built supersede surfaces as a SignalR `Disconnect` goodbye (heartbeat is hub-only)|
 |`no-common-version`|`409`|Reserved HTTP shape of the no-compatible-protocol-version goodbye|
 
@@ -243,6 +287,10 @@ The receipt timestamp is the frozen `processedAt` — the spec §5.2 example's `
 |`Link:MaxInFlight`|16|Per-session in-flight window (≥1); advertised in `welcome`, enforced at claim|
 |`Link:HeartbeatSeconds`|30 (5..600)|Client heartbeat cadence in `welcome`; SignalR keepalive = this, client timeout = 2×|
 |`Link:InFlightLeaseSeconds`|120|Redelivery deadline after each claim|
+|`Link:Teams`|`[]`|Team roster slugs seeded at startup; mode-(a) enrollment must name one|
+|`Link:WorkloadIdentities`|`[]`|Mode-(b) pre-registrations: `{clientId, endpointId, team, role, acceptsDelegatedClaims}`|
+|`Link:Evidence:Audience`|`facilitator-link`|Required `aud` of `oidc:` evidence and mode-(b) enrollment credentials|
+|`Link:Evidence:ClockSkewSeconds`|30|Tolerated skew on evidence lifetime checks|
 
 ## Client half — Workspace Link SDK (implemented, Plan 04)
 

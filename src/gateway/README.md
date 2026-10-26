@@ -20,7 +20,7 @@ enrollmentSecret: enroll-dev  # or OFAC_ENROLL_SECRET (env wins); optional once 
 role: gateway                 # sent at enrollment (default gateway; gw.* endpoints MUST be gateway)
 # workload:                     # mode-(b) enrollment: OIDC client-credentials instead of the secret
 #   tokenUrl: https://idp/realms/facilitator/protocol/openid-connect/token
-#   clientId: gw-team-a           # kernel must pre-register this client's issuer|subject
+#   clientId: gw-team-a           # the kernel binds (azp, endpointId) via a Link:WorkloadIdentities entry
 #   clientSecret: s3cret        # OFAC_OIDC_TOKEN_URL/CLIENT_ID/CLIENT_SECRET env wins per-key
 trustMode: shared-runtime
 stateDir: ./gw-state          # link.sqlite3 + gateway.sqlite3 + token, mode 0700

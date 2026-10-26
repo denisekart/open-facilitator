@@ -1,6 +1,6 @@
 # Plan 10 — Workload identity: enrollment team binding, dual enrollment modes, actorEvidenceRef → effective principal
 
-**Status:** 🔵 replanning → 🟡 in-progress → 🟢 done via the Implementation Status table below.
+**Status:** 🟢 done (🔵 replanning → 🟡 in-progress → 🟢 done via the Implementation Status table below).
 **Phase:** C. **Depends on:** 09 (🟢 landed: realm `facilitator`, `identity:` config, `FacilitatorPrincipal`, `facilitator.audit` + `AuditWriter` — consumed, not rebuilt).
 **Branching:** work and commit **directly on `main`** (standing directive). Do not push.
 **One plan, not split:** teams roster, role law, dual-mode enrollment, evidence validation, and effective principal all land on the same `ILinkTokenValidator`→principal→audit seam; splitting ships a half-enriched `LinkPrincipal` with two intermediate wire shapes.

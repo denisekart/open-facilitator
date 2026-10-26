@@ -34,6 +34,14 @@ namespace Facilitator.Migrations
                         .HasColumnType("text")
                         .HasColumnName("action_digest");
 
+                    b.Property<string>("ActorEvidenceRef")
+                        .HasColumnType("text")
+                        .HasColumnName("actor_evidence_ref");
+
+                    b.Property<string>("Comment")
+                        .HasColumnType("text")
+                        .HasColumnName("comment");
+
                     b.Property<DateTime?>("ConsumedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("consumed_at");
@@ -41,6 +49,19 @@ namespace Facilitator.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
+
+                    b.Property<DateTime?>("DecidedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("decided_at");
+
+                    b.Property<string>("DecidedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("decided_by");
+
+                    b.Property<string>("DigestVerification")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("digest_verification");
 
                     b.Property<string>("EligibleActors")
                         .IsRequired()
@@ -66,6 +87,9 @@ namespace Facilitator.Migrations
                         .HasColumnName("work_id");
 
                     b.HasKey("ApprovalId");
+
+                    b.HasIndex("WorkId")
+                        .HasDatabaseName("ix_approvals_work_id");
 
                     b.ToTable("approvals", "facilitator", t =>
                         {
@@ -907,7 +931,7 @@ namespace Facilitator.Migrations
 
                     b.ToTable("work_events", "facilitator", t =>
                         {
-                            t.HasCheckConstraint("work_events_kind_check", "kind IN ('created', 'state.transition', 'steer', 'command.accepted', 'assignment.transition')");
+                            t.HasCheckConstraint("work_events_kind_check", "kind IN ('created', 'state.transition', 'steer', 'command.accepted', 'assignment.transition', 'approval.decided')");
                         });
                 });
 

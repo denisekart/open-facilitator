@@ -38,20 +38,28 @@ public sealed class AuditWriter(IDbContextFactory<FacilitatorDbContext> contextF
     public async Task WriteAsync(AuditRecord record, CancellationToken ct)
     {
         await using var db = await contextFactory.CreateDbContextAsync(ct);
-        db.Audit.Add(new AuditEventEntity
-        {
-            AuditId = Guid.NewGuid(),
-            OccurredAt = timeProvider.GetUtcNow().UtcDateTime,
-            Actor = record.Actor,
-            Action = record.Action,
-            Resource = record.Resource,
-            Decision = record.Decision,
-            Reason = record.Reason,
-            EvidenceRef = record.EvidenceRef,
-            PolicyVersion = record.PolicyVersion,
-            Detail = string.IsNullOrWhiteSpace(record.Detail) ? "{}" : record.Detail,
-            TraceId = System.Diagnostics.Activity.Current?.TraceId.ToHexString(),
-        });
+        db.Audit.Add(Build(record));
         await db.SaveChangesAsync(ct);
     }
+
+    /// <summary>
+    /// Stage one decision row on a caller-owned context so the audit row
+    /// commits atomically with the state change it records (Plan 11 ledger).
+    /// </summary>
+    public void Append(FacilitatorDbContext db, AuditRecord record) => db.Audit.Add(Build(record));
+
+    private AuditEventEntity Build(AuditRecord record) => new()
+    {
+        AuditId = Guid.NewGuid(),
+        OccurredAt = timeProvider.GetUtcNow().UtcDateTime,
+        Actor = record.Actor,
+        Action = record.Action,
+        Resource = record.Resource,
+        Decision = record.Decision,
+        Reason = record.Reason,
+        EvidenceRef = record.EvidenceRef,
+        PolicyVersion = record.PolicyVersion,
+        Detail = string.IsNullOrWhiteSpace(record.Detail) ? "{}" : record.Detail,
+        TraceId = System.Diagnostics.Activity.Current?.TraceId.ToHexString(),
+    };
 }

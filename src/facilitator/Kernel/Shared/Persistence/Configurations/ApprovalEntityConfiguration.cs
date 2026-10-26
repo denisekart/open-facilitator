@@ -22,6 +22,12 @@ public sealed class ApprovalEntityConfiguration : IEntityTypeConfiguration<Appro
         e.Property(x => x.ExpiresAt).HasColumnName("expires_at").IsRequired();
         e.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
         e.Property(x => x.ConsumedAt).HasColumnName("consumed_at");
+        e.Property(x => x.DecidedBy).HasColumnName("decided_by");
+        e.Property(x => x.ActorEvidenceRef).HasColumnName("actor_evidence_ref");
+        e.Property(x => x.Comment).HasColumnName("comment");
+        e.Property(x => x.DecidedAt).HasColumnName("decided_at");
+        e.Property(x => x.DigestVerification).HasColumnName("digest_verification").IsRequired();
+        e.HasIndex(x => x.WorkId).HasDatabaseName("ix_approvals_work_id");
         e.ToTable(t => t.HasCheckConstraint("approvals_state_check",
             CheckSql.InList("state", ["pending", "approved", "denied", "expired", "revoked", "consumed"])));
     }

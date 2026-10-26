@@ -320,7 +320,7 @@ public sealed class LinkDeliveryEntity
     public DateTime? RedeliverAfter { get; set; }
 }
 
-/// <summary>facilitator.approvals — Plan 08 behaviour, schema now (§ approvals).</summary>
+/// <summary>facilitator.approvals — Plan 11 lifecycle authority (record/respond/consume/revoke).</summary>
 public sealed class ApprovalEntity
 {
     public Guid ApprovalId { get; set; }
@@ -342,6 +342,20 @@ public sealed class ApprovalEntity
     public DateTime CreatedAt { get; set; }
 
     public DateTime? ConsumedAt { get; set; }
+
+    /// <summary>Canonical actor of the deciding principal (oidc:iss|sub).</summary>
+    public string? DecidedBy { get; set; }
+
+    /// <summary>The responder's actorEvidenceRef, verbatim.</summary>
+    public string? ActorEvidenceRef { get; set; }
+
+    /// <summary>Responder comment (<= 1024).</summary>
+    public string? Comment { get; set; }
+
+    public DateTime? DecidedAt { get; set; }
+
+    /// <summary>Digest provenance: recomputed | digest-unverified (1.0 senders without action).</summary>
+    public string DigestVerification { get; set; } = "recomputed";
 }
 
 /// <summary>facilitator.communication_bindings — Plan 13 behaviour, schema now.</summary>

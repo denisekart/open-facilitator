@@ -112,6 +112,51 @@ public static class ProblemErrors
         Create("evidence-invalid", "Evidence invalid", StatusCodes.Status422UnprocessableEntity,
             $"actorEvidenceRef failed validation ({reason})");
 
+    /// <summary>422 kernel-recomputed action digest != the declared one (no ledger row).</summary>
+    public static ProblemDetails ApprovalDigestMismatch(string approvalId) =>
+        Create("approval-digest-mismatch", "Approval digest mismatch", StatusCodes.Status422UnprocessableEntity,
+            $"approval '{approvalId}': the canonicalized action does not hash to the declared actionDigest");
+
+    /// <summary>422 approvalId outside the ledger's Guid identity space.</summary>
+    public static ProblemDetails ApprovalIdInvalid(string approvalId) =>
+        Create("approval-id-invalid", "Approval id invalid", StatusCodes.Status422UnprocessableEntity,
+            $"'{approvalId}' is not a GUID — the approvals ledger cannot key it");
+
+    /// <summary>404 unknown approval (or another work's approval, on the work-scoped surface).</summary>
+    public static ProblemDetails ApprovalNotFound(string approvalId) =>
+        Create("approval-not-found", "Approval not found", StatusCodes.Status404NotFound,
+            $"no approval '{approvalId}' in the ledger");
+
+    /// <summary>409 approval already decided/consumed — atomic single use (spec §12.2).</summary>
+    public static ProblemDetails ApprovalAlreadyConsumed(string approvalId) =>
+        Create("approval-already-consumed", "Approval already consumed", StatusCodes.Status409Conflict,
+            $"approval '{approvalId}' was already decided — a replay denies even with identical command JSON");
+
+    /// <summary>409 approval past its expiry (lazy flip applied).</summary>
+    public static ProblemDetails ApprovalExpired(string approvalId) =>
+        Create("approval-expired", "Approval expired", StatusCodes.Status409Conflict,
+            $"approval '{approvalId}' is past its expiresAt");
+
+    /// <summary>409 approval revoked before use (appendix §7.3).</summary>
+    public static ProblemDetails ApprovalRevoked(string approvalId) =>
+        Create("approval-revoked", "Approval revoked", StatusCodes.Status409Conflict,
+            $"approval '{approvalId}' was revoked before use");
+
+    /// <summary>409 respond against a still-pending approval (consume/revoke-before-decide).</summary>
+    public static ProblemDetails ApprovalNotPending(string approvalId) =>
+        Create("approval-not-pending", "Approval not pending", StatusCodes.Status409Conflict,
+            $"approval '{approvalId}' is pending — only an approved row may be consumed");
+
+    /// <summary>403 the responding principal does not intersect eligibleActors.</summary>
+    public static ProblemDetails ApprovalActorIneligible(string approvalId) =>
+        Create("approval-actor-ineligible", "Approval actor ineligible", StatusCodes.Status403Forbidden,
+            $"the responding principal is not in approval '{approvalId}'s eligibleActors");
+
+    /// <summary>403 respond arrived without a verified human identity behind it (law D4).</summary>
+    public static ProblemDetails ApprovalActorUnknown() =>
+        Create("approval-actor-unknown", "Approval actor unknown", StatusCodes.Status403Forbidden,
+            "approval.respond requires a verified human principal (oidc:/kernel: evidence or the OIDC-authenticated REST surface)");
+
     /// <summary>409 HTTP-surface equivalent of the no-compatible-protocol-version goodbye.</summary>
     public static ProblemDetails NoCommonVersion() =>
         Create("no-common-version", "No common protocol version", StatusCodes.Status409Conflict,

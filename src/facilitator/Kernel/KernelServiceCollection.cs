@@ -114,6 +114,7 @@ public static class KernelServiceCollection
         builder.Services.AddHostedService(sp => sp.GetRequiredService<LinkEnrollmentStartupCheck>());
         builder.Services.AddSingleton<LinkEnrollmentStore>();
         builder.Services.AddSingleton<IEvidenceStore, EvidenceStore>();
+        builder.Services.AddScoped<IApprovalLedger, ApprovalLedger>();
         builder.Services.AddHostedService<TeamRosterSeeder>();
         builder.Services.AddSingleton<ILinkTokenValidator, StoreLinkTokenValidator>();
         builder.Services.AddSingleton<LinkService>();

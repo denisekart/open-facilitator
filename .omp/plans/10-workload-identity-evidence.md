@@ -1,92 +1,139 @@
-# Plan 10 — Workload identity: enrollment binding, client-credentials option, actorEvidenceRef → effective principal
+# Plan 10 — Workload identity: enrollment team binding, dual enrollment modes, actorEvidenceRef → effective principal
 
-**Status:** ⬜ not-started (🔵 replanning → 🟡 in-progress → 🟢 done via the Implementation Status table below)
-**Phase:** C. **Depends on:** 09 (realm, claim mapper, audit spine — all consumed, not rebuilt).
+**Status:** 🔵 replanning → 🟡 in-progress → 🟢 done via the Implementation Status table below.
+**Phase:** C. **Depends on:** 09 (🟢 landed: realm `facilitator`, `identity:` config, `FacilitatorPrincipal`, `facilitator.audit` + `AuditWriter` — consumed, not rebuilt).
 **Branching:** work and commit **directly on `main`** (standing directive). Do not push.
-**Size judgment:** kept as ONE plan — enrollment team-binding, workload OIDC option, and evidence validation all land on the same `ILinkTokenValidator`→principal seam; splitting would ship a half-enriched `LinkPrincipal` with two intermediate wire shapes. Split candidate if execution drags: drop the optional OIDC-client-credentials enrollment mode (keep enrollment-token + evidence) — decidable at Step 3 only.
-**Questions may be asked during planning, but not during implementation.**
+**One plan, not split:** teams roster, role law, dual-mode enrollment, evidence validation, and effective principal all land on the same `ILinkTokenValidator`→principal→audit seam; splitting ships a half-enriched `LinkPrincipal` with two intermediate wire shapes.
+**Questions may be asked during planning, but not during implementation.** Infer missing details from existing code or spec; consult OIDC/JWKS best-practice docs online when framework questions arise; when stuck after several straightforward attempts, re-evaluate that part's design and prefer the simpler option consistent with the spec.
 
-## Objective
+## Step 0 — Seed this file
 
-Complete the trust plane at the Link edge (spec §11.3, appendix §3.2): enrollments bind to real teams (kill the seeded `default` team), an enrolled workload cannot claim a role it wasn't enrolled as (Gateway vs child), and `actorEvidenceRef` stops being opaque pass-through bytes: the kernel validates evidence per the appendix §3.2 algorithm and derives an **effective principal** (workload identity + optional verified human delegation) that admission audits and that Plans 11/12 authorize against.
+Copy this plan (title through Implementation Status) over `.omp/plans/10-workload-identity-evidence.md` verbatim as the first commit, before any code. It replaces the prior draft.
 
-## Expected state after
+## Context
 
-- `POST /api/link/v1/enroll` requires the enroll body's claimed role/endpoint to match the credential: two enrollment modes — (a) enrollment secret + endpoint pre-registration per team, (b) OIDC client-credentials token whose `azp`/`sub` maps to a registered endpoint (audience `facilitator-link`). A child's token cannot enroll/manifest as a Gateway (§11.3).
-- Team slugs are explicit (`teams` table or config seed of `team-alpha`/`team-beta` from the realm); the `default`-team on-demand seeding is deleted (clean cutover); manifest `ownerTeam` mismatch keeps 403 `team-mismatch`, now against a real roster.
-- `actorEvidenceRef` on commands is resolved+validated when it points at kernel-checkable evidence (evidence kinds registry; unresolvable ⇒ recorded, non-authoritative, never grants privilege — appendix §3.3); validated delegation can extend the workload principal only when the enrollment is marked `acceptsDelegatedClaims`.
-- Every admission decision writes `authorization.evaluated` with workload + (optional) human principal; §26.1 item 5's evidence half passes.
+The kernel's link edge today trusts three things it shouldn't: every enrollment binds to a `default` team seeded on demand, the enroll body carries no workload role so a child can enroll indistinguishably from a Gateway, and `actorEvidenceRef` is opaque pass-through bytes the kernel never reads. Spec §11.3 requires the Facilitator to bind a verified token subject to a **pre-registered logical endpoint and team** and that "an enrolled child worker cannot claim to be a Gateway by editing a manifest"; appendix §2 line 45 makes evidence validation a MUST with the §3.2 five-step algorithm ending in an `authorization.evaluated` audit event. End state: enrollments bind to real team slugs, carry a `gateway`/`child` role, may be obtained either with the enrollment secret or with an OIDC client-credentials token (both modes kept — small orgs without an IdP use mode (a), larger ones mode (b)), and admission resolves `actorEvidenceRef` through scheme validators into an **effective principal** that Plan 12's policy engine authorizes against.
 
-## Known facts (verified 2026-10-25; re-verify, code wins)
+## Known facts (verified 2026-10-26 by direct read; code wins on divergence)
 
-1. Link auth as-built: `ILinkTokenValidator.ValidateAsync(token) → LinkPrincipal(EndpointId, TeamId, TrustMode)` (`Shared/Auth/ILinkTokenValidator.cs:7,15-18`, doc'd as the OIDC clean-cutover point); `StoreLinkTokenValidator` (`LinkEnrollmentStore.cs:152-167`, SHA-256 base64url lookup, `RevokedAt`/`ExpiresAt` gates); `LinkBearerHandler` mints claims `ClaimTypes.Name`, `facilitator.team`, `facilitator.trust_mode` (`LinkBearerHandler.cs:50-55`, constants `LinkHub.cs:39-41`); `?access_token=` only on WS upgrade.
-2. Enrollment as-built: `LinkEndpoints.Enroll.cs` (secret `Link:EnrollmentToken`, dev literal `enroll-dev`, rate-limit `enroll` policy, upsert-by-endpointId rotation, `Link:TokenLifetimeHours` default 720); `EnrollRequestDto(Token, EndpointId, InstanceId, TrustMode)` (`LinkDtos.cs:22`); trustMode whitelist server-side + DB check constraint. **No role/kind field**: Gateway-vs-child is not expressed at all today. Team binds to slug `default` seeded on demand (`LinkEnrollmentStore.cs:66-71`).
-3. `actorEvidenceRef`: schema `$defs/evidenceRef` pattern `^[a-z0-9-]+:.{1,256}$` (`common.v1.json`); REQUIRED in every command data schema; kernel treats it as opaque bytes (`CloudEventIngress`/`AdmissionGate`/`IngressProcessor` never read it); fixtures exist (`valid/command.*.json`, `invalid/command.assign.no-evidence.json`).
-4. Admission path: `LinkIngress.AdmitAsync` (`Kernel/Link/LinkIngress.cs:49-127`) → `AdmissionGate.ScreenAsync` (size→parse→receipt-refusal→envelope validation→`KnownCommands` gate→`work.assign`-from-link ban→dedupe). Both fall-through dispatch sites carry the principal.
-5. From Plan 09: `FacilitatorPrincipal`, `identity:` config block, `facilitator.audit` + `AuditWriter`, Keycloak realm `facilitator` with clients — extend the SAME realm (new workload clients/roles), no second realm.
-6. Gateway/SDK enroll call-sites: gateway `runtime.ts:518-519` sends trustMode in enroll body; SDK `enroll()` in `src/workspace-link` (token factory already async — refresh-compatible).
+1. **Auth seam:** `LinkPrincipal(string EndpointId, Guid TeamId, string TrustMode)` at `src/facilitator/Kernel/Shared/Auth/ILinkTokenValidator.cs:8`; `ValidateAsync(token) → LinkPrincipal?` (null = unknown/expired/revoked). `StoreLinkTokenValidator` lives at `src/facilitator/Kernel/Shared/Persistence/LinkEnrollmentStore.cs:152-168` (SHA-256 base64url lookup, `RevokedAt == null && ExpiresAt > now`). The store (`:44 EnrollAsync`) validates the secret constant-time, whitelists trustMode, mints 32-byte base64url tokens, upserts by `endpoint_id` (rotation: old token dies immediately), and seeds team slug `default` on demand at `:62-68` (its "Plan 11" comment is stale — this plan owns it).
+2. **Enroll endpoint:** `src/facilitator/Kernel/Link/LinkEndpoints.Enroll.cs` — `POST /api/link/v1/enroll`, guarded by `Link:EnrollmentToken` (dev literal `enroll-dev`, fail-closed startup check otherwise), rate-limit policy `enroll` (30/min/IP), DTO `EnrollRequestDto(Token, EndpointId, InstanceId, TrustMode)` (`LinkDtos.cs:22`), errors 413 `payload-too-large` / 400 `schema-violation` / 401 `enrollment-secret-invalid` (`ProblemErrors.cs:100`), 201 + `EnrollResponseDto(EnrollmentId, TrustMode, LinkToken, ExpiresAt)`. `Link:TokenLifetimeHours` default 720 (`LinkOptions.cs:40`).
+3. **Schema gate:** `protocol/json-schema/enroll-request.v1.json` is `additionalProperties:false`, required `[token, endpointId, instanceId, trustMode]` — nothing new may go on the enroll body until the schema changes. Precedent for additive change: OpenAPI `protocol/openapi/link-v1.yaml` version 1.0.1 with a written "additive minor change" rationale at lines 23-29; `docs/protocol.md` rule: optional additive fields stay v1, breaking = new file + new `$id`. `$defs/evidenceRef` = `"pattern": "^[a-z0-9-]+:.{1,256}$"` (`common.v1.json:11-14`) — REQUIRED in all 7 command data schemas; an RS256 JWT exceeds 256 chars, so the bound is the blocker for inline evidence (amended below, Step 2).
+4. **Admission is principal-blind:** `AdmissionGate.ScreenAsync` (`src/facilitator/Kernel/Link/AdmissionGate.cs`) runs size→parse→receipt-refusal→envelope-schema→known-command→assign-ban→dedupe; its `AuditAsync` only writes a `failed` inbox row — **no `facilitator.audit` rows exist on the link plane today**. `LinkIngress.AdmitAsync(rawBody, ct)` takes no principal; `LinkHub.Envelope` calls `RequirePrincipal()` and discards the result (`LinkHub.cs:125-132`); HTTP door is `POST /api/link/v1/events` (`LinkEndpoints.Enroll.cs:74-83`), principal in `HttpContext.Items["facilitator.link.principal"]` (`LinkAuthMiddleware.cs:20`). Hub claims today: `ClaimTypes.Name`, `facilitator.team`, `facilitator.trust_mode` (`LinkBearerHandler.cs:49-55`, `LinkHub.cs:39,42`).
+5. **Plan 09 assets to reuse (never fork):** `facilitator.audit` table already has `evidence_ref`, `decision CHECK allow|deny`, `policy_version`, `detail jsonb`, `trace_id` (`Entities.cs:355-391`); `AuditWriter.AuditRecord(Actor, Action, Resource, Decision, Reason, EvidenceRef, PolicyVersion, Detail)` (`Kernel/Shared/Identity/AuditWriter.cs:17`); human-plane action form `authorization.evaluated:{binding.Id}` with audit-fail⇒deny+503 (`IngressRoleGateMiddleware.cs:106-113`); typed problems `https://errors.openfacilitator.org/v1/{unauthorized,auth-unavailable,forbidden}` (`IdentityAuthentication.cs:28-52`); pinned algs `RS256/ES256`; `identity:oidc:{authority,trustedIssuers,audience,requireHttps}` config; "config seeds DB when empty" precedent (`RoleStore`). Realm `facilitator` (`reference/keycloak/realm.json`): clients `facilitator-api` (public) + `facilitator-cli` (confidential, secret `e2e-cli-secret`, client-credentials, group+audience mappers as the copy pattern); groups `/teams/team-alpha`, `/teams/team-beta`; users `alice` (alpha)/`bob` (beta)/`carol` (none); `accessTokenLifespan 300`. **No workload clients, no `facilitator-link` audience, no delegation mapper exist yet.** `facilitator.teams` table exists (guid PK, unique slug) with zero roster rows and no seeding mechanism.
+6. **TS edge:** SDK `enroll(opts:{baseUrl,token,endpointId,instanceId,trustMode})` (`src/workspace-link/src/core/enroll.ts`) client-side-validates against the enroll schema — the wire schema change must land first. Token seam `LinkTokenProvider{getToken(); refresh?()}` (`core/types.ts:95-99`), `refresh` fires on 401 only (`token-rotation.ts`). `linkd` config `LinkdConfig` + flags `--url --token --secret --endpoint --team --manifest --trust-mode --transport --state --mode` (`core/config.ts`); env `OFAC_ENROLL_SECRET`/`OFAC_LINK_TOKEN`; two enroll callsites in `bin/linkd.ts` (:75-93). Gateway: `runtime.ts:507-541 acquireToken()` sends the 4-field body, enroll-at-startup + 0600 token file; YAML whitelist `TOP_LEVEL_KEYS` (`config.ts:118-135`), env overlay `OFAC_ENROLL_SECRET`/`OFAC_LINK_TOKEN`/`OFAC_CHILD_SECRET`. **Production code never populates `actorEvidenceRef`** — only test fixtures with `"identity-evidence:e2e"` etc.
+7. **E2E relies on `default`:** workspace-link harness `ENROLL_SECRET="enroll-dev"` + `makeManifest("default")` (`test/e2e/harness.ts:479-514`), gateway harness YAML writer emits `team: default` (`gateway-harness.ts:80`), worker e2e asserts union `ownerTeam === "default"` (`worker.e2e.test.ts:169`). Feature `workspace-link` option `team` defaults `"default"` and the generated unit is a heredoc in `features/src/workspace-link/install.sh:41-71` (1:1 option mirror rule, `features/AGENTS.md`; secrets are never options).
+8. **Fixtures harness is free:** new fixture = `protocol/conformance-fixtures/index.json` entry + file; both harnesses (TS `src/protocol/test/fixtures.test.ts` dispatch by `class`, .NET `protocol/tools/Validate.Fixtures`) pick schema-expressed classes up with zero code change. Codegen via `make protocol`.
+9. **Dispatch channel law:** sinks route on the text before the first `.` of `recipient_endpoint_id` (`Kernel/Shared/Dispatch/ISink.cs:19`); Gateway endpoints are `gw.<slug>` — the `gw.` prefix is the de-facto Gateway channel, currently enforced nowhere in the kernel.
 
-## Locked decisions (planning-approved)
+## Locked decisions
 
-- Evidence kinds registry (kernel-side validators): `oidc:` — a signed JWT checked against realm JWKS with issuer/audience/expiry/`delegation:true` per appendix §3.2; `kernel:` — a kernel-issued evidence record id (created by Plan 11's approval flow) looked up in DB. Unknown scheme ⇒ evidence NOT validated, principal = workload only, audit records `evidence=unverified:<scheme>`. Non-authoritative free-form fields are recorded, never grant privilege (§3.3).
-- `link_enrollments` gains columns via one migration: `team_slug`-backed FK to a new `teams` table (slugs `team-alpha`, `team-beta` seeded from `reference/keycloak` parity + config), `role` (`gateway` | `child`), `accepts_delegated_claims bool`. Enrollment body carries `role`; a `child` enrollment's token may never POST a Gateway-shaped manifest. Mode (b) OIDC enrollment requires the client's `sub` registered against an endpoint record.
-- `LinkPrincipal` widens to `LinkPrincipal(EndpointId, TeamSlug, TrustMode, Role)`; hub claims gain `facilitator.role`. Effective principal = workload + validated evidence subject, computed once in admission, carried through both ingress doors.
-- Clean cutover: the `default`-team seeding branch is deleted, not feature-flagged; e2e harnesses enroll against `team-alpha` (realm parity).
+- **Both enrollment modes (user decision).** Mode (a) enrollment secret (unchanged crypto/rotation) + mode (b) OIDC client-credentials enrollment. Security posture: mode (b) tokens are JWKS-verified with pinned `RS256/ES256`, trusted issuer, audience `facilitator-link`, and bound to a config pre-registration keyed on `azp` (client id). Mode (a) remains full-trust behind the shared secret, as today.
+- **Inline JWT evidence + additive schema amendment (user decision).** This plan spends its one allowed additive frozen-schema amendment: `common.v1.json` `$defs/evidenceRef` pattern `^[a-z0-9-]+:.{1,256}$` → `^[a-z0-9-]+:.{1,2048}$` (backward-compatible loosening; every existing value stays valid). No evidence-upload endpoint.
+- **Evidence law (final, resolves the deny-vs-record tension):** scheme registry with two validators —
+  - `oidc:<jwt>`: signature (realm JWKS, cached per §11.2 bounded-cache rule), pinned algs, `iss` ∈ `identity:oidc:trustedIssuers`, `aud` contains config `Link:Evidence:Audience`, `exp`/`nbf`, required claim `delegation: true`, extracts `sub` + `groups` + `scope` (appendix §3.3 authoritative set).
+  - `kernel:<id>`: lookup in new table `facilitator.evidence`; missing id ⇒ `unknown-id`; `expires_at` past ⇒ `expired`; `consumed_at` set ⇒ `consumed` (replay law — Plan 11 owns consumption, this plan only validates and defines the table).
+  - **A `oidc:`/`kernel:` ref that is kernel-checkable and FAILS validation ⇒ admission DENY** (422 `evidence-invalid`, audit `decision=deny`), because failed-vs-replayed evidence must not silently downgrade to workload-only and keep a command alive that was presented *as* authority. **Any other scheme (e.g. `identity-evidence:`, `artifact:`) or a malformed ref ⇒ evidence recorded non-authoritative**: principal = workload only, admission proceeds, audit records outcome. Validated delegation extends the principal only when the enrollment's `accepts_delegated_claims` is true; otherwise outcome `delegation-refused` (workload-only, allowed).
+- **Role model:** `role ∈ {gateway, child}`, stored per enrollment. Mode (a): body's optional `role` recorded, default `gateway` (compat — current callers send nothing). Mode (b): role/team come from the pre-registration binding; a body `role` contradicting the binding ⇒ 403 `role-mismatch`. **`gw.` prefix law:** an `endpointId` starting `gw.` requires `role=gateway` (both modes); violation ⇒ 403 `role-mismatch`. This is the kernel-checkable face of §11.3's "cannot claim to be a Gateway by editing a manifest": identity+role come from enrollment, never from manifest bytes (the manifest schema has no gateway field and gets none).
+- **`accepts_delegated_claims`:** stored column; mode (b) sets it from the binding; mode (a) is always `false` — delegation acceptance requires a registered workload identity (security-first, avoids a free-for-all on the shared secret).
+- **Team roster:** `facilitator.teams` rows seeded at startup from new config `Link:Teams: [<slugs>]` (dev: `["team-alpha","team-beta"]`), using the RoleStore "seed when row absent" pattern. The `default`-team on-demand seeding branch is **deleted** (clean cutover); enrolling with a team the roster lacks ⇒ 403 `team-unknown`. `LinkPrincipal` keeps `Guid TeamId` (everything is Guid-keyed today) and gains `string TeamSlug` + `string Role`.
+- **Audit actor form:** link-plane rows use actor `link:<endpointId>`; the human delegation, when validated, appears as `detail.delegatedSubject` = `oidc:<iss>|<sub>` (Plan 09 form). Action string: `authorization.evaluated:link` for link admissions (mirrors the human plane's `authorization.evaluated:{id}`).
+- **Audit-fail law mirrors the human plane:** a failed `AuditWriter` write on an allow path ⇒ deny + 503 `auth-unavailable`.
 
-## Steps
+## Steps (ordered; each step leaves the tree green)
 
-0. **Research (mandatory start).** Appendix §3.2–3.4, spec §11.3–11.4 re-read; Plan 09's as-built mapper/realm/audit (it lands first — code wins on divergences); Keycloak client-credentials flow + JWKS validation options in .NET (`AddJwtBearer` multi-audience); how `AdmissionGate` audit rows are written today (`AdmissionGate.AuditAsync`, `CloudEventIngress.cs:52-59`).
-1. Teams table + migration (`teams`, enrollment columns, drop default-seed path); realm gains workload clients (`ofac-gateway-alpha`, `ofac-worker-alpha`) with roles.
-2. Enrollment v2: role field, pre-registration check, mode (b) OIDC-client-credentials arm, rotated-token semantics unchanged; 401/403 typed errors extended in `ProblemErrors`.
-3. Evidence validators (`oidc:`, `kernel:`) + effective-principal derivation in `AdmissionGate`/`CloudEventIngress`; `authorization.evaluated` writes with both planes; metrics.
-4. SDK/Gateway: enroll body gains `role`; token factory supports client-credentials mode (fetch+refresh) alongside static enrollment tokens; `linkd` gains the flag; example manifests/configs updated.
-5. Conformance fixtures: new invalid classes (child-claiming-gateway, evidence wrong-issuer, evidence expired, unknown-scheme passthrough) + `KNOWN_COMMAND_TYPES` untouched; both-language harnesses run them.
-6. Docs + skills + roadmap bookkeeping.
+### 1. Migration + roster seeding + `LinkPrincipal` widening (kernel)
+One EF migration (`AddWorkloadIdentity`):
+- `link_enrollments`: `role text NOT NULL DEFAULT 'gateway'` (CHECK IN ('gateway','child')), `accepts_delegated_claims boolean NOT NULL DEFAULT false`, `workload_issuer text NULL`, `workload_subject text NULL`. Entity `Entities.cs:261-288` + `Configurations/LinkEnrollmentEntityConfiguration.cs` updated.
+- New table `facilitator.evidence`: `evidence_id text PK` (the id after `kernel:`), `subject text NOT NULL`, `claims jsonb NOT NULL`, `issued_at timestamptz`, `expires_at timestamptz`, `consumed_at timestamptz NULL`. Entity + configuration + `IEvidenceStore { Task<EvidenceRecord?> FindAsync(string id, CancellationToken) }` in `Kernel/Shared/Persistence/` (Plan 11 will add mint/consume against this exact table — do not fork the concept).
+- Team roster seeder: hosted startup service (alongside `IdentityStartupCheck` pattern, but it seeds not fails) reading `LinkOptions.Teams` (`string[]`, new key `Link:Teams`, dev config `["team-alpha","team-beta"]`); insert slug rows when absent.
+- `LinkEnrollmentStore.EnrollAsync`: delete the `default` seeding branch (`:62-68`); resolve `team` arg by slug ⇒ null when absent; store `role`, `acceptsDelegatedClaims`, `workloadIssuer/Subject` (null for mode (a)); rotation keeps role/team immutable on an existing row (rotation may not re-role an endpoint — a role change needs re-enrollment after `RevokeAsync`).
+- `LinkPrincipal` → `record LinkPrincipal(string EndpointId, Guid TeamId, string TeamSlug, string TrustMode, string Role)`; `StoreLinkTokenValidator` join to teams for slug; `LinkBearerHandler` mints 4th claim `facilitator.role` (const in `LinkHub` beside `:39/:42`); `RequirePrincipal` reconstructs all five. Call-site fixups: every construction/teardown of the 3-arg record (grep `new LinkPrincipal`).
+- Update the .NET test fixtures that rely on `default` (they gain `team-alpha` in `Link:Teams` config).
 
-## Testing requirements
+### 2. Protocol amendment + codegen + fixtures (contract, before kernel role parsing)
+- `protocol/json-schema/common.v1.json`: evidenceRef pattern → `^[a-z-0-9]+:.{1,2048}$` (keep scheme-charset exact; widen the 256→2048).
+- `protocol/json-schema/enroll-request.v1.json`: add optional `"role": {"enum": ["gateway","child"]}` and `"team": {"$ref": "common.v1.json#/$defs/idToken"}`. Additive; no required-field changes.
+- `protocol/openapi/link-v1.yaml`: version `1.0.1`→`1.0.2`; add a rationale paragraph mirroring the 1.0.1 precedent (optional `role`/`team` enroll fields; evidenceRef bound loosened; nothing changed meaning or requiredness).
+- `make protocol` regenerates `src/protocol/src/generated/` + `protocol/dotnet/Ofac.Protocol/Generated/WireTypes.cs`; fix the hand-mirrored `KnownCommands.cs` only if codegen touches it (command types unchanged — expect no change).
+- New fixtures + `index.json` entries: `valid/enroll.request.role.json` (mode-(a) body with `role:"child"`, `team:"team-alpha"`), `invalid/enroll.bad-role.json` (role `"admin"` → `schema-violation`, class `enroll`), `valid/command.assign.oidc-evidence.json` (envelope with a >256-char `oidc:` ref → validates post-amendment; reuse an existing command envelope, swap the ref for the 400-char dummy `oidc:` + filler).
 
-- Integration (Keycloak container): child token enrolling as `gateway` role rejected; mode (b) enrollment round-trip incl. rotation semantics; manifest `ownerTeam` against real roster (403 `team-mismatch` preserved); evidence: valid `oidc:` delegation extends principal (audit proves effective principal), wrong-issuer/expired ⇒ deny, `kernel:` unknown id ⇒ non-authoritative.
-- Replay: same evidence ref reused past its expiry denies.
-- E2E: gateway-e2e + worker-e2e flip from static tokens to client-credentials tokens end-to-end with zero kernel special-casing; §26.1 item 5 evidence-side green.
+### 3. Enrollment v2 (kernel) — role, team, mode (b)
+- `EnrollRequestDto` gains `string? Role, string? Team` (`LinkDtos.cs:22`); endpoint validates role ∈ {null,"gateway","child"} else 400 `schema-violation`.
+- New config `Link:WorkloadIdentities: [{ ClientId, EndpointId, Team, Role, AcceptsDelegatedClaims }]` (`LinkOptions`). Mode-(b) arm in `LinkEndpoints.Enroll.cs`: when the body `token` decodes as a JWT whose `iss` ∈ `identity:oidc:trustedIssuers` and `aud` contains `facilitator-link` → mode (b) path: verify signature (reuse a shared `OidcJwks` validator extracted from/alongside `IdentityJwt`'s `TokenValidationParameters` construction — pinned algs, one cached `ConfigurationManager<OpenIdConnectConfiguration>` per authority), then require `azp` matching a binding with matching `EndpointId` ⇒ bind team/role/accepts from the binding, store `workload_issuer/subject`; a body `role` contradicting the binding or a `gw.` endpointId with non-gateway role ⇒ 403. Non-JWT token (or JWT from untrusted issuer) → mode (a) path unchanged (constant-time secret check) + now requires roster-present `team` (body `Team` ⇒ 403 `team-unknown` when absent) and applies the `gw.` prefix law. Response DTO unchanged (mode (b) still mints an opaque rotating link token — the OIDC flow is enrollment-only; runtime stays single-token).
+- `ProblemErrors` gains: `team-unknown` (403), `role-mismatch` (403), `workload-token-invalid` (401), all `https://errors.openfacilitator.org/v1/<slug>` + human detail strings.
+- Existing mode-(a) tests updated to send `team:"team-alpha"`; new integration tests per **Verification**.
 
-## Documentation requirements
+### 4. Evidence validators + effective principal + link-plane audit (kernel)
+- New `Kernel/Shared/Evidence/`: `EvidenceValidator` (static scheme split on first `:`), `OidcEvidenceValidator` (params from new `Link:Evidence:Audience` key + shared `OidcJwks` + trusted issuers + pinned algs + `delegation:true` claim check + `sub`/`groups`/`scope` extraction), `KernelEvidenceValidator` (`IEvidenceStore` lookup). Result: `record EvidenceOutcome(string Scheme, EvidenceState State, string? DelegatedSubject, IReadOnlyList<string> Groups, string? InvalidReason)` with `EvidenceState { Absent, UnverifiedScheme, Malformed, Valid, Invalid }`.
+- `EffectivePrincipal` derivation (one pure function, appendix §3.2 step 3): workload-only when `Absent|UnverifiedScheme|Malformed|Invalid` or when enrollment rejects delegation (`delegation-refused`); workload + `Delegated(subject, groups)` when Valid **and** `accepts_delegated_claims`.
+- Thread the principal: `AdmissionGate.ScreenAsync(rawBody, LinkPrincipal, ct)` and `LinkIngress.AdmitAsync(rawBody, LinkPrincipal, ct)`; `LinkHub.Envelope` passes `RequirePrincipal()` (was discarded at `:127`); HTTP door reads `HttpContext.Items["facilitator.link.principal"]`.
+- After the gate's existing pipeline passes and the message is a **command** (class command; events/receipts stay workload-only, no evidence evaluation): extract envelope `data.actorEvidenceRef` → `EvidenceValidator` → on `Invalid` deny with 422 `evidence-invalid` (typed, reason in detail) → else write `AuditWriter` row: actor `link:<endpointId>`, action `authorization.evaluated:link`, resource = command type, decision allow/deny, reason ∈ {`workload-only`, `delegation-validated`, `evidence-unverified:<scheme>`, `evidence-malformed`, `delegation-refused`, `evidence-invalid:<reason>`}, `evidence_ref` = the raw ref (≤2 KiB, column is text), policy_version = `"identity-v1"`, detail `{team, role, scheme, outcome, delegatedSubject, groups, endpointId}`. Audit-fail on allow ⇒ 503 `auth-unavailable` (both doors).
+- Metrics: counter `facilitator.link.evidence` with `{scheme, outcome}` tags (`KernelMetrics`); reuse `facilitator.identity.decisions` only if trivially parameterizable — otherwise the new counter stands alone.
+- Both fall-through dispatch sites (`work.steer` path, accepted-command no-op path) inherit the audit row from the gate; no per-path audit duplication.
 
-- `docs/security.md`: workload identity section (modes, rotation, role law), evidence validation algorithm as implemented, effective-principal rules.
-- `docs/protocol.md`: enroll request/response v2 fields (additive, minor version 1.1 semantics — record decision in OpenAPI notes).
-- `.omp/skills/facilitator-protocol` + `facilitator-architecture` as-built (AGENTS.md maintenance rule, same commit).
-- This file's Implementation Status table per step; roadmap Plan 10 row flip.
+### 5. SDK + Gateway + linkd + Features (TypeScript)
+- `src/workspace-link/src/core/enroll.ts`: `EnrollOptions` gains `role?: "gateway"|"child"`, `team?: string`; body includes them only when set (client-side schema validates against the regenerated schema).
+- New `src/workspace-link/src/core/oidc-token-provider.ts`: `oidcClientCredentialsTokenProvider({tokenUrl, clientId, clientSecret, scope?, audience?})` implementing `LinkTokenProvider` (POST form-encoded `grant_type=client_credentials`, cache until `expires_in − 30s`, `refresh()` re-fetches). No equivalent exists (Plan 09's TS `kernelToken()` is password-grant test-only). Exported from the package index.
+- `linkd`: `--role <gateway|child>` flag (default **child** — linkd is a standalone child workspace), whitelist-validated like `--trust-mode`; enroll callsites send `{...existing, role, team: cfg.team}` (the existing `--team` now rides the wire). USAGE text updated.
+- Gateway: YAML keys `role` (enum) and `workload: {tokenUrl, clientId, clientSecret}` added to `TOP_LEVEL_KEYS` + `GatewayConfig`; env overlay gains `OFAC_OIDC_TOKEN_URL`, `OFAC_OIDC_CLIENT_ID`, `OFAC_OIDC_CLIENT_SECRET` (secret env-wins-over-file, same law as `OFAC_ENROLL_SECRET`). `acquireToken()`: when `workload` configured → mode (b): provider mints CC token, enroll body `{token: <cc-jwt>, endpointId, instanceId, trustMode, role: config.role ?? "gateway", team}`; enrollment-secret path unchanged (adds `role: config.role ?? "gateway"`). Token-file/rotation law unchanged.
+- Feature mirror (`features/AGENTS.md` 1:1 rule): `features/src/workspace-link/devcontainer-feature.json` gains option `role` (default `"child"`) and `team` default flips `"default"`→`"team-alpha"`; the `install.sh:41-71` heredoc unit passes `--role` and the new team default. Gateway Feature needs nothing (YAML-carried).
+- `src/workspace-link` README quickstart + gateway example config gain the new keys.
 
-## Architecture fit
+### 6. Realm + test/e2e cutover
+- `reference/keycloak/realm.json`: clients `ofac-gateway-alpha` + `ofac-worker-alpha` (confidential, `serviceAccountsEnabled`, client-credentials only; secrets `gateway-alpha-secret`, `worker-alpha-secret`), each with the audience mapper for `facilitator-link` (copy the `facilitator-cli` mapper pattern); client `ofac-evidence` (confidential, directAccess + standard grants, secret `evidence-secret`) with mappers: group membership (full.path, → `/groups`), audience `facilitator-link`, **static claim mapper `delegation: true`** — its user-context token is the e2e delegation evidence. No new users.
+- Kernel dev/test config: `Link:Teams=["team-alpha","team-beta"]`; `Link:WorkloadIdentities` entries binding `ofac-gateway-alpha→gw.team-alpha/team-alpha/gateway/accepts:true` and `ofac-worker-alpha→gw.team-beta/team-beta/gateway/accepts:false`; `Link:Evidence:Audience=facilitator-link`.
+- .NET integration (`tests/Facilitator.Tests`, KeycloakFixture container): mode-(b) enrollment round-trip incl. rotation semantics (re-enroll rotates, old token 401); unregistered `azp` ⇒ 403 `workload-not-registered`; body `role:gateway` vs binding `child` ⇒ 403 `role-mismatch`; `gw.` endpointId with `role:child` ⇒ 403 `role-mismatch`; mode-(a) `team:"team-ghost"` ⇒ 403 `team-unknown`; enrollment without team ⇒ 403 `team-unknown` (clean cutover: no default fallback). Evidence: password-grant token from `ofac-evidence` as `alice` → valid `oidc:` ref extends principal (audit row proves `delegation-validated` + `detail.delegatedSubject=oidc:...|alice-sub`); tampered signature ⇒ 422 deny; expired (short-lived token + clock skew via test `TimeProvider` advance or `--notBefore`) ⇒ deny `evidence-invalid:expired`; wrong-audience client token ⇒ deny `wrong-audience`; `kernel:` unknown id ⇒ deny `evidence-invalid:unknown-id`; `identity-evidence:e2e` ⇒ allow, audit `evidence-unverified:identity-evidence`; delegation accepted by `gw.team-alpha` enrollment, refused-but-allowed on the accepts:false binding (audit `delegation-refused`). Manifest `ownerTeam` check re-run against real roster (403 `team-mismatch` preserved).
+- TS e2e: `harness.ts` — `makeManifest("default")`→`makeManifest("team-alpha")`, enroll body gains `team:"team-alpha"`; `gateway-harness.ts` YAML `team: default`→`team-alpha` + `role: gateway`; **gateway e2e flips to mode (b)**: harness mints a CC token from `KEYCLOAK_URL` (helper mirroring `kernelToken()`), gateway YAML gains `workload:` block; worker e2e assertion `ownerTeam === "team-alpha"`. Fixture literal refs (`identity-evidence:e2e`) stay — unverified-scheme path proves back-compat.
+- Feature unit regeneration check per the 1:1 rule.
 
-Spec §11.3 + appendix §3.2 steps 1–5: the workload plane and evidence resolution. After this plan the kernel knows WHO (human+workload+effective); Plans 11/12 decide WHAT they may do.
+### 7. Docs + skills + roadmap bookkeeping
+- `docs/security.md`: workload-identity section (both modes, `gw.` prefix law, role immutability across rotation, evidence algorithm as implemented incl. the deny-vs-unverified rule, effective-principal table).
+- `docs/protocol.md`: enroll 1.0.2 fields + evidence bound, mirroring the OpenAPI rationale.
+- `.omp/skills/facilitator-architecture` + `facilitator-protocol` as-built (same commits as the code, per AGENTS.md rule); `IMPLEMENTATION_ROADMAP_PLAN.md` Plan 10 row → 🟢 with evidence.
 
-## Additional resources
+## Critical files & anchors
 
-Spec §11.3–11.4, appendix §3.2–3.4; OIDC client-credentials + JWKS docs; Keycloak service-account docs; existing `LinkEnrollmentStore` rotation code.
+|File|Why|
+|---|---|
+|`src/facilitator/Kernel/Shared/Persistence/LinkEnrollmentStore.cs`|default-seed deletion (`:62-68`), role/team storage, validator slug join — primary cutover site|
+|`src/facilitator/Kernel/Link/AdmissionGate.cs`|principal param + evidence evaluation + `AuditWriter` hook (`AuditAsync :104` is inbox-only today; audit is greenfield)|
+|`src/facilitator/Kernel/Link/LinkEndpoints.Enroll.cs`|mode-(b) arm, role/team validation, typed errors|
+|`protocol/json-schema/common.v1.json` + `enroll-request.v1.json`|the two frozen-schema amendments everything else keys off|
+|`src/gateway/src/runtime.ts:499-541`|token-mode branch point (enroll-or-mount law stays intact)|
+
+## Verification
+
+1. `make build` zero warnings; `dotnet test --filter "FullyQualifiedName~Identity|FullyQualifiedName~Link"` green after each of Steps 1, 3, 4.
+2. New-behavior proofs (integration harness):
+   - `ofac-worker-alpha` CC token + body `role:"gateway"` ⇒ 403 Problem type `…/v1/role-mismatch`.
+   - Command with expired `ofac-evidence` JWT as `oidc:<jwt>` ref ⇒ 422 Problem `…/v1/evidence-invalid`; `facilitator.audit` shows `authorization.evaluated:link decision=deny reason=evidence-invalid:expired`.
+   - Same command from the accepts:true enrollment with live evidence ⇒ 202 + audit `decision=allow reason=delegation-validated` with `delegatedSubject=oidc:<iss>|<alice-sub>`.
+   - Second use of a `kernel:` id with `consumed_at` set (hand-inserted row) ⇒ deny `evidence-invalid:consumed`.
+   - Mode-(a) enroll `team:"team-ghost"` ⇒ 403 `team-unknown`; fresh DB + dev config ⇒ exactly `team-alpha`/`team-beta` rows, no `default`.
+3. `pnpm -C src/protocol test` + `dotnet run --project protocol/tools/Validate.Fixtures` green on the amended schemas/new fixtures (proves the 2048 amendment + role enum in both harnesses).
+4. `make link-e2e && make gateway-e2e && make worker-e2e` green with the gateway enrolling via a Keycloak CC token (observe its startup log line "link token enrolled" + zero `team-mismatch` in kernel logs); §26.1 item 5 evidence half demonstrable via the audit table.
+5. Full gate: `make lint && make build && make test && make docs-check` + `pnpm -r --if-present typecheck`.
+
+## Assumptions & contingencies
+
+- If `Microsoft.IdentityModel` JWKS plumbing against Keycloak over plain-HTTP dev ports fights the pinned-issuer validator, fall back to a hand-rolled `JwksCache` (GET `.well-known/openid-configuration` → jwks_uri, cache with bounded TTL) — the vendor-law requirement is OIDC-only, not library-specific.
+- If mode-(b) e2e flips prove flaky under shared Keycloak container timing, keep the gateway e2e on mode (a) + secret and cover mode (b) end-to-end in the .NET integration tier only — record the deviation in the status table; the kernel-side arm stays fully tested either way.
+- If `Link:Teams` startup seeding races concurrent first enrollments, the seeder's `INSERT ... ON CONFLICT DO NOTHING` idempotency suffices (unique slug index exists).
+- If a realm re-import in the shared fixture loses the workload service-account users (Keycloak 26.x `serviceAccountClientId` import quirk, documented in `reference/keycloak/README.md`), apply the same quirk workaround the `facilitator-cli` client already uses.
+- If a step's fix needs several iterations, prefer deleting complexity (e.g., drop the mode-(a) body `team` field and require mode (b) for anything but the dev roster's single team) over layering workarounds — the invariant that must survive every simplification: **an enrolled child cannot become a Gateway, and failed evidence never silently authorizes.**
 
 ## Implementation Status
 
 |Step|State|
 |---|---|
-|0 Research|Not started|
-|1 Teams + enrollment migration|Not started|
-|2 Enrollment v2|Not started|
-|3 Evidence validators + effective principal|Not started|
-|4 SDK/Gateway role + token factory|Not started|
-|5 Fixtures|Not started|
-|6 Docs + skills|Not started|
+|0 Seed plan file|Not started|
+|1 Migration + roster + principal widening|Not started|
+|2 Protocol amendment + fixtures|Not started|
+|3 Enrollment v2|Not started|
+|4 Evidence validators + audit|Not started|
+|5 SDK/Gateway/linkd/Features|Not started|
+|6 Realm + e2e cutover|Not started|
+|7 Docs + skills + roadmap|Not started|
 
 States: Not started / In progress / Partially implemented: <what>/ Fully implemented: <evidence>/ Blocked: <reason>.
-
-## Assumptions & contingencies
-
-- Replanning or optimization may be required before implementation: if pre-registration of endpoints (mode a) is judged redundant once mode (b) exists, keeping only enrollment-secret mode + role field is a valid simplification — the invariant that must survive is "an enrolled child cannot claim to be a Gateway."
-- If JWKS fetch latency shows in admission hot path, bounded-cache the issuer keys (appendix §11.2's bounded-caching rule for directory adapters) — record, don't pre-build.
-- `linkd`/Gateway config surface for client-credentials may collide with the Feature options 1:1 mirror rule (`features/AGENTS.md`); if new env vars are needed, the Feature options update rides this same change.
-
-## Verification
-
-1. `dotnet build` zero warnings; identity+link suites green.
-2. New-behavior proof: enroll with a worker client-credentials token claiming `role=gateway` ⇒ 403 typed error, audit row; assign a command with an expired `oidc:` evidence ref ⇒ admission deny, `authorization.evaluated decision=deny reason=evidence-expired` visible via probe.
-3. `make link-e2e && make gateway-e2e && make worker-e2e` green; `pnpm protocol` + fixture gates green.
-4. Full gate: `make lint && make build && make test && make docs-check`; CI green = 🟢.

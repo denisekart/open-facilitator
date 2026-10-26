@@ -112,9 +112,9 @@ Verify per step with the test suite below.
 
 |Step|State|
 |---|---|
-|0 Research|Not started|
-|1 Schema 1.1 + codegen|Not started|
-|2 Digest helpers + goldens|Not started|
+|0 Research|Fully implemented: all anchors re-verified; divergences: generated C# DTOs live at `protocol/dotnet/Ofac.Protocol/Generated/WireTypes.cs` (known fact 2 cited bare filename), configurations under `Kernel/Shared/Persistence/Configurations/`; gate binding config precedent is `src/facilitator/appsettings.Development.json` (`identity:authorization:operations`)|
+|1 Schema 1.1 + codegen|Fully implemented: `event.approval.required.v1.json` gains optional `action` (object) + `workId` (idToken); codegen renders `action?: {[k:string]:unknown}`/`Dictionary<string,object>?` + `workId?` in both languages; both harnesses green, `make protocol` drift clean (commit 95e416d)|
+|2 Digest helpers + goldens|Fully implemented: `Kernel/Shared/ApprovalDigest.cs` (Jcs.Net, added to kernel csproj) + `src/protocol/src/digest.ts` (`computeActionDigest`, canonicalize moved to deps, exported from package root); golden `canonical/approval-record-1.json|.sha256` = `sha256:573315ec...38b11` verified identical in .NET (harness compiles the helper source directly — a ProjectReference to the web app caused EF Core MSB3277 conflicts) and TS, incl. reordered-key + NFD-variant property twins in both harnesses (helper NFC-normalizes per appendix §7.1)|
 |3 ApprovalLedger + migration|Not started|
 |4 Ingress arms + REST pair + evidence|Not started|
 |5 Tests|Not started|

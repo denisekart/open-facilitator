@@ -3,6 +3,7 @@
 // without remapping; Plan 03 (Link server) uses KNOWN_COMMAND_TYPES as its
 // fail-closed command table.
 export * from "./generated/index.js";
+export * from "./digest.js";
 export {
   ALL_SCHEMAS,
   SCHEMA_IDS,

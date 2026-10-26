@@ -14,4 +14,10 @@
   <ItemGroup>
     <ProjectReference Include="../../dotnet/Ofac.Protocol/Ofac.Protocol.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- Compile the kernel's digest helper directly (source): the golden must
+         exercise the production implementation, and a ProjectReference to the
+         web app drags EF Core version conflicts into this harness. -->
+    <Compile Include="../../../src/facilitator/Kernel/Shared/ApprovalDigest.cs" />
+  </ItemGroup>
 </Project>

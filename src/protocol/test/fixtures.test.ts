@@ -7,6 +7,7 @@ import { createHash } from "node:crypto";
 import canonicalize from "canonicalize";
 import { describe, expect, it } from "vitest";
 import {
+  computeActionDigest,
   enforceSizeLimit,
   negotiateProtocolVersion,
   validateControlFrame,
@@ -125,5 +126,41 @@ describe("canonicalization golden (RFC 8785)", () => {
       "utf8",
     ).trim();
     expect(digest).toBe(golden);
+  });
+});
+
+describe("approval-record digest golden (appendix §7.2)", () => {
+  const record = JSON.parse(
+    readFileSync(new URL("canonical/approval-record-1.json", fixturesRoot), "utf8"),
+  ) as {
+    approvalId: string;
+    action: Record<string, unknown>;
+    eligibleActors: string[];
+    expiresAt: string;
+    createdAt: string;
+  };
+  const golden = readFileSync(
+    new URL("canonical/approval-record-1.sha256", fixturesRoot),
+    "utf8",
+  ).trim();
+
+  it("canonical/approval-record-1.json digests to the committed golden", () => {
+    expect(computeActionDigest(record)).toBe(golden);
+  });
+
+  it("digest is invariant to action key order and NFD unicode spelling", () => {
+    const flip = (value: unknown): unknown => {
+      if (Array.isArray(value)) return value.map(flip);
+      if (typeof value === "string") return value.normalize("NFD");
+      if (value !== null && typeof value === "object") {
+        const out: Record<string, unknown> = {};
+        for (const key of Object.keys(value).reverse()) {
+          out[key.normalize("NFD")] = flip((value as Record<string, unknown>)[key]);
+        }
+        return out;
+      }
+      return value;
+    };
+    expect(computeActionDigest({ ...record, action: flip(record.action) as Record<string, unknown> })).toBe(golden);
   });
 });

@@ -1,0 +1,28 @@
+{
+  "approvalId": "01JB0W0M40APPROVAL000000001",
+  "action": {
+    "zulu": "last-key-sources-first",
+    "operation": "deploy",
+    "unicode": "naïve café — 日本語 🚀",
+    "resources": [
+      "repo:open-facilitator",
+      "env:prod-eu"
+    ],
+    "params": {
+      "revision": "a]b1c2d",
+      "replicas": 3,
+      "ratio": 1.5,
+      "nested": {
+        "flag": true,
+        "none": null
+      }
+    },
+    "alpha": "first-key-sources-last"
+  },
+  "eligibleActors": [
+    "user:alice",
+    "group:/teams/team-alpha"
+  ],
+  "expiresAt": "2026-10-23T18:00:00Z",
+  "createdAt": "2026-10-22T18:00:00Z"
+}

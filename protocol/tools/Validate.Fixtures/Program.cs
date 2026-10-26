@@ -5,11 +5,14 @@
 // shared canonical golden cross-checks the two RFC 8785 implementations.
 //
 // Usage: dotnet run --project protocol/tools/Validate.Fixtures -- [fixturesDir]
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
+
+using Facilitator.Kernel.Shared;
 
 using Jcs.Net;
 
@@ -113,6 +116,39 @@ foreach (var c in cases)
     if (!pass)
     {
         Console.WriteLine($"  digest {digest} != golden {golden}");
+        failed++;
+    }
+}
+
+// ---- approval-record golden (appendix §7.2 record digest via the kernel helper) ----
+{
+    var recordGolden = File.ReadAllText(Path.Combine(fixturesDir, "canonical", "approval-record-1.sha256")).Trim();
+    using var recordDoc = JsonDocument.Parse(File.ReadAllText(Path.Combine(fixturesDir, "canonical", "approval-record-1.json")));
+    var record = recordDoc.RootElement;
+    var actors = record.GetProperty("eligibleActors").EnumerateArray().Select(x => x.GetString()!).ToArray();
+    var expiresAt = DateTime.Parse(record.GetProperty("expiresAt").GetString()!, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal);
+    var createdAt = DateTime.Parse(record.GetProperty("createdAt").GetString()!, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal);
+    var digest = ApprovalDigest.Compute(record.GetProperty("approvalId").GetString()!, record.GetProperty("action"), actors, expiresAt, createdAt);
+
+    // Property twin: action keys reversed + strings NFD-encoded — the digest
+    // must not depend on source key order or unicode spelling (appendix §7.1).
+    static JsonNode Flip(JsonElement element) => element.ValueKind switch
+    {
+        JsonValueKind.Object => new JsonObject(element.EnumerateObject()
+            .Reverse()
+            .Select(p => KeyValuePair.Create<string, JsonNode?>(p.Name.Normalize(NormalizationForm.FormD), Flip(p.Value)))),
+        JsonValueKind.Array => new JsonArray(element.EnumerateArray().Select(Flip).ToArray()),
+        JsonValueKind.String => JsonValue.Create(element.GetString()!.Normalize(NormalizationForm.FormD)),
+        _ => JsonNode.Parse(element.GetRawText())!,
+    };
+
+    using var flippedDoc = JsonDocument.Parse(Flip(record.GetProperty("action")).ToJsonString());
+    var reordered = ApprovalDigest.Compute(record.GetProperty("approvalId").GetString()!, flippedDoc.RootElement, actors, expiresAt, createdAt);
+    var recordPass = digest == recordGolden && reordered == recordGolden;
+    Console.WriteLine($"[{(recordPass ? "PASS" : "FAIL")}] canonical/approval-record-1.json valid/schema-violation");
+    if (!recordPass)
+    {
+        Console.WriteLine($"  digest {digest} / reordered {reordered} != golden {recordGolden}");
         failed++;
     }
 }

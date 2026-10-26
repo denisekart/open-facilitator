@@ -29,11 +29,11 @@
   },
   "dependencies": {
     "ajv": "catalog:",
-    "ajv-formats": "catalog:"
+    "ajv-formats": "catalog:",
+    "canonicalize": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",
-    "canonicalize": "catalog:",
     "tsup": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

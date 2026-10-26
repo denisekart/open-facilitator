@@ -29,6 +29,16 @@
         "separate-process-same-host",
         "isolated-executor"
       ]
+    },
+    "role": {
+      "type": "string",
+      "enum": [
+        "gateway",
+        "child"
+      ]
+    },
+    "team": {
+      "$ref": "common.v1.json#/$defs/idToken"
     }
   }
 }

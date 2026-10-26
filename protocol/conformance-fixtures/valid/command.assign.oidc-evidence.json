@@ -1,0 +1,32 @@
+{
+  "specversion": "1.0",
+  "id": "01JCOMMAND-OIDC-EVIDENCE",
+  "source": "urn:facilitator:instance:main",
+  "type": "org.facilitator.command.work.assign.v1",
+  "subject": "work/work-123/assignment/analysis-1",
+  "time": "2026-10-22T18:00:00Z",
+  "datacontenttype": "application/json",
+  "dataschema": "https://schemas.openfacilitator.org/v1/command.work.assign.v1.json",
+  "data": {
+    "commandId": "cmd-oidc-evidence-1",
+    "workId": "work-123",
+    "targetId": "gateway-team-alpha",
+    "capabilityId": "research.analyze",
+    "expectedContextVersion": 4,
+    "inputs": {
+      "objective": "Compare data retention alternatives",
+      "sourceRefs": [
+        "artifact://sources/brief-1"
+      ]
+    },
+    "expectedDeliverables": [
+      {
+        "kind": "analysis.report",
+        "mediaType": "text/markdown"
+      }
+    ],
+    "actorEvidenceRef": "oidc:eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eW5kLmV2aWRlbmNlLmZpbGxlci5mb3IudGhlLm9pZGMuZXZpZGVuY2Uuc2NoZW1lLmJvdW5kcy5hbWVuZG1lbnQ=eW5kLmV2aWRlbmNlLmZpbGxlci5mb3IudGhlLm9pZGMuZXZpZGVuY2Uuc2NoZW1lLmJvdW5kcy5hbWVuZG1lbnQ=eW5kLmV2aWRlbmNlLmZpbGxlci5mb3IudGhlLm9pZGMuZXZpZGVuY2Uuc2NoZW1lLmJvdW5kcy5hbWVuZG1lbnQ=eW5kLmV2aWRlbmNlLmZpbGxlci5mb3IudGhlLm9pZGMuZXZpZGVuY2Uuc2NoZW1lLmJvdW5kcy5hbWVuZG1lbnQ=eW5kLmV2aWRlbmNlLmZpbGxlci5mb3IudGhlLm9pZGMuZXZpZGVuY2Uuc2NoZW1lLmJvdW5kcy5hbWVuZG1lbnQ=eW5kLmV2aWRlbmNlLmZpbGxlci5mb3IudGhlLm9pZGMuZXZpZGVuY2Uuc2NoZW1lLmJvdW5kcy5hbWVuZG1lbnQ=.sig",
+    "deadline": "2026-10-23T18:00:00Z",
+    "assignmentId": "analysis-1"
+  }
+}

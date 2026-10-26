@@ -208,9 +208,13 @@ export type SupportedTransport = "signalr" | "websocket" | "http-poll";
 export interface EnrollRequestV1 {
   endpointId: string;
   instanceId: string;
+  role?: Role;
+  team?: string;
   token: string;
   trustMode: TrustMode;
 }
+
+export type Role = "gateway" | "child";
 
 export type TrustMode = "shared-runtime" | "separate-process-same-host" | "isolated-executor";
 

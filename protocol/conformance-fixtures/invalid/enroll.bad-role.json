@@ -1,0 +1,7 @@
+{
+  "token": "enroll-secret-1",
+  "endpointId": "gw-team-alpha",
+  "instanceId": "inst-01",
+  "trustMode": "separate-process-same-host",
+  "role": "admin"
+}

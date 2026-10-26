@@ -556,6 +556,15 @@ namespace Ofac.Protocol
         [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
         public string instanceId { get; set; }
 
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("role")]
+        public Role? role { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("team")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string? team { get; set; }
+
         [JsonPropertyName("token")]
         [JsonConverter(typeof(HilariousMinMaxLengthCheckConverter))]
         public string token { get; set; }
@@ -928,6 +937,8 @@ namespace Ofac.Protocol
 
     public enum SupportedTransport { HttpPoll, Signalr, Websocket };
 
+    public enum Role { Child, Gateway };
+
     public enum TrustMode { IsolatedExecutor, SeparateProcessSameHost, SharedRuntime };
 
     public enum PolicyLabel { EvidenceOnly, FacilitatorVisible, Private, TeamOnly };
@@ -953,6 +964,7 @@ namespace Ofac.Protocol
                 DecisionConverter.Singleton,
                 ControlFrameKindConverter.Singleton,
                 SupportedTransportConverter.Singleton,
+                RoleConverter.Singleton,
                 TrustModeConverter.Singleton,
                 PolicyLabelConverter.Singleton,
                 ScopeConverter.Singleton,
@@ -1428,6 +1440,40 @@ namespace Ofac.Protocol
         }
 
         public static readonly SupportedTransportConverter Singleton = new SupportedTransportConverter();
+    }
+
+    internal class RoleConverter : JsonConverter<Role>
+    {
+        public override bool CanConvert(Type t) => t == typeof(Role);
+
+        public override Role Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            var value = reader.GetString();
+            switch (value)
+            {
+                case "child":
+                    return Role.Child;
+                case "gateway":
+                    return Role.Gateway;
+            }
+            throw new Exception("Cannot unmarshal type Role");
+        }
+
+        public override void Write(Utf8JsonWriter writer, Role value, JsonSerializerOptions options)
+        {
+            switch (value)
+            {
+                case Role.Child:
+                    JsonSerializer.Serialize(writer, "child", options);
+                    return;
+                case Role.Gateway:
+                    JsonSerializer.Serialize(writer, "gateway", options);
+                    return;
+            }
+            throw new Exception("Cannot marshal type Role");
+        }
+
+        public static readonly RoleConverter Singleton = new RoleConverter();
     }
 
     internal class HilariousMinMaxLengthCheckConverter : JsonConverter<string>

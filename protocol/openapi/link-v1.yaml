@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Open Facilitator — Workspace Link HTTP surface (v1)
-  version: 1.0.1
+  version: 1.0.2
   description: |
     Provider-neutral HTTP fallback for the Workspace Link contract (spec §5.3).
     SignalR is the default reference transport; these endpoints carry identical
@@ -31,6 +31,15 @@ info:
     single-source-of-truth JSON Schema files (the precedent set by the events
     path above); Delivery sits beside the envelope schema it embeds, under
     protocol/cloudevents-schemas/.
+
+    1.0.2 rationale (additive minor change): EnrollRequest gains the optional
+    `role` (enum gateway|child) and `team` (idToken) properties — the workload
+    role and team roster slug a kernel binds at enrollment (Plan 10) — and the
+    shared `evidenceRef` bound loosens from 256 to 2048 characters so an
+    inline `oidc:<jwt>` delegation evidence reference fits (every value valid
+    under 1.0.1 stays valid). No existing field changed meaning or
+    requiredness, so per the 1.0.1 precedent the minor bump is the only
+    compatibility action required.
 servers:
   - url: /
 security:

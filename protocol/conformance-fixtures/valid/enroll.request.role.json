@@ -1,0 +1,8 @@
+{
+  "token": "enroll-secret-1",
+  "endpointId": "worker-team-alpha-1",
+  "instanceId": "inst-02",
+  "trustMode": "isolated-executor",
+  "role": "child",
+  "team": "team-alpha"
+}

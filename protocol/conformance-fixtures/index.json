@@ -257,6 +257,25 @@
       "errorClass": "schema-violation"
     },
     {
+      "file": "valid/enroll.request.role.json",
+      "expect": "valid",
+      "class": "enroll",
+      "schemaFile": "enroll-request.v1.json"
+    },
+    {
+      "file": "invalid/enroll.bad-role.json",
+      "expect": "invalid",
+      "class": "enroll",
+      "schemaFile": "enroll-request.v1.json",
+      "errorClass": "schema-violation"
+    },
+    {
+      "file": "valid/command.assign.oidc-evidence.json",
+      "expect": "valid",
+      "class": "command",
+      "type": "org.facilitator.command.work.assign.v1"
+    },
+    {
       "file": "valid/link.delivery.json",
       "expect": "valid",
       "class": "delivery",

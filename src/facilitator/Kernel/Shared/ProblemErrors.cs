@@ -88,6 +88,30 @@ public static class ProblemErrors
         Create("enrollment-secret-invalid", "Enrollment secret invalid", StatusCodes.Status401Unauthorized,
             "the enrollment token did not match Link:EnrollmentToken");
 
+    /// <summary>403 enrollment named a team the roster (Link:Teams) lacks.</summary>
+    public static ProblemDetails TeamUnknown(string team) =>
+        Create("team-unknown", "Team unknown", StatusCodes.Status403Forbidden,
+            $"team '{team}' is not in the configured roster (Link:Teams)");
+
+    /// <summary>403 claimed role contradicts the binding or the gw. prefix law.</summary>
+    public static ProblemDetails RoleMismatch(string detail) =>
+        Create("role-mismatch", "Role mismatch", StatusCodes.Status403Forbidden, detail);
+
+    /// <summary>401 mode-(b) OIDC enrollment token failed verification.</summary>
+    public static ProblemDetails WorkloadTokenInvalid(string reason) =>
+        Create("workload-token-invalid", "Workload token invalid", StatusCodes.Status401Unauthorized,
+            $"the OIDC enrollment token failed verification ({reason})");
+
+    /// <summary>403 the workload identity (azp + endpoint) has no pre-registration (Link:WorkloadIdentities).</summary>
+    public static ProblemDetails WorkloadNotRegistered(string clientId) =>
+        Create("workload-not-registered", "Workload not registered", StatusCodes.Status403Forbidden,
+            $"client '{clientId}' has no Link:WorkloadIdentities binding for this endpoint");
+
+    /// <summary>422 kernel-checkable evidence failed validation.</summary>
+    public static ProblemDetails EvidenceInvalid(string reason) =>
+        Create("evidence-invalid", "Evidence invalid", StatusCodes.Status422UnprocessableEntity,
+            $"actorEvidenceRef failed validation ({reason})");
+
     /// <summary>409 HTTP-surface equivalent of the no-compatible-protocol-version goodbye.</summary>
     public static ProblemDetails NoCommonVersion() =>
         Create("no-common-version", "No common protocol version", StatusCodes.Status409Conflict,

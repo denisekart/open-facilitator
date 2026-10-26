@@ -18,9 +18,9 @@ internal static class LinkTestHarness
     internal static readonly JsonSerializerOptions Web = new(JsonSerializerDefaults.Web);
 
     /// <summary>Enroll an endpoint (Development bootstrap secret) and return its link token.</summary>
-    internal static async Task<string> EnrollAsync(HttpClient client, string endpointId, string trustMode = "isolated-executor")
+    internal static async Task<string> EnrollAsync(HttpClient client, string endpointId, string trustMode = "isolated-executor", string team = "team-alpha")
     {
-        var body = JsonSerializer.Serialize(new { token = "enroll-dev", endpointId, instanceId = "inst-1", trustMode });
+        var body = JsonSerializer.Serialize(new { token = "enroll-dev", endpointId, instanceId = "inst-1", trustMode, team });
         var json = await KernelOps.PostJsonAsync(client, "/api/link/v1/enroll", body, System.Net.HttpStatusCode.Created);
         return json.GetProperty("linkToken").GetString()!;
     }

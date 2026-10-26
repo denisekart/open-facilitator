@@ -132,6 +132,13 @@ public sealed class LinkEnrollmentStore(
         return new EnrollmentResult(enrollmentId, endpointId, team.TeamId, trustMode, token, expiresAt);
     }
 
+    /// <summary>True when the slug is in the team roster (facilitator.teams).</summary>
+    public async Task<bool> TeamExistsAsync(string slug, CancellationToken ct)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(ct);
+        return await db.Teams.AsNoTracking().AnyAsync(t => t.Slug == slug, ct);
+    }
+
     /// <summary>Store an advertised capability manifest (+ SHA-256 digest) for an endpoint.</summary>
     public async Task StoreCapabilitiesAsync(string endpointId, string manifestJson, string digest, CancellationToken ct)
     {

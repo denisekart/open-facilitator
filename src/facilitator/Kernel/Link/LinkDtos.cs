@@ -15,11 +15,13 @@ namespace Facilitator.Kernel.Link;
 public sealed record DeliveryDto(Guid DeliveryId, JsonElement Envelope, DateTime DeliveredAt);
 
 /// <summary>Wire shape of POST /api/link/v1/enroll (enroll-request.v1.json).</summary>
-/// <param name="Token">Bootstrap enrollment secret (Link:EnrollmentToken).</param>
+/// <param name="Token">Mode (a): bootstrap enrollment secret. Mode (b): an OIDC client-credentials JWT.</param>
 /// <param name="EndpointId">Logical endpoint identity.</param>
 /// <param name="InstanceId">This process instance (changes on restart).</param>
 /// <param name="TrustMode">Declared trust mode (immutable for the session).</param>
-public sealed record EnrollRequestDto(string Token, string EndpointId, string InstanceId, string TrustMode);
+/// <param name="Role">gateway | child (mode (a) hint; must not contradict a mode-(b) binding).</param>
+/// <param name="Team">Team roster slug to bind (mode (b): binding wins).</param>
+public sealed record EnrollRequestDto(string Token, string EndpointId, string InstanceId, string TrustMode, string? Role, string? Team);
 
 /// <summary>
 /// Wire shape of the 201 enroll response (enroll-response.v1.json; the token

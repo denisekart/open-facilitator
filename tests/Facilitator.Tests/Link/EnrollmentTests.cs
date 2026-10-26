@@ -23,7 +23,7 @@ public sealed class EnrollmentTests(PostgresFixture fixture)
         var json = await KernelOps.PostJsonAsync(
             client,
             "/api/link/v1/enroll",
-            JsonSerializer.Serialize(new { token = "enroll-dev", endpointId, instanceId = "inst-1", trustMode = "isolated-executor" }),
+            JsonSerializer.Serialize(new { token = "enroll-dev", endpointId, instanceId = "inst-1", trustMode = "isolated-executor", team = "team-alpha" }),
             System.Net.HttpStatusCode.Created);
 
         AssertTrue(json.GetProperty("enrollmentId").GetString() is string id && Guid.TryParse(id, out _), "enrollmentId is a guid");
@@ -78,14 +78,14 @@ public sealed class EnrollmentTests(PostgresFixture fixture)
         var first = await KernelOps.PostJsonAsync(
             client,
             "/api/link/v1/enroll",
-            JsonSerializer.Serialize(new { token = "enroll-dev", endpointId, instanceId = "inst-1", trustMode = "isolated-executor" }),
+            JsonSerializer.Serialize(new { token = "enroll-dev", endpointId, instanceId = "inst-1", trustMode = "isolated-executor", team = "team-alpha" }),
             System.Net.HttpStatusCode.Created);
         var oldToken = first.GetProperty("linkToken").GetString()!;
 
         var second = await KernelOps.PostJsonAsync(
             client,
             "/api/link/v1/enroll",
-            JsonSerializer.Serialize(new { token = "enroll-dev", endpointId, instanceId = "inst-2", trustMode = "isolated-executor" }),
+            JsonSerializer.Serialize(new { token = "enroll-dev", endpointId, instanceId = "inst-2", trustMode = "isolated-executor", team = "team-alpha" }),
             System.Net.HttpStatusCode.Created);
         var newToken = second.GetProperty("linkToken").GetString()!;
         Assert.NotEqual(oldToken, newToken);
@@ -96,6 +96,83 @@ public sealed class EnrollmentTests(PostgresFixture fixture)
 
         using var newProbe = await factory.CreateLinkClient(newToken).GetAsync("/api/link/v1/capabilities");
         Assert.Equal(System.Net.HttpStatusCode.NotFound, newProbe.StatusCode); // capabilities-not-found, principal accepted
+    }
+
+    [Fact]
+    public async Task ModeATeamOutsideRosterIs403TeamUnknown()
+    {
+        using var factory = new KernelTestFactory(fixture);
+        var client = factory.CreateAuthedClient();
+
+        using var response = await client.PostAsync(
+            "/api/link/v1/enroll",
+            new StringContent(
+                JsonSerializer.Serialize(new { token = "enroll-dev", endpointId = NewEndpoint(), instanceId = "i", trustMode = "shared-runtime", team = "team-ghost" }),
+                System.Text.Encoding.UTF8,
+                "application/json"));
+
+        Assert.Equal(System.Net.HttpStatusCode.Forbidden, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("team-unknown", body);
+    }
+
+    [Fact]
+    public async Task ModeAWithoutTeamIs403TeamUnknown()
+    {
+        using var factory = new KernelTestFactory(fixture);
+        var client = factory.CreateAuthedClient();
+
+        using var response = await client.PostAsync(
+            "/api/link/v1/enroll",
+            new StringContent(
+                JsonSerializer.Serialize(new { token = "enroll-dev", endpointId = NewEndpoint(), instanceId = "i", trustMode = "shared-runtime" }),
+                System.Text.Encoding.UTF8,
+                "application/json"));
+
+        Assert.Equal(System.Net.HttpStatusCode.Forbidden, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("team-unknown", body);
+    }
+
+    [Fact]
+    public async Task ChildRoleOnGwDotChannelIs403RoleMismatch()
+    {
+        using var factory = new KernelTestFactory(fixture);
+        var client = factory.CreateAuthedClient();
+
+        using var response = await client.PostAsync(
+            "/api/link/v1/enroll",
+            new StringContent(
+                JsonSerializer.Serialize(new { token = "enroll-dev", endpointId = "gw.child-claim", instanceId = "i", trustMode = "isolated-executor", team = "team-alpha", role = "child" }),
+                System.Text.Encoding.UTF8,
+                "application/json"));
+
+        Assert.Equal(System.Net.HttpStatusCode.Forbidden, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("role-mismatch", body);
+    }
+
+    [Fact]
+    public async Task RotationMayNotReRoleAnEndpoint()
+    {
+        using var factory = new KernelTestFactory(fixture);
+        var client = factory.CreateAuthedClient();
+        var endpointId = "child-" + Guid.NewGuid().ToString("N")[..12];
+
+        await KernelOps.PostJsonAsync(client, "/api/link/v1/enroll",
+            JsonSerializer.Serialize(new { token = "enroll-dev", endpointId, instanceId = "i", trustMode = "isolated-executor", team = "team-alpha", role = "child" }),
+            System.Net.HttpStatusCode.Created);
+
+        using var response = await client.PostAsync(
+            "/api/link/v1/enroll",
+            new StringContent(
+                JsonSerializer.Serialize(new { token = "enroll-dev", endpointId, instanceId = "i", trustMode = "isolated-executor", team = "team-alpha", role = "gateway" }),
+                System.Text.Encoding.UTF8,
+                "application/json"));
+
+        Assert.Equal(System.Net.HttpStatusCode.Forbidden, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("role-mismatch", body);
     }
 
     private static string NewEndpoint() => "gw-test-" + Guid.NewGuid().ToString("N")[..12];

@@ -71,6 +71,7 @@ public static class KernelServiceCollection
         builder.Services.Configure<IdentityOptions>(
             builder.Configuration.GetSection(IdentityOptions.SectionName));
         builder.Services.AddSingleton<AuditWriter>();
+        builder.Services.AddSingleton<OidcJwks>();
         builder.Services.AddSingleton<RoleStore>();
         builder.Services.AddSingleton<IdentityStartupCheck>();
         builder.Services.AddHostedService(sp => sp.GetRequiredService<IdentityStartupCheck>());

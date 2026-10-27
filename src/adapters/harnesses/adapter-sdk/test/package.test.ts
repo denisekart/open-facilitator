@@ -10,6 +10,12 @@ describe("adapter package surface", () => {
     expect(typeof mod.ExecutionRegistry).toBe("function");
     expect(mod.TERMINAL_TTL_MS).toBe(60_000);
     expect(mod.DEFAULT_RESTART_BACKOFF_MS).toEqual([100, 250, 500, 1000, 2000, 5000]);
+    // Plan 15: the artifact capability (upload client + manifest builder).
+    expect(typeof mod.createArtifactClient).toBe("function");
+    expect(typeof mod.buildResultManifest).toBe("function");
+    expect(typeof mod.buildCompletedEvent).toBe("function");
+    expect(typeof mod.artifactUri).toBe("function");
+    expect(mod.artifactUri("w", "a", "art-1")).toBe("artifact://w/a/art-1");
   });
 
   it("the ./testing entry exports the lifecycle contract kit", async () => {

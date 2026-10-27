@@ -438,3 +438,118 @@ export function runAdapterLifecycleContract(opts: AdapterLifecycleContractOption
 export function kitSocketPath(): string {
   return join(mkdtempSync(join(tmpdir(), "ofac-kit-")), "child.sock");
 }
+
+// ---------------------------------------------------------------------------
+// startStubKernel — the in-process kernel stand-in for the artifact client
+// (Plan 15). Implements the link-plane byte path the client speaks: POST
+// /api/link/v1/events answers a request_upload command with 202 + the ticket
+// in-band on `data` (fs-style: no presigned uploadUrl, so the client PUTs to
+// uploadLocation); the matching PUT stores the bytes and answers with the
+// kernel-verified digest (counting + hashing, like ArtifactLedger.StoreAsync).
+// A duplicate commandId re-attaches the live ticket, exercising the client's
+// re-attach path. `opts.rejectDigest` answers a digest-mismatched PUT with
+// 422 (the kernel's law) so failure legs are testable too.
+// ---------------------------------------------------------------------------
+import { createServer } from "node:http";
+import { createHash, randomUUID } from "node:crypto";
+
+export interface StubKernel {
+  readonly url: string;
+  /** artifactId (lowercase guid, no dashes) → stored bytes + mediaType + kernel digest. */
+  readonly artifacts: Map<string, { bytes: Buffer; mediaType: string; digest: string }>;
+  /** Every envelope the stub received (assert completed-event legs against it). */
+  readonly events: Array<Record<string, unknown>>;
+  close(): Promise<void>;
+}
+
+export async function startStubKernel(opts?: { rejectDigest?: boolean }): Promise<StubKernel> {
+  const artifacts = new Map<string, { bytes: Buffer; mediaType: string; digest: string }>();
+  // commandId → allocated artifactId (the pending slot).
+  const pending = new Map<string, string>();
+  const events: Array<Record<string, unknown>> = [];
+  const server = createServer((request, response) => {
+    const chunks: Buffer[] = [];
+    request.on("data", (c: Buffer) => chunks.push(c));
+    request.on("end", () => {
+      const body = Buffer.concat(chunks);
+      const url = request.url ?? "";
+      const send = (status: number, obj: unknown): void => {
+        response.writeHead(status, { "content-type": "application/json" });
+        response.end(JSON.stringify(obj));
+      };
+      if (request.method === "POST" && url === "/api/link/v1/events") {
+        const env = JSON.parse(body.toString("utf8")) as Record<string, unknown>;
+        const data = (env["data"] ?? {}) as Record<string, unknown>;
+        events.push(env);
+        if (env["type"] === "org.facilitator.command.artifact.request_upload.v1") {
+          const commandId = String(data["commandId"] ?? "");
+          const declared = String(data["digest"] ?? "");
+          const existing = pending.get(commandId);
+          const artifactId = existing ?? randomUUID().replaceAll("-", "");
+          pending.set(commandId, artifactId);
+          artifacts.set(artifactId, {
+            bytes: Buffer.alloc(0),
+            mediaType: String(data["mediaType"] ?? "application/octet-stream"),
+            digest: declared,
+          });
+          send(202, {
+            deliveryId: randomUUID(),
+            status: existing === undefined ? "accepted" : "duplicate",
+            processedAt: new Date().toISOString(),
+            data: {
+              artifactId,
+              uploadLocation: `/api/link/v1/artifacts/${artifactId}/content`,
+              method: "POST",
+              expiresAt: new Date(Date.now() + 900_000).toISOString(),
+            },
+          });
+          return;
+        }
+        send(202, {
+          deliveryId: randomUUID(),
+          status: "accepted",
+          processedAt: new Date().toISOString(),
+        });
+        return;
+      }
+      const put = /^\/api\/link\/v1\/artifacts\/([0-9a-f]+)\/content$/.exec(url);
+      if (request.method === "PUT" && put !== null) {
+        const id = put[1]!;
+        const row = artifacts.get(id);
+        if (row === undefined) {
+          send(404, { status: 404, detail: "no such allocation" });
+          return;
+        }
+        const digest = "sha256:" + createHash("sha256").update(body).digest("hex");
+        if (digest !== row.digest) {
+          send(422, { status: 422, detail: `digest mismatch: ${digest}` });
+          return;
+        }
+        if (opts?.rejectDigest === true) {
+          send(422, { status: 422, detail: "stub configured to reject" });
+          return;
+        }
+        artifacts.set(id, { bytes: body, mediaType: row.mediaType, digest });
+        send(200, { artifactId: id, digest, size: body.byteLength, state: "stored" });
+        return;
+      }
+      send(404, { status: 404, detail: `stub: ${request.method} ${url}` });
+    });
+  });
+  const listening = Promise.withResolvers<void>();
+  server.listen(0, "127.0.0.1", () => listening.resolve());
+  await listening.promise;
+  const address = server.address();
+  const url = `http://127.0.0.1:${typeof address === "object" && address !== null ? address.port : 0}`;
+  const closing = Promise.withResolvers<void>();
+  server.on("close", () => closing.resolve());
+  return {
+    url,
+    artifacts,
+    events,
+    close: () => {
+      server.close();
+      return closing.promise;
+    },
+  };
+}

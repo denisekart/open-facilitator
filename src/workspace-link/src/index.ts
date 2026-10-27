@@ -18,6 +18,8 @@ export {
 export { MemoryLedger } from "./core/memory-ledger.js";
 export {
   enroll,
+  parseProblem,
+  trimSlash,
   ENROLL_SCHEMA_ID,
   ENROLL_RESPONSE_SCHEMA_ID,
   type EnrollOptions,

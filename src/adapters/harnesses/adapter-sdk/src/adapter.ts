@@ -126,7 +126,7 @@ class Adapter implements AdapterHandle {
       try {
         const conn = await connectChild({
           childWorkspaceId: this.opts.childWorkspaceId,
-          token: this.opts.token ?? process.env["OFAC_CHILD_SECRET"] ?? "",
+          token: this.childToken(),
           manifest: this.opts.manifest,
           ...("socketPath" in transport
             ? { path: transport.socketPath }
@@ -266,6 +266,11 @@ class Adapter implements AdapterHandle {
     }
   }
 
+  /** The child link token, resolved per use (OFAC_CHILD_SECRET overlay law). */
+  private childToken(): string {
+    return this.opts.token ?? process.env["OFAC_CHILD_SECRET"] ?? "";
+  }
+
   private makeContext(
     entry: RegistryEntry,
     command: EnvelopeCommand,
@@ -281,6 +286,9 @@ class Adapter implements AdapterHandle {
     const runs = this.runs;
     const hooks = this.opts.hooks;
     const ctx: RunContext = {
+      ...(this.opts.kernel !== undefined
+        ? { kernel: { baseUrl: this.opts.kernel.baseUrl, token: this.childToken() } }
+        : {}),
       executionId: entry.executionId,
       executionGeneration,
       command,

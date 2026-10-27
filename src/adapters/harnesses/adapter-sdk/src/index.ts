@@ -10,6 +10,19 @@ export const ADAPTER_PACKAGE_NAME = "@ofac/adapter";
 
 export { ADAPTER_PACKAGE, DEFAULT_RESTART_BACKOFF_MS, createAdapter } from "./adapter.js";
 export {
+  artifactUri,
+  buildCompletedEvent,
+  buildResultManifest,
+  createArtifactClient,
+  type ArtifactClient,
+  type CompletedEventContext,
+  type KernelHttpOptions,
+  type ResultManifest,
+  type ResultManifestInput,
+  type ResultManifestOutput,
+  type UploadOptions,
+} from "./artifacts.js";
+export {
   ExecutionRegistry,
   TERMINAL_TTL_MS,
   type RegistryEntry,

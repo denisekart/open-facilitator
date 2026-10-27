@@ -54,6 +54,13 @@ export interface RunContext {
    * itself (or via `sessionStore`) — the SDK never reads it.
    */
   sessionRef?: string | undefined;
+  /**
+   * Kernel byte-path surface (Plan 15): present when the adapter was created
+   * with `kernel: { baseUrl }` — the configured origin plus the child link
+   * token, which IS the workload credential (link-plane HTTP: request_upload
+   * + PUT). Harnesses hand this to `createArtifactClient`.
+   */
+  readonly kernel?: { readonly baseUrl: string; readonly token: string };
 }
 
 export type RunOutcome =
@@ -92,6 +99,8 @@ export interface CreateAdapterOptions {
   /** Restart backoff schedule (cap-loop forever on the last entry); `[]` disables auto-restart. */
   restartBackoffMs?: readonly number[];
   logger?: LinkLogger;
+  /** Kernel origin for the artifact byte path (RunContext.kernel surfaces it + the token verbatim). Unset ⇒ no kernel surface. */
+  kernel?: { readonly baseUrl: string };
 }
 
 export interface AdapterStatus {

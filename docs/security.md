@@ -287,21 +287,44 @@ set — `decision`, `reason`, `workId`/`assignmentId`/`capabilityId`,
   `/groups` claim) precisely so a wrong-team human hits the ledger's 404
   rather than leaking team-ownership through a 403; a principal with no
   group claim never reaches the ledger at all.
-- **External refs are `unverified` and never fetched.** An
-  `artifact.available` with a foreign `artifactId` registers metadata only
-  (`stored`/`unverified`, `external:<url>`); the kernel never dereferences
-  the URL, so an artifact declaration can neither drive SSRF nor become a
-  trust claim it didn't earn. A kernel-allocated id, once stored+verified,
-  cannot be rewritten by a later declaration (422
+- **External refs are screened, never fetched.** An `artifact.available`
+  with a foreign `artifactId` registers metadata only (`stored`,
+  `external:<url>`); the kernel never dereferences the URL, so an artifact
+  declaration cannot drive SSRF. `verification` is the screen's verdict:
+  an external URL is screened against operator bindings
+  (`Storage:ExternalBindings`, prefix match) plus SSRF address rules
+  (absolute http(s), no userinfo, host resolves and EVERY address is
+  outside loopback/private/link-local/unique-local); a binding waives the
+  address screen but never the syntax laws. Unbound or unsafe resolves to
+  `unverified`, never fetched — a miss downgrades, it never refuses, and
+  the reason rides the audit detail. A kernel-allocated id, once
+  stored+verified, cannot be rewritten by a later declaration (422
   `artifact-declaration-mismatch`, deny audit).
+- **Direct uploads confirm by kernel re-hash.** A presigned PUT lets bytes
+  reach the object store with no kernel hop, so the confirm path re-reads
+  and re-hashes the declared key itself — provider ETags (composite for
+  multipart, md5-shaped on some gates) are never trusted as proof of the
+  declared `sha256:`. Presigned URLs are minted ONLY for the digest-derived
+  key the allocation already fixed (never a caller-supplied key), share the
+  ticket's 15-min expiry, and appear only in the ticket response — never in
+  a manifest or row (appendix 8.1: no long-lived bearer secrets).
+- **Retention GC** (`RetentionGcService`, advisory-lock serialized):
+  | Policy | Law |
+  |---|---|
+  | `permanent` | never collected by age |
+  | `Nd` (N ≥ 1) | collect once `stored_at + Nd` lapses AND unreferenced — the row's `work_id` is NULL or that Work is terminal; a live Work pins the blob |
+  | `archive` | never deleted by the GC — kernel-side tombstone-free hold; cold-tiering is an ops concern |
+  | expired pending slot | `deleted` + audit, NO backend call (bytes never arrived) |
+  Collection = conditional-update tombstone + audit in one transaction, backend delete AFTER commit (idempotent): a crash between the two re-collects next pass, batch 100/pass.
 - **No path traversal in the store.** Blob paths derive only from hex
   digests (`{hex[0..2]}/{hex}`); no client-supplied text (mediaType,
   comment, URL) ever participates in a filesystem path, and the store
   refuses any non-hex or escaping relative path before touching the disk.
 - **Envelope cap ≠ artifact cap.** The 262144-byte ingress body cap bounds
-  the JSON envelope only; artifact bytes travel by `PUT …/content` as a
-  stream (counted + hashed, never buffered whole), so the cap can never
-  become a silent artifact-size limit.
+  the JSON envelope only; artifact bytes travel by `PUT` — proxied as a
+  stream (counted + hashed, never buffered whole) or direct to the object
+  store via a presigned URL — so the cap can never become a silent
+  artifact-size limit.
 
 ## Deferred to later plans
 
@@ -309,4 +332,3 @@ set — `decision`, `reason`, `workId`/`assignmentId`/`capabilityId`,
 |---|---|
 | Refresh-token / session lifecycle for interactive UIs | 13+ |
 | Admin surface authorization (replacing `/api/dev/*`) | 13+ |
-| Artifact GC (unclaimed pending sweep, retention deletes), S3 backend, signed URLs | 14 |

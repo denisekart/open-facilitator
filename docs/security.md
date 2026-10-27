@@ -1,6 +1,7 @@
 # Security posture
 
-Status: reflects Plans 09–10 (OIDC identity foundation + workload identity).
+Status: reflects Plans 09–10 (OIDC identity foundation + workload identity)
+plus the artifact-store and result-manifest laws below.
 The human plane federates to any OIDC IdP; roles are operator-defined claim
 rules; every gate decision audits.
 
@@ -97,6 +98,7 @@ deny ⇒ `403 forbidden` (both RFC 9457, camelCase).
 | `/api/works*`, `/api/works/{id}/*` | OIDC bearer; POSTs gated `work.write` | Work CRUD, steer, transitions, timeline |
 | `POST /api/ingress/events` | OIDC bearer; gated `work.write` | CloudEvents 1.0 envelope ingress; fail-closed validation |
 | `GET /api/works/{id}/approvals` | OIDC bearer; gated `approvals.read` (kernel-operator ∣ framework-admin) | Work's ledger rows, lazy expiry on read |
+| `GET /api/works/{id}/manifests` | OIDC bearer; gated `manifests.read` (mirrors `artifacts.read`, includes `team-member`) | Work's recorded manifest chain, newest-first; work-scope 404 non-disclosure |
 | `POST /api/works/{id}/approvals/{approvalId}/respond` | OIDC bearer; gated `approvals.respond` | Human decision; eligibility + single use below |
 | `/api/identity/roles*` | OIDC bearer; PUT/DELETE gated `identity.roles.manage` | runtime role rules |
 | `/api/dev/*`, `/api/dead-letters` | OIDC bearer (read surface) | dev-time ledger dumps; Plan 12 replaces with admin views |
@@ -308,11 +310,21 @@ set — `decision`, `reason`, `workId`/`assignmentId`/`capabilityId`,
   key the allocation already fixed (never a caller-supplied key), share the
   ticket's 15-min expiry, and appear only in the ticket response — never in
   a manifest or row (appendix 8.1: no long-lived bearer secrets).
+- **Manifests record only kernel-verified canonical bytes.** A completed
+  event's `resultManifestRef` records nothing until the ledger has the
+  stored bytes: they must byte-equal their own RFC 8785 canonical form,
+  re-hash to the wire `resultDigest` AND to the artifact row's
+  boundary-verified digest, and every declared output must resolve to a
+  verified same-team artifact — otherwise 422, zero rows, deny audit. The
+  kernel never rewrites a manifest to make it canonical; the producer
+  ships canonical bytes or the completion is honestly rejected. Recording
+  audits `manifest.recorded` (+ timeline); supersession audits
+  `manifest.superseded`.
 - **Retention GC** (`RetentionGcService`, advisory-lock serialized):
   | Policy | Law |
   |---|---|
   | `permanent` | never collected by age |
-  | `Nd` (N ≥ 1) | collect once `stored_at + Nd` lapses AND unreferenced — the row's `work_id` is NULL or that Work is terminal; a live Work pins the blob |
+  | `Nd` (N ≥ 1) | collect once `stored_at + Nd` lapses AND unreferenced — the row's `work_id` is NULL or that Work is terminal, AND no non-superseded `result_manifests` row pins it (as `artifact_id` or inside `output_artifact_ids`); a recorded manifest pins its document AND every declared output blob REGARDLESS of Work state; supersession releases |
   | `archive` | never deleted by the GC — kernel-side tombstone-free hold; cold-tiering is an ops concern |
   | expired pending slot | `deleted` + audit, NO backend call (bytes never arrived) |
   Collection = conditional-update tombstone + audit in one transaction, backend delete AFTER commit (idempotent): a crash between the two re-collects next pass, batch 100/pass.

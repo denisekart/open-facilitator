@@ -164,6 +164,8 @@ process + DB boundaries (§26.1 items 5+8 complete).
 
 **Normalized against Phase C as-built:** the Phase D wire surface is already half-frozen — `event.artifact.available`, `event.memory.candidate`, `event.memory.used`, `artifactRef`, and an extensible (`additionalProperties:true`) `result-manifest.v1` exist with fixtures, so 13–16 add commands/behavior, not contract (additive amendments follow the Plan 11 precedent, both harnesses same commit); every new inbound command rides 10's admission/evidence plane and 09's role gate with new binding rows, no new auth mechanism; digests split by law — artifacts SHA-256-of-bytes (schema-locked), result manifests RFC 8785 reusing 11's dual-language machinery; artifact/memory ledgers copy the 11 ApprovalLedger template (same-tx audit + outbox), the 13/16 arms copy 11/12's `ApprovalIngress` shape; the kernel never names a vendor (09's standing directive) — SeaweedFS lives in containers only.
 
+**Updated against Plan 15 as-built:** the manifest half landed — 1.1 completed-event ref+digest with the kernel-chained revision ledger (`facilitator.result_manifests`, canonical-bytes law enforced at record time), and the GC reference check strengthened: a recorded manifest pins its document AND every declared output blob regardless of Work state (supersession releases).
+
 **Downstream renumber +2 (2026-10-27):** old 15 Slim ref-env → 17, 16 Admin SPA → 18, 17–22 Phase F → 19–24, 23–25 Phase G → 25–27. `Depends on:` lines and cross-references updated throughout this file.
 
 ---

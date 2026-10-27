@@ -7,18 +7,32 @@ namespace Facilitator.Tests.Artifacts;
 /// Digest + size enforcement at the kernel boundary: the received bytes are
 /// hashed by the kernel, a mismatch rejects the slot (fresh allocation
 /// required), a deny audit records it, and the wrong-bytes blob never lands
-/// as the artifact's stored content.
+/// as the artifact's stored content. Provider-matrixed: the fs leg hashes on
+/// the proxied stream; the s3 leg hashes the temp-key copy server-side-
+/// independently — both must refuse to flip a lying declaration.
 /// </summary>
-[Collection("postgres:work")]
-public sealed class ArtifactRejectionTests(PostgresFixture fixture)
+public abstract class ArtifactRejectionTestsBase
 {
+    private readonly PostgresFixture _fixture;
+
+    protected ArtifactRejectionTestsBase(PostgresFixture fixture) => _fixture = fixture;
+
+    /// <summary>Factory settings for this provider leg.</summary>
+    protected virtual IReadOnlyDictionary<string, string?> ProviderSettings => ArtifactTestKit.WorkloadBinding;
+    /// <summary>The mode-(b) endpoint id this leg enrolls: read from the leg's
+    /// own binding settings, so both matrix legs never share an endpoint id
+    /// (a re-enroll of the same id fences the other leg's live token).</summary>
+    protected virtual string WorkloadEndpoint =>
+        ProviderSettings["Link:WorkloadIdentities:2:EndpointId"]!;
+
+
     [Fact]
     public async Task TamperedBytesRejectSlotAndAudit()
     {
-        using var factory = new KernelTestFactory(fixture, noDispatcher: true, settings: ArtifactTestKit.WorkloadBinding);
+        using var factory = new KernelTestFactory(_fixture, noDispatcher: true, settings: ProviderSettings);
         var kernel = factory.CreateAuthedClient();
         var link = factory.CreateLinkClient(await ArtifactTestKit.EnrollModeBAsync(
-            kernel, "art.wk1", "ofac-gateway-alpha", "gateway-alpha-secret"));
+            kernel, WorkloadEndpoint, "ofac-gateway-alpha", "gateway-alpha-secret"));
 
         var commandId = "cmd-art-" + ArtifactTestKit.B64(Guid.NewGuid());
         var ack = await KernelOps.PostJsonAsync(link, "/api/link/v1/events",
@@ -34,11 +48,11 @@ public sealed class ArtifactRejectionTests(PostgresFixture fixture)
         Assert.Equal("https://errors.openfacilitator.org/v1/artifact-digest-mismatch",
             ArtifactTestKit.ProblemType(put));
 
-        var row = await fixture.Db.Artifact(artifactId);
+        var row = await _fixture.Db.Artifact(artifactId);
         Assert.Equal("rejected", row!.State);
-        Assert.DoesNotContain(await fixture.Db.AuditRows(),
+        Assert.DoesNotContain(await _fixture.Db.AuditRows(),
             a => a.Action == "artifact.stored" && a.Resource.Contains(artifactId.ToString(), StringComparison.Ordinal));
-        Assert.Contains(await fixture.Db.AuditRows(),
+        Assert.Contains(await _fixture.Db.AuditRows(),
             a => a.Action == "artifact.rejected" && a.Decision == "deny" && a.Resource.Contains(artifactId.ToString(), StringComparison.Ordinal));
 
         // The slot is spent: a re-PUT answers absent, not "retry later".
@@ -49,10 +63,10 @@ public sealed class ArtifactRejectionTests(PostgresFixture fixture)
     [Fact]
     public async Task SizeLieRejectsSlot()
     {
-        using var factory = new KernelTestFactory(fixture, noDispatcher: true, settings: ArtifactTestKit.WorkloadBinding);
+        using var factory = new KernelTestFactory(_fixture, noDispatcher: true, settings: ProviderSettings);
         var kernel = factory.CreateAuthedClient();
         var link = factory.CreateLinkClient(await ArtifactTestKit.EnrollModeBAsync(
-            kernel, "art.wk1", "ofac-gateway-alpha", "gateway-alpha-secret"));
+            kernel, WorkloadEndpoint, "ofac-gateway-alpha", "gateway-alpha-secret"));
 
         var commandId = "cmd-art-" + ArtifactTestKit.B64(Guid.NewGuid());
         var ack = await KernelOps.PostJsonAsync(link, "/api/link/v1/events",
@@ -66,16 +80,16 @@ public sealed class ArtifactRejectionTests(PostgresFixture fixture)
         Assert.Equal(HttpStatusCode.UnprocessableEntity, put.StatusCode);
         Assert.Equal("https://errors.openfacilitator.org/v1/artifact-size-mismatch",
             ArtifactTestKit.ProblemType(put));
-        Assert.Equal("rejected", (await fixture.Db.Artifact(artifactId))!.State);
+        Assert.Equal("rejected", (await _fixture.Db.Artifact(artifactId))!.State);
     }
 
     [Fact]
     public async Task IdempotentRePutOfSameBytesSucceedsOnceRowStored()
     {
-        using var factory = new KernelTestFactory(fixture, noDispatcher: true, settings: ArtifactTestKit.WorkloadBinding);
+        using var factory = new KernelTestFactory(_fixture, noDispatcher: true, settings: ProviderSettings);
         var kernel = factory.CreateAuthedClient();
         var link = factory.CreateLinkClient(await ArtifactTestKit.EnrollModeBAsync(
-            kernel, "art.wk1", "ofac-gateway-alpha", "gateway-alpha-secret"));
+            kernel, WorkloadEndpoint, "ofac-gateway-alpha", "gateway-alpha-secret"));
 
         var commandId = "cmd-art-" + ArtifactTestKit.B64(Guid.NewGuid());
         var ack = await KernelOps.PostJsonAsync(link, "/api/link/v1/events",
@@ -89,4 +103,16 @@ public sealed class ArtifactRejectionTests(PostgresFixture fixture)
         var body = JsonDocument.Parse(await second.Content.ReadAsStringAsync()).RootElement;
         Assert.Equal("stored", body.GetProperty("state").GetString());
     }
+}
+
+/// <summary>Filesystem leg of the rejection matrix.</summary>
+[Collection("postgres:work")]
+public sealed class FsArtifactRejectionTests(PostgresFixture fixture) : ArtifactRejectionTestsBase(fixture);
+
+/// <summary>s3 leg of the rejection matrix.</summary>
+[Collection("postgres:work:s3")]
+public sealed class S3ArtifactRejectionTests(PostgresFixture fixture) : ArtifactRejectionTestsBase(fixture)
+{
+    /// <inheritdoc />
+    protected override IReadOnlyDictionary<string, string?> ProviderSettings => ArtifactTestKit.S3Settings;
 }

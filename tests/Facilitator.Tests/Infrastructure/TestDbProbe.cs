@@ -236,6 +236,37 @@ public sealed class TestDbProbe : IAsyncDisposable
                 cmd.Parameters.AddWithValue((object?)consumedAt ?? DBNull.Value);
             });
 
+    /// <summary>Hand-mint a facilitator.artifacts row (GC tests seed ledger states the API cannot reach without time travel).</summary>
+    public Task SeedArtifact(
+        Guid artifactId, string state, string retentionPolicy, DateTime? storedAt, Guid? workId,
+        string? storageUri = null, DateTime? expiresAt = null) =>
+        NonQuery(
+            "INSERT INTO facilitator.artifacts (artifact_id, work_id, media_type, size, digest, storage_uri, "
+            + "state, verification, origin, created_by, created_at, expires_at, stored_at, retention_policy) "
+            + "VALUES ($1, $2, 'application/octet-stream', 11, 'sha256:' || repeat('a', 64), $3, "
+            + "$4, 'verified', 'rest', 'seed', now(), coalesce($7, now()), $5, $6)",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(artifactId);
+                cmd.Parameters.AddWithValue((object?)workId ?? DBNull.Value);
+                cmd.Parameters.AddWithValue(storageUri ?? $"kernel-fs:aa/bb/sha256/{new string('a', 64)}");
+                cmd.Parameters.AddWithValue(state);
+                cmd.Parameters.AddWithValue((object?)storedAt ?? DBNull.Value);
+                cmd.Parameters.AddWithValue(retentionPolicy);
+                cmd.Parameters.AddWithValue((object?)expiresAt ?? DBNull.Value);
+            });
+
+    /// <summary>Force a row's state (crash-recovery seeding: pretend the
+    /// backend delete landed but the tombstone transaction did not).</summary>
+    public Task RevertArtifactState(Guid artifactId, string state) =>
+        NonQuery(
+            "UPDATE facilitator.artifacts SET state = $2 WHERE artifact_id = $1",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(artifactId);
+                cmd.Parameters.AddWithValue(state);
+            });
+
     /// <summary>The approvals ledger row for one approval (null when never recorded).</summary>
     public async Task<ApprovalRow?> Approval(Guid approvalId)
     {

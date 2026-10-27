@@ -9,6 +9,14 @@ namespace Facilitator.Tests.Infrastructure;
 [CollectionDefinition("postgres:work")]
 public sealed class WorkCollection : ICollectionFixture<PostgresFixture>, ICollectionFixture<KeycloakFixture>;
 
+/// <summary>
+/// Artifact suites against the s3 provider (Plan 14 matrix): same Postgres +
+/// Keycloak containers, plus the shared SeaweedFS S3 container. Serial among
+/// themselves; runs parallel to the fs leg (distinct rows, distinct buckets).
+/// </summary>
+[CollectionDefinition("postgres:work:s3")]
+public sealed class WorkS3Collection : ICollectionFixture<PostgresFixture>, ICollectionFixture<KeycloakFixture>, ICollectionFixture<SeaweedFsFixture>;
+
 /// <summary>CloudEvent-ingress suites (serial among themselves).</summary>
 [CollectionDefinition("postgres:ingress")]
 public sealed class IngressCollection : ICollectionFixture<PostgresFixture>, ICollectionFixture<KeycloakFixture>;

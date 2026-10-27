@@ -6,18 +6,35 @@ namespace Facilitator.Tests.Artifacts;
 /// Non-disclosure law: every foreign-team access — human read, human PUT,
 /// workload PUT — answers the SAME 404 as a missing row (the approvals
 /// work-scope precedent). A principal without any team group is refused at
-/// the role gate before the ledger is touched.
+/// the role gate before the ledger is touched. Provider-matrixed: the law
+/// holds identically on the filesystem and s3 legs.
 /// </summary>
-[Collection("postgres:work")]
-public sealed class ArtifactAuthorizationTests(PostgresFixture fixture)
+public abstract class ArtifactAuthorizationTestsBase
 {
+    private readonly PostgresFixture _fixture;
+
+    protected ArtifactAuthorizationTestsBase(PostgresFixture fixture) => _fixture = fixture;
+
+    /// <summary>Factory settings for this provider leg.</summary>
+    protected virtual IReadOnlyDictionary<string, string?> ProviderSettings => ArtifactTestKit.WorkloadBinding;
+    /// <summary>The mode-(b) endpoint id this leg enrolls: read from the leg's
+    /// own binding settings, so both matrix legs never share an endpoint id
+    /// (a re-enroll of the same id fences the other leg's live token).</summary>
+    protected string WorkloadEndpoint =>
+        ProviderSettings["Link:WorkloadIdentities:2:EndpointId"]!;
+
+    /// <summary>Collection-unambiguous suffix for free-form endpoint ids: the
+    /// leg tag carried by this leg's bound workload endpoint id.</summary>
+    protected string LegTag => WorkloadEndpoint[WorkloadEndpoint.LastIndexOf('-')..];
+
+
     [Fact]
     public async Task ForeignTeamReadsAndWritesAnswerAbsent()
     {
-        using var factory = new KernelTestFactory(fixture, noDispatcher: true, settings: ArtifactTestKit.WorkloadBinding);
+        using var factory = new KernelTestFactory(_fixture, noDispatcher: true, settings: ProviderSettings);
         var kernel = factory.CreateAuthedClient();
         var token = await ArtifactTestKit.EnrollModeBAsync(
-            kernel, "art.wk1", "ofac-gateway-alpha", "gateway-alpha-secret");
+            kernel, WorkloadEndpoint, "ofac-gateway-alpha", "gateway-alpha-secret");
         var link = factory.CreateLinkClient(token);
 
         var commandId = "cmd-art-" + ArtifactTestKit.B64(Guid.NewGuid());
@@ -40,7 +57,7 @@ public sealed class ArtifactAuthorizationTests(PostgresFixture fixture)
 
         // A team-beta WORKLOAD (mode-a secret enrollment, role child so no gw. prefix law):
         // the link-plane PUT route guards on row team ownership -> 404.
-        var betaToken = await LinkTestHarness.EnrollAsync(kernel, "art.beta", team: "team-beta");
+        var betaToken = await LinkTestHarness.EnrollAsync(kernel, $"art.beta{LegTag}", team: "team-beta");
         var beta = factory.CreateLinkClient(betaToken);
         var betaPut = await ArtifactTestKit.PutBytesAsync(beta, $"/api/link/v1/artifacts/{artifactId}/content", ArtifactTestKit.ReportBytes);
         Assert.Equal(HttpStatusCode.NotFound, betaPut.StatusCode);
@@ -61,10 +78,10 @@ public sealed class ArtifactAuthorizationTests(PostgresFixture fixture)
     [Fact]
     public async Task PendingSlotIsNotReadableContent()
     {
-        using var factory = new KernelTestFactory(fixture, noDispatcher: true, settings: ArtifactTestKit.WorkloadBinding);
+        using var factory = new KernelTestFactory(_fixture, noDispatcher: true, settings: ProviderSettings);
         var kernel = factory.CreateAuthedClient();
         var link = factory.CreateLinkClient(await ArtifactTestKit.EnrollModeBAsync(
-            kernel, "art.wk1", "ofac-gateway-alpha", "gateway-alpha-secret"));
+            kernel, WorkloadEndpoint, "ofac-gateway-alpha", "gateway-alpha-secret"));
 
         var ack = await KernelOps.PostJsonAsync(link, "/api/link/v1/events",
             ArtifactTestKit.RequestUploadEnvelope(
@@ -78,4 +95,15 @@ public sealed class ArtifactAuthorizationTests(PostgresFixture fixture)
         Assert.Equal("pending", meta.GetProperty("state").GetString());
         Assert.Equal(HttpStatusCode.NotFound, (await alice.GetAsync($"/api/artifacts/{artifactId}/content")).StatusCode);
     }
+}
+
+/// <summary>Filesystem leg of the authorization matrix.</summary>
+[Collection("postgres:work")]
+public sealed class FsArtifactAuthorizationTests(PostgresFixture fixture) : ArtifactAuthorizationTestsBase(fixture);
+
+[Collection("postgres:work:s3")]
+public sealed class S3ArtifactAuthorizationTests(PostgresFixture fixture) : ArtifactAuthorizationTestsBase(fixture)
+{
+    /// <inheritdoc />
+    protected override IReadOnlyDictionary<string, string?> ProviderSettings => ArtifactTestKit.S3Settings;
 }

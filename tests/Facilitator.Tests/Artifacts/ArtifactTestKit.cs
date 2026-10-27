@@ -15,16 +15,38 @@ namespace Facilitator.Tests.Artifacts;
 /// </summary>
 internal static class ArtifactTestKit
 {
-    /// <summary>Factory settings adding a test-only mode-(b) binding: the gateway-alpha client, endpoint <c>art.wk1</c>, team-alpha, accepting delegated claims.</summary>
+    /// <summary>Factory settings adding a test-only mode-(b) binding: the gateway-alpha client,
+    /// endpoint <c>art.wk1-fs</c>, team-alpha, accepting delegated claims. Endpoint ids carry a
+    /// leg tag: both matrix legs share one database, and a re-enroll of the same endpoint id
+    /// fences the other leg\u2019s live token.</summary>
     internal static readonly IReadOnlyDictionary<string, string?> WorkloadBinding =
         new Dictionary<string, string?>
         {
             ["Link:WorkloadIdentities:2:ClientId"] = "ofac-gateway-alpha",
-            ["Link:WorkloadIdentities:2:EndpointId"] = "art.wk1",
+            ["Link:WorkloadIdentities:2:EndpointId"] = "art.wk1-fs",
             ["Link:WorkloadIdentities:2:Team"] = "team-alpha",
             ["Link:WorkloadIdentities:2:Role"] = "child",
             ["Link:WorkloadIdentities:2:AcceptsDelegatedClaims"] = "true",
         };
+
+    /// <summary>The mode-(b) binding plus the s3 provider pointed at the shared SeaweedFS
+    /// container (every s3 matrix leg). A computed property, NOT a field: evaluating it
+    /// boots the container, so it must only fire on an s3 leg's factory construction.</summary>
+    internal static IReadOnlyDictionary<string, string?> S3Settings => new Dictionary<string, string?>
+    {
+        ["Link:WorkloadIdentities:2:ClientId"] = "ofac-gateway-alpha",
+        ["Link:WorkloadIdentities:2:EndpointId"] = "art.wk1-s3",
+        ["Link:WorkloadIdentities:2:Team"] = "team-alpha",
+        ["Link:WorkloadIdentities:2:Role"] = "child",
+        ["Link:WorkloadIdentities:2:AcceptsDelegatedClaims"] = "true",
+        ["Storage:Provider"] = "s3",
+        ["Storage:S3:Endpoint"] = SeaweedFsFixture.Endpoint,
+        ["Storage:S3:Bucket"] = SeaweedFsFixture.Bucket,
+        ["Storage:S3:Region"] = "us-east-1",
+        ["Storage:S3:AccessKey"] = SeaweedFsFixture.AccessKey,
+        ["Storage:S3:SecretKey"] = SeaweedFsFixture.SecretKey,
+        ["Storage:S3:ForcePathStyle"] = "true",
+    };
 
     internal static readonly byte[] ReportBytes =
         "# research report\nkernel-boundary digest law proved here\n"u8.ToArray();
@@ -97,7 +119,13 @@ internal static class ArtifactTestKit
 
     internal static async Task<HttpClient> UserClientAsync(KernelTestFactory factory, string user)
     {
-        var client = factory.CreateClient();
+        // Auto-redirect OFF: the content route's 302 target is the object
+        // store, and the factory client would re-dispatch it against the
+        // TestServer instead of letting the test see the redirect.
+        var client = factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false,
+        });
         client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", await KeycloakFixture.TokenForUserAsync(user, user));
         client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
@@ -107,6 +135,28 @@ internal static class ArtifactTestKit
     internal static async Task<HttpResponseMessage> PutBytesAsync(
         HttpClient client, string path, byte[] bytes) =>
         await client.PutAsync(path, new ByteArrayContent(bytes));
+
+    /// <summary>A valid digest nothing has ever been uploaded under (fresh random
+    /// bytes): allocations that must NOT collide on the shared content-addressed
+    /// key (one bucket across the whole s3 matrix) declare one.</summary>
+    internal static string FreshDigest() => DigestOf(Guid.NewGuid().ToByteArray());
+
+    /// <summary>GET a content route, following a 302 to the store over the REAL
+    /// network (the factory client auto-redirects into the TestServer, which
+    /// does not speak S3 paths).</summary>
+    internal static async Task<HttpResponseMessage> GetContentAsync(HttpClient client, string path)
+    {
+        var response = await client.GetAsync(path);
+        if (response.StatusCode == HttpStatusCode.Redirect && response.Headers.Location is { } location)
+        {
+            var target = location.ToString();
+            response.Dispose();
+            using var network = new HttpClient();
+            return await network.GetAsync(target);
+        }
+
+        return response;
+    }
 
     internal static string ProblemType(HttpResponseMessage response) =>
         JsonDocument.Parse(response.Content.ReadAsStringAsync().Result)

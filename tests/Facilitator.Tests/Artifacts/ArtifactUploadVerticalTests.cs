@@ -6,19 +6,37 @@ namespace Facilitator.Tests.Artifacts;
 
 /// <summary>
 /// The vertical: Link request_upload (delegated evidence, mode-(b) workload)
-/// ⇒ ticket in the ack `data` ⇒ PUT bytes on the link plane ⇒ digest verified,
-/// row stored, timeline entry, content readable by the owning team.
+/// ⇒ ticket in the ack `data` ⇒ PUT bytes ⇒ digest verified, row stored,
+/// timeline entry, content readable by the owning team. Provider-matrixed:
+/// the fs leg proxies bytes through the kernel; the s3 leg uploads the same
+/// way (link-plane proxied PUT) — the presigned direct path is the
+/// ArtifactSignedUrlTests surface.
 /// </summary>
-[Collection("postgres:work")]
-public sealed class ArtifactUploadVerticalTests(PostgresFixture fixture)
+public abstract class ArtifactUploadVerticalTestsBase
 {
+    private readonly PostgresFixture _fixture;
+
+    protected ArtifactUploadVerticalTestsBase(PostgresFixture fixture) => _fixture = fixture;
+
+    /// <summary>Factory settings for this provider leg.</summary>
+    protected virtual IReadOnlyDictionary<string, string?> ProviderSettings => ArtifactTestKit.WorkloadBinding;
+    /// <summary>The mode-(b) endpoint id this leg enrolls: read from the leg's
+    /// own binding settings, so both matrix legs never share an endpoint id
+    /// (a re-enroll of the same id fences the other leg's live token).</summary>
+    protected virtual string WorkloadEndpoint =>
+        ProviderSettings["Link:WorkloadIdentities:2:EndpointId"]!;
+
+
+    /// <summary>The StorageUri scheme prefix a kernel-stored row must carry on this leg.</summary>
+    protected abstract string ExpectedScheme { get; }
+
     [Fact]
     public async Task LinkUploadHappyPathStoresVerifiesAndTimelines()
     {
-        using var factory = new KernelTestFactory(fixture, noDispatcher: true, settings: ArtifactTestKit.WorkloadBinding);
+        using var factory = new KernelTestFactory(_fixture, noDispatcher: true, settings: ProviderSettings);
         var kernel = factory.CreateAuthedClient();
         var (workId, _) = await KernelOps.CreateWorkAsync(kernel, "artifact vertical");
-        var token = await ArtifactTestKit.EnrollModeBAsync(kernel, "art.wk1", "ofac-gateway-alpha", "gateway-alpha-secret");
+        var token = await ArtifactTestKit.EnrollModeBAsync(kernel, WorkloadEndpoint, "ofac-gateway-alpha", "gateway-alpha-secret");
         var link = factory.CreateLinkClient(token);
 
         var commandId = "cmd-art-" + ArtifactTestKit.B64(Guid.NewGuid());
@@ -33,7 +51,7 @@ public sealed class ArtifactUploadVerticalTests(PostgresFixture fixture)
         Assert.Equal($"/api/link/v1/artifacts/{artifactId}/content", data.GetProperty("uploadLocation").GetString());
         Assert.False(string.IsNullOrEmpty(data.GetProperty("expiresAt").GetString()));
 
-        var row = await fixture.Db.Artifact(artifactId);
+        var row = await _fixture.Db.Artifact(artifactId);
         Assert.Equal("pending", row!.State);
         Assert.Equal("team-alpha", row.TeamSlug);
         Assert.Equal(workId.ToString(), row.WorkId);
@@ -42,16 +60,16 @@ public sealed class ArtifactUploadVerticalTests(PostgresFixture fixture)
         var put = await ArtifactTestKit.PutBytesAsync(link, data.GetProperty("uploadLocation").GetString()!, ArtifactTestKit.ReportBytes);
         Assert.Equal(HttpStatusCode.OK, put.StatusCode);
 
-        row = await fixture.Db.Artifact(artifactId);
+        row = await _fixture.Db.Artifact(artifactId);
         Assert.Equal("stored", row!.State);
         Assert.Equal("verified", row.Verification);
         Assert.Equal(ArtifactTestKit.DigestOf(ArtifactTestKit.ReportBytes), row.Digest);
-        Assert.StartsWith("kernel-fs:", row.StorageUri);
-        Assert.Equal(1, await fixture.Db.TimelineEventCount(workId, "artifact.stored"));
+        Assert.StartsWith(ExpectedScheme, row.StorageUri);
+        Assert.Equal(1, await _fixture.Db.TimelineEventCount(workId, "artifact.stored"));
 
         // Owning team reads the bytes back; digest of served bytes == declared.
         var alice = await ArtifactTestKit.UserClientAsync(factory, "alice");
-        var served = await alice.GetAsync($"/api/artifacts/{artifactId}/content");
+        var served = await ArtifactTestKit.GetContentAsync(alice, $"/api/artifacts/{artifactId}/content");
         Assert.Equal(HttpStatusCode.OK, served.StatusCode);
         Assert.Equal("text/markdown", served.Content.Headers.ContentType!.MediaType);
         var fetched = await served.Content.ReadAsByteArrayAsync();
@@ -71,7 +89,7 @@ public sealed class ArtifactUploadVerticalTests(PostgresFixture fixture)
     [Fact]
     public async Task RestTwinAllocatesAndStoresForHumanPlane()
     {
-        using var factory = new KernelTestFactory(fixture, noDispatcher: true);
+        using var factory = new KernelTestFactory(_fixture, noDispatcher: true, settings: ProviderSettings);
         var alice = await ArtifactTestKit.UserClientAsync(factory, "alice");
 
         var body = JsonSerializer.Serialize(new
@@ -85,12 +103,31 @@ public sealed class ArtifactUploadVerticalTests(PostgresFixture fixture)
         var artifactId = Guid.Parse(created.GetProperty("artifactId").GetString()!);
         Assert.Equal($"/api/artifacts/{artifactId}/content", created.GetProperty("uploadLocation").GetString());
 
-        var row = await fixture.Db.Artifact(artifactId);
+        var row = await _fixture.Db.Artifact(artifactId);
         Assert.Equal("rest", row!.Origin);
         Assert.Equal("team-alpha", row.TeamSlug);
 
         var put = await ArtifactTestKit.PutBytesAsync(alice, $"/api/artifacts/{artifactId}/content", ArtifactTestKit.ReportBytes);
         Assert.Equal(HttpStatusCode.OK, put.StatusCode);
-        Assert.Equal("stored", (await fixture.Db.Artifact(artifactId))!.State);
+        Assert.Equal("stored", (await _fixture.Db.Artifact(artifactId))!.State);
     }
+}
+
+/// <summary>Filesystem leg of the upload vertical.</summary>
+[Collection("postgres:work")]
+public sealed class FsArtifactUploadVerticalTests(PostgresFixture fixture) : ArtifactUploadVerticalTestsBase(fixture)
+{
+    /// <inheritdoc />
+    protected override string ExpectedScheme => "kernel-fs:";
+}
+
+/// <summary>s3 leg of the upload vertical (kernel-proxied PUT, s3-scheme rows).</summary>
+[Collection("postgres:work:s3")]
+public sealed class S3ArtifactUploadVerticalTests(PostgresFixture fixture) : ArtifactUploadVerticalTestsBase(fixture)
+{
+    /// <inheritdoc />
+    protected override string ExpectedScheme => "s3:";
+
+    /// <inheritdoc />
+    protected override IReadOnlyDictionary<string, string?> ProviderSettings => ArtifactTestKit.S3Settings;
 }

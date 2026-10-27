@@ -127,13 +127,13 @@ One EF migration (`AddWorkloadIdentity`):
 
 |Step|State|
 |---|---|
-|0 Seed plan file|Not started|
-|1 Migration + roster + principal widening|Not started|
-|2 Protocol amendment + fixtures|Not started|
-|3 Enrollment v2|Not started|
-|4 Evidence validators + audit|Not started|
-|5 SDK/Gateway/linkd/Features|Not started|
-|6 Realm + e2e cutover|Not started|
-|7 Docs + skills + roadmap|Not started|
+|0 Seed plan file|Fully implemented: seeded as first commit (amended: the tracked canonical file is this uppercase copy, per the Plan 09 naming precedent; roadmap row updated to link it)|
+|1 Migration + roster + principal widening|Fully implemented: `AddWorkloadIdentity` migration (`link_enrollments.role/-accepts_delegated_claims/-workload_issuer/-workload_subject` + `facilitator.evidence` + role check constraint); `TeamRosterSeeder` (`Link:Teams`, `INSERT ... ON CONFLICT DO NOTHING`); default-team on-demand seeding deleted; `LinkPrincipal` + validator join team slug/role/accepts|
+|2 Protocol amendment + fixtures|Fully implemented: `common.v1.json#evidenceRef` ≤2048, `enroll-request.v1.json` role/team, OpenAPI 1.0.2 rationale; fixtures `valid/enroll.request.role.json` + `invalid/enroll.bad-role.json` registered (64 cases); codegen regenerated, both harnesses green|
+|3 Enrollment v2|Fully implemented: mode-(b) arm (`OidcJwks` + `Link:WorkloadIdentities` binding, 403 `workload-not-registered`/`role-mismatch`), mode-(a) roster-required team (403 `team-unknown`), gw. prefix law, role-immutability-on-rotation (403), typed errors; `dotnet test --filter Identity|Link` green|
+|4 Evidence validators + audit|Fully implemented: `Shared/Evidence/EvidenceValidator` (oidc/kernel scheme-split, deny-vs-unverified), `EffectivePrincipal.Derive`, AdmissionGate evidence evaluation + `authorization.evaluated:link` audit (allow+deny, 503 on audit-fail), kernel id consumption, `facilitator.link.evidence` metric; WorkloadIdentityTests 9/9 incl. `consumed` and delegation-refused paths|
+|5 SDK/Gateway/linkd/Features|Fully implemented: `enroll.ts` role/team, gateway YAML `role`+`workload:` block (env overlay), runtime mode-(b) token provider, linkd `--team`/`--role`, Feature `team`/`role` options + unit regeneration (scenarios updated), READMEs|
+|6 Realm + e2e cutover|Fully implemented: realm `ofac-gateway-alpha`/`ofac-worker-alpha`/`facilitator-link`/`ofac-evidence` (boolean `delegation` via `jsonType.label: JSON` — Keycloak 26 ignores `claim.type`); dev config roster+bindings; .NET `WorkloadIdentityTests` mode-b round-trip/rotation/403s/evidence+audit; TS e2e flipped to team-alpha, gateway e2e enrolls mode-(b) via Keycloak CC token (fixed `gw.team-alpha`, per-file DBs), rotation test re-enrolls mode-(b); link/gateway/worker e2e tiers green|
+|7 Docs + skills + roadmap|Fully implemented: docs/security.md workload-plane section, docs/protocol.md enrollment v2 + error/config tables, realm README plan-10 clients, getting-started team-bound enroll walkthrough, facilitator-architecture + facilitator-protocol skills as-built, roadmap Plan 10 row 🟢|
 
 States: Not started / In progress / Partially implemented: <what>/ Fully implemented: <evidence>/ Blocked: <reason>.

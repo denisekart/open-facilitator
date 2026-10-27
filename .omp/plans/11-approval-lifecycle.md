@@ -1,6 +1,6 @@
 # Plan 11 — Approval lifecycle: ledger, action digest, atomic single use, revocation
 
-**Status:** 🟢 done (🔵 replanning → 🟡 in-progress → 🟢 done via the Implementation Status table below).
+**Status:** 🟢 done (🔵 replanning → 🟡 in-progress → 🟢 done via the Implementation Status table below). Execution flips states via the Implementation Status table below.
 **Phase:** C. **Depends on:** 09 (human principal, audit spine — landed 🟢) + 10 (`kernel:` evidence, effective principal — landed 🟢). Plan 12 (Gateway policy `confirm` effect) is the first producer/consumer of this lifecycle.
 **Branching:** work and commit **directly on `main`** (standing directive). Do not push. Copy this plan (title through Implementation Status) over `.omp/plans/11-approval-lifecycle.md` verbatim as the first commit, before any code.
 **Size judgment:** kept as ONE plan — ledger, digest, dispatch, and the human REST pair are one vertical: an approval nobody can answer proves nothing. The digest + `@ofac/protocol` export (Steps 1–2) is a clean early-checkpoint commit; if execution drags after it, Steps 5–6 (REST pair + evidence) can ship as a second commit of the same plan, not a split plan.
@@ -121,3 +121,12 @@ Verify per step with the test suite below.
 |6 Fixtures + docs|Fully implemented: fixtures `valid/event.approval.required.with-action.json` (digest = golden, cross-verifies §7.2 ↔ envelope shape), `invalid/event.approval.required.bad-digest.json`, `invalid/command.approval.respond.bad-decision.json`, registered in index.json, both harnesses green; docs: protocol.md (1.1 registry row, REST pair, 8 approval error rows, golden paragraph, ingress-effects), security.md (lifecycle section: digest law/single use/lazy expiry/D4/non-repudiation/receipt/revocation + exposure rows), skills facilitator-protocol law 8 + facilitator-architecture (status, schema line, approvals bullet, still-target pruned)|
 
 States: Not started / In progress / Partially implemented: <what>/ Fully implemented: <evidence>/ Blocked: <reason>. Update this table in the same commit as each step; flip the roadmap Plan 11 row ⬜→🟡 at the first commit, 🟢 on CI green.
+
+## Assumptions & contingencies
+
+- **Role-gate route matching**: the new two-segment-deeper routes may not match existing `works/{id}` bindings under `MatchBinding`'s segmentwise comparison. If unbound after Step 4's check, any authenticated principal passes (documented middleware behavior) — acceptable for this plan (eligibility is enforced by the ledger), add explicit `approvals.read`/`approvals.respond` bindings only if a role rule is demanded. Do not invent a new gate mechanism.
+- **Realm username availability**: D4's `user:` match reads `DisplayName` (claims:displayName pointer → `preferred_username`). If the reference realm token lacks it, fall back to matching `user:<sub>`; record which in the status table.
+- **Jcs.Net record-build fidelity**: if dictionary-serialization of the record reorders or reformats numbers differently from the harness pipeline, the golden test catches it immediately — fix the serialization (stringify scalars as they appear in the record fixture), never the golden.
+- **If a frozen-schema reality check fails** (Step 1 amendment rejected by conformance negotiation code — check `negotiateProtocolVersion`/`$id` handling): the fallback is to carry the action payload as a **new sibling event** `event.approval.required.v2.json`; but amendment 1.1 is the approved path and optional-field addition is explicitly sanctioned by the roadmap's Phase C note ("one additive amendment allowed per plan").
+- **Lazy expiry**: GET/respond carries one extra conditional UPDATE. Read amplification is accepted at this scale; a janitor background service is deliberately NOT built (deny-by-default is preserved: an expired-but-not-flipped row still denies).
+- **Split**: none — one vertical. Steps 1–2 (contract+digest, no behavior change for any existing consumer) are a natural checkpoint commit if the session needs one.

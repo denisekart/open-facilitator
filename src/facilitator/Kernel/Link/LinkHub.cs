@@ -130,7 +130,7 @@ public sealed class LinkHub(
         var admission = await ingress.AdmitAsync(envelope.GetRawText(), principal, Context.ConnectionAborted);
         return admission.Problem is not null
             ? new EnvelopeAck("rejected", null, admission.Problem)
-            : new EnvelopeAck(admission.Status!, admission.InboxId!.Value.ToString("N"));
+            : new EnvelopeAck(admission.Status!, admission.InboxId!.Value.ToString("N"), Data: admission.Data);
     }
 
     /// <summary>

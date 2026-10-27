@@ -6,6 +6,7 @@ using Facilitator.Kernel.Shared.Dispatch;
 using Facilitator.Kernel.Shared.Evidence;
 using Facilitator.Kernel.Shared.Identity;
 using Facilitator.Kernel.Shared.Persistence;
+using Facilitator.Kernel.Shared.Storage;
 using Facilitator.Kernel.Work;
 
 using Microsoft.AspNetCore.Authentication;
@@ -36,6 +37,7 @@ public static class KernelServiceCollection
         builder.AddSharedKernel();
         builder.AddIdentityFeature();
         builder.AddWorkFeature();
+        builder.AddStorageFeature();
         builder.AddLinkFeature();
         return builder;
     }
@@ -88,6 +90,7 @@ public static class KernelServiceCollection
         builder.Services.AddSingleton<IngressPipeline>();
         builder.Services.AddScoped<IngressProcessor>();
         builder.Services.AddScoped<CloudEventIngress>();
+        builder.Services.AddScoped<ArtifactIngress>();
         builder.Services.AddScoped<ApprovalIngress>();
         return builder;
     }
@@ -138,6 +141,22 @@ public static class KernelServiceCollection
         });
         builder.Services.AddAuthentication().AddScheme<AuthenticationSchemeOptions, LinkBearerHandler>(LinkBearerHandler.SchemeName, null);
         builder.Services.AddAuthorization();
+        return builder;
+    }
+
+    /// <summary>Artifact storage: options (fail-closed provider check), the byte-store port, the ledger.</summary>
+    private static WebApplicationBuilder AddStorageFeature(this WebApplicationBuilder builder)
+    {
+        var storage = builder.Configuration.GetSection(ArtifactOptions.SectionName).Get<ArtifactOptions>() ?? new ArtifactOptions();
+        builder.Services.AddSingleton(storage);
+        builder.Services.AddSingleton<IArtifactStore>(sp => storage.Provider switch
+        {
+            // Read once at composition: no hot-swap.
+            "filesystem" => new FileSystemArtifactStore(sp.GetRequiredService<ArtifactOptions>()),
+            _ => throw new InvalidOperationException(
+                $"Storage:Provider '{storage.Provider}' is unknown (only 'filesystem' ships) — fail-closed."),
+        });
+        builder.Services.AddScoped<IArtifactLedger, ArtifactLedger>();
         return builder;
     }
 

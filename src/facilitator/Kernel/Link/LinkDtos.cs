@@ -71,4 +71,9 @@ public sealed record FlowControlFrame(
 /// <param name="Status">accepted | duplicate | rejected.</param>
 /// <param name="DeliveryId">Inbox row id (identity the receipt would reference), when admitted.</param>
 /// <param name="Problem">Typed problem document when refused (422/400/413 equivalents).</param>
-public sealed record EnvelopeAck(string Status, string? DeliveryId = null, Microsoft.AspNetCore.Mvc.ProblemDetails? Problem = null);
+/// <param name="Data">In-band command payload (e.g. an upload ticket), additive/optional; carried on accepted AND duplicate acks when the command produced one.</param>
+public sealed record EnvelopeAck(
+    [property: JsonPropertyName("status")] string Status,
+    [property: JsonPropertyName("deliveryId")] string? DeliveryId = null,
+    [property: JsonPropertyName("problem")] Microsoft.AspNetCore.Mvc.ProblemDetails? Problem = null,
+    [property: JsonPropertyName("data")] object? Data = null);

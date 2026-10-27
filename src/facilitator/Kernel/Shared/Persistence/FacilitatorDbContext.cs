@@ -54,6 +54,8 @@ public class FacilitatorDbContext(DbContextOptions<FacilitatorDbContext> options
 
     public DbSet<EvidenceEntity> Evidence => Set<EvidenceEntity>();
 
+    public DbSet<ArtifactEntity> Artifacts => Set<ArtifactEntity>();
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder model)
     {

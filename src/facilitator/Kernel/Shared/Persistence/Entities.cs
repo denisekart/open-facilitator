@@ -452,3 +452,60 @@ public sealed class EvidenceEntity
     /// <summary>Set once consumed (replay law: a second use fails validation).</summary>
     public DateTime? ConsumedAt { get; set; }
 }
+
+/// <summary>facilitator.artifacts — durable artifact metadata ledger (the kernel is the artifact
+/// authority: allocation, digest-verified store, external registration, retention hook).</summary>
+public sealed class ArtifactEntity
+{
+    public Guid ArtifactId { get; set; }
+
+    public Guid? WorkId { get; set; }
+
+    public Guid? AssignmentId { get; set; }
+
+    /// <summary>Declared media type — the kernel never parses it.</summary>
+    public required string MediaType { get; set; }
+
+    /// <summary>Declared byte size; the store path counts actual bytes and rejects a lie.</summary>
+    public long Size { get; set; }
+
+    /// <summary>Declared digest, <c>sha256:[0-9a-f]{64}</c>; verified at ingest when stored here.</summary>
+    public required string Digest { get; set; }
+
+    /// <summary><c>kernel-fs:&lt;relpath&gt;</c> (verified bytes here) or <c>external:&lt;url&gt;</c> (unverified).</summary>
+    public required string StorageUri { get; set; }
+
+    /// <summary>pending | stored | rejected | deleted</summary>
+    public string State { get; set; } = "pending";
+
+    /// <summary>verified | unverified — verified only when the kernel hashed the bytes itself.</summary>
+    public string Verification { get; set; } = "unverified";
+
+    /// <summary>link | rest | external — the plane that allocated/registered the row.</summary>
+    public required string Origin { get; set; }
+
+    /// <summary>Canonical actor of the allocating principal (oidc:iss|sub or link:endpoint).</summary>
+    public required string CreatedBy { get; set; }
+
+    /// <summary>Team scope of the row (non-disclosure boundary); null for team-less external registrations.</summary>
+    public string? TeamSlug { get; set; }
+
+    /// <summary>The Link endpoint that allocated the slot (ownership audit); null on the REST plane.</summary>
+    public string? RequestedByEndpointId { get; set; }
+
+    /// <summary>Wire commandId of the allocating request_upload (duplicate acks re-attach its ticket).</summary>
+    public string? CommandId { get; set; }
+
+    /// <summary>For non-Guid wire artifactIds (external path): the declared label.</summary>
+    public string? WireArtifactId { get; set; }
+
+    public DateTime CreatedAt { get; set; }
+
+    /// <summary>Upload-slot expiry for pending rows (re-allocation is idempotent until expiry).</summary>
+    public DateTime ExpiresAt { get; set; }
+
+    public DateTime? StoredAt { get; set; }
+
+    /// <summary>permanent | (future GC policies) — enforcement is the storage plan's.</summary>
+    public string RetentionPolicy { get; set; } = "permanent";
+}

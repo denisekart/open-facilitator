@@ -17,8 +17,13 @@ public sealed class KernelMetrics
     private readonly Counter<long> _identityDecisions;
     private readonly Counter<long> _linkReceived;
     private readonly Counter<long> _linkEvidence;
+    private readonly Counter<long> _artifactAllocated;
+    private readonly Counter<long> _artifactStored;
+    private readonly Counter<long> _artifactRegistered;
+    private readonly Counter<long> _artifactRejected;
     private readonly Histogram<double> _deliveryLatency;
     private readonly Histogram<double> _ingressLatency;
+    private readonly Histogram<double> _artifactStoreLatency;
     private long _outboxDepth;
     private long _inboxDepth;
     private long _deadLetters;
@@ -39,6 +44,11 @@ public sealed class KernelMetrics
         _linkReceived = meter.CreateCounter<long>("facilitator.link.received", description: "Envelopes admitted over the link surface");
         _identityDecisions = meter.CreateCounter<long>("facilitator.identity.decisions", description: "Authorization-gate decisions (tag: decision)");
         _linkEvidence = meter.CreateCounter<long>("facilitator.link.evidence", description: "actorEvidenceRef evaluations on link admission (tags: scheme, outcome)");
+        _artifactAllocated = meter.CreateCounter<long>("facilitator.artifact.allocated", description: "Upload slots allocated");
+        _artifactStored = meter.CreateCounter<long>("facilitator.artifact.stored", description: "Artifacts stored with verified digests");
+        _artifactRegistered = meter.CreateCounter<long>("facilitator.artifact.registered", description: "Externally-declared artifacts registered (unverified)");
+        _artifactRejected = meter.CreateCounter<long>("facilitator.artifact.rejected", description: "Upload ingest rejections (tag: reason)");
+        _artifactStoreLatency = meter.CreateHistogram<double>("facilitator.artifact.store.latency", unit: "ms", description: "Content put latency");
     }
 
     /// <summary>Record one charged delivery attempt.</summary>
@@ -68,6 +78,22 @@ public sealed class KernelMetrics
 
     /// <summary>Record inline ingress processing latency in milliseconds.</summary>
     public void IngressLatency(double ms) => _ingressLatency.Record(ms);
+
+    /// <summary>Record one upload-slot allocation.</summary>
+    public void ArtifactAllocated() => _artifactAllocated.Add(1);
+
+    /// <summary>Record one digest-verified store.</summary>
+    public void ArtifactStored() => _artifactStored.Add(1);
+
+    /// <summary>Record one external (unverified) registration.</summary>
+    public void ArtifactRegistered() => _artifactRegistered.Add(1);
+
+    /// <summary>Record one ingest rejection.</summary>
+    /// <param name="reason">digest | size | external.</param>
+    public void ArtifactRejected(string reason) => _artifactRejected.Add(1, new KeyValuePair<string, object?>("reason", reason));
+
+    /// <summary>Record content put latency in milliseconds.</summary>
+    public void ArtifactStoreLatency(double ms) => _artifactStoreLatency.Record(ms);
 
     /// <summary>Refresh the cached queue-depth/dead-letter gauges.</summary>
     public void SetGauges(long outboxDepth, long inboxDepth, long deadLetters)

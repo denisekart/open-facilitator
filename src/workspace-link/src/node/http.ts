@@ -232,17 +232,19 @@ export class HttpPollTransport implements LinkTransport {
     });
   }
 
-  /** OpenAPI 1.0.1 codes: 202 accepted, 200 duplicate, 4xx rejected + ProblemDetails. */
+  /** OpenAPI 1.0.1 codes: 202 accepted, 200 duplicate, 4xx rejected + ProblemDetails.
+   * The optional in-band `data` payload (e.g. an upload ticket) surfaces verbatim. */
   private async ackFrom(response: Response): Promise<EnvelopeAck> {
-    if (response.status === 202) {
-      const payload = (await response.json().catch(() => ({}))) as { deliveryId?: string };
-      return {
-        status: "accepted",
-        ...(payload.deliveryId !== undefined ? { deliveryId: payload.deliveryId } : {}),
+    if (response.status === 202 || response.status === 200) {
+      const payload = (await response.json().catch(() => ({}))) as {
+        deliveryId?: string;
+        data?: Record<string, unknown>;
       };
-    }
-    if (response.status === 200) {
-      return { status: "duplicate" };
+      return {
+        status: response.status === 202 ? "accepted" : "duplicate",
+        ...(payload.deliveryId !== undefined ? { deliveryId: payload.deliveryId } : {}),
+        ...(payload.data !== undefined ? { data: payload.data } : {}),
+      };
     }
     return { status: "rejected", problem: await parseProblem(response) };
   }

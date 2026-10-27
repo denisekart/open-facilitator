@@ -24,6 +24,8 @@ public sealed class WorkEventEntityConfiguration : IEntityTypeConfiguration<Work
         e.HasIndex(x => new { x.WorkId, x.CreatedAt }).HasDatabaseName("work_events_work_id_created_at_idx");
         e.HasOne(x => x.Work).WithMany().HasForeignKey(x => x.WorkId).HasConstraintName("work_events_work_id_fkey");
         e.ToTable(t => t.HasCheckConstraint("work_events_kind_check",
-            CheckSql.InList("kind", ["created", "state.transition", "steer", "command.accepted", "assignment.transition", "approval.decided"])));
+            CheckSql.InList("kind",
+                ["created", "state.transition", "steer", "command.accepted", "assignment.transition", "approval.decided",
+                    "artifact.stored", "artifact.registered", "artifact.available"])));
     }
 }

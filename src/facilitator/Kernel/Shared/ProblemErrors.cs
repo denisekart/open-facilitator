@@ -54,6 +54,26 @@ public static class ProblemErrors
     public static ProblemDetails WorkNotFound(Guid workId) =>
         Create("work-not-found", "Work not found", StatusCodes.Status404NotFound, $"no work {workId}");
 
+    /// <summary>404 unknown or foreign-team artifact (non-disclosure: identical for both).</summary>
+    public static ProblemDetails ArtifactNotFound(string artifactId) =>
+        Create("artifact-not-found", "Artifact not found", StatusCodes.Status404NotFound,
+            $"no artifact '{artifactId}' visible to this principal");
+
+    /// <summary>422 uploaded bytes hash elsewhere than the declared digest; row rejected.</summary>
+    public static ProblemDetails ArtifactDigestMismatch(string artifactId) =>
+        Create("artifact-digest-mismatch", "Artifact digest mismatch", StatusCodes.Status422UnprocessableEntity,
+            $"bytes uploaded for artifact '{artifactId}' do not hash to the declared digest");
+
+    /// <summary>422 uploaded body differs from the declared size; row rejected.</summary>
+    public static ProblemDetails ArtifactSizeMismatch(string artifactId) =>
+        Create("artifact-size-mismatch", "Artifact size mismatch", StatusCodes.Status422UnprocessableEntity,
+            $"bytes uploaded for artifact '{artifactId}' differ from the declared size");
+
+    /// <summary>422 an artifact.available declaration contradicts the kernel's recorded row; the row stays as recorded.</summary>
+    public static ProblemDetails ArtifactDeclarationMismatch(string artifactId) =>
+        Create("artifact-declaration-mismatch", "Artifact declaration mismatch", StatusCodes.Status422UnprocessableEntity,
+            $"artifact '{artifactId}' re-declared with fields the kernel did not record");
+
     /// <summary>422 message class the link path cannot act on (e.g. work.assign FROM a link).</summary>
     public static ProblemDetails Unsupported(string detail) =>
         Create("unsupported", "Unsupported", StatusCodes.Status422UnprocessableEntity, detail);

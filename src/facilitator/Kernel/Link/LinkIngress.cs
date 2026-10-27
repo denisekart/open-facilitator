@@ -16,13 +16,19 @@ namespace Facilitator.Kernel.Link;
 /// <param name="Problem">ProblemDetails to surface, when the envelope was refused.</param>
 /// <param name="Status">Admission status wire value ("accepted"|"duplicate") when admitted.</param>
 /// <param name="InboxId">Inbox row identity (receipt deliveryId on the HTTP path).</param>
-public sealed record LinkAdmission(ProblemDetails? Problem, string? Status, Guid? InboxId)
+public sealed record LinkAdmission(ProblemDetails? Problem, string? Status, Guid? InboxId, object? Data = null)
 {
-    /// <summary>HTTP result equivalent of this verdict (OpenAPI: 202 + receipt body, else typed problem).</summary>
+    /// <summary>HTTP result equivalent of this verdict (OpenAPI: 202 + receipt body, else typed problem).
+    /// Admissions that carry in-band payload (e.g. an upload ticket) surface it as the optional
+    /// <c>data</c> field of the success bodies.</summary>
     public IResult ToResult(DateTime processedAt) =>
         Problem is not null ? Results.Problem(Problem)
-        : Status == "duplicate" ? Results.Ok(new { status = "duplicate", inboxId = InboxId })
-        : Results.Accepted(null, new { deliveryId = InboxId!.Value.ToString("N"), status = Status, processedAt });
+        : Status == "duplicate"
+            ? (Data is null ? Results.Ok(new { status = "duplicate", inboxId = InboxId })
+                : Results.Ok(new { status = "duplicate", inboxId = InboxId, data = Data }))
+        : (Data is null
+            ? Results.Accepted(null, new { deliveryId = InboxId!.Value.ToString("N"), status = Status, processedAt })
+            : Results.Accepted(null, new { deliveryId = InboxId!.Value.ToString("N"), status = Status, processedAt, data = Data }));
 }
 
 /// <summary>
@@ -42,7 +48,8 @@ public sealed class LinkIngress(
     ICoordinationStore store,
     KernelMetrics metrics,
     TimeProvider timeProvider,
-    Facilitator.Kernel.Work.ApprovalIngress approvals)
+    Facilitator.Kernel.Work.ApprovalIngress approvals,
+    Facilitator.Kernel.Work.ArtifactIngress artifacts)
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
@@ -63,7 +70,16 @@ public sealed class LinkIngress(
         metrics.LinkReceived();
         if (duplicate)
         {
-            return new LinkAdmission(null, "duplicate", inboxId);
+            // A duplicate request_upload re-attaches the still-live ticket so a
+            // retried command can still find its upload location.
+            object? ticketData = null;
+            if (screen.Type == "org.facilitator.command.artifact.request_upload.v1" && screen.CommandId is { } cid)
+            {
+                var live = await artifacts.TicketForLinkCommandAsync(cid, ct);
+                ticketData = live is null ? null : Facilitator.Kernel.Work.ArtifactEndpoints.Ticket(live);
+            }
+
+            return new LinkAdmission(null, "duplicate", inboxId, ticketData);
         }
 
         if (!screen.IsCommand)
@@ -77,6 +93,20 @@ public sealed class LinkIngress(
                     return new LinkAdmission(arm.Problem, null, null);
                 }
 
+                metrics.InboxProcessed();
+                return new LinkAdmission(null, "accepted", inboxId);
+            }
+
+            if (screen.Type == "org.facilitator.event.artifact.available.v1")
+            {
+                var arm = await artifacts.HandleEventAsync(root, ct);
+                if (arm.Refused)
+                {
+                    await inbox.MarkProcessedAsync(inboxId, arm.Status, ct);
+                    return new LinkAdmission(arm.Problem, null, null);
+                }
+
+                await inbox.MarkProcessedAsync(inboxId, null, ct);
                 metrics.InboxProcessed();
                 return new LinkAdmission(null, "accepted", inboxId);
             }
@@ -120,6 +150,24 @@ public sealed class LinkIngress(
             await inbox.MarkProcessedAsync(inboxId, null, ct);
             metrics.InboxProcessed();
             return new LinkAdmission(null, "consumed", inboxId);
+        }
+
+        if (screen.Type == "org.facilitator.command.artifact.request_upload.v1")
+        {
+            // The gate already evaluated the evidence + audited the principal;
+            // allocation is the ledger's. The ticket rides back in-band on the
+            // ack (data), never as a pushed event.
+            var arm = await artifacts.HandleRequestUploadAsync(root, screen.Principal, ct);
+            if (arm.Refused)
+            {
+                await inbox.MarkProcessedAsync(inboxId, arm.Status, ct);
+                return new LinkAdmission(arm.Problem, null, null);
+            }
+
+            await inbox.MarkProcessedAsync(inboxId, null, ct);
+            metrics.InboxProcessed();
+            return new LinkAdmission(null, "accepted", inboxId,
+                Facilitator.Kernel.Work.ArtifactEndpoints.Ticket(arm.Ticket!));
         }
 
         var workId = EnvelopeReader.WorkIdOf(root);

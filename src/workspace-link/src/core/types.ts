@@ -80,6 +80,8 @@ export interface EnvelopeAck {
   status: "accepted" | "duplicate" | "rejected";
   deliveryId?: string;
   problem?: ProblemDetails;
+  /** In-band command payload (e.g. `{artifactId, uploadLocation, expiresAt}`); additive, optional. */
+  data?: Record<string, unknown>;
 }
 /** The transport seam: two implementations in `"./node"`, mocks in tests. */
 export interface LinkTransport {

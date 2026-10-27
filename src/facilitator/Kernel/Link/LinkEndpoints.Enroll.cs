@@ -3,6 +3,8 @@ using System.Text.Json;
 using Facilitator.Kernel.Shared;
 using Facilitator.Kernel.Shared.Identity;
 using Facilitator.Kernel.Shared.Persistence;
+using Facilitator.Kernel.Shared.Storage;
+using Facilitator.Kernel.Work;
 
 using Ofac.Protocol.Validation;
 
@@ -165,6 +167,25 @@ public static partial class LinkEndpoints
             var admission = await ingress.AdmitAsync(body.Text, LinkAuthMiddleware.RequirePrincipal(http), ct);
             return admission.ToResult(time.GetUtcNow().UtcDateTime);
         });
+
+    // Workload-plane upload: the guard is the link token (this route lives
+    // under the guarded /api/link/v1 prefix, so LinkAuthMiddleware already
+    // classified it and the role gate skipped it) + row team ownership in
+    // the ledger; foreign rows answer 404.
+    private static void MapArtifactContent(RouteGroupBuilder group) =>
+        group.MapPut("/artifacts/{id:guid}/content",
+            async (Guid id, HttpRequest request, IArtifactLedger ledger, HttpContext http, CancellationToken ct) =>
+            {
+                var workload = LinkAuthMiddleware.RequirePrincipal(http);
+                var scoped = await ledger.GetForWorkloadAsync(workload, id, ct);
+                if (scoped is null)
+                {
+                    return Results.Problem(ProblemErrors.ArtifactNotFound(id.ToString()));
+                }
+
+                return ArtifactEndpoints.StoreResultAsync(
+                    await ledger.StoreAsync(id, request.Body, workload.TeamSlug, workload, ct), id);
+            });
 
     private static void MapCapabilities(RouteGroupBuilder group)
     {

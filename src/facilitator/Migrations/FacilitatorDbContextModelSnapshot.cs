@@ -101,6 +101,116 @@ namespace Facilitator.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.ArtifactEntity", b =>
+                {
+                    b.Property<Guid>("ArtifactId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("artifact_id");
+
+                    b.Property<Guid?>("AssignmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("assignment_id");
+
+                    b.Property<string>("CommandId")
+                        .HasColumnType("text")
+                        .HasColumnName("command_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Digest")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("digest");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("MediaType")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("media_type");
+
+                    b.Property<string>("Origin")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("origin");
+
+                    b.Property<string>("RequestedByEndpointId")
+                        .HasColumnType("text")
+                        .HasColumnName("requested_by_endpoint_id");
+
+                    b.Property<string>("RetentionPolicy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("retention_policy");
+
+                    b.Property<long>("Size")
+                        .HasColumnType("bigint")
+                        .HasColumnName("size");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("state");
+
+                    b.Property<string>("StorageUri")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("storage_uri");
+
+                    b.Property<DateTime?>("StoredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("stored_at");
+
+                    b.Property<string>("TeamSlug")
+                        .HasColumnType("text")
+                        .HasColumnName("team_slug");
+
+                    b.Property<string>("Verification")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("verification");
+
+                    b.Property<string>("WireArtifactId")
+                        .HasColumnType("text")
+                        .HasColumnName("wire_artifact_id");
+
+                    b.Property<Guid?>("WorkId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("work_id");
+
+                    b.HasKey("ArtifactId");
+
+                    b.HasIndex("CommandId")
+                        .HasDatabaseName("ix_artifacts_command_id");
+
+                    b.HasIndex("Digest")
+                        .HasDatabaseName("ix_artifacts_digest");
+
+                    b.HasIndex("WireArtifactId")
+                        .HasDatabaseName("ix_artifacts_wire_artifact_id");
+
+                    b.HasIndex("WorkId")
+                        .HasDatabaseName("ix_artifacts_work_id");
+
+                    b.ToTable("artifacts", "facilitator", t =>
+                        {
+                            t.HasCheckConstraint("artifacts_origin_check", "origin IN ('link', 'rest', 'external')");
+
+                            t.HasCheckConstraint("artifacts_state_check", "state IN ('pending', 'stored', 'rejected', 'deleted')");
+
+                            t.HasCheckConstraint("artifacts_verification_check", "verification IN ('verified', 'unverified')");
+                        });
+                });
+
             modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.AssignmentEntity", b =>
                 {
                     b.Property<Guid>("AssignmentId")
@@ -935,7 +1045,7 @@ namespace Facilitator.Migrations
 
                     b.ToTable("work_events", "facilitator", t =>
                         {
-                            t.HasCheckConstraint("work_events_kind_check", "kind IN ('created', 'state.transition', 'steer', 'command.accepted', 'assignment.transition', 'approval.decided')");
+                            t.HasCheckConstraint("work_events_kind_check", "kind IN ('created', 'state.transition', 'steer', 'command.accepted', 'assignment.transition', 'approval.decided', 'artifact.stored', 'artifact.registered', 'artifact.available')");
                         });
                 });
 

@@ -32,3 +32,5 @@ catalog:
   "@types/better-sqlite3": "^9.6.0"
   # @ofac/gateway runtime deps (Plan 05), yaml resolved via npm registry 2026-11 (latest 2.9.1).
   yaml: "^2.9.1"
+  # @ofac/gateway OIDC claim verification (Plan 12 Step 3).
+  jose: "^6.1.0"

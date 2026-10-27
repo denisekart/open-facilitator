@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openfacilitator.org/v1/policy-file.v1.json",
+  "title": "PolicyFileV1",
+  "description": "Team authorization policy file (spec \u00a712). Gateway-local artifact: published here for third-party Gateway builders; it never rides a wire envelope. First-match-wins over `policies`; an implicit final deny closes the list.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["owner", "policies"],
+  "properties": {
+    "owner": {
+      "$ref": "common.v1.json#/$defs/idToken",
+      "description": "Owning team id; cited as the policyId prefix in every audit line."
+    },
+    "policies": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/policyRow"
+      }
+    }
+  },
+  "$defs": {
+    "policyRow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["capability", "resources", "actorAnyOf", "effect"],
+      "properties": {
+        "capability": {
+          "$ref": "common.v1.json#/$defs/idToken",
+          "description": "Capability id this row gates; exact match."
+        },
+        "resources": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "description": "Resource terms matched against the derived resource id: exact, bare \"*\", or a single trailing \"*\" prefix-glob."
+        },
+        "actorAnyOf": {
+          "type": "array",
+          "minItems": 0,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "description": "D4-spelled actor terms (user:..., group:/..., role:...). Empty list = any authenticated caller."
+        },
+        "conditions": {
+          "type": "object",
+          "additionalProperties": {
+            "type": ["string", "number", "boolean"]
+          },
+          "description": "Opaque advisory key-values passed through to connectors; never evaluated by the engine."
+        },
+        "effect": {
+          "type": "string",
+          "enum": ["allow", "deny", "confirm"]
+        }
+      }
+    }
+  }
+}

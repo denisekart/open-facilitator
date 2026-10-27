@@ -30,6 +30,9 @@ function ctx(over: Partial<PolicyContext>): PolicyContext {
   return {
     commandType: "org.facilitator.command.work.assign.v1",
     childWorkspaceId: CHILD,
+    resource: "research.analyze",
+    claims: { subject: "workload:gw.test", groups: [], verified: false },
+    workloadActor: "workload:gw.test",
     ...over,
   };
 }

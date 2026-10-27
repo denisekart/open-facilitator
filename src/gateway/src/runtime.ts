@@ -57,7 +57,17 @@ import {
   type BindingRow,
   type GatewayPaths,
 } from "./ledger.js";
-import { DefaultPolicy, type PolicyEvaluator } from "./policy.js";
+import {
+  DefaultPolicy,
+  TeamPolicy,
+  type PolicyAction,
+  type PolicyContext,
+  type PolicyEvaluator,
+  type PolicyVerdict,
+} from "./policy.js";
+import { loadPolicyFile, type LoadedPolicy } from "./policy-file.js";
+import { auditPolicy } from "./audit.js";
+import { defaultClaimsDeps, extractClaims, type ActorClaims } from "./claims.js";
 import {
   ChildFleet,
   ChildLink,
@@ -109,8 +119,19 @@ export interface CreateGatewayRuntimeDeps {
   handlerFactory?: () => LinkHandler;
   logger?: LinkLogger;
   fetchImpl?: typeof fetch;
-  /** Override the policy seam (defaults to DefaultPolicy over the live fleet union). */
+  /** Override the policy seam (defaults to TeamPolicy from a policy file, else DefaultPolicy). */
   policy?: PolicyEvaluator;
+  /** Override actor-claim extraction (unit tests inject workload-only claims). */
+  claimsOf?: ((actorEvidenceRef: string) => Promise<ActorClaims>) | undefined;
+}
+
+/** One policy decision + everything the audit line cites about it. */
+interface PolicyDecision {
+  readonly verdict: PolicyVerdict;
+  readonly ctx: PolicyContext;
+  readonly workId?: string | undefined;
+  readonly assignmentId?: string | undefined;
+  readonly evidenceRef?: string | undefined;
 }
 
 /** Live view of the fleet's advertised descriptors (online first, offline honest). */
@@ -155,6 +176,9 @@ export class GatewayRuntime {
   private readonly fleet: ChildFleet;
   private readonly embedded: EmbeddedChild | null;
   private readonly policy: PolicyEvaluator;
+  /** The loaded policy document (null ⇒ DefaultPolicy fallback). */
+  private readonly loadedPolicy: LoadedPolicy | null;
+  private readonly claimsOf: (actorEvidenceRef: string) => Promise<ActorClaims>;
   private readonly capabilityByExecution = new Map<string, string>();
   private client: LinkClient | null = null;
   private listener: ChildListener | null = null;
@@ -194,7 +218,20 @@ export class GatewayRuntime {
       this.embedded = null;
       this.childWorkspaceId = "";
     }
-    this.policy = deps.policy ?? new DefaultPolicy(new FleetCapabilities(this.fleet));
+    // Plan 12: a configured policy file boots or aborts (malformed ⇒ throw);
+    // no file ⇒ today's DefaultPolicy plus one loud warning at start().
+    this.loadedPolicy =
+      deps.policy === undefined && config.policy !== undefined
+        ? loadPolicyFile(config.policy.inline ?? readFileSync(config.policy.path as string, "utf8"))
+        : null;
+    this.policy =
+      deps.policy ??
+      (this.loadedPolicy !== null
+        ? new TeamPolicy(this.loadedPolicy, new FleetCapabilities(this.fleet))
+        : new DefaultPolicy(new FleetCapabilities(this.fleet)));
+    this.claimsOf =
+      deps.claimsOf ??
+      ((ref: string) => extractClaims(ref, defaultClaimsDeps(`workload:${config.gatewayId}`)));
     this.currentDigest = digestOf(this.fleet.unionManifest(config.team));
   }
 
@@ -225,6 +262,11 @@ export class GatewayRuntime {
    * parts (the CLI prints the line).
    */
   async start(): Promise<{ leaseEpoch: number; children: number }> {
+    if (this.loadedPolicy === null && this.deps.policy === undefined) {
+      this.logger.warn(
+        "policy: no policy file configured — DefaultPolicy in effect (capability-advertence only)",
+      );
+    }
     const token = await this.acquireToken();
     this.tokenProvider = token;
     if (this.embedded !== null) {
@@ -604,16 +646,19 @@ export class GatewayRuntime {
     }
     const member = this.fleet.member(route.childId);
     if (member === undefined) return { kind: "rejected", reason: "child-disconnected" };
-    if (
-      this.policy.evaluate("command.forward", {
-        commandType: cmd.type,
-        capabilityId: data.capabilityId,
-        childWorkspaceId: member.childId,
-      }) === "deny"
-    ) {
+    const decision = await this.decide("command.forward", cmd, member.childId);
+    if (decision.verdict === "confirm") {
+      // Step 5's hold installs the pending row here; until then a held
+      // action is honestly refused, never executed unreviewed.
+      this.audit(decision, "confirm-required");
+      return { kind: "rejected", reason: `confirm-required: ${data.capabilityId}` };
+    }
+    if (decision.verdict === "deny") {
       // Policy rejection is not an execution: no ledger row.
+      this.audit(decision, "policy-denied");
       return { kind: "rejected", reason: `policy-denied: ${data.capabilityId}` };
     }
+    this.audit(decision, "policy-allowed");
     // Quota: the live count of running rows routed to this child.
     const maxInFlight = this.fleet.entries.get(member.childId)?.maxInFlight ?? 1;
     if (this.paths.execution.byChildState(member.childId, "running").length >= maxInFlight) {
@@ -693,18 +738,23 @@ export class GatewayRuntime {
       return { kind: "rejected", reason: "child-disconnected" };
     }
     const capabilityId = this.capabilityByExecution.get(row.executionId);
-    if (
-      capabilityId !== undefined &&
-      this.policy.evaluate("command.forward", {
-        commandType: cmd.type,
-        capabilityId,
-        childWorkspaceId: member.childId,
-      }) === "deny"
-    ) {
+    if (capabilityId !== undefined) {
+      const decision = await this.decide("command.forward", cmd, member.childId, capabilityId);
       // 05 law kept: the descriptor forbids it — the child's own answer
       // decides for the embedded fleet-of-one, a fleet refuses honestly.
-      if (this.embedded !== null && member === this.embeddedMember()) return this.passthrough(cmd);
-      return { kind: "rejected", reason: `policy-denied: ${capabilityId}` };
+      // `confirm` has no hold to park an interaction in: it denies here.
+      if (decision.verdict === "deny" || decision.verdict === "confirm") {
+        this.audit(decision, `policy-${decision.verdict}`);
+        if (this.embedded !== null && member === this.embeddedMember())
+          return this.passthrough(cmd);
+        return {
+          kind: "rejected",
+          reason:
+            decision.verdict === "confirm"
+              ? `confirm-not-supported-here: ${capabilityId}`
+              : `policy-denied: ${capabilityId}`,
+        };
+      }
     }
     let reply: ChildReply;
     try {
@@ -723,6 +773,80 @@ export class GatewayRuntime {
       }
     }
     return childOutcome(reply);
+  }
+
+  // ── policy decision plumbing (Plan 12) ───────────────────────────────────
+
+  /**
+   * The whole resource-derivation law (§12): the connector-supplied
+   * `inputs.resource` when present, else the capability id itself as the
+   * wildcard-capability resource. Finer resources are connector territory.
+   */
+  static resourceOf(data: Record<string, unknown>, capabilityId: string): string {
+    const inputs = data["inputs"];
+    if (typeof inputs === "object" && inputs !== null) {
+      const resource = (inputs as Record<string, unknown>)["resource"];
+      if (typeof resource === "string" && resource.length > 0) return resource;
+    }
+    return capabilityId;
+  }
+
+  private async decide(
+    action: PolicyAction,
+    cmd: EnvelopeCommand,
+    childWorkspaceId: string,
+    capabilityIdOverride?: string,
+  ): Promise<PolicyDecision> {
+    const data = cmd.data as unknown as Record<string, unknown>;
+    const capabilityId = capabilityIdOverride ?? String(data["capabilityId"] ?? "");
+    const evidenceRef =
+      typeof data["actorEvidenceRef"] === "string" ? (data["actorEvidenceRef"] as string) : "";
+    const claims = await this.claimsOf(evidenceRef);
+    const ctx: PolicyContext = {
+      commandType: cmd.type,
+      capabilityId,
+      childWorkspaceId,
+      resource: GatewayRuntime.resourceOf(data, capabilityId),
+      claims,
+      workloadActor: `workload:${this.config.gatewayId}`,
+    };
+    return {
+      verdict: this.policy.evaluate(action, ctx),
+      ctx,
+      workId: typeof data["workId"] === "string" ? data["workId"] : undefined,
+      assignmentId: typeof data["assignmentId"] === "string" ? data["assignmentId"] : undefined,
+      evidenceRef,
+    };
+  }
+
+  private decideEvent(env: EnvelopeEvent, childWorkspaceId: string): PolicyDecision {
+    const workloadActor = `workload:${this.config.gatewayId}`;
+    const ctx: PolicyContext = {
+      commandType: env.type,
+      childWorkspaceId,
+      resource: "*",
+      claims: { subject: workloadActor, groups: [], verified: false },
+      workloadActor,
+    };
+    return { verdict: this.policy.evaluate("event.forward", ctx), ctx };
+  }
+
+  /** One §12.2 audit line per decision; long-lived tokens NEVER included. */
+  private audit(decision: PolicyDecision, reason: string): void {
+    const { ctx } = decision;
+    auditPolicy(this.logger, {
+      decision: decision.verdict,
+      reason,
+      ...(decision.workId !== undefined ? { workId: decision.workId } : {}),
+      ...(decision.assignmentId !== undefined ? { assignmentId: decision.assignmentId } : {}),
+      ...(ctx.capabilityId !== undefined ? { capabilityId: ctx.capabilityId } : {}),
+      resource: ctx.resource,
+      callerWorkload: ctx.workloadActor,
+      gatewayWorkload: `workload:${this.config.gatewayId}`,
+      ...(ctx.claims.verified ? { humanSubject: ctx.claims.subject } : {}),
+      policyId: this.loadedPolicy?.policyId ?? "default",
+      ...(decision.evidenceRef !== undefined ? { evidenceRef: decision.evidenceRef } : {}),
+    });
   }
 
   private async passthrough(cmd: EnvelopeCommand): Promise<CommandOutcome> {
@@ -763,12 +887,10 @@ export class GatewayRuntime {
       });
       return;
     }
-    if (
-      this.policy.evaluate("event.forward", {
-        commandType: env.type,
-        childWorkspaceId: source.childId,
-      }) === "deny"
-    ) {
+    const decision = this.decideEvent(env, source.childId);
+    if (decision.verdict !== "allow") {
+      // Plan 12: the silent drop gains its audit line.
+      this.audit(decision, `event-${decision.verdict}`);
       return;
     }
     const rawExecution = env.data?.["executionId"];

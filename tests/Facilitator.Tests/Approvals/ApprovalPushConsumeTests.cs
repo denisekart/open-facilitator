@@ -315,8 +315,12 @@ public sealed class ApprovalPushConsumeTests(PostgresFixture fixture)
     {
         var body = JsonSerializer.Serialize(new
         {
-            token = "enroll-dev", endpointId, instanceId = "inst-1",
-            trustMode = "isolated-executor", team = "team-alpha", role = "child",
+            token = "enroll-dev",
+            endpointId,
+            instanceId = "inst-1",
+            trustMode = "isolated-executor",
+            team = "team-alpha",
+            role = "child",
         });
         var json = await KernelOps.PostJsonAsync(client, "/api/link/v1/enroll", body, HttpStatusCode.Created);
         return json.GetProperty("linkToken").GetString()!;

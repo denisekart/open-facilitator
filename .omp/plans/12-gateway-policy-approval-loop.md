@@ -142,8 +142,8 @@ Update this table whenever a step's state changes (automatically, in the same co
 |0 Research|Fully implemented: 3-scout pass 2026-10-26; all 14 known facts re-verified; drift ≤8 lines, deltas absorbed into Steps 3/6 (config baseDir, child-runner multi-capability, assignEnvelope widening)|
 |1 Kernel: schemas + decided-push + consume arm|Fully implemented: commit 15bcd34 — two schemas + codegen, `requested_by_endpoint_id` + migration, same-tx decided-push on every terminal transition, Link consume arm; Approvals suite 22/22, 67 fixture cases|
 |2 Kernel delta smoke|Fully implemented: commit 4dbbfa2 — `DecidedPushReachesTheGatewayOverTheHttpFallback` proves pump routing + receipt terminality with zero pump delta|
-|3 Gateway policy engine + config|Not started|
-|4 Gateway audit lines|Not started|
+|3 Gateway policy engine + config|Fully implemented: `policy-file.ts` (schema-validated loader, revision hash), `claims.ts` (oidc: JWKS verification, workload-only degrade), `TeamPolicy` engine (first-match-wins, deny-by-default, fleet-honesty pre-pass), `policy:` config block (inline/path, configDir resolution, confirmTimeoutSeconds), runtime wiring (3 call-sites widened, boot warning); 158 gateway unit tests green|
+|4 Gateway audit lines|Fully implemented: `audit.ts` `authorization.evaluated` line with the §12.2 field set; wired at every decision point incl. the former event-forward silent drop|
 |5 Confirm lifecycle (pending ledger, ingest, consume)|Not started|
 |6 e2e loop + worker capability|Not started|
 |7 Fixtures + docs + skill + roadmap|Not started|

@@ -33,6 +33,7 @@
     "@ofac/protocol": "workspace:*",
     "@ofac/workspace-link": "workspace:*",
     "better-sqlite3": "catalog:",
+    "jose": "catalog:",
     "yaml": "catalog:"
   },
   "devDependencies": {

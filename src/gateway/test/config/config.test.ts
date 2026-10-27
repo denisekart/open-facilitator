@@ -506,3 +506,47 @@ describe("parseConfig env overlay", () => {
     ).not.toThrow();
   });
 });
+
+describe("parseConfig policy block", () => {
+  const withPolicy = (block: string): string => `${BASE}${block}`;
+
+  it("parses policy.inline with the confirm-timeout default", () => {
+    const config = parseConfig(withPolicy('policy:\n  inline: "owner: t\\npolicies: []"\n'), {
+      hasStoredToken: () => false,
+    });
+    expect(config.policy?.inline).toContain("owner: t");
+    expect(config.policy?.path).toBeUndefined();
+    expect(config.policy?.confirmTimeoutSeconds).toBe(900);
+  });
+
+  it("resolves policy.path against the config file's dir", () => {
+    const dir = stateDir();
+    const file = join(dir, "gateway.yaml");
+    writeFileSync(file, withPolicy("policy:\n  path: policy.yaml\n  confirmTimeoutSeconds: 600\n"));
+    const config = loadConfigFile(file, { hasStoredToken: () => false });
+    expect(config.policy?.path).toBe(join(dir, "policy.yaml"));
+    expect(config.policy?.confirmTimeoutSeconds).toBe(600);
+  });
+
+  it("an absolute policy.path survives untouched", () => {
+    const config = parseConfig(withPolicy("policy:\n  path: /etc/ofac/policy.yaml\n"), {
+      hasStoredToken: () => false,
+      configDir: "/srv",
+    });
+    expect(config.policy?.path).toBe("/etc/ofac/policy.yaml");
+  });
+
+  it("inline+path together or an empty block are config errors", () => {
+    expectKey(withPolicy("policy:\n  inline: x\n  path: p.yaml\n"), "policy");
+    expectKey(withPolicy("policy: {}\n"), "policy");
+    expectKey(withPolicy("policy:\n  typo: 1\n"), "policy");
+    expectKey(
+      withPolicy("policy:\n  inline: x\n  confirmTimeoutSeconds: 7\n"),
+      "policy.confirmTimeoutSeconds",
+    );
+  });
+
+  it("absent policy key parses to undefined", () => {
+    expect(parseConfig(BASE, { hasStoredToken: () => false }).policy).toBeUndefined();
+  });
+});

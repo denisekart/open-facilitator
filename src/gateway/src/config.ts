@@ -7,7 +7,7 @@
 // Unknown top-level keys are config errors — fail loud on typos rather than
 // silently ignoring an identity or credential.
 import { existsSync, readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { parse } from "yaml";
 
 export const GATEWAY_API_VERSION = "facilitator.framework/v1";
@@ -99,6 +99,17 @@ export interface GatewayConfig {
     /** 0 ⇒ diagnostics disabled; >0 binds 127.0.0.1:port (fail-fast on clash). */
     port: number;
   };
+  /** Team policy source (Plan 12); absent ⇒ DefaultPolicy fallback + boot warning. */
+  policy?:
+    | {
+        /** YAML text of the policy document. */
+        inline?: string | undefined;
+        /** Absolute path; a relative one resolved against the config file's dir. */
+        path?: string | undefined;
+        /** Approval expiry for confirm holds; default 900 s. */
+        confirmTimeoutSeconds?: number | undefined;
+      }
+    | undefined;
   /** Business workspace.heartbeat cadence (transport heartbeat is the SDK's). */
   heartbeatSeconds: number;
 }
@@ -115,6 +126,8 @@ export interface ParseConfigOptions {
   env?: Record<string, string | undefined>;
   /** Test seam for the stored-token escape hatch (default: fs existence). */
   hasStoredToken?: (stateDir: string) => boolean;
+  /** Dir `policy.path` resolves against — loadConfigFile passes dirname(config). */
+  configDir?: string | undefined;
 }
 
 const GATEWAY_ID_RE = /^gw\.[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
@@ -139,6 +152,7 @@ const TOP_LEVEL_KEYS: Record<string, true> = {
   childTransport: true,
   diagnostics: true,
   heartbeatSeconds: true,
+  policy: true,
 };
 const CHILD_KEYS: Record<string, true> = { name: true, mode: true, manifestFile: true };
 /** Builtin-only keys (`mode`, `manifestFile`) are embedded-only, NOT fleet keys. */
@@ -383,6 +397,32 @@ export function parseConfig(yamlText: string, options: ParseConfigOptions = {}):
     };
   }
 
+  // Team policy block (Plan 12): exactly one of inline/path; the key present
+  // with neither source is a typo, not a fallback.
+  let policy: GatewayConfig["policy"];
+  if (root["policy"] !== undefined) {
+    const doc = asRecord(root["policy"], "policy");
+    rejectUnknown(doc, { inline: true, path: true, confirmTimeoutSeconds: true }, "policy");
+    const inline = optionalString(doc, "inline", "policy.inline");
+    const path = optionalString(doc, "path", "policy.path");
+    if ((inline === undefined) === (path === undefined)) {
+      fail("policy", "exactly one of inline/path must be set");
+    }
+    const confirmTimeoutSeconds = optionalInt(
+      doc,
+      "confirmTimeoutSeconds",
+      60,
+      86_400,
+      900,
+      "policy.confirmTimeoutSeconds",
+    );
+    policy = {
+      ...(inline !== undefined ? { inline } : {}),
+      ...(path !== undefined ? { path: resolve(options.configDir ?? process.cwd(), path) } : {}),
+      confirmTimeoutSeconds,
+    };
+  }
+
   const stateDir = resolve(requireString(root, "stateDir"));
 
   // Deployment mode: absent ⇒ "embedded" — the v1 back-compat law (05 sample
@@ -495,6 +535,7 @@ export function parseConfig(yamlText: string, options: ParseConfigOptions = {}):
     ...(childTransport !== undefined ? { childTransport } : {}),
     ...(childSecret !== undefined ? { childSecret } : {}),
     diagnostics: { port },
+    ...(policy !== undefined ? { policy } : {}),
     heartbeatSeconds,
   };
 }
@@ -507,5 +548,5 @@ export function loadConfigFile(path: string, options: ParseConfigOptions = {}): 
   } catch {
     fail("config", `cannot read '${path}'`);
   }
-  return parseConfig(text, options);
+  return parseConfig(text, { configDir: dirname(resolve(path)), ...options });
 }

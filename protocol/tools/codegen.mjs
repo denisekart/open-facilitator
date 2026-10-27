@@ -19,8 +19,9 @@ const schemaDirs = [join(repo, "protocol/json-schema"), join(repo, "protocol/clo
 // stop/reject reason, and its $ref into capability-manifest.v1.json renames
 // the published CapabilityDescriptor types. Contract consumers (fixture
 // harnesses, docs) validate against the schema, not the DTOs, so no generated
-// name is worth that churn.
-const CODEGEN_SKIP = new Set(["adapter.v1.json"]);
+// name is worth that churn. policy-file.v1.json (Plan 12) is a Gateway-local
+// artifact: mirrored + registered for loader validation, no wire DTO wanted.
+const CODEGEN_SKIP = new Set(["adapter.v1.json", "policy-file.v1.json"]);
 const schemas = schemaDirs
   .flatMap((d) => readdirSync(d).filter((f) => f.endsWith(".json")).map((f) => join(d, f)))
   .sort();

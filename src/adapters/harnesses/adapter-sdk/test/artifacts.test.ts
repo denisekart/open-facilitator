@@ -4,7 +4,11 @@
 // bytes == RFC 8785 form; digest recomputes), the completed-event payload
 // law (four frozen fields + inline + ref + digest, schema-valid).
 import { createHash } from "node:crypto";
-import { canonicalizeManifest, computeManifestDigest, validateAgainstSchemaId } from "@ofac/protocol";
+import {
+  canonicalizeManifest,
+  computeManifestDigest,
+  validateAgainstSchemaId,
+} from "@ofac/protocol";
 import { describe, expect, it } from "vitest";
 import {
   artifactUri,
@@ -52,7 +56,11 @@ describe("createArtifactClient (stub kernel)", () => {
       const second = await client.upload(BYTES, { mediaType: "text/markdown", workId: "w" });
       // Content-derived commandId: the stub re-attached the live ticket.
       expect(second.artifactId).toBe(first.artifactId);
-      expect(kernel.events.filter((e) => e["type"] === "org.facilitator.command.artifact.request_upload.v1")).toHaveLength(2);
+      expect(
+        kernel.events.filter(
+          (e) => e["type"] === "org.facilitator.command.artifact.request_upload.v1",
+        ),
+      ).toHaveLength(2);
       expect(kernel.events[1]?.["id"]).not.toBe(kernel.events[0]?.["id"]);
       expect(kernel.artifacts.get(first.artifactId)?.bytes).toEqual(Buffer.from(BYTES));
     } finally {
@@ -135,7 +143,12 @@ describe("buildCompletedEvent (amendment law)", () => {
       time: "2026-10-27T17:00:00Z",
       datacontenttype: "application/json",
       dataschema: "https://schemas.openfacilitator.org/v1/command.work.assign.v1.json",
-      data: { workId: "work-9", assignmentId: "asg-9", capabilityId: "research.analyze", childWorkspaceId: "gw.team-alpha/deterministic" },
+      data: {
+        workId: "work-9",
+        assignmentId: "asg-9",
+        capabilityId: "research.analyze",
+        childWorkspaceId: "gw.team-alpha/deterministic",
+      },
     } as const;
     const env = buildCompletedEvent(
       { executionId: "exec-1", executionGeneration: 2, command },

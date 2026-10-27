@@ -24,13 +24,15 @@ export interface ApprovalDigestRecord {
 
 /** Canonicalize (RFC 8785) + SHA-256 the approval record → "sha256:…". */
 export function computeActionDigest(record: ApprovalDigestRecord): string {
-  return digestCanonical(nfc({
-    approvalId: record.approvalId,
-    action: record.action,
-    eligibleActors: record.eligibleActors,
-    expiresAt: record.expiresAt,
-    createdAt: record.createdAt,
-  }));
+  return digestCanonical(
+    nfc({
+      approvalId: record.approvalId,
+      action: record.action,
+      eligibleActors: record.eligibleActors,
+      expiresAt: record.expiresAt,
+      createdAt: record.createdAt,
+    }),
+  );
 }
 
 /**

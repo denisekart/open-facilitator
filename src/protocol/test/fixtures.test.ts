@@ -190,10 +190,7 @@ describe("approval-record digest golden (appendix §7.2)", () => {
 });
 
 describe("result-manifest digest golden (Plan 15, spec §15.3)", () => {
-  const raw = readFileSync(
-    new URL("canonical/result-manifest-1.json", fixturesRoot),
-    "utf8",
-  );
+  const raw = readFileSync(new URL("canonical/result-manifest-1.json", fixturesRoot), "utf8");
   const golden = readFileSync(
     new URL("canonical/result-manifest-1.sha256", fixturesRoot),
     "utf8",

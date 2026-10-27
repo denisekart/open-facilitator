@@ -19,11 +19,7 @@ import {
   type EnvelopeCommand,
   type EnvelopeEvent,
 } from "@ofac/protocol";
-import {
-  buildEvent,
-  dataschemaFor,
-  trimSlash,
-} from "@ofac/workspace-link";
+import { buildEvent, dataschemaFor, trimSlash } from "@ofac/workspace-link";
 
 const REQUEST_UPLOAD_TYPE = "org.facilitator.command.artifact.request_upload.v1";
 const COMPLETED_TYPE = "org.facilitator.event.assignment.completed.v1";

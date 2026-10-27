@@ -143,21 +143,30 @@ approval-already-consumed`.
 
 ## 6. Verify the artifact digest
 
-The completion event's `resultManifest` carries the report's absolute
-`file://` URL and `sha256:` digest; rehash the bytes on disk:
+Completion truth rides the kernel artifact path: the worker uploaded the
+report AND a canonical Result Manifest document, and the completion event
+carries `resultManifestRef` (an `artifact://` URI whose last segment is the
+kernel artifact GUID) + `resultDigest`. Fetch the manifest back through the
+kernel and rehash the served bytes:
 
 ```bash
-REPORT=$(ls .ofac-worker/artifacts/*-report.md)
-sha256sum "$REPORT" | cut -d' ' -f1   # the hex
+REF=$(docker exec ofac-pg psql -U demo -d facilitator -tA -c \
+  "SELECT payload->'data'->>'resultManifestRef' FROM facilitator.inbox WHERE payload->>'type' = 'org.facilitator.event.assignment.completed.v1'")
+MAN_ID=${REF##*/}   # the kernel artifact GUID
+curl -s "localhost:8088/api/artifacts/$MAN_ID/content" \
+  -H "Authorization: Bearer $USER" > manifest.json
+sha256sum manifest.json | cut -d' ' -f1   # the hex
 docker exec ofac-pg psql -U demo -d facilitator -tA -c \
-  "SELECT payload::text FROM facilitator.inbox WHERE payload->>'type' = 'org.facilitator.event.assignment.completed.v1'" \
-  | grep -oE 'sha256:[a-f0-9]{64}'   # jsonb pretty-prints key: value — match the hex, not the raw JSON
-# must equal "sha256:<the hex>"
+  "SELECT payload->'data'->>'resultDigest' FROM facilitator.inbox WHERE payload->>'type' = 'org.facilitator.event.assignment.completed.v1'" \
+  # must equal "sha256:<the hex>" — the kernel verified the same bytes at the boundary
+docker exec ofac-pg psql -U demo -d facilitator -c \
+  "SELECT revision, digest, state FROM facilitator.result_manifests"   # revision 1, recorded
 ```
 
-A mismatch means something rewrote the file between publish and read —
-the digest is the verified-external-ref interim until the artifact store
-era lands.
+The `manifest.json` bytes are canonical RFC 8785 — rehashing the file IS
+the digest check; the report's own digest is the manifest's
+`outputs[0].digest`, verifiable the same way through
+`/api/artifacts/{outputs[0].artifactId}/content`.
 
 ## Troubleshooting
 

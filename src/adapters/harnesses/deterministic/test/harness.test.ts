@@ -91,8 +91,7 @@ function hooksFor(dir: string, stepMs: number) {
     workDir: dir,
     stepMs,
     logger: createMemoryLogger(),
-    fetchImpl: ((...args: Parameters<typeof fetch>) =>
-      kernelFetch(...args)) as typeof fetch,
+    fetchImpl: ((...args: Parameters<typeof fetch>) => kernelFetch(...args)) as typeof fetch,
   });
 }
 
@@ -153,9 +152,7 @@ describe("deterministic harness script", () => {
     const reportBytes = kernel.artifacts.get(String(output["storageUrl"]).split("/").pop()!)!;
     const disk = readFileSync(join(dir, "artifacts", "exec-a-report.md"));
     expect(reportBytes.bytes.equals(disk)).toBe(true);
-    expect(output["digest"]).toBe(
-      `sha256:${createHash("sha256").update(disk).digest("hex")}`,
-    );
+    expect(output["digest"]).toBe(`sha256:${createHash("sha256").update(disk).digest("hex")}`);
     expect(output["size"]).toBe(disk.length);
     expect(manifest["structuredResult"]).toEqual({
       objectiveChars: "objective work-a".length,

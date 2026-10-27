@@ -128,8 +128,7 @@ Deterministic ${publishing ? "publish" : "analysis"} complete.
       assignmentId,
       retentionPolicy: "30d",
     });
-    const conclusion =
-      report.split("## Conclusion\n")[1]?.trim().split("\n")[0] ?? "complete.";
+    const conclusion = report.split("## Conclusion\n")[1]?.trim().split("\n")[0] ?? "complete.";
     const manifest = buildResultManifest({
       manifestId: `man-${ctx.executionId}`,
       workId,

@@ -283,24 +283,17 @@ describe.skipIf(!E2E)("deterministic worker e2e", () => {
       const resultDigest = String(envelope.data["resultDigest"]);
       expect(ref.startsWith("artifact://")).toBe(true);
       expect(resultDigest).toMatch(/^sha256:[0-9a-f]{64}$/);
-      expect(
-        (envelope.data["resultManifest"] as { outputs: unknown[] }).outputs,
-      ).toEqual([]);
+      expect((envelope.data["resultManifest"] as { outputs: unknown[] }).outputs).toEqual([]);
       // The manifest document rides the artifact content path (last path
       // segment = kernel artifact GUID), stored ALREADY canonical.
       const manifestArtifactId = ref.split("/").pop()!;
-      const docBytes = await fetchContent(
-        `/api/artifacts/${manifestArtifactId}/content`,
-        alice,
-      );
+      const docBytes = await fetchContent(`/api/artifacts/${manifestArtifactId}/content`, alice);
       expect(Buffer.from(docBytes).toString("utf8")).toBe(
         Buffer.from(docBytes).toString("utf8").trim(),
       );
       const doc = JSON.parse(docBytes.toString("utf8")) as Record<string, unknown>;
       expect(computeManifestDigest(doc)).toBe(resultDigest); // event digest = document bytes
-      expect(String(doc["manifestId"])).toBe(
-        `man-${String(envelope.data["executionId"])}`,
-      ); // man-{executionId}: the wire execution id, echoed from the event
+      expect(String(doc["manifestId"])).toBe(`man-${String(envelope.data["executionId"])}`); // man-{executionId}: the wire execution id, echoed from the event
       const docOutput = (doc["outputs"] as Record<string, unknown>[])[0]!;
       const reportBytes = await fetchContent(
         `/api/artifacts/${String(docOutput["artifactId"])}/content`,

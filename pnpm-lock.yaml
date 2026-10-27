@@ -183,8 +183,8 @@ catalogs:
       specifier: ^13.0.3
       version: 13.0.3
     canonicalize:
-      specifier: ^2.1.0
-      version: 2.1.0
+      specifier: ^5.1.0
+      version: 5.1.0
     jose:
       specifier: ^6.1.0
       version: 6.2.13
@@ -333,7 +333,7 @@ importers:
         version: 3.0.1(ajv@8.20.0)
       canonicalize:
         specifier: 'catalog:'
-        version: 2.1.0
+        version: 5.1.0
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -1148,8 +1148,9 @@ packages:
     resolution: {integrity: sha512-L28STB170nwWS63UjtlEOE3dldQApaJXZkOI1uMFfzf3rRuPegHaHesyee+YxQ+W6SvRDQV6UrdOdRiR153wJg==}
     engines: {node: '>=6'}
 
-  canonicalize@2.1.0:
-    resolution: {integrity: sha512-F705O3xrsUtgt98j7leetNhTWPe+5S72rlL5O4jA1pKqBVQ/dT1O1D6PFxmSXvc0SUOinWS57DKx0I3CHrXJHQ==}
+  canonicalize@5.1.0:
+    resolution: {integrity: sha512-bab9+WefZljqQ8jT0qRwVmTyzAUU63K97QIQD3agynIBrb6sa5M2eAy8Hv8K3p4V9+ONVYZKtGYl4Dg+/5Gumw==}
+    engines: {node: '>=22'}
     hasBin: true
 
   chai@6.3.0:
@@ -2822,7 +2823,7 @@ snapshots:
 
   camelcase@5.3.1: {}
 
-  canonicalize@2.1.0: {}
+  canonicalize@5.1.0: {}
 
   chai@6.3.0: {}
 

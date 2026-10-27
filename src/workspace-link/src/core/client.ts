@@ -9,6 +9,7 @@
 // welcome is a policy answer, not a network failure, so it is never retried).
 import { validateReceipt } from "@ofac/protocol";
 import type { EnvelopeEvent, ReceiptV1 } from "@ofac/protocol";
+import type { EnvelopeObject } from "@ofac/protocol";
 import { CommandDispatcher } from "./command-dispatcher.js";
 import { DeliveryPipeline } from "./delivery-pipeline.js";
 import { DispatchQueue } from "./dispatch-queue.js";
@@ -285,6 +286,17 @@ export class LinkClient {
       }
       throw error;
     }
+  }
+
+  /**
+   * Send a command envelope and return the kernel's answer verbatim.
+   * Unlike publishEvent there is NO outbox buffering: a transport failure
+   * throws (a fire-and-forget law is wrong for a synchronous consume whose
+   * outcome decides an execution), and a rejected ack resolves with the
+   * typed problem instead of throwing — the caller branches on status.
+   */
+  async sendCommand(env: EnvelopeObject): Promise<EnvelopeAck> {
+    return await this.options.transport.envelope(env);
   }
 
   /** Convenience: build + publish (linkd handlers use this). */

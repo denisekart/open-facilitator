@@ -24,6 +24,12 @@ export interface PolicyContext {
 
 export interface PolicyEvaluator {
   evaluate(action: PolicyAction, ctx: PolicyContext): PolicyVerdict;
+  /**
+   * The row backing a `confirm` verdict (Plan 12: its `actorAnyOf` becomes
+   * the approval's eligibleActors). Absent/null ⇒ no row to cite (the
+   * DefaultPolicy fallback, or a test-injected engine).
+   */
+  matchRow?(action: PolicyAction, ctx: PolicyContext): PolicyRow | null;
 }
 
 const STEER = "org.facilitator.command.work.steer.v1";
@@ -121,12 +127,22 @@ export class TeamPolicy implements PolicyEvaluator {
   evaluate(action: PolicyAction, ctx: PolicyContext): PolicyVerdict {
     const structural = structuralVerdict(action, ctx, this.childCapabilities);
     if (structural !== null) return structural;
+    const row = this.match(ctx);
+    return row === null ? "deny" : row.effect;
+  }
+
+  matchRow(action: PolicyAction, ctx: PolicyContext): PolicyRow | null {
+    if (structuralVerdict(action, ctx, this.childCapabilities) !== null) return null;
+    return this.match(ctx);
+  }
+
+  private match(ctx: PolicyContext): PolicyRow | null {
     for (const row of this.policy.file.policies) {
       if (row.capability !== ctx.capabilityId) continue;
       if (!row.resources.some((term) => resourceMatches(term, ctx.resource))) continue;
       if (!actorMatches(row, ctx)) continue;
-      return row.effect;
+      return row;
     }
-    return "deny";
+    return null;
   }
 }

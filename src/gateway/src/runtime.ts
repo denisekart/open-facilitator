@@ -20,7 +20,7 @@
 // policy → binding row → child start → receipt follows the child's answer.
 // steer/cancel route to the row's child (bound-child law); with no row the
 // embedded fleet-of-one passes through (05) and a fleet rejects no-binding.
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { parse } from "yaml";
 import { chmodSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -56,6 +56,7 @@ import {
   ExecutionLedger,
   type BindingRow,
   type GatewayPaths,
+  type PendingRow,
 } from "./ledger.js";
 import {
   DefaultPolicy,
@@ -65,9 +66,10 @@ import {
   type PolicyEvaluator,
   type PolicyVerdict,
 } from "./policy.js";
-import { loadPolicyFile, type LoadedPolicy } from "./policy-file.js";
+import { loadPolicyFile, type LoadedPolicy, type PolicyRow } from "./policy-file.js";
 import { auditPolicy } from "./audit.js";
 import { defaultClaimsDeps, extractClaims, type ActorClaims } from "./claims.js";
+import { computeActionDigest } from "@ofac/protocol";
 import {
   ChildFleet,
   ChildLink,
@@ -85,6 +87,12 @@ const CANCEL = "org.facilitator.command.work.cancel.v1";
 const COMPLETED = "org.facilitator.event.assignment.completed.v1";
 const FAILED = "org.facilitator.event.assignment.failed.v1";
 const HEARTBEAT = "org.facilitator.event.workspace.heartbeat.v1";
+const APPROVAL_REQUIRED = "org.facilitator.event.approval.required.v1";
+const APPROVAL_REVOKED = "org.facilitator.event.approval.revoked.v1";
+const APPROVAL_CONSUME = "org.facilitator.command.approval.consume.v1";
+
+/** Kernel ProblemDetails types the consume path branches on. */
+const ERROR_BASE = "https://errors.openfacilitator.org/v1/";
 
 /** Union re-POST debounce: child churn settles before the kernel sees it. */
 const UNION_POST_DEBOUNCE_MS = 1000;
@@ -98,6 +106,8 @@ export interface GatewayStatus {
   reconciled: boolean;
   session?: { leaseEpoch: number; sessionId: string; state: string } | undefined;
   executions: { running: number; completed: number; failed: number; lost: number };
+  /** Plan 12: confirm-held assignments awaiting a decision (incl. consumed-executing). */
+  awaitingApproval: number;
   bindings: {
     assignmentId: string;
     executionId: string;
@@ -132,6 +142,8 @@ interface PolicyDecision {
   readonly workId?: string | undefined;
   readonly assignmentId?: string | undefined;
   readonly evidenceRef?: string | undefined;
+  /** The row behind a `confirm` verdict (its actorAnyOf seeds eligibleActors). */
+  readonly matchedRow: PolicyRow | null;
 }
 
 /** Live view of the fleet's advertised descriptors (online first, offline honest). */
@@ -185,6 +197,8 @@ export class GatewayRuntime {
   private heartbeatTimer: ReturnType<typeof setInterval> | undefined;
   private unionTimer: ReturnType<typeof setTimeout> | undefined;
   private tokenProvider: LinkTokenProvider | null = null;
+  /** Plan 12 reconcile polling: the OIDC CC provider (undefined ⇒ no REST plane). */
+  private workloadToken: LinkTokenProvider | null = null;
   /** Digest of the manifest bytes the kernel last accepted (hello carries it). */
   private currentDigest: string;
   private _state: GatewayRuntimeState = "starting";
@@ -305,6 +319,7 @@ export class GatewayRuntime {
     }
 
     await this.reconcile();
+    await this.reconcileApprovals();
     this._reconciled = true;
 
     if (this.config.childTransport !== undefined) {
@@ -376,6 +391,7 @@ export class GatewayRuntime {
           }
         : {}),
       executions: this.paths.execution.counts(),
+      awaitingApproval: this.paths.execution.pendingCounts().awaitingApproval,
       bindings: this.paths.execution.all().map((row) => ({
         assignmentId: row.assignmentId,
         executionId: row.executionId,
@@ -555,6 +571,9 @@ export class GatewayRuntime {
       config.workload === undefined
         ? undefined
         : oidcClientCredentialsTokenProvider(config.workload, deps.fetchImpl ?? fetch);
+    // Plan 12: reconcile polls the kernel REST plane with the SAME workload
+    // credential (audience facilitator-api via the realm's audience mapper).
+    this.workloadToken = workload ?? null;
     const refresh = async (): Promise<void> => {
       // Mode (b): a fresh OIDC CC JWT per enroll; mode (a): the shared
       // enrollment secret. Neither ⇒ static mount, nothing to rotate.
@@ -607,6 +626,7 @@ export class GatewayRuntime {
             return this.passthrough(cmd);
         }
       },
+      onDecided: (env) => this.onDecided(env),
     };
   }
 
@@ -647,11 +667,12 @@ export class GatewayRuntime {
     const member = this.fleet.member(route.childId);
     if (member === undefined) return { kind: "rejected", reason: "child-disconnected" };
     const decision = await this.decide("command.forward", cmd, member.childId);
+    const epoch = await this.awaitSessionEpoch();
     if (decision.verdict === "confirm") {
-      // Step 5's hold installs the pending row here; until then a held
-      // action is honestly refused, never executed unreviewed.
+      // §12.1 hold: pending row + approval.required, accepted receipt; the
+      // decided-push (or a reconcile poll) executes or settles it later.
       this.audit(decision, "confirm-required");
-      return { kind: "rejected", reason: `confirm-required: ${data.capabilityId}` };
+      return this.holdForApproval(cmd, deliveryId, decision, member, epoch);
     }
     if (decision.verdict === "deny") {
       // Policy rejection is not an execution: no ledger row.
@@ -664,7 +685,6 @@ export class GatewayRuntime {
     if (this.paths.execution.byChildState(member.childId, "running").length >= maxInFlight) {
       return { kind: "rejected", reason: `child-busy: ${member.childId}` };
     }
-    const epoch = await this.awaitSessionEpoch();
     const executionId = newExecutionId();
     try {
       this.paths.execution.insert({
@@ -729,6 +749,16 @@ export class GatewayRuntime {
     const data = cmd.data as unknown as WorkCancelCommandV1Data;
     const row = this.paths.execution.byAssignment(data.assignmentId);
     if (row === null || row.state !== "running") {
+      // Plan 12: a confirm-held assignment has no binding row yet — cancel
+      // revokes the approval, steer has nothing mid-flight to steer.
+      const pending = this.paths.execution.pendingByAssignment(data.assignmentId);
+      if (pending !== null && pending.state === "awaiting-approval") {
+        if (kind === "cancel") {
+          await this.revokePending(pending, data.reason ?? "work-cancelled");
+          return { kind: "accepted" };
+        }
+        return { kind: "rejected", reason: "pending-approval" };
+      }
       if (this.embedded !== null && row === null) return this.passthrough(cmd);
       return { kind: "rejected", reason: "no-binding" };
     }
@@ -770,6 +800,7 @@ export class GatewayRuntime {
     if (kind === "cancel" && reply.kind === "accepted") {
       if (this.fence(row, "cancel") === "fresh") {
         this.paths.execution.markState(row.executionId, "completed");
+        this.settleLinkedPending(row.executionId, "completed");
       }
     }
     return childOutcome(reply);
@@ -810,12 +841,14 @@ export class GatewayRuntime {
       claims,
       workloadActor: `workload:${this.config.gatewayId}`,
     };
+    const verdict = this.policy.evaluate(action, ctx);
     return {
-      verdict: this.policy.evaluate(action, ctx),
+      verdict,
       ctx,
       workId: typeof data["workId"] === "string" ? data["workId"] : undefined,
       assignmentId: typeof data["assignmentId"] === "string" ? data["assignmentId"] : undefined,
       evidenceRef,
+      matchedRow: verdict === "confirm" ? (this.policy.matchRow?.(action, ctx) ?? null) : null,
     };
   }
 
@@ -828,7 +861,7 @@ export class GatewayRuntime {
       claims: { subject: workloadActor, groups: [], verified: false },
       workloadActor,
     };
-    return { verdict: this.policy.evaluate("event.forward", ctx), ctx };
+    return { verdict: this.policy.evaluate("event.forward", ctx), ctx, matchedRow: null };
   }
 
   /** One §12.2 audit line per decision; long-lived tokens NEVER included. */
@@ -847,6 +880,516 @@ export class GatewayRuntime {
       policyId: this.loadedPolicy?.policyId ?? "default",
       ...(decision.evidenceRef !== undefined ? { evidenceRef: decision.evidenceRef } : {}),
     });
+  }
+
+  // ── approval lifecycle (Plan 12) ─────────────────────────────────────────
+
+  /**
+   * Confirm hold (spec §12.1): mint the approval, park a pending row BEFORE
+   * publishing (crash ⇒ reconcile, never a lost action), publish
+   * approval.required, answer accepted. The decision arrives as a
+   * decided-push (§12.1 step 5) or via reconcile polling.
+   */
+  private async holdForApproval(
+    cmd: EnvelopeCommand,
+    deliveryId: string,
+    decision: PolicyDecision,
+    member: FleetMember,
+    epoch: number,
+  ): Promise<CommandOutcome> {
+    const data = cmd.data as unknown as WorkAssignCommandV1Data;
+    const matched = decision.matchedRow;
+    const eligibleActors =
+      matched !== null && matched.actorAnyOf.length > 0
+        ? [...matched.actorAnyOf]
+        : [decision.ctx.claims.subject];
+    const approvalId = randomUUID();
+    const nonce = `n-${randomBytes(24).toString("base64url")}`;
+    const timeout = this.config.policy?.confirmTimeoutSeconds ?? 900;
+    const createdAt = new Date().toISOString().slice(0, 19).concat("Z");
+    const expiresAt = new Date(Date.parse(createdAt) + timeout * 1000)
+      .toISOString()
+      .slice(0, 19)
+      .concat("Z");
+    const action: Record<string, unknown> = {
+      capabilityId: data.capabilityId,
+      resource: decision.ctx.resource,
+      assignmentId: data.assignmentId,
+    };
+    if (data.workId !== undefined) action["workId"] = data.workId;
+    // The frozen §7.2 record: the kernel recomputes and compares.
+    const record = { approvalId, action, eligibleActors, expiresAt, createdAt };
+    const actionDigest = computeActionDigest(record);
+    this.paths.execution.insertPending({
+      approvalId,
+      deliveryId,
+      envelope: JSON.stringify(cmd),
+      workId: data.workId ?? null,
+      assignmentId: data.assignmentId,
+      capabilityId: data.capabilityId,
+      resource: decision.ctx.resource,
+      childId: member.childId,
+      approvalDigestRecord: JSON.stringify(record),
+      policyId: this.loadedPolicy?.policyId ?? "default",
+      requiredAt: createdAt,
+      expiresAt,
+      epoch,
+    });
+    const env = buildEvent(APPROVAL_REQUIRED, {
+      source: `urn:workspace:${this.config.gatewayId}`,
+      subject: `approval/${approvalId}`,
+      data: {
+        approvalId,
+        actionDigest,
+        eligibleActors,
+        nonce,
+        expiresAt,
+        createdAt,
+        action,
+        ...(data.workId !== undefined ? { workId: data.workId } : {}),
+      },
+      ...(cmd.traceparent !== undefined ? { traceparent: cmd.traceparent } : {}),
+      correlationid: cmd.id,
+    });
+    try {
+      await this.client?.publishEvent(env);
+    } catch (error) {
+      // The kernel refused the approval itself: nothing can decide it.
+      const reason = error instanceof Error ? error.message : String(error);
+      this.paths.execution.markPending(approvalId, "failed");
+      this.approvalAudit("approval-publish-failed", data.workId, data.assignmentId, approvalId);
+      await this.publishAssignmentFailed(
+        data.workId,
+        data.assignmentId,
+        epoch,
+        `approval-publish-failed: ${reason}`,
+      );
+      return { kind: "rejected", reason: `approval-publish-failed: ${approvalId}` };
+    }
+    this.approvalAudit("approval-required", data.workId, data.assignmentId, approvalId);
+    this.logger.info("approval required", { approvalId, assignmentId: data.assignmentId });
+    return { kind: "accepted" };
+  }
+
+  /**
+   * Decided-push ingest (§12.1 step 5). The receipt is accepted whatever
+   * happens here; every settle is ledger-side. A push for an unknown or
+   * already-terminal approval is a no-op (late/replayed push); a createdAt
+   * mismatch against the stored digest record means the push is NOT for the
+   * action this row parked — logged and ignored, never applied.
+   */
+  private async onDecided(env: EnvelopeEvent): Promise<void> {
+    const data = (env.data ?? {}) as Record<string, unknown>;
+    const approvalId = String(data["approvalId"] ?? "");
+    const decision = String(data["decision"] ?? "");
+    const pending = this.paths.execution.getPending(approvalId);
+    if (pending === null) {
+      this.logger.info("decided-push for unknown approval", { approvalId, decision });
+      return;
+    }
+    if (pending.state !== "awaiting-approval") {
+      return; // already settled (reconcile raced the push, or revoke)
+    }
+    const record = JSON.parse(pending.approvalDigestRecord) as { createdAt: string };
+    if (String(data["createdAt"] ?? "") !== record.createdAt) {
+      this.logger.warn("decided-push createdAt mismatch (ignored)", { approvalId });
+      return;
+    }
+    if (decision === "approved") {
+      await this.consumeAndExecute(pending, String(data["decidedBy"] ?? ""));
+      return;
+    }
+    const state: "expired" | "revoked" | "failed" =
+      decision === "expired" ? "expired" : decision === "revoked" ? "revoked" : "failed";
+    this.paths.execution.markPending(approvalId, state);
+    this.approvalAudit(
+      `approval-${decision === "" ? "denied" : decision}`,
+      pending.workId,
+      pending.assignmentId,
+      approvalId,
+    );
+    await this.publishAssignmentFailed(
+      pending.workId,
+      pending.assignmentId,
+      pending.epoch,
+      `approval-${decision === "" ? "denied" : decision}`,
+    );
+  }
+
+  /**
+   * Approved: re-evaluate current state (appendix §7.3 — a stale policy or a
+   * vanished capability denies even after a human approved), consume the
+   * approval synchronously, then bind + start like a plain assign.
+   */
+  private async consumeAndExecute(pending: PendingRow, decidedBy: string): Promise<void> {
+    const approvalId = pending.approvalId;
+    const cmd = JSON.parse(pending.envelope) as EnvelopeCommand;
+    const data = cmd.data as unknown as WorkAssignCommandV1Data;
+    const member = this.fleet.member(pending.childId);
+    const deny = async (reason: string): Promise<void> => {
+      this.paths.execution.markPending(approvalId, "failed");
+      this.approvalAudit(
+        `approval-exec-${reason}`,
+        pending.workId,
+        pending.assignmentId,
+        approvalId,
+      );
+      await this.publishAssignmentFailed(
+        pending.workId,
+        pending.assignmentId,
+        pending.epoch,
+        `approval-${reason}`,
+      );
+    };
+    if (member === undefined) {
+      await deny("child-offline");
+      return;
+    }
+    const fresh = await this.decide("command.forward", cmd, member.childId);
+    if (fresh.verdict === "deny") {
+      this.audit(fresh, "policy-deny-on-reaudit");
+      await deny("denied-on-reaudit");
+      return;
+    }
+    const maxInFlight = this.fleet.entries.get(member.childId)?.maxInFlight ?? 1;
+    if (this.paths.execution.byChildState(member.childId, "running").length >= maxInFlight) {
+      await deny("child-busy");
+      return;
+    }
+    const consume = buildEvent(APPROVAL_CONSUME, {
+      source: `urn:workspace:${this.config.gatewayId}`,
+      subject: `approval/${approvalId}`,
+      data: {
+        commandId: `${approvalId}:consume`,
+        approvalId,
+        actorEvidenceRef: `workload:${this.config.gatewayId}`,
+      },
+      ...(cmd.traceparent !== undefined ? { traceparent: cmd.traceparent } : {}),
+      correlationid: cmd.id,
+    });
+    let rejectedProblem: string | undefined;
+    try {
+      const ack = await this.client?.sendCommand(consume);
+      if (ack !== undefined && ack.status === "rejected") {
+        rejectedProblem = String(ack.problem?.type ?? "consume-rejected").replace(ERROR_BASE, "");
+      }
+    } catch (error) {
+      // Transport-dead on the synchronous consume: leave the row awaiting;
+      // reconcile polling resolves the kernel's answer later.
+      this.logger.warn("consume send failed (reconcile will resolve)", {
+        approvalId,
+        reason: error instanceof Error ? error.message : String(error),
+      });
+      return;
+    }
+    if (rejectedProblem !== undefined) {
+      // The kernel answered the consume with a typed problem: settle to the
+      // problem's own terminal state (revoked/expired), else honest failed.
+      // The approval is spent either way — a replay denies (single use).
+      const state: "revoked" | "expired" | "failed" =
+        rejectedProblem === "approval-revoked"
+          ? "revoked"
+          : rejectedProblem === "approval-expired"
+            ? "expired"
+            : "failed";
+      this.paths.execution.markPending(approvalId, state);
+      this.approvalAudit(
+        `approval-${rejectedProblem}`,
+        pending.workId,
+        pending.assignmentId,
+        approvalId,
+      );
+      await this.publishAssignmentFailed(
+        pending.workId,
+        pending.assignmentId,
+        pending.epoch,
+        rejectedProblem,
+      );
+      return;
+    }
+    this.approvalAudit("approval-consumed", pending.workId, pending.assignmentId, approvalId);
+    const epoch = this.client?.session?.leaseEpoch ?? 0;
+    const executionId = newExecutionId();
+    try {
+      this.paths.execution.insert({
+        deliveryId: pending.deliveryId,
+        dedupeKey: data.commandId,
+        gatewayId: this.config.gatewayId,
+        childId: member.childId,
+        assignmentId: data.assignmentId,
+        executionId,
+        workId: data.workId ?? "",
+        connectionGeneration: epoch,
+        childGeneration: member.generation,
+      });
+    } catch (error) {
+      if (error instanceof BindingConflictError) {
+        // A parallel redelivered assign bound it first: the pending is done.
+        this.paths.execution.bindPendingExecution(approvalId, executionId);
+        this.paths.execution.markPending(approvalId, "completed");
+        return;
+      }
+      throw error;
+    }
+    this.capabilityByExecution.set(executionId, data.capabilityId);
+    this.paths.execution.bindPendingExecution(approvalId, executionId);
+    let reply: ChildReply;
+    try {
+      reply = await member.executor.send({
+        kind: "start",
+        executionId,
+        connectionGeneration: epoch,
+        command: cmd,
+      });
+    } catch (error) {
+      const reason = error instanceof ChildTransportError ? error.reason : "child-disconnected";
+      this.paths.execution.markState(executionId, "failed", reason);
+      this.paths.execution.markPending(approvalId, "failed");
+      return;
+    }
+    const outcome = this.settleStart(executionId, reply);
+    if (outcome.kind !== "accepted") this.paths.execution.markPending(approvalId, "failed");
+    this.logger.info("approved action executed", {
+      approvalId,
+      executionId,
+      decidedBy,
+      outcome: outcome.kind,
+    });
+  }
+
+  /** Cancel on a pending action: revoke at the kernel, park revoked. */
+  private async revokePending(pending: PendingRow, reason: string): Promise<void> {
+    this.paths.execution.markPending(pending.approvalId, "revoked");
+    try {
+      await this.client?.publishEvent(
+        buildEvent(APPROVAL_REVOKED, {
+          source: `urn:workspace:${this.config.gatewayId}`,
+          subject: `approval/${pending.approvalId}`,
+          data: {
+            approvalId: pending.approvalId,
+            revokedBy: `workload:${this.config.gatewayId}`,
+            reason,
+          },
+        }),
+      );
+    } catch (error) {
+      this.logger.warn("approval.revoked publish dropped (row already revoked)", {
+        approvalId: pending.approvalId,
+        reason: error instanceof Error ? error.message : String(error),
+      });
+    }
+    this.approvalAudit(
+      "approval-revoked",
+      pending.workId,
+      pending.assignmentId,
+      pending.approvalId,
+    );
+  }
+
+  /**
+   * Crash recovery for approvals: every non-terminal pending row re-resolves
+   * against the kernel ledger (the REST plane, workload credential).
+   * pending/absent ⇒ republish (kernel dedupes by approvalId); approved ⇒
+   * consume + execute (the kernel's atomic single-use consume is the arbiter
+   * of a crash between consume and start); denied/expired/revoked ⇒ settle +
+   * ONE honest assignment.failed.
+   */
+  private async reconcileApprovals(): Promise<void> {
+    const now = Date.now();
+    for (const pending of [
+      ...this.paths.execution.pendingByState("awaiting-approval"),
+      ...this.paths.execution.pendingByState("executing"),
+    ]) {
+      if (pending.state === "awaiting-approval" && Date.parse(pending.expiresAt) <= now) {
+        this.paths.execution.markPending(pending.approvalId, "expired");
+        this.approvalAudit(
+          "approval-expired",
+          pending.workId,
+          pending.assignmentId,
+          pending.approvalId,
+        );
+        await this.publishAssignmentFailed(
+          pending.workId,
+          pending.assignmentId,
+          pending.epoch,
+          "approval-expired",
+        );
+        continue;
+      }
+      if (pending.state === "executing") {
+        // Consume committed pre-crash; the binding row tracks the rest —
+        // unless there is none, meaning start never shipped.
+        if (
+          pending.executionId === null ||
+          this.paths.execution.byExecution(pending.executionId) === null
+        ) {
+          this.paths.execution.markPending(pending.approvalId, "failed");
+          await this.publishAssignmentFailed(
+            pending.workId,
+            pending.assignmentId,
+            pending.epoch,
+            "approval-execution-lost",
+          );
+        }
+        continue;
+      }
+      const kernel = await this.pollKernelApproval(pending);
+      if (kernel === null) continue; // unreachable kernel: retry next tick
+      if (kernel === "approved") {
+        await this.consumeAndExecute(pending, "reconcile");
+      } else if (kernel === "pending" || kernel === "absent") {
+        await this.republishRequired(pending);
+      } else if (kernel === "denied") {
+        this.paths.execution.markPending(pending.approvalId, "failed");
+        await this.publishAssignmentFailed(
+          pending.workId,
+          pending.assignmentId,
+          pending.epoch,
+          "approval-denied",
+        );
+      } else if (kernel === "expired") {
+        this.paths.execution.markPending(pending.approvalId, "expired");
+        await this.publishAssignmentFailed(
+          pending.workId,
+          pending.assignmentId,
+          pending.epoch,
+          "approval-expired",
+        );
+      } else if (kernel === "revoked") {
+        this.paths.execution.markPending(pending.approvalId, "revoked");
+      } else {
+        // Spent by a consume whose follow-through died: the execution never
+        // started (no binding row) — honest failure.
+        this.paths.execution.markPending(pending.approvalId, "failed");
+        await this.publishAssignmentFailed(
+          pending.workId,
+          pending.assignmentId,
+          pending.epoch,
+          "approval-execution-lost",
+        );
+      }
+    }
+  }
+
+  /** GET /api/works/{workId}/approvals; null ⇒ kernel unreachable this tick. */
+  private async pollKernelApproval(
+    pending: PendingRow,
+  ): Promise<
+    "pending" | "approved" | "denied" | "expired" | "revoked" | "consumed" | "absent" | null
+  > {
+    if (pending.workId === null || this.workloadToken === null) return null;
+    try {
+      const token = await this.workloadToken.getToken();
+      const response = await (this.deps.fetchImpl ?? fetch)(
+        `${this.config.facilitatorUrl}/api/works/${pending.workId}/approvals`,
+        { headers: { authorization: `Bearer ${token}` } },
+      );
+      if (!response.ok) return null;
+      const rows = (await response.json()) as { approvalId: string; state: string }[];
+      const row = rows.find((r) => r.approvalId === pending.approvalId);
+      if (row === undefined) return "absent";
+      if (row.state === "pending" || row.state === "approved" || row.state === "denied")
+        return row.state;
+      if (row.state === "expired") return "expired";
+      if (row.state === "revoked") return "revoked";
+      return "consumed";
+    } catch {
+      return null;
+    }
+  }
+
+  /** Re-publish approval.required (new envelope id; kernel dedupes by approvalId). */
+  private async republishRequired(pending: PendingRow): Promise<void> {
+    const record = JSON.parse(pending.approvalDigestRecord) as {
+      approvalId: string;
+      action: unknown;
+      eligibleActors: string[];
+      expiresAt: string;
+      createdAt: string;
+    };
+    try {
+      await this.client?.publishEvent(
+        buildEvent(APPROVAL_REQUIRED, {
+          source: `urn:workspace:${this.config.gatewayId}`,
+          subject: `approval/${pending.approvalId}`,
+          data: {
+            approvalId: record.approvalId,
+            actionDigest: computeActionDigest(record),
+            eligibleActors: record.eligibleActors,
+            nonce: `n-${randomBytes(24).toString("base64url")}`,
+            expiresAt: record.expiresAt,
+            createdAt: record.createdAt,
+            action: record.action,
+            ...(pending.workId !== null ? { workId: pending.workId } : {}),
+          },
+        }),
+      );
+      this.logger.info("approval republished (reconcile)", { approvalId: pending.approvalId });
+    } catch (error) {
+      this.logger.warn("approval republish dropped", {
+        approvalId: pending.approvalId,
+        reason: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  /** ONE honest non-retryable assignment.failed for a settled-without-execution action. */
+  private async publishAssignmentFailed(
+    workId: string | null,
+    assignmentId: string,
+    epoch: number,
+    reason: string,
+  ): Promise<void> {
+    if (workId === null) return;
+    try {
+      await this.client?.publishEvent(
+        buildEvent(FAILED, {
+          source: `urn:workspace:${this.config.gatewayId}`,
+          subject: `work/${workId}/assignment/${assignmentId}`,
+          data: {
+            workId,
+            assignmentId,
+            executionGeneration: Math.max(1, epoch),
+            reason,
+            retryable: false,
+          },
+        }),
+      );
+    } catch (error) {
+      this.logger.warn("assignment.failed dropped", {
+        assignmentId,
+        reason: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  /** Approval-lifecycle audit lines (§12.2): same shape, lifecycle reasons. */
+  private approvalAudit(
+    reason: string,
+    workId: string | null,
+    assignmentId: string,
+    approvalId: string,
+  ): void {
+    auditPolicy(this.logger, {
+      decision:
+        reason === "approval-required" ? "confirm" : reason.endsWith("-failed") ? "deny" : "allow",
+      reason,
+      ...(workId !== null ? { workId } : {}),
+      assignmentId,
+      resource: "*",
+      callerWorkload: `workload:${this.config.gatewayId}`,
+      gatewayWorkload: `workload:${this.config.gatewayId}`,
+      policyId: this.loadedPolicy?.policyId ?? "default",
+      evidenceRef: `approval/${approvalId}`,
+    });
+  }
+
+  /** Pending rows mirror their binding row's terminal settle. */
+  private settleLinkedPending(executionId: string, state: "completed" | "failed"): void {
+    const pending = this.paths.execution.pendingByExecution(executionId);
+    if (pending !== null && pending.state === "executing") {
+      this.paths.execution.markPending(pending.approvalId, state);
+    }
   }
 
   private async passthrough(cmd: EnvelopeCommand): Promise<CommandOutcome> {
@@ -898,9 +1441,14 @@ export class GatewayRuntime {
     const row = executionId !== null ? this.paths.execution.byExecution(executionId) : null;
     if (row !== null) {
       if (this.fence(row, `forward ${env.type}`) === "stale") return;
-      if (env.type === COMPLETED) this.paths.execution.markState(row.executionId, "completed");
-      if (env.type === FAILED)
+      if (env.type === COMPLETED) {
+        this.paths.execution.markState(row.executionId, "completed");
+        this.settleLinkedPending(row.executionId, "completed");
+      }
+      if (env.type === FAILED) {
         this.paths.execution.markState(row.executionId, "failed", reasonOf(env));
+        this.settleLinkedPending(row.executionId, "failed");
+      }
     }
     await this.client?.publishEvent(env);
   }

@@ -151,18 +151,19 @@ function seedV1(file: string): void {
   db.close();
 }
 
-describe("ExecutionLedger schema v2", () => {
-  it("migrates a v1 file in place: version 2, child_state exists, old rows read with childGeneration 0", () => {
+describe("ExecutionLedger schema v2/v3", () => {
+  it("migrates a v1 file in place: version 3, child_state + pending_actions exist, old rows read with childGeneration 0", () => {
     const file = join(mkdtempSync(join(tmpdir(), "gw-ledger-")), "gateway.sqlite3");
     seedV1(file);
 
     const l = open(file);
     const db = new Database(file, { readonly: true });
-    expect(db.pragma("user_version", { simple: true })).toBe(2);
+    expect(db.pragma("user_version", { simple: true })).toBe(3);
     const tables = db
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
       .all() as { name: string }[];
     expect(tables.map((t) => t.name)).toContain("child_state");
+    expect(tables.map((t) => t.name)).toContain("pending_actions");
     db.close();
 
     // the pre-v2 row survived the ALTER and reads as generation 0
@@ -180,8 +181,26 @@ describe("ExecutionLedger schema v2", () => {
     db.pragma("user_version = 7");
     db.close();
     expect(() => new ExecutionLedger(file)).toThrow(
-      "bindings: unsupported schema version 7 (this build writes 2)",
+      "bindings: unsupported schema version 7 (this build writes 3)",
     );
+  });
+
+  it("migrates a v2 file in place: pending_actions appears, bindings untouched", () => {
+    const file = join(mkdtempSync(join(tmpdir(), "gw-ledger-")), "gateway.sqlite3");
+    seedV1(file);
+    new ExecutionLedger(file).close(); // v1 → v3
+    const v2 = new Database(file);
+    v2.exec("DROP TABLE pending_actions; PRAGMA user_version = 2;");
+    v2.close();
+    const l = open(file);
+    const db = new Database(file, { readonly: true });
+    expect(db.pragma("user_version", { simple: true })).toBe(3);
+    const tables = db
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
+      .all() as { name: string }[];
+    expect(tables.map((t) => t.name)).toContain("pending_actions");
+    db.close();
+    expect(l.byExecution("exec-old")?.state).toBe("running");
   });
 
   it("upsertChild: first bump starts generation 1, re-register bumps, no-bump keeps it", () => {

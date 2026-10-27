@@ -14,6 +14,8 @@ import type {
   LinkLogger,
   LinkStats,
 } from "./types.js";
+import { DECIDED_EVENT } from "./types.js";
+
 export class CommandDispatcher {
   constructor(
     private readonly deps: {
@@ -42,12 +44,47 @@ export class CommandDispatcher {
           ? (env.data["assignmentId"] as string)
           : undefined,
     };
+    // Plan 12 pre-branch: a kernel-pushed business event (approval.decided)
+    // rides the same delivery machinery as a command — classify it BEFORE
+    // the command gate, ack it, and let the handler react.
     const outcome: CommandOutcome = !KNOWN_COMMAND_TYPES.includes(env.type)
-      ? { kind: "unsupported", reason: `unknown command type ${env.type}` }
+      ? await this.onDecidedOrUnsupported(env, delivery, correlation)
       : this.deps.handler === undefined
         ? { kind: "unsupported", reason: "no handler mounted" }
         : await this.invokeHandler(env, delivery, correlation);
     await this.complete(delivery, outcome, correlation);
+  }
+
+  private async onDecidedOrUnsupported(
+    env: EnvelopeCommand,
+    delivery: LinkDeliveryV1,
+    correlation: Record<string, unknown>,
+  ): Promise<CommandOutcome> {
+    if (env.type === DECIDED_EVENT && this.deps.handler?.onDecided !== undefined) {
+      try {
+        await this.routeDecided(env, delivery);
+        return { kind: "accepted" };
+      } catch (error) {
+        this.deps.logger.error("onDecided threw; answering rejected", {
+          ...correlation,
+          reason: error instanceof Error ? error.message : String(error),
+        });
+        return { kind: "rejected", reason: `decided handler error: ${String(error)}` };
+      }
+    }
+    return { kind: "unsupported", reason: `unknown command type ${env.type}` };
+  }
+
+  private async routeDecided(env: EnvelopeCommand, delivery: LinkDeliveryV1): Promise<void> {
+    const ctx = {
+      deliveryId: delivery.deliveryId,
+      envelope: env,
+      signal: new AbortController().signal,
+      publishEvent: (e: EnvelopeEvent) => this.deps.publishEvent(e, env.traceparent, env.id),
+    };
+    // SAFETY: the DECIDED_EVENT type is an event class, not a command — the
+    // dispatcher casts every delivery to EnvelopeCommand up front.
+    await this.deps.handler?.onDecided?.(env as unknown as EnvelopeEvent, ctx);
   }
 
   private async invokeHandler(

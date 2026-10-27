@@ -15,7 +15,7 @@ export interface GatewayPaths {
   execution: ExecutionLedger;
 }
 
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 const DDL_BINDINGS = `
 CREATE TABLE IF NOT EXISTS bindings (
@@ -49,6 +49,109 @@ CREATE TABLE IF NOT EXISTS child_state (
   offline_at       TEXT
 );
 `;
+
+// Plan 12 v3: confirm-held assignments park here while an approval is
+// pending — a side table, NOT a bindings-state widening: reconcile,
+// probeChild and the quota law all read `running`, and a disguised-pending
+// binding would be reported lost on restart.
+const DDL_PENDING = `
+CREATE TABLE IF NOT EXISTS pending_actions (
+  approval_id            TEXT PRIMARY KEY,
+  delivery_id            TEXT NOT NULL,
+  envelope               TEXT NOT NULL,          -- the assign envelope, verbatim
+  work_id                TEXT,
+  assignment_id          TEXT NOT NULL,
+  capability_id          TEXT NOT NULL,
+  resource               TEXT NOT NULL,
+  child_id               TEXT NOT NULL,
+  approval_digest_record TEXT NOT NULL,          -- the exact digest record sent
+  policy_id              TEXT NOT NULL,
+  state                  TEXT NOT NULL CHECK (state IN ('awaiting-approval','executing','completed','failed','expired','revoked')),
+  required_at            TEXT NOT NULL,
+  expires_at             TEXT NOT NULL,
+  epoch                  INTEGER NOT NULL,
+  execution_id           TEXT,                 -- set at consume: the binding row it spawned
+  updated_at             TEXT NOT NULL
+);
+`;
+
+export type PendingState =
+  "awaiting-approval" | "executing" | "completed" | "failed" | "expired" | "revoked";
+
+export interface PendingRow {
+  approvalId: string;
+  deliveryId: string;
+  envelope: string;
+  workId: string | null;
+  assignmentId: string;
+  capabilityId: string;
+  resource: string;
+  childId: string;
+  approvalDigestRecord: string;
+  policyId: string;
+  state: PendingState;
+  requiredAt: string;
+  expiresAt: string;
+  epoch: number;
+  executionId: string | null;
+  updatedAt: string;
+}
+
+export interface NewPending {
+  approvalId: string;
+  deliveryId: string;
+  envelope: string;
+  workId: string | null;
+  assignmentId: string;
+  capabilityId: string;
+  resource: string;
+  childId: string;
+  approvalDigestRecord: string;
+  policyId: string;
+  requiredAt: string;
+  expiresAt: string;
+  epoch: number;
+}
+
+interface DbPendingRow {
+  approval_id: string;
+  delivery_id: string;
+  envelope: string;
+  work_id: string | null;
+  assignment_id: string;
+  capability_id: string;
+  resource: string;
+  child_id: string;
+  approval_digest_record: string;
+  policy_id: string;
+  state: PendingState;
+  required_at: string;
+  expires_at: string;
+  epoch: number;
+  execution_id: string | null;
+  updated_at: string;
+}
+
+function toPending(row: DbPendingRow): PendingRow {
+  return {
+    approvalId: row.approval_id,
+    deliveryId: row.delivery_id,
+    envelope: row.envelope,
+    workId: row.work_id,
+    assignmentId: row.assignment_id,
+    capabilityId: row.capability_id,
+    resource: row.resource,
+    childId: row.child_id,
+    approvalDigestRecord: row.approval_digest_record,
+    policyId: row.policy_id,
+    state: row.state,
+    requiredAt: row.required_at,
+    expiresAt: row.expires_at,
+    epoch: row.epoch,
+    executionId: row.execution_id,
+    updatedAt: row.updated_at,
+  };
+}
 
 export type BindingState = "running" | "completed" | "failed" | "lost";
 
@@ -170,7 +273,7 @@ export class ExecutionLedger {
     const version = this.db.pragma("user_version", { simple: true }) as number;
     if (version === 0) {
       this.db.exec(
-        `BEGIN IMMEDIATE;${DDL_BINDINGS}${DDL_CHILD_STATE}PRAGMA user_version = ${SCHEMA_VERSION};COMMIT;`,
+        `BEGIN IMMEDIATE;${DDL_BINDINGS}${DDL_CHILD_STATE}${DDL_PENDING}PRAGMA user_version = ${SCHEMA_VERSION};COMMIT;`,
       );
     } else if (version === 1) {
       // v1 (plan 05) files carry bindings WITHOUT the child fence and no
@@ -180,13 +283,88 @@ export class ExecutionLedger {
         `BEGIN IMMEDIATE;` +
           `ALTER TABLE bindings ADD COLUMN child_generation INTEGER NOT NULL DEFAULT 0;` +
           DDL_CHILD_STATE +
+          DDL_PENDING +
           `PRAGMA user_version = ${SCHEMA_VERSION};COMMIT;`,
       );
+    } else if (version === 2) {
+      // v2 (plan 06/10) files gain only the Plan 12 pending side table.
+      this.db.exec(`BEGIN IMMEDIATE;${DDL_PENDING}PRAGMA user_version = ${SCHEMA_VERSION};COMMIT;`);
     } else if (version !== SCHEMA_VERSION) {
       throw new Error(
         `bindings: unsupported schema version ${version} (this build writes ${SCHEMA_VERSION})`,
       );
     }
+  }
+
+  /** Park a confirm-held assignment awaiting its approval decision. */
+  insertPending(p: NewPending): void {
+    this.db
+      .prepare(
+        `INSERT INTO pending_actions (approval_id, delivery_id, envelope, work_id, assignment_id,
+                                      capability_id, resource, child_id, approval_digest_record,
+                                      policy_id, state, required_at, expires_at, epoch, updated_at)
+         VALUES (@approvalId, @deliveryId, @envelope, @workId, @assignmentId, @capabilityId,
+                 @resource, @childId, @approvalDigestRecord, @policyId,
+                 'awaiting-approval', @requiredAt, @expiresAt, @epoch, @requiredAt)`,
+      )
+      .run({ ...p });
+  }
+
+  getPending(approvalId: string): PendingRow | null {
+    const row = this.db
+      .prepare("SELECT * FROM pending_actions WHERE approval_id = @approvalId")
+      .get({ approvalId }) as DbPendingRow | undefined;
+    return row === undefined ? null : toPending(row);
+  }
+
+  pendingByState(state: PendingState): PendingRow[] {
+    const rows = this.db
+      .prepare("SELECT * FROM pending_actions WHERE state = @state ORDER BY required_at")
+      .all({ state }) as DbPendingRow[];
+    return rows.map(toPending);
+  }
+
+  markPending(approvalId: string, state: PendingState): void {
+    this.db
+      .prepare(
+        "UPDATE pending_actions SET state = @state, updated_at = @now WHERE approval_id = @approvalId",
+      )
+      .run({ approvalId, state, now: new Date().toISOString() });
+  }
+
+  /** Consume succeeded: park the spawned execution's id and move to `executing`. */
+  bindPendingExecution(approvalId: string, executionId: string): void {
+    this.db
+      .prepare(
+        `UPDATE pending_actions SET state = 'executing', execution_id = @executionId, updated_at = @now
+         WHERE approval_id = @approvalId`,
+      )
+      .run({ approvalId, executionId, now: new Date().toISOString() });
+  }
+
+  pendingByExecution(executionId: string): PendingRow | null {
+    const row = this.db
+      .prepare("SELECT * FROM pending_actions WHERE execution_id = @executionId")
+      .get({ executionId }) as DbPendingRow | undefined;
+    return row === undefined ? null : toPending(row);
+  }
+
+  pendingByAssignment(assignmentId: string): PendingRow | null {
+    const row = this.db
+      .prepare(
+        "SELECT * FROM pending_actions WHERE assignment_id = @assignmentId ORDER BY required_at DESC LIMIT 1",
+      )
+      .get({ assignmentId }) as DbPendingRow | undefined;
+    return row === undefined ? null : toPending(row);
+  }
+
+  pendingCounts(): { awaitingApproval: number } {
+    const row = this.db
+      .prepare(
+        "SELECT COUNT(*) AS n FROM pending_actions WHERE state IN ('awaiting-approval','executing')",
+      )
+      .get() as { n: number };
+    return { awaitingApproval: row.n };
   }
 
   /** Insert a fresh `running` binding; a dedupe_key hit throws BindingConflictError. */

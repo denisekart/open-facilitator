@@ -20,6 +20,10 @@
       {
         "name": "e2e-operator",
         "description": "Realm role the e2e/dev CLI service account holds; role-rule config maps it to the kernel-operator role."
+      },
+      {
+        "name": "gateway-workload",
+        "description": "Gateway workload identity: polls its own work's approvals (Plan 12 reconcile)."
       }
     ]
   },
@@ -318,6 +322,13 @@
       "realmRoles": ["default-roles-facilitator", "kernel-operator", "e2e-operator"],
       "requiredActions": [],
       "serviceAccountClientId": "facilitator-cli"
+    },
+    {
+      "username": "service-account-ofac-gateway-alpha",
+      "enabled": true,
+      "realmRoles": ["default-roles-facilitator", "gateway-workload"],
+      "requiredActions": [],
+      "serviceAccountClientId": "ofac-gateway-alpha"
     }
   ]
 }

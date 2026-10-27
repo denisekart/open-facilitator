@@ -24,6 +24,13 @@ export type { ProblemDetails };
  */
 export const MAX_ENVELOPE_BYTES = 262144;
 
+/**
+ * The kernel's approval-decision push (Plan 12 §12.1 step 5). An event
+ * CLASS, yet it routes as work: the dispatcher hands it to the handler's
+ * `onDecided` arm instead of the fact-event auto-ack.
+ */
+export const DECIDED_EVENT = "org.facilitator.event.approval.decided.v1";
+
 // ── Control frames (kind-refined views of the generated ControlFrame) ─────
 
 export interface HelloFrame {
@@ -117,6 +124,12 @@ export interface CommandContext {
 
 export interface LinkHandler {
   onCommand(cmd: EnvelopeCommand, ctx: CommandContext): Promise<CommandOutcome>;
+  /**
+   * Kernel-pushed business event delivered on the Link (Plan 12:
+   * approval.decided). Acked (receipt accepted) whatever the handler does;
+   * absent handler ⇒ silent ack.
+   */
+  onDecided?(env: EnvelopeEvent, ctx: CommandContext): Promise<void>;
 }
 
 /**

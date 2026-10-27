@@ -8,7 +8,7 @@ import { KNOWN_COMMAND_TYPES, enforceSizeLimit, validateEnvelope } from "@ofac/p
 import type { LinkDeliveryV1, ReceiptV1 } from "@ofac/protocol";
 import { dedupeKeyOf, type Ledger } from "./ledger.js";
 import type { DispatchQueue } from "./dispatch-queue.js";
-import { MAX_ENVELOPE_BYTES, type LinkLogger, type LinkStats } from "./types.js";
+import { DECIDED_EVENT, MAX_ENVELOPE_BYTES, type LinkLogger, type LinkStats } from "./types.js";
 
 /** Answer for one delivery; the client validates + ships it over the transport. */
 export type SendReceipt = (
@@ -83,10 +83,13 @@ export class DeliveryPipeline {
       await sendReceipt(delivery.deliveryId, { status: "duplicate", processedAt: nowIso() });
       return;
     }
-    // 3) Fresh: events are facts, auto-acked after logging; commands queue
-    //    for the handler inside the flow window (bounded by maxQueue).
+    // 3) Fresh: business events are facts, auto-acked after logging;
+    //    commands queue for the handler inside the flow window (bounded by
+    //    maxQueue). Plan 12 law: the kernel's approval.decided PUSH is an
+    //    event class yet routes as work — a silently auto-acked decision is
+    //    a lost approval round-trip.
     const isCommand = env.type.startsWith("org.facilitator.command.");
-    if (!isCommand) {
+    if (!isCommand && env.type !== DECIDED_EVENT) {
       ledger.markState(delivery.deliveryId, "processed");
       counters.processed += 1;
       logger.info("event delivery auto-acked", { ...correlation, type: env.type });

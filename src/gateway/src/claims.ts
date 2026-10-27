@@ -33,6 +33,8 @@ export interface ClaimsDeps {
   jwks: (issuer: string) => KeySource;
   audience: string;
   workloadActor: string;
+  /** Lifetime tolerance in seconds; mirrors kernel `Link:Evidence:ClockSkewSeconds` (default 30). */
+  clockToleranceSeconds?: number;
 }
 
 const unverified = (workloadActor: string): ActorClaims => ({
@@ -69,6 +71,11 @@ export async function extractClaims(
     const { payload } = await jwtVerify(jwt, deps.jwks(header.iss), {
       audience: deps.audience,
       algorithms: ["RS256", "ES256"],
+      // same lifetime tolerance as the kernel's evidence validator default:
+      // the 1s ofac-evidence mints stay verifiable across the decided-push
+      // → re-audit leg (an expired-on-arrival token still denies, the
+      // tolerance only absorbs clock + in-flight latency).
+      clockTolerance: deps.clockToleranceSeconds ?? 30,
     });
     if (payload["delegation"] !== true) return unverified(deps.workloadActor);
     if (typeof payload.iss !== "string" || typeof payload.sub !== "string") {
@@ -94,5 +101,5 @@ export async function extractClaims(
 
 /** Production deps: remote JWKS per issuer, kernel-issued-token audience. */
 export function defaultClaimsDeps(workloadActor: string, audience = "facilitator-api"): ClaimsDeps {
-  return { jwks: remote, audience, workloadActor };
+  return { jwks: remote, audience, workloadActor, clockToleranceSeconds: 30 };
 }

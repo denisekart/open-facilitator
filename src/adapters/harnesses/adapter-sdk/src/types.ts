@@ -99,8 +99,15 @@ export interface CreateAdapterOptions {
   /** Restart backoff schedule (cap-loop forever on the last entry); `[]` disables auto-restart. */
   restartBackoffMs?: readonly number[];
   logger?: LinkLogger;
-  /** Kernel origin for the artifact byte path (RunContext.kernel surfaces it + the token verbatim). Unset ⇒ no kernel surface. */
-  kernel?: { readonly baseUrl: string };
+  /**
+   * Kernel origin for the artifact byte path (Plan 15). `RunContext.kernel`
+   * surfaces it + the bearer for link-plane HTTP; `token` defaults to the
+   * child token — pass the worker's separately enrolled KERNEL link token
+   * when the Gateway-facing token is not one (e2e/example enroll role
+   * `child`: the Gateway fleet secret does not validate kernel-side).
+   * Unset origin ⇒ no kernel surface.
+   */
+  kernel?: { readonly baseUrl: string; readonly token?: string };
 }
 
 export interface AdapterStatus {

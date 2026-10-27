@@ -5,9 +5,11 @@
 //
 // Credential law (as-built Plan 13/14): the CHILD LINK TOKEN IS the workload
 // credential. `POST {base}/api/link/v1/events` with a request_upload command
-// (actorEvidenceRef omitted ⇒ workload-only allow, the AdmissionGate's
-// absent-evidence law) answers 202 with the upload ticket IN-BAND on `data`;
-// bytes then travel to `uploadUrl` when the kernel minted a presigned URL,
+// answers 202 with the upload ticket IN-BAND on `data`; the wire schema makes
+// `actorEvidenceRef` REQUIRED, so the client always rides a non-authoritative
+// pointer (default `workload:adapter`) — the AdmissionGate records unknown
+// schemes and allows on workload authority alone (its absent-evidence law).
+// Bytes then travel to `uploadUrl` when the kernel minted a presigned URL,
 // else to `uploadLocation` on the same base (the kernel-proxied PUT, which
 // counts + hashes + auto-confirms while storing).
 import { createHash, randomUUID } from "node:crypto";
@@ -41,6 +43,13 @@ export interface UploadOptions {
   readonly assignmentId?: string;
   /** `permanent` | `archive` | `<n>d` (schema vocabulary). */
   readonly retentionPolicy?: string;
+  /**
+   * Schema-required pointer to the acting actor's evidence. Unknown/free
+   * schemes are recorded non-authoritative, so the workload-only default
+   * `workload:adapter` rides unchanged unless a delegated human evidence
+   * (`oidc:<jwt>`, kernel-minted `kernel:<id>`) must be presented.
+   */
+  readonly actorEvidenceRef?: string;
 }
 
 export interface ArtifactClient {
@@ -91,6 +100,7 @@ export function createArtifactClient(opts: KernelHttpOptions): ArtifactClient {
         ...(up.workId !== undefined ? { workId: up.workId } : {}),
         ...(up.assignmentId !== undefined ? { assignmentId: up.assignmentId } : {}),
         ...(up.retentionPolicy !== undefined ? { retentionPolicy: up.retentionPolicy } : {}),
+        actorEvidenceRef: up.actorEvidenceRef ?? "workload:adapter",
       };
       const command: EnvelopeCommand = {
         specversion: "1.0",

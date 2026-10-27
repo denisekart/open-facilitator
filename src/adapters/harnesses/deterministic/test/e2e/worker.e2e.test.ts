@@ -265,6 +265,8 @@ describe.skipIf(!E2E)("deterministic worker e2e", () => {
           "org.facilitator.event.assignment.completed.v1",
         );
         return rows.find((r) => r.payload.includes(asgA)) ?? false;
+      }).catch((e: unknown) => {
+        throw new Error(`${String(e)}\n${dump("no completed row")}`, { cause: e });
       });
       const envelope = JSON.parse(completed.payload) as {
         data: Record<string, unknown>;
@@ -296,7 +298,9 @@ describe.skipIf(!E2E)("deterministic worker e2e", () => {
       );
       const doc = JSON.parse(docBytes.toString("utf8")) as Record<string, unknown>;
       expect(computeManifestDigest(doc)).toBe(resultDigest); // event digest = document bytes
-      expect(String(doc["manifestId"])).toMatch(/^man-[0-9a-f-]{36}$/); // man-{executionId}
+      expect(String(doc["manifestId"])).toBe(
+        `man-${String(envelope.data["executionId"])}`,
+      ); // man-{executionId}: the wire execution id, echoed from the event
       const docOutput = (doc["outputs"] as Record<string, unknown>[])[0]!;
       const reportBytes = await fetchContent(
         `/api/artifacts/${String(docOutput["artifactId"])}/content`,

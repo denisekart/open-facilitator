@@ -36,6 +36,9 @@ describe("createArtifactClient (stub kernel)", () => {
       const commandData = command?.["data"] as Record<string, unknown> | undefined; // stub echoes the posted envelope
       expect(command?.["type"]).toBe("org.facilitator.command.artifact.request_upload.v1");
       expect(commandData?.["size"]).toBe(BYTES.byteLength);
+      // The frozen schema REQUIRES actorEvidenceRef: the client rides a
+      // non-authoritative workload pointer (unknown scheme ⇒ allow).
+      expect(commandData?.["actorEvidenceRef"]).toBe("workload:adapter");
     } finally {
       await kernel.close();
     }

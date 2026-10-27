@@ -287,7 +287,12 @@ class Adapter implements AdapterHandle {
     const hooks = this.opts.hooks;
     const ctx: RunContext = {
       ...(this.opts.kernel !== undefined
-        ? { kernel: { baseUrl: this.opts.kernel.baseUrl, token: this.childToken() } }
+        ? {
+            kernel: {
+              baseUrl: this.opts.kernel.baseUrl,
+              token: this.opts.kernel.token ?? this.childToken(),
+            },
+          }
         : {}),
       executionId: entry.executionId,
       executionGeneration,

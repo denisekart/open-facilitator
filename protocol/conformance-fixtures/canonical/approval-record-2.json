@@ -1,0 +1,15 @@
+{
+  "approvalId": "01JB0W0M40APPROVAL000000002",
+  "action": {
+    "capabilityId": "research.publish",
+    "resource": "repository:svc-core",
+    "assignmentId": "asg-cmd-1a2b3c4d",
+    "workId": "01JB0W0M40WORK000000000002"
+  },
+  "eligibleActors": [
+    "group:/teams/team-alpha",
+    "user:alice"
+  ],
+  "expiresAt": "2026-10-23T18:00:00Z",
+  "createdAt": "2026-10-22T18:00:00Z"
+}

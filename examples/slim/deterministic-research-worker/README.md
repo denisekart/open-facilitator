@@ -104,6 +104,43 @@ curl -s http://127.0.0.1:8099/status | jq .bindings   # while running: the execu
 
 With `stepMs: 800` the run completes ~1.6s after the assign.
 
+## 5b. The confirm round-trip (Plan 12)
+
+`gateway.yaml` carries `policy: { path: ./policy.yaml }`: `research.analyze`
+stays `allow`, `research.publish` is `confirm` for team-alpha actors. Re-seed
+§4's curl with `"capabilityId": "research.publish"`, a fresh
+`commandId`/`subject`, a **GUID** `workId` (`uuidgen` — the approvals row
+scopes by work id, so the respond route needs one),
+`"actorEvidenceRef": "oidc:<EVIDENCE_JWT>"` (an `ofac-evidence`
+password-grant token for `alice`, below), and
+`inputs: { "objective": "ship it", "sourceRefs": [], "resource":
+"repository:svc-core" }`. The Gateway now parks the assignment
+(`curl -s 127.0.0.1:8099/status | jq .awaitingApproval` → 1) and the kernel holds
+a `pending` row in `facilitator.approvals`. A human answers over REST:
+
+```bash
+EVIDENCE=$(curl -s localhost:8480/realms/facilitator/protocol/openid-connect/token \
+  -d grant_type=password -d client_id=ofac-evidence -d client_secret=evidence-secret \
+  -d username=alice -d password=alice -d 'audience=facilitator-api' | jq -r .access_token)
+APPROVAL_ID=$(docker exec ofac-pg psql -U demo -d facilitator -tA -c \
+  "SELECT approval_id FROM facilitator.approvals WHERE state='pending'")
+USER=$(curl -s localhost:8480/realms/facilitator/protocol/openid-connect/token \
+  -d grant_type=password -d client_id=facilitator-api \
+  -d username=alice -d password=alice | jq -r .access_token)
+WORK_ID=$(docker exec ofac-pg psql -U demo -d facilitator -tA -c \
+  "SELECT work_id FROM facilitator.approvals WHERE approval_id='$APPROVAL_ID'")
+curl -s -X POST "localhost:8088/api/works/$WORK_ID/approvals/$APPROVAL_ID/respond" \
+  -H "Authorization: Bearer $USER" -H 'Content-Type: application/json' \
+  -d '{"decision":"approved","comment":"ship it"}' | jq .   # 200, evidenceRef kernel:...
+```
+
+The kernel's decided-push (`link.gw.demo` outbox row → the Gateway's
+session) wakes the Gateway: it re-evaluates, consumes the approval over the
+Link plane (row flips `consumed`), and the child runs the SAME deterministic
+script — the artifact lands as `*-published.md`. `/status`
+`executions.completed` ticks to 1; a second respond answers `409
+approval-already-consumed`.
+
 ## 6. Verify the artifact digest
 
 The completion event's `resultManifest` carries the report's absolute

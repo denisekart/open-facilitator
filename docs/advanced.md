@@ -78,6 +78,7 @@ The locked YAML surface (`loadConfigFile` rejects any other key, naming it):
 |`childTransport.handshakeTimeoutSeconds` `childTransport.leaseMissedBeats`|hello deadline; lease (default 5 / 2)|
 |`diagnostics.port`|localhost `/status` endpoint; `0` disables|
 |`heartbeatSeconds`|1..3600, default 30|
+|`policy.inline` \| `policy.path`|team policy file (spec §12): exactly one; `path` resolves against the config file's dir; fail-closed loader. `policy.confirmTimeoutSeconds` (default 900) caps how long a `confirm` approval stays pending. Laws + audit line: `docs/security.md`|
 
 ## HarnessAdapter contract
 

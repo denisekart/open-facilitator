@@ -195,10 +195,85 @@ approvalId/digest/decision/actor, `policy_version` `approval-v1`; gate
 evaluations on the REST pair ride `authorization.evaluated:approvals.read`/
 `:approvals.respond`) — never a raw token.
 
+## Team policy engine + the confirm round-trip (spec §12, Plan 12)
+
+The Gateway evaluates every inbound command against the team's policy
+file (`policy.inline` / `policy.path` in `gateway.yaml`; the path resolves
+against the config file's directory — keep it on team-owned, write-protected
+storage, since its rows ARE the team's authorization). Schema:
+`protocol/json-schema/policy-file.v1.json`; the loader
+(`src/gateway/src/policy-file.ts`) is fail-closed: any structural error
+aborts boot. `policyId = owner/sha256-prefix` of the file bytes rides every
+audit line, so a policy edit is visible in the trail.
+
+**Evaluation law** (`src/gateway/src/policy.ts`): a fleet-honesty pre-pass
+first (event.forward always allowed; missing capability, vanished child
+descriptor, steer/cancel of an unsupported capability ⇒ deny), then
+first-match-wins over `policies[]`; no match ⇒ implicit final **deny**.
+A row matches when `capability` equals the command's, a `resources[]` term
+matches the derived resource, and — when `actorAnyOf` is non-empty — one
+term matches the actor claims. `effect` ∈ `allow | deny | confirm`.
+`conditions` are advisory metadata for connectors; the engine NEVER
+evaluates them.
+
+**Resource law** (single boring rule): the resource is
+`data.inputs["resource"]` when that field is a string, else the
+`capabilityId` itself. A `resources[]` term matches on exact equality, `*`
+(matches anything), or a single trailing `*` prefix-glob
+(`repository:svc-*`). Finer per-connector resources are later-plan
+territory.
+
+**Actor-claim law** (`src/gateway/src/claims.ts`): the Gateway trusts
+exactly two identity sources — its own workload identity, and an
+`oidc:<jwt>` `actorEvidenceRef` verifying against the issuer JWKS
+(signature, `iss`, `aud facilitator-api`, `exp` with the kernel's 30 s
+clock-skew default, `delegation: true`). Verified ⇒
+`subject = oidc:<iss>|<sub>` + the token's `groups`. Anything else
+(`kernel:` opaque receipts, bare `identity-evidence:*`, a failed verify) ⇒
+workload-only claims: an untrusted string NEVER buys privilege. Row terms:
+`group:<path>` (case-sensitive, raw or `/teams/`-stripped, verified claims
+only), `user:<principal-or-preferred_username>`, `workload:<id>`.
+`role:<r>` terms match nothing today — no realm mapper mints roles into
+evidence — so a `role:` row denies until one lands (documented limitation).
+
+**The §12 loop** across kernel + Gateway, wire-visible in both directions:
+
+1. `command.work.assign` arrives over the Link; a `confirm` verdict parks a
+   `awaiting-approval` row in the Gateway ledger, publishes
+   `event.approval.required.v1` (with the `action` payload —
+   `{capabilityId, resource, assignmentId, workId}`) to
+   `/api/link/v1/events`, and ACKS the delivery `accepted`. The kernel
+   recomputes the §7.2 digest (cross-language goldens:
+   `canonical/approval-record-1|-2`) and stores
+   `requested_by_endpoint_id` from the Link caller.
+2. A human answers the REST pair (§ above). Every terminal flip
+   (approved/denied/expired/revoked) enqueues
+   `event.approval.decided.v1` on the `link.<endpointId>` outbox channel in
+   the SAME transaction (outbox law; per-decision `commandId` dedupe), and
+   the pump pushes it into the Gateway's session.
+3. The Gateway re-evaluates the parked envelope against CURRENT state
+   (appendix §7.3: a policy flip or a vanished capability denies even after
+   a human approved; `createdAt` must match the parked digest record), then
+   sends `command.approval.consume.v1` (`actorEvidenceRef:
+   workload:<gatewayId>`) synchronously over the Link plane. The kernel
+   flips `approved→consumed` — the EnvelopeAck IS the consume outcome.
+   Denied/expired/revoked settle with one honest `assignment.failed`.
+4. Crash recovery: `GET /api/works/{id}/approvals` (the Gateway SA holds
+   `approvals.read` via the `gateway-workload` role claim rule) re-resolves
+   parked rows on reconnect; a consumed row executes once, a terminal row
+   settles once.
+
+**Gateway audit line** (`src/gateway/src/audit.ts`): every policy decision
+emits exactly one `authorization.evaluated` info line carrying the §12.2
+set — `decision`, `reason`, `workId`/`assignmentId`/`capabilityId`,
+`resource`, the three principals (`callerWorkload`, `gatewayWorkload`,
+`humanSubject` only when claims verified), `policyId`, `actionDigest` +
+`evidenceRef` (kind-only, never the raw token) on approval lines,
+`traceId`/`correlationId` when present.
+
 ## Deferred to later plans
 
 | Concern | Plan |
 |---|---|
-| Refresh-token / session lifecycle for interactive UIs | 12 |
-| Admin surface authorization (replacing `/api/dev/*`) | 12 |
-| Scope-level evidence enforcement (groups→policy) | 12 |
+| Refresh-token / session lifecycle for interactive UIs | 13+ |
+| Admin surface authorization (replacing `/api/dev/*`) | 13+ |

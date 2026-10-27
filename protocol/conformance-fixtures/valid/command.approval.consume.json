@@ -1,0 +1,16 @@
+{
+  "specversion": "1.0",
+  "id": "01JCOMMAND-appr-consume",
+  "source": "urn:workspace:gw-team-alpha",
+  "type": "org.facilitator.command.approval.consume.v1",
+  "subject": "approval/appr-123",
+  "time": "2026-10-22T18:05:01Z",
+  "datacontenttype": "application/json",
+  "dataschema": "https://schemas.openfacilitator.org/v1/command.approval.consume.v1.json",
+  "data": {
+    "commandId": "cmd-131",
+    "approvalId": "appr-123",
+    "actorEvidenceRef": "workload:gw.team-alpha",
+    "comment": "Executing the approved action."
+  }
+}

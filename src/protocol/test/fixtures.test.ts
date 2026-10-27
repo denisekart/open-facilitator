@@ -129,6 +129,26 @@ describe("canonicalization golden (RFC 8785)", () => {
   });
 });
 
+describe("approval-record digest golden — Gateway-shaped action (Plan 12)", () => {
+  const record = JSON.parse(
+    readFileSync(new URL("canonical/approval-record-2.json", fixturesRoot), "utf8"),
+  ) as {
+    approvalId: string;
+    action: Record<string, unknown>;
+    eligibleActors: string[];
+    expiresAt: string;
+    createdAt: string;
+  };
+  const golden = readFileSync(
+    new URL("canonical/approval-record-2.sha256", fixturesRoot),
+    "utf8",
+  ).trim();
+
+  it("canonical/approval-record-2.json digests to the committed golden", () => {
+    expect(computeActionDigest(record)).toBe(golden);
+  });
+});
+
 describe("approval-record digest golden (appendix §7.2)", () => {
   const record = JSON.parse(
     readFileSync(new URL("canonical/approval-record-1.json", fixturesRoot), "utf8"),

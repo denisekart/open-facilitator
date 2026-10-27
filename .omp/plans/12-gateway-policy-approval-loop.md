@@ -1,6 +1,6 @@
 # Plan 12 — Gateway team policy engine and confirm→approval round-trip (refined)
 
-**Status:** 🟡 in progress — kernel wire delta (Steps 0–2) landed; Gateway engine + loop next.
+**Status:** 🟢 done — all steps landed (see the Implementation Status table at the foot of this file).
 **Phase:** C (closer). **Depends on:** 11 (kernel approval lifecycle, 🟢 done) and transitively 09/10. After this plan the full spec §12 loop (policy → confirm → `approval.required` → human responds → decided-push → consume → re-evaluate → execute once) runs across kernel + Gateway.
 **Branching:** work and commit **directly on `main`** (standing directive). Do not push.
 **Size judgment:** kept as ONE plan (approved at replanning): the evaluator is meaningless without the confirm flow, the flow untestable without a `confirm` policy, and the kernel wire delta has no observable behavior alone. Kernel-delta steps commit first so history bisects. Split fallback only if execution drags: 12a = kernel wire delta (Steps 1–2), 12b = Gateway engine + loop (Steps 3–7).
@@ -144,8 +144,8 @@ Update this table whenever a step's state changes (automatically, in the same co
 |2 Kernel delta smoke|Fully implemented: commit 4dbbfa2 — `DecidedPushReachesTheGatewayOverTheHttpFallback` proves pump routing + receipt terminality with zero pump delta|
 |3 Gateway policy engine + config|Fully implemented: `policy-file.ts` (schema-validated loader, revision hash), `claims.ts` (oidc: JWKS verification, workload-only degrade), `TeamPolicy` engine (first-match-wins, deny-by-default, fleet-honesty pre-pass), `policy:` config block (inline/path, configDir resolution, confirmTimeoutSeconds), runtime wiring (3 call-sites widened, boot warning); 158 gateway unit tests green|
 |4 Gateway audit lines|Fully implemented: `audit.ts` `authorization.evaluated` line with the §12.2 field set; wired at every decision point incl. the former event-forward silent drop|
-|5 Confirm lifecycle (pending ledger, ingest, consume)|Not started|
-|6 e2e loop + worker capability|Not started|
-|7 Fixtures + docs + skill + roadmap|Not started|
+|5 Confirm lifecycle (pending ledger, ingest, consume)|Fully implemented: commit 59eee74 — ledger v3 `pending_actions`, decided ingest + §7.3 re-evaluate, synchronous Link-plane consume, kernel-REST reconcile, steer/cancel arms, `awaitingApproval` status bucket; 177 gateway unit tests green|
+|6 e2e loop + worker capability|Fully implemented: commit 52613ac + worker publish branch — `approval-loop.e2e.test.ts` (confirm round-trip w/ kernel-recomputed digest + consume-once + 409 replay, deny, cancel-on-pending, cross-team ceiling) green 3/3 stability runs; `make gateway-e2e` 7 files, `make worker-e2e` green; policy config matrix in `test/config/config.test.ts`|
+|7 Fixtures + docs + skill + roadmap|In progress: 4 envelope fixtures + 2nd cross-language golden wired into both harnesses (71 cases, both harnesses green); docs/security.md policy+loop+audit sections, docs/protocol.md rows, example policy.yaml + §5b walkthrough, skills as-built (architecture/protocol/workspace-packaging), roadmap row 🟢 — pending the full gate set|
 
 States: Not started / In progress / Partially implemented: <what>/ Fully implemented: <evidence>/ Blocked: <reason>.

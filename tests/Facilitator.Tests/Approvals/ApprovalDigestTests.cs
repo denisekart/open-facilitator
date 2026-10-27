@@ -15,20 +15,20 @@ namespace Facilitator.Tests.Approvals;
 /// </summary>
 public sealed class ApprovalDigestTests
 {
-    private static readonly string Golden = File.ReadAllText(
-        Path.Combine(PostgresFixture.FixtureRoot(), "canonical", "approval-record-1.sha256")).Trim();
+    private static string Golden(string name) => File.ReadAllText(
+        Path.Combine(PostgresFixture.FixtureRoot(), "canonical", name)).Trim();
 
     [Fact]
     public void GoldenRecordDigestsToTheCommittedValue()
     {
-        var (id, action, actors, expiresAt, createdAt) = GoldenRecord();
-        Assert.Equal(Golden, ApprovalDigest.Compute(id, action, actors, expiresAt, createdAt));
+        var (id, action, actors, expiresAt, createdAt) = GoldenRecord("approval-record-1.json");
+        Assert.Equal(Golden("approval-record-1.sha256"), ApprovalDigest.Compute(id, action, actors, expiresAt, createdAt));
     }
 
     [Fact]
     public void DigestIgnoresActionKeyOrderAndNfdSpelling()
     {
-        var (id, action, actors, expiresAt, createdAt) = GoldenRecord();
+        var (id, action, actors, expiresAt, createdAt) = GoldenRecord("approval-record-1.json");
         var baseline = ApprovalDigest.Compute(id, action, actors, expiresAt, createdAt);
 
         // Same action, every object's keys reversed + every string re-spelled
@@ -36,6 +36,18 @@ public sealed class ApprovalDigestTests
         // the canonical form — hence the digest — identical.
         var flipped = JsonDocument.Parse(Reverse(action).ToJsonString()).RootElement;
         Assert.Equal(baseline, ApprovalDigest.Compute(id, flipped, actors, expiresAt, createdAt));
+    }
+
+    /// <summary>
+    /// Plan 12: the SECOND golden carries the exact action shape the Gateway
+    /// records (capabilityId/resource/assignmentId/workId) — the kernel must
+    /// recompute the Gateway's declared digest byte-for-byte.
+    /// </summary>
+    [Fact]
+    public void GatewayShapedGoldenRecordDigestsToTheCommittedValue()
+    {
+        var (id, action, actors, expiresAt, createdAt) = GoldenRecord("approval-record-2.json");
+        Assert.Equal(Golden("approval-record-2.sha256"), ApprovalDigest.Compute(id, action, actors, expiresAt, createdAt));
     }
 
     private static JsonNode Reverse(JsonElement element) => element.ValueKind switch
@@ -48,9 +60,9 @@ public sealed class ApprovalDigestTests
         _ => JsonNode.Parse(element.GetRawText())!,
     };
 
-    private static (string Id, JsonElement Action, string[] Actors, DateTime ExpiresAt, DateTime CreatedAt) GoldenRecord()
+    private static (string Id, JsonElement Action, string[] Actors, DateTime ExpiresAt, DateTime CreatedAt) GoldenRecord(string file)
     {
-        var text = PostgresFixture.ReadFixture(Path.Combine("canonical", "approval-record-1.json"));
+        var text = PostgresFixture.ReadFixture(Path.Combine("canonical", file));
         var root = JsonDocument.Parse(text).RootElement;
         return (
             root.GetProperty("approvalId").GetString()!,

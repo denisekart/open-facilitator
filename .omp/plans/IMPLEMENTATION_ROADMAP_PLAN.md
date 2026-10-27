@@ -124,9 +124,15 @@ The repo is spec-only: `docs/specs/open_facilitator_framework_architecture.md` (
 **Depends on:** 09, 10
 
 ### Plan 12 — Gateway team policy engine and confirm→approval round-trip
-**Status:** ⬜ not-started (detail design: `12-gateway-policy-approval-loop.md`)
+**Status:** 🟢 implemented (detail design + status table: `12-gateway-policy-approval-loop.md`)
 **Objective:** Gateway half of §12: typed allow/deny/confirm YAML policy replacing `DefaultPolicy`'s guts at untouched call-sites, confirm→`approval.required`→consume→re-evaluate→execute loop, cross-resource denial. Closes Phase C (slice-4 exit, §26.1 items 5+8 complete).
 **Depends on:** 11
+
+**Phase C closed:** the full spec §12 loop runs across kernel + Gateway —
+policy → confirm → `approval.required` (kernel-recomputed digest) → human
+respond → decided-push → consume → re-evaluate → execute once — proven
+end-to-end by `src/gateway/test/e2e/approval-loop.e2e.test.ts` over real
+process + DB boundaries (§26.1 items 5+8 complete).
 
 **Normalized against Phase B as-built:** approval/command/event schemas and the RFC 8785 golden fixtures froze in Plan 01 — `approval.respond` is already a known command and the `approvals` table already exists (schema-only), so Phase C adds behavior, not contract (one additive amendment allowed per plan if a frozen schema proves short, both-harness fixtures same commit); the interim seams are single-extension-point (`IIngressTokenValidator` 09, `ILinkTokenValidator` 10, `policy.ts` call-site-stable seam 12) and are deleted, not shimmed, at cutover; the `default`-team seed, `dev-token`, and `enroll-dev` literals die with 09/10's test cutover (Keycloak testcontainer, realm file as single source of truth).
 

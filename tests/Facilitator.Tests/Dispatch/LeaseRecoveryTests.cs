@@ -32,10 +32,14 @@ public class LeaseRecoveryTests(PostgresFixture fixture)
         var reclaimed = await dispatcher.ReclaimExpiredLeasesAsync(CancellationToken.None);
         Assert.Equal(1, reclaimed);
         Assert.Equal(1, await fixture.Db.OutboxCountBy(workId, "pending", noLeaseOwner: true));
-        Assert.Equal(1, await dispatcher.DrainOnceAsync(CancellationToken.None));
+        // The drain is global (shared suite DB, parallel collections leave
+        // their own pending rows), so assert OUR row via the probe and treat
+        // the drain count / dev ledger as at-least-this-row, like the
+        // sibling restart-survival poll does.
+        Assert.True(await dispatcher.DrainOnceAsync(CancellationToken.None) >= 1);
         Assert.Equal(1, await fixture.Db.OutboxCountBy(workId, "delivered", attempts: 2));
 
         var ledger = await KernelOps.GetJsonAsync(client, "/api/dev/deliveries", HttpStatusCode.OK);
-        Assert.Equal(1, ledger.GetArrayLength());
+        Assert.True(ledger.GetArrayLength() >= 1);
     }
 }

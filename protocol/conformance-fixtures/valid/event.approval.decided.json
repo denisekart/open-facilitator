@@ -1,0 +1,19 @@
+{
+  "specversion": "1.0",
+  "id": "01JEVENT-approval-decided-approved",
+  "source": "urn:kernel:instance-1",
+  "type": "org.facilitator.event.approval.decided.v1",
+  "subject": "approval/appr-123",
+  "time": "2026-10-22T18:05:00Z",
+  "datacontenttype": "application/json",
+  "dataschema": "https://schemas.openfacilitator.org/v1/event.approval.decided.v1.json",
+  "data": {
+    "approvalId": "appr-123",
+    "decision": "approved",
+    "decidedBy": "oidc:https://idp/realms/f|alice-sub",
+    "evidenceRef": "kernel:receipt-77",
+    "expiresAt": "2026-10-23T18:00:00Z",
+    "createdAt": "2026-10-22T18:00:00Z",
+    "workId": "work-123"
+  }
+}

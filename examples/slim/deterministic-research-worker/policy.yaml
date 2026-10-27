@@ -1,0 +1,13 @@
+# Team policy for the walkthrough (§5b): analyze stays free, publish
+# requires a human confirm from a team-alpha member. First-match-wins,
+# implicit final deny (docs/security.md "Team policy engine").
+owner: team-alpha
+policies:
+  - capability: research.analyze
+    resources: ["*"]
+    actorAnyOf: []
+    effect: allow
+  - capability: research.publish
+    resources: ["*"]
+    actorAnyOf: ["group:/teams/team-alpha"]
+    effect: confirm

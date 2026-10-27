@@ -18,3 +18,5 @@ childTransport:
 diagnostics:
   port: 8099
 heartbeatSeconds: 5
+policy:
+  path: ./policy.yaml

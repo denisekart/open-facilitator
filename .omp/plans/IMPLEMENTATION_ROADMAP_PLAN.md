@@ -153,7 +153,7 @@ process + DB boundaries (§26.1 items 5+8 complete).
 **Depends on:** 13
 
 ### Plan 15 — Result manifests, typed outputs, worker artifact cutover, `@ofac/adapter` artifact client
-**Status:** 🟡 in-progress (detail design: `15-result-manifests-worker-cutover.md`)
+**Status:** 🟢 done (detail design: `15-result-manifests-worker-cutover.md`)
 **Objective:** Immutable Result Manifests with revision chains + RFC 8785 digests as kernel records, completed-event amendment (spec §15.3 ref+digest shape), deterministic-worker cutover off the inline/`file://` interim, artifact client in `@ofac/adapter`. Slice-5 exit (artifact half).
 **Depends on:** 13, 14
 

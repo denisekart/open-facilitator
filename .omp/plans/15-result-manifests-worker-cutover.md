@@ -1,6 +1,6 @@
 # Plan 15 — Result manifests, typed outputs, worker artifact cutover, `@ofac/adapter` artifact client
 
-**Status:** 🟡 In progress (🟢 on CI green — Implementation Status table below).
+**Status:** 🟢 Done (all five steps below; full gate green 2026-10-27: `make build` 0 warnings, `make test` incl. 10 Results-tier verticals + 82/82 fixtures, `make lint`, `make docs-check`, repo-wide `typecheck`, `make gateway-e2e` 13/13, worker e2e re-run green post-hygiene).
 **Phase:** D (third). **Depends on:** 13 + 14 (artifact store as-built, both 🟢). Cuts over Plan 07's inline-manifest/`file://` interim.
 **Branching:** work and commit **directly on `main`** (standing directive from Plans 03–08). Do not push.
 **Landing note:** on approval, copy this file's content over `.omp/plans/15-result-manifests-worker-cutover.md` (first commit of Step 1) — that file is the canonical plan record; the Implementation Status table there is the living status from then on.

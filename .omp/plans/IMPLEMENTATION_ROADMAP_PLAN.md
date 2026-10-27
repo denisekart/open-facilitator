@@ -148,7 +148,7 @@ process + DB boundaries (§26.1 items 5+8 complete).
 **Depends on:** 03
 
 ### Plan 14 — S3 artifact backend: SeaweedFS adapter, signed URLs, verified external refs, retention GC
-**Status:** ⬜ not-started (detail design: `14-s3-artifact-backend-gc.md`)
+**Status:** 🟢 implemented (detail design + status table: `14-s3-artifact-backend-gc.md`; execution record + divergences: `14_S3_ARTIFACT_BACKEND_GC_PLAN.md`)
 **Objective:** S3-wire `IArtifactStore` adapter (SeaweedFS test/dev only), presigned upload/download cutover of the 13 interim, operator-bound external-ref SSRF screen, retention GC pass. Provider behavior is a test matrix, not a fork.
 **Depends on:** 13
 

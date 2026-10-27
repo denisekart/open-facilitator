@@ -1,6 +1,6 @@
 # Plan 14 — S3 artifact backend: SeaweedFS adapter, signed URLs, verified external refs, retention GC
 
-**Status:** ⬜ Not started (🔵 replanning → 🟡 in-progress → 🟢 done via the Implementation Status table below).
+**Status:** 🟢 implemented locally — executed against `14_S3_ARTIFACT_BACKEND_GC_PLAN.md` (its Implementation Status table is the record of evidence + divergences); flips green on CI (detail design: this file).
 **Phase:** D (second). **Depends on:** 13 (artifact store core, as-built). Config-plane consumer of Plan 09's role gate.
 **Branching:** work and commit **directly on `main`** (standing directive from Plans 03–08). Do not push.
 **Questions may be asked during planning, but not during implementation.** In implementation, prefer straightforward fixes consistent with this plan; if several iterations fail, step back and simplify rather than adding machinery.
@@ -57,12 +57,12 @@ Replace the filesystem interim with the production-shaped storage backend (spec 
 
 |Step|State|
 |---|---|
-|0 Research|Not started|
-|1 S3 adapter + config + provider matrix|Not started|
-|2 Signed-URL upload cutover|Not started|
-|3 Verified-external + GC|Not started|
-|4 Tests|Not started|
-|5 Docs + skills|Not started|
+|0 Research|Fully implemented: executed plan Step 0|
+|1 S3 adapter + config + provider matrix|Fully implemented: executed plan Step 1|
+|2 Signed-URL upload cutover|Fully implemented: executed plan Step 2 (ticket + confirm + 302 + wire amendment)|
+|3 Verified-external + GC|Fully implemented: executed plan Step 3|
+|4 Tests|Fully implemented: executed plan Step 4 (dual-leg matrix + GC suite, 235 .NET tests green locally)|
+|5 Docs + skills|Fully implemented: executed plan Step 5|
 
 States: Not started / In progress / Partially implemented: <what>/ Fully implemented: <evidence>/ Blocked: <reason>. Update this table in the same commit as each step; flip the roadmap Plan 14 row ⬜→🟡 at the first commit, 🟢 on CI green.
 

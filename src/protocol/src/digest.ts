@@ -24,13 +24,34 @@ export interface ApprovalDigestRecord {
 
 /** Canonicalize (RFC 8785) + SHA-256 the approval record → "sha256:…". */
 export function computeActionDigest(record: ApprovalDigestRecord): string {
-  const canonical = canonicalize({
-    approvalId: nfc(record.approvalId),
-    action: nfc(record.action),
-    eligibleActors: record.eligibleActors.map(nfc),
+  return digestCanonical(nfc({
+    approvalId: record.approvalId,
+    action: record.action,
+    eligibleActors: record.eligibleActors,
     expiresAt: record.expiresAt,
     createdAt: record.createdAt,
-  });
+  }));
+}
+
+/**
+ * The Result Manifest digest (Plan 15, spec §15.3): SHA-256 over the
+ * RFC 8785 canonical form of the manifest document, NFC-normalized — the
+ * same law as `computeActionDigest` over a different document. Producers
+ * serialize the manifest WITH `canonicalizeManifest` so the stored bytes
+ * equal the canonical form the kernel re-verifies byte-for-byte.
+ */
+export function computeManifestDigest(manifest: Record<string, unknown>): string {
+  return digestCanonical(nfc(manifest));
+}
+
+/** The document bytes a producer must store for `computeManifestDigest` to
+ *  match: RFC 8785 canonical form, NFC-normalized strings. */
+export function canonicalizeManifest(manifest: Record<string, unknown>): string {
+  return canonicalize(nfc(manifest)) as string;
+}
+
+function digestCanonical(canonicalInput: unknown): string {
+  const canonical = canonicalize(canonicalInput);
   return (
     "sha256:" +
     createHash("sha256")

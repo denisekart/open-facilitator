@@ -7,7 +7,9 @@ import { createHash } from "node:crypto";
 import canonicalize from "canonicalize";
 import { describe, expect, it } from "vitest";
 import {
+  canonicalizeManifest,
   computeActionDigest,
+  computeManifestDigest,
   enforceSizeLimit,
   negotiateProtocolVersion,
   validateControlFrame,
@@ -184,5 +186,27 @@ describe("approval-record digest golden (appendix §7.2)", () => {
     expect(
       computeActionDigest({ ...record, action: flip(record.action) as Record<string, unknown> }),
     ).toBe(golden);
+  });
+});
+
+describe("result-manifest digest golden (Plan 15, spec §15.3)", () => {
+  const raw = readFileSync(
+    new URL("canonical/result-manifest-1.json", fixturesRoot),
+    "utf8",
+  );
+  const golden = readFileSync(
+    new URL("canonical/result-manifest-1.sha256", fixturesRoot),
+    "utf8",
+  ).trim();
+
+  it("canonical/result-manifest-1.json digests to the committed golden", () => {
+    expect(computeManifestDigest(JSON.parse(raw) as Record<string, unknown>)).toBe(golden);
+  });
+
+  it("the stored file bytes are the canonical form byte-for-byte", () => {
+    // The kernel records the manifest digest over the STORED bytes and
+    // rejects non-canonical submissions, so the golden must be stored
+    // already-canonical (sorted keys, no insignificant whitespace, NFC).
+    expect(canonicalizeManifest(JSON.parse(raw) as Record<string, unknown>)).toBe(raw);
   });
 });

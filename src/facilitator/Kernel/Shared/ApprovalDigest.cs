@@ -42,6 +42,27 @@ public static class ApprovalDigest
         return "sha256:" + Convert.ToHexString(SHA256.HashData(JsonCanonicalizer.CanonicalizeToUtf8(text))).ToLowerInvariant();
     }
 
+    /// <summary>
+    /// The Result Manifest digest law (Plan 15, spec §15.3): SHA-256 over the
+    /// RFC 8785 canonical form of an arbitrary document, NFC-normalized with
+    /// the same normalization as <see cref="Compute"/> — one law, two
+    /// documents. The <c>@ofac/protocol</c> <c>computeManifestDigest</c>
+    /// export is the TS mirror checked against
+    /// <c>canonical/result-manifest-1.sha256</c>.
+    /// </summary>
+    public static string CanonicalDocument(JsonElement document)
+    {
+        var text = JsonSerializer.Serialize(Normalize(document));
+        return "sha256:" + Convert.ToHexString(SHA256.HashData(JsonCanonicalizer.CanonicalizeToUtf8(text))).ToLowerInvariant();
+    }
+
+    /// <summary>The canonical form (sorted keys, no insignificant whitespace,
+    /// NFC) of <paramref name="document"/> as UTF-8 bytes — what a manifest
+    /// upload must be byte-for-byte for <see cref="CanonicalDocument"/> to
+    /// match the stored bytes.</summary>
+    public static byte[] CanonicalBytes(JsonElement document) =>
+        JsonCanonicalizer.CanonicalizeToUtf8(JsonSerializer.Serialize(Normalize(document)));
+
     /// <summary>RFC 3339 UTC second-precision rendering shared by every digest caller.</summary>
     public static string Format(DateTime value) =>
         value.ToUniversalTime().ToString(TimestampFormat, CultureInfo.InvariantCulture);

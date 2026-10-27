@@ -323,23 +323,45 @@ export interface AssignmentCompletedEventV1Data {
   assignmentId: string;
   executionGeneration: number;
   executionId: string;
+  resultDigest?: string;
   resultManifest: ResultManifestObject;
+  resultManifestRef?: string;
   workId: string;
 }
 
 export interface ResultManifestObject {
+  assignmentId?: string;
+  capability?: string;
+  createdAt?: string;
+  externalRefs?: string[];
   manifestId: string;
   notes?: string;
   outputs: ArtifactRef[];
+  revision?: number;
   revisionOf?: string;
+  sourceRefs?: string[];
+  structuredResult?: { [key: string]: unknown };
+  summary?: string;
+  workId?: string;
   [property: string]: unknown;
 }
 
 export interface ArtifactRef {
   artifactId: string;
+  /**
+   * Optional handling/classification label (e.g. internal). Plan 15 widened artifactRef
+   * additively; opaque to the kernel.
+   */
+  classification?: string;
   createdAt: string;
   createdBy: string;
   digest: string;
+  /**
+   * Optional producer-owned taxonomy label (e.g. analysis.report). Plan 15 widened
+   * artifactRef additively; the kernel treats unknown values as opaque (spec 15.6
+   * extensibility).
+   */
+  kind?: string;
   mediaType: string;
   size: number;
   storageUrl: string;
@@ -416,9 +438,18 @@ export interface ReceiptV1 {
 export type ReceiptV1Status = "accepted" | "duplicate" | "rejected" | "unsupported";
 
 export interface ResultManifestV1 {
+  assignmentId?: string;
+  capability?: string;
+  createdAt?: string;
+  externalRefs?: string[];
   manifestId: string;
   notes?: string;
   outputs: ArtifactRef[];
+  revision?: number;
   revisionOf?: string;
+  sourceRefs?: string[];
+  structuredResult?: { [key: string]: unknown };
+  summary?: string;
+  workId?: string;
   [property: string]: unknown;
 }

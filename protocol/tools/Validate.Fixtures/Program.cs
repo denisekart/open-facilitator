@@ -153,6 +153,25 @@ foreach (var c in cases)
     }
 }
 
+// ---- result-manifest golden (RFC 8785 manifest digest + canonical-bytes law, Plan 15) ----
+{
+    var manifestGolden = File.ReadAllText(Path.Combine(fixturesDir, "canonical", "result-manifest-1.sha256")).Trim();
+    var manifestRaw = File.ReadAllText(Path.Combine(fixturesDir, "canonical", "result-manifest-1.json"));
+    using var manifestDoc = JsonDocument.Parse(manifestRaw);
+    var manifestDigest = ApprovalDigest.CanonicalDocument(manifestDoc.RootElement);
+    // The kernel rejects non-canonical submissions: the stored golden must BE
+    // the canonical form, byte-for-byte (UTF-8, no trailing newline).
+    var canonicalBytes = ApprovalDigest.CanonicalBytes(manifestDoc.RootElement);
+    var bytesMatch = canonicalBytes.AsSpan().SequenceEqual(Encoding.UTF8.GetBytes(manifestRaw));
+    var manifestPass = manifestDigest == manifestGolden && bytesMatch;
+    Console.WriteLine($"[{(manifestPass ? "PASS" : "FAIL")}] canonical/result-manifest-1.json valid/schema-violation");
+    if (!manifestPass)
+    {
+        Console.WriteLine($"  digest {manifestDigest} != golden {manifestGolden}; canonical-bytes match: {bytesMatch}");
+        failed++;
+    }
+}
+
 Console.WriteLine(failed == 0 ? $"ALL {cases.Count} FIXTURE CASES PASS" : $"{failed} FAILURE(S)");
 return failed == 0 ? 0 : 1;
 

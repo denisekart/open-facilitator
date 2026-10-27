@@ -24,6 +24,48 @@
     "notes": {
       "type": "string",
       "maxLength": 4096
+    },
+    "workId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "assignmentId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "capability": {
+      "type": "string",
+      "maxLength": 256
+    },
+    "summary": {
+      "type": "string",
+      "maxLength": 4096
+    },
+    "structuredResult": {
+      "type": "object"
+    },
+    "externalRefs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uri",
+        "maxLength": 2048
+      }
+    },
+    "sourceRefs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 2048
+      },
+      "maxItems": 256
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
     }
   }
 }

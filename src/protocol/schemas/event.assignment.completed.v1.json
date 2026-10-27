@@ -27,6 +27,26 @@
     },
     "resultManifest": {
       "$ref": "result-manifest.v1.json"
+    },
+    "resultManifestRef": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^artifact://",
+      "maxLength": 2048
+    },
+    "resultDigest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
     }
+  },
+  "if": {
+    "required": [
+      "resultManifestRef"
+    ]
+  },
+  "then": {
+    "required": [
+      "resultDigest"
+    ]
   }
 }

@@ -89,6 +89,12 @@
       "type": "org.facilitator.event.assignment.completed.v1"
     },
     {
+      "file": "valid/event.assignment.completed.with-manifest-ref.json",
+      "expect": "valid",
+      "class": "event",
+      "type": "org.facilitator.event.assignment.completed.v1"
+    },
+    {
       "file": "valid/event.assignment.failed.json",
       "expect": "valid",
       "class": "event",
@@ -402,6 +408,12 @@
       "schemaFile": "adapter.v1.json"
     },
     {
+      "file": "valid/adapter.event.completed.with-manifest-ref.json",
+      "expect": "valid",
+      "class": "adapter",
+      "schemaFile": "adapter.v1.json"
+    },
+    {
       "file": "valid/adapter.heartbeat.json",
       "expect": "valid",
       "class": "adapter",
@@ -445,6 +457,20 @@
       "expect": "invalid",
       "class": "adapter",
       "schemaFile": "adapter.v1.json",
+      "errorClass": "schema-violation"
+    },
+    {
+      "file": "invalid/adapter.event.completed.ref-without-digest.json",
+      "expect": "invalid",
+      "class": "adapter",
+      "schemaFile": "adapter.v1.json",
+      "errorClass": "schema-violation"
+    },
+    {
+      "file": "invalid/event.assignment.completed.bad-manifest-digest.json",
+      "expect": "invalid",
+      "class": "event",
+      "type": "org.facilitator.event.assignment.completed.v1",
       "errorClass": "schema-violation"
     },
     {

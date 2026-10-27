@@ -25,6 +25,7 @@ secrets/
 .ofac-worker/
 .ofac-logs/
 .ofac-linkd.sqlite3
+.ofac-artifacts/
 
 # Generated Feature install payloads (features/build.mjs output)
 features/src/*/pkg/

@@ -1,0 +1,15 @@
+{
+  "specversion": "1.0",
+  "id": "01JCOMMAND-art-cu",
+  "source": "urn:workspace:ws-01",
+  "type": "org.facilitator.command.artifact.confirm_upload.v1",
+  "subject": "artifact/artifact-123",
+  "time": "2026-10-27T18:05:00Z",
+  "datacontenttype": "application/json",
+  "dataschema": "https://schemas.openfacilitator.org/v1/command.artifact.confirm_upload.v1.json",
+  "data": {
+    "commandId": "cmd-141",
+    "artifactId": "018f3b2c-9f0e-7a3d-9b41-2f6c1d8e4a55",
+    "comment": "Bytes landed at the presigned URL; kernel verify please."
+  }
+}

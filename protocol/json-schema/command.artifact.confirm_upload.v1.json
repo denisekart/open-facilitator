@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openfacilitator.org/v1/command.artifact.confirm_upload.v1.json",
+  "title": "ArtifactConfirmUploadCommandV1Data",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "commandId",
+    "artifactId"
+  ],
+  "properties": {
+    "commandId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "artifactId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "comment": {
+      "type": "string",
+      "maxLength": 1024
+    }
+  }
+}

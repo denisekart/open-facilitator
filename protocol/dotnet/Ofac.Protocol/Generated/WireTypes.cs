@@ -321,6 +321,22 @@ namespace Ofac.Protocol
         public ApprovalRespondCommandV1DataDecision decision { get; set; }
     }
 
+    public partial class ArtifactConfirmUploadCommandV1Data
+    {
+        [JsonPropertyName("artifactId")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string artifactId { get; set; }
+
+        [JsonPropertyName("commandId")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string commandId { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("comment")]
+        [JsonConverter(typeof(TentacledMinMaxLengthCheckConverter))]
+        public string? comment { get; set; }
+    }
+
     public partial class ArtifactRequestUploadCommandV1Data
     {
         [JsonPropertyName("actorEvidenceRef")]
@@ -349,7 +365,7 @@ namespace Ofac.Protocol
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("retentionPolicy")]
-        public RetentionPolicy? retentionPolicy { get; set; }
+        public string? retentionPolicy { get; set; }
 
         [JsonPropertyName("size")]
         public long size { get; set; }
@@ -1053,8 +1069,6 @@ namespace Ofac.Protocol
 
     public enum ApprovalRespondCommandV1DataDecision { Approved, Denied };
 
-    public enum RetentionPolicy { Permanent };
-
     public enum ControlFrameKind { FlowControl, Goodbye, Heartbeat, Hello, Welcome };
 
     public enum SupportedTransport { HttpPoll, Signalr, Websocket };
@@ -1086,7 +1100,6 @@ namespace Ofac.Protocol
                 ExecutionConverter.Singleton,
                 CapabilityManifestV1KindConverter.Singleton,
                 ApprovalRespondCommandV1DataDecisionConverter.Singleton,
-                RetentionPolicyConverter.Singleton,
                 ControlFrameKindConverter.Singleton,
                 SupportedTransportConverter.Singleton,
                 RoleConverter.Singleton,
@@ -1424,33 +1437,6 @@ namespace Ofac.Protocol
         }
 
         public static readonly StickyMinMaxLengthCheckConverter Singleton = new StickyMinMaxLengthCheckConverter();
-    }
-
-    internal class RetentionPolicyConverter : JsonConverter<RetentionPolicy>
-    {
-        public override bool CanConvert(Type t) => t == typeof(RetentionPolicy);
-
-        public override RetentionPolicy Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
-        {
-            var value = reader.GetString();
-            if (value == "permanent")
-            {
-                return RetentionPolicy.Permanent;
-            }
-            throw new Exception("Cannot unmarshal type RetentionPolicy");
-        }
-
-        public override void Write(Utf8JsonWriter writer, RetentionPolicy value, JsonSerializerOptions options)
-        {
-            if (value == RetentionPolicy.Permanent)
-            {
-                JsonSerializer.Serialize(writer, "permanent", options);
-                return;
-            }
-            throw new Exception("Cannot marshal type RetentionPolicy");
-        }
-
-        public static readonly RetentionPolicyConverter Singleton = new RetentionPolicyConverter();
     }
 
     internal class IndigoMinMaxLengthCheckConverter : JsonConverter<string>

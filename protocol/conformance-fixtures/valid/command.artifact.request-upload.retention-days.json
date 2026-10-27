@@ -1,0 +1,19 @@
+{
+  "specversion": "1.0",
+  "id": "01JCOMMAND-art-ru-30d",
+  "source": "urn:workspace:ws-01",
+  "type": "org.facilitator.command.artifact.request_upload.v1",
+  "subject": "artifact/artifact-124",
+  "time": "2026-10-27T18:00:00Z",
+  "datacontenttype": "application/json",
+  "dataschema": "https://schemas.openfacilitator.org/v1/command.artifact.request_upload.v1.json",
+  "data": {
+    "commandId": "cmd-143",
+    "mediaType": "application/pdf",
+    "size": 20480,
+    "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "actorEvidenceRef": "identity-evidence:ref-125",
+    "retentionPolicy": "30d",
+    "comment": "Retention family: Nd branch of the widened grammar."
+  }
+}

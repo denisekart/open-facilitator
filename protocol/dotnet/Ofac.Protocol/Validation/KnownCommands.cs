@@ -1,7 +1,7 @@
 namespace Ofac.Protocol.Validation;
 
 /// <summary>
-/// Fail-closed command table: the exact nine <c>org.facilitator.command.*.v1</c>
+/// Fail-closed command table: the exact ten <c>org.facilitator.command.*.v1</c>
 /// types the v1 contract accepts. Mirrors KNOWN_COMMAND_TYPES in
 /// <c>src/protocol/src/validate.ts</c> and the schema-derived set in
 /// <c>protocol/tools/Validate.Fixtures</c>; a command type outside this set is
@@ -15,6 +15,7 @@ public static class KnownCommands
         "org.facilitator.command.approval.consume.v1",
         "org.facilitator.command.approval.respond.v1",
         "org.facilitator.command.artifact.request_upload.v1",
+        "org.facilitator.command.artifact.confirm_upload.v1",
         "org.facilitator.command.context.fetch.v1",
         "org.facilitator.command.work.assign.v1",
         "org.facilitator.command.work.cancel.v1",

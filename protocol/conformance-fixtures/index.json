@@ -53,6 +53,18 @@
       "type": "org.facilitator.command.artifact.request_upload.v1"
     },
     {
+      "file": "valid/command.artifact.request-upload.retention-days.json",
+      "expect": "valid",
+      "class": "command",
+      "type": "org.facilitator.command.artifact.request_upload.v1"
+    },
+    {
+      "file": "valid/command.artifact.confirm-upload.json",
+      "expect": "valid",
+      "class": "command",
+      "type": "org.facilitator.command.artifact.confirm_upload.v1"
+    },
+    {
       "file": "valid/event.work.accepted.json",
       "expect": "valid",
       "class": "event",
@@ -261,6 +273,12 @@
     },
     {
       "file": "invalid/command.artifact.request-upload.extra-field.json",
+      "expect": "invalid",
+      "class": "command",
+      "errorClass": "schema-violation"
+    },
+    {
+      "file": "invalid/command.artifact.confirm-upload.no-artifact-id.json",
       "expect": "invalid",
       "class": "command",
       "errorClass": "schema-violation"

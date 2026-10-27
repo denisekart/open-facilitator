@@ -129,6 +129,12 @@ export interface ApprovalRespondCommandV1Data {
 
 export type ApprovalRespondCommandV1DataDecision = "approved" | "denied";
 
+export interface ArtifactConfirmUploadCommandV1Data {
+  artifactId: string;
+  commandId: string;
+  comment?: string;
+}
+
 export interface ArtifactRequestUploadCommandV1Data {
   actorEvidenceRef: string;
   assignmentId?: string;
@@ -136,12 +142,10 @@ export interface ArtifactRequestUploadCommandV1Data {
   comment?: string;
   digest: string;
   mediaType: string;
-  retentionPolicy?: RetentionPolicy;
+  retentionPolicy?: string;
   size: number;
   workId?: string;
 }
-
-export type RetentionPolicy = "permanent";
 
 export interface ContextFetchCommandV1Data {
   actorEvidenceRef: string;

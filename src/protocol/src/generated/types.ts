@@ -129,6 +129,20 @@ export interface ApprovalRespondCommandV1Data {
 
 export type ApprovalRespondCommandV1DataDecision = "approved" | "denied";
 
+export interface ArtifactRequestUploadCommandV1Data {
+  actorEvidenceRef: string;
+  assignmentId?: string;
+  commandId: string;
+  comment?: string;
+  digest: string;
+  mediaType: string;
+  retentionPolicy?: RetentionPolicy;
+  size: number;
+  workId?: string;
+}
+
+export type RetentionPolicy = "permanent";
+
 export interface ContextFetchCommandV1Data {
   actorEvidenceRef: string;
   commandId: string;

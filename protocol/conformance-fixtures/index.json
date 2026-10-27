@@ -47,6 +47,12 @@
       "type": "org.facilitator.command.approval.respond.v1"
     },
     {
+      "file": "valid/command.artifact.request-upload.json",
+      "expect": "valid",
+      "class": "command",
+      "type": "org.facilitator.command.artifact.request_upload.v1"
+    },
+    {
       "file": "valid/event.work.accepted.json",
       "expect": "valid",
       "class": "event",
@@ -237,6 +243,24 @@
     },
     {
       "file": "invalid/command.approval.respond.bad-decision.json",
+      "expect": "invalid",
+      "class": "command",
+      "errorClass": "schema-violation"
+    },
+    {
+      "file": "invalid/command.artifact.request-upload.no-digest.json",
+      "expect": "invalid",
+      "class": "command",
+      "errorClass": "schema-violation"
+    },
+    {
+      "file": "invalid/command.artifact.request-upload.bad-digest.json",
+      "expect": "invalid",
+      "class": "command",
+      "errorClass": "schema-violation"
+    },
+    {
+      "file": "invalid/command.artifact.request-upload.extra-field.json",
       "expect": "invalid",
       "class": "command",
       "errorClass": "schema-violation"

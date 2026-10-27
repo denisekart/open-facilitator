@@ -1,0 +1,17 @@
+{
+  "specversion": "1.0",
+  "id": "01JCOMMAND-art-ru-bad-digest",
+  "source": "urn:workspace:ws-01",
+  "type": "org.facilitator.command.artifact.request_upload.v1",
+  "subject": "artifact/artifact-123",
+  "time": "2026-10-27T18:00:00Z",
+  "datacontenttype": "application/json",
+  "dataschema": "https://schemas.openfacilitator.org/v1/command.artifact.request_upload.v1.json",
+  "data": {
+    "commandId": "cmd-142",
+    "mediaType": "text/markdown",
+    "size": 10240,
+    "digest": "sha256:B5BB9D8014A0F9B1D61E21E796D78DCCDF1352F23CD32812F4850B878AE4944C",
+    "actorEvidenceRef": "identity-evidence:ref-124"
+  }
+}

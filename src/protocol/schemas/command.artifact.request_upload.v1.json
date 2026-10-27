@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openfacilitator.org/v1/command.artifact.request_upload.v1.json",
+  "title": "ArtifactRequestUploadCommandV1Data",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "commandId",
+    "mediaType",
+    "size",
+    "digest",
+    "actorEvidenceRef"
+  ],
+  "properties": {
+    "commandId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "mediaType": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "size": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "actorEvidenceRef": {
+      "$ref": "common.v1.json#/$defs/evidenceRef"
+    },
+    "workId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "assignmentId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "retentionPolicy": {
+      "type": "string",
+      "enum": [
+        "permanent"
+      ]
+    },
+    "comment": {
+      "type": "string",
+      "maxLength": 1024
+    }
+  }
+}

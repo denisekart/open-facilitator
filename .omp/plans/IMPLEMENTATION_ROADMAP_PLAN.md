@@ -143,7 +143,7 @@ process + DB boundaries (§26.1 items 5+8 complete).
 **Split 2026-10-27 against Phase C reality** (plans 00–12 as-built, Phase C closed with the approval loop proven e2e). The two 2026-10-25 entries (13 Artifacts, 14 Memory) were too coarse — the artifact entry bundled storage backends, the upload-flow trust shift, manifest authority, and the producer cutover, three runtimes (kernel, SDK, harness) and two clean-cutover moments (FS→S3, `file://` inline→kernel-stored) — so Phase D is four plans, each with its own detail-design file:
 
 ### Plan 13 — Artifact store core: IArtifactStore, filesystem backend, upload flow, artifact.available wiring
-**Status:** ⬜ not-started (detail design: `13-artifact-store-kernel-core.md`)
+**Status:** 🟡 in-progress (detail design: `13-artifact-store-kernel-core.md`)
 **Objective:** Kernel artifact authority: `artifacts` ledger + `IArtifactStore` port with FS adapter, `command.artifact.request-upload` + kernel-side content PUT with kernel-recomputed SHA-256 verification, real `event.artifact.available` handling, team-scoped read pair. §26.1 item 12 basis.
 **Depends on:** 03
 

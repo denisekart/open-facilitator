@@ -14,10 +14,13 @@ import {
 } from "@ofac/adapter";
 import {
   runAdapterLifecycleContract,
+  startStubKernel,
   untilAborted,
   type AdapterRunGate,
+  type StubKernel,
 } from "@ofac/adapter/testing";
 import { createConsoleLogger } from "@ofac/workspace-link";
+import { afterAll } from "vitest";
 import { createDeterministicHooks } from "../src/harness.js";
 import type { CapabilityManifestV1 } from "@ofac/protocol";
 
@@ -41,6 +44,10 @@ const MANIFEST: CapabilityManifestV1 = {
 };
 
 const CHILD_ID = "gw.kit/deterministic";
+
+// Plan 15: the harness completes over the kernel artifact path, so every
+// adapter booted here needs a kernel surface — the stub stands in.
+const stubKernel: StubKernel = await startStubKernel();
 
 function baseHooks(workDir: string): HarnessHooks {
   return createDeterministicHooks({
@@ -74,6 +81,7 @@ function start(
   return createAdapter({
     childWorkspaceId: CHILD_ID,
     manifest: MANIFEST,
+    kernel: { baseUrl: stubKernel.url },
     transport: { socketPath },
     descriptor: {
       invocation: "sdk",
@@ -109,4 +117,8 @@ runAdapterLifecycleContract({
     void onSteer;
     return start(noSteerPath, gated(noSteer, gate));
   },
+});
+
+afterAll(async () => {
+  await stubKernel.close();
 });

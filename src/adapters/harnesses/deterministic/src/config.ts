@@ -24,6 +24,15 @@ export interface WorkerConfig {
   childWorkspaceId: string;
   /** Env overlay applied: OFAC_CHILD_SECRET wins over the file. */
   token?: string | undefined;
+  /** Kernel origin for the artifact byte path (Plan 15); OFAC_KERNEL_URL overlay. Required by the harness at completion. */
+  kernelUrl?: string | undefined;
+  /**
+   * Bearer for the kernel link plane (Plan 15); OFAC_KERNEL_TOKEN overlay.
+   * The Gateway-facing `token` is NOT a kernel credential unless it is one
+   * (mode-(a) enrollment issues a separate linkToken); unset ⇒ the worker's
+   * own `token` is sent verbatim.
+   */
+  kernelToken?: string | undefined;
   transport: WorkerTransport;
   manifest: CapabilityManifestV1;
   /** Absolute: artifacts land under <workDir>/artifacts/. */
@@ -43,6 +52,8 @@ const TOP_KEYS: Record<string, true> = {
   kind: true,
   childWorkspaceId: true,
   token: true,
+  kernelUrl: true,
+  kernelToken: true,
   transport: true,
   manifestFile: true,
   workDir: true,
@@ -174,6 +185,16 @@ export function parseWorkerConfig(
       ? { token: env["OFAC_CHILD_SECRET"] }
       : optionalString(root, "token") !== undefined
         ? { token: optionalString(root, "token") }
+        : {}),
+    ...(env["OFAC_KERNEL_URL"] !== undefined
+      ? { kernelUrl: env["OFAC_KERNEL_URL"] }
+      : optionalString(root, "kernelUrl") !== undefined
+        ? { kernelUrl: optionalString(root, "kernelUrl") }
+        : {}),
+    ...(env["OFAC_KERNEL_TOKEN"] !== undefined
+      ? { kernelToken: env["OFAC_KERNEL_TOKEN"] }
+      : optionalString(root, "kernelToken") !== undefined
+        ? { kernelToken: optionalString(root, "kernelToken") }
         : {}),
     transport,
     manifest,

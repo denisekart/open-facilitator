@@ -1,18 +1,25 @@
 // The deterministic harness: a two-step, zero-randomness research run that
 // behaves identically every time (Plan 07's worked example — third-party
 // implementers copy this file as the shape of "harness hooks").
-//
 // Script (locked): progress → sleep → progress → sleep → write report →
-// publish assignment.completed.v1 with a result manifest whose digest is
-// the sha256 of the bytes actually on disk. Cancel law: an abort during a
-// sleep unwinds as cancelled — NO terminal event (the accepted stop reply
-// already settled the Gateway row).
-import { createHash } from "node:crypto";
+// publish assignment.completed.v1. Completion truth (Plan 15): the report
+// bytes are UPLOADED to the kernel artifact store over the link plane
+// (child link token), an immutable canonical Result Manifest is uploaded as
+// an artifact, and the completed event carries resultManifestRef +
+// resultDigest — no file:// URLs, no self-declared digests. Cancel law: an
+// abort during a sleep unwinds as cancelled — NO terminal event (the
+// accepted stop reply already settled the Gateway row). A failed upload is
+// an honest failure: the hook throws and the SDK publishes
+// assignment.failed.
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { pathToFileURL } from "node:url";
-import { buildEvent } from "@ofac/workspace-link";
 import type { LinkLogger } from "@ofac/workspace-link";
+import {
+  artifactUri,
+  buildCompletedEvent,
+  buildResultManifest,
+  createArtifactClient,
+} from "@ofac/adapter";
 import type { RunContext, RunOutcome } from "@ofac/adapter";
 
 export interface DeterministicRunOptions {
@@ -20,6 +27,8 @@ export interface DeterministicRunOptions {
   workDir: string;
   stepMs: number;
   logger: LinkLogger;
+  /** Injectable fetch for the artifact upload path (tests); default global. */
+  fetchImpl?: typeof fetch;
 }
 
 export interface DeterministicHooks {
@@ -100,36 +109,73 @@ Deterministic ${publishing ? "publish" : "analysis"} complete.
 `;
     const bytes = Buffer.from(report, "utf8");
     writeFileSync(reportPath, bytes);
-    const digest = `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
-
-    ctx.publishEvent(
-      buildEvent("org.facilitator.event.assignment.completed.v1", {
-        source: `urn:workspace:${childWorkspaceId}`,
-        subject: `work/${workId}/assignment/${assignmentId}`,
-        data: {
-          workId,
-          assignmentId,
-          executionId: ctx.executionId,
-          executionGeneration: ctx.executionGeneration,
-          resultManifest: {
-            manifestId: `man-${ctx.executionId}`,
-            outputs: [
-              {
-                artifactId: `art-${ctx.executionId}-${suffix}`,
-                mediaType: "text/markdown",
-                size: bytes.length,
-                digest,
-                storageUrl: pathToFileURL(reportPath).href,
-                createdBy: `workspace:${childWorkspaceId}`,
-                createdAt: new Date().toISOString(),
-              },
-            ],
-          },
+    if (ctx.kernel === undefined) {
+      throw new Error(
+        "deterministic worker: ctx.kernel unset — kernelUrl is required (Plan 15 retired the file:// inline-manifest path)",
+      );
+    }
+    const client = createArtifactClient({
+      baseUrl: ctx.kernel.baseUrl,
+      token: ctx.kernel.token,
+      ...(options.fetchImpl !== undefined ? { fetchImpl: options.fetchImpl } : {}),
+    });
+    const createdAt = new Date().toISOString();
+    // The report's own bytes land first; the manifest declares them with the
+    // kernel-verified digest from the upload receipt.
+    const reportArtifact = await client.upload(bytes, {
+      mediaType: "text/markdown",
+      workId,
+      assignmentId,
+      retentionPolicy: "30d",
+    });
+    const conclusion =
+      report.split("## Conclusion\n")[1]?.trim().split("\n")[0] ?? "complete.";
+    const manifest = buildResultManifest({
+      manifestId: `man-${ctx.executionId}`,
+      workId,
+      assignmentId,
+      capability: capabilityId,
+      summary: conclusion,
+      structuredResult: {
+        objectiveChars: objective.length,
+        steeringDirectives: seen.length,
+      },
+      outputs: [
+        {
+          artifactId: reportArtifact.artifactId,
+          mediaType: "text/markdown",
+          size: bytes.length,
+          digest: reportArtifact.digest,
+          artifactUri: artifactUri(workId, assignmentId, reportArtifact.artifactId),
+          createdBy: `workspace:${childWorkspaceId}`,
+          createdAt,
+          kind: "analysis.report",
+          classification: "internal",
         },
-        ...(ctx.command.traceparent !== undefined ? { traceparent: ctx.command.traceparent } : {}),
-      }),
+      ],
+      createdAt,
+    });
+    const manifestDoc = await client.upload(manifest.document, {
+      mediaType: "application/json",
+      workId,
+      assignmentId,
+      retentionPolicy: "30d",
+    });
+    ctx.publishEvent(
+      buildCompletedEvent(
+        ctx,
+        { manifestId: `man-${ctx.executionId}`, workId, assignmentId },
+        {
+          manifestRef: artifactUri(workId, assignmentId, manifestDoc.artifactId),
+          digest: manifest.digest,
+        },
+      ),
     );
-    logger.info("worker-completed", { executionId: ctx.executionId, reportPath });
+    logger.info("worker-completed", {
+      executionId: ctx.executionId,
+      reportPath,
+      manifestRef: artifactUri(workId, assignmentId, manifestDoc.artifactId),
+    });
     return { kind: "completed" };
   }
 

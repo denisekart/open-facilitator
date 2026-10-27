@@ -5,6 +5,9 @@ apiVersion: facilitator.framework/v1
 kind: HarnessAdapter
 childWorkspaceId: gw.demo/deterministic
 token: child-secret-demo
+# Plan 15: the completion path uploads report+manifest bytes to this origin
+# with the child token (same secret the Gateway admits us with).
+kernelUrl: http://localhost:8088
 transport:
   socket:
     path: .ofac-gateway/child.sock

@@ -1,21 +1,34 @@
-// E2E worker tier (Plan 07 step 5): the REAL ofac-deterministic-worker
-// binary against a standalone Gateway + a dedicated Facilitator. Proven
-// end-to-end, observable in the kernel inbox + on disk:
+// E2E worker tier (Plan 07 step 5, Plan 15 cutover): the REAL
+// ofac-deterministic-worker binary against a standalone Gateway + a
+// dedicated Facilitator. Proven end-to-end, observable in the kernel:
 // 1. boot → register → the union capability POST (ownerTeam rewritten);
-// 2. seeded work.assign → 2 progress rows → completed row whose
-//    resultManifest validates, whose file:// artifact exists on disk, and
-//    whose sha256 digest matches the bytes;
+// 2. seeded work.assign → 2 progress rows → completed row carrying
+//    resultManifestRef + resultDigest; the manifest document fetched back
+//    through the kernel artifact path re-hashes to the event's digest, the
+//    report artifact's served bytes match the manifest's declared digest,
+//    and facilitator.result_manifests holds revision 1 + a manifest.recorded
+//    timeline row; a re-published completed event chains revision 2 and
+//    supersedes revision 1;
 // 3. steer mid-run lands on the RUNNING execution (visible inside the
-//    report file under "## Steering directives");
+//    served report bytes under "## Steering directives");
 // 4. SIGKILL mid-run → re-spawn → probe `unknown` ⇒ exactly ONE
 //    child-lost-execution assignment.failed (06's crash law, real harness).
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { spawn, type ChildProcess } from "node:child_process";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import { validateAgainstSchemaId } from "@ofac/protocol";
+import {
+  computeManifestDigest,
+  validateAgainstSchemaId,
+  type EnvelopeCommand,
+} from "@ofac/protocol";
+import {
+  artifactUri,
+  buildCompletedEvent,
+  buildResultManifest,
+  createArtifactClient,
+} from "@ofac/adapter";
 import { describe, expect, it } from "vitest";
 import {
   E2E,
@@ -24,13 +37,16 @@ import {
   gatewayStatus,
   gatewayToken,
   inboxRowsByType,
+  kernelToken,
+  psql,
   seedDelivery,
   startGateway,
   useFacilitator,
+  userToken,
   waitFor,
   type Harness,
 } from "../../../../../gateway/test/e2e/gateway-harness.js";
-import { linkGet } from "../../../../../workspace-link/test/e2e/harness.js";
+import { linkGet, linkPost } from "../../../../../workspace-link/test/e2e/harness.js";
 
 const ROOT = new URL("../../../../../../", import.meta.url).pathname;
 
@@ -50,6 +66,8 @@ function startWorker(options: {
   socket: string;
   workDir: string;
   stepMs: number;
+  kernelUrl: string;
+  token: string;
 }): WorkerHandle {
   const dir = mkdtempSync(join(tmpdir(), "worker-e2e-"));
   const configPath = join(dir, "worker.yaml");
@@ -58,6 +76,8 @@ function startWorker(options: {
     `apiVersion: facilitator.framework/v1
 kind: HarnessAdapter
 childWorkspaceId: ${options.childWorkspaceId}
+token: ${options.token}
+kernelUrl: ${options.kernelUrl}
 transport:
   socket:
     path: ${options.socket}
@@ -135,13 +155,6 @@ describe.skipIf(!E2E)("deterministic worker e2e", () => {
       heartbeatSeconds: 2,
     });
     const workDir = mkdtempSync(join(tmpdir(), "worker-e2e-work-"));
-    const gateway = startGateway(gw.configPath);
-    let worker = startWorker({
-      childWorkspaceId: `${gw.gatewayId}/deterministic`,
-      socket: gw.socketPath ?? "",
-      workDir,
-      stepMs: 4000, // a wide steer/kill window per step
-    });
     const dump = (label: string): string =>
       `${label}\nGATEWAY LOG:\n${gateway.log()}\nWORKER LOG:\n${worker.log()}\n`;
     const withDump = <T>(p: Promise<T>, label: string): Promise<T> => {
@@ -151,6 +164,65 @@ describe.skipIf(!E2E)("deterministic worker e2e", () => {
       });
       return Promise.race([p, guard]).finally(() => clearTimeout(timer!));
     };
+    // Plan 15: the worker's kernel credential is a CHILD enrollment — mode
+    // (a) with the dev enrollment secret. The empty-fleet standalone Gateway
+    // admits any hello token, so the SAME link token rides both the child
+    // wire and the kernel link-plane HTTP (the plan's verbatim-token law).
+    const childToken = await (async () => {
+      const r = await linkPost(harness.baseUrl, "/api/link/v1/enroll", "enroll-dev", {
+        token: "enroll-dev",
+        endpointId: "det-e2e-child",
+        instanceId: "e2e-worker",
+        trustMode: "isolated-executor",
+        team: "team-alpha",
+        role: "child",
+      });
+      if (r.status !== 201) throw new Error(`child enroll failed: ${r.status}`);
+      return String((r.body as { linkToken: string }).linkToken);
+    })();
+    // Real works on a team-alpha PROJECT (the ledger resolves team scope via
+    // work → project → team; a projectless work answers manifest-not-found):
+    // seed the project row over psql, create works over kernel REST. GUID
+    // ids: the ledger's work_id/assignment_id are uuid.
+    const projectRows = await psql(
+      harness.dbUrl,
+      `INSERT INTO facilitator.projects (project_id, team_id, name, config, created_at)
+       VALUES (gen_random_uuid(), (SELECT team_id FROM facilitator.teams WHERE slug = 'team-alpha'),
+               'e2e-worker-proj', '{}', now())
+       RETURNING project_id`,
+    );
+    const projectId = projectRows[0]!;
+    const workIdOf = async (objective: string): Promise<string> => {
+      const r = await linkPost(harness.baseUrl, "/api/works", await kernelToken(), {
+        objective,
+        capabilityId: "research.analyze",
+        projectId,
+      });
+      if (r.status !== 201) throw new Error(`work create failed: ${r.status}`);
+      return String((r.body as { workId: string }).workId);
+    };
+    const fetchContent = async (path: string, token: string): Promise<Buffer> => {
+      const r = await fetch(`${harness.baseUrl}${path}`, {
+        headers: { authorization: `Bearer ${token}` },
+      });
+      if (!r.ok) throw new Error(`GET ${path} -> ${r.status}`);
+      return Buffer.from(await r.arrayBuffer());
+    };
+    const alice = await userToken("alice", "alice");
+    const workA = await workIdOf("worker e2e plain run");
+    const workB = await workIdOf("worker e2e steered run");
+    // GUID assignment ids: the ledger's assignment_id is uuid.
+    const asgA = randomUUID();
+    const asgB = randomUUID();
+    const gateway = startGateway(gw.configPath);
+    let worker = startWorker({
+      childWorkspaceId: `${gw.gatewayId}/deterministic`,
+      socket: gw.socketPath ?? "",
+      workDir,
+      stepMs: 4000, // a wide steer/kill window per step
+      kernelUrl: harness.baseUrl,
+      token: childToken,
+    });
     try {
       // ── 1. boot + register + capability union (ownerTeam rewritten) ──
       const ready = await withDump(gateway.ready(), "awaiting gateway ready line");
@@ -179,20 +251,20 @@ describe.skipIf(!E2E)("deterministic worker e2e", () => {
         gw.gatewayId, // the endpointId is the gatewayId (06 idiom)
         assignEnvelope({
           commandId: "e2e-det-1",
-          workId: "work-det-1",
-          assignmentId: "asg-det-1",
+          workId: workA,
+          assignmentId: asgA,
         }),
       );
       await waitFor("two progress rows", async () => {
         const rows = await inboxRowsByType(harness.dbUrl, "org.facilitator.event.work.progress.v1");
-        return rows.filter((r) => r.payload.includes("asg-det-1")).length >= 2 ? true : false;
+        return rows.filter((r) => r.payload.includes(asgA)).length >= 2 ? true : false;
       });
       const completed = await waitFor("completed row lands", async () => {
         const rows = await inboxRowsByType(
           harness.dbUrl,
           "org.facilitator.event.assignment.completed.v1",
         );
-        return rows.find((r) => r.payload.includes("asg-det-1")) ?? false;
+        return rows.find((r) => r.payload.includes(asgA)) ?? false;
       });
       const envelope = JSON.parse(completed.payload) as {
         data: Record<string, unknown>;
@@ -203,51 +275,184 @@ describe.skipIf(!E2E)("deterministic worker e2e", () => {
           envelope.data,
         ).ok,
       ).toBe(true);
-      const output = (envelope.data["resultManifest"] as { outputs: Record<string, unknown>[] })
-        .outputs[0] as Record<string, unknown>;
-      const artifactPath = fileURLToPath(String(output["storageUrl"]));
-      const bytes = readFileSync(artifactPath); // the file:// ref is REAL
-      expect(output["digest"]).toBe(`sha256:${createHash("sha256").update(bytes).digest("hex")}`);
+      // The amendment's shape: ref + digest ride together; the inline
+      // manifest is the deprecated empty shell.
+      const ref = String(envelope.data["resultManifestRef"]);
+      const resultDigest = String(envelope.data["resultDigest"]);
+      expect(ref.startsWith("artifact://")).toBe(true);
+      expect(resultDigest).toMatch(/^sha256:[0-9a-f]{64}$/);
+      expect(
+        (envelope.data["resultManifest"] as { outputs: unknown[] }).outputs,
+      ).toEqual([]);
+      // The manifest document rides the artifact content path (last path
+      // segment = kernel artifact GUID), stored ALREADY canonical.
+      const manifestArtifactId = ref.split("/").pop()!;
+      const docBytes = await fetchContent(
+        `/api/artifacts/${manifestArtifactId}/content`,
+        alice,
+      );
+      expect(Buffer.from(docBytes).toString("utf8")).toBe(
+        Buffer.from(docBytes).toString("utf8").trim(),
+      );
+      const doc = JSON.parse(docBytes.toString("utf8")) as Record<string, unknown>;
+      expect(computeManifestDigest(doc)).toBe(resultDigest); // event digest = document bytes
+      expect(String(doc["manifestId"])).toMatch(/^man-[0-9a-f-]{36}$/); // man-{executionId}
+      const docOutput = (doc["outputs"] as Record<string, unknown>[])[0]!;
+      const reportBytes = await fetchContent(
+        `/api/artifacts/${String(docOutput["artifactId"])}/content`,
+        alice,
+      );
+      expect("sha256:" + createHash("sha256").update(reportBytes).digest("hex")).toBe(
+        String(docOutput["digest"]),
+      ); // declared == served
+      expect(docOutput["kind"]).toBe("analysis.report");
+      // Ledger truth: revision-1 row, timeline, and the GET pair.
+      await waitFor("result_manifests revision 1", async () => {
+        const rows = await psql(
+          harness.dbUrl,
+          `SELECT digest || '|' || state FROM facilitator.result_manifests WHERE assignment_id = '${asgA}'`,
+        );
+        return rows[0] === `${resultDigest}|recorded` ? true : false;
+      });
+      const kinds = await psql(
+        harness.dbUrl,
+        `SELECT DISTINCT kind FROM facilitator.work_events WHERE work_id = '${workA}'`,
+      );
+      expect(kinds).toContain("manifest.recorded");
+      const listed = await linkGet(harness.baseUrl, `/api/works/${workA}/manifests`, alice);
+      expect(listed.status).toBe(200);
+      const visible = listed.body as Array<Record<string, unknown>>;
+      expect(visible).toHaveLength(1);
+      expect(visible[0]!).toMatchObject({
+        revision: 1,
+        state: "recorded",
+        digest: resultDigest,
+        artifactId: manifestArtifactId,
+      });
 
-      // ── 3. steer mid-run: lands on the RUNNING execution, in the file ──
+      // ── 2b. correction: a second completed event chains revision 2 ──
+      // Published straight at the kernel over the link plane (the same
+      // child credential); a fresh manifest document, the same assignment.
+      const client = createArtifactClient({ baseUrl: harness.baseUrl, token: childToken });
+      const correction = buildResultManifest({
+        manifestId: "man-correction-det-1",
+        workId: workA,
+        assignmentId: asgA,
+        revisionOf: String(doc["manifestId"]),
+        summary: "corrected summary",
+        outputs: [
+          {
+            artifactId: String(docOutput["artifactId"]),
+            mediaType: "text/markdown",
+            size: reportBytes.length,
+            digest: String(docOutput["digest"]),
+            artifactUri: artifactUri(workA, asgA, String(docOutput["artifactId"])),
+            createdBy: "workspace:gw.team-alpha/deterministic",
+            createdAt: String(docOutput["createdAt"]),
+          },
+        ],
+        createdAt: new Date().toISOString(),
+      });
+      const correctionDoc = await client.upload(correction.document, {
+        mediaType: "application/json",
+        workId: workA,
+        assignmentId: asgA,
+        retentionPolicy: "30d",
+      });
+      const correctionEvent = buildCompletedEvent(
+        {
+          executionId: "exec-correction",
+          executionGeneration: 1,
+          command: {
+            specversion: "1.0",
+            id: `corr-${randomUUID()}`,
+            source: "urn:workspace:gw.team-alpha/deterministic",
+            type: "org.facilitator.command.work.assign.v1",
+            subject: `work/${workA}/assignment/${asgA}`,
+            time: new Date().toISOString(),
+            datacontenttype: "application/json",
+            dataschema: "https://schemas.openfacilitator.org/v1/command.work.assign.v1.json",
+            data: {},
+          } as EnvelopeCommand,
+        },
+        { manifestId: "man-correction-det-1", workId: workA, assignmentId: asgA },
+        {
+          manifestRef: artifactUri(workA, asgA, correctionDoc.artifactId),
+          digest: correction.digest,
+        },
+      );
+      const reposted = await linkPost(
+        harness.baseUrl,
+        "/api/link/v1/events",
+        childToken,
+        correctionEvent,
+      );
+      expect(reposted.status).toBe(202);
+      const revisions = await waitFor("revision 2 recorded, revision 1 superseded", async () => {
+        const rows = await psql(
+          harness.dbUrl,
+          `SELECT revision || ':' || state FROM facilitator.result_manifests WHERE work_id = '${workA}' ORDER BY revision`,
+        );
+        return rows.join(",") === "1:superseded,2:recorded" ? rows : false;
+      });
+      expect(revisions).toHaveLength(2);
+      const listed2 = await linkGet(harness.baseUrl, `/api/works/${workA}/manifests`, alice);
+      const visible2 = listed2.body as Array<Record<string, unknown>>;
+      expect(visible2).toHaveLength(2); // newest-revision-first
+      expect(visible2[0]).toMatchObject({
+        revision: 2,
+        revisionOf: String(doc["manifestId"]),
+        state: "recorded",
+        digest: correction.digest,
+      });
+      expect(visible2[1]).toMatchObject({ revision: 1, state: "superseded" });
+
+      // ── 3. steer mid-run: lands on the RUNNING execution, in the SERVED bytes ──
       await seedDelivery(
         harness.baseUrl,
         gw.gatewayId,
         assignEnvelope({
           commandId: "e2e-det-2",
-          workId: "work-det-2",
-          assignmentId: "asg-det-2",
+          workId: workB,
+          assignmentId: asgB,
         }),
       );
       // Wait for the run to be live (progress row seen), THEN steer it.
       await waitFor("steer-run progress", async () => {
         const rows = await inboxRowsByType(harness.dbUrl, "org.facilitator.event.work.progress.v1");
-        return rows.some((r) => r.payload.includes("asg-det-2")) ? true : false;
+        return rows.some((r) => r.payload.includes(asgB)) ? true : false;
       });
       await seedDelivery(
         harness.baseUrl,
         gw.gatewayId,
-        steerEnvelopeFor("work-det-2", "asg-det-2", "focus on costs"),
+        steerEnvelopeFor(workB, asgB, "focus on costs"),
       );
       await waitFor("steered run completes", async () => {
         const rows = await inboxRowsByType(
           harness.dbUrl,
           "org.facilitator.event.assignment.completed.v1",
         );
-        return rows.find((r) => r.payload.includes("asg-det-2")) ?? false;
+        return rows.find((r) => r.payload.includes(asgB)) ?? false;
       });
-      const report = await waitFor("steer visible in the report", async () => {
+      const report = await waitFor("steer visible in the served report", async () => {
         const row = (
           await inboxRowsByType(harness.dbUrl, "org.facilitator.event.assignment.completed.v1")
-        ).find((r) => r.payload.includes("asg-det-2"));
+        ).find((r) => r.payload.includes(asgB));
         if (row === undefined) return false;
         const data = (JSON.parse(row.payload) as { data: Record<string, unknown> }).data;
-        const url = String(
-          (data["resultManifest"] as { outputs: Record<string, unknown>[] }).outputs[0]![
-            "storageUrl"
-          ],
+        const steerRef = String(data["resultManifestRef"]);
+        const steerDocBytes = await fetchContent(
+          `/api/artifacts/${steerRef.split("/").pop()}/content`,
+          alice,
         );
-        const text = readFileSync(fileURLToPath(url), "utf8");
+        const steerDoc = JSON.parse(steerDocBytes.toString("utf8")) as Record<string, unknown>;
+        if (computeManifestDigest(steerDoc) !== String(data["resultDigest"])) return false;
+        const text = (
+          await fetchContent(
+            `/api/artifacts/${String((steerDoc["outputs"] as Record<string, unknown>[])[0]!["artifactId"])}/content`,
+            alice,
+          )
+        ).toString("utf8");
         return text.includes("## Steering directives") &&
           /## Steering directives\n- \+\d+ms: focus on costs/.test(text)
           ? text
@@ -279,6 +484,8 @@ describe.skipIf(!E2E)("deterministic worker e2e", () => {
         socket: gw.socketPath ?? "",
         workDir,
         stepMs: 4000,
+        kernelUrl: harness.baseUrl,
+        token: childToken,
       });
       await worker.ready();
       const lost = await waitFor("probe settles the row lost", async () => {

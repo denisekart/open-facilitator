@@ -120,6 +120,28 @@ describe("worker config law", () => {
     expect(logged.logLevel).toBe("debug");
   });
 
+  it("kernelUrl: file key parses; OFAC_KERNEL_URL overlay wins (Plan 15 byte path)", () => {
+    const bare = parse(BASE, { env: {} });
+    expect(bare.kernelUrl).toBeUndefined();
+    const withFile = parse(`${BASE}kernelUrl: http://kernel:8080\n`, { env: {} });
+    expect(withFile.kernelUrl).toBe("http://kernel:8080");
+    const overridden = parse(`${BASE}kernelUrl: http://file:1\n`, {
+      env: { OFAC_KERNEL_URL: "http://env:2" },
+    });
+    expect(overridden.kernelUrl).toBe("http://env:2");
+  });
+
+  it("kernelToken: file key parses; OFAC_KERNEL_TOKEN overlay wins (separate kernel credential)", () => {
+    const bare = parse(BASE, { env: {} });
+    expect(bare.kernelToken).toBeUndefined();
+    const withFile = parse(`${BASE}kernelToken: link-abc\n`, { env: {} });
+    expect(withFile.kernelToken).toBe("link-abc");
+    const overridden = parse(`${BASE}kernelToken: file-abc\n`, {
+      env: { OFAC_KERNEL_TOKEN: "env-abc" },
+    });
+    expect(overridden.kernelToken).toBe("env-abc");
+  });
+
   it("apiVersion/kind are optional but exact when present", () => {
     expectFail(`${BASE}apiVersion: facilitator.framework/v2\n`, "apiVersion");
     expectFail(`${BASE}kind: Nope\n`, "kind");

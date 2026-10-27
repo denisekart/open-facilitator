@@ -1,16 +1,18 @@
 // The deterministic script driven in-process: a fake RunContext (no
-// sockets), createMemoryLogger, stepMs=1 — asserting the locked report
-// structure, steer recording ORDER, the cancel law (no terminal publish),
-// schema-valid completed payloads, and the digest/URL honesty.
+// sockets), the SDK's stub kernel (Plan 15: the completion path uploads
+// report + manifest and completes with ref+digest), createMemoryLogger,
+// stepMs=1 — asserting the locked report structure, steer recording ORDER,
+// the cancel law (no terminal publish), schema-valid completed payloads,
+// and digest honesty against what the stub kernel actually stored.
 import { createHash } from "node:crypto";
 import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import { validateAgainstSchemaId } from "@ofac/protocol";
+import { computeManifestDigest, validateAgainstSchemaId } from "@ofac/protocol";
 import type { EnvelopeCommand, EnvelopeEvent } from "@ofac/protocol";
 import { createMemoryLogger } from "@ofac/workspace-link";
-import { describe, expect, it } from "vitest";
+import { startStubKernel, type StubKernel } from "@ofac/adapter/testing";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { RunContext } from "@ofac/adapter";
 import { createDeterministicHooks } from "../src/harness.js";
 
@@ -36,9 +38,20 @@ function assignCommand(workId: string, assignmentId: string): EnvelopeCommand {
       expectedDeliverables: [{ kind: "analysis.report", mediaType: "text/markdown" }],
       deadline: "2036-10-23T18:00:00Z",
       assignmentId,
+      childWorkspaceId: "gw.t/det",
     },
   } as EnvelopeCommand;
 }
+
+let kernel: StubKernel;
+
+beforeAll(async () => {
+  kernel = await startStubKernel();
+});
+
+afterAll(async () => {
+  await kernel.close();
+});
 
 interface FakeCtx {
   ctx: RunContext;
@@ -56,6 +69,7 @@ function fakeContext(executionId: string, workId: string, assignmentId: string):
     executionGeneration: 3,
     command: assignCommand(workId, assignmentId),
     signal: controller.signal,
+    kernel: { baseUrl: kernel.url, token: "child-token" },
     publishEvent: (env) => {
       events.push(env);
     },
@@ -71,15 +85,26 @@ function workDir(): string {
   return mkdtempSync(join(tmpdir(), "ofac-det-"));
 }
 
+function hooksFor(dir: string, stepMs: number) {
+  return createDeterministicHooks({
+    childWorkspaceId: "gw.t/det",
+    workDir: dir,
+    stepMs,
+    logger: createMemoryLogger(),
+    fetchImpl: ((...args: Parameters<typeof fetch>) =>
+      kernelFetch(...args)) as typeof fetch,
+  });
+}
+
+// The stub kernel listens on 127.0.0.1; route everything through it.
+async function kernelFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  return fetch(input, init);
+}
+
 describe("deterministic harness script", () => {
-  it("no-steer run: two progress notes, a sectioned report, one schema-valid completed event", async () => {
+  it("no-steer run: two progress notes, a sectioned report, ref+digest completion against the kernel", async () => {
     const dir = workDir();
-    const hooks = createDeterministicHooks({
-      childWorkspaceId: "gw.t/det",
-      workDir: dir,
-      stepMs: 1,
-      logger: createMemoryLogger(),
-    });
+    const hooks = hooksFor(dir, 1);
     const { ctx, events, progress } = fakeContext("exec-a", "work-a", "asg-a");
     const outcome = await hooks.onExecute(ctx);
     expect(outcome).toEqual({ kind: "completed" });
@@ -99,20 +124,44 @@ describe("deterministic harness script", () => {
         data,
       ).ok,
     ).toBe(true);
+    // Inline manifest: deprecated leg — present, empty outputs.
+    const inline = data["resultManifest"] as Record<string, unknown>;
+    expect(inline["manifestId"]).toBe("man-exec-a");
+    expect(inline["outputs"]).toEqual([]);
+    // Ref + digest law: the ref is artifact://.../<uploaded doc id>; the
+    // digest recomputes over the bytes the stub kernel stored, which declare
+    // the report output with the digest the report's on-disk bytes carry.
+    const ref = String(data["resultManifestRef"]);
+    expect(ref).toMatch(/^artifact:\/\/work-a\/asg-a\/[0-9a-f]{32}$/);
+    const docId = ref.split("/").pop()!;
+    const doc = kernel.artifacts.get(docId);
+    expect(doc).toBeDefined();
+    expect(String(data["resultDigest"])).toBe(
+      computeManifestDigest(JSON.parse(doc!.bytes.toString("utf8")) as Record<string, unknown>),
+    );
+    const manifest = JSON.parse(doc!.bytes.toString("utf8")) as Record<string, unknown>;
     expect(
       validateAgainstSchemaId(
         "https://schemas.openfacilitator.org/v1/result-manifest.v1.json",
-        data["resultManifest"],
+        manifest,
       ).ok,
     ).toBe(true);
-    const manifest = data["resultManifest"] as Record<string, unknown>;
     const output = (manifest["outputs"] as Record<string, unknown>[])[0]!;
-    expect(String(output["storageUrl"])).toMatch(/^file:\/\/\//);
-    const path = fileURLToPath(String(output["storageUrl"]));
-    const bytes = readFileSync(path);
-    expect(output["digest"]).toBe(`sha256:${createHash("sha256").update(bytes).digest("hex")}`);
-    expect(output["size"]).toBe(bytes.length);
-    const report = bytes.toString("utf8");
+    expect(output["kind"]).toBe("analysis.report");
+    expect(output["classification"]).toBe("internal");
+    expect(String(output["storageUrl"])).toMatch(/^artifact:\/\/work-a\/asg-a\/[0-9a-f]{32}$/);
+    const reportBytes = kernel.artifacts.get(String(output["storageUrl"]).split("/").pop()!)!;
+    const disk = readFileSync(join(dir, "artifacts", "exec-a-report.md"));
+    expect(reportBytes.bytes.equals(disk)).toBe(true);
+    expect(output["digest"]).toBe(
+      `sha256:${createHash("sha256").update(disk).digest("hex")}`,
+    );
+    expect(output["size"]).toBe(disk.length);
+    expect(manifest["structuredResult"]).toEqual({
+      objectiveChars: "objective work-a".length,
+      steeringDirectives: 0,
+    });
+    const report = disk.toString("utf8");
     for (const section of [
       "# Research report work-a",
       "Objective: objective work-a",
@@ -126,14 +175,18 @@ describe("deterministic harness script", () => {
     }
   });
 
+  it("no kernel surface: the run fails honestly instead of publishing a file:// manifest", async () => {
+    const dir = workDir();
+    const hooks = hooksFor(dir, 1);
+    const { ctx, events } = fakeContext("exec-k", "work-k", "asg-k");
+    delete (ctx as { kernel?: unknown }).kernel;
+    await expect(hooks.onExecute(ctx)).rejects.toThrow(/kernelUrl is required/);
+    expect(events).toEqual([]);
+  });
+
   it("steer mid-run: directives land in the report under ## Steering directives, arrival order", async () => {
     const dir = workDir();
-    const hooks = createDeterministicHooks({
-      childWorkspaceId: "gw.t/det",
-      workDir: dir,
-      stepMs: 30,
-      logger: createMemoryLogger(),
-    });
+    const hooks = hooksFor(dir, 30);
     const { ctx } = fakeContext("exec-b", "work-b", "asg-b");
     const running = hooks.onExecute(ctx);
     await new Promise((resolve) => setTimeout(resolve, 5));
@@ -150,12 +203,7 @@ describe("deterministic harness script", () => {
 
   it("cancel before step 2: the run unwinds as cancelled, publishing NOTHING", async () => {
     const dir = workDir();
-    const hooks = createDeterministicHooks({
-      childWorkspaceId: "gw.t/det",
-      workDir: dir,
-      stepMs: 10_000,
-      logger: createMemoryLogger(),
-    });
+    const hooks = hooksFor(dir, 10_000);
     const { ctx, events, progress, controller } = fakeContext("exec-c", "work-c", "asg-c");
     const running = hooks.onExecute(ctx);
     await new Promise((resolve) => setTimeout(resolve, 10));
@@ -167,12 +215,7 @@ describe("deterministic harness script", () => {
 
   it("two runs of the same work are byte-stable in structure (zero randomness beyond timing)", async () => {
     const dir = workDir();
-    const hooks = createDeterministicHooks({
-      childWorkspaceId: "gw.t/det",
-      workDir: dir,
-      stepMs: 1,
-      logger: createMemoryLogger(),
-    });
+    const hooks = hooksFor(dir, 1);
     const first = fakeContext("exec-d", "work-d", "asg-d");
     await hooks.onExecute(first.ctx);
     const second = fakeContext("exec-d2", "work-d", "asg-d");

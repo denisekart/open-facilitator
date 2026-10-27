@@ -17,25 +17,24 @@ const childWorkspaceId = flag("--child");
 const socket = flag("--socket");
 const token = flag("--token") ?? "tok";
 const mode = flag("--mode") ?? "silent";
-const capability = flag("--capability") ?? "research.analyze";
+// Plan 12: repeatable --capability so one child can advertise several ids.
+const capabilities = args.filter((_a, i) => args[i - 1] === "--capability");
 
 const manifest = {
   apiVersion: "facilitator.framework/v1",
   kind: "CapabilityManifest",
   ownerTeam: childWorkspaceId.split("/").pop(),
-  capabilities: [
-    {
-      id: capability,
-      version: 1,
-      execution: "asynchronous",
-      acceptedContexts: ["uri-reference"],
-      outputKinds: [`${capability.replaceAll(".", "-")}.result`],
-      outputMediaTypes: ["text/markdown"],
-      supportsSteering: false,
-      supportsCancellation: false,
-      supportsNudge: false,
-    },
-  ],
+  capabilities: capabilities.map((capability) => ({
+    id: capability,
+    version: 1,
+    execution: "asynchronous",
+    acceptedContexts: ["uri-reference"],
+    outputKinds: [`${capability.replaceAll(".", "-")}.result`],
+    outputMediaTypes: ["text/markdown"],
+    supportsSteering: false,
+    supportsCancellation: false,
+    supportsNudge: false,
+  })),
 };
 
 // A fresh process forgets everything: the reconcile probe must honestly

@@ -15,3 +15,13 @@ capabilities:
     supportsSteering: true
     supportsCancellation: true
     supportsNudge: false
+  # Plan 12: the confirm-scoped capability the approval loop rides.
+  - id: research.publish
+    version: 1
+    execution: asynchronous
+    acceptedContexts: [uri-reference]
+    outputKinds: [research-publish.result]
+    outputMediaTypes: [text/markdown]
+    supportsSteering: false
+    supportsCancellation: false
+    supportsNudge: false

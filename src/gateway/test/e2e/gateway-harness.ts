@@ -15,11 +15,14 @@ export {
   PG_URL,
   TEAM,
   assignEnvelope,
+  evidenceToken,
   kernelDeliveries,
+  kernelToken,
   linkRow,
   psql,
   seedDelivery,
   useFacilitator,
+  userToken,
   waitFor,
   workloadToken,
   type ServerConfig,
@@ -67,6 +70,8 @@ export async function gatewayConfig(options: {
   mode?: "echo" | "stub";
   childName?: string;
   heartbeatSeconds?: number;
+  /** Plan 12: policy-file YAML, written beside gateway.yaml + referenced by path. */
+  policy?: string;
   /** Fleet children (shared/standalone): name + token; socket auto-configured. */
   fleet?: { name: string; token?: string; maxInFlight?: number }[];
   /** Gateway role for fleet YAML (default: shared). */
@@ -112,12 +117,15 @@ childTransport:
     path: child.sock
 mode: ${options.gatewayMode ?? "shared"}`
 }
-diagnostics:
+${options.policy === undefined ? "" : "policy:\n  path: policy.yaml\n"}diagnostics:
   port: ${diagnosticsPort}
 heartbeatSeconds: ${options.heartbeatSeconds ?? 5}
 `;
   const configPath = join(stateDir, "gateway.yaml");
   writeFileSync(configPath, yaml);
+  if (options.policy !== undefined) {
+    writeFileSync(join(stateDir, "policy.yaml"), options.policy);
+  }
   return {
     configPath,
     stateDir,
@@ -189,6 +197,7 @@ export interface GatewayStatusDoc {
   reconciled: boolean;
   session?: { leaseEpoch: number; sessionId: string; state: string } | undefined;
   executions: { running: number; completed: number; failed: number; lost: number };
+  awaitingApproval?: number;
   bindings: {
     assignmentId: string;
     executionId: string;
@@ -240,6 +249,8 @@ export function startChild(options: {
   token?: string;
   mode?: "complete" | "silent";
   capability?: string;
+  /** Plan 12: several advertised ids for one child (overrides `capability`). */
+  capabilities?: string[];
 }): ChildProcess {
   const runner = join(new URL(".", import.meta.url).pathname, "child-runner.mjs");
   const child = spawn(
@@ -254,8 +265,10 @@ export function startChild(options: {
       options.token ?? "tok",
       "--mode",
       options.mode ?? "silent",
-      "--capability",
-      options.capability ?? "research.analyze",
+      ...(options.capabilities ?? [options.capability ?? "research.analyze"]).flatMap((c) => [
+        "--capability",
+        c,
+      ]),
     ],
     { stdio: ["ignore", "pipe", "pipe"] },
   );

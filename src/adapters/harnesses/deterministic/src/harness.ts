@@ -64,6 +64,9 @@ export function createDeterministicHooks(options: DeterministicRunOptions): Dete
     const inputs = data["inputs"] as Record<string, unknown> | undefined;
     const objective = typeof inputs?.["objective"] === "string" ? inputs["objective"] : workId;
     const capabilityId = String(data["capabilityId"] ?? "research.analyze");
+    // Plan 12: the confirm-loop e2e rides research.publish — identical
+    // deterministic script, published-flavored artifact + conclusion.
+    const publishing = capabilityId === "research.publish";
     const t0 = Date.now();
     startedAt.set(ctx.executionId, t0);
     const seen: SteerRecord[] = [];
@@ -79,7 +82,8 @@ export function createDeterministicHooks(options: DeterministicRunOptions): Dete
     if (!(await cancellableSleep(stepMs, ctx.signal))) return cancelled(ctx);
     const step2At = Date.now() - t0;
 
-    const reportPath = join(workDir, "artifacts", `${ctx.executionId}-report.md`);
+    const suffix = publishing ? "published" : "report";
+    const reportPath = join(workDir, "artifacts", `${ctx.executionId}-${suffix}.md`);
     mkdirSync(dirname(reportPath), { recursive: true, mode: 0o700 });
     const directiveLines =
       seen.length === 0 ? "none" : seen.map((s) => `- +${s.atMs}ms: ${s.directive}`).join("\n");
@@ -92,7 +96,7 @@ Assignment: ${assignmentId} (execution ${ctx.executionId})
 ## Steering directives
 ${directiveLines}
 ## Conclusion
-Deterministic analysis complete.
+Deterministic ${publishing ? "publish" : "analysis"} complete.
 `;
     const bytes = Buffer.from(report, "utf8");
     writeFileSync(reportPath, bytes);
@@ -111,7 +115,7 @@ Deterministic analysis complete.
             manifestId: `man-${ctx.executionId}`,
             outputs: [
               {
-                artifactId: `art-${ctx.executionId}-report`,
+                artifactId: `art-${ctx.executionId}-${suffix}`,
                 mediaType: "text/markdown",
                 size: bytes.length,
                 digest,

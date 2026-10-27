@@ -81,6 +81,51 @@ export async function workloadToken(): Promise<string> {
   return body.access_token;
 }
 
+/**
+ * Plan 12: a HUMAN bearer — password grant on the public `facilitator-api`
+ * client (alice = framework-admin + team-alpha group, bob = team-beta only).
+ * Proves the respond path acts with a real user principal (groups included).
+ */
+export async function userToken(username: string, password: string): Promise<string> {
+  const response = await fetch(`${KEYCLOAK_URL}/realms/facilitator/protocol/openid-connect/token`, {
+    method: "post",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "password",
+      client_id: "facilitator-api",
+      username,
+      password,
+    }),
+  });
+  if (!response.ok) throw new Error(`keycloak user token mint failed: ${response.status}`);
+  const body = (await response.json()) as { access_token: string };
+  return body.access_token;
+}
+
+/**
+ * Plan 12: a delegated-action evidence token — password grant on
+ * `ofac-evidence`, whose mappers stamp `delegation: true` + groups + the
+ * facilitator-api audience. The Gateway verifies an `oidc:<jwt>`
+ * actorEvidenceRef against exactly this shape (§11).
+ */
+export async function evidenceToken(username: string, password: string): Promise<string> {
+  const response = await fetch(`${KEYCLOAK_URL}/realms/facilitator/protocol/openid-connect/token`, {
+    method: "post",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "password",
+      client_id: "ofac-evidence",
+      client_secret: "evidence-secret",
+      username,
+      password,
+      audience: "facilitator-api",
+    }),
+  });
+  if (!response.ok) throw new Error(`keycloak evidence token mint failed: ${response.status}`);
+  const body = (await response.json()) as { access_token: string };
+  return body.access_token;
+}
+
 const REPO_ROOT = new URL("../../../../", import.meta.url).pathname;
 
 /** Per-file config overrides merged into the spawned server env. */

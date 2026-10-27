@@ -94,7 +94,19 @@ public static class ArtifactEndpoints
                     return Results.Problem(ProblemErrors.ArtifactNotFound(id.ToString()));
                 }
 
-                var stream = await store.GetAsync(view.StorageUri["kernel-fs:".Length..], ct);
+                // Object-store backends hand out a presigned GET and answer 302:
+                // retrieval bytes bypass the kernel (spec §15.4 portable
+                // retrieval). The URL rides the row's own key + the allocation
+                // TTL law; HttpClient auto-follows, so consumers see the same
+                // bytes with one extra hop.
+                if (store is IStoreSignedUrlSource source
+                    && await source.PresignDownloadAsync(
+                        ArtifactKeys.StoreKeyOf(view.StorageUri), view.MediaType, ArtifactTicket.AllocationTtl, ct) is { } url)
+                {
+                    return Results.Redirect(url.ToString(), permanent: false);
+                }
+
+                var stream = await store.GetAsync(ArtifactKeys.StoreKeyOf(view.StorageUri), ct);
                 if (stream is null)
                 {
                     // Row says stored but the blob is gone: absent, like any other 404.
@@ -103,6 +115,27 @@ public static class ArtifactEndpoints
 
                 return Results.Stream(stream, view.MediaType,
                     entityTag: new Microsoft.Net.Http.Headers.EntityTagHeaderValue($"\"{view.Digest}\""));
+            });
+
+        group.MapPost("/artifacts/{id:guid}/confirm",
+            async (Guid id, IArtifactLedger ledger, HttpContext http, CancellationToken ct) =>
+            {
+                var principal = http.GetFacilitatorPrincipal();
+                if (principal is null)
+                {
+                    return Results.Problem(IdentityAuthentication.Unauthorized());
+                }
+
+                // Team scope first (the proxied-PUT twin): a foreign team's row
+                // answers absent. The ledger re-checks state + the DB-arbitrated
+                // transition + the row's scheme underneath.
+                var scoped = await ledger.GetAsync(principal.Actor, principal.Groups, principal.Roles, id, ct);
+                if (scoped is null)
+                {
+                    return Results.Problem(ProblemErrors.ArtifactNotFound(id.ToString()));
+                }
+
+                return ConfirmResultAsync(await ledger.ConfirmAsync(id, string.Empty, null, ct), id);
             });
 
         return app;
@@ -117,13 +150,34 @@ public static class ArtifactEndpoints
         _ => Results.Problem(ProblemErrors.ArtifactNotFound(id.ToString())),
     };
 
-    /// <summary>Wire ticket shape (both planes, both ack paths).</summary>
-    public static object Ticket(ArtifactTicket ticket) => new
+    /// <summary>Shared confirm outcome mapping for both planes; a spent slot answers by why (409), never silently.</summary>
+    public static IResult ConfirmResultAsync(ArtifactStoreResult result, Guid id) => result.Outcome switch
     {
-        artifactId = ticket.ArtifactId,
-        uploadLocation = ticket.UploadLocation,
-        expiresAt = ticket.ExpiresAt,
+        ArtifactStoreOutcome.Stored or ArtifactStoreOutcome.Idempotent => Results.Json(Stored(id, result.Row)),
+        ArtifactStoreOutcome.DigestMismatch => Results.Problem(ProblemErrors.ArtifactDigestMismatch(id.ToString())),
+        ArtifactStoreOutcome.SizeMismatch => Results.Problem(ProblemErrors.ArtifactSizeMismatch(id.ToString())),
+        ArtifactStoreOutcome.NotConfirmable => Results.Problem(ProblemErrors.ArtifactNotConfirmable(id.ToString())),
+        ArtifactStoreOutcome.NotPending => Results.Problem(ProblemErrors.ArtifactNotPending(id.ToString())),
+        _ => Results.Problem(ProblemErrors.ArtifactNotFound(id.ToString())),
     };
+
+    /// <summary>Wire ticket shape (both planes, both ack paths): <c>uploadUrl</c> rides only when the configured adapter mints presigned URLs (absent, not null, when it does not); callers prefer it over <c>uploadLocation</c> when present.</summary>
+    public static object Ticket(ArtifactTicket ticket)
+    {
+        var body = new Dictionary<string, object?>
+        {
+            ["artifactId"] = ticket.ArtifactId,
+            ["uploadLocation"] = ticket.UploadLocation,
+            ["method"] = ticket.Method,
+            ["expiresAt"] = ticket.ExpiresAt,
+        };
+        if (ticket.UploadUrl is not null)
+        {
+            body["uploadUrl"] = ticket.UploadUrl;
+        }
+
+        return body;
+    }
 
     internal static object View(ArtifactView view) => new
     {

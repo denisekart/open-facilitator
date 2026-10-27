@@ -153,10 +153,15 @@ public static class KernelServiceCollection
         {
             // Read once at composition: no hot-swap.
             "filesystem" => new FileSystemArtifactStore(sp.GetRequiredService<ArtifactOptions>()),
+            "s3" => new S3ArtifactStore(sp.GetRequiredService<ArtifactOptions>()),
             _ => throw new InvalidOperationException(
-                $"Storage:Provider '{storage.Provider}' is unknown (only 'filesystem' ships) — fail-closed."),
+                $"Storage:Provider '{storage.Provider}' is unknown (only 'filesystem' and 's3' ship) — fail-closed."),
         });
+        builder.Services.AddSingleton<StorageStartupCheck>();
+        builder.Services.AddHostedService(sp => sp.GetRequiredService<StorageStartupCheck>());
         builder.Services.AddScoped<IArtifactLedger, ArtifactLedger>();
+        builder.Services.AddSingleton<RetentionGcService>();
+        builder.Services.AddHostedService(sp => sp.GetRequiredService<RetentionGcService>());
         return builder;
     }
 

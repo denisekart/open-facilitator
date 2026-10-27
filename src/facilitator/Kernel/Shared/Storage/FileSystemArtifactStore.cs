@@ -29,6 +29,12 @@ public sealed class FileSystemArtifactStore : IArtifactStore
     }
 
     /// <inheritdoc />
+    public string StorageUriScheme => "kernel-fs";
+
+    /// <inheritdoc />
+    public bool Owns(string storageUri) => storageUri.StartsWith("kernel-fs:", StringComparison.Ordinal);
+
+    /// <inheritdoc />
     public async Task<ArtifactPut> PutAsync(Stream content, CancellationToken ct)
     {
         var temp = Path.Combine(_root, $".part-{Guid.NewGuid():N}");
@@ -44,7 +50,7 @@ public sealed class FileSystemArtifactStore : IArtifactStore
             digestHex = Convert.ToHexString(hasher.GetHashAndReset()).ToLowerInvariant();
         }
 
-        var relative = RelativePathOf(digestHex);
+        var relative = ArtifactKeys.RelativePathOf(digestHex);
         var target = Path.Combine(_root, relative);
         Directory.CreateDirectory(Path.GetDirectoryName(target)!);
         try
@@ -108,8 +114,12 @@ public sealed class FileSystemArtifactStore : IArtifactStore
         }
     }
 
-    /// <summary>Canonical relative path for a hex digest ({hex[0..2]}/{hex}).</summary>
-    public static string RelativePathOf(string digestHex) => $"{digestHex[..2]}/{digestHex}";
+    /// <inheritdoc />
+    public Task<long?> StatAsync(string relativePath, CancellationToken ct)
+    {
+        var full = FullPath(relativePath);
+        return Task.FromResult<long?>(full is not null && File.Exists(full) ? new FileInfo(full).Length : null);
+    }
 
     // Defense in depth: relative paths come from the ledger (stored under the
     // digest at put time); a non-hex or escaping path never leaves the root.

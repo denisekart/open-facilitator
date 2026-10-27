@@ -74,6 +74,16 @@ public static class ProblemErrors
         Create("artifact-declaration-mismatch", "Artifact declaration mismatch", StatusCodes.Status422UnprocessableEntity,
             $"artifact '{artifactId}' re-declared with fields the kernel did not record");
 
+    /// <summary>409 the row exists but no adapter configured here can confirm it (external or foreign-scheme row).</summary>
+    public static ProblemDetails ArtifactNotConfirmable(string artifactId) =>
+        Create("artifact-not-confirmable", "Artifact not confirmable", StatusCodes.Status409Conflict,
+            $"artifact '{artifactId}' is not a kernel-hosted pending upload");
+
+    /// <summary>409 the row exists and is visible but is not in pending state (spent slot).</summary>
+    public static ProblemDetails ArtifactNotPending(string artifactId) =>
+        Create("artifact-not-pending", "Artifact not pending", StatusCodes.Status409Conflict,
+            $"artifact '{artifactId}' is not awaiting upload confirmation");
+
     /// <summary>422 message class the link path cannot act on (e.g. work.assign FROM a link).</summary>
     public static ProblemDetails Unsupported(string detail) =>
         Create("unsupported", "Unsupported", StatusCodes.Status422UnprocessableEntity, detail);

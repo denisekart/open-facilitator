@@ -16,6 +16,15 @@ public sealed record ArtifactPut(string RelativePath, string DigestHex, long Byt
 /// </summary>
 public interface IArtifactStore
 {
+    /// <summary>StorageUri scheme this adapter writes (<c>kernel-fs</c>, <c>s3</c>); rows decide every later action by their scheme, never by re-reading config.</summary>
+    string StorageUriScheme { get; }
+
+    /// <summary>True when a StorageUri was written by THIS adapter (scheme prefix match).</summary>
+    bool Owns(string storageUri);
+
+    /// <summary>Content length of a stored blob; null when absent (the confirm path needs size without a full GET).</summary>
+    Task<long?> StatAsync(string relativePath, CancellationToken ct);
+
     /// <summary>Persist the stream at its content address; idempotent (same bytes ⇒ same blob). Returns path + computed digest + byte count.</summary>
     Task<ArtifactPut> PutAsync(Stream content, CancellationToken ct);
 

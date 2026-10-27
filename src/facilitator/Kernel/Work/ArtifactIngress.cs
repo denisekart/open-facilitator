@@ -23,6 +23,9 @@ public sealed record ArtifactArm(ProblemDetails? Problem, string Status, Artifac
 /// <c>command.artifact.request_upload</c> allocates a pending slot through the
 /// ledger (the admission gate already evaluated the evidence + audited the
 /// link principal) and the ticket rides back IN-BAND on the ack;
+/// <c>command.artifact.confirm_upload</c> re-hashes bytes a producer put
+/// DIRECTLY at the store (the link token is the actor proof — no
+/// actorEvidenceRef needed, matching request_upload's own handling);
 /// <c>event.artifact.available</c> registers external declarations (unverified)
 /// or idempotently confirms kernel-stored ones. A foreign wire artifactId never
 /// rewrites a kernel row — first writer owns it (a mismatched re-declaration is
@@ -47,6 +50,37 @@ public sealed class ArtifactIngress(IArtifactLedger ledger)
         return new ArtifactArm(null, "accepted", ticket);
     }
 
+    /// <summary>Command arm: verify + settle a direct-to-store upload the producer confirmed.</summary>
+    public async Task<ArtifactArm> HandleConfirmUploadAsync(
+        JsonElement root, EffectivePrincipal? principal, CancellationToken ct)
+    {
+        var data = root.GetProperty("data");
+        var rawId = GetString(data, "artifactId");
+        if (rawId is null || !Guid.TryParse(rawId, out var artifactId))
+        {
+            return new ArtifactArm(ProblemErrors.SchemaViolation("artifactId must be a GUID"), "failed");
+        }
+
+        // The link token IS the actor proof: the workload (team scope) rides
+        // straight from the admitted principal.
+        var workload = principal?.Workload;
+        var result = await ledger.ConfirmAsync(
+            artifactId, workload?.TeamSlug ?? string.Empty, workload, ct);
+        return result.Outcome switch
+        {
+            ArtifactStoreOutcome.Stored or ArtifactStoreOutcome.Idempotent => new ArtifactArm(null, "confirmed"),
+            ArtifactStoreOutcome.DigestMismatch =>
+                new ArtifactArm(ProblemErrors.ArtifactDigestMismatch(artifactId.ToString()), "failed"),
+            ArtifactStoreOutcome.SizeMismatch =>
+                new ArtifactArm(ProblemErrors.ArtifactSizeMismatch(artifactId.ToString()), "failed"),
+            ArtifactStoreOutcome.NotConfirmable =>
+                new ArtifactArm(ProblemErrors.ArtifactNotConfirmable(artifactId.ToString()), "failed"),
+            ArtifactStoreOutcome.NotPending =>
+                new ArtifactArm(ProblemErrors.ArtifactNotPending(artifactId.ToString()), "failed"),
+            _ => new ArtifactArm(ProblemErrors.ArtifactNotFound(artifactId.ToString()), "failed"),
+        };
+    }
+
     /// <summary>Event arm: record an artifact.available declaration (external or confirmation).</summary>
     public async Task<ArtifactArm> HandleEventAsync(JsonElement root, CancellationToken ct)
     {
@@ -65,6 +99,9 @@ public sealed class ArtifactIngress(IArtifactLedger ledger)
     /// <summary>The still-live ticket a duplicate link-plane request_upload re-attaches (null once spent/expired).</summary>
     public Task<ArtifactTicket?> TicketForLinkCommandAsync(string commandId, CancellationToken ct) =>
         ledger.TicketForCommandAsync(commandId, "link", ct);
+
+    private static string? GetString(JsonElement data, string name) =>
+        data.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
 }
 
 /// <summary>Shared request-upload body parsing for both planes (schema-validated
@@ -130,9 +167,9 @@ internal static class ArtifactArmPolicy
         }
 
         var retention = GetString(data, "retentionPolicy");
-        if (retention is not null && retention != "permanent")
+        if (retention is not null && !IsValidRetention(retention))
         {
-            problem = ProblemErrors.SchemaViolation("retentionPolicy must be \"permanent\"");
+            problem = ProblemErrors.SchemaViolation("retentionPolicy must be \"permanent\", \"archive\", or Nd (1-9999 days, e.g. \"30d\")");
             return false;
         }
 
@@ -144,6 +181,30 @@ internal static class ArtifactArmPolicy
         }
 
         fields = (mediaType!, size, digest, workId, assignmentId, retention, comment, GetString(data, "commandId"));
+        return true;
+    }
+
+    /// <summary>Wire-retention grammar (mirrors the schema's anyOf exactly): permanent, archive, or Nd with 1 &lt;= N &lt;= 9999.</summary>
+    public static bool IsValidRetention(string retention)
+    {
+        if (retention is "permanent" or "archive")
+        {
+            return true;
+        }
+
+        if (retention.Length is < 2 or > 5 || retention[^1] != 'd' || retention[0] is < '1' or > '9')
+        {
+            return false;
+        }
+
+        foreach (var c in retention.AsSpan(1, retention.Length - 2))
+        {
+            if (c is < '0' or > '9')
+            {
+                return false;
+            }
+        }
+
         return true;
     }
 

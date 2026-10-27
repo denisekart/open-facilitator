@@ -170,6 +170,22 @@ public sealed class LinkIngress(
                 Facilitator.Kernel.Work.ArtifactEndpoints.Ticket(arm.Ticket!));
         }
 
+        if (screen.Type == "org.facilitator.command.artifact.confirm_upload.v1")
+        {
+            // D9: the link token is the actor proof; the arm runs the ledger's
+            // re-hash law and answers settled / refused like the upload twin.
+            var arm = await artifacts.HandleConfirmUploadAsync(root, screen.Principal, ct);
+            if (arm.Refused)
+            {
+                await inbox.MarkProcessedAsync(inboxId, arm.Status, ct);
+                return new LinkAdmission(arm.Problem, null, null);
+            }
+
+            await inbox.MarkProcessedAsync(inboxId, null, ct);
+            metrics.InboxProcessed();
+            return new LinkAdmission(null, "confirmed", inboxId);
+        }
+
         var workId = EnvelopeReader.WorkIdOf(root);
         if (screen.Type == "org.facilitator.command.work.steer.v1" && workId is not null)
         {

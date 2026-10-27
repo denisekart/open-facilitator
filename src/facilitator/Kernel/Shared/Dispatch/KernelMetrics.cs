@@ -21,6 +21,10 @@ public sealed class KernelMetrics
     private readonly Counter<long> _artifactStored;
     private readonly Counter<long> _artifactRegistered;
     private readonly Counter<long> _artifactRejected;
+    private readonly Counter<long> _artifactConfirmed;
+    private readonly Counter<long> _artifactPresigned;
+    private readonly Counter<long> _artifactGcCollected;
+    private readonly Counter<long> _artifactStoreErrors;
     private readonly Histogram<double> _deliveryLatency;
     private readonly Histogram<double> _ingressLatency;
     private readonly Histogram<double> _artifactStoreLatency;
@@ -28,6 +32,7 @@ public sealed class KernelMetrics
     private long _inboxDepth;
     private long _deadLetters;
     private long _linkSessions;
+    private long _gcLastPassAgeSeconds;
 
     /// <summary>Create the meter and all instruments.</summary>
     public KernelMetrics()
@@ -48,6 +53,11 @@ public sealed class KernelMetrics
         _artifactStored = meter.CreateCounter<long>("facilitator.artifact.stored", description: "Artifacts stored with verified digests");
         _artifactRegistered = meter.CreateCounter<long>("facilitator.artifact.registered", description: "Externally-declared artifacts registered (unverified)");
         _artifactRejected = meter.CreateCounter<long>("facilitator.artifact.rejected", description: "Upload ingest rejections (tag: reason)");
+        _artifactConfirmed = meter.CreateCounter<long>("facilitator.artifact.confirmed", description: "Direct-to-store uploads confirmed by kernel re-hash (tag: origin)");
+        _artifactPresigned = meter.CreateCounter<long>("facilitator.artifact.presigned", description: "Presigned URLs minted (tag: op)");
+        _artifactGcCollected = meter.CreateCounter<long>("facilitator.artifact.gc.collected", description: "Retention-GC collections (tag: reason)");
+        _artifactStoreErrors = meter.CreateCounter<long>("facilitator.artifact.store.errors", description: "Backend store errors by operation (tag: op)");
+        meter.CreateObservableGauge("facilitator.artifact.gc.last_pass_age", () => Volatile.Read(ref _gcLastPassAgeSeconds), unit: "s", description: "Seconds since the last retention-GC pass");
         _artifactStoreLatency = meter.CreateHistogram<double>("facilitator.artifact.store.latency", unit: "ms", description: "Content put latency");
     }
 
@@ -94,6 +104,25 @@ public sealed class KernelMetrics
 
     /// <summary>Record content put latency in milliseconds.</summary>
     public void ArtifactStoreLatency(double ms) => _artifactStoreLatency.Record(ms);
+
+    /// <summary>Record one direct-to-store upload confirmed by kernel re-hash.</summary>
+    /// <param name="origin">link | rest.</param>
+    public void ArtifactConfirmed(string origin) => _artifactConfirmed.Add(1, new KeyValuePair<string, object?>("origin", origin));
+
+    /// <summary>Record one minted presigned URL.</summary>
+    /// <param name="op">upload | download.</param>
+    public void ArtifactPresigned(string op) => _artifactPresigned.Add(1, new KeyValuePair<string, object?>("op", op));
+
+    /// <summary>Record one retention-GC collection.</summary>
+    /// <param name="reason">retention | expired-slot.</param>
+    public void ArtifactGcCollected(string reason) => _artifactGcCollected.Add(1, new KeyValuePair<string, object?>("reason", reason));
+
+    /// <summary>Record a backend store error.</summary>
+    /// <param name="op">The failing operation (gc | put | get).</param>
+    public void ArtifactStoreErrors(string op) => _artifactStoreErrors.Add(1, new KeyValuePair<string, object?>("op", op));
+
+    /// <summary>Refresh the GC last-pass-age gauge (written by the GC loop each pass).</summary>
+    public void SetGcLastPassAge(long seconds) => Volatile.Write(ref _gcLastPassAgeSeconds, seconds);
 
     /// <summary>Refresh the cached queue-depth/dead-letter gauges.</summary>
     public void SetGauges(long outboxDepth, long inboxDepth, long deadLetters)

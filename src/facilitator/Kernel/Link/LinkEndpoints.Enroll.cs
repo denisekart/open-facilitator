@@ -187,6 +187,23 @@ public static partial class LinkEndpoints
                     await ledger.StoreAsync(id, request.Body, workload.TeamSlug, workload, ct), id);
             });
 
+    // Direct-upload confirmation on the workload plane: same guard shape as
+    // the content PUT (link token + row team ownership in the ledger).
+    private static void MapArtifactConfirm(RouteGroupBuilder group) =>
+        group.MapPost("/artifacts/{id:guid}/confirm",
+            async (Guid id, IArtifactLedger ledger, HttpContext http, CancellationToken ct) =>
+            {
+                var workload = LinkAuthMiddleware.RequirePrincipal(http);
+                var scoped = await ledger.GetForWorkloadAsync(workload, id, ct);
+                if (scoped is null)
+                {
+                    return Results.Problem(ProblemErrors.ArtifactNotFound(id.ToString()));
+                }
+
+                return ArtifactEndpoints.ConfirmResultAsync(
+                    await ledger.ConfirmAsync(id, workload.TeamSlug, workload, ct), id);
+            });
+
     private static void MapCapabilities(RouteGroupBuilder group)
     {
         group.MapGet("/capabilities", async (LinkEnrollmentStore store, HttpContext http, CancellationToken ct) =>

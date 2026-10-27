@@ -14,8 +14,14 @@ namespace Facilitator.Kernel.Shared.Storage;
 /// <summary>Upload ticket handed back in-band on the ack / 201 body.</summary>
 /// <param name="ArtifactId">Kernel artifact id (wire: lowercase GUID).</param>
 /// <param name="UploadLocation">Kernel-relative PUT path (plane-appropriate); the producer composes it against the base URL it already talks to.</param>
-/// <param name="ExpiresAt">When the pending allocation lapses (UTC).</param>
-public sealed record ArtifactTicket(Guid ArtifactId, string UploadLocation, DateTime ExpiresAt);
+/// <param name="UploadUrl">Presigned direct-upload URL when the configured adapter mints one; null = the kernel-proxied <paramref name="UploadLocation"/> is the only byte path.</param>
+/// <param name="Method"><c>PUT</c> (direct, when <paramref name="UploadUrl"/> rides) or <c>POST</c> (kernel-proxied at <paramref name="UploadLocation"/>).</param>
+/// <param name="ExpiresAt">When the pending allocation lapses (UTC) — the SAME instant a minted presigned URL expires (one timestamp, no drift).</param>
+public sealed record ArtifactTicket(Guid ArtifactId, string UploadLocation, string? UploadUrl, string Method, DateTime ExpiresAt)
+{
+    /// <summary>One law for both faces of a slot: the allocation lapses at the SAME instant a minted presigned URL does — ticket expiry and presign TTL are ONE timestamp. The content route mints download URLs with this too.</summary>
+    public static readonly TimeSpan AllocationTtl = TimeSpan.FromMinutes(15);
+}
 
 /// <summary>Projection of one ledger row for readers (never exposes the storage URI).</summary>
 public sealed record ArtifactView(
@@ -58,6 +64,12 @@ public enum ArtifactStoreOutcome
 
     /// <summary>Row is stored but the declared digest names a different blob (re-declaration).</summary>
     AlreadyStoredOther,
+
+    /// <summary>Row visible, but a direct upload cannot be confirmed for it: the configured adapter mints no URLs (filesystem: proxied PUT is the only byte path) or the row is external:/foreign-scheme.</summary>
+    NotConfirmable,
+
+    /// <summary>Row visible, same team, but not pending (rejected/deleted — the slot is spent).</summary>
+    NotPending,
 }
 
 /// <summary>Result of one content PUT.</summary>
@@ -119,13 +131,20 @@ public interface IArtifactLedger
         LinkPrincipal? workload,
         CancellationToken ct);
 
+    /// <summary>Confirm a direct-to-store upload for a pending slot: HEAD (absent ⇒ NotFound), size law, kernel re-hash law, then the same conditional-update + audit + timeline tail as the proxied PUT. The row's scheme — never live config — decides confirmability.</summary>
+    Task<ArtifactStoreResult> ConfirmAsync(
+        Guid artifactId,
+        string workloadOrActorTeam,
+        LinkPrincipal? workload,
+        CancellationToken ct);
+
     /// <summary>Register/confirm an <c>event.artifact.available</c> declaration (external rows unverified, kernel-stored rows idempotent confirmation).</summary>
     Task<ArtifactRegisterResult> RegisterExternalAsync(JsonElement eventRoot, CancellationToken ct);
 
     /// <summary>One row, team-scoped: null (⇒ 404) when missing or foreign.</summary>
     Task<ArtifactView?> GetAsync(string actor, IReadOnlyList<string> groups, IReadOnlySet<string> roles, Guid artifactId, CancellationToken ct);
 
-    /// <summary>Team-scoped row for the content endpoints: row + readable state (stored, kernel-fs blob). Null when missing/foreign/not-readable.</summary>
+    /// <summary>Team-scoped row for the content endpoints: row + readable state (stored, and a scheme one configured adapter Owns). Null when missing/foreign/not-readable.</summary>
     Task<ArtifactView?> GetReadableAsync(string actor, IReadOnlyList<string> groups, IReadOnlySet<string> roles, Guid artifactId, CancellationToken ct);
 
     /// <summary>Team-scoped row for the workload PUT plane: the allocating endpoint (same team) may store; foreign ⇒ null.</summary>
@@ -138,10 +157,11 @@ public sealed class ArtifactLedger(
     AuditWriter audit,
     IArtifactStore store,
     KernelMetrics metrics,
-    TimeProvider timeProvider) : IArtifactLedger
+    TimeProvider timeProvider,
+    ArtifactOptions options) : IArtifactLedger
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
-    private static readonly TimeSpan AllocationTtl = TimeSpan.FromMinutes(15);
+    private static readonly TimeSpan AllocationTtl = ArtifactTicket.AllocationTtl;
 
     /// <inheritdoc />
     public async Task<ArtifactTicket> AllocateAsync(
@@ -171,7 +191,7 @@ public sealed class ArtifactLedger(
                 .FirstOrDefaultAsync(ct);
             if (existing is not null && existing.State == "pending" && existing.ExpiresAt > now)
             {
-                return Ticket(existing);
+                return await TicketAsync(existing, ct);
             }
         }
 
@@ -214,7 +234,7 @@ public sealed class ArtifactLedger(
             })));
         await db.SaveChangesAsync(ct);
         metrics.ArtifactAllocated();
-        return Ticket(row);
+        return await TicketAsync(row, ct);
     }
 
     /// <inheritdoc />
@@ -225,7 +245,7 @@ public sealed class ArtifactLedger(
         var row = await db.Artifacts.AsNoTracking()
             .Where(a => a.CommandId == commandId && a.Origin == origin && a.State == "pending" && a.ExpiresAt > now)
             .FirstOrDefaultAsync(ct);
-        return row is null ? null : Ticket(row);
+        return row is null ? null : await TicketAsync(row, ct);
     }
 
     /// <inheritdoc />
@@ -274,13 +294,86 @@ public sealed class ArtifactLedger(
             return new ArtifactStoreResult(ArtifactStoreOutcome.DigestMismatch);
         }
 
-        // Conditional guard: pending→stored; a concurrent PUT loses and re-reads.
+        return await ConfirmStoredAsync(db, artifactId, row, put.Bytes, "digest-verified", now, ct);
+    }
+
+    /// <inheritdoc />
+    public async Task<ArtifactStoreResult> ConfirmAsync(
+        Guid artifactId,
+        string workloadOrActorTeam,
+        LinkPrincipal? workload,
+        CancellationToken ct)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(ct);
+        var row = await db.Artifacts.AsNoTracking().FirstOrDefaultAsync(a => a.ArtifactId == artifactId, ct);
+        if (row is null || !TeamMayWrite(row, workloadOrActorTeam, workload))
+        {
+            return new ArtifactStoreResult(ArtifactStoreOutcome.NotFound);
+        }
+
+        if (row.State == "stored")
+        {
+            return new ArtifactStoreResult(ArtifactStoreOutcome.Idempotent, View(row));
+        }
+
+        if (row.State != "pending")
+        {
+            return new ArtifactStoreResult(ArtifactStoreOutcome.NotPending);
+        }
+
+        // Only an adapter that mints URLs could have RECEIVED a direct upload,
+        // and a row whose scheme a configured adapter doesn't Own is inert
+        // (single-source law: the row's scheme, never the live config, decides).
+        if (store is not IStoreSignedUrlSource || (row.StorageUri.Length > 0 && !store.Owns(row.StorageUri)))
+        {
+            return new ArtifactStoreResult(ArtifactStoreOutcome.NotConfirmable);
+        }
+
+        var declaredHex = row.Digest["sha256:".Length..];
+        var key = ArtifactKeys.RelativePathOf(declaredHex);
+        var now = timeProvider.GetUtcNow().UtcDateTime;
+        var landed = await store.StatAsync(key, ct);
+        if (landed is null)
+        {
+            return new ArtifactStoreResult(ArtifactStoreOutcome.NotFound);
+        }
+
+        if (landed.Value != row.Size)
+        {
+            await RejectAsync(db, row, "size-mismatch",
+                $"declared {row.Size} bytes, object holds {landed.Value}", now, ct);
+            return new ArtifactStoreResult(ArtifactStoreOutcome.SizeMismatch);
+        }
+
+        // D5: kernel re-hash, never ETag trust — same audit/metrics law as the
+        // proxied PUT, so a direct upload cannot smuggle a squatting blob.
+        if (!await store.VerifyDigestAsync(key, declaredHex, ct))
+        {
+            await RejectAsync(db, row, "digest-mismatch",
+                $"declared {row.Digest}, object at {key} hashes elsewhere", now, ct);
+            return new ArtifactStoreResult(ArtifactStoreOutcome.DigestMismatch);
+        }
+
+        var confirmed = await ConfirmStoredAsync(db, artifactId, row, row.Size, "direct-upload-verified", now, ct);
+        if (confirmed.Outcome == ArtifactStoreOutcome.Stored)
+        {
+            metrics.ArtifactConfirmed(workload is null ? "rest" : "link");
+        }
+
+        return confirmed;
+    }
+
+    /// <summary>The DB-arbitrated pending→stored law shared by the proxied PUT and the confirm path: one conditional update, then audit + timeline + metrics in the same transaction.</summary>
+    private async Task<ArtifactStoreResult> ConfirmStoredAsync(
+        FacilitatorDbContext db, Guid artifactId, ArtifactEntity row, long bytes, string reason, DateTime now, CancellationToken ct)
+    {
+        var storageUri = store.StorageUriScheme + ":" + ArtifactKeys.RelativePathOf(row.Digest["sha256:".Length..]);
         var rows = await db.Artifacts
             .Where(a => a.ArtifactId == artifactId && a.State == "pending")
             .ExecuteUpdateAsync(s => s
                 .SetProperty(a => a.State, "stored")
                 .SetProperty(a => a.Verification, "verified")
-                .SetProperty(a => a.StorageUri, "kernel-fs:" + put.RelativePath)
+                .SetProperty(a => a.StorageUri, storageUri)
                 .SetProperty(a => a.StoredAt, now), ct);
         if (rows == 0)
         {
@@ -297,10 +390,10 @@ public sealed class ArtifactLedger(
             Action: "artifact.stored",
             Resource: $"artifact/{artifactId}",
             Decision: "allow",
-            Reason: "digest-verified",
+            Reason: reason,
             EvidenceRef: null,
             PolicyVersion: "artifact-v1",
-            Detail: Serialize(new Dictionary<string, string?> { ["digest"] = after.Digest, ["bytes"] = put.Bytes.ToString() })));
+            Detail: Serialize(new Dictionary<string, string?> { ["digest"] = after.Digest, ["bytes"] = bytes.ToString() })));
         await AppendTimelineAsync(db, after, "artifact.stored", after.CreatedAt, now, ct);
         await db.SaveChangesAsync(ct);
         metrics.ArtifactStored();
@@ -351,11 +444,31 @@ public sealed class ArtifactLedger(
 
                 if (row.State == "pending")
                 {
-                    // Confirmed before the bytes landed (event-first): mark pending→stored
-                    // with the event's URL, unverified (the kernel never fetched them).
+                    // Confirmed before the bytes landed (event-first): mark
+                    // pending→stored with the event's URL. Verification is the
+                    // screen's verdict — a binding or a clean SSRF screen
+                    // upgrades, anything else (including no URL at all) stays
+                    // unverified; the kernel never fetched the bytes.
                     row.State = "stored";
                     row.StorageUri = $"external:{storageUrl ?? wireId}";
-                    row.Verification = "unverified";
+                    var (confirmedAllowed, confirmedReason) = storageUrl is null
+                        ? (false, "no-url")
+                        : await ExternalRefScreener.ScreenAsync(storageUrl, options.ExternalBindings);
+                    row.Verification = confirmedAllowed ? "verified" : "unverified";
+                    audit.Append(db, new AuditRecord(
+                        Actor: createdBy ?? "external",
+                        Action: "artifact.external-screened",
+                        Resource: $"artifact/{kernelId}",
+                        Decision: "allow",
+                        Reason: confirmedReason,
+                        EvidenceRef: storageUrl,
+                        PolicyVersion: "artifact-v1",
+                        Detail: Serialize(new Dictionary<string, string?>
+                        {
+                            ["stage"] = "confirm",
+                            ["screen"] = confirmedReason,
+                            ["verification"] = row.Verification,
+                        })));
                     row.StoredAt = now;
                 }
 
@@ -375,6 +488,12 @@ public sealed class ArtifactLedger(
             return new ArtifactRegisterResult(ArtifactRegisterOutcome.Duplicate, prior.ArtifactId);
         }
 
+        // Screen the declared URL: a binding prefix or a clean SSRF screen
+        // makes the claim verified; anything else stays unverified (never a
+        // refusal — a bad screen downgrades, it doesn't reject).
+        var (screenAllowed, screenReason) = storageUrl is null
+            ? (false, "no-url")
+            : await ExternalRefScreener.ScreenAsync(storageUrl, options.ExternalBindings);
         var external = new ArtifactEntity
         {
             ArtifactId = Guid.NewGuid(),
@@ -384,7 +503,7 @@ public sealed class ArtifactLedger(
             Digest = digest,
             StorageUri = $"external:{storageUrl ?? wireId}",
             State = "stored",
-            Verification = "unverified",
+            Verification = screenAllowed ? "verified" : "unverified",
             Origin = "external",
             CreatedBy = createdBy ?? "external",
             TeamSlug = null,
@@ -402,7 +521,13 @@ public sealed class ArtifactLedger(
             Reason: "external",
             EvidenceRef: storageUrl,
             PolicyVersion: "artifact-v1",
-            Detail: Serialize(new Dictionary<string, string?> { ["wireArtifactId"] = wireId, ["digest"] = digest })));
+            Detail: Serialize(new Dictionary<string, string?>
+            {
+                ["wireArtifactId"] = wireId,
+                ["digest"] = digest,
+                ["screen"] = screenReason,
+                ["verification"] = external.Verification,
+            })));
         if (external.WorkId is not null)
         {
             await AppendTimelineAsync(db, external, "artifact.registered", external.CreatedAt, now, ct);
@@ -427,7 +552,10 @@ public sealed class ArtifactLedger(
         string actor, IReadOnlyList<string> groups, IReadOnlySet<string> roles, Guid artifactId, CancellationToken ct)
     {
         var view = await GetAsync(actor, groups, roles, artifactId, ct);
-        return view is { State: "stored" } && view.StorageUri.StartsWith("kernel-fs:", StringComparison.Ordinal) ? view : null;
+        // Kernel-hosted only: a configured adapter Owns() the row's scheme (external:
+        // rows and foreign-scheme rows answer unreadable — the scheme on the row is
+        // the single source of truth, never a re-read of Storage:Provider).
+        return view is { State: "stored" } && store.Owns(view.StorageUri) ? view : null;
     }
 
     /// <inheritdoc />
@@ -528,8 +656,27 @@ public sealed class ArtifactLedger(
         });
     }
 
-    private static ArtifactTicket Ticket(ArtifactEntity row) =>
-        new(row.ArtifactId, UploadLocation(row), row.ExpiresAt);
+    // A pending slot's ticket: when the configured adapter mints URLs, the
+    // ticket carries a presigned PUT for the digest-derived key the admission
+    // already fixed (D2) — the same key the bytes MUST land at, so a
+    // client-chosen address can never squat another digest's location. The URL
+    // expires WITH the allocation (one timestamp). A row that already got
+    // re-pointed (event-first confirmation wrote external:) gets no URL.
+    private async Task<ArtifactTicket> TicketAsync(ArtifactEntity row, CancellationToken ct)
+    {
+        string? uploadUrl = null;
+        if (row.State == "pending" && row.StorageUri.Length == 0
+            && store is IStoreSignedUrlSource source
+            && await source.PresignUploadAsync(
+                ArtifactKeys.RelativePathOf(row.Digest["sha256:".Length..]), AllocationTtl, ct) is { } url)
+        {
+            uploadUrl = url.ToString();
+            metrics.ArtifactPresigned("upload");
+        }
+
+        return new ArtifactTicket(row.ArtifactId, UploadLocation(row), uploadUrl,
+            uploadUrl is null ? "POST" : "PUT", row.ExpiresAt);
+    }
 
     private static string UploadLocation(ArtifactEntity row) =>
         row.Origin == "link"

@@ -26,6 +26,6 @@ public sealed class WorkEventEntityConfiguration : IEntityTypeConfiguration<Work
         e.ToTable(t => t.HasCheckConstraint("work_events_kind_check",
             CheckSql.InList("kind",
                 ["created", "state.transition", "steer", "command.accepted", "assignment.transition", "approval.decided",
-                    "artifact.stored", "artifact.registered", "artifact.available"])));
+                    "artifact.stored", "artifact.registered", "artifact.available", "artifact.gc"])));
     }
 }

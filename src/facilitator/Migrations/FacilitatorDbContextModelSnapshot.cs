@@ -1045,7 +1045,7 @@ namespace Facilitator.Migrations
 
                     b.ToTable("work_events", "facilitator", t =>
                         {
-                            t.HasCheckConstraint("work_events_kind_check", "kind IN ('created', 'state.transition', 'steer', 'command.accepted', 'assignment.transition', 'approval.decided', 'artifact.stored', 'artifact.registered', 'artifact.available')");
+                            t.HasCheckConstraint("work_events_kind_check", "kind IN ('created', 'state.transition', 'steer', 'command.accepted', 'assignment.transition', 'approval.decided', 'artifact.stored', 'artifact.registered', 'artifact.available', 'artifact.gc')");
                         });
                 });
 

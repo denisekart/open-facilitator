@@ -1,6 +1,6 @@
 # Plan 15 — Result manifests, typed outputs, worker artifact cutover, `@ofac/adapter` artifact client
 
-**Status:** ⬜ Not started (flip 🔵→🟡 at first commit, 🟢 on CI green — Implementation Status table below).
+**Status:** 🟡 In progress (🟢 on CI green — Implementation Status table below).
 **Phase:** D (third). **Depends on:** 13 + 14 (artifact store as-built, both 🟢). Cuts over Plan 07's inline-manifest/`file://` interim.
 **Branching:** work and commit **directly on `main`** (standing directive from Plans 03–08). Do not push.
 **Landing note:** on approval, copy this file's content over `.omp/plans/15-result-manifests-worker-cutover.md` (first commit of Step 1) — that file is the canonical plan record; the Implementation Status table there is the living status from then on.
@@ -179,7 +179,7 @@ export function buildCompletedEvent(ctx: Pick<RunContext, "executionId" | "execu
 
 |Step|State|
 |---|---|
-|1 Wire delta + golden + fixtures|Not started|
+|1 Wire delta + golden + fixtures|Fully implemented: schemas amended (ref+digest + if/then, artifactRef kind/classification, manifest vocabulary); canonical/result-manifest-1 golden byte-canonical, digest cross-checked in both harnesses; 4 fixtures registered, index green in both languages; computeManifestDigest/canonicalizeManifest exported; ApprovalDigest.CanonicalDocument/CanonicalBytes law factored; DTOs regenerated, `make protocol` drift-clean, DTO round-trip of the with-manifest-ref fixture green (commit ad4de05)|
 |2 Kernel manifest recording|Not started|
 |3 @ofac/adapter artifact client|Not started|
 |4 Worker + e2e cutover|Not started|

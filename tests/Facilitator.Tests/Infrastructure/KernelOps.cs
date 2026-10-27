@@ -29,10 +29,13 @@ internal static class KernelOps
         return body;
     }
 
-    /// <summary>Create a Work via the API; returns (workId, version).</summary>
-    internal static async Task<(Guid WorkId, long Version)> CreateWorkAsync(HttpClient client, string objective)
+    /// <summary>Create a Work via the API (optionally under a project, for team-scoped works); returns (workId, version).</summary>
+    internal static async Task<(Guid WorkId, long Version)> CreateWorkAsync(HttpClient client, string objective, Guid? projectId = null)
     {
-        var created = await PostJsonAsync(client, "/api/works", JsonSerializer.Serialize(new { objective }), HttpStatusCode.Created);
+        var body = projectId is null
+            ? JsonSerializer.Serialize(new { objective })
+            : JsonSerializer.Serialize(new { objective, projectId = projectId.Value });
+        var created = await PostJsonAsync(client, "/api/works", body, HttpStatusCode.Created);
         return (created.GetProperty("workId").GetGuid(), created.GetProperty("version").GetInt64());
     }
 

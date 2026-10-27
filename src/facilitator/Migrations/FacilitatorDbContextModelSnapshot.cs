@@ -931,6 +931,92 @@ namespace Facilitator.Migrations
                     b.ToTable("provider_events", "facilitator");
                 });
 
+            modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.ResultManifestEntity", b =>
+                {
+                    b.Property<string>("ManifestId")
+                        .HasColumnType("text")
+                        .HasColumnName("manifest_id");
+
+                    b.Property<Guid>("ArtifactId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("artifact_id");
+
+                    b.Property<Guid>("AssignmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("assignment_id");
+
+                    b.Property<string>("Digest")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("digest");
+
+                    b.Property<string>("ExecutionId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("execution_id");
+
+                    b.PrimitiveCollection<string[]>("OutputArtifactIds")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text[]")
+                        .HasDefaultValue(new string[0])
+                        .HasColumnName("output_artifact_ids");
+
+                    b.Property<DateTime>("RecordedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("recorded_at");
+
+                    b.Property<string>("ResultState")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("result_state");
+
+                    b.Property<int>("Revision")
+                        .HasColumnType("integer")
+                        .HasColumnName("revision");
+
+                    b.Property<string>("RevisionOf")
+                        .HasColumnType("text")
+                        .HasColumnName("revision_of");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("state");
+
+                    b.Property<string>("StructuredDigest")
+                        .HasColumnType("text")
+                        .HasColumnName("structured_digest");
+
+                    b.Property<Guid>("WorkId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("work_id");
+
+                    b.HasKey("ManifestId");
+
+                    b.HasIndex("AssignmentId")
+                        .HasDatabaseName("ix_result_manifests_assignment_id");
+
+                    b.HasIndex("RevisionOf")
+                        .HasDatabaseName("ix_result_manifests_revision_of");
+
+                    b.HasIndex("WorkId")
+                        .HasDatabaseName("ix_result_manifests_work_id");
+
+                    b.HasIndex("AssignmentId", "Revision")
+                        .IsUnique()
+                        .HasDatabaseName("result_manifests_assignment_id_revision_key");
+
+                    b.ToTable("result_manifests", "facilitator", t =>
+                        {
+                            t.HasCheckConstraint("result_manifests_digest_check", "digest ~ '^sha256:[0-9a-f]{64}$'");
+
+                            t.HasCheckConstraint("result_manifests_result_state_check", "result_state IN ('missing', 'available', 'validated', 'rejected', 'superseded')");
+
+                            t.HasCheckConstraint("result_manifests_state_check", "state IN ('recorded', 'superseded')");
+                        });
+                });
+
             modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.TeamEntity", b =>
                 {
                     b.Property<Guid>("TeamId")
@@ -1045,7 +1131,7 @@ namespace Facilitator.Migrations
 
                     b.ToTable("work_events", "facilitator", t =>
                         {
-                            t.HasCheckConstraint("work_events_kind_check", "kind IN ('created', 'state.transition', 'steer', 'command.accepted', 'assignment.transition', 'approval.decided', 'artifact.stored', 'artifact.registered', 'artifact.available', 'artifact.gc')");
+                            t.HasCheckConstraint("work_events_kind_check", "kind IN ('created', 'state.transition', 'steer', 'command.accepted', 'assignment.transition', 'approval.decided', 'artifact.stored', 'artifact.registered', 'artifact.available', 'artifact.gc', 'manifest.recorded', 'manifest.superseded')");
                         });
                 });
 
@@ -1103,6 +1189,21 @@ namespace Facilitator.Migrations
                         .HasConstraintName("projects_team_id_fkey");
 
                     b.Navigation("Team");
+                });
+
+            modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.ResultManifestEntity", b =>
+                {
+                    b.HasOne("Facilitator.Kernel.Shared.Persistence.ResultManifestEntity", null)
+                        .WithMany()
+                        .HasForeignKey("RevisionOf")
+                        .HasConstraintName("result_manifests_revision_of_fkey");
+
+                    b.HasOne("Facilitator.Kernel.Shared.Persistence.WorkEntity", null)
+                        .WithMany()
+                        .HasForeignKey("WorkId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("result_manifests_work_id_fkey");
                 });
 
             modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.WorkEntity", b =>

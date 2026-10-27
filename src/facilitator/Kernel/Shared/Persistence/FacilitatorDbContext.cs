@@ -56,6 +56,8 @@ public class FacilitatorDbContext(DbContextOptions<FacilitatorDbContext> options
 
     public DbSet<ArtifactEntity> Artifacts => Set<ArtifactEntity>();
 
+    public DbSet<ResultManifestEntity> ResultManifests => Set<ResultManifestEntity>();
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder model)
     {

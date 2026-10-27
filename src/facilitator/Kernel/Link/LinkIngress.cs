@@ -49,7 +49,8 @@ public sealed class LinkIngress(
     KernelMetrics metrics,
     TimeProvider timeProvider,
     Facilitator.Kernel.Work.ApprovalIngress approvals,
-    Facilitator.Kernel.Work.ArtifactIngress artifacts)
+    Facilitator.Kernel.Work.ArtifactIngress artifacts,
+    Facilitator.Kernel.Work.ResultIngress results)
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
@@ -100,6 +101,23 @@ public sealed class LinkIngress(
             if (screen.Type == "org.facilitator.event.artifact.available.v1")
             {
                 var arm = await artifacts.HandleEventAsync(root, ct);
+                if (arm.Refused)
+                {
+                    await inbox.MarkProcessedAsync(inboxId, arm.Status, ct);
+                    return new LinkAdmission(arm.Problem, null, null);
+                }
+
+                await inbox.MarkProcessedAsync(inboxId, null, ct);
+                metrics.InboxProcessed();
+                return new LinkAdmission(null, "accepted", inboxId);
+            }
+
+            if (screen.Type == Facilitator.Kernel.Work.ResultIngress.CompletedType)
+            {
+                // Plan 15: a completed event carrying a manifest ref records
+                // the manifest; a refusal settles the inbox with the refused
+                // status, mirroring the artifact.available arm.
+                var arm = await results.HandleCompletedAsync(root, screen.Principal, ct);
                 if (arm.Refused)
                 {
                     await inbox.MarkProcessedAsync(inboxId, arm.Status, ct);

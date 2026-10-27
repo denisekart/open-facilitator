@@ -25,6 +25,9 @@ public sealed class KernelMetrics
     private readonly Counter<long> _artifactPresigned;
     private readonly Counter<long> _artifactGcCollected;
     private readonly Counter<long> _artifactStoreErrors;
+    private readonly Counter<long> _manifestRecorded;
+    private readonly Counter<long> _manifestSuperseded;
+    private readonly Counter<long> _manifestDigestMismatch;
     private readonly Histogram<double> _deliveryLatency;
     private readonly Histogram<double> _ingressLatency;
     private readonly Histogram<double> _artifactStoreLatency;
@@ -59,6 +62,9 @@ public sealed class KernelMetrics
         _artifactStoreErrors = meter.CreateCounter<long>("facilitator.artifact.store.errors", description: "Backend store errors by operation (tag: op)");
         meter.CreateObservableGauge("facilitator.artifact.gc.last_pass_age", () => Volatile.Read(ref _gcLastPassAgeSeconds), unit: "s", description: "Seconds since the last retention-GC pass");
         _artifactStoreLatency = meter.CreateHistogram<double>("facilitator.artifact.store.latency", unit: "ms", description: "Content put latency");
+        _manifestRecorded = meter.CreateCounter<long>("facilitator.manifest.recorded", description: "Result manifests recorded into the ledger (tag: origin)");
+        _manifestSuperseded = meter.CreateCounter<long>("facilitator.manifest.superseded", description: "Result-manifest chain heads superseded by a correction");
+        _manifestDigestMismatch = meter.CreateCounter<long>("facilitator.manifest.digest_mismatch", description: "Manifest recompute-vs-declared digest rejections");
     }
 
     /// <summary>Record one charged delivery attempt.</summary>
@@ -120,6 +126,16 @@ public sealed class KernelMetrics
     /// <summary>Record a backend store error.</summary>
     /// <param name="op">The failing operation (gc | put | get).</param>
     public void ArtifactStoreErrors(string op) => _artifactStoreErrors.Add(1, new KeyValuePair<string, object?>("op", op));
+
+    /// <summary>Record one manifest recorded into the ledger.</summary>
+    /// <param name="origin">link | rest.</param>
+    public void ManifestRecorded(string origin) => _manifestRecorded.Add(1, new KeyValuePair<string, object?>("origin", origin));
+
+    /// <summary>Record one chain head superseded by a correction revision.</summary>
+    public void ManifestSuperseded() => _manifestSuperseded.Add(1);
+
+    /// <summary>Record one manifest digest-recompute rejection.</summary>
+    public void ManifestDigestMismatch() => _manifestDigestMismatch.Add(1);
 
     /// <summary>Refresh the GC last-pass-age gauge (written by the GC loop each pass).</summary>
     public void SetGcLastPassAge(long seconds) => Volatile.Write(ref _gcLastPassAgeSeconds, seconds);

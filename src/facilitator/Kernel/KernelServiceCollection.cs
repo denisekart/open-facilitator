@@ -91,6 +91,8 @@ public static class KernelServiceCollection
         builder.Services.AddScoped<IngressProcessor>();
         builder.Services.AddScoped<CloudEventIngress>();
         builder.Services.AddScoped<ArtifactIngress>();
+        builder.Services.AddScoped<ResultIngress>();
+        builder.Services.AddScoped<IResultManifestLedger, ResultManifestLedger>();
         builder.Services.AddScoped<ApprovalIngress>();
         return builder;
     }

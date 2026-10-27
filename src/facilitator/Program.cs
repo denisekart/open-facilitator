@@ -34,6 +34,7 @@ app.UseRateLimiter();
 app.MapWorkApi(app.Environment);
 app.MapApprovalsApi();
 app.MapArtifactsApi();
+app.MapResultManifestsApi();
 app.MapLinkApi(app.Environment);
 app.MapIdentityApi();
 

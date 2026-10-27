@@ -20,7 +20,7 @@ public class MigrationTests(PostgresFixture fixture)
         await KernelOps.GetJsonAsync(client, "/api/works", System.Net.HttpStatusCode.OK);
 
         var tables = await fixture.Db.SchemaTables();
-        foreach (var table in new[] { "works", "work_events", "inbox", "outbox", "dead_letters" })
+        foreach (var table in new[] { "works", "work_events", "inbox", "outbox", "dead_letters", "result_manifests" })
         {
             Assert.Contains(table, tables);
         }
@@ -33,6 +33,7 @@ public class MigrationTests(PostgresFixture fixture)
                      "inbox_state_check",
                      "outbox_status_check",
                      "outbox_aggregate_type_check",
+                     "result_manifests_state_check",
                  })
         {
             Assert.Contains(name, checks);

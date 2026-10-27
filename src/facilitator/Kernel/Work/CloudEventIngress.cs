@@ -23,7 +23,8 @@ public sealed class CloudEventIngress(
     KernelMetrics metrics,
     TimeProvider timeProvider,
     ApprovalIngress approvals,
-    ArtifactIngress artifacts)
+    ArtifactIngress artifacts,
+    ResultIngress results)
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
@@ -99,6 +100,19 @@ public sealed class CloudEventIngress(
             if (type == "org.facilitator.event.artifact.available.v1")
             {
                 var arm = await artifacts.HandleEventAsync(root, ct);
+                if (arm.Refused)
+                {
+                    return await pipeline.SettleAsync(
+                        inboxId, arm.Status, ct, () => IngressPipeline.Problem(arm.Problem!));
+                }
+
+                metrics.InboxProcessed();
+                return Results.Accepted(null, new { status = arm.Status, inboxId });
+            }
+
+            if (type == ResultIngress.CompletedType)
+            {
+                var arm = await results.HandleCompletedAsync(root, null, ct);
                 if (arm.Refused)
                 {
                     return await pipeline.SettleAsync(

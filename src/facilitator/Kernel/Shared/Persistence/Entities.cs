@@ -509,3 +509,36 @@ public sealed class ArtifactEntity
     /// <summary>permanent | (future GC policies) — enforcement is the storage plan's.</summary>
     public string RetentionPolicy { get; set; } = "permanent";
 }
+
+/// <summary>
+/// facilitator.result_manifests — durable ledger of result manifests recorded against a work
+/// (Plan 15): the kernel is the authority on the manifest revision chain, the declared digests,
+/// and the GC pin. The manifest document itself lives as content-addressed bytes in the artifact
+/// store; this row records its identity, its revision lineage, and the output artifact ids it
+/// declares (flattened so the retention sweep can pin referenced blobs in a single set-based check).
+/// </summary>
+public sealed class ResultManifestEntity
+{
+    /// <summary>The manifest id as declared by the stored document and by the completed event's inline <c>resultManifest</c> (PK).</summary>
+    public string ManifestId { get; set; } = string.Empty;
+    public Guid WorkId { get; set; }
+    public Guid AssignmentId { get; set; }
+    public string ExecutionId { get; set; } = string.Empty;
+    /// <summary>1-based revision chain head per assignment; corrections supersede the previous head in the same tx.</summary>
+    public int Revision { get; set; }
+    /// <summary>The manifest id this revision supersedes; null on the first revision.</summary>
+    public string? RevisionOf { get; set; }
+    /// <summary>Wire digest ("sha256:&lt;64hex&gt;") of the canonical manifest document, verified against the stored bytes.</summary>
+    public string Digest { get; set; } = string.Empty;
+    /// <summary>Digest of the canonical <c>structuredResult</c> sub-document when present, else null.</summary>
+    public string? StructuredDigest { get; set; }
+    /// <summary>The verified artifact row carrying the manifest bytes.</summary>
+    public Guid ArtifactId { get; set; }
+    /// <summary>Every <c>outputs[].artifactId</c> the document declares (lower-case GUID strings); empty array when none.</summary>
+    public string[] OutputArtifactIds { get; set; } = [];
+    /// <summary>missing | available | validated | rejected | superseded.</summary>
+    public string ResultState { get; set; } = "available";
+    /// <summary>recorded | superseded — the chain-law state of this row.</summary>
+    public string State { get; set; } = "recorded";
+    public DateTime RecordedAt { get; set; }
+}

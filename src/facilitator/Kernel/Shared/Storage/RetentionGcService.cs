@@ -241,6 +241,19 @@ public sealed class RetentionGcService(
             }
         }
 
+        // Plan 15: a recorded (non-superseded) result manifest pins the blob
+        // it was stored under AND every output artifact its document declared,
+        // regardless of the Work's state — the manifest is the durable claim.
+        var idText = artifactId.ToString();
+        var manifestPinned = await db.ResultManifests.AsNoTracking()
+            .Where(m => m.State == "recorded"
+                        && (m.ArtifactId == artifactId || m.OutputArtifactIds.Contains(idText)))
+            .AnyAsync(ct);
+        if (manifestPinned)
+        {
+            return new CollectOutcome(CollectKind.ReferenceHeld, "reference-held", null);
+        }
+
         var key = StoreKeyOf(row.StorageUri);
         var tombstoned = await TombstoneAsync(db, row, "retention", now, ct);
         return tombstoned

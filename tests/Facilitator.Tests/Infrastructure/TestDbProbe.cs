@@ -344,6 +344,83 @@ public sealed class TestDbProbe : IAsyncDisposable
         ScalarLong("SELECT count(*) FROM facilitator.artifacts WHERE command_id = $1",
             cmd => cmd.Parameters.AddWithValue(commandId));
 
+    /// <summary>Hand-mint a facilitator.projects row on a roster team (work team-scoping tests).</summary>
+    public async Task<Guid> SeedProject(string teamSlug)
+    {
+        var projectId = Guid.NewGuid();
+        await NonQuery(
+            "INSERT INTO facilitator.projects (project_id, team_id, name, config, created_at) "
+            + "VALUES ($1, (SELECT team_id FROM facilitator.teams WHERE slug = $2), 'proj-' || $1, '{}', now())",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(projectId);
+                cmd.Parameters.AddWithValue(teamSlug);
+            });
+        return projectId;
+    }
+
+    /// <summary>Hand-mint a facilitator.works row in a given state (GC tests pin/reference scenarios need a work without the full API lifecycle).</summary>
+    public async Task<Guid> SeedWork(string state)
+    {
+        var workId = Guid.NewGuid();
+        await NonQuery(
+            "INSERT INTO facilitator.works (work_id, project_id, objective, state, version, created_at, updated_at) "
+            + "VALUES ($1, NULL, 'gc-seed', $2, 1, now(), now())",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(workId);
+                cmd.Parameters.AddWithValue(state);
+            });
+        return workId;
+    }
+
+    /// <summary>Hand-mint a facilitator.result_manifests row (GC tests seed ledger states the API cannot reach without a full upload flow).</summary>
+    public Task SeedResultManifest(
+        string manifestId, Guid workId, Guid artifactId, string[] outputArtifactIds, string state, string resultState) =>
+        NonQuery(
+            "INSERT INTO facilitator.result_manifests (manifest_id, work_id, assignment_id, execution_id, "
+            + "revision, digest, artifact_id, output_artifact_ids, result_state, state, recorded_at) "
+            + "VALUES ($1, $6, gen_random_uuid(), 'exec-seed', 1, 'sha256:' || repeat('b', 64), "
+            + "$2, $3::text[], $5, $4, now())",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(manifestId);
+                cmd.Parameters.AddWithValue(artifactId);
+                cmd.Parameters.AddWithValue(outputArtifactIds);
+                cmd.Parameters.AddWithValue(state);
+                cmd.Parameters.AddWithValue(resultState);
+                cmd.Parameters.AddWithValue(workId);
+            });
+
+    /// <summary>The result-manifest ledger rows for one assignment chain (null-valued optionals as empty strings).</summary>
+    public async Task<List<ManifestRow>> ManifestRowsForAssignment(Guid assignmentId)
+    {
+        await using var connection = await _dataSource.OpenConnectionAsync();
+        await using var cmd = new NpgsqlCommand(
+            "SELECT manifest_id, work_id::text, assignment_id::text, execution_id, revision, "
+            + "coalesce(revision_of, ''), digest, coalesce(structured_digest, ''), artifact_id::text, "
+            + "result_state, state, recorded_at FROM facilitator.result_manifests WHERE assignment_id = $1 ORDER BY revision",
+            connection);
+        cmd.Parameters.AddWithValue(assignmentId);
+        await using var reader = await cmd.ExecuteReaderAsync();
+        var rows = new List<ManifestRow>();
+        while (await reader.ReadAsync())
+        {
+            rows.Add(new ManifestRow(reader.GetString(0), reader.GetString(1), reader.GetString(2),
+                reader.GetString(3), reader.GetInt32(4), reader.GetString(5), reader.GetString(6),
+                reader.GetString(7), reader.GetString(8), reader.GetString(9), reader.GetString(10),
+                reader.GetDateTime(11)));
+        }
+
+        return rows;
+    }
+
+    /// <summary>One result-manifest ledger assertion row (typed window, no raw SQL in tests).</summary>
+    public sealed record ManifestRow(
+        string ManifestId, string WorkId, string AssignmentId, string ExecutionId, int Revision,
+        string RevisionOf, string Digest, string StructuredDigest, string ArtifactId,
+        string ResultState, string State, DateTime RecordedAt);
+
     /// <summary>Artifacts rows registered under one wire artifactId (redelivery dedupe proof).</summary>
     public async Task<List<(Guid ArtifactId, string State, string Verification, string Origin, string StorageUri)>> ArtifactByWireId(string wireId)
     {

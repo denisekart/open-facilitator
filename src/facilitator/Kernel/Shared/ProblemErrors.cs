@@ -191,4 +191,19 @@ public static class ProblemErrors
     public static ProblemDetails NoCommonVersion() =>
         Create("no-common-version", "No common protocol version", StatusCodes.Status409Conflict,
             "no protocol version the server supports was offered");
+
+    /// <summary>404 manifest ref unknown, unresolvable, or off-team (non-disclosure: identical for every cause).</summary>
+    public static ProblemDetails ManifestNotFound(string manifestRef) =>
+        Create("manifest-not-found", "Manifest not found", StatusCodes.Status404NotFound,
+            $"no manifest for '{manifestRef}' visible to this principal");
+
+    /// <summary>422 stored manifest bytes do not hash to the declared <c>resultDigest</c>.</summary>
+    public static ProblemDetails ManifestDigestMismatch(string manifestId) =>
+        Create("manifest-digest-mismatch", "Manifest digest mismatch", StatusCodes.Status422UnprocessableEntity,
+            $"manifest '{manifestId}' bytes do not match the declared resultDigest");
+
+    /// <summary>422 an <c>outputs[].artifactId</c> does not resolve to a verified, same-team artifact with the declared digest.</summary>
+    public static ProblemDetails ManifestOutputUnresolvable(string manifestId) =>
+        Create("manifest-output-unresolvable", "Manifest output unresolvable", StatusCodes.Status422UnprocessableEntity,
+            $"manifest '{manifestId}' declares an output artifact the kernel cannot resolve");
 }

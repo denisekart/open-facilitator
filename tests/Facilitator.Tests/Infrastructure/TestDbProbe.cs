@@ -287,6 +287,49 @@ public sealed class TestDbProbe : IAsyncDisposable
         string State, string ActionDigest, string DigestVerification, string WorkId,
         string DecidedBy, DateTime ExpiresAt, DateTime CreatedAt, string RequestedByEndpointId);
 
+    /// <summary>The artifacts ledger row for one artifact (null when never allocated/registered).</summary>
+    public async Task<ArtifactRow?> Artifact(Guid artifactId)
+    {
+        await using var connection = await _dataSource.OpenConnectionAsync();
+        await using var cmd = new NpgsqlCommand(
+            "SELECT state, digest, storage_uri, verification, origin, size, coalesce(work_id::text, ''), "
+            + "coalesce(team_slug, ''), coalesce(command_id, '') FROM facilitator.artifacts WHERE artifact_id = $1", connection);
+        cmd.Parameters.AddWithValue(artifactId);
+        await using var reader = await cmd.ExecuteReaderAsync();
+        return await reader.ReadAsync()
+            ? new ArtifactRow(reader.GetString(0), reader.GetString(1), reader.GetString(2),
+                reader.GetString(3), reader.GetString(4), reader.GetInt64(5), reader.GetString(6),
+                reader.GetString(7), reader.GetString(8))
+            : null;
+    }
+
+    /// <summary>One artifacts ledger assertion row (typed window, no raw SQL in tests).</summary>
+    public sealed record ArtifactRow(
+        string State, string Digest, string StorageUri, string Verification, string Origin,
+        long Size, string WorkId, string TeamSlug, string CommandId);
+
+    /// <summary>Artifacts rows allocated under one commandId (re-allocation must never fork rows).</summary>
+    public Task<long> ArtifactCountForCommand(string commandId) =>
+        ScalarLong("SELECT count(*) FROM facilitator.artifacts WHERE command_id = $1",
+            cmd => cmd.Parameters.AddWithValue(commandId));
+
+    /// <summary>Artifacts rows registered under one wire artifactId (redelivery dedupe proof).</summary>
+    public async Task<List<(Guid ArtifactId, string State, string Verification, string Origin, string StorageUri)>> ArtifactByWireId(string wireId)
+    {
+        await using var connection = await _dataSource.OpenConnectionAsync();
+        await using var cmd = new NpgsqlCommand(
+            "SELECT artifact_id::text, state, verification, origin, storage_uri FROM facilitator.artifacts WHERE wire_artifact_id = $1", connection);
+        cmd.Parameters.AddWithValue(wireId);
+        await using var reader = await cmd.ExecuteReaderAsync();
+        var rows = new List<(Guid, string, string, string, string)>();
+        while (await reader.ReadAsync())
+        {
+            rows.Add((Guid.Parse(reader.GetString(0)), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetString(4)));
+        }
+
+        return rows;
+    }
+
     /// <summary>facilitator.audit rows, newest first, optionally fenced by actor/decision.</summary>
     public async Task<List<AuditRow>> AuditRows(string? actor = null, string? decision = null)
     {
@@ -304,7 +347,7 @@ public sealed class TestDbProbe : IAsyncDisposable
             parameters.Add(decision);
         }
 
-        var sql = "SELECT actor, action, decision, coalesce(reason, ''), detail::text, coalesce(policy_version, ''), coalesce(evidence_ref, '') "
+        var sql = "SELECT actor, action, decision, coalesce(reason, ''), detail::text, coalesce(policy_version, ''), coalesce(evidence_ref, ''), coalesce(resource, '') "
             + "FROM facilitator.audit"
             + (clauses.Count == 0 ? string.Empty : " WHERE " + string.Join(" AND ", clauses))
             + " ORDER BY occurred_at DESC";
@@ -326,7 +369,8 @@ public sealed class TestDbProbe : IAsyncDisposable
                 reader.GetString(3),
                 reader.GetString(4),
                 reader.GetString(5),
-                reader.GetString(6)));
+                reader.GetString(6),
+                reader.GetString(7)));
         }
 
         return rows;
@@ -337,7 +381,7 @@ public sealed class TestDbProbe : IAsyncDisposable
         TextListRaw("SELECT role_name FROM facilitator.identity_roles ORDER BY role_name");
 
     /// <summary>One audit assertion row (typed window, no raw SQL in tests).</summary>
-    public sealed record AuditRow(string? Actor, string Action, string Decision, string Reason, string Detail, string PolicyVersion, string EvidenceRef);
+    public sealed record AuditRow(string? Actor, string Action, string Decision, string Reason, string Detail, string PolicyVersion, string EvidenceRef, string Resource);
 
     /// <inheritdoc />
     public async ValueTask DisposeAsync() => await _dataSource.DisposeAsync();

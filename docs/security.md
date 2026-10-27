@@ -271,9 +271,42 @@ set — `decision`, `reason`, `workId`/`assignmentId`/`capabilityId`,
 `evidenceRef` (kind-only, never the raw token) on approval lines,
 `traceId`/`correlationId` when present.
 
+## Artifact store laws
+
+- **Digest at the kernel boundary.** A declared `sha256:` digest means nothing
+  until the kernel has hashed the bytes it actually received: the byte-PUT
+  streams through a count+hash tee, and only a match flips
+  `pending → stored`/`verified`. A mismatch rejects the slot (422, deny
+  audit, row `rejected`) — the kernel never stores what it could not verify,
+  and a rejected slot is spent (a fresh allocation is required, no replay
+  against the old digest).
+- **Non-disclosure 404.** Artifact reads and workload writes are team-scoped
+  inside the ledger: a foreign-team row and a missing row answer the same
+  404 `artifact-not-found` (the approvals work-scope precedent). The
+  `artifacts.read` gate binding includes the `team-member` role (any
+  `/groups` claim) precisely so a wrong-team human hits the ledger's 404
+  rather than leaking team-ownership through a 403; a principal with no
+  group claim never reaches the ledger at all.
+- **External refs are `unverified` and never fetched.** An
+  `artifact.available` with a foreign `artifactId` registers metadata only
+  (`stored`/`unverified`, `external:<url>`); the kernel never dereferences
+  the URL, so an artifact declaration can neither drive SSRF nor become a
+  trust claim it didn't earn. A kernel-allocated id, once stored+verified,
+  cannot be rewritten by a later declaration (422
+  `artifact-declaration-mismatch`, deny audit).
+- **No path traversal in the store.** Blob paths derive only from hex
+  digests (`{hex[0..2]}/{hex}`); no client-supplied text (mediaType,
+  comment, URL) ever participates in a filesystem path, and the store
+  refuses any non-hex or escaping relative path before touching the disk.
+- **Envelope cap ≠ artifact cap.** The 262144-byte ingress body cap bounds
+  the JSON envelope only; artifact bytes travel by `PUT …/content` as a
+  stream (counted + hashed, never buffered whole), so the cap can never
+  become a silent artifact-size limit.
+
 ## Deferred to later plans
 
 | Concern | Plan |
 |---|---|
 | Refresh-token / session lifecycle for interactive UIs | 13+ |
 | Admin surface authorization (replacing `/api/dev/*`) | 13+ |
+| Artifact GC (unclaimed pending sweep, retention deletes), S3 backend, signed URLs | 14 |

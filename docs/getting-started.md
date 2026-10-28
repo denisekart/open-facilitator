@@ -1,6 +1,6 @@
 # Getting started
 
-Status: Plans 02–03 (transactional kernel + Link server) — the Facilitator runs against PostgreSQL with HTTP ingress, Work state machines, the outbox dispatcher, and the Workspace Link transport (SignalR hub + HTTP fallback). The slim reference environment (`referencectl up slim`) arrives with Plan 11; until then, this is the full contributor loop.
+Status: the transactional kernel (PostgreSQL, HTTP ingress, Work state machines, the outbox dispatcher, the Workspace Link transport) runs locally or as a container; the slim reference environment boots the full provider stack via `make compose-slim` (see [`reference/README.md`](../reference/README.md)).
 
 ## 1. Environment
 
@@ -23,7 +23,7 @@ make lint      # dotnet format --verify-no-changes + eslint + prettier --check
 make format    # auto-fix .NET + TS/JSON/YAML formatting
 ```
 
-`make compose-slim` / `make compose-full` intentionally exit 2 until Plan 11.
+`make compose-slim` / `make compose-full` boot the reference environment (builds the kernel image, needs Docker); `make compose-down` tears it down. First run copies `reference/.env.example` to `.env` — rotate the placeholder secrets for anything beyond a smoke run.
 
 `dotnet test` requires a running Docker daemon: the Plan 02 integration suite boots `postgres:17-alpine` via Testcontainers (image tag pinned in `reference/versions.env`).
 

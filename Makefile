@@ -64,9 +64,19 @@ db-update:
 	dotnet tool restore
 	dotnet ef database update -p src/facilitator -s src/facilitator
 
-compose-slim compose-full:
-	@echo "Reference environment lands in Plan 11: cd reference && ./referencectl up slim|full"
-	@exit 2
+compose-slim:
+	cd reference && cp -n .env.example .env && \
+	docker compose --env-file versions.env --env-file .env -f compose.slim.yaml up -d --build
+	@echo "Facilitator: http://localhost:8088/health · Keycloak: http://localhost:8080 (realm facilitator, admin demo-admin)"
+
+compose-full:
+	cd reference && cp -n .env.example .env && \
+	docker compose --env-file versions.env --env-file .env -f compose.slim.yaml -f compose.full.yaml up -d --build
+	@echo "Slim stack + forgejo :3000, mattermost :8065, kafka :9092, ollama :11434 (loopback)"
+
+compose-down:
+	cd reference && docker compose --env-file versions.env --env-file .env \
+	-f compose.slim.yaml $(if $(FULL),-f compose.full.yaml,) down -v
 
 clean:
 	dotnet clean OpenFacilitator.slnx

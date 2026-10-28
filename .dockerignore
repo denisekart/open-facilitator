@@ -1,4 +1,5 @@
-**/bin/
+**/bin/Debug/
+**/bin/Release/
 **/obj/
 node_modules/
 **/dist/
@@ -6,3 +7,7 @@ node_modules/
 docs/
 .omp/
 .devcontainer/
+reference/.env
+reference/secrets/
+TestResults/
+coverage/

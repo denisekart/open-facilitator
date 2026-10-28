@@ -3,7 +3,7 @@ name: facilitator-reference-env
 description: Slim/full Docker Compose reference environments, versions.env pinning, referencectl bootstrap/seed/verify, localhost hostname wiring, and local debugging of the Open Facilitator Framework.
 ---
 
-> **Status:** nothing exists yet — compose files, `referencectl`, seeds, and services below are spec-proposed targets to build. Update this skill the moment a slice lands so implemented reality replaces spec proposals.
+> **Status (as-built):** `reference/compose.slim.yaml` boots PostgreSQL + Keycloak + SeaweedFS + Aspire dashboard + the Facilitator container (`make compose-slim` at the repo root; `compose.full.yaml` overlays forgejo/mattermost/kafka/ollama). NOT built yet: `referencectl`, `bootstrap/` seeds, `checks/` scripts, and the gateway/launcher/worker compose services. Where this document describes those, it is spec-proposed target, not reality.
 
 # Reference Environment & Dev Loop
 
@@ -37,14 +37,16 @@ Layer compose: `docker compose -f compose.slim.yaml -f compose.full.yaml`; ship 
 ## Dev loop
 
 ```bash
-cd reference && cp .env.example .env
-./bootstrap/generate-secrets.sh
-./referencectl up slim && ./referencectl seed slim && ./referencectl verify slim
-./referencectl up full  && ./referencectl seed full  && ./referencectl verify full
-./referencectl status   # waits for HTTP/readiness, not container start
+make compose-slim          # from the repo root: cp -n .env.example .env, then
+                           # docker compose --env-file versions.env --env-file .env \
+                           #   -f compose.slim.yaml up -d --build
+make compose-full          # + compose.full.yaml overlay
+make compose-down          # down -v (FULL=1 to include the overlay)
 ```
 
-`referencectl` is idempotent: provisions Forgejo org/repos/issues, Mattermost team/channel/bot token, linkage challenges, Kafka topic + sample event, worker enrollment grants, Ollama model; prints login links, never dumps tokens. Appendix ergonomics: `./dev up`, `./dev assign --work work-1 --capability research.analyze`, `./dev show deliveries --pending`, `./dev inspect delivery del-123`.
+Observe: `docker compose ... ps` (all healthy), kernel `http://localhost:8088/health`, realm `.well-known` at `http://id.localhost:8080/realms/facilitator`, bucket browse `http://localhost:8333`, traces at the dashboard `http://localhost:18888`. Operator bearer: `facilitator-cli`/`e2e-cli-secret` client_credentials against the realm token endpoint.
+
+`referencectl` (planned, not built): idempotent provisioning of Forgejo org/repos/issues, Mattermost team/channel/bot token, linkage challenges, Kafka topic + sample event, worker enrollment grants, Ollama model; would print login links, never dump tokens. Appendix ergonomics (`./dev up`, `./dev assign`, `./dev show deliveries`) share that unbuilt status.
 
 ## Debugging hooks
 

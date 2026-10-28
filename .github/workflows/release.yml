@@ -18,8 +18,6 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      # Add gateway / workspace-link image entries here (Plans 04/05), same pattern:
-      #   tags: ${{ vars.OCI_REGISTRY ... }}/<name>:${{ github.ref_name }} + :latest
       - uses: docker/build-push-action@v6
         with:
           context: .
@@ -27,6 +25,16 @@ jobs:
           tags: |
             ghcr.io/denisekart/open-facilitator/facilitator:${{ github.ref_name }}
             ghcr.io/denisekart/open-facilitator/facilitator:latest
+          platforms: linux/amd64,linux/arm64
+          push: true
+      # Source-built Node runtime (gateway/linkd/worker in one image).
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.node
+          tags: |
+            ghcr.io/denisekart/open-facilitator/node-runtime:${{ github.ref_name }}
+            ghcr.io/denisekart/open-facilitator/node-runtime:latest
           platforms: linux/amd64,linux/arm64
           push: true
 
@@ -80,7 +88,8 @@ jobs:
     steps:
       - run: echo "inert seam — see comment in job definition"
 
-  # Plan 18 (spec §22.6): SBOM generation + digest pinning into
-  # reference/versions.env (*_DIGEST keys) + green conformance matrix gate.
+  # SBOM generation + digest pinning into reference/versions.env (*_DIGEST
+  # keys, incl. a future RUNTIME_DIGEST for node-runtime) + green conformance
+  # matrix gate (spec §22.6).
   # sbom: cyclonedx-gomod/npm/dotnet per artifact, attached to the GitHub release.
   # digest-pin: resolve pushed digests, PR or commit them back to versions.env.

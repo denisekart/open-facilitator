@@ -1,80 +1,135 @@
 # Plan 17 — Slim reference environment, leg 1: images and kernel-side Compose stack
-**Status:** ⬜ not-started (flips 🔵 at the replanning gate, then 🟡)
-**Depends on:** 08, 09, 13, 14, 15, 16
-**Phase E leg 1 of 5.** Chain: 17 → 18 → 19 (reference env), 20 → 21 (operator surface).
 
-## Objective
-Stand up the kernel half of spec §21.1's slim profile as real, tested infrastructure:
-container images for every framework runtime that needs one, and
-`reference/compose.slim.yaml` booting PostgreSQL + Keycloak + SeaweedFS + Aspire
-dashboard + the Facilitator container, wired from `reference/versions.env` and
-`reference/.env.example` verbatim, with healthchecks. After this plan
-`docker compose up` gets a healthy, authenticated, S3-backed, OTLP-exporting
-Facilitator — no Gateway/worker yet (that is Plan 18).
+**Status:** 🟢 implemented (all seven steps; see Implementation Status below).
+**Depends on:** 08, 09, 13, 14, 15, 16 (all 🟢). **Phase E leg 1 of 5.** Chain: 17 → 18 → 19 (reference env), 20 → 21 (operator surface).
 
-## Known facts (as-built anchors; code wins, divergence goes in the status table)
-- Only one Dockerfile exists: `src/facilitator/Dockerfile` (multi-stage, aspnet:10.0, EXPOSE 8080). No images for gateway, workspace-link/linkd, or the deterministic worker; everything TS runs from source, Features, or `node dist/`.
-- `release.yml` `containers` job publishes only the facilitator image (amd64+arm64); a comment at `release.yml:23-25` says gateway/workspace-link entries are "to be added". CI `docker-build` job builds the kernel image per PR but never pushes.
-- `reference/versions.env` pins `POSTGRES_TAG=17-alpine`, `KEYCLOAK_TAG=26.7.5`, `SEAWEEDFS_TAG=4.48`, `ASPIRE_TAG=13.4.2` (+ full-profile pins), `OCI_REGISTRY=ghcr.io/denisekart/open-facilitator`, nine empty `*_DIGEST` keys; CI `meta` job enforces key completeness. No compose file consumes any of it yet; `make compose-slim|compose-full` are echo + `exit 2` placeholders (`Makefile:67-69`).
-- No compose is used by any test tier today: TS e2e spawns the kernel from `dotnet` binaries against external Postgres/Keycloak; .NET tests use Testcontainers (Postgres, Keycloak importing `reference/keycloak/realm.json`, SeaweedFS 4.48 generic container, bucket `ofac-test`).
-- Kernel OTLP export is config-only: exporters activate when `Otel:Endpoint` is set (`Kernel/KernelServiceCollection.cs:192-209`). `/health` exists anonymous (`Program.cs:27`).
-- S3 backend fully implemented (`Storage:Provider=s3`, `Storage:S3.{Endpoint,Bucket,Region,AccessKey,SecretKey,ForcePathStyle}`), exercised only by the .NET fixture; dev default is the filesystem provider.
-- Keycloak realm `reference/keycloak/realm.json` imports cleanly on 26.7.5 `start-dev --import-realm` (Plan 11 fixed the group-mapper `claim.name` gap; KC 26 needs `jsonType.label: JSON` for boolean delegation claims).
-- `GET /api/dead-letters` (newest-50) is the only admin-ish read surface; no `/api/admin/*` routes exist.
-- Spec §22.2 ships a slim Compose template (`docs/specs/…architecture.md:1530-1627`) grounded in official container interfaces; §22.5 fixes loopback `.localhost` hostnames.
+## Context
 
-## Locked decisions (from planning; replanning may only amend with recorded reason)
-- **Image shape: source-built.** New `Dockerfile`s for gateway and linkd/worker on slim `node:22`, built from this tree like the kernel Dockerfile. No dependency on the inert npm-publish flip. `release.yml` gains the gateway image entry (replacing the stale "to be added" comment); worker rides the gateway image or its own — decided at the gate.
-- **Compose consumes `versions.env` + `.env.example` verbatim** via `env_file`/`${VAR:?}`; zero hardcoded tags or registry hosts.
-- **Aspire = standalone dashboard container** (`ASPIRE_TAG`), no AppHost project; kernel+gateway get `Otel:Endpoint` pointing at its OTLP port.
-- Healthchecks on every service; `depends_on: condition: service_healthy` ordering.
-- This plan does **not** ship `referencectl` or seeds (Plan 18) nor acceptance verify (Plan 19).
+Stand up the kernel half of spec §22's reference environment as real, CI-gated infrastructure: a source-built Node runtime image (gateway/linkd/worker share one image), a production-ready `reference/compose.slim.yaml` booting PostgreSQL + Keycloak + SeaweedFS + Aspire dashboard + the Facilitator container, wired verbatim from `reference/versions.env` and `reference/.env.example`, healthchecked and ordered. After this plan `make compose-slim` boots a healthy, authenticated, S3-backed, OTLP-exporting Facilitator. No Gateway/worker services in compose yet — that is Plan 18 (this plan only builds + releases + CI-gates their image).
+
+**Process rules for the implementer:**
+- Inspect the as-built anchors below before writing each artifact; code wins over this document, and divergence gets recorded in the Implementation Status table with a reason.
+- Consult existing proven invocations before inventing new ones: the .NET fixtures (`tests/Facilitator.Tests/Infrastructure/`) are the code-proven reference for Keycloak and SeaweedFS container behavior; spec §22.2/§22.3 is the template for compose shape.
+- Prefer boring, spec-template-shaped solutions; when stuck, re-simplify rather than add machinery.
+- **Questions may be asked during planning, but not during implementation** — infer missing details from existing code, specs, or provider docs (web) instead of asking.
+
+## As-built facts (verified this replanning pass; re-check anchors before editing)
+
+- Only `src/facilitator/Dockerfile` exists (multi-stage, `aspnet:10.0`, EXPOSE 8080, `ENV ASPNETCORE_URLS=http://0.0.0.0:8080`, no `ASPNETCORE_ENVIRONMENT` → container runs **Production**).
+- **No `appsettings.json`** — only `src/facilitator/appsettings.Development.json` (filesystem storage, localhost authority, `Link:Teams` roster `[team-alpha, team-beta]`, full `identity:` block with claims descriptors/roles/10 authorization bindings). In Production every setting must arrive via env/mounted config or fail-closed startup checks throw.
+- Fail-closed gates: `IdentityStartupCheck` (authority absolute + `requireHttps=false` for http, audience, `claims.subject`), `StorageStartupCheck` (s3 requires Endpoint/Bucket/Region/AccessKey/SecretKey; `ForcePathStyle` defaults true), `LinkEnrollmentStartupCheck` (**non-Development requires `Link:EnrollmentToken`**), Postgres must be reachable at boot (`Program.cs:25` awaits `IDatabaseInitializer` — EF migrations run automatically under advisory lock, schema `facilitator`, `Database:AutoMigrate` default true).
+- OTel (`Kernel/KernelServiceCollection.cs:192-209`): `Otel:Endpoint` non-empty is only the **on/off switch** — `AddOtlpExporter()` takes no argument and reads the standard `OTEL_EXPORTER_OTLP_ENDPOINT` env var. Compose must set **both**.
+- `/health` is anonymous 200 `{"status":"ok"}` (no dependency probes). `GET /api/dead-letters` needs any valid OIDC token (no role binding). Token mint: realm `facilitator`, client `facilitator-cli` / secret `e2e-cli-secret`, client_credentials, audience mapper adds `facilitator-api` (`reference/keycloak/realm.json`, realm name **`facilitator`** — not the spec template's `framework`).
+- Keycloak issuer validation is against `identity:oidc:authority` (+ `trustedIssuers`), `IdentityJwt.cs:21-30` → the kernel's authority must byte-match the `iss` Keycloak publishes, hence `KC_HOSTNAME` + a compose network alias make `http://id.localhost:8080/realms/facilitator` the single URL both host and container use.
+- Code-proven SeaweedFS 4.48: `server -s3 -s3.port=8333 -ip=127.0.0.1 -ip.bind=0.0.0.0 -dir=<writable> -s3.config=/etc/s3.json` + fixed identity JSON; bucket created via S3 API (`SeaweedFsFixture.cs:54-119`). Spec template instead uses `weed mini -dir=/data` with `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`/`S3_BUCKET` env seeding credentials + pre-created bucket (verified against SeaweedFS docs/wiki — `weed mini` auto-creates the bucket; 4.48 contains `weed mini`, confirm at first pull).
+- Aspire standalone dashboard 13.x env contract (verified against MCR docs / dotnet-docker README): `ASPNETCORE_URLS` (frontend, default `http://localhost:18888` — must rebind `0.0.0.0`), `ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL` (gRPC 18889), `ASPIRE_DASHBOARD_OTLP_HTTP_ENDPOINT_URL` (HTTP 18890), `ASPIRE_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS=true`. Kernel's default exporter protocol is OTLP/HTTP → point `OTEL_EXPORTER_OTLP_ENDPOINT=http://aspire:18890`.
+- Keycloak 26 images are UBI-micro: **no curl/sh healthcheck tools**; health endpoints on management port 9000 (`KC_HEALTH_ENABLED=true`); the community-proven container healthcheck is the static `/bin/bash` `/dev/tcp` probe.
+- Node side: pnpm workspace (`pnpm-workspace.yaml`), `packageManager: pnpm@12.5.1`, Node ≥22, all ESM/tsup, native dep `better-sqlite3` (glibc prebuilds → Debian-based runtime, not Alpine). Entrypoints after build: gateway `dist/bin/gateway.js run --config <yaml>` (env `GATEWAY_CONFIG`), linkd `dist/bin/linkd.js run --url … --token|--secret …`, worker `dist/bin/worker.js run --config <yaml>` (env `WORKER_CONFIG`). Worker (`@ofac/harness-deterministic`) depends on **all** of `@ofac/adapter`, `@ofac/gateway`, `@ofac/protocol`, `@ofac/workspace-link` at runtime → the three processes share one dependency closure ⇒ **one combined image** (user-approved).
+- `release.yml` `containers` job publishes only `…/facilitator:{tag,latest}` (amd64+arm64); comment at `:21-22` claims gateway/workspace-link entries "to be added". CI `docker-build` job (`ci.yml:73-77`) builds only the kernel image, never pushes. CI `meta` job enforces a hardcoded `versions.env` key list (`ci.yml:65-71`).
+- `make compose-slim|compose-full` are `exit 2` placeholders (`Makefile:67-69`). Stale `Plan 11`/`Plan 18` prose exists in: `reference/{bootstrap,checks,config,postgres-init,keycloak}/README.md`, `reference/.env.example:2`, `reference/versions.env:6,8,12`, `Makefile:68`, `docs/getting-started.md:3,26`, `docs/contributing.md:16,29,31`, `release.yml:21,83-85` (`docs-check` fails on `Plan <n>` outside `.omp/`/`docs/specs/` — `protocol/tools/agents-docs-check.mjs:50`).
+- No compose file exists anywhere; no test tier consumes compose. `.gitignore` has no `reference/.env` / `reference/secrets/` entries yet.
+
+## Locked decisions
+
+1. **Image shape (user-approved): one source-built Node runtime image.** New `Dockerfile.node` at repo root context builds all five workspace TS packages, then `pnpm deploy --prod` materializes three self-contained app dirs (`gateway`, `linkd`, `worker`) into a single `node:22-bookworm-slim` image. Plan 18 runs the three processes from this image with different commands. No npm-publish dependency. The kernel image stays as-is.
+2. **Kernel config (user-approved): add a YAML config provider** so `reference/config/facilitator.yaml` (a spec §22.1 mandated path) mounts into the container as the primary Production config. Env vars override it (standard ASP.NET layering: yaml loaded *before* env vars).
+3. **Compose consumes `versions.env` + `.env` verbatim** via two `--env-file` flags (compose ≥2.24 merges them for interpolation); zero hardcoded tags/registry hosts; `${VAR:?…}` on every secret/tag.
+4. **Aspire = standalone dashboard container**, no AppHost. Kernel sets `Otel__Endpoint` (switch) **and** `OTEL_EXPORTER_OTLP_ENDPOINT=http://aspire:18890` (transport).
+5. **`make compose-full` becomes real now (user-approved):** `compose.full.yaml` = the provider services of spec §22.3 verbatim (forgejo, mattermost, kafka, ollama — tags from `versions.env`). No gateway/launcher/worker services in it yet (Plan 18 adds them).
+6. Healthchecks on every slim service; `depends_on: condition: service_healthy` where a real readiness dependency exists.
+7. This plan does **not** ship `referencectl`, seeds, gateway/worker compose services, or acceptance verify (Plans 18/19).
 
 ## Steps
-0. **Research (mandatory):** re-verify §22.2 template against the actual config surface of 02–16 (`appsettings` shapes, `ArtifactOptions`, realm clients, `Link:Teams` roster); verify SeaweedFS `weed mini` vs the fixture's `server -s3` invocation and the S3 config-file mount shape; verify the Aspire standalone dashboard image's OTLP ingest ports; verify Keycloak 26.7.5 hostname env (`KC_HOSTNAME` behavior per §22.5).
-1. `src/gateway/Dockerfile` + `src/workspace-link/Dockerfile` (or one node image with two entrypoints), dist-only layer, non-root, 8080-style HTTP ports per the gateway diagnostics surface.
-2. `reference/compose.slim.yaml` per §22.2: postgres (+`./postgres-init`), keycloak (`start-dev --import-realm`, `KC_HOSTNAME=http://id.localhost:8080`), seaweedfs (`weed mini` or fixture-proven invocation, bucket init), aspire-dashboard, facilitator (`Storage:Provider=s3`, `Otel:Endpoint`, Keycloak authority, `/health` healthcheck).
-3. `reference/config/facilitator.yaml` (mounted kernel config), postgres-init SQL (databases for facilitator + keycloak), seaweedfs s3 config json — replacing the placeholder README stubs.
-4. Makefile: `compose-slim`/`compose-full` become real (full = overlay file exists but may only pin services until the full-profile plans). Replace "Lands with Plan 11" prose in the touched stubs with factual statements (no plan numbers per the cross-plan rule).
-5. Release/CI: gateway image entry in `release.yml` `containers` job; PR `docker-build` extended to build (not push) the node image.
-6. Local proof: `make compose-slim` boots healthy on WSL arm64; kernel `/health` 200, realm imported, bucket exists, OTLP spans land in dashboard (`/api/v0` health or logs).
 
-## State after
-Fresh clone → `make compose-slim` (after `.env` copy) → healthy slim kernel stack with S3 artifacts, OIDC, OTLP→Aspire. Images buildable and CI-gated; release publishes a gateway image.
+### 1. Kernel: YAML config provider
+In `src/facilitator/`:
+- Add NuGet `Microsoft.Extensions.Configuration.YamlStream` (the .NET-provided YAML config package; CPM: add `<PackageVersion>` to `Directory.Packages.props`). If the package does not resolve on net10.0, fall back to `YamlStream` support shipped in `Microsoft.Extensions.Configuration` 10.x; if neither works, rename the artifact to `facilitator.json` everywhere in this plan and record the deviation (still satisfies "mounted kernel config"; §22.1 path deviation gets a one-line note in `reference/config/README.md`).
+- In `Kernel/KernelServiceCollection.cs` (`AddKernel`, before env-var-dependent binding): conditionally load `builder.Configuration.AddYamlStream(File.OpenRead(path), optional: true)` when the file at `config/facilitator.yaml` (relative to content root, overridable via `Config:File`) exists. Dev/source runs without the file are unaffected (optional).
+- This is the only kernel code change in the plan; all config content ships as data (step 3).
 
-## Testing
-- Image builds gated in CI (extend `docker-build`).
-- Bring-up smoke in CI (new `ref-env-bringup` job, per-tier decision below): `make compose-slim` → all services healthy → `/health` 200 → Keycloak well-known reachable → `GET /api/dead-letters` answers with a kernel token. Teardown. PR-tier only (bring-up + healthchecks); no acceptance run yet.
-- Provider behavior (SeaweedFS S3 semantics) stays covered by the existing .NET fixture matrix; compose adds no new S3 tests.
+### 2. `Dockerfile.node` (repo root)
+Multi-stage, mirroring the kernel Dockerfile's shape:
+- **build:** `node:22-bookworm` + `corepack enable` (honors root `packageManager: pnpm@12.5.1`). Copy `package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json` + each workspace package's `package.json`/`tsconfig*.json`; `pnpm install --frozen-lockfile` (offline store from lockfile); copy sources; `pnpm -r build` (dependency-DAG order is pnpm's job). Then `pnpm deploy --filter=@ofac/gateway --prod --out /deploy/gateway`, same for `@ofac/workspace-link` (produces linkd) and `@ofac/harness-deterministic`; copy each package's freshly built `dist/` into its deployed dir (deploy runs from source layout, dist is what ships).
+- **runtime:** `node:22-bookworm-slim` (Debian — glibc prebuilds for `better-sqlite3`; Alpine would force a native rebuild). Non-root `node` user (built-in uid 1000). `COPY --from=build /deploy /app`. Three self-contained app dirs: `/app/gateway`, `/app/linkd`, `/app/worker`. Default `CMD` = gateway (`node /app/gateway/dist/bin/gateway.js run`); linkd/worker run via command override in Plan 18. `HEALTHCHECK` none (gateway diagnostics bind 127.0.0.1 only and services appear in compose at Plan 18). No ports EXPOSE'd — the gateway dials out; diagnostics come with 18.
+- Keep `.dockerignore` current: exclude `node_modules`, `dist`, `reference/.env`, `bin/obj`, test output (extend the existing file if one exists; create otherwise).
 
-## CI tier (locked)
-PR gate = bring-up + healthchecks. Full `referencectl verify` (Plan 19) runs on main-push + nightly, linux/arm64 + amd64.
+### 3. `reference/` data files
+- **`reference/compose.slim.yaml`** — services (project name `facilitator-demo` via top-level `name:`):
+  - `postgres`: `postgres:${POSTGRES_TAG:?}`, `POSTGRES_USER=demo`, `POSTGRES_PASSWORD=${DEMO_POSTGRES_PASSWORD:?…}`, `POSTGRES_DB=facilitator`, volumes `pg_data` + `./postgres-init:/docker-entrypoint-initdb.d:ro`, healthcheck `pg_isready -U demo -d facilitator`.
+  - `keycloak`: `quay.io/keycloak/keycloak:${KEYCLOAK_TAG:?}`, `command: ["start-dev","--import-realm"]`, `KC_BOOTSTRAP_ADMIN_USERNAME=demo-admin`, `KC_BOOTSTRAP_ADMIN_PASSWORD=${DEMO_KEYCLOAK_ADMIN_PASSWORD:?…}`, `KC_DB=postgres`, `KC_DB_URL=jdbc:postgresql://postgres:5432/keycloak`, `KC_DB_USERNAME=demo`, `KC_DB_PASSWORD=${DEMO_POSTGRES_PASSWORD:?…}`, `KC_HOSTNAME=http://id.localhost:8080`, `KC_HEALTH_ENABLED=true`, mount `./keycloak:/opt/keycloak/data/import:ro`, ports `127.0.0.1:8080:8080`, network alias `id.localhost`, healthcheck `["CMD","/bin/bash","-c","exec 3<>/dev/tcp/127.0.0.1/9000"]` (UBI-micro has no curl; if the probe misbehaves on 26.7.5, drop to `condition: service_started` for dependents and record it), `depends_on: postgres: service_healthy`.
+  - `artifacts`: `chrislusf/seaweedfs:${SEAWEEDFS_TAG:?}`, `entrypoint: ["weed"]`, `command: ["mini","-dir=/data"]`, env `AWS_ACCESS_KEY_ID=${DEMO_S3_ACCESS_KEY:?…}`, `AWS_SECRET_ACCESS_KEY=${DEMO_S3_SECRET_KEY:?…}`, `S3_BUCKET=facilitator-artifacts`, volume `artifacts_data`, ports `127.0.0.1:8333:8333`, healthcheck `["CMD-SHELL","wget -q -O- http://127.0.0.1:8333/ >/dev/null 2>&1 || exit 1"]` (busybox wget tolerates 403-with-body; confirm, else `nc -z 127.0.0.1 8333`). **Contingency (locked):** if 4.48's `weed mini` doesn't seed the bucket/credentials from env as documented, switch to the fixture-proven `server -s3 -s3.port=8333 -ip=127.0.0.1 -ip.bind=0.0.0.0 -dir=/data -s3.config=/etc/s3.json` + mount `reference/config/seaweedfs-s3.json` (identity JSON modeled on `SeaweedFsFixture.cs:34-39` with the `DEMO_S3_*` values rendered at compose time via a generated file under `reference/secrets/` — document generation in README; bucket then created by a `bucket-init` one-shot service using `amazon/aws-cli` pinned as new `AWSCLI_TAG` key) and record the deviation.
+  - `aspire`: `mcr.microsoft.com/dotnet/aspire-dashboard:${ASPIRE_TAG:?}`, env `ASPNETCORE_URLS=http://0.0.0.0:18888`, `ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL=http://0.0.0.0:18889`, `ASPIRE_DASHBOARD_OTLP_HTTP_ENDPOINT_URL=http://0.0.0.0:18890`, `ASPIRE_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS=true`, ports `127.0.0.1:18888:18888` + `127.0.0.1:18890:18890`, healthcheck `["CMD-SHELL","wget -q -O- http://127.0.0.1:18888/ >/dev/null 2>&1 || exit 1"]` (confirm image has wget/curl; else no healthcheck + `service_started`).
+  - `facilitator`: `build: {context: .., dockerfile: src/facilitator/Dockerfile}`, `image: ${OCI_REGISTRY:?}/facilitator:${FRAMEWORK_TAG:?}`, env: `ConnectionStrings__Facilitator=Host=postgres;Database=facilitator;Username=demo;Password=${DEMO_POSTGRES_PASSWORD:?…}`, `Authentication`-style identity config lives in the mounted yaml (below), plus env overrides `Link__EnrollmentToken=${DEMO_ENROLLMENT_TOKEN:?set in .env}`, `Storage__Provider=s3`, `Storage__S3__Endpoint=http://artifacts:8333`, `Storage__S3__Bucket=facilitator-artifacts`, `Storage__S3__Region=us-east-1`, `Storage__S3__AccessKey=${DEMO_S3_ACCESS_KEY:?…}`, `Storage__S3__SecretKey=${DEMO_S3_SECRET_KEY:?…}`, `Otel__Endpoint=http://aspire:18890`, `OTEL_EXPORTER_OTLP_ENDPOINT=http://aspire:18890`; mounts `./config/facilitator.yaml:/app/config/facilitator.yaml:ro`; ports `127.0.0.1:8088:8080`; healthcheck `["CMD-SHELL","wget -q -O- http://127.0.0.1:8080/health >/dev/null || exit 1"]` (aspnet image has curl — prefer `curl -sf`; confirm at bring-up); `depends_on`: postgres `service_healthy`, keycloak `service_healthy`, artifacts `service_healthy`.
+- **`reference/config/facilitator.yaml`** — Production kernel config, shape copied from `appsettings.Development.json` (read it at implementation time and transcribe): `Storage.Provider: filesystem` default overridden by env (or set s3 inline minus secrets — env wins either way; keep secrets env-only), full `identity:` block (`oidc.authority: http://id.localhost:8080/realms/facilitator`, `audience: facilitator-api`, `requireHttps: false`, claims/roles/authorization transcribed verbatim from the dev file so role gating behaves identically), `Link: { Teams: [team-alpha, team-beta], WorkloadIdentities: <dev-file roster verbatim: ofac-gateway-alpha→gw.team-alpha, ofac-worker-alpha→gw.team-beta>, Evidence: { Audience: facilitator-link } }`, Logging levels. No secrets, no digests. `Link:EnrollmentToken` intentionally absent (env-only; step keeps rotation in `.env`).
+- **`reference/postgres-init/01-databases.sql`** — `CREATE DATABASE keycloak OWNER demo;` (template1; runs first-boot only). Facilitator DB arrives via `POSTGRES_DB`.
+- **`reference/.env.example`** — add `DEMO_ENROLLMENT_TOKEN=change-me-enrollment` with a `# consumer: Facilitator kernel Link enrollment (POST /api/link/v1/enroll mode (a))` comment; rewrite header line 2 dropping "(Plan 11)".
+- **`reference/versions.env`** — add `FRAMEWORK_TAG=dev` (tag for source-built images until release digests land) and `AWSCLI_TAG=…` only if the SeaweedFS contingency fires; extend the CI meta-job key list (step 5) to match. Strip `Plan 11`/`Plan 18` from comments (`:6,8,12`), rewrite as facts.
+- **`.gitignore`** — add `reference/.env` and `reference/secrets/`.
+- **`reference/compose.full.yaml`** — overlay: forgejo/mattermost/kafka/ollama blocks verbatim from spec §22.3 (`docs/specs/open_facilitator_framework_architecture.md:1636-1692`), tags via `${VAR:?}`. No new volumes beyond the template's. Gateway/launcher/worker services land at Plan 18.
 
-## Documentation
-- `reference/README.md` written for real (port map, `.env`, up/down, what each service is).
-- Fix the stale "Plan 11" landing prose in `reference/*/README.md`, `Makefile`, `docs/getting-started.md` header, `docs/contributing.md` — rewrite as statements of fact.
-- `.omp/skills/facilitator-reference-env` updated to as-built (AGENTS.md maintenance rule).
+### 4. Makefile cutover (`Makefile:67-69`)
+Replace the placeholder block:
+- `compose-slim`: `cd reference && cp -n .env.example .env && docker compose --env-file versions.env --env-file .env -f compose.slim.yaml up -d --build` — the `cp -n` gives a fresh clone a working `.env` (documented: change the secrets for real use). Add a trailing hint line pointing at `http://localhost:8088/health` and Keycloak.
+- `compose-full`: same but `-f compose.slim.yaml -f compose.full.yaml`.
+- Add `compose-down` running `docker compose --env-file versions.env --env-file .env -f compose.slim.yaml down -v` (both-profile parity: document that down uses whichever files were up).
+- Strip "lands in Plan 11" prose → factual description.
 
-## Architecture fit
-§22.1/§22.2/§22.4 — the static reference skeleton gets its runtime half. §21.1's kernel-side services first; the workspace-side services and the single-command story are Plans 18–19.
+### 5. Release + CI
+- `release.yml` `containers` job: replace the stale comment (`:21-22`) with a second `docker/build-push-action@v6` step — `file: Dockerfile.node`, tags `ghcr.io/denisekart/open-facilitator/node-runtime:${{ github.ref_name }}` + `:latest`, same platforms/push. Update the job's digest comment block (`:83-85`) to name `RUNTIME_DIGEST` as a future release-key (fact, no plan number).
+- `ci.yml` `docker-build` job: add `docker build -t node-runtime:ci -f Dockerfile.node .` (build-only, no push, matching existing pattern).
+- `ci.yml` `meta` job (`:65-71`): append `FRAMEWORK_TAG` to the key list (+ `AWSCLI_TAG` if contingency fired).
+- New `ci.yml` job `ref-env-bringup` (PR-tier, ubuntu-latest/amd64): steps — checkout; `docker build -t facilitator:ci -f src/facilitator/Dockerfile .`; `cd reference && cp .env.example .env && docker compose --env-file versions.env --env-file .env -f compose.slim.yaml up -d --build`; wait-loop (`--wait` + timeout) until all slim services healthy; assertions: `curl -f http://localhost:8088/health` → 200; `curl -sf http://localhost:8080/realms/facilitator/.well-known/openid-configuration` → 200; mint operator token (`curl` client_credentials POST to `http://localhost:8080/realms/facilitator/protocol/openid-connect/token`, `client_id=facilitator-cli`, `client_secret=e2e-cli-secret`) then `GET http://localhost:8088/api/dead-letters` with Bearer → 200; verify the S3 bucket answers a signed `ListObjects` (`aws --endpoint-url http://localhost:8333 s3 ls s3://facilitator-artifacts` via a throwaway aws-cli container pinned to `SEAWEEDFS`-independent `AWSCLI_TAG`, or skip if bucket-init proved via weed mini logs — assert the bucket exists either way); `docker compose … logs facilitator` contains no unhandled startup exception. Teardown `down -v` in an always step. ARM64 coverage: local proof (step 6); dual-arch CI lands with Plan 19's nightly tier.
 
-## Assumptions & contingencies (replanning caveat)
-- If `weed mini` diverges from the fixture-proven `server -s3` flags, keep the fixture invocation (code-proven) and record the deviation.
-- If the Aspire dashboard image's ARM64 tag lags `ASPIRE_TAG`, re-pin and note it in `versions.env`.
-- Cross-container child-transport shape (06's contingency: TCP `0.0.0.0` bind vs sidecar socket volume) is deferred to Plan 18, where gateway+worker enter compose.
-- Replanning or optimization may be required before implementation begins; implementation begins with additional research (Step 0).
-- **Questions may be asked during planning, but not during implementation.**
+### 6. Local proof (WSL, arm64)
+`make compose-slim` from a clean state (`docker compose … down -v` first) → every service `healthy` within ~2 min; `/health` 200; realm live at `http://localhost:8080/realms/facilitator/.well-known/openid-configuration`; `GET /api/dead-letters` 200 with a `facilitator-cli` token; bucket `facilitator-artifacts` exists (browse `http://localhost:8333`); open `http://localhost:18888` (or its API) and confirm kernel traces/metrics arrive over 18890. Then `make compose-full` boots the four provider services additionally. Record any healthcheck/`weed mini` deviations in the status table.
+
+### 7. Docs + skill
+Rewrite every stale landing stub as factual prose (strip all `Plan <n>` mentions — `make docs-check` enforces):
+- `reference/README.md`: **write for real** — port map (`id.localhost:8080` Keycloak, `:8088` Facilitator, `:8333` S3, `:18888/:18890` Aspire), `.env` copy + rotate-secrets note, `make compose-slim/-full/compose-down`, what each service is, `Production` env note, loopback/plaintext reference-only caveat (spec §22.2 security profile).
+- `reference/{bootstrap,checks,config,postgres-init,keycloak}/README.md`: current role in one-two factual sentences (bootstrap/checks remain "planned, not built" — say that without a plan number; config now holds `facilitator.yaml`; postgres-init now mounted).
+- `.env.example` header, `versions.env` comments, `docs/getting-started.md:3,26` (compose-slim now works — update the contributor loop section), `docs/contributing.md:16,29,31` (table row + compose verification rule now real).
+- `reference/AGENTS.md`: truth anchors now include `compose.slim.yaml`/`compose.full.yaml`/`config/facilitator.yaml`; drop "compose files do not exist".
+- `.omp/skills/facilitator-reference-env/SKILL.md`: replace the "nothing exists yet" banner with as-built slim reality (what boots, how to bring up, how to observe), keep the full-profile + referencectl parts clearly marked as not-yet-built reality.
+
+## Critical files & anchors
+
+| File | Anchor | Why |
+|---|---|---|
+| `src/facilitator/appsettings.Development.json` | whole file | the config shape `facilitator.yaml` must transcribe (identity block + Link roster) |
+| `src/facilitator/Kernel/KernelServiceCollection.cs` | `AddKernel` composition; OTel gate `:192-209` | YAML provider insertion point; proves env-only OTLP transport |
+| `tests/Facilitator.Tests/Infrastructure/SeaweedFsFixture.cs` | `:34-39`, `:54-119` | proven s3 identity JSON + fallback invocation + bucket semantics |
+| `docs/specs/open_facilitator_framework_architecture.md` | §22.2 `:1532-1628`, §22.3 `:1636-1692` | compose template ground truth (slim + full provider blocks) |
+| `.github/workflows/ci.yml` | `meta` `:65-71`, `docker-build` `:73-77` | key-completeness list to extend; job to extend + pattern for `ref-env-bringup` |
+
+## Verification
+
+New-behavior checks (beyond build/lint/typecheck):
+1. **Bring-up (replaces everything):** `make compose-slim` from a fresh clone state → `docker compose ps` shows all 5 slim services `healthy`; `curl -fs http://localhost:8088/health` → `{"status":"ok"}`.
+2. **Auth path end-to-end:** POST client_credentials to `http://localhost:8080/realms/facilitator/protocol/openid-connect/token` (`facilitator-cli`/`e2e-cli-secret`), GET `http://localhost:8088/api/dead-letters` with the token → `200` + `[]`-shaped body on a fresh stack. Negative: same GET without token → `401`.
+3. **S3 wiring:** `PUT` an object through the kernel's artifact API or assert bucket `facilitator-artifacts` lists via aws-cli; kernel boots fail-closed when `Storage__S3__SecretKey` is removed (compose up → facilitator exits with the named-offenders message) — proves the mounted config + fail-closed check are live.
+4. **OTLP:** drive `POST /api/works` once (kernel-operator token, `facilitator-cli`) → Aspire dashboard at `:18888` shows a `facilitator` trace/metric within 30 s (CI: assert via dashboard's `/api/v0` resource API or log scrape of exporter failures being absent).
+5. **CI:** `ref-env-bringup` job green on a PR touching compose; `docker-build` builds both images; `meta` passes with the extended key list; `make docs-check`, `make lint`, `make build`, `make test` all green (kernel YAML-provider change must not break the .NET suite — no appsettings changes, provider is optional-path only).
+6. **Full overlay:** `make compose-full` → forgejo/mattermost/kafka/ollama containers reach running/healthy; no interpolations missing (catches un-pinned tags).
+
+## Assumptions & contingencies
+
+- `weed mini` in 4.48 seeds credentials+bucket from env per current docs. If reality differs at first pull → locked fallback in step 3 (fixture invocation + mounted s3.config + `AWSCLI_TAG`-pinned bucket-init sidecar); record in status table.
+- UBI-micro `/bin/bash` `/dev/tcp` healthcheck works on `keycloak:26.7.5`. If not → keycloak dependents switch to `service_started` and the CI well-known poll (already present in other jobs' pattern, `ci.yml:113-114`) covers readiness; record it.
+- `Microsoft.Extensions.Configuration.YamlStream` resolves under net10 CPM. If not → `facilitator.json` variant of step 3, §22.1 path noted as deviated.
+- `ASPIRE_TAG=13.4.2` has a linux/arm64 manifest (MCR publishes dual-arch for the dashboard; the 13.x env-var names `ASPIRE_DASHBOARD_*` apply — pre-13 images used `DOTNET_DASHBOARD_*`; verify prefix at first pull, 13.x accepts the `ASPIRE_` names). If ARM64 lags → re-pin `ASPIRE_TAG` and note in versions.env comment.
+- Cross-container child-transport shape (06's open question) stays owned by Plan 18 — the node image intentionally exposes no inbound listener contract this plan.
+- `FACILITATOR_DIGEST`/`RUNTIME_DIGEST` filling stays with the release-process step (§22.6); this plan only adds `FRAMEWORK_TAG`.
+- If bring-up fights compose ordering (Keycloak first-boot realm import vs facilitator auth laziness), remember the kernel discovers JWKS lazily — ordering only matters for the CI assertions, which poll. Don't add retry machinery to the kernel.
+- Implementation is iterative: if a provider's documented invocation fails, try the code-proven fixture variant first, then the provider's docs/issues (web) — do not invent third variants or ask.
 
 ## Implementation Status
 | Step | Status | Notes |
 |---|---|---|
-| 0 Research | Not started | |
-| 1 Node images | Not started | |
-| 2 compose.slim.yaml | Not started | |
-| 3 config/init/seeds-input | Not started | |
-| 4 Makefile cutover | Not started | |
-| 5 release/CI images | Not started | |
-| 6 Local proof | Not started | |
-
-## Verification
-`make compose-slim` healthy + the CI `ref-env-bringup` job green + `make docs-check`/`make lint` green.
+| 0 Re-verify anchors (this pass + on resume) | Fully implemented | all facts below verified 2026-10-28 replanning |
+| 1 Kernel YAML provider | Fully implemented | **Deviation (locked contingency fired):** no Microsoft YAML provider exists for net10.0 (`…Configuration.YamlStream` 404 on NuGet; `…Configuration.Yaml` only 2.0.0-preview2, 2019; 10.0.12 ref pack/ASP.NET shared framework ship none). Artifact is `config/facilitator.json`; `AddKernel` inserts a `JsonConfigurationSource` before the env-var source (env wins), path overridable via `Config:File`; optional when missing. Zero new packages. §22.1 path deviation noted in `reference/config/README.md`. |
+| 2 Dockerfile.node | Fully implemented | **Deviation:** pnpm 12 `deploy` takes the output dir positionally, not `--out`. Build green on arm64; gateway/linkd/worker binaries all resolve their closures inside the image (uid 1000). `.dockerignore`: `**/bin/` was silently killing `src/*/src/bin/*.ts` — scoped to `**/bin/Debug|Release/`. |
+| 3 reference/ data files | Fully implemented | `compose.slim.yaml` + `compose.full.yaml` validate against both env files (`config --quiet`). Facilitator healthcheck: aspnet:10.0 has bash but NO curl/wget → /dev/tcp probe. Dashboard image has no probe tooling → no healthcheck (nothing depends on it). Keycloak probe hits management port 9000 `/v/health`. `AWSCLI_TAG=2.39.0` added unconditionally (CI bucket assertion needs it). `.gitignore` already covered `reference/.env` + `reference/secrets/` (verified `check-ignore`). mattermost DB added to `01-databases.sql` (overlay datasource points at it). |
+| 4 Makefile cutover | Fully implemented | `compose-slim`/`compose-full`/`compose-down` (`FULL=1` parity flag); `make -n` verified. |
+| 5 Release/CI | Fully implemented | release.yml: second build-push step for `node-runtime` (amd64+arm64, tag+latest); digest comment now names `RUNTIME_DIGEST` as fact. ci.yml: `docker-build` builds both images; `meta` key list += `FRAMEWORK_TAG` `AWSCLI_TAG`; new `ref-env-bringup` job (up --wait, health/realm/401/bearer assertions, dashboard resource API for OTLP proof, aws-cli bucket ls, clean-log gate, always-teardown). actionlint + yamllint green. |
+| 6 Local proof | Fully implemented | WSL arm64: all 5 slim services `healthy`; `/health` 200 `{"status":"ok"}`; realm `.well-known` 200; `dead-letters` 401 anonymous / 200 `[]` with `facilitator-cli` bearer; bucket `facilitator-artifacts` exists via aws-cli `s3 ls` (4.48 `weed mini` env-seeding worked — locked fallback NOT needed); fail-closed negative proven: unsetting `Storage__S3__SecretKey` → exit with `Storage:Provider 's3' requires Storage:S3:SecretKey (fail-closed)`; dashboard telemetry API shows spans from resource `facilitator`; kernel log clean; full overlay: 9 services up, forgejo :3000 200, ollama :11434 200, kafka up, mattermost boots after fixes below; .NET suite 254/254 green. **Deviations found+fixed during proof:** (a) Keycloak probe path is SmallRye `/health` on 9000, not `/v/health`; (b) .NET OTLP exporter defaults to gRPC — compose pins `OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf` + `OTEL_SERVICE_NAME=facilitator` (dashboard :18890 is the HTTP listener; 13.4.2 telemetry REST API is `/api/telemetry/spans`, the spec's `/api/v0/resource` 404s); (c) kernel config provider needs append-then-reappend-env (ConfigurationManager ignores `Sources` surgery — caught by the fail-closed identity gate on first boot, proven via standalone probe); (d) `FORGEJO_TAG` 16.0.2→16.0.7 (16.0.2 blobs GC'd upstream, pull 404s); (e) mattermost official image is amd64-only at every tag — `platform: linux/amd64` pinned so arm64 hosts boot the overlay under emulation; (f) `.env.example` placeholders contained a literal U+2026 `…` — Mattermost parses its DSN with Go's net/url and rejects non-ASCII userinfo, so placeholders are now plain ASCII (`change-me-*`). |
+| 7 Docs + skill | Fully implemented | `reference/README.md` written for real; bootstrap/checks READMEs say "planned, not built" without plan numbers; config/postgres-init READMEs factual; keycloak README plan cites stripped; getting-started:3,26 + contributing table/§22.4 rules now factual; `reference/AGENTS.md` anchors updated; skill banner = as-built slim reality. NOTE: docs-check's Plan-mention ban scans only `AGENTS.md` files; other prose fixed for accuracy, not gating. |

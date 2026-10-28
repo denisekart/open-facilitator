@@ -1,0 +1,137 @@
+# Slim reference environment (spec §22.2): identity + persistence + artifacts +
+# observability + the Facilitator. Interpolates ONLY from the two env files the
+# make targets pass: versions.env (image pins) and .env (local secrets).
+# Bring up: make compose-slim (from the repo root).
+name: facilitator-demo
+
+services:
+  postgres:
+    image: postgres:${POSTGRES_TAG:?set in versions.env}
+    environment:
+      POSTGRES_USER: demo
+      POSTGRES_PASSWORD: ${DEMO_POSTGRES_PASSWORD:?set in .env}
+      POSTGRES_DB: facilitator
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U demo -d facilitator"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:${KEYCLOAK_TAG:?set in versions.env}
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: demo-admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${DEMO_KEYCLOAK_ADMIN_PASSWORD:?set in .env}
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: demo
+      KC_DB_PASSWORD: ${DEMO_POSTGRES_PASSWORD:?set in .env}
+      # Single issuer URL for host and container alike: the alias resolves
+      # id.localhost inside the compose network, and the host port mapping
+      # serves the host. Issuer validation is byte-exact, so this URL must
+      # match identity:oidc:authority in ./config/facilitator.json.
+      KC_HOSTNAME: http://id.localhost:8080
+      KC_HEALTH_ENABLED: "true"
+    volumes:
+      - ./keycloak:/opt/keycloak/data/import:ro
+    ports:
+      - "127.0.0.1:8080:8080"
+    networks:
+      default:
+        aliases: [id.localhost]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # UBI-micro ships bash but no HTTP client; probe the management health
+    # endpoint over bash's /dev/tcp.
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - bash -c 'exec 3<>/dev/tcp/127.0.0.1/9000 && printf "GET /health HTTP/1.0\r\n\r\n" >&3 && head -n1 <&3 | grep -q " 200 "'
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+
+  artifacts:
+    image: chrislusf/seaweedfs:${SEAWEEDFS_TAG:?set in versions.env}
+    entrypoint: ["weed"]
+    command: ["mini", "-dir=/data"]
+    environment:
+      # weed mini seeds these credentials and pre-creates the bucket.
+      AWS_ACCESS_KEY_ID: ${DEMO_S3_ACCESS_KEY:?set in .env}
+      AWS_SECRET_ACCESS_KEY: ${DEMO_S3_SECRET_KEY:?set in .env}
+      S3_BUCKET: facilitator-artifacts
+    volumes:
+      - artifacts_data:/data
+    ports:
+      - "127.0.0.1:8333:8333"
+    # Any HTTP answer (403 unauthenticated included) proves the S3 listener.
+    healthcheck:
+      test: ["CMD", "curl", "-s", "-o", "/dev/null", "http://127.0.0.1:8333/"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+
+  aspire:
+    image: mcr.microsoft.com/dotnet/aspire-dashboard:${ASPIRE_TAG:?set in versions.env}
+    environment:
+      ASPNETCORE_URLS: http://0.0.0.0:18888
+      ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL: http://0.0.0.0:18889
+      ASPIRE_DASHBOARD_OTLP_HTTP_ENDPOINT_URL: http://0.0.0.0:18890
+      ASPIRE_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS: "true"
+    ports:
+      - "127.0.0.1:18888:18888"
+      - "127.0.0.1:18890:18890"
+    # Image ships no shell tooling for a probe; nothing depends on its readiness.
+
+  facilitator:
+    build:
+      context: ..
+      dockerfile: src/facilitator/Dockerfile
+    image: ${OCI_REGISTRY:?set in versions.env}/facilitator:${FRAMEWORK_TAG:?set in versions.env}
+    environment:
+      ConnectionStrings__Facilitator: Host=postgres;Database=facilitator;Username=demo;Password=${DEMO_POSTGRES_PASSWORD:?set in .env}
+      Link__EnrollmentToken: ${DEMO_ENROLLMENT_TOKEN:?set in .env}
+      Storage__Provider: s3
+      Storage__S3__Endpoint: http://artifacts:8333
+      Storage__S3__Bucket: facilitator-artifacts
+      Storage__S3__Region: us-east-1
+      Storage__S3__AccessKey: ${DEMO_S3_ACCESS_KEY:?set in .env}
+      Storage__S3__SecretKey: ${DEMO_S3_SECRET_KEY:?set in .env}
+      # Otel:Endpoint is the kernel's on/off switch; the exporter transport
+      # reads the standard OTLP env vars (AddOtlpExporter takes no argument).
+      # The .NET exporter defaults to gRPC (dashboard :18889); pin HTTP so both
+      # point at the dashboard's HTTP/protobuf listener :18890.
+      Otel__Endpoint: http://aspire:18890
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://aspire:18890
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_SERVICE_NAME: facilitator
+    volumes:
+      - ./config/facilitator.json:/app/config/facilitator.json:ro
+    ports:
+      - "127.0.0.1:8088:8080"
+    # aspnet:10.0 has bash but no HTTP client; probe /health over /dev/tcp.
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080 && printf "GET /health HTTP/1.0\r\n\r\n" >&3 && head -n1 <&3 | grep -q " 200 "'
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      artifacts:
+        condition: service_healthy
+
+volumes:
+  pg_data: {}
+  artifacts_data: {}

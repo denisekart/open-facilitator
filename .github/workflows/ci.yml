@@ -65,7 +65,7 @@ jobs:
       - name: versions.env completeness
         run: |
           missing=0
-          for key in POSTGRES_TAG KEYCLOAK_TAG KAFKA_TAG FORGEJO_TAG MATTERMOST_TAG SEAWEEDFS_TAG ASPIRE_TAG OLLAMA_TAG OCI_REGISTRY FACILITATOR_DIGEST; do
+          for key in POSTGRES_TAG KEYCLOAK_TAG KAFKA_TAG FORGEJO_TAG MATTERMOST_TAG SEAWEEDFS_TAG ASPIRE_TAG OLLAMA_TAG AWSCLI_TAG OCI_REGISTRY FACILITATOR_DIGEST FRAMEWORK_TAG; do
             grep -q "^${key}=" reference/versions.env || { echo "missing ${key}"; missing=1; }
           done
           exit $missing
@@ -75,6 +75,67 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - run: docker build -t facilitator:ci -f src/facilitator/Dockerfile .
+      - run: docker build -t node-runtime:ci -f Dockerfile.node .
+
+  ref-env-bringup:
+    # The slim reference environment boots authenticated, S3-backed and
+    # OTLP-exporting end-to-end (compose assertions, PR tier).
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+      - run: docker build -t facilitator:ci -f src/facilitator/Dockerfile .
+      - name: boot slim stack
+        working-directory: reference
+        run: |
+          cp .env.example .env
+          docker compose --env-file versions.env --env-file .env \
+            -f compose.slim.yaml up -d --build --wait --wait-timeout 600
+      - name: host-side assertions
+        run: |
+          curl -sf http://localhost:8088/health
+          curl -sf http://localhost:8080/realms/facilitator/.well-known/openid-configuration >/dev/null
+          # 401 without a token
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8088/api/dead-letters)" = 401
+          # 200 with a facilitator-cli bearer
+          TOKEN=$(curl -sf http://localhost:8080/realms/facilitator/protocol/openid-connect/token \
+            -d grant_type=client_credentials -d client_id=facilitator-cli \
+            -d client_secret=e2e-cli-secret | jq -r .access_token)
+          curl -sf http://localhost:8088/api/dead-letters -H "Authorization: Bearer $TOKEN" >/dev/null
+      - name: telemetry arrives at the dashboard
+        run: |
+          # The GETs above generated ASP.NET Core spans; the dashboard's
+          # telemetry API must report them within its export interval.
+          # (OTEL_SERVICE_NAME pins the resource name in compose.)
+          for _ in $(seq 1 30); do
+            curl -sf http://localhost:18888/api/telemetry/spans 2>/dev/null \
+              | grep -q 'facilitator' && exit 0
+            sleep 2
+          done
+          curl -s http://localhost:18888/api/telemetry/spans; exit 1
+      - name: artifact bucket exists
+        working-directory: reference
+        run: |
+          AWS_ACCESS_KEY_ID=$(grep '^DEMO_S3_ACCESS_KEY=' .env | cut -d= -f2)
+          AWS_SECRET_ACCESS_KEY=$(grep '^DEMO_S3_SECRET_KEY=' .env | cut -d= -f2)
+          AWS_DEFAULT_REGION=us-east-1
+          export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_DEFAULT_REGION
+          docker run --rm --network host \
+            -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_DEFAULT_REGION \
+            "amazon/aws-cli:$(grep '^AWSCLI_TAG=' versions.env | cut -d= -f2)" \
+            --endpoint-url http://127.0.0.1:8333 s3 ls s3://facilitator-artifacts
+      - name: kernel booted clean
+        working-directory: reference
+        run: |
+          docker compose --env-file versions.env --env-file .env -f compose.slim.yaml logs facilitator
+          ! docker compose --env-file versions.env --env-file .env -f compose.slim.yaml \
+            logs --no-log-prefix facilitator | grep -q "Unhandled exception"
+      - name: teardown
+        if: always()
+        working-directory: reference
+        run: |
+          docker compose --env-file versions.env --env-file .env -f compose.slim.yaml logs || true
+          docker compose --env-file versions.env --env-file .env -f compose.slim.yaml down -v
 
   link-e2e:
     runs-on: ubuntu-latest

@@ -1,0 +1,41 @@
+# syntax=docker/dockerfile:1
+# Source-built Node runtime image: gateway, linkd and the deterministic worker
+# share one dependency closure (the worker depends on @ofac/adapter,
+# @ofac/gateway, @ofac/protocol, @ofac/workspace-link at runtime), so one image
+# carries three self-contained app dirs. Consumers pick a process via command
+# override — see reference/ compose files.
+
+FROM node:22-bookworm AS build
+WORKDIR /repo
+RUN corepack enable
+# Manifest layer first: installs only need the workspace topology.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY src/protocol/package.json src/protocol/
+COPY src/workspace-link/package.json src/workspace-link/
+COPY src/gateway/package.json src/gateway/
+COPY src/adapters/harnesses/adapter-sdk/package.json src/adapters/harnesses/adapter-sdk/
+COPY src/adapters/harnesses/deterministic/package.json src/adapters/harnesses/deterministic/
+RUN pnpm install --frozen-lockfile
+COPY tsconfig.base.json ./
+COPY src/protocol/ src/protocol/
+COPY src/workspace-link/ src/workspace-link/
+COPY src/gateway/ src/gateway/
+COPY src/adapters/harnesses/adapter-sdk/ src/adapters/harnesses/adapter-sdk/
+COPY src/adapters/harnesses/deterministic/ src/adapters/harnesses/deterministic/
+RUN pnpm -r build
+# --prod + injected workspace deps: each dir is a runnable closure (node_modules
+# with the workspace packages copied in), freshly built dist/ included via each
+# package's `files: ["dist"]`.
+RUN pnpm deploy --filter=@ofac/gateway --prod /deploy/gateway \
+ && pnpm deploy --filter=@ofac/workspace-link --prod /deploy/linkd \
+ && pnpm deploy --filter=@ofac/harness-deterministic --prod /deploy/worker
+
+# Debian slim, not Alpine: better-sqlite3 ships glibc prebuilds (see
+# pnpm-workspace.yaml allowBuilds); Alpine would force a node-gyp rebuild.
+FROM node:22-bookworm-slim AS runtime
+COPY --from=build /deploy /app
+USER node
+# Default process: the Gateway. linkd: `node /app/linkd/dist/bin/linkd.js run …`;
+# worker: `node /app/worker/dist/bin/worker.js run …` (Plan 18 compose services).
+# No EXPOSE: every process dials out to the kernel; no inbound contract yet.
+CMD ["node", "/app/gateway/dist/bin/gateway.js", "run"]

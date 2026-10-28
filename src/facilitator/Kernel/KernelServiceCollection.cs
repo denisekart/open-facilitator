@@ -14,6 +14,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration.Json;
 using Microsoft.Extensions.DependencyInjection;
 
 using Ofac.Protocol.Validation;
@@ -35,12 +36,38 @@ public static class KernelServiceCollection
     /// <summary>Register every kernel feature on the builder.</summary>
     public static WebApplicationBuilder AddKernel(this WebApplicationBuilder builder)
     {
+        builder.AddMountedConfigFile();
         builder.AddSharedKernel();
         builder.AddIdentityFeature();
         builder.AddWorkFeature();
         builder.AddStorageFeature();
         builder.AddLinkFeature();
         builder.AddMemoryFeature();
+        return builder;
+    }
+
+    /// <summary>
+    /// Mounted production config (<c>config/facilitator.json</c> under the content
+    /// root; path overridable via <c>Config:File</c>, i.e. env <c>Config__File</c>).
+    /// Appended, then the environment-variable provider is re-appended after it
+    /// so env vars keep overriding the file (a <see cref="Microsoft.Extensions.Configuration.ConfigurationManager"/>
+    /// ignores <c>Sources</c> surgery — precedence follows append order).
+    /// Optional by design: dev/source runs without the file are unaffected. No
+    /// YAML provider ships with net10.0 (the Microsoft <c>…Configuration.Yaml*</c>
+    /// packages never left preview), hence JSON.
+    /// </summary>
+    private static WebApplicationBuilder AddMountedConfigFile(this WebApplicationBuilder builder)
+    {
+        var path = builder.Configuration["Config:File"]
+            ?? Path.Combine(builder.Environment.ContentRootPath, "config", "facilitator.json");
+        if (!File.Exists(path))
+        {
+            return builder;
+        }
+
+        builder.Configuration
+            .AddJsonFile(path, optional: true, reloadOnChange: false)
+            .AddEnvironmentVariables();
         return builder;
     }
 

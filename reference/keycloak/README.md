@@ -6,13 +6,13 @@ realm is the shared dev/test IdP that mints the bearer tokens every tier
 authenticates with — the .NET suite (`KeycloakFixture`), the TS e2e harnesses
 (`KEYCLOAK_URL`), CI service steps, and local manual runs.
 
-Contents (plans 09+10): realm `facilitator`; realm roles `framework-admin`,
+Contents: realm `facilitator`; realm roles `framework-admin`,
 `kernel-operator`, `e2e-operator`; groups `/teams/team-alpha`,
 `/teams/team-beta` surfaced as the `/groups` claim via a group-membership
 mapper; clients `facilitator-api` (public, audience `facilitator-api`,
 password grants for alice/bob/carol) and `facilitator-cli` (confidential,
 client-credentials only, secret `e2e-cli-secret`, service account holds
-`kernel-operator` + `e2e-operator`). Plan 10 workload-plane clients:
+`kernel-operator` + `e2e-operator`). Workload-plane clients:
 `ofac-gateway-alpha` / `ofac-worker-alpha` (confidential, client-credentials
 — mode-(b) enrollment tokens, audience `facilitator-link`; the gateway's
 kernel binding accepts delegated claims, the worker's refuses them) and

@@ -1,0 +1,67 @@
+# Full overlay (spec §22.3): the provider services on top of the slim stack.
+# Bring up: make compose-full. Gateway/launcher/worker services land with the
+# node-runtime compose services.
+services:
+  forgejo:
+    image: codeberg.org/forgejo/forgejo:${FORGEJO_TAG:?set in versions.env}
+    environment:
+      FORGEJO__database__DB_TYPE: sqlite3
+      FORGEJO__server__ROOT_URL: http://git.localhost:3000/
+    volumes:
+      - forgejo_data:/data
+    ports:
+      - "127.0.0.1:3000:3000"
+    networks:
+      default:
+        aliases: [git.localhost]
+
+  mattermost:
+    image: mattermost/mattermost-team-edition:${MATTERMOST_TAG:?set in versions.env}
+    # Official image ships amd64 only; the platform pin lets arm64 hosts boot
+    # the overlay under emulation.
+    platform: linux/amd64
+    environment:
+      MM_SQLSETTINGS_DRIVERNAME: postgres
+      MM_SQLSETTINGS_DATASOURCE: postgres://demo:${DEMO_POSTGRES_PASSWORD:?set in .env}@postgres:5432/mattermost?sslmode=disable
+      MM_SERVICESETTINGS_SITEURL: http://chat.localhost:8065
+    volumes:
+      - mattermost_data:/mattermost/data
+    ports:
+      - "127.0.0.1:8065:8065"
+    networks:
+      default:
+        aliases: [chat.localhost]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  kafka:
+    image: apache/kafka:${KAFKA_TAG:?set in versions.env}
+    hostname: kafka
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,HOST:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:29093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_LISTENERS: CONTROLLER://:29093,PLAINTEXT://:19092,HOST://:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:19092,HOST://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      CLUSTER_ID: 4L6g3nShT-eMCtK--X86sw
+    ports:
+      - "127.0.0.1:9092:9092"
+
+  ollama:
+    image: ollama/ollama:${OLLAMA_TAG:?set in versions.env}
+    volumes:
+      - ollama_models:/root/.ollama
+    ports:
+      - "127.0.0.1:11434:11434"
+
+volumes:
+  forgejo_data: {}
+  mattermost_data: {}
+  ollama_models: {}

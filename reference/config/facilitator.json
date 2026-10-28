@@ -1,0 +1,152 @@
+{
+  "Storage": {
+    "Provider": "filesystem"
+  },
+  "Link": {
+    "Teams": ["team-alpha", "team-beta"],
+    "Evidence": { "Audience": "facilitator-link" },
+    "WorkloadIdentities": [
+      {
+        "ClientId": "ofac-gateway-alpha",
+        "EndpointId": "gw.team-alpha",
+        "Team": "team-alpha",
+        "Role": "gateway",
+        "AcceptsDelegatedClaims": true
+      },
+      {
+        "ClientId": "ofac-worker-alpha",
+        "EndpointId": "gw.team-beta",
+        "Team": "team-beta",
+        "Role": "gateway",
+        "AcceptsDelegatedClaims": false
+      }
+    ]
+  },
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning",
+      "Microsoft.EntityFrameworkCore": "Warning"
+    }
+  },
+  "identity": {
+    "oidc": {
+      "authority": "http://id.localhost:8080/realms/facilitator",
+      "audience": "facilitator-api",
+      "requireHttps": false
+    },
+    "claims": {
+      "subject": "/sub",
+      "displayName": "/preferred_username",
+      "groups": [{ "path": "/groups", "shape": "string-array" }],
+      "scopes": [
+        { "path": "/scope", "shape": "space-delimited-string" },
+        { "path": "/scp", "shape": "string-array-or-space-delimited" }
+      ],
+      "permissions": [{ "path": "/permissions", "shape": "string-array" }],
+      "authenticationMethods": [{ "path": "/amr", "shape": "string-array" }],
+      "authenticationContext": "/acr"
+    },
+    "roles": {
+      "kernel-operator": [
+        {
+          "all": [{ "claim": "/realm_access/roles", "op": "contains", "value": "kernel-operator" }]
+        }
+      ],
+      "framework-admin": [
+        {
+          "all": [{ "claim": "/realm_access/roles", "op": "contains", "value": "framework-admin" }]
+        }
+      ],
+      "team-member": [
+        {
+          "all": [{ "claim": "/groups", "op": "exists" }]
+        }
+      ],
+      "gateway-workload": [
+        {
+          "all": [{ "claim": "/realm_access/roles", "op": "contains", "value": "gateway-workload" }]
+        }
+      ]
+    },
+    "authorization": {
+      "operations": [
+        {
+          "id": "work.write",
+          "methods": ["POST"],
+          "paths": [
+            "/api/works",
+            "/api/works/{id}/steer",
+            "/api/works/{id}/transitions",
+            "/api/ingress/events"
+          ],
+          "rolesAnyOf": ["kernel-operator"]
+        },
+        {
+          "id": "approvals.read",
+          "methods": ["GET"],
+          "paths": ["/api/works/{id}/approvals"],
+          "rolesAnyOf": ["kernel-operator", "framework-admin", "gateway-workload"]
+        },
+        {
+          "id": "approvals.respond",
+          "methods": ["POST"],
+          "paths": ["/api/works/{id}/approvals/{approvalId}/respond"],
+          "rolesAnyOf": ["kernel-operator", "framework-admin"]
+        },
+        {
+          "id": "artifacts.read",
+          "methods": ["GET"],
+          "paths": ["/api/artifacts/{id}", "/api/artifacts/{id}/content"],
+          "rolesAnyOf": ["kernel-operator", "framework-admin", "gateway-workload", "team-member"]
+        },
+        {
+          "id": "manifests.read",
+          "methods": ["GET"],
+          "paths": ["/api/works/{id}/manifests"],
+          "rolesAnyOf": ["kernel-operator", "framework-admin", "gateway-workload", "team-member"]
+        },
+        {
+          "id": "artifacts.write",
+          "methods": ["POST", "PUT"],
+          "paths": [
+            "/api/artifacts/request-upload",
+            "/api/artifacts/{id}/content",
+            "/api/artifacts/{id}/confirm"
+          ],
+          "rolesAnyOf": ["kernel-operator", "framework-admin"]
+        },
+        {
+          "id": "memory.read",
+          "methods": ["GET", "POST"],
+          "paths": ["/api/memory/recall", "/api/memory/{id}", "/api/memory/export"],
+          "rolesAnyOf": ["kernel-operator", "framework-admin", "gateway-workload", "team-member"]
+        },
+        {
+          "id": "memory.write",
+          "methods": ["POST"],
+          "paths": ["/api/memory/retain"],
+          "rolesAnyOf": ["kernel-operator", "framework-admin", "gateway-workload", "team-member"]
+        },
+        {
+          "id": "memory.curate",
+          "methods": ["POST", "DELETE"],
+          "paths": [
+            "/api/memory/{id}/promote",
+            "/api/memory/{id}/correct",
+            "/api/memory/{id}/shares",
+            "/api/memory/{id}/shares/{shareId}",
+            "/api/memory/{id}"
+          ],
+          "rolesAnyOf": ["kernel-operator", "framework-admin", "team-member"]
+        },
+        {
+          "id": "identity.roles.manage",
+          "methods": ["PUT", "DELETE"],
+          "paths": ["/api/identity/roles/{name}"],
+          "rolesAnyOf": ["kernel-operator"]
+        }
+      ]
+    }
+  }
+}

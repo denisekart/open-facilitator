@@ -13,7 +13,7 @@ Repo root **is** the spec §22.1 `framework/` tree — no `framework/` subdirect
 |`make test`|.NET tests (--no-build) + `pnpm -r test` (depends on build)|
 |`make lint`|`dotnet format --verify-no-changes` + eslint + prettier --check|
 |`make format`|`dotnet format` + `pnpm format`|
-|`make compose-slim` / `compose-full`|Placeholder (exit 2) until Plan 11 ships `reference/referencectl`|
+|`make compose-slim` / `compose-full`|Boots the reference environment (`reference/compose.slim.yaml`, plus the `compose.full.yaml` overlay); `make compose-down` tears it down|
 |`make clean`|`dotnet clean` + remove TS dist outputs and node_modules|
 
 ## Protocol changes
@@ -26,9 +26,11 @@ The wire contract is schema-first: edit the JSON Schema under `protocol/`, add v
 
 ## Version pinning policy (spec §22.4)
 
-- All reference image tags live in `reference/versions.env`; compose files (Plan 11) consume it verbatim via `env_file:` — never hardcode a tag elsewhere.
-- Tags now, digests at release: the release job (Plan 18) fills the `*_DIGEST` keys.
-- Every version bump needs a compose verification run (available from Plan 11; until then, bumps are reviewed by hand).
+- All reference image tags live in `reference/versions.env`; the compose files
+  interpolate it verbatim via `--env-file` — never hardcode a tag elsewhere.
+- Tags now, digests at release: the release process fills the `*_DIGEST` keys.
+- Every version bump needs a compose verification run: `make compose-slim` to a
+  healthy stack (the CI `ref-env-bringup` job enforces the same on every PR).
 - .NET: Central Package Management — add `<PackageVersion>` to `Directory.Packages.props`, reference versionless in csproj.
 - TypeScript: shared toolchain versions live in the `catalog:` block of `pnpm-workspace.yaml`.
 

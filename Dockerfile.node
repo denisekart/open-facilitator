@@ -34,6 +34,9 @@ RUN pnpm deploy --filter=@ofac/gateway --prod /deploy/gateway \
 # pnpm-workspace.yaml allowBuilds); Alpine would force a node-gyp rebuild.
 FROM node:22-bookworm-slim AS runtime
 COPY --from=build /deploy /app
+# Writable state root for mounted consumers (compose demo-workspace: the
+# Gateway stateDir, worker workDir, and supervisor logs live under here).
+RUN install -d -o node -g node /var/lib/ofac
 USER node
 # Default process: the Gateway. linkd: `node /app/linkd/dist/bin/linkd.js run …`;
 # worker: `node /app/worker/dist/bin/worker.js run …` (Plan 18 compose services).

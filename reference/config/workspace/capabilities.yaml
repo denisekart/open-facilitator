@@ -1,0 +1,24 @@
+# The manifest the demo worker advertises (same capability descriptors the
+# e2e seeding targets). ownerTeam must equal the Gateway enrollment's team.
+apiVersion: facilitator.framework/v1
+kind: CapabilityManifest
+ownerTeam: team-alpha
+capabilities:
+  - id: research.analyze
+    version: 1
+    execution: asynchronous
+    acceptedContexts: [uri-reference]
+    outputKinds: [analysis.report]
+    outputMediaTypes: [text/markdown]
+    supportsSteering: true
+    supportsCancellation: true
+    supportsNudge: false
+  - id: research.publish
+    version: 1
+    execution: asynchronous
+    acceptedContexts: [uri-reference]
+    outputKinds: [research-publish.result]
+    outputMediaTypes: [text/markdown]
+    supportsSteering: false
+    supportsCancellation: false
+    supportsNudge: false

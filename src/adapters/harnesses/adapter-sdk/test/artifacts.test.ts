@@ -48,6 +48,24 @@ describe("createArtifactClient (stub kernel)", () => {
     }
   });
 
+  it("presigned upload: bytes land direct, confirm_upload settles the slot", async () => {
+    const kernel = await startStubKernel({ presign: true });
+    try {
+      const client = createArtifactClient({ baseUrl: kernel.url, token: "t", fetchImpl: fetch });
+      const result = await client.upload(BYTES, { mediaType: "text/markdown", workId: "w" });
+      expect(result.digest).toBe(SHA);
+      // The kernel-side row carries the bytes only after the confirm leg.
+      expect(kernel.artifacts.get(result.artifactId)?.bytes).toEqual(Buffer.from(BYTES));
+      const types = kernel.events.map((e) => e["type"]);
+      expect(types).toEqual([
+        "org.facilitator.command.artifact.request_upload.v1",
+        "org.facilitator.command.artifact.confirm_upload.v1",
+      ]);
+    } finally {
+      await kernel.close();
+    }
+  });
+
   it("a repeated upload of identical bytes converges via the duplicate ticket", async () => {
     const kernel = await startStubKernel();
     try {

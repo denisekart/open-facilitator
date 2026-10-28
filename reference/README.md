@@ -1,19 +1,21 @@
 # Reference environment
 
-Slim/full Docker Compose deployment inputs (spec §22). `make compose-slim`
-from the repo root boots: PostgreSQL, Keycloak (realm `facilitator`),
-SeaweedFS (S3 artifact store), the Aspire dashboard (OTLP), and the
-Facilitator kernel container — healthy, authenticated, S3-backed, and
-exporting traces/metrics. Gateway/worker services join this stack in the
-compose services tier.
+Slim/full Docker Compose deployment inputs (spec §22). `./referencectl up slim`
+from the repo root boots and seeds the demo path: PostgreSQL, Keycloak (realm
+`facilitator`), SeaweedFS (S3 artifact store), the Aspire dashboard (OTLP),
+the Facilitator kernel container, and `demo-workspace` — a team-owned
+workspace container running a standalone Gateway (`gw.team-alpha`) plus the
+deterministic worker over an in-container unix child leg, enrolled and
+policy-gated. One seeded `work.assign` then dispatches end-to-end.
 
 ## Bring up / tear down
 
 ```bash
-make compose-slim    # five services, builds the kernel image
-make compose-full    # + forgejo, mattermost, kafka, ollama (mattermost
-                     # ships amd64-only: on arm64 it boots under emulation, slow)
-make compose-down    # down -v (append FULL=1 after compose-full)
+./referencectl up slim        # build + wait healthy + seed the demo path
+./referencectl up slim --no-seed   # stack only (seeds own data)
+./referencectl status         # service table + kernel + gateway probes
+./referencectl down           # down -v with -v; FULL=1 adds the overlay
+make compose-slim / compose-full / compose-down   # raw compose path
 ```
 
 The first `up` copies `.env.example` to `.env`; **edit `.env` for real use** —
@@ -31,6 +33,7 @@ both verbatim and fail hard on a missing key.
 |`8333`|SeaweedFS S3|bucket `facilitator-artifacts`, credentials from `.env`|
 |`18888`|Aspire dashboard|UI + telemetry REST API (`/api/telemetry/spans`)|
 |`18890`|Aspire OTLP/HTTP|kernel exporter target|
+|`8099`|Gateway diagnostics|**not published** — binds the workspace container's loopback; `./referencectl status` probes it via `compose exec`|
 |`3000`/`8065`/`9092`/`11434`|full overlay|forgejo / mattermost / kafka / ollama|
 
 ## What the kernel runs with

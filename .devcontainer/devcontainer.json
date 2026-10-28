@@ -13,6 +13,9 @@
   "remoteUser": "vscode",
 
   "updateRemoteUserUID": true,
+  "containerEnv": {
+    "OFAC_KERNEL_URL": "http://host.docker.internal:8088"
+  },
 
   "remoteEnv": {
     "PATH": "${containerEnv:PATH}:/home/vscode/.dotnet/tools:/home/vscode/.local/bin"

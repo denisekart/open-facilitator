@@ -49,6 +49,7 @@ import { createConsoleLogger } from "@ofac/workspace-link";
 const adapter = createAdapter({
   childWorkspaceId: "gw.demo/my-harness", // Gateway-side law, validated here too
   transport: { socketPath: "./child.sock" }, // or { host: "127.0.0.1", port: 8090 }
+  kernel: { baseUrl: "http://localhost:8088" }, // required: the artifact byte path (token defaults to the child token)
   manifest, // CapabilityManifestV1 — what you advertise; ownerTeam is discarded Gateway-side
   descriptor: { invocation: "sdk", supports: { steer: true, interrupt: true, resume: "restart-with-context" } },
   hooks: {

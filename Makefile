@@ -67,6 +67,7 @@ db-update:
 compose-slim:
 	cd reference && cp -n .env.example .env && \
 	docker compose --env-file versions.env --env-file .env -f compose.slim.yaml up -d --build
+	@echo "Full loop (seed + wait + demo workspace): ./referencectl up slim — this target is the raw compose path."
 	@echo "Facilitator: http://localhost:8088/health · Keycloak: http://localhost:8080 (realm facilitator, admin demo-admin)"
 
 compose-full:

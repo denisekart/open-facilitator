@@ -6,6 +6,10 @@ apiVersion: facilitator.framework/v1
 kind: HarnessAdapter
 childWorkspaceId: gw.demo/deterministic
 token: child-secret-demo
+# The kernel origin for the artifact byte path (required). On the host the
+# dev kernel publishes 8088; inside the devcontainer host.docker.internal
+# reaches it. OFAC_KERNEL_URL (devcontainer.json containerEnv) overrides.
+kernelUrl: http://host.docker.internal:8088
 transport:
   socket:
     path: /workspace/.ofac-gateway/child.sock

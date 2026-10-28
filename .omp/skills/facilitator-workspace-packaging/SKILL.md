@@ -49,6 +49,16 @@ as of 2026-10, only the shipped `prebuilds/linuxmusl-*.node` files exist),
 combo scenario on gateway proves composition. Feature version ≠ protocol
 major (§8.5).
 
+Supervisor units read `${UNITS_DIR:-/usr/local/share/openfacilitator/units}`
+— the compose `demo-workspace` service (reference env) bind-mounts
+`reference/container/units/` + `reference/config/workspace/` and runs the
+same unit law over the node-runtime image (`/app/gateway`, `/app/worker`);
+the worker unit's kernel self-enroll block (OFAC_KERNEL_URL +
+OFAC_ENROLL_SECRET → POST /api/link/v1/enroll role child → export
+OFAC_KERNEL_TOKEN) is deliberately duplicated between the Feature template
+and the reference copy. `kernelUrl` is a REQUIRED worker config key (Plan 15
+kill rule): no optional path, no shim.
+
 ## Gateway modes & trust truth
 
 - **Embedded**: Feature beside the agent, normally 1 worker; privileged connectors allowed at team discretion; persistence SQLite/mounted volume. Co-located policy is *operational guidance*, not a security boundary against arbitrary in-container code — say so in docs/manifests/audit metadata.

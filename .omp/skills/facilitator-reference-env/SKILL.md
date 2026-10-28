@@ -3,7 +3,7 @@ name: facilitator-reference-env
 description: Slim/full Docker Compose reference environments, versions.env pinning, referencectl bootstrap/seed/verify, localhost hostname wiring, and local debugging of the Open Facilitator Framework.
 ---
 
-> **Status (as-built):** `reference/compose.slim.yaml` boots PostgreSQL + Keycloak + SeaweedFS + Aspire dashboard + the Facilitator container (`make compose-slim` at the repo root; `compose.full.yaml` overlays forgejo/mattermost/kafka/ollama). NOT built yet: `referencectl`, `bootstrap/` seeds, `checks/` scripts, and the gateway/launcher/worker compose services. Where this document describes those, it is spec-proposed target, not reality.
+> **Status (as-built):** `./referencectl up slim` (repo root) boots + seeds the demo path: PostgreSQL + Keycloak + SeaweedFS + Aspire dashboard + the Facilitator container + `demo-workspace` (one container, two processes: standalone Gateway `gw.team-alpha` + the deterministic worker over an in-container unix child leg — the mode-(b) embedded story). `reference/bootstrap/bootstrap.sh` seeds project + Work + a `work.assign` outbox row (`pg_notify` wakes the dispatcher); the SQL outbox insert stands in until the routing slice assigns works itself. NOT built yet: `checks/` scripts, full-overlay seed data. Where this document describes those, it is spec-proposed target, not reality.
 
 # Reference Environment & Dev Loop
 
@@ -46,7 +46,7 @@ make compose-down          # down -v (FULL=1 to include the overlay)
 
 Observe: `docker compose ... ps` (all healthy), kernel `http://localhost:8088/health`, realm `.well-known` at `http://id.localhost:8080/realms/facilitator`, bucket browse `http://localhost:8333`, traces at the dashboard `http://localhost:18888`. Operator bearer: `facilitator-cli`/`e2e-cli-secret` client_credentials against the realm token endpoint.
 
-`referencectl` (planned, not built): idempotent provisioning of Forgejo org/repos/issues, Mattermost team/channel/bot token, linkage challenges, Kafka topic + sample event, worker enrollment grants, Ollama model; would print login links, never dump tokens. Appendix ergonomics (`./dev up`, `./dev assign`, `./dev show deliveries`) share that unbuilt status.
+`referencectl` (built): `up slim [--no-seed]` (compose up --wait + bootstrap), `down [-v]`, `status` (compose ps + kernel `/health` + a `compose exec` probe of the Gateway's `127.0.0.1:8099/status` — diagnostics bind the demo-workspace container's loopback, never a published port), `token [--user U --password P]`, `work [--objective T]`. `verify` is reserved for the acceptance-check pass. Appendix ergonomics (`./dev up`, `./dev assign`, `./dev show deliveries`) share that unbuilt status.
 
 ## Debugging hooks
 

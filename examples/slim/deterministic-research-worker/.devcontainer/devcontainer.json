@@ -29,6 +29,7 @@
   "containerEnv": {
     "OFAC_ENROLL_SECRET": "enroll-dev",
     "OFAC_CHILD_SECRET": "child-secret-demo",
+    "OFAC_KERNEL_URL": "http://host.docker.internal:8088",
     "OFAC_LOG_DIR": "/workspace/.ofac-logs",
     "OFAC_LINKD_STATE": "/workspace/.ofac-linkd.sqlite3"
   }

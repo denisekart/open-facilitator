@@ -176,7 +176,7 @@ the digest check; the report's own digest is the manifest's
   path (both configs must point at `.ofac-gateway/child.sock` under *this*
   directory; the Gateway resolves it against its CWD, so start it here).
 - Capabilities POST 403 in the Gateway log — `team:` ≠ the kernel's team
-  slug (the dev kernel seeds `default`).
+  slug (the dev kernel seeds `team-alpha` and `team-beta`).
 - Seed answered 202 but nothing ran, Gateway `/status` shows
   `linkStats.unsupported: 1` — the assign arrived before the worker's
   register landed (capabilities unknown ⇒ honest `unsupported`, retry the
@@ -203,6 +203,13 @@ node features/build.mjs
 devcontainer up --workspace-folder examples/slim/deterministic-research-worker
 # or: make example-slim-up
 ```
+
+The harness-adapter unit self-enrolls before booting the worker: with
+`OFAC_KERNEL_URL` + `OFAC_ENROLL_SECRET` set (and no `OFAC_KERNEL_TOKEN`),
+it POSTs `/api/link/v1/enroll` for endpoint `demo-worker-child` (role
+`child`) until the host kernel answers, then exports the returned linkToken
+as `OFAC_KERNEL_TOKEN` — the worker's kernel credential for the artifact
+byte path.
 
 Expect in the workspace-mounted logs (`OFAC_LOG_DIR=/workspace/.ofac-logs`):
 

@@ -85,12 +85,28 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - run: docker build -t facilitator:ci -f src/facilitator/Dockerfile .
-      - name: boot slim stack
+      - name: "boot slim stack (referencectl: up + wait + seed)"
+        run: ./referencectl up slim
+      - name: demo workspace linked + dispatch completed
         working-directory: reference
         run: |
-          cp .env.example .env
-          docker compose --env-file versions.env --env-file .env \
-            -f compose.slim.yaml up -d --build --wait --wait-timeout 600
+          # Gateway ready with the deterministic worker registered as a child.
+          # Diagnostics bind the container's loopback only -> probe in place.
+          docker compose --env-file versions.env --env-file .env -f compose.slim.yaml \
+            exec -T demo-workspace node -e \
+            "fetch('http://127.0.0.1:8099/status').then(r=>r.ok?r.json():Promise.reject(r.status)).then(s=>process.stdout.write(JSON.stringify(s)))" \
+            | jq -e '.state=="ready" and ([.children[] | select(.state=="connected")] | length >= 1)'
+          # The seeded work.assign rode kernel → gateway → worker → artifact
+          # → receipt: the completed event must be in the kernel inbox.
+          for _ in $(seq 1 30); do
+            docker compose --env-file versions.env --env-file .env -f compose.slim.yaml \
+              exec -T postgres psql -U demo -d facilitator -tAc \
+              "SELECT 1 FROM facilitator.inbox WHERE payload->>'type'='org.facilitator.event.assignment.completed.v1'" \
+              | grep -q '^1$' && exit 0
+            sleep 2
+          done
+          docker compose --env-file versions.env --env-file .env -f compose.slim.yaml logs demo-workspace
+          exit 1
       - name: host-side assertions
         run: |
           curl -sf http://localhost:8088/health

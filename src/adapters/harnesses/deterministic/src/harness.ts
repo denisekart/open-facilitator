@@ -109,11 +109,6 @@ Deterministic ${publishing ? "publish" : "analysis"} complete.
 `;
     const bytes = Buffer.from(report, "utf8");
     writeFileSync(reportPath, bytes);
-    if (ctx.kernel === undefined) {
-      throw new Error(
-        "deterministic worker: ctx.kernel unset — kernelUrl is required (Plan 15 retired the file:// inline-manifest path)",
-      );
-    }
     const client = createArtifactClient({
       baseUrl: ctx.kernel.baseUrl,
       token: ctx.kernel.token,

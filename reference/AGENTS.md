@@ -2,21 +2,28 @@
 
 ## Purpose
 Reference deployment inputs for the slim/full Docker Compose environments:
-image version pins, Keycloak realm inputs, Postgres init, kernel config, smoke
-checks. `make compose-slim` / `compose-full` / `compose-down` (repo root) boot
-the stack; `ref-env-bringup` in `../.github/workflows/ci.yml` gates it per PR.
+image version pins, Keycloak realm inputs, Postgres init, kernel config, the
+demo-workspace container payload, seeds, smoke checks. `./referencectl up
+slim` (repo root) boots + seeds the demo path; `ref-env-bringup` in
+`../.github/workflows/ci.yml` gates it per PR.
 
 ## Truth anchors
-- `compose.slim.yaml` / `compose.full.yaml` — the stacks: providers only
-  (gateway/launcher/worker services come with the node-runtime services);
+- `compose.slim.yaml` / `compose.full.yaml` — the stacks: providers plus
+  `demo-workspace` (node-runtime image, supervisor entrypoint);
   interpolation ONLY from `versions.env` + `.env` (two `--env-file` flags).
+- `../referencectl` — the operator loop: up/down/status/token/work; it owns
+  the compose invocation and the bootstrap call.
 - `versions.env` — the single pin source: every reference image tag, the
   source-built `FRAMEWORK_TAG`, and release-time digests live here, nothing
   else. `.env.example` — every local secret, each naming its consumer.
 - `config/facilitator.json` — mounted Production kernel config (no secrets);
   env vars override it. `keycloak/realm.json` — shared dev/test IdP fixture.
 - `postgres-init/01-databases.sql` — side databases on first boot only.
-- `bootstrap/`, `checks/` — planned seed/verify inputs, not built yet.
+- `container/units/` — supervisor units for `demo-workspace` (mirror the
+  Feature-baked ones; duplication is deliberate); `config/workspace/` —
+  Gateway/worker/policy/manifest configs; `bootstrap/bootstrap.sh` — seeds
+  project + Work + a `work.assign` outbox row (SQL stands in for the routing
+  slice); `checks/` — planned verify inputs, not built yet.
 - Target design: `../docs/specs/open_facilitator_framework_architecture.md`
   §21–22 (reference environment).
 

@@ -172,15 +172,6 @@ describe("deterministic harness script", () => {
     }
   });
 
-  it("no kernel surface: the run fails honestly instead of publishing a file:// manifest", async () => {
-    const dir = workDir();
-    const hooks = hooksFor(dir, 1);
-    const { ctx, events } = fakeContext("exec-k", "work-k", "asg-k");
-    delete (ctx as { kernel?: unknown }).kernel;
-    await expect(hooks.onExecute(ctx)).rejects.toThrow(/kernelUrl is required/);
-    expect(events).toEqual([]);
-  });
-
   it("steer mid-run: directives land in the report under ## Steering directives, arrival order", async () => {
     const dir = workDir();
     const hooks = hooksFor(dir, 30);

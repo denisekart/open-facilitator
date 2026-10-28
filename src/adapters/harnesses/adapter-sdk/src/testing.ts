@@ -443,12 +443,16 @@ export function kitSocketPath(): string {
 // startStubKernel — the in-process kernel stand-in for the artifact client
 // (Plan 15). Implements the link-plane byte path the client speaks: POST
 // /api/link/v1/events answers a request_upload command with 202 + the ticket
-// in-band on `data` (fs-style: no presigned uploadUrl, so the client PUTs to
-// uploadLocation); the matching PUT stores the bytes and answers with the
-// kernel-verified digest (counting + hashing, like ArtifactLedger.StoreAsync).
-// A duplicate commandId re-attaches the live ticket, exercising the client's
-// re-attach path. `opts.rejectDigest` answers a digest-mismatched PUT with
-// 422 (the kernel's law) so failure legs are testable too.
+// in-band on `data` (fs-style by default: no presigned uploadUrl, so the
+// client PUTs to uploadLocation); the matching PUT stores the bytes and
+// answers with the kernel-verified digest (counting + hashing, like
+// ArtifactLedger.StoreAsync). `opts.presign` mints an uploadUrl instead:
+// bytes land at PUT /presigned/<id> (no authority), and only a following
+// confirm_upload command HEADs + re-hashes them and settles the slot (the
+// real kernel's direct-to-store law). A duplicate commandId re-attaches the
+// live ticket, exercising the client's re-attach path. `opts.rejectDigest`
+// answers a digest-mismatched PUT with 422 (the kernel's law) so failure
+// legs are testable too.
 // ---------------------------------------------------------------------------
 import { createServer } from "node:http";
 import { createHash, randomUUID } from "node:crypto";
@@ -464,10 +468,15 @@ export interface StubKernel {
   close(): Promise<void>;
 }
 
-export async function startStubKernel(opts?: { rejectDigest?: boolean }): Promise<StubKernel> {
+export async function startStubKernel(opts?: {
+  rejectDigest?: boolean;
+  presign?: boolean;
+}): Promise<StubKernel> {
   const artifacts = new Map<string, { bytes: Buffer; mediaType: string; digest: string }>();
   // commandId → allocated artifactId (the pending slot).
   const pending = new Map<string, string>();
+  // presigned direct uploads: artifactId → bytes awaiting confirm_upload.
+  const directBytes = new Map<string, Buffer>();
   const memories = new Map<string, { content: string; scopeSelector: string }>();
   const events: Array<Record<string, unknown>> = [];
   const server = createServer((request, response) => {
@@ -502,9 +511,44 @@ export async function startStubKernel(opts?: { rejectDigest?: boolean }): Promis
             data: {
               artifactId,
               uploadLocation: `/api/link/v1/artifacts/${artifactId}/content`,
-              method: "POST",
+              ...(opts?.presign === true
+                ? {
+                    uploadUrl: `http://${String(request.headers["host"])}/presigned/${artifactId}`,
+                    method: "PUT",
+                  }
+                : { method: "POST" }),
               expiresAt: new Date(Date.now() + 900_000).toISOString(),
             },
+          });
+          return;
+        }
+        if (env["type"] === "org.facilitator.command.artifact.confirm_upload.v1") {
+          // The kernel's direct-to-store law: HEAD the slot, re-hash, settle.
+          const id = String(data["artifactId"] ?? "");
+          const row = artifacts.get(id);
+          const direct = directBytes.get(id);
+          if (row === undefined || direct === undefined) {
+            send(202, {
+              deliveryId: randomUUID(),
+              status: "failed",
+              processedAt: new Date().toISOString(),
+            });
+            return;
+          }
+          const digest = "sha256:" + createHash("sha256").update(direct).digest("hex");
+          if (digest !== row.digest || opts?.rejectDigest === true) {
+            send(202, {
+              deliveryId: randomUUID(),
+              status: "failed",
+              processedAt: new Date().toISOString(),
+            });
+            return;
+          }
+          artifacts.set(id, { bytes: direct, mediaType: row.mediaType, digest });
+          send(202, {
+            deliveryId: randomUUID(),
+            status: "confirmed",
+            processedAt: new Date().toISOString(),
           });
           return;
         }
@@ -559,6 +603,14 @@ export async function startStubKernel(opts?: { rejectDigest?: boolean }): Promis
           status: "accepted",
           processedAt: new Date().toISOString(),
         });
+        return;
+      }
+      const direct = /^\/presigned\/([0-9a-f-]+)$/.exec(url);
+      if (request.method === "PUT" && direct !== null) {
+        // The store stand-in: bytes land, no verdict until confirm_upload.
+        directBytes.set(direct[1]!.replaceAll("-", ""), body);
+        response.writeHead(200);
+        response.end();
         return;
       }
       const put = /^\/api\/link\/v1\/artifacts\/([0-9a-f]+)\/content$/.exec(url);

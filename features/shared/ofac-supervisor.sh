@@ -4,14 +4,14 @@
 # in IDE and headless contexts alike). Installed identically by every Feature;
 # the last Feature to install simply rewrites the same bytes.
 #
-# Contract: run every executable in /usr/local/share/openfacilitator/units/
+# Contract: run every executable in ${UNITS_DIR:-/usr/local/share/openfacilitator/units}/
 # (sorted), each logging to ${OFAC_LOG_DIR:-/tmp/openfacilitator/logs}/<unit>.log.
 # A unit script is a plain loop: it restarts its runtime with backoff and
 # exits non-zero when it gives up. The supervisor forwards TERM/INT to all
 # units, waits, and exits with the first non-zero unit status.
 set -eu
 
-UNITS_DIR=/usr/local/share/openfacilitator/units
+UNITS_DIR=${UNITS_DIR:-/usr/local/share/openfacilitator/units}
 LOG_DIR=${OFAC_LOG_DIR:-/tmp/openfacilitator/logs}
 mkdir -p "$LOG_DIR"
 

@@ -1,6 +1,6 @@
 # Getting started
 
-Status: the transactional kernel (PostgreSQL, HTTP ingress, Work state machines, the outbox dispatcher, the Workspace Link transport) runs locally or as a container; the slim reference environment boots the full provider stack via `make compose-slim` (see [`reference/README.md`](../reference/README.md)).
+Status: the transactional kernel (PostgreSQL, HTTP ingress, Work state machines, the outbox dispatcher, the Workspace Link transport) runs locally or as a container; the slim reference environment boots the full provider stack plus a linked demo workspace via `./referencectl up slim` (see [`reference/README.md`](../reference/README.md)).
 
 ## 1. Environment
 
@@ -23,7 +23,7 @@ make lint      # dotnet format --verify-no-changes + eslint + prettier --check
 make format    # auto-fix .NET + TS/JSON/YAML formatting
 ```
 
-`make compose-slim` / `make compose-full` boot the reference environment (builds the kernel image, needs Docker); `make compose-down` tears it down. First run copies `reference/.env.example` to `.env` — rotate the placeholder secrets for anything beyond a smoke run.
+`./referencectl up slim` boots and seeds the reference environment end-to-end (builds the images, waits for every healthcheck, seeds a demo Work that dispatches to a linked Gateway + worker): `./referencectl status` probes it, `./referencectl down` tears it down, `./referencectl token` mints an API bearer. The raw compose path remains `make compose-slim` / `make compose-full` / `make compose-down`. First run generates `reference/.env` from `.env.example` — rotate the placeholder secrets for anything beyond a smoke run.
 
 `dotnet test` requires a running Docker daemon: the Plan 02 integration suite boots `postgres:17-alpine` via Testcontainers (image tag pinned in `reference/versions.env`).
 

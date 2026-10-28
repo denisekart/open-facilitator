@@ -9,9 +9,11 @@
 // `actorEvidenceRef` REQUIRED, so the client always rides a non-authoritative
 // pointer (default `workload:adapter`) — the AdmissionGate records unknown
 // schemes and allows on workload authority alone (its absent-evidence law).
-// Bytes then travel to `uploadUrl` when the kernel minted a presigned URL,
-// else to `uploadLocation` on the same base (the kernel-proxied PUT, which
-// counts + hashes + auto-confirms while storing).
+// Bytes then travel to `uploadUrl` when the kernel minted a presigned URL —
+// the direct-to-store path, which the producer MUST settle with a
+// `command.artifact.confirm_upload` on the same plane (the kernel HEADs +
+// re-hashes the slot) — else to `uploadLocation` on the same base (the
+// kernel-proxied PUT, which counts + hashes + auto-confirms while storing).
 import { createHash, randomUUID } from "node:crypto";
 import {
   canonicalizeManifest,
@@ -22,6 +24,7 @@ import {
 import { buildEvent, dataschemaFor, trimSlash } from "@ofac/workspace-link";
 
 const REQUEST_UPLOAD_TYPE = "org.facilitator.command.artifact.request_upload.v1";
+const CONFIRM_UPLOAD_TYPE = "org.facilitator.command.artifact.confirm_upload.v1";
 const COMPLETED_TYPE = "org.facilitator.event.assignment.completed.v1";
 
 export interface KernelHttpOptions {
@@ -130,6 +133,28 @@ export function createArtifactClient(opts: KernelHttpOptions): ArtifactClient {
       });
       if (!put.ok) {
         throw new Error(`artifact PUT failed: ${put.status} ${await safeBody(put)}`);
+      }
+      if (presigned) {
+        // Direct-to-store law: the producer settles the slot; the kernel
+        // HEADs the digest key, re-hashes, and flips the row. Content-derived
+        // commandId ⇒ a re-send converges on the inbox's duplicate ack.
+        const ack2 = await postEvent({
+          specversion: "1.0",
+          id: randomUUID(),
+          source: "urn:ofac:adapter",
+          type: CONFIRM_UPLOAD_TYPE,
+          subject: `artifact/${artifactId}`,
+          time: new Date().toISOString(),
+          datacontenttype: "application/json",
+          dataschema: dataschemaFor(CONFIRM_UPLOAD_TYPE),
+          data: {
+            commandId: `cmd-art-cfm-${digest.slice(7, 39)}-${artifactId}`,
+            artifactId,
+          },
+        });
+        if (String(ack2["status"] ?? "") === "failed") {
+          throw new Error(`artifact confirm failed: ${JSON.stringify(ack2).slice(0, 256)}`);
+        }
       }
       const stored = (await put.json().catch(() => ({}))) as Record<string, unknown>;
       return {

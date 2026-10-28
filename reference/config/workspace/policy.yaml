@@ -1,0 +1,13 @@
+# Demo team policy: analyze runs free, publish parks for a human confirm.
+# First-match-wins, implicit final deny (docs/security.md "Team policy
+# engine"). Empty actorAnyOf matches every actor.
+owner: team-alpha
+policies:
+  - capability: research.publish
+    resources: ["*"]
+    actorAnyOf: []
+    effect: confirm
+  - capability: research.analyze
+    resources: ["*"]
+    actorAnyOf: []
+    effect: allow

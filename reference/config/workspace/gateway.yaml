@@ -1,0 +1,27 @@
+# Standalone Gateway for the compose demo-workspace container (§9.1 mode
+# (b)): empty fleet, late child hello over the unix socket under stateDir.
+# Identity: realm workload enrollment (mode (b)) — the kernel binds
+# (azp=ofac-gateway-alpha, endpointId=gw.team-alpha) to team-alpha/gateway
+# (Link:WorkloadIdentities in the mounted kernel config).
+apiVersion: facilitator.framework/v1
+kind: Gateway
+gatewayId: gw.team-alpha
+team: team-alpha
+role: gateway
+facilitatorUrl: http://facilitator:8080
+trustMode: isolated-executor
+stateDir: /var/lib/ofac/gateway
+mode: standalone
+children: []
+childTransport:
+  socket:
+    path: child.sock
+workload:
+  tokenUrl: http://id.localhost:8080/realms/facilitator/protocol/openid-connect/token
+  clientId: ofac-gateway-alpha
+  clientSecret: gateway-alpha-secret
+diagnostics:
+  port: 8099
+heartbeatSeconds: 5
+policy:
+  path: policy.yaml

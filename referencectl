@@ -1,0 +1,149 @@
+#!/usr/bin/env bash
+# referencectl — the reference environment's operator loop over docker
+# compose: bring the slim (or FULL=1 slim+full-overlay) stack up, seed the
+# demo path, inspect it, and mint tokens. An orchestrator, not a runtime:
+# everything here shells to `docker compose`, `curl`, and `jq`.
+#
+# Usage:
+#   ./referencectl up slim [--no-seed]   bring the stack up, then seed (unless --no-seed)
+#   ./referencectl down [-v|--volumes]   tear down (-v also removes volumes)
+#   ./referencectl status                compose ps + kernel + gateway diagnostics probes
+#   ./referencectl token [--user U --password P]   mint an operator token (client
+#                                    credentials; --user mints a password-grant one)
+#   ./referencectl work [--objective TEXT]  create a Work and print its timeline
+set -euo pipefail
+
+ROOT=$(cd -- "$(dirname -- "$0")" && pwd)
+REF="$ROOT/reference"
+KERNEL=http://localhost:8088
+IDP=http://localhost:8080
+REALM=facilitator
+
+usage() {
+  awk '/^set -euo/{exit} NR>1 && /^#/{sub(/^# ?/,"");print}' "$0"
+  exit 2
+}
+
+have() { command -v "$1" >/dev/null 2>&1 || { echo "referencectl: '$1' required" >&2; exit 2; }; }
+have docker; have curl; have jq
+
+overlays=(-f compose.slim.yaml)
+[ -n "${FULL:-}" ] && overlays+=(-f compose.full.yaml)
+compose() { (cd "$REF" && docker compose --env-file versions.env --env-file .env "${overlays[@]}" -p facilitator-demo "$@"); }
+
+mint_token() {
+  # $1: client_credentials | password; password needs $2/$3.
+  if [ "$1" = "client_credentials" ]; then
+    curl -fs --max-time 10 "$IDP/realms/$REALM/protocol/openid-connect/token" \
+      -d grant_type=client_credentials -d client_id=facilitator-cli -d client_secret=e2e-cli-secret \
+      | jq -re .access_token
+  else
+    curl -fs --max-time 10 "$IDP/realms/$REALM/protocol/openid-connect/token" \
+      -d grant_type=password -d client_id=facilitator-api \
+      -d "username=$2" -d "password=$3" \
+      | jq -re .access_token
+  fi
+}
+
+cmd_up() {
+  local profile=${1:-} seed=1
+  case "$profile" in
+    slim) shift ;;
+    *) echo "referencectl: only 'up slim' exists (FULL=1 adds the full overlay)" >&2; usage ;;
+  esac
+  for arg in "$@"; do
+    if [ "$arg" = "--no-seed" ]; then seed=0; else echo "referencectl: unknown up flag '$arg'" >&2; usage; fi
+  done
+  have jq
+  [ -f "$REF/.env" ] || "$REF/bootstrap/generate-secrets.sh"
+  if ! compose up -d --build --wait --wait-timeout 240; then
+    echo "referencectl: stack not healthy in 240s — service status:" >&2
+    compose ps --format '{{.Name}} {{.Status}}' >&2
+    exit 1
+  fi
+  if [ "$seed" = 1 ]; then
+    have curl
+    "$REF/bootstrap/bootstrap.sh"
+  fi
+  cat <<EOF
+
+  Facilitator API      http://localhost:8088        (health: /health)
+  Keycloak login       http://id.localhost:8080     realm facilitator · alice/alice
+  S3 (artifacts)       http://localhost:8333        bucket facilitator-artifacts
+  Aspire dashboard     http://localhost:18888
+  Gateway diagnostics  in-container (demo-workspace, 127.0.0.1:8099/status)
+
+Next: ./referencectl status · ./referencectl work · ./referencectl down
+EOF
+}
+
+cmd_down() {
+  case "${1:-}" in
+    "" ) compose down ;;
+    -v | --volumes) compose down -v ;;
+    *) echo "referencectl: down takes [-v|--volumes]" >&2; exit 2 ;;
+  esac
+}
+
+cmd_status() {
+  have jq
+  compose ps
+  local rc=0
+  curl -fs --max-time 10 "$KERNEL/health" >/dev/null || { echo "kernel probe FAILED ($KERNEL/health)" >&2; rc=1; }
+  # The Gateway binds diagnostics to the container's loopback only; probe it
+  # where it lives.
+  compose exec -T demo-workspace node -e \
+    "fetch('http://127.0.0.1:8099/status').then(r=>r.ok?r.json():Promise.reject(r.status)).then(s=>process.stdout.write(JSON.stringify(s)))" \
+    | jq '{gatewayId, state, session, children, awaitingApproval}' \
+    || { echo "gateway probe FAILED (demo-workspace 127.0.0.1:8099/status)" >&2; rc=1; }
+  return $rc
+}
+
+cmd_token() {
+  have jq
+  local user=${1:-}
+  case "$user" in
+    "") mint_token client_credentials ;;
+    --user|--password) ;;
+    *) echo "referencectl: token takes [--user U --password P]" >&2; exit 2 ;;
+  esac
+  local pass=
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --user) user=${2:?--user needs a value}; shift 2 ;;
+      --password) pass=${2:?--password needs a value}; shift 2 ;;
+      *) echo "referencectl: token takes [--user U --password P]" >&2; exit 2 ;;
+    esac
+  done
+  [ -n "$user" ] && [ -n "$pass" ] || { echo "referencectl: both --user and --password required" >&2; exit 2; }
+  mint_token password "$user" "$pass"
+}
+
+cmd_work() {
+  have jq
+  local objective="referencectl demo work" token work_id
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --objective) objective=${2:?--objective needs a value}; shift 2 ;;
+      *) echo "referencectl: work takes [--objective TEXT]" >&2; exit 2 ;;
+    esac
+  done
+  token=$(mint_token client_credentials)
+  work_id=$(curl -fs --max-time 10 -X POST "$KERNEL/api/works" \
+    -H "Authorization: Bearer $token" -H 'content-type: application/json' \
+    -d "{\"objective\":\"$objective\"}" | jq -re .workId)
+  echo "workId=$work_id"
+  curl -fs --max-time 10 "$KERNEL/api/works/$work_id/timeline" \
+    -H "Authorization: Bearer $token" | jq .
+}
+
+verb=${1:-}
+[ $# -gt 0 ] && shift || true
+case "$verb" in
+  up) cmd_up "$@" ;;
+  down) cmd_down "$@" ;;
+  status) cmd_status ;;
+  token) cmd_token "$@" ;;
+  work) cmd_work "$@" ;;
+  *) usage ;;
+esac

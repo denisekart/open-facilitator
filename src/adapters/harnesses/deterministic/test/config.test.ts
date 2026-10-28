@@ -19,6 +19,7 @@ transport:
   socket:
     path: ./child.sock
 manifestFile: ./capabilities.yaml
+kernelUrl: http://kernel:8080
 `;
 
 function parse(
@@ -87,11 +88,11 @@ describe("worker config law", () => {
 
   it("tcp transport carries host+port; absolute socket paths stay absolute", () => {
     const config = parse(
-      "childWorkspaceId: gw.t/x\ntransport:\n  tcp:\n    host: 127.0.0.1\n    port: 8090\nmanifestFile: ./m.yaml\n",
+      "childWorkspaceId: gw.t/x\ntransport:\n  tcp:\n    host: 127.0.0.1\n    port: 8090\nmanifestFile: ./m.yaml\nkernelUrl: http://k\n",
     );
     expect(config.transport).toEqual({ host: "127.0.0.1", port: 8090 });
     const absolute = parse(
-      "childWorkspaceId: gw.t/x\ntransport:\n  socket:\n    path: /run/c.sock\nmanifestFile: ./m.yaml\n",
+      "childWorkspaceId: gw.t/x\ntransport:\n  socket:\n    path: /run/c.sock\nmanifestFile: ./m.yaml\nkernelUrl: http://k\n",
     );
     expect(absolute.transport.socketPath).toBe("/run/c.sock");
   });
@@ -120,12 +121,14 @@ describe("worker config law", () => {
     expect(logged.logLevel).toBe("debug");
   });
 
-  it("kernelUrl: file key parses; OFAC_KERNEL_URL overlay wins (Plan 15 byte path)", () => {
-    const bare = parse(BASE, { env: {} });
-    expect(bare.kernelUrl).toBeUndefined();
-    const withFile = parse(`${BASE}kernelUrl: http://kernel:8080\n`, { env: {} });
+  it("kernelUrl: required; file key parses; OFAC_KERNEL_URL overlay wins", () => {
+    expectFail(
+      "childWorkspaceId: gw.t/x\ntransport:\n  socket:\n    path: ./c.sock\nmanifestFile: ./m.yaml\n",
+      "kernelUrl",
+    );
+    const withFile = parse(BASE, { env: {} });
     expect(withFile.kernelUrl).toBe("http://kernel:8080");
-    const overridden = parse(`${BASE}kernelUrl: http://file:1\n`, {
+    const overridden = parse(BASE.replace("http://kernel:8080", "http://file:1"), {
       env: { OFAC_KERNEL_URL: "http://env:2" },
     });
     expect(overridden.kernelUrl).toBe("http://env:2");

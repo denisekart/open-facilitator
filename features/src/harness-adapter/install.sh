@@ -49,6 +49,25 @@ cat > "$SHARE/units/30-harness-adapter.sh" <<EOF
 # WORKER_CONFIG overrides the config path, OFAC_CHILD_SECRET the file token,
 # OFAC_ADAPTER_LOG the level).
 export WORKER_CONFIG=\${WORKER_CONFIG:-${CONFIGPATH:-.facilitator/harness.yaml}}
+# Self-enroll (mirrored byte-for-byte in reference/container/units): when the
+# kernel origin + enrollment secret are set and no kernel token exists, enroll
+# a child endpoint so the worker gets a kernel link credential for the
+# artifact byte path. Retries until the kernel answers (bounded).
+if [ -n "\${OFAC_KERNEL_URL:-}" ] && [ -n "\${OFAC_ENROLL_SECRET:-}" ] && [ -z "\${OFAC_KERNEL_TOKEN:-}" ]; then
+  i=0
+  while [ "\$i" -lt 60 ]; do
+    tok=\$(OFAC_ENROLL_URL="\$OFAC_KERNEL_URL/api/link/v1/enroll" \\
+      OFAC_ENROLL_BODY="{\\"token\\":\\"\$OFAC_ENROLL_SECRET\\",\\"endpointId\\":\\"\${OFAC_WORKER_ENDPOINT:-demo-worker-child}\\",\\"instanceId\\":\\"unit-\$\$\\",\\"trustMode\\":\\"isolated-executor\\",\\"role\\":\\"child\\",\\"team\\":\\"\${OFAC_WORKER_TEAM:-team-alpha}\\"}" \\
+      node -e 'fetch(process.env.OFAC_ENROLL_URL,{method:"POST",headers:{"content-type":"application/json"},body:process.env.OFAC_ENROLL_BODY}).then(r=>r.ok?r.json():{}).then(j=>process.stdout.write(j.linkToken??"")).catch(()=>{})') || true
+    if [ -n "\$tok" ]; then
+      export OFAC_KERNEL_TOKEN="\$tok"
+      break
+    fi
+    i=\$((i + 1))
+    sleep 2
+  done
+  [ -n "\${OFAC_KERNEL_TOKEN:-}" ] || { echo "unit: kernel self-enrollment failed at \$OFAC_KERNEL_URL"; exit 1; }
+fi
 # Exit-code law (worker): 0 clean · 1 runtime (restart: the Gateway may have
 # been down) · 2 config (terminal) · 3 register denied w/ backoff off (terminal).
 [ -f "\$WORKER_CONFIG" ] || { echo "unit: worker config \$WORKER_CONFIG not found"; exit 2; }

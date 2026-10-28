@@ -132,6 +132,52 @@ services:
       artifacts:
         condition: service_healthy
 
+  # Team-owned workspace (spec §22.2): one container, two processes — a
+  # standalone Gateway (empty fleet) + the deterministic worker over a unix
+  # child leg, under the Feature supervisor's unit law. Enrolls kernel-side
+  # as gw.team-alpha (realm workload), self-enrolls the worker's child
+  # kernel credential, and advertises the research.analyze manifest.
+  demo-workspace:
+    build:
+      context: ..
+      dockerfile: Dockerfile.node
+    image: ${OCI_REGISTRY:?set in versions.env}/node-runtime:${FRAMEWORK_TAG:?set in versions.env}
+    entrypoint: ["/bin/sh", "/opt/ofac/ofac-supervisor.sh"]
+    environment:
+      UNITS_DIR: /opt/ofac/units
+      OFAC_LOG_DIR: /var/lib/ofac/logs
+      GATEWAY_CONFIG: /opt/ofac/config/gateway.yaml
+      WORKER_CONFIG: /opt/ofac/config/worker.yaml
+      # Child self-enrollment (mode-(a) shared secret vs Link:EnrollmentToken).
+      OFAC_ENROLL_SECRET: ${DEMO_ENROLLMENT_TOKEN:?set in .env}
+      OFAC_KERNEL_URL: http://facilitator:8080
+      OFAC_WORKER_TEAM: team-alpha
+      # Gateway child-wire admission + the worker's hello token.
+      OFAC_CHILD_SECRET: ${DEMO_CHILD_SECRET:?set in .env}
+    volumes:
+      - workspace_state:/var/lib/ofac
+      # Bind-mount the supervisor bytes + the units + the workspace configs
+      # straight from the repo (compose project dir = reference/).
+      - ../features/shared/ofac-supervisor.sh:/opt/ofac/ofac-supervisor.sh:ro
+      - ./container/units:/opt/ofac/units:ro
+      - ./config/workspace:/opt/ofac/config:ro
+    # No port publish: the Gateway binds diagnostics to 127.0.0.1 INSIDE the
+    # container, which a published port can never reach (docker-proxy dials
+    # the container's eth0 address). Probe it in-container:
+    #   docker compose exec demo-workspace node -e "fetch('http://127.0.0.1:8099/status').then(r=>r.text()).then(process.stdout.write)"
+    depends_on:
+      facilitator:
+        condition: service_healthy
+    # Debian-slim ships no curl/wget; probe diagnostics with node's fetch.
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8099/status').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+
 volumes:
   pg_data: {}
   artifacts_data: {}
+  workspace_state: {}

@@ -156,6 +156,57 @@ export interface ContextFetchCommandV1Data {
   workId: string;
 }
 
+export interface MemoryRecallCommandV1Data {
+  actorEvidenceRef: string;
+  commandId: string;
+  includeSuperseded?: boolean;
+  maxItems?: number;
+  maxTokens?: number;
+  purpose: Purpose;
+  query: string;
+  scopeSelectors?: string[];
+  workId?: string;
+}
+
+export type Purpose = "assignment.context" | "requirements.clarification" | "report.synthesis";
+
+export interface MemoryRetainCommandV1Data {
+  actorEvidenceRef: string;
+  classification?: Classification;
+  commandId: string;
+  content: string;
+  contentSummary?: string;
+  mediaType?: string;
+  observedAt?: string;
+  policyLabel?: PolicyLabel;
+  provenance: MemoryRetainCommandV1DataProvenance;
+  scopeSelector: string;
+  type: Type;
+}
+
+export type Classification = "internal" | "public";
+
+export type PolicyLabel = "private" | "team-only" | "facilitator-visible" | "evidence-only";
+
+export interface MemoryRetainCommandV1DataProvenance {
+  createdAt: string;
+  createdBy: string;
+  evidenceRef: string;
+  executionId?: string;
+  source: string;
+  sourceDigest?: string;
+  workId?: string;
+}
+
+export type Type =
+  | "observed_fact"
+  | "experience"
+  | "decision"
+  | "lesson_candidate"
+  | "lesson_verified"
+  | "hypothesis"
+  | "preference";
+
 export interface WorkAssignCommandV1Data {
   actorEvidenceRef: string;
   assignmentId: string;
@@ -379,13 +430,11 @@ export interface AssignmentFailedEventV1Data {
 export interface MemoryCandidateEventV1Data {
   contentSummary: string;
   policyLabel?: PolicyLabel;
-  provenance: Provenance;
+  provenance: MemoryCandidateEventV1DataProvenance;
   scope: Scope;
 }
 
-export type PolicyLabel = "private" | "team-only" | "facilitator-visible" | "evidence-only";
-
-export interface Provenance {
+export interface MemoryCandidateEventV1DataProvenance {
   createdAt: string;
   createdBy: string;
   evidenceRef: string;

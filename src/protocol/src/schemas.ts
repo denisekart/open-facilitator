@@ -19,6 +19,8 @@ import commandApprovalConsume from "../schemas/command.approval.consume.v1.json"
 import commandApprovalRespond from "../schemas/command.approval.respond.v1.json" with { type: "json" };
 import commandArtifactRequestUpload from "../schemas/command.artifact.request_upload.v1.json" with { type: "json" };
 import commandArtifactConfirmUpload from "../schemas/command.artifact.confirm_upload.v1.json" with { type: "json" };
+import commandMemoryRetain from "../schemas/command.memory.retain.v1.json" with { type: "json" };
+import commandMemoryRecall from "../schemas/command.memory.recall.v1.json" with { type: "json" };
 import eventWorkAccepted from "../schemas/event.work.accepted.v1.json" with { type: "json" };
 import eventWorkProgress from "../schemas/event.work.progress.v1.json" with { type: "json" };
 import eventWorkInputRequired from "../schemas/event.work.input_required.v1.json" with { type: "json" };
@@ -61,6 +63,8 @@ const all: JsonSchema[] = [
   commandApprovalRespond,
   commandArtifactRequestUpload,
   commandArtifactConfirmUpload,
+  commandMemoryRetain,
+  commandMemoryRecall,
   eventWorkAccepted,
   eventWorkProgress,
   eventWorkInputRequired,

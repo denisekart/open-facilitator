@@ -1,0 +1,22 @@
+{
+  "specversion": "1.0",
+  "id": "01JCOMMAND-mem-retain-no-evidence",
+  "source": "urn:workspace:ws-01",
+  "type": "org.facilitator.command.memory.retain.v1",
+  "subject": "memory/mem-102",
+  "time": "2026-10-28T18:00:00Z",
+  "datacontenttype": "application/json",
+  "dataschema": "https://schemas.openfacilitator.org/v1/command.memory.retain.v1.json",
+  "data": {
+    "commandId": "cmd-152",
+    "scopeSelector": "project:analysis-lab",
+    "type": "lesson_candidate",
+    "content": "A retain without actorEvidenceRef must not pass the schema gate.",
+    "provenance": {
+      "source": "workspace:ws-01",
+      "evidenceRef": "artifact://sources/brief-1",
+      "createdBy": "workload:adapter",
+      "createdAt": "2026-10-28T17:55:00Z"
+    }
+  }
+}

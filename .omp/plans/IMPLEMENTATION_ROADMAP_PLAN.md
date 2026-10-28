@@ -158,7 +158,7 @@ process + DB boundaries (§26.1 items 5+8 complete).
 **Depends on:** 13, 14
 
 ### Plan 16 — Memory broker: scopes, ACLs, retain/recall/reflect over PostgreSQL FTS, adapter memory client
-**Status:** ⬜ not-started (detail design: `16-memory-broker.md`)
+**Status:** 🟡 in-progress (executed against `16_MEMORY_BROKER_PLAN.md`; detail design: `16-memory-broker.md`)
 **Objective:** Memory contract layer (§14.3 core ops) as a broker over Postgres FTS: scope ownership + ACL-before-search, frozen candidate→promoted lifecycle, `memory.used` law, per-Project retention, cross-team private block, injection audit; memory client in `@ofac/adapter`. Slice-5 exit (memory half), §26.1 item 11.
 **Depends on:** 09, 10
 

@@ -1,0 +1,21 @@
+{
+  "specversion": "1.0",
+  "id": "01JCOMMAND-mem-recall",
+  "source": "urn:workspace:ws-01",
+  "type": "org.facilitator.command.memory.recall.v1",
+  "subject": "memory/query-1",
+  "time": "2026-10-28T18:05:00Z",
+  "datacontenttype": "application/json",
+  "dataschema": "https://schemas.openfacilitator.org/v1/command.memory.recall.v1.json",
+  "data": {
+    "commandId": "cmd-151",
+    "actorEvidenceRef": "identity-evidence:ref-124",
+    "query": "previous conclusions about integration trade-offs",
+    "purpose": "assignment.context",
+    "workId": "work-77",
+    "scopeSelectors": ["work:work-77", "project:analysis-lab"],
+    "maxItems": 8,
+    "maxTokens": 2000,
+    "includeSuperseded": false
+  }
+}

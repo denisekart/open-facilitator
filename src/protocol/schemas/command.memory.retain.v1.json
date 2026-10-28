@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openfacilitator.org/v1/command.memory.retain.v1.json",
+  "title": "MemoryRetainCommandV1Data",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "commandId",
+    "actorEvidenceRef",
+    "scopeSelector",
+    "type",
+    "content",
+    "provenance"
+  ],
+  "properties": {
+    "commandId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "actorEvidenceRef": {
+      "$ref": "common.v1.json#/$defs/evidenceRef"
+    },
+    "scopeSelector": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 128
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "observed_fact",
+        "experience",
+        "decision",
+        "lesson_candidate",
+        "lesson_verified",
+        "hypothesis",
+        "preference"
+      ]
+    },
+    "content": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 16384
+    },
+    "mediaType": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "contentSummary": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "evidenceRef",
+        "createdBy",
+        "createdAt"
+      ],
+      "properties": {
+        "source": {
+          "$ref": "common.v1.json#/$defs/idToken"
+        },
+        "evidenceRef": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "createdBy": {
+          "$ref": "common.v1.json#/$defs/idToken"
+        },
+        "createdAt": {
+          "$ref": "common.v1.json#/$defs/rfc3339DateTime"
+        },
+        "workId": {
+          "$ref": "common.v1.json#/$defs/idToken"
+        },
+        "executionId": {
+          "$ref": "common.v1.json#/$defs/idToken"
+        },
+        "sourceDigest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "policyLabel": {
+      "type": "string",
+      "enum": [
+        "private",
+        "team-only",
+        "facilitator-visible",
+        "evidence-only"
+      ]
+    },
+    "classification": {
+      "type": "string",
+      "enum": [
+        "internal",
+        "public"
+      ]
+    },
+    "observedAt": {
+      "$ref": "common.v1.json#/$defs/rfc3339DateTime"
+    }
+  }
+}

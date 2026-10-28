@@ -1,0 +1,29 @@
+{
+  "specversion": "1.0",
+  "id": "01JCOMMAND-mem-retain",
+  "source": "urn:workspace:ws-01",
+  "type": "org.facilitator.command.memory.retain.v1",
+  "subject": "memory/mem-101",
+  "time": "2026-10-28T18:00:00Z",
+  "datacontenttype": "application/json",
+  "dataschema": "https://schemas.openfacilitator.org/v1/command.memory.retain.v1.json",
+  "data": {
+    "commandId": "cmd-150",
+    "actorEvidenceRef": "identity-evidence:ref-124",
+    "scopeSelector": "project:analysis-lab",
+    "type": "lesson_candidate",
+    "content": "Replaying validation fixtures exposed an API/UI schema mismatch; regenerate DTOs before asserting on wire shapes.",
+    "contentSummary": "Fixture replay exposed a codegen drift; regenerate DTOs first.",
+    "provenance": {
+      "source": "workspace:ws-01",
+      "evidenceRef": "artifact://work/WORK-123/validation-report",
+      "createdBy": "workload:adapter",
+      "createdAt": "2026-10-28T17:55:00Z",
+      "workId": "work-77",
+      "sourceDigest": "sha256:b5bb9d8014a0f9b1d61e21e796d78dccdf1352f23cd32812f4850b878ae4944c"
+    },
+    "policyLabel": "team-only",
+    "classification": "internal",
+    "observedAt": "2026-10-28T17:55:00Z"
+  }
+}

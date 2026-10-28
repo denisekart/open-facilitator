@@ -400,6 +400,123 @@ namespace Ofac.Protocol
         public string workId { get; set; }
     }
 
+    public partial class MemoryRecallCommandV1Data
+    {
+        [JsonPropertyName("actorEvidenceRef")]
+        public string actorEvidenceRef { get; set; }
+
+        [JsonPropertyName("commandId")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string commandId { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("includeSuperseded")]
+        public bool? includeSuperseded { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("maxItems")]
+        public long? maxItems { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("maxTokens")]
+        public long? maxTokens { get; set; }
+
+        [JsonPropertyName("purpose")]
+        public Purpose purpose { get; set; }
+
+        [JsonPropertyName("query")]
+        [JsonConverter(typeof(FluffyMinMaxLengthCheckConverter))]
+        public string query { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("scopeSelectors")]
+        [JsonConverter(typeof(PurpleDecodeArrayConverter))]
+        public string[]? scopeSelectors { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("workId")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string? workId { get; set; }
+    }
+
+    public partial class MemoryRetainCommandV1Data
+    {
+        [JsonPropertyName("actorEvidenceRef")]
+        public string actorEvidenceRef { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("classification")]
+        public Classification? classification { get; set; }
+
+        [JsonPropertyName("commandId")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string commandId { get; set; }
+
+        [JsonPropertyName("content")]
+        [JsonConverter(typeof(IndecentMinMaxLengthCheckConverter))]
+        public string content { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("contentSummary")]
+        [JsonConverter(typeof(HilariousMinMaxLengthCheckConverter))]
+        public string? contentSummary { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("mediaType")]
+        [JsonConverter(typeof(StickyMinMaxLengthCheckConverter))]
+        public string? mediaType { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("observedAt")]
+        public string? observedAt { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("policyLabel")]
+        public PolicyLabel? policyLabel { get; set; }
+
+        [JsonPropertyName("provenance")]
+        public MemoryRetainCommandV1DataProvenance provenance { get; set; }
+
+        [JsonPropertyName("scopeSelector")]
+        [JsonConverter(typeof(IndigoMinMaxLengthCheckConverter))]
+        public string scopeSelector { get; set; }
+
+        [JsonPropertyName("type")]
+        public TypeEnum type { get; set; }
+    }
+
+    public partial class MemoryRetainCommandV1DataProvenance
+    {
+        [JsonPropertyName("createdAt")]
+        public string createdAt { get; set; }
+
+        [JsonPropertyName("createdBy")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string createdBy { get; set; }
+
+        [JsonPropertyName("evidenceRef")]
+        [JsonConverter(typeof(AmbitiousMinMaxLengthCheckConverter))]
+        public string evidenceRef { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("executionId")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string? executionId { get; set; }
+
+        [JsonPropertyName("source")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string source { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("sourceDigest")]
+        public string? sourceDigest { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("workId")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string? workId { get; set; }
+    }
+
     public partial class WorkAssignCommandV1Data
     {
         [JsonPropertyName("actorEvidenceRef")]
@@ -466,7 +583,7 @@ namespace Ofac.Protocol
         public string deadline { get; set; }
 
         [JsonPropertyName("reason")]
-        [JsonConverter(typeof(IndigoMinMaxLengthCheckConverter))]
+        [JsonConverter(typeof(CunningMinMaxLengthCheckConverter))]
         public string reason { get; set; }
 
         [JsonPropertyName("targetId")]
@@ -692,7 +809,7 @@ namespace Ofac.Protocol
         /// Canonical actor that decided; empty string for lazy expiry.
         /// </summary>
         [JsonPropertyName("decidedBy")]
-        [JsonConverter(typeof(AmbitiousMinMaxLengthCheckConverter))]
+        [JsonConverter(typeof(MagentaMinMaxLengthCheckConverter))]
         public string decidedBy { get; set; }
 
         [JsonPropertyName("decision")]
@@ -702,7 +819,7 @@ namespace Ofac.Protocol
         /// kernel: receipt on approved (law D5); empty string otherwise.
         /// </summary>
         [JsonPropertyName("evidenceRef")]
-        [JsonConverter(typeof(CunningMinMaxLengthCheckConverter))]
+        [JsonConverter(typeof(FriskyMinMaxLengthCheckConverter))]
         public string evidenceRef { get; set; }
 
         [JsonPropertyName("expiresAt")]
@@ -738,14 +855,14 @@ namespace Ofac.Protocol
         public string createdAt { get; set; }
 
         [JsonPropertyName("eligibleActors")]
-        [JsonConverter(typeof(PurpleDecodeArrayConverter))]
+        [JsonConverter(typeof(FluffyDecodeArrayConverter))]
         public string[] eligibleActors { get; set; }
 
         [JsonPropertyName("expiresAt")]
         public string expiresAt { get; set; }
 
         [JsonPropertyName("nonce")]
-        [JsonConverter(typeof(MagentaMinMaxLengthCheckConverter))]
+        [JsonConverter(typeof(MischievousMinMaxLengthCheckConverter))]
         public string nonce { get; set; }
 
         /// <summary>
@@ -845,7 +962,7 @@ namespace Ofac.Protocol
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("capability")]
-        [JsonConverter(typeof(AmbitiousMinMaxLengthCheckConverter))]
+        [JsonConverter(typeof(MagentaMinMaxLengthCheckConverter))]
         public string? capability { get; set; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -862,7 +979,7 @@ namespace Ofac.Protocol
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("notes")]
-        [JsonConverter(typeof(FriskyMinMaxLengthCheckConverter))]
+        [JsonConverter(typeof(BraggadociousMinMaxLengthCheckConverter))]
         public string? notes { get; set; }
 
         [JsonPropertyName("outputs")]
@@ -879,7 +996,7 @@ namespace Ofac.Protocol
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("sourceRefs")]
-        [JsonConverter(typeof(FluffyDecodeArrayConverter))]
+        [JsonConverter(typeof(TentacledDecodeArrayConverter))]
         public string[]? sourceRefs { get; set; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -888,7 +1005,7 @@ namespace Ofac.Protocol
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("summary")]
-        [JsonConverter(typeof(FriskyMinMaxLengthCheckConverter))]
+        [JsonConverter(typeof(BraggadociousMinMaxLengthCheckConverter))]
         public string? summary { get; set; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -909,7 +1026,7 @@ namespace Ofac.Protocol
         /// </summary>
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("classification")]
-        [JsonConverter(typeof(MischievousMinMaxLengthCheckConverter))]
+        [JsonConverter(typeof(MinMaxLengthCheckConverter1))]
         public string? classification { get; set; }
 
         [JsonPropertyName("createdAt")]
@@ -929,7 +1046,7 @@ namespace Ofac.Protocol
         /// </summary>
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("kind")]
-        [JsonConverter(typeof(MischievousMinMaxLengthCheckConverter))]
+        [JsonConverter(typeof(MinMaxLengthCheckConverter1))]
         public string? kind { get; set; }
 
         [JsonPropertyName("mediaType")]
@@ -980,13 +1097,13 @@ namespace Ofac.Protocol
         public PolicyLabel? policyLabel { get; set; }
 
         [JsonPropertyName("provenance")]
-        public Provenance provenance { get; set; }
+        public MemoryCandidateEventV1DataProvenance provenance { get; set; }
 
         [JsonPropertyName("scope")]
         public Scope scope { get; set; }
     }
 
-    public partial class Provenance
+    public partial class MemoryCandidateEventV1DataProvenance
     {
         [JsonPropertyName("createdAt")]
         public string createdAt { get; set; }
@@ -996,7 +1113,7 @@ namespace Ofac.Protocol
         public string createdBy { get; set; }
 
         [JsonPropertyName("evidenceRef")]
-        [JsonConverter(typeof(MinMaxLengthCheckConverter1))]
+        [JsonConverter(typeof(AmbitiousMinMaxLengthCheckConverter))]
         public string evidenceRef { get; set; }
 
         [JsonPropertyName("source")]
@@ -1112,7 +1229,7 @@ namespace Ofac.Protocol
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("capability")]
-        [JsonConverter(typeof(AmbitiousMinMaxLengthCheckConverter))]
+        [JsonConverter(typeof(MagentaMinMaxLengthCheckConverter))]
         public string? capability { get; set; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -1129,7 +1246,7 @@ namespace Ofac.Protocol
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("notes")]
-        [JsonConverter(typeof(FriskyMinMaxLengthCheckConverter))]
+        [JsonConverter(typeof(BraggadociousMinMaxLengthCheckConverter))]
         public string? notes { get; set; }
 
         [JsonPropertyName("outputs")]
@@ -1146,7 +1263,7 @@ namespace Ofac.Protocol
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("sourceRefs")]
-        [JsonConverter(typeof(FluffyDecodeArrayConverter))]
+        [JsonConverter(typeof(TentacledDecodeArrayConverter))]
         public string[]? sourceRefs { get; set; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -1155,7 +1272,7 @@ namespace Ofac.Protocol
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("summary")]
-        [JsonConverter(typeof(FriskyMinMaxLengthCheckConverter))]
+        [JsonConverter(typeof(BraggadociousMinMaxLengthCheckConverter))]
         public string? summary { get; set; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -1178,6 +1295,14 @@ namespace Ofac.Protocol
 
     public enum ApprovalRespondCommandV1DataDecision { Approved, Denied };
 
+    public enum Purpose { AssignmentContext, ReportSynthesis, RequirementsClarification };
+
+    public enum Classification { Internal, Public };
+
+    public enum PolicyLabel { EvidenceOnly, FacilitatorVisible, Private, TeamOnly };
+
+    public enum TypeEnum { Decision, Experience, Hypothesis, LessonCandidate, LessonVerified, ObservedFact, Preference };
+
     public enum ControlFrameKind { FlowControl, Goodbye, Heartbeat, Hello, Welcome };
 
     public enum SupportedTransport { HttpPoll, Signalr, Websocket };
@@ -1187,8 +1312,6 @@ namespace Ofac.Protocol
     public enum TrustMode { IsolatedExecutor, SeparateProcessSameHost, SharedRuntime };
 
     public enum ApprovalDecidedEventV1DataDecision { Approved, Denied, Expired, Revoked };
-
-    public enum PolicyLabel { EvidenceOnly, FacilitatorVisible, Private, TeamOnly };
 
     public enum Scope { Private, Project, Team, Workspace };
 
@@ -1209,12 +1332,15 @@ namespace Ofac.Protocol
                 ExecutionConverter.Singleton,
                 CapabilityManifestV1KindConverter.Singleton,
                 ApprovalRespondCommandV1DataDecisionConverter.Singleton,
+                PurposeConverter.Singleton,
+                ClassificationConverter.Singleton,
+                PolicyLabelConverter.Singleton,
+                TypeEnumConverter.Singleton,
                 ControlFrameKindConverter.Singleton,
                 SupportedTransportConverter.Singleton,
                 RoleConverter.Singleton,
                 TrustModeConverter.Singleton,
                 ApprovalDecidedEventV1DataDecisionConverter.Singleton,
-                PolicyLabelConverter.Singleton,
                 ScopeConverter.Singleton,
                 WorkspaceHeartbeatEventV1DataStatusConverter.Singleton,
                 ReceiptV1StatusConverter.Singleton,
@@ -1548,6 +1674,78 @@ namespace Ofac.Protocol
         public static readonly StickyMinMaxLengthCheckConverter Singleton = new StickyMinMaxLengthCheckConverter();
     }
 
+    internal class PurposeConverter : JsonConverter<Purpose>
+    {
+        public override bool CanConvert(Type t) => t == typeof(Purpose);
+
+        public override Purpose Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            var value = reader.GetString();
+            switch (value)
+            {
+                case "assignment.context":
+                    return Purpose.AssignmentContext;
+                case "report.synthesis":
+                    return Purpose.ReportSynthesis;
+                case "requirements.clarification":
+                    return Purpose.RequirementsClarification;
+            }
+            throw new Exception("Cannot unmarshal type Purpose");
+        }
+
+        public override void Write(Utf8JsonWriter writer, Purpose value, JsonSerializerOptions options)
+        {
+            switch (value)
+            {
+                case Purpose.AssignmentContext:
+                    JsonSerializer.Serialize(writer, "assignment.context", options);
+                    return;
+                case Purpose.ReportSynthesis:
+                    JsonSerializer.Serialize(writer, "report.synthesis", options);
+                    return;
+                case Purpose.RequirementsClarification:
+                    JsonSerializer.Serialize(writer, "requirements.clarification", options);
+                    return;
+            }
+            throw new Exception("Cannot marshal type Purpose");
+        }
+
+        public static readonly PurposeConverter Singleton = new PurposeConverter();
+    }
+
+    internal class PurpleDecodeArrayConverter : JsonConverter<string[]>
+    {
+        public override bool CanConvert(Type t) => t == typeof(string[]);
+
+        public override string[] Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            reader.Read();
+            var value = new List<string>();
+            while (reader.TokenType != JsonTokenType.EndArray)
+            {
+                var converter = IndigoMinMaxLengthCheckConverter.Singleton;
+                var arrayItem = (string)converter.Read(ref reader, typeof(string), options);
+                value.Add(arrayItem);
+                reader.Read();
+            }
+            return value.ToArray();
+        }
+
+        public override void Write(Utf8JsonWriter writer, string[] value, JsonSerializerOptions options)
+        {
+            writer.WriteStartArray();
+            foreach (var arrayItem in value)
+            {
+                var converter = IndigoMinMaxLengthCheckConverter.Singleton;
+                converter.Write(writer, arrayItem, options);
+            }
+            writer.WriteEndArray();
+            return;
+        }
+
+        public static readonly PurpleDecodeArrayConverter Singleton = new PurpleDecodeArrayConverter();
+    }
+
     internal class IndigoMinMaxLengthCheckConverter : JsonConverter<string>
     {
         public override bool CanConvert(Type t) => t == typeof(string);
@@ -1555,7 +1753,7 @@ namespace Ofac.Protocol
         public override string Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             var value = reader.GetString();
-            if (value.Length >= 0 && value.Length <= 1024)
+            if (value.Length >= 3 && value.Length <= 128)
             {
                 return value;
             }
@@ -1564,7 +1762,7 @@ namespace Ofac.Protocol
 
         public override void Write(Utf8JsonWriter writer, string value, JsonSerializerOptions options)
         {
-            if (value.Length >= 0 && value.Length <= 1024)
+            if (value.Length >= 3 && value.Length <= 128)
             {
                 JsonSerializer.Serialize(writer, value, options);
                 return;
@@ -1573,6 +1771,40 @@ namespace Ofac.Protocol
         }
 
         public static readonly IndigoMinMaxLengthCheckConverter Singleton = new IndigoMinMaxLengthCheckConverter();
+    }
+
+    internal class ClassificationConverter : JsonConverter<Classification>
+    {
+        public override bool CanConvert(Type t) => t == typeof(Classification);
+
+        public override Classification Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            var value = reader.GetString();
+            switch (value)
+            {
+                case "internal":
+                    return Classification.Internal;
+                case "public":
+                    return Classification.Public;
+            }
+            throw new Exception("Cannot unmarshal type Classification");
+        }
+
+        public override void Write(Utf8JsonWriter writer, Classification value, JsonSerializerOptions options)
+        {
+            switch (value)
+            {
+                case Classification.Internal:
+                    JsonSerializer.Serialize(writer, "internal", options);
+                    return;
+                case Classification.Public:
+                    JsonSerializer.Serialize(writer, "public", options);
+                    return;
+            }
+            throw new Exception("Cannot marshal type Classification");
+        }
+
+        public static readonly ClassificationConverter Singleton = new ClassificationConverter();
     }
 
     internal class IndecentMinMaxLengthCheckConverter : JsonConverter<string>
@@ -1600,6 +1832,190 @@ namespace Ofac.Protocol
         }
 
         public static readonly IndecentMinMaxLengthCheckConverter Singleton = new IndecentMinMaxLengthCheckConverter();
+    }
+
+    internal class HilariousMinMaxLengthCheckConverter : JsonConverter<string>
+    {
+        public override bool CanConvert(Type t) => t == typeof(string);
+
+        public override string Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            var value = reader.GetString();
+            if (value.Length >= 1 && value.Length <= 4096)
+            {
+                return value;
+            }
+            throw new Exception("Cannot unmarshal type string");
+        }
+
+        public override void Write(Utf8JsonWriter writer, string value, JsonSerializerOptions options)
+        {
+            if (value.Length >= 1 && value.Length <= 4096)
+            {
+                JsonSerializer.Serialize(writer, value, options);
+                return;
+            }
+            throw new Exception("Cannot marshal type string");
+        }
+
+        public static readonly HilariousMinMaxLengthCheckConverter Singleton = new HilariousMinMaxLengthCheckConverter();
+    }
+
+    internal class PolicyLabelConverter : JsonConverter<PolicyLabel>
+    {
+        public override bool CanConvert(Type t) => t == typeof(PolicyLabel);
+
+        public override PolicyLabel Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            var value = reader.GetString();
+            switch (value)
+            {
+                case "evidence-only":
+                    return PolicyLabel.EvidenceOnly;
+                case "facilitator-visible":
+                    return PolicyLabel.FacilitatorVisible;
+                case "private":
+                    return PolicyLabel.Private;
+                case "team-only":
+                    return PolicyLabel.TeamOnly;
+            }
+            throw new Exception("Cannot unmarshal type PolicyLabel");
+        }
+
+        public override void Write(Utf8JsonWriter writer, PolicyLabel value, JsonSerializerOptions options)
+        {
+            switch (value)
+            {
+                case PolicyLabel.EvidenceOnly:
+                    JsonSerializer.Serialize(writer, "evidence-only", options);
+                    return;
+                case PolicyLabel.FacilitatorVisible:
+                    JsonSerializer.Serialize(writer, "facilitator-visible", options);
+                    return;
+                case PolicyLabel.Private:
+                    JsonSerializer.Serialize(writer, "private", options);
+                    return;
+                case PolicyLabel.TeamOnly:
+                    JsonSerializer.Serialize(writer, "team-only", options);
+                    return;
+            }
+            throw new Exception("Cannot marshal type PolicyLabel");
+        }
+
+        public static readonly PolicyLabelConverter Singleton = new PolicyLabelConverter();
+    }
+
+    internal class AmbitiousMinMaxLengthCheckConverter : JsonConverter<string>
+    {
+        public override bool CanConvert(Type t) => t == typeof(string);
+
+        public override string Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            var value = reader.GetString();
+            if (value.Length >= 1 && value.Length <= 512)
+            {
+                return value;
+            }
+            throw new Exception("Cannot unmarshal type string");
+        }
+
+        public override void Write(Utf8JsonWriter writer, string value, JsonSerializerOptions options)
+        {
+            if (value.Length >= 1 && value.Length <= 512)
+            {
+                JsonSerializer.Serialize(writer, value, options);
+                return;
+            }
+            throw new Exception("Cannot marshal type string");
+        }
+
+        public static readonly AmbitiousMinMaxLengthCheckConverter Singleton = new AmbitiousMinMaxLengthCheckConverter();
+    }
+
+    internal class TypeEnumConverter : JsonConverter<TypeEnum>
+    {
+        public override bool CanConvert(Type t) => t == typeof(TypeEnum);
+
+        public override TypeEnum Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            var value = reader.GetString();
+            switch (value)
+            {
+                case "decision":
+                    return TypeEnum.Decision;
+                case "experience":
+                    return TypeEnum.Experience;
+                case "hypothesis":
+                    return TypeEnum.Hypothesis;
+                case "lesson_candidate":
+                    return TypeEnum.LessonCandidate;
+                case "lesson_verified":
+                    return TypeEnum.LessonVerified;
+                case "observed_fact":
+                    return TypeEnum.ObservedFact;
+                case "preference":
+                    return TypeEnum.Preference;
+            }
+            throw new Exception("Cannot unmarshal type TypeEnum");
+        }
+
+        public override void Write(Utf8JsonWriter writer, TypeEnum value, JsonSerializerOptions options)
+        {
+            switch (value)
+            {
+                case TypeEnum.Decision:
+                    JsonSerializer.Serialize(writer, "decision", options);
+                    return;
+                case TypeEnum.Experience:
+                    JsonSerializer.Serialize(writer, "experience", options);
+                    return;
+                case TypeEnum.Hypothesis:
+                    JsonSerializer.Serialize(writer, "hypothesis", options);
+                    return;
+                case TypeEnum.LessonCandidate:
+                    JsonSerializer.Serialize(writer, "lesson_candidate", options);
+                    return;
+                case TypeEnum.LessonVerified:
+                    JsonSerializer.Serialize(writer, "lesson_verified", options);
+                    return;
+                case TypeEnum.ObservedFact:
+                    JsonSerializer.Serialize(writer, "observed_fact", options);
+                    return;
+                case TypeEnum.Preference:
+                    JsonSerializer.Serialize(writer, "preference", options);
+                    return;
+            }
+            throw new Exception("Cannot marshal type TypeEnum");
+        }
+
+        public static readonly TypeEnumConverter Singleton = new TypeEnumConverter();
+    }
+
+    internal class CunningMinMaxLengthCheckConverter : JsonConverter<string>
+    {
+        public override bool CanConvert(Type t) => t == typeof(string);
+
+        public override string Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            var value = reader.GetString();
+            if (value.Length >= 0 && value.Length <= 1024)
+            {
+                return value;
+            }
+            throw new Exception("Cannot unmarshal type string");
+        }
+
+        public override void Write(Utf8JsonWriter writer, string value, JsonSerializerOptions options)
+        {
+            if (value.Length >= 0 && value.Length <= 1024)
+            {
+                JsonSerializer.Serialize(writer, value, options);
+                return;
+            }
+            throw new Exception("Cannot marshal type string");
+        }
+
+        public static readonly CunningMinMaxLengthCheckConverter Singleton = new CunningMinMaxLengthCheckConverter();
     }
 
     internal class ControlFrameKindConverter : JsonConverter<ControlFrameKind>
@@ -1724,33 +2140,6 @@ namespace Ofac.Protocol
         public static readonly RoleConverter Singleton = new RoleConverter();
     }
 
-    internal class HilariousMinMaxLengthCheckConverter : JsonConverter<string>
-    {
-        public override bool CanConvert(Type t) => t == typeof(string);
-
-        public override string Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
-        {
-            var value = reader.GetString();
-            if (value.Length >= 1 && value.Length <= 4096)
-            {
-                return value;
-            }
-            throw new Exception("Cannot unmarshal type string");
-        }
-
-        public override void Write(Utf8JsonWriter writer, string value, JsonSerializerOptions options)
-        {
-            if (value.Length >= 1 && value.Length <= 4096)
-            {
-                JsonSerializer.Serialize(writer, value, options);
-                return;
-            }
-            throw new Exception("Cannot marshal type string");
-        }
-
-        public static readonly HilariousMinMaxLengthCheckConverter Singleton = new HilariousMinMaxLengthCheckConverter();
-    }
-
     internal class TrustModeConverter : JsonConverter<TrustMode>
     {
         public override bool CanConvert(Type t) => t == typeof(TrustMode);
@@ -1790,7 +2179,7 @@ namespace Ofac.Protocol
         public static readonly TrustModeConverter Singleton = new TrustModeConverter();
     }
 
-    internal class AmbitiousMinMaxLengthCheckConverter : JsonConverter<string>
+    internal class MagentaMinMaxLengthCheckConverter : JsonConverter<string>
     {
         public override bool CanConvert(Type t) => t == typeof(string);
 
@@ -1814,7 +2203,7 @@ namespace Ofac.Protocol
             throw new Exception("Cannot marshal type string");
         }
 
-        public static readonly AmbitiousMinMaxLengthCheckConverter Singleton = new AmbitiousMinMaxLengthCheckConverter();
+        public static readonly MagentaMinMaxLengthCheckConverter Singleton = new MagentaMinMaxLengthCheckConverter();
     }
 
     internal class ApprovalDecidedEventV1DataDecisionConverter : JsonConverter<ApprovalDecidedEventV1DataDecision>
@@ -1861,93 +2250,6 @@ namespace Ofac.Protocol
         public static readonly ApprovalDecidedEventV1DataDecisionConverter Singleton = new ApprovalDecidedEventV1DataDecisionConverter();
     }
 
-    internal class CunningMinMaxLengthCheckConverter : JsonConverter<string>
-    {
-        public override bool CanConvert(Type t) => t == typeof(string);
-
-        public override string Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
-        {
-            var value = reader.GetString();
-            if (value.Length <= 2048)
-            {
-                return value;
-            }
-            throw new Exception("Cannot unmarshal type string");
-        }
-
-        public override void Write(Utf8JsonWriter writer, string value, JsonSerializerOptions options)
-        {
-            if (value.Length <= 2048)
-            {
-                JsonSerializer.Serialize(writer, value, options);
-                return;
-            }
-            throw new Exception("Cannot marshal type string");
-        }
-
-        public static readonly CunningMinMaxLengthCheckConverter Singleton = new CunningMinMaxLengthCheckConverter();
-    }
-
-    internal class PurpleDecodeArrayConverter : JsonConverter<string[]>
-    {
-        public override bool CanConvert(Type t) => t == typeof(string[]);
-
-        public override string[] Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
-        {
-            reader.Read();
-            var value = new List<string>();
-            while (reader.TokenType != JsonTokenType.EndArray)
-            {
-                var converter = PurpleMinMaxLengthCheckConverter.Singleton;
-                var arrayItem = (string)converter.Read(ref reader, typeof(string), options);
-                value.Add(arrayItem);
-                reader.Read();
-            }
-            return value.ToArray();
-        }
-
-        public override void Write(Utf8JsonWriter writer, string[] value, JsonSerializerOptions options)
-        {
-            writer.WriteStartArray();
-            foreach (var arrayItem in value)
-            {
-                var converter = PurpleMinMaxLengthCheckConverter.Singleton;
-                converter.Write(writer, arrayItem, options);
-            }
-            writer.WriteEndArray();
-            return;
-        }
-
-        public static readonly PurpleDecodeArrayConverter Singleton = new PurpleDecodeArrayConverter();
-    }
-
-    internal class MagentaMinMaxLengthCheckConverter : JsonConverter<string>
-    {
-        public override bool CanConvert(Type t) => t == typeof(string);
-
-        public override string Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
-        {
-            var value = reader.GetString();
-            if (value.Length >= 16 && value.Length <= 128)
-            {
-                return value;
-            }
-            throw new Exception("Cannot unmarshal type string");
-        }
-
-        public override void Write(Utf8JsonWriter writer, string value, JsonSerializerOptions options)
-        {
-            if (value.Length >= 16 && value.Length <= 128)
-            {
-                JsonSerializer.Serialize(writer, value, options);
-                return;
-            }
-            throw new Exception("Cannot marshal type string");
-        }
-
-        public static readonly MagentaMinMaxLengthCheckConverter Singleton = new MagentaMinMaxLengthCheckConverter();
-    }
-
     internal class FriskyMinMaxLengthCheckConverter : JsonConverter<string>
     {
         public override bool CanConvert(Type t) => t == typeof(string);
@@ -1955,7 +2257,7 @@ namespace Ofac.Protocol
         public override string Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             var value = reader.GetString();
-            if (value.Length <= 4096)
+            if (value.Length <= 2048)
             {
                 return value;
             }
@@ -1964,7 +2266,7 @@ namespace Ofac.Protocol
 
         public override void Write(Utf8JsonWriter writer, string value, JsonSerializerOptions options)
         {
-            if (value.Length <= 4096)
+            if (value.Length <= 2048)
             {
                 JsonSerializer.Serialize(writer, value, options);
                 return;
@@ -1973,33 +2275,6 @@ namespace Ofac.Protocol
         }
 
         public static readonly FriskyMinMaxLengthCheckConverter Singleton = new FriskyMinMaxLengthCheckConverter();
-    }
-
-    internal class MischievousMinMaxLengthCheckConverter : JsonConverter<string>
-    {
-        public override bool CanConvert(Type t) => t == typeof(string);
-
-        public override string Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
-        {
-            var value = reader.GetString();
-            if (value.Length >= 1 && value.Length <= 64)
-            {
-                return value;
-            }
-            throw new Exception("Cannot unmarshal type string");
-        }
-
-        public override void Write(Utf8JsonWriter writer, string value, JsonSerializerOptions options)
-        {
-            if (value.Length >= 1 && value.Length <= 64)
-            {
-                JsonSerializer.Serialize(writer, value, options);
-                return;
-            }
-            throw new Exception("Cannot marshal type string");
-        }
-
-        public static readonly MischievousMinMaxLengthCheckConverter Singleton = new MischievousMinMaxLengthCheckConverter();
     }
 
     internal class FluffyDecodeArrayConverter : JsonConverter<string[]>
@@ -2012,7 +2287,7 @@ namespace Ofac.Protocol
             var value = new List<string>();
             while (reader.TokenType != JsonTokenType.EndArray)
             {
-                var converter = BraggadociousMinMaxLengthCheckConverter.Singleton;
+                var converter = PurpleMinMaxLengthCheckConverter.Singleton;
                 var arrayItem = (string)converter.Read(ref reader, typeof(string), options);
                 value.Add(arrayItem);
                 reader.Read();
@@ -2025,7 +2300,7 @@ namespace Ofac.Protocol
             writer.WriteStartArray();
             foreach (var arrayItem in value)
             {
-                var converter = BraggadociousMinMaxLengthCheckConverter.Singleton;
+                var converter = PurpleMinMaxLengthCheckConverter.Singleton;
                 converter.Write(writer, arrayItem, options);
             }
             writer.WriteEndArray();
@@ -2035,14 +2310,14 @@ namespace Ofac.Protocol
         public static readonly FluffyDecodeArrayConverter Singleton = new FluffyDecodeArrayConverter();
     }
 
-    internal class BraggadociousMinMaxLengthCheckConverter : JsonConverter<string>
+    internal class MischievousMinMaxLengthCheckConverter : JsonConverter<string>
     {
         public override bool CanConvert(Type t) => t == typeof(string);
 
         public override string Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             var value = reader.GetString();
-            if (value.Length >= 1 && value.Length <= 2048)
+            if (value.Length >= 16 && value.Length <= 128)
             {
                 return value;
             }
@@ -2051,7 +2326,34 @@ namespace Ofac.Protocol
 
         public override void Write(Utf8JsonWriter writer, string value, JsonSerializerOptions options)
         {
-            if (value.Length >= 1 && value.Length <= 2048)
+            if (value.Length >= 16 && value.Length <= 128)
+            {
+                JsonSerializer.Serialize(writer, value, options);
+                return;
+            }
+            throw new Exception("Cannot marshal type string");
+        }
+
+        public static readonly MischievousMinMaxLengthCheckConverter Singleton = new MischievousMinMaxLengthCheckConverter();
+    }
+
+    internal class BraggadociousMinMaxLengthCheckConverter : JsonConverter<string>
+    {
+        public override bool CanConvert(Type t) => t == typeof(string);
+
+        public override string Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            var value = reader.GetString();
+            if (value.Length <= 4096)
+            {
+                return value;
+            }
+            throw new Exception("Cannot unmarshal type string");
+        }
+
+        public override void Write(Utf8JsonWriter writer, string value, JsonSerializerOptions options)
+        {
+            if (value.Length <= 4096)
             {
                 JsonSerializer.Serialize(writer, value, options);
                 return;
@@ -2062,50 +2364,6 @@ namespace Ofac.Protocol
         public static readonly BraggadociousMinMaxLengthCheckConverter Singleton = new BraggadociousMinMaxLengthCheckConverter();
     }
 
-    internal class PolicyLabelConverter : JsonConverter<PolicyLabel>
-    {
-        public override bool CanConvert(Type t) => t == typeof(PolicyLabel);
-
-        public override PolicyLabel Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
-        {
-            var value = reader.GetString();
-            switch (value)
-            {
-                case "evidence-only":
-                    return PolicyLabel.EvidenceOnly;
-                case "facilitator-visible":
-                    return PolicyLabel.FacilitatorVisible;
-                case "private":
-                    return PolicyLabel.Private;
-                case "team-only":
-                    return PolicyLabel.TeamOnly;
-            }
-            throw new Exception("Cannot unmarshal type PolicyLabel");
-        }
-
-        public override void Write(Utf8JsonWriter writer, PolicyLabel value, JsonSerializerOptions options)
-        {
-            switch (value)
-            {
-                case PolicyLabel.EvidenceOnly:
-                    JsonSerializer.Serialize(writer, "evidence-only", options);
-                    return;
-                case PolicyLabel.FacilitatorVisible:
-                    JsonSerializer.Serialize(writer, "facilitator-visible", options);
-                    return;
-                case PolicyLabel.Private:
-                    JsonSerializer.Serialize(writer, "private", options);
-                    return;
-                case PolicyLabel.TeamOnly:
-                    JsonSerializer.Serialize(writer, "team-only", options);
-                    return;
-            }
-            throw new Exception("Cannot marshal type PolicyLabel");
-        }
-
-        public static readonly PolicyLabelConverter Singleton = new PolicyLabelConverter();
-    }
-
     internal class MinMaxLengthCheckConverter1 : JsonConverter<string>
     {
         public override bool CanConvert(Type t) => t == typeof(string);
@@ -2113,7 +2371,7 @@ namespace Ofac.Protocol
         public override string Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             var value = reader.GetString();
-            if (value.Length >= 1 && value.Length <= 512)
+            if (value.Length >= 1 && value.Length <= 64)
             {
                 return value;
             }
@@ -2122,7 +2380,7 @@ namespace Ofac.Protocol
 
         public override void Write(Utf8JsonWriter writer, string value, JsonSerializerOptions options)
         {
-            if (value.Length >= 1 && value.Length <= 512)
+            if (value.Length >= 1 && value.Length <= 64)
             {
                 JsonSerializer.Serialize(writer, value, options);
                 return;
@@ -2131,6 +2389,66 @@ namespace Ofac.Protocol
         }
 
         public static readonly MinMaxLengthCheckConverter1 Singleton = new MinMaxLengthCheckConverter1();
+    }
+
+    internal class TentacledDecodeArrayConverter : JsonConverter<string[]>
+    {
+        public override bool CanConvert(Type t) => t == typeof(string[]);
+
+        public override string[] Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            reader.Read();
+            var value = new List<string>();
+            while (reader.TokenType != JsonTokenType.EndArray)
+            {
+                var converter = MinMaxLengthCheckConverter2.Singleton;
+                var arrayItem = (string)converter.Read(ref reader, typeof(string), options);
+                value.Add(arrayItem);
+                reader.Read();
+            }
+            return value.ToArray();
+        }
+
+        public override void Write(Utf8JsonWriter writer, string[] value, JsonSerializerOptions options)
+        {
+            writer.WriteStartArray();
+            foreach (var arrayItem in value)
+            {
+                var converter = MinMaxLengthCheckConverter2.Singleton;
+                converter.Write(writer, arrayItem, options);
+            }
+            writer.WriteEndArray();
+            return;
+        }
+
+        public static readonly TentacledDecodeArrayConverter Singleton = new TentacledDecodeArrayConverter();
+    }
+
+    internal class MinMaxLengthCheckConverter2 : JsonConverter<string>
+    {
+        public override bool CanConvert(Type t) => t == typeof(string);
+
+        public override string Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            var value = reader.GetString();
+            if (value.Length >= 1 && value.Length <= 2048)
+            {
+                return value;
+            }
+            throw new Exception("Cannot unmarshal type string");
+        }
+
+        public override void Write(Utf8JsonWriter writer, string value, JsonSerializerOptions options)
+        {
+            if (value.Length >= 1 && value.Length <= 2048)
+            {
+                JsonSerializer.Serialize(writer, value, options);
+                return;
+            }
+            throw new Exception("Cannot marshal type string");
+        }
+
+        public static readonly MinMaxLengthCheckConverter2 Singleton = new MinMaxLengthCheckConverter2();
     }
 
     internal class ScopeConverter : JsonConverter<Scope>

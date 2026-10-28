@@ -59,6 +59,18 @@
       "type": "org.facilitator.command.artifact.request_upload.v1"
     },
     {
+      "file": "valid/command.memory.retain.json",
+      "expect": "valid",
+      "class": "command",
+      "type": "org.facilitator.command.memory.retain.v1"
+    },
+    {
+      "file": "valid/command.memory.recall.json",
+      "expect": "valid",
+      "class": "command",
+      "type": "org.facilitator.command.memory.recall.v1"
+    },
+    {
       "file": "valid/command.artifact.confirm-upload.json",
       "expect": "valid",
       "class": "command",
@@ -295,6 +307,30 @@
       "class": "command",
       "errorClass": "unknown-command",
       "receipt": "valid/receipt.unsupported.json"
+    },
+    {
+      "file": "invalid/command.memory.retain.no-evidence.json",
+      "expect": "invalid",
+      "class": "command",
+      "errorClass": "schema-violation"
+    },
+    {
+      "file": "invalid/command.memory.retain.extra-field.json",
+      "expect": "invalid",
+      "class": "command",
+      "errorClass": "schema-violation"
+    },
+    {
+      "file": "invalid/command.memory.retain.content-too-long.json",
+      "expect": "invalid",
+      "class": "command",
+      "errorClass": "schema-violation"
+    },
+    {
+      "file": "invalid/command.memory.recall.bad-purpose.json",
+      "expect": "invalid",
+      "class": "command",
+      "errorClass": "schema-violation"
     },
     {
       "file": "invalid/control.hello.v9-only.json",

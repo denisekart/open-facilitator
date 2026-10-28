@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openfacilitator.org/v1/command.memory.recall.v1.json",
+  "title": "MemoryRecallCommandV1Data",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "commandId",
+    "actorEvidenceRef",
+    "query",
+    "purpose"
+  ],
+  "properties": {
+    "commandId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "actorEvidenceRef": {
+      "$ref": "common.v1.json#/$defs/evidenceRef"
+    },
+    "query": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024
+    },
+    "purpose": {
+      "type": "string",
+      "enum": [
+        "assignment.context",
+        "requirements.clarification",
+        "report.synthesis"
+      ]
+    },
+    "workId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "scopeSelectors": {
+      "type": "array",
+      "maxItems": 8,
+      "items": {
+        "type": "string",
+        "minLength": 3,
+        "maxLength": 128
+      }
+    },
+    "maxItems": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 20
+    },
+    "maxTokens": {
+      "type": "integer",
+      "minimum": 256
+    },
+    "includeSuperseded": {
+      "type": "boolean"
+    }
+  }
+}

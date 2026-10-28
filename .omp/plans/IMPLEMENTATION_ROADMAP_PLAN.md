@@ -4,13 +4,13 @@
 
 The repo is spec-only: `docs/specs/open_facilitator_framework_architecture.md` (normative architecture, §26 defines ten delivery slices) plus `docs/specs/open-facilitator-appendix.md` (normative clarifications: trustMode, actorEvidenceRef, RFC 8785 approval hashing, outbox/inbox, memory ACLs, conformance must-haves). Nothing is implemented. This roadmap is the top-level collection of numbered, autonomous implementation plans in execution order. Early plans establish architecture infrastructure (repo skeleton, protocol contracts, transactional kernel, transport); later plans deliver single vertical feature slices.
 
-**Deliverable of this plan:** create `docs/roadmap.md` containing exactly the plan catalogue below (sections "How to use" + plans 00–27), and nothing else. No code, no scaffold — implementation starts when Plan 00 is executed after its own replanning pass.
+**Deliverable of this plan:** create `docs/roadmap.md` containing exactly the plan catalogue below (sections "How to use" + plans 00–30), and nothing else. No code, no scaffold — implementation starts when Plan 00 is executed after its own replanning pass.
 
 ## How to use this roadmap
 
 - **Status legend:** ⬜ `not-started` → 🔵 `replanning` (mandatory gate) → 🟡 `in-progress` → 🟢 `done`.
 - **Every plan starts with a replanning pass** (status flips to 🔵): re-verify assumptions against the specs and the state left by prior plans, run the listed research, produce a per-plan detail design (`.omp/plans/<slug>.md`), and only then flip to 🟡. Decisions made during earlier plan executions are expected to force local re-optimization here; the roadmap scope/objective stays, the internal detail is re-derived.
-- Plans execute **in numeric order** except where a `Depends on` line names a strict subset. Phase B runs 05→06→07→08 in sequence; Phase C runs 09→10→11→12 in sequence; Phase D runs 13→14→15 in sequence, 16 independent of the storage leg (after 09/10); 19∥20∥21 chain within Phase F independently of 22/23.
+- Plans execute **in numeric order** except where a `Depends on` line names a strict subset. Phase B runs 05→06→07→08 in sequence; Phase C runs 09→10→11→12 in sequence; Phase D runs 13→14→15 in sequence, 16 independent of the storage leg (after 09/10); Phase E runs 17→18→19 then 20→21 in sequence; within Phase F, 22→23→24 and 25→26 chain, 27 last; Phase G is independent of 25/26.
 - Each plan owns its tests and docs in the same change (AGENTS.md skill-maintenance rule applies: update `.omp/skills/` projections in the slice's change).
 - Cross-cutting conformance: shared fixtures live in `protocol/conformance-fixtures/` from Plan 01 onward; every later plan adds fixtures for its behavior. Spec §26.1's 15-item suite is the acceptance backlog; each plan below names which items it lands.
 
@@ -22,7 +22,7 @@ The repo is spec-only: `docs/specs/open_facilitator_framework_architecture.md` (
 **Status:** 🟡 in-progress (detail design: `00-repository-skeleton-build-ci.md`; 🟢 when CI is green on `main`)
 **Objective:** Turn the spec-only repo into a buildable monorepo matching spec §22.1 (`framework/` tree: `src/facilitator`, `src/gateway`, `src/workspace-link`, `src/adapters`, `protocol/`, `features/`, `examples/`, `reference/`, `docs/`, `Makefile`) with green CI on an empty-but-compiling codebase.
 **Replanning gate:** run `/scaffold` (stack `dotnet-aspire-svelte`) and reconcile its output against §22.1; decide sln/csproj granularity (one `Facilitator.sln`, projects `Facilitator`, `Facilitator.Tests`; pnpm workspace for TS packages `@ofac/gateway`, `@ofac/workspace-link`), TS toolchain (Node 22 LTS, vitest, tsup), .NET 10 SDK pin in `global.json`.
-**Scope:** directory tree with stub projects/packages that compile; `versions.env` pinning Postgres 17, Keycloak 26.x, SeaweedFS digest, Aspire dashboard release, Kafka 4.2.x, Forgejo 16.x, Mattermost TE, Ollama (§22.4); `Makefile` targets `build|test|lint|compose-slim|compose-full` placeholders; GitHub Actions per §22.6 (build .NET + TS, validate configs, unit tests; compose jobs gated until the slim reference env, now Plan 17); `.editorconfig`, NuGet/npm config, `.gitignore` additions (`reference/secrets/`, `bin/`, `obj/`, `dist/`, `node_modules/`).
+**Scope:** directory tree with stub projects/packages that compile; `versions.env` pinning Postgres 17, Keycloak 26.x, SeaweedFS digest, Aspire dashboard release, Kafka 4.2.x, Forgejo 16.x, Mattermost TE, Ollama (§22.4); `Makefile` targets `build|test|lint|compose-slim|compose-full` placeholders; GitHub Actions per §22.6 (build .NET + TS, validate configs, unit tests; compose jobs gated until the slim reference env, now Plans 17–19); `.editorconfig`, NuGet/npm config, `.gitignore` additions (`reference/secrets/`, `bin/`, `obj/`, `dist/`, `node_modules/`).
 **State after:** `make build` and `make test` pass locally and in CI on empty projects; every §22.1 path exists; CI is the merge gate from here on.
 **Testing:** CI runs dotnet build/test + `pnpm -r build/test` on stubs; no behavior tests yet.
 **Documentation:** `README.md` build instructions section; `docs/contributing.md` stub (repo layout, make targets, PR gate).
@@ -52,7 +52,7 @@ The repo is spec-only: `docs/specs/open_facilitator_framework_architecture.md` (
 **Documentation:** `docs/security.md` stub for trust/data-plane split (§3.3); ADR note in-code for lock strategy; `.omp/skills/facilitator-architecture` + `facilitator-protocol` updated to implemented reality.
 **Architecture fit:** §4, §7.1–7.4, §19, §20 — "the database is the coordination authority." Kernel is the hub; Link/Gateway/adapters later attach at its edges.
 **Depends on:** 01
-**Additional resources:** spec §4/§7/§19/§20, appendix §5.2–5.3; `Npgsql` docs on `FOR UPDATE SKIP LOCKED`; EF Core 10 + `Testcontainers.PostgreSql`; OTLP wiring baseline (`OpenTelemetry.AspNetCore`) so the slim reference env's Aspire step (now Plan 17) is config-only.
+**Additional resources:** spec §4/§7/§19/§20, appendix §5.2–5.3; `Npgsql` docs on `FOR UPDATE SKIP LOCKED`; EF Core 10 + `Testcontainers.PostgreSql`; OTLP wiring baseline (`OpenTelemetry.AspNetCore`) so the slim reference env's Aspire step (now Plans 17/19) is config-only.
 
 ### Plan 03 — Link server: SignalR hub and HTTP fallback
 **Status:** 🟡 in-progress (detail design + Implementation Status: `03-link-server.md`; 🟢 when CI is green on `main`)
@@ -173,40 +173,48 @@ over real Keycloak + Postgres + kernel boundaries (§26.1 items 11+12 complete).
 
 **Updated against Plan 15 as-built:** the manifest half landed — 1.1 completed-event ref+digest with the kernel-chained revision ledger (`facilitator.result_manifests`, canonical-bytes law enforced at record time), and the GC reference check strengthened: a recorded manifest pins its document AND every declared output blob regardless of Work state (supersession releases).
 
-**Downstream renumber +2 (2026-10-27):** old 15 Slim ref-env → 17, 16 Admin SPA → 18, 17–22 Phase F → 19–24, 23–25 Phase G → 25–27. `Depends on:` lines and cross-references updated throughout this file.
+**Downstream renumber +2 (2026-10-27):** old 15 Slim ref-env → 17, 16 Admin SPA → 18, 17–22 Phase F → 19–24, 23–25 Phase G → 25–27. `Depends on:` lines and cross-references updated throughout this file. **Superseded 2026-10-28 (+3):** Phase E was split into 17–21 and the +2 targets from 19 onward shifted again; see the Phase E section's note for the current mapping.
 
 ---
 
 ## Phase E — Reference environment and operator surface
 
-### Plan 17 — Slim reference environment: Compose, referencectl, Aspire
-**Status:** ⬜ not-started
-**Objective:** Make §21.1's slim acceptance run reproducible: `reference/compose.slim.yaml` (Facilitator, Postgres, Keycloak, SeaweedFS, Aspire dashboard, embedded Gateway+worker container), `reference/config/*.yaml`, bootstrap seeds, and the `referencectl` CLI (`up slim|down|verify`) — the framework's single-command demo.
-**Replanning gate:** validate §22.2's template against the actually-built images/config surface from 02–16; pin `.localhost` hostname behavior per §22.5 preflight; decide seed data set (demo team, capability manifest, deterministic worker fixture).
-**Scope:** image Dockerfiles (slim runtime), env wiring from `versions.env`, healthchecks, `referencectl verify` running the acceptance script (login → create Work → link dispatch → deterministic harness → artifact → memory candidate → trace correlation → restart mid-task).
-**State after:** fresh clone → `referencectl up slim` → §21.1 acceptance run passes unattended. Slice-6 exit test.
-**Testing:** CI job brings up slim Compose on linux/arm64+amd64 runners and executes `referencectl verify`; OTLP spans visible in Aspire checked via dashboard API. §26.1 item 15 (slim half).
-**Documentation:** `docs/getting-started.md` completed to spec §28 (exact CLI/curl + expected output, port map, budget, cleanup).
-**Architecture fit:** §21.1/§22 — the reference proves the architecture; every prior plan gains its first end-to-end integration harness.
-**Depends on:** 08, 09, 12, 13, 14, 15, 16
-**Additional resources:** spec §21.1/§22.2/§22.5/§28, appendix §11 (one-command dev loop); compose `healthcheck`/`depends_on: condition` docs; Aspire dashboard OTLP ingestion docs.
+**Split 2026-10-28 against Phase D reality** (plans 00–16 as-built, Phase D closed with manifest authority + memory broker proven e2e). The two 2026-10-27 entries were too coarse — the reference-env entry bundled image builds, compose topology, seeds, a new CLI, an acceptance harness, a CI tier, and a docs rewrite across two runtimes; the admin entry bundled a whole kernel API plane plus an SPA plus a new E2E tier — so Phase E is five plans, each with its own detail-design file, chain 17→18→19 (reference env) then 20→21 (operator surface):
 
-### Plan 18 — Admin surface: embedded operator inspector
-**Status:** ⬜ not-started
-**Objective:** Build the embedded Svelte 5 + Tailwind + shad/svelte operator surface (§17), optimized ruthlessly for simplicity — one coherent inspector, not a page-count target (multi-view is fine when it removes navigation). Universal search, health strip, contextual inspector for Work/Gateway/workspace/artifact/memory objects, activity timeline, inline metrics (§17.2), `PATCH /api/admin/config/{resource}` with `If-Match` optimistic revision (§17.4), trustMode displayed per enrollment (appendix §4.3), dead-letter replay control (appendix §11.2).
-**Replanning gate:** §17's "single-page" title is a simplicity constraint, not a requirement — operator-approved deviation, record it in the spec's errata/appendix note rather than silently diverging; confirm the read-model endpoints needed beyond §17.4's list (timeline, deliveries, metrics) against 02–16's actual tables and add them to the Facilitator in the same slice; fix build/embed pipeline (SPA built into the Facilitator's `wwwroot`, single deployable).
-**State after:** operator can trace a slim acceptance-run Work from search to artifact to trace link without psql.
-**Testing:** Playwright .NET E2E against slim Compose: search a Work, open timeline, replay a forced dead-letter, verify trustMode badge; API tests for If-Match conflicts.
-**Documentation:** `docs/getting-started.md` admin tour section; SPA README.
-**Architecture fit:** §17 — operational inspector over the kernel, never a second source of truth.
+### Plan 17 — Slim Compose, kernel-side: framework images + kernel/infra stack
+**Status:** ⬜ not-started (detail design: `17-slim-compose-images.md`)
+**Objective:** Source-built node images for gateway/linkd/worker + `reference/compose.slim.yaml` booting Postgres, Keycloak, SeaweedFS, Aspire dashboard, and the Facilitator container, wired verbatim from `versions.env`/`.env.example`, healthchecked; real `make compose-slim`.
+**Depends on:** 08, 09, 13, 14, 15, 16
+
+### Plan 18 — Gateway + worker in Compose, bootstrap seeds, referencectl
+**Status:** ⬜ not-started (detail design: `18-slim-workspace-seeds-referencectl.md`)
+**Objective:** Gateway/worker container (supervisor story, localhost child leg), API-driven demo seeds, `referencectl up slim|down|status`; kernel-URL dev interim dies.
 **Depends on:** 17
-**Additional resources:** spec §17 + appendix §4.3/§11.2; `svelte` profile skills; shadcn/svelte docs; playwright-dotnet + Aspire integration test patterns.
+
+### Plan 19 — Acceptance run: `referencectl verify`, CI tier, getting-started
+**Status:** ⬜ not-started (detail design: `19-slim-acceptance-verify-ci-docs.md`)
+**Objective:** §21.1 acceptance script as `referencectl verify` (incl. mid-task restarts + OTLP→Aspire correlation), PR-bring-up/main-nightly-verify dual-arch CI tier, `docs/getting-started.md` to §28. Slice-6 exit, §26.1 item 15 (slim half).
+**Depends on:** 17, 18
+
+### Plan 20 — Admin API: §17.4 read models, dead-letter replay, versioned config
+**Status:** ⬜ not-started (detail design: `20-admin-read-models-config-api.md`)
+**Objective:** `/api/admin/*` server surface — summary/search/detail/timeline/links(trustMode)/deliveries/metrics, dead-letter replay, manifest re-mark, `PATCH config` + `If-Match`; dev-endpoint cutover.
+**Depends on:** 19
+
+### Plan 21 — Embedded Svelte inspector + Playwright E2E
+**Status:** ⬜ not-started (detail design: `21-admin-spa-inspector-e2e.md`)
+**Objective:** Svelte 5 SPA embedded in the kernel's `wwwroot` (single deployable): search → inspector → timeline, inline metrics, replay button, minimal §17.3 edit affordances; Playwright .NET against the slim stack. Closes Phase E.
+**Depends on:** 20
+
+**Normalized against Phase D as-built:** no compose exists anywhere and only the kernel has a Dockerfile (17 builds the rest, source-first — no npm-publish dependency, 04's deferred image-shape question dies here); the Feature env-overlay names (`OFAC_ENROLL_SECRET`/`OFAC_LINK_TOKEN`/`OFAC_CHILD_SECRET`, `facilitatorUrl`) are the compose env contract, not a new one; 06's open cross-container child-leg question resolves to one container (sidecar decision owned by 18); 15's `kernelUrl`-unset dev path is deleted by 18 (its own kill rule); SeaweedFS config relocates from the .NET-test fixture to compose per 14's replanning caveat; 11's realm-mapper fix + 09's realm are the single identity source, 18 seeds via API only; admin surface starts from zero routes (only `/api/dead-letters` + dev endpoints exist — 20 cuts them over); §26.1 item 15's inspector claim splits: API assertions in 19, browser proof in 21; every live "Lands with Plan 11" doc stub is stale old numbering and is rewritten to fact-based prose by 17/18 (cross-plan no-plan-prose rule).
+
+**Downstream renumber +3 (2026-10-28):** old 19–24 Phase F → 22–27, old 25–27 Phase G → 28–30. `Depends on:` lines and cross-references updated throughout this file; this section owns the current mapping.
 
 ---
 
 ## Phase F — Providers, multi-work, scale, hardening
 
-### Plan 19 — Mattermost adapter: threads, reactions, echo suppression
+### Plan 22 — Mattermost adapter: threads, reactions, echo suppression
 **Status:** ⬜ not-started
 **Objective:** First full provider adapter (spec slice 7, first leg): Mattermost Team Edition service in full Compose, inbound event verification → normalized inbox (`provider_events` dedupe per §7.1), `communication_bindings` thread tracking, verified account linking via single-use challenge (§11/§21.2 — never email-equality), threaded replies, low-noise reaction ack with idempotency ledger, bot echo suppression (§13.4), reaction-never-consent rule (§13.3).
 **Replanning gate:** pin adapter interface to 02's inbox port + 12's approval flow (reaction ≠ approval path explicit); confirm Mattermost TE bot-account API version tested; fix echo-suppression matching on exact provider actor IDs.
@@ -215,21 +223,21 @@ over real Keycloak + Postgres + kernel boundaries (§26.1 items 11+12 complete).
 **Testing:** adapter contract tests + recorded-fixture tests; live-container E2E in full Compose; §26.1 item 9 (echo suppression, thread replies).
 **Documentation:** `docs/advanced.md` adapter authoring walkthrough (first worked example).
 **Architecture fit:** §13 — thin provider adapter at the kernel's edge; team-owned writes stay behind Gateway policy (12).
-**Depends on:** 17 (18 optional)
-**Additional resources:** spec §13 + appendix §10; Mattermost REST API v4 docs; Forgejo webhook docs as contrast for Plan 20.
+**Depends on:** 19 (20/21 optional)
+**Additional resources:** spec §13 + appendix §10; Mattermost REST API v4 docs; Forgejo webhook docs as contrast for Plan 23.
 
-### Plan 20 — Forgejo adapter + coding worker vertical slice
+### Plan 23 — Forgejo adapter + coding worker vertical slice
 **Status:** ⬜ not-started
 **Objective:** Full-profile coding leg: Forgejo (VCS + issues, one deployment) webhooks → normalized events; Gateway-side team-owned Forgejo connector (issue read, branch push, PR create — all through Gateway policy + approval when privileged, §9.2); coding-worker harness example (`examples/full/coding-worker`) completing §23.1's sequence: chat → Work → assignment → feature branch + PR → review comment steers the same Assignment (or relaunches a scaled-to-zero worker).
-**Replanning gate:** decide issue-ID→Work binding ownership (provider_events + communication_bindings reuse); fix connector idempotency strategy per appendix §5.4–5.5 (canonical payload hash + read-before-reconcile for PR creation); fix worker lifecycle vs 22's provisioning seam (worker may stay long-lived here, scale-to-zero deferred — state it).
+**Replanning gate:** decide issue-ID→Work binding ownership (provider_events + communication_bindings reuse); fix connector idempotency strategy per appendix §5.4–5.5 (canonical payload hash + read-before-reconcile for PR creation); fix worker lifecycle vs 25's provisioning seam (worker may stay long-lived here, scale-to-zero deferred — state it).
 **Scope:** `src/adapters/forgejo/`, `examples/full/seed-repositories/`, webhook wiring to `/api/integrations/forgejo/webhook`, review-comment steering to running assignment, PR-URL bound to Work as artifact reference (13–15).
 **State after:** §21.2 demo steps 2–7 run in full Compose. Slice-7 coding half.
 **Testing:** webhook dedupe, PR-create idempotent retry (ambiguous timeout → reconcile), steering routing to live vs relaunched worker; live full-Compose E2E script.
 **Documentation:** `docs/advanced.md` provider-connector privilege ceilings; seed-repo README.
-**Depends on:** 19
+**Depends on:** 22
 **Additional resources:** spec §9.2/§13.6/§23.1, appendix §5.4–5.5 (connector idempotency, GitHub-style prior art applies); Forgejo webhook/API docs.
 
-### Plan 21 — Kafka adapter + Ollama decision provider
+### Plan 24 — Kafka adapter + Ollama decision provider
 **Status:** ⬜ not-started
 **Objective:** Complete full-profile parity (§21.2 steps 8–9, 4): a Kafka KRaft input adapter (at-least-once consume → normalized inbox events, offsets never treated as business completion, §7.5) and the `IDecisionProvider` (§10.2) with a deterministic stub plus Ollama-backed implementation for routing disambiguation among allowed advertised candidates — model output is advisory only.
 **Replanning gate:** fix decision-provider call sites against the routing evaluation steps (§10.1) actually implemented in 02/09; bound model latency/limits; fix Kafka consumer group/offset governance vs inbox dedupe overlap.
@@ -237,10 +245,10 @@ over real Keycloak + Postgres + kernel boundaries (§26.1 items 11+12 complete).
 **Testing:** at-least-once redelivery test (no double business command, §26.1 item 14); decision provider contract tests incl. unauthorized-candidate rejection and model-down fallback to deterministic-first behavior.
 **Documentation:** `docs/advanced.md` model-advisory boundary + Kafka seam rationale (§7.5 "introduce when measurements show need").
 **Architecture fit:** §7.5/§10.2/§13 — proving the seam points: broker and model are optional adapters around the Postgres authority.
-**Depends on:** 20 (19 sufficient if 20 slips)
+**Depends on:** 23 (22 sufficient if 23 slips)
 **Additional resources:** spec §7.5/§10/§13.6/§21.2; Kafka KRaft single-node compose examples; Ollama API docs.
 
-### Plan 22 — Multi-work, dependencies, and zero-to-N provisioning
+### Plan 25 — Multi-work, dependencies, and zero-to-N provisioning
 **Status:** ⬜ not-started
 **Objective:** Deliver spec slice 8: Assignment `dependsOn` with conditions (`completed|result_validated|approved`, §4.2), one Work spanning two repositories/two independent executions (§23.2), steering that restarts a transient worker with context continuity, and the provisioning port (§18) with a local OCI launcher so workers scale zero→N and back.
 **Replanning gate:** fix DAG evaluation as pure deterministic kernel step (no AI), placement in 02's event loop; fix provisioning contract (`provisioningOperationId` idempotency per §7.4) vs Gateway's child lifecycle from 05; fix nudge semantics + rate caps (§6.4, §23.5) with stalled-vs-offline reconciliation.
@@ -249,62 +257,62 @@ over real Keycloak + Postgres + kernel boundaries (§26.1 items 11+12 complete).
 **Testing:** two-assignment DAG (one blocked on `result_validated`), steer-during-run generation fencing test, launcher idempotency, nudge cap test (§26.1 items 10, 13).
 **Documentation:** `docs/advanced.md` dependencies + provisioning contract.
 **Architecture fit:** §4.2/§18/§23.2 — the scaling story on the execution side, still kernel-first.
-**Depends on:** 20
+**Depends on:** 23
 **Additional resources:** spec §4.2/§6.4/§18/§23.2/§23.5; OCI runtime CLI docs for the local launcher.
 
-### Plan 23 — Horizontal replicas: two Facilitators, one Postgres
+### Plan 26 — Horizontal replicas: two Facilitators, one Postgres
 **Status:** ⬜ not-started
 **Objective:** Prove §7 at production shape: two Facilitator replicas behind the shared Postgres — inbox dedupe under concurrent duplicate webhooks, outbox lease handover on replica crash, `link_sessions` owner routing (LISTEN/NOTIFY hints, polling fallback), SignalR sticky-session guidance, and `workVersion` optimistic-conflict retries under a two-replica race.
 **Replanning gate:** audit 02/03 for hidden singleton assumptions (in-process caches, timers, hub state); decide compose topology (`compose.full.yaml` replica overlay vs separate file per §22's "one tested method" rule); fix crash-injection method for CI.
 **Scope:** replicaId/endpointId wiring, `referencectl` full-profile multi-replica mode, load-shed/backpressure defaults (§7.5).
 **State after:** concurrent duplicate webhook hits both replicas → one business command; SIGKILL a replica owning a live link → session lease expires, other replica's reconnected session resumes deliveries. Slice-9 exit test.
 **Testing:** dual-replica integration: duplicate-webhook race, outbox lease recovery, reconnect-epoch fencing, §26.1 item 4.
-**Documentation:** `docs/advanced.md` replication + SignalR affinity; runbook updates (begin Plan 24 doc set).
+**Documentation:** `docs/advanced.md` replication + SignalR affinity; runbook updates (begin Plan 27 doc set).
 **Architecture fit:** §7 — "connections are transient delivery optimizations, the database is the authority" becomes a tested claim.
-**Depends on:** 22
+**Depends on:** 25
 **Additional resources:** spec §7; SignalR scale-out docs (affinity, `IUserIdProvider`); Postgres advisory-lock + LISTEN/NOTIFY docs.
 
-### Plan 24 — Operational hardening: dead letters, runbooks, conformance suite, production entry
+### Plan 27 — Operational hardening: dead letters, runbooks, conformance suite, production entry
 **Status:** ⬜ not-started
-**Objective:** Close §26.1–26.2: complete the shared conformance suite as an executable package (all 15 items green across Facilitator/Gateway/Link), administration audit trail + versioned preference changes (§17.1), dead-letter UX (replay button wired in 18 verified here), full runbook set (§27), backup/restore + upgrade/rollback drills, and the incident exercise: DB restart, provider outage, invalid token replay.
-**Replanning gate:** diff §26.1's 15 items against fixtures/tests existing from 01–23; enumerate the gaps and assign each to a harness (conformance package vs E2E); fix what "production-eligible" checks become automatable (`referencectl verify --full`).
+**Objective:** Close §26.1–26.2: complete the shared conformance suite as an executable package (all 15 items green across Facilitator/Gateway/Link), administration audit trail + versioned preference changes (§17.1), dead-letter UX (replay button wired in 21 verified here), full runbook set (§27), backup/restore + upgrade/rollback drills, and the incident exercise: DB restart, provider outage, invalid token replay.
+**Replanning gate:** diff §26.1's 15 items against fixtures/tests existing from 01–26; enumerate the gaps and assign each to a harness (conformance package vs E2E); fix what "production-eligible" checks become automatable (`referencectl verify --full`).
 **Scope:** conformance-suite CLI (run against any conformant implementation, not just this one), bad-provider fault-injection fixtures, SBOM + digest-pinned release job (§22.6), version-negotiation test (protocol v1 vs a simulated v2 link). Prose scrub: strip every plan-number/phase/stage reference from everything outside `.omp/` and `docs/specs/` (code comments, READMEs, docs/, protocol descriptions, test comments) and rewrite each sentence as a statement of fact — the existing corpus already carries stale numbers after the Phase B renumber, so this is a one-time sweep, then the cross-plan rule below keeps it clean.
 **State after:** `referencectl verify` full profile passes from empty volumes; conformance package publishes a machine-readable pass/fail report; runbooks validated by executing the incident drill.
 **Testing:** the suite itself is the deliverable; drill logged in runbooks.
 **Documentation:** `docs/security.md` + runbook chapter (§27) finalized; `docs/getting-started.md` re-verified word-for-word by a clean-clone run; all `.omp/skills/` updated to implemented reality (AGENTS.md maintenance rule).
 **Architecture fit:** §26 — the conformance gate that turns "reference implementation" into "conformant framework," and §29.5's final statement made testable.
-**Depends on:** 18, 21, 23
+**Depends on:** 21, 24, 26
 **Additional resources:** spec §26.1/§26.2/§27/§28/§22.6, appendix §9 (metrics/runbook snippets), §10.1 (must-have conformance list), §15 (MVP checklist).
 
 ---
 
 ## Phase G — Ecosystem extensibility
 
-The framework's adoption thesis: first-party adapters are ordinary *implementations* of published contracts, not privileged code — anyone can build their own harness adapter, communication integration, or onboard an existing repo with their own LLM setup. This phase turns those seams into shippable, independently consumable products. Independent of 22/23/24; 25–26 depend on 15/16 (adapter client surface) and on 19/20 (worked provider/harness examples), 27 on 17.
+The framework's adoption thesis: first-party adapters are ordinary *implementations* of published contracts, not privileged code — anyone can build their own harness adapter, communication integration, or onboard an existing repo with their own LLM setup. This phase turns those seams into shippable, independently consumable products. Independent of 25/26/27; 28–29 depend on 15/16 (adapter client surface) and on 22/23 (worked provider/harness examples), 30 on 19.
 
-### Plan 25 — Communication adapter SDK: open protocol for third-party integrations
+### Plan 28 — Communication adapter SDK: open protocol for third-party integrations
 **Status:** ⬜ not-started
-**Objective:** Publish the CommunicationAdapter contract (§13.5) the same way the harness side published `@ofac/adapter`: JSON Schemas for provider-inbound events and adapter capability manifests under `protocol/json-schema/`, a TS SDK package (ingest/reply/react/ack ops, echo suppression, dedupe helpers), and a lifecycle conformance kit. Mattermost/Forgejo/Kafka (19–21) are then demonstrably just first implementations — a user's Slack/Discord/GitHub/Jira integration ships as an external package, developed against the published contract, not against repo internals.
-**Replanning gate:** extract the de-facto interface from 19/20's two shipped adapters; fix which ops are core vs optional capability flags; fix the adapter↔kernel ingress path (inbox `provider_events` posting vs Link command) and its auth (workload identity from 10).
-**Testing:** 19/20's adapters cut over onto the SDK and pass its conformance kit unmodified-except-imports; a synthetic reference "toy provider" adapter written only against published docs+schemas passes the same suite.
+**Objective:** Publish the CommunicationAdapter contract (§13.5) the same way the harness side published `@ofac/adapter`: JSON Schemas for provider-inbound events and adapter capability manifests under `protocol/json-schema/`, a TS SDK package (ingest/reply/react/ack ops, echo suppression, dedupe helpers), and a lifecycle conformance kit. Mattermost/Forgejo/Kafka (22–24) are then demonstrably just first implementations — a user's Slack/Discord/GitHub/Jira integration ships as an external package, developed against the published contract, not against repo internals.
+**Replanning gate:** extract the de-facto interface from 22/23's two shipped adapters; fix which ops are core vs optional capability flags; fix the adapter↔kernel ingress path (inbox `provider_events` posting vs Link command) and its auth (workload identity from 10).
+**Testing:** 22/23's adapters cut over onto the SDK and pass its conformance kit unmodified-except-imports; a synthetic reference "toy provider" adapter written only against published docs+schemas passes the same suite.
 **Documentation:** `docs/advanced.md` "write your own integration" walkthrough mirroring the adapter-sdk one; SDK README with minimal example.
-**Depends on:** 19, 20
+**Depends on:** 22, 23
 
-### Plan 26 — Independently pullable harness adapters (Feature + registry story)
+### Plan 29 — Independently pullable harness adapters (Feature + registry story)
 **Status:** ⬜ not-started
 **Objective:** Each harness adapter is its own folder, its own package, and its own pullable artifact: the `ofac-harness-adapter` Feature's `adapter` option accepts an arbitrary adapter bundle (npm spec or OCI tarball digest) instead of only the baked-in `deterministic`, so any devcontainer composes any adapter — first-party or team-authored — without building this repo. First-party sibling adapters land as worked third-party-shaped implementations of `@ofac/adapter` (one folder each under `src/adapters/harnesses/`): the coding harness family (Pi, OpenCode, Codex-class CLIs) and one local-LLM harness (Ollama-backed) proving the "hook in your own model" story.
-**Replanning gate:** fix the bundle contract (entry binary, config env, supervisor unit expectations); decide the trust model for third-party bundles (digest pinning, no postinstall); pick the first two sibling adapters from 20/21's actual harness surfaces.
+**Replanning gate:** fix the bundle contract (entry binary, config env, supervisor unit expectations); decide the trust model for third-party bundles (digest pinning, no postinstall); pick the first two sibling adapters from 23/24's actual harness surfaces.
 **Testing:** Feature scenario test installs a non-baked adapter from a local tarball end-to-end; each sibling adapter passes `@ofac/adapter/testing` and a composed-devcontainer smoke.
 **Documentation:** `features/src/harness-adapter/README.md` rewrite for arbitrary bundles; each adapter folder's README as the copy-me template.
-**Depends on:** 15, 20
+**Depends on:** 15, 23
 
-### Plan 27 — Self-service onboarding: adopt-an-existing-repo skill + local-LLM hookup
+### Plan 30 — Self-service onboarding: adopt-an-existing-repo skill + local-LLM hookup
 **Status:** ⬜ not-started
 **Objective:** A user (or their agent) onboard a repository by pointing any LLM at a shipped entry document: a canonical `ONBOARDING.md` + agent skill (repo root and published as a standalone pullable doc/skill) that walks enrollment, Dev Container Feature or standalone `linkd` wiring, capability manifest authoring, and hooking the team's own harness + local LLM (Ollama/vLLM/etc.) via the adapter contract. Runbook-driven: the skill drives the *user's* agent, the framework only ships instructions + CLI.
-**Replanning gate:** fix the exact onboarding sequence against 17's shipped `referencectl`/enrollment UX; decide skill packaging (in-repo file vs published doc vs both) so it's consumable without cloning.
+**Replanning gate:** fix the exact onboarding sequence against the shipped `referencectl`/enrollment UX (reference-env chain); decide skill packaging (in-repo file vs published doc vs both) so it's consumable without cloning.
 **Testing:** a fresh agent with only the skill document onboards a scratch repo against slim ref-env and completes one Work end-to-end.
-**Documentation:** the skill/`ONBOARDING.md` itself; `docs/getting-started.md` pointer; harness-adapter hookup section cross-linking Plan 26.
-**Depends on:** 17
+**Documentation:** the skill/`ONBOARDING.md` itself; `docs/getting-started.md` pointer; harness-adapter hookup section cross-linking Plan 29.
+**Depends on:** 19
 
 ---
 

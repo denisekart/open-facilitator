@@ -338,6 +338,46 @@ set — `decision`, `reason`, `workId`/`assignmentId`/`capabilityId`,
   store via a presigned URL — so the cap can never become a silent
   artifact-size limit.
 
+## Memory broker laws
+
+- **ACL before search, always.** Recall builds the caller's readable
+  predicate (`status <> 'tombstoned' AND (own team OR facilitator-visible OR
+  live share)`, private rows never reachable via another team's label) and
+  embeds it in the SQL `WHERE` — never a post-filter over a wider search.
+  Denial discloses nothing: a foreign-team recall is `{entries: []}` with no
+  count, no "N hidden".
+- **Non-disclosure 404.** Entry reads and curation are team-scoped inside
+  the broker: a foreign row, a tombstone, and a missing row all answer the
+  same 404 `memory-not-found` (the artifact precedent).
+- **Quotas + payload caps.** `Memory:Quota:MaxContentChars` (default
+  16384, mirrored as the schema `maxLength`) bounds one entry;
+  `Memory:Quota:DailyRetainPerTeam` (default 200) bounds a team's UTC-day —
+  the breach is 422 `memory-quota-exceeded` + deny audit, never a queue
+  backpressured onto readers. Duplicate content (same scope, same sha256)
+  dedupes to the stored identity instead of consuming budget growth.
+- **Memory is never authorization (spec §3.3).** Recall and the usage law
+  inform decisions; no gate, transition, or ledger mutation reads memory
+  as an authority source.
+- **Injected content is data.** Recalled entries ride back as reference
+  material with provenance; the delimiter discipline around untrusted text
+  is the harness's law, the kernel records who said it (`provenance`,
+  `accessControl`) and who consumed it (one `memory_usage` row per entry
+  returned by any read, external consumers attesting through
+  `event.memory.used`).
+- **Workload writes land `candidate`.** A link-plane retain or a
+  `memory.candidate` event can only propose: promotion, correction,
+  sharing, and deletion are REST human curation (`memory.curate`), so an
+  compromised workspace cannot silently seed a team's recall corpus.
+- **Deletion drops content, keeps the trail.** Tombstone + content drop +
+  share revocation + usage-row retention commit in one transaction; the
+  emptied tsvector recomputes, so the row leaves every search while the
+  audit chain (and `content_hash`) survives. The retention pass
+  (`MemoryRetentionService`, advisory lock 420003) applies the same law to
+  lapsed candidates: per-Project `projects.config` `memory` key first,
+  `Memory:Retention:CandidateDays` (90) as the fallback. Backup-retention
+  honesty: content dropped from the live table ages out of each operator's
+  backup window on its own schedule.
+
 ## Deferred to later plans
 
 | Concern | Plan |

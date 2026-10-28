@@ -421,6 +421,57 @@ public sealed class TestDbProbe : IAsyncDisposable
         string RevisionOf, string Digest, string StructuredDigest, string ArtifactId,
         string ResultState, string State, DateTime RecordedAt);
 
+    /// <summary>The broker row for one entry (null when absent), typed window for memory assertions.</summary>
+    public async Task<MemoryEntryRow?> MemoryEntry(Guid entryId)
+    {
+        await using var connection = await _dataSource.OpenConnectionAsync();
+        await using var cmd = new NpgsqlCommand(
+            "SELECT team_slug, status, content, content_hash, revision, "
+            + "coalesce(supersedes_entry_id::text, ''), coalesce(expires_at::text, ''), (search <> ''::tsvector) "
+            + "FROM facilitator.memory_entries WHERE entry_id = $1", connection);
+        cmd.Parameters.AddWithValue(entryId);
+        await using var reader = await cmd.ExecuteReaderAsync();
+        return await reader.ReadAsync()
+            ? new MemoryEntryRow(reader.GetString(0), reader.GetString(1), reader.GetString(2),
+                reader.GetString(3), reader.GetInt32(4), reader.GetString(5), reader.GetString(6),
+                !reader.IsDBNull(7))
+            : null;
+    }
+
+    /// <summary>One memory-entry assertion row (typed window, no raw SQL in tests).</summary>
+    public sealed record MemoryEntryRow(
+        string TeamSlug, string Status, string Content, string ContentHash, int Revision,
+        string SupersedesEntryId, string ExpiresAt, bool Indexed);
+
+    /// <summary>Usage rows recorded for one entry (the §6.2 usage-event law), optionally one purpose.</summary>
+    public Task<long> MemoryUsageCount(Guid entryId, string? purpose = null) =>
+        ScalarLong(
+            "SELECT count(*) FROM facilitator.memory_usage WHERE entry_id = $1"
+            + (purpose is null ? string.Empty : " AND purpose = $2"),
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(entryId);
+                if (purpose is not null)
+                {
+                    cmd.Parameters.AddWithValue(purpose);
+                }
+            });
+
+    /// <summary>Live (unrevoked) shares from one entry to one grantee team.</summary>
+    public Task<long> MemoryShareCount(Guid entryId, string granteeTeam) =>
+        ScalarLong(
+            "SELECT count(*) FROM facilitator.memory_shares WHERE entry_id = $1 AND grantee_team_slug = $2 AND revoked_at IS NULL",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(entryId);
+                cmd.Parameters.AddWithValue(granteeTeam);
+            });
+
+    /// <summary>Hand-age a candidate's expiry (the GC tests pin scenarios the API cannot reach without waiting days).</summary>
+    public Task ExpireMemoryEntry(Guid entryId) =>
+        NonQuery("UPDATE facilitator.memory_entries SET expires_at = now() - interval '1 second' WHERE entry_id = $1",
+            cmd => cmd.Parameters.AddWithValue(entryId));
+
     /// <summary>Artifacts rows registered under one wire artifactId (redelivery dedupe proof).</summary>
     public async Task<List<(Guid ArtifactId, string State, string Verification, string Origin, string StorageUri)>> ArtifactByWireId(string wireId)
     {

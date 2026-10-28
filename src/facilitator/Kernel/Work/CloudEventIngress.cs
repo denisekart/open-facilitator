@@ -3,6 +3,7 @@ using System.Text.Json;
 
 using Facilitator.Kernel.Shared;
 using Facilitator.Kernel.Shared.Dispatch;
+using Facilitator.Kernel.Shared.Evidence;
 using Facilitator.Kernel.Shared.Persistence;
 
 using Ofac.Protocol.Validation;
@@ -24,7 +25,8 @@ public sealed class CloudEventIngress(
     TimeProvider timeProvider,
     ApprovalIngress approvals,
     ArtifactIngress artifacts,
-    ResultIngress results)
+    ResultIngress results,
+    MemoryIngress memory)
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
@@ -123,6 +125,26 @@ public sealed class CloudEventIngress(
                 return Results.Accepted(null, new { status = arm.Status, inboxId });
             }
 
+            if (type == MemoryIngress.CandidateType || type == MemoryIngress.UsedType)
+            {
+                // Plan 16: the frozen memory events on the CE plane run the
+                // same arms; no AdmissionGate exists here, so the command's
+                // actorEvidenceRef law does not apply to events (they never
+                // carried one) — the workload context is absent, the broker
+                // records what the event's own provenance claims.
+                var arm = type == MemoryIngress.CandidateType
+                    ? await memory.HandleCandidateAsync(root, null, ct)
+                    : await memory.HandleUsedAsync(root, null, ct);
+                if (arm.Refused)
+                {
+                    return await pipeline.SettleAsync(
+                        inboxId, arm.Status, ct, () => IngressPipeline.Problem(arm.Problem!));
+                }
+
+                metrics.InboxProcessed();
+                return Results.Accepted(null, new { status = arm.Status, inboxId });
+            }
+
             metrics.InboxProcessed();
             return Results.Accepted(null, new { status = "accepted", inboxId });
         }
@@ -159,6 +181,27 @@ public sealed class CloudEventIngress(
                 () => Results.Ok(new { status = arm.Status, approvalId = arm.ApprovalId, inboxId }));
         }
 
+        if (type == MemoryIngress.RetainType || type == MemoryIngress.RecallType)
+        {
+            // No AdmissionGate on this surface: the command's actorEvidenceRef
+            // must validate inline (the approvals law); the receipt/response
+            // rides the 202 body's data field (the link-plane precedent).
+            var (actor, groups) = await approvals.ResolveWireActorAsync(root, ct);
+            var linkPrincipal = WirePrincipal(actor, groups);
+            var arm = type == MemoryIngress.RetainType
+                ? await memory.HandleRetainAsync(root, linkPrincipal, ct)
+                : await memory.HandleRecallAsync(root, linkPrincipal, ct);
+            if (arm.Refused)
+            {
+                return await pipeline.SettleAsync(
+                    inboxId, arm.Status, ct, () => IngressPipeline.Problem(arm.Problem!));
+            }
+
+            return await pipeline.SettleAsync(
+                inboxId, null, ct,
+                () => Results.Accepted(null, new { status = arm.Status, inboxId, data = arm.Data }));
+        }
+
         // Known command with no Plan 02 business effect: processed + a
         // typed timeline note (not silent), when the work is known.
         if (workId is not null)
@@ -170,5 +213,27 @@ public sealed class CloudEventIngress(
 
         return await pipeline.SettleAsync(
             inboxId, null, ct, () => Results.Accepted(null, new { status = "accepted", inboxId }));
+    }
+
+    /// <summary>
+    /// A link-plane context synthesized from a validated wire actor on the
+    /// ungated CE surface: the endpoint identity is the ingress itself, the
+    /// team is the actor's evidence groups' team (memory's own
+    /// team-from-groups law). No team ⇒ the broker's own denials apply.
+    /// </summary>
+    private static EffectivePrincipal? WirePrincipal(string? actor, IReadOnlyList<string> groups)
+    {
+        var team = Facilitator.Kernel.Shared.Storage.ArtifactLedger.TeamOfGroups(groups);
+        if (team is null)
+        {
+            return null;
+        }
+
+        var workload = new Facilitator.Kernel.Shared.Auth.LinkPrincipal(
+            "ingress", Guid.Empty, team, "evidence", "workload");
+        var delegated = actor is null
+            ? null
+            : new Facilitator.Kernel.Shared.Evidence.DelegatedIdentity(actor, groups);
+        return new EffectivePrincipal(workload, delegated, actor is null ? "workload-only" : "delegation-validated");
     }
 }

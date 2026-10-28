@@ -58,6 +58,14 @@ public class FacilitatorDbContext(DbContextOptions<FacilitatorDbContext> options
 
     public DbSet<ResultManifestEntity> ResultManifests => Set<ResultManifestEntity>();
 
+    public DbSet<MemoryScopeEntity> MemoryScopes => Set<MemoryScopeEntity>();
+
+    public DbSet<MemoryEntryEntity> MemoryEntries => Set<MemoryEntryEntity>();
+
+    public DbSet<MemoryShareEntity> MemoryShares => Set<MemoryShareEntity>();
+
+    public DbSet<MemoryUsageEntity> MemoryUsage => Set<MemoryUsageEntity>();
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder model)
     {

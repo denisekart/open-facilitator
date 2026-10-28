@@ -760,6 +760,256 @@ namespace Facilitator.Migrations
                     b.ToTable("link_sessions", "facilitator");
                 });
 
+            modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.MemoryEntryEntity", b =>
+                {
+                    b.Property<Guid>("EntryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("entry_id");
+
+                    b.Property<string>("Classification")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("classification");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("content");
+
+                    b.Property<string>("ContentHash")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("content_hash");
+
+                    b.Property<string>("ContentSummary")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("content_summary");
+
+                    b.PrimitiveCollection<string[]>("ContradictsEntryIds")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("contradicts_entry_ids");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateTime?>("EffectiveFrom")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("effective_from");
+
+                    b.Property<DateTime?>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("MediaType")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("media_type");
+
+                    b.Property<DateTime>("ObservedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("observed_at");
+
+                    b.Property<string>("PolicyLabel")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("policy_label");
+
+                    b.Property<string>("ProvenanceJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("provenance");
+
+                    b.Property<int>("Revision")
+                        .HasColumnType("integer")
+                        .HasColumnName("revision");
+
+                    b.Property<Guid>("ScopeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<Guid?>("SupersedesEntryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("supersedes_entry_id");
+
+                    b.Property<string>("TeamSlug")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("team_slug");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("type");
+
+                    b.HasKey("EntryId");
+
+                    b.HasIndex("ExpiresAt")
+                        .HasDatabaseName("ix_memory_entries_expires")
+                        .HasFilter("status <> 'tombstoned'");
+
+                    b.HasIndex("ScopeId")
+                        .HasDatabaseName("ix_memory_entries_scope");
+
+                    b.HasIndex("TeamSlug")
+                        .HasDatabaseName("ix_memory_entries_team");
+
+                    b.ToTable("memory_entries", "facilitator", t =>
+                        {
+                            t.HasCheckConstraint("memory_entries_classification_check", "classification IN ('internal', 'public')");
+
+                            t.HasCheckConstraint("memory_entries_content_hash_check", "content_hash ~ '^sha256:[0-9a-f]{64}$'");
+
+                            t.HasCheckConstraint("memory_entries_policy_label_check", "policy_label IN ('private', 'team-only', 'facilitator-visible', 'evidence-only')");
+
+                            t.HasCheckConstraint("memory_entries_status_check", "status IN ('candidate', 'active', 'superseded', 'tombstoned')");
+
+                            t.HasCheckConstraint("memory_entries_type_check", "type IN ('observed_fact', 'experience', 'decision', 'lesson_candidate', 'lesson_verified', 'hypothesis', 'preference')");
+                        });
+                });
+
+            modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.MemoryScopeEntity", b =>
+                {
+                    b.Property<Guid>("ScopeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_id");
+
+                    b.Property<string>("CanonicalSelector")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("canonical_selector");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("kind");
+
+                    b.Property<Guid?>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
+                    b.Property<int?>("RetentionDays")
+                        .HasColumnType("integer")
+                        .HasColumnName("retention_days");
+
+                    b.Property<string>("TeamSlug")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("team_slug");
+
+                    b.Property<Guid?>("WorkId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("work_id");
+
+                    b.HasKey("ScopeId");
+
+                    b.HasIndex("CanonicalSelector")
+                        .IsUnique()
+                        .HasDatabaseName("ix_memory_scopes_selector");
+
+                    b.HasIndex("TeamSlug")
+                        .HasDatabaseName("ix_memory_scopes_team");
+
+                    b.ToTable("memory_scopes", "facilitator", t =>
+                        {
+                            t.HasCheckConstraint("memory_scopes_kind_check", "kind IN ('work', 'project', 'team', 'private')");
+                        });
+                });
+
+            modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.MemoryShareEntity", b =>
+                {
+                    b.Property<Guid>("ShareId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("share_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("EntryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("entry_id");
+
+                    b.Property<string>("GrantedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("granted_by");
+
+                    b.Property<string>("GranteeTeamSlug")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("grantee_team_slug");
+
+                    b.Property<DateTime?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at");
+
+                    b.HasKey("ShareId");
+
+                    b.HasIndex("EntryId", "GranteeTeamSlug")
+                        .IsUnique()
+                        .HasDatabaseName("ix_memory_shares_pair");
+
+                    b.ToTable("memory_shares", "facilitator");
+                });
+
+            modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.MemoryUsageEntity", b =>
+                {
+                    b.Property<Guid>("UsageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("usage_id");
+
+                    b.Property<string>("Consumer")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("consumer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("EntryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("entry_id");
+
+                    b.Property<string>("Justification")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("justification");
+
+                    b.Property<string>("Purpose")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("purpose");
+
+                    b.Property<Guid?>("WorkId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("work_id");
+
+                    b.HasKey("UsageId");
+
+                    b.HasIndex("EntryId")
+                        .HasDatabaseName("ix_memory_usage_entry");
+
+                    b.ToTable("memory_usage", "facilitator");
+                });
+
             modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.OutboxEntity", b =>
                 {
                     b.Property<Guid>("OutboxId")
@@ -1131,7 +1381,7 @@ namespace Facilitator.Migrations
 
                     b.ToTable("work_events", "facilitator", t =>
                         {
-                            t.HasCheckConstraint("work_events_kind_check", "kind IN ('created', 'state.transition', 'steer', 'command.accepted', 'assignment.transition', 'approval.decided', 'artifact.stored', 'artifact.registered', 'artifact.available', 'artifact.gc', 'manifest.recorded', 'manifest.superseded')");
+                            t.HasCheckConstraint("work_events_kind_check", "kind IN ('created', 'state.transition', 'steer', 'command.accepted', 'assignment.transition', 'approval.decided', 'artifact.stored', 'artifact.registered', 'artifact.available', 'artifact.gc', 'manifest.recorded', 'manifest.superseded', 'memory.candidate', 'memory.promoted')");
                         });
                 });
 
@@ -1177,6 +1427,26 @@ namespace Facilitator.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("link_enrollments_team_id_fkey");
+                });
+
+            modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.MemoryEntryEntity", b =>
+                {
+                    b.HasOne("Facilitator.Kernel.Shared.Persistence.MemoryScopeEntity", null)
+                        .WithMany()
+                        .HasForeignKey("ScopeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("memory_entries_scope_id_fkey");
+                });
+
+            modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.MemoryShareEntity", b =>
+                {
+                    b.HasOne("Facilitator.Kernel.Shared.Persistence.MemoryEntryEntity", null)
+                        .WithMany()
+                        .HasForeignKey("EntryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("memory_shares_entry_id_fkey");
                 });
 
             modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.ProjectEntity", b =>

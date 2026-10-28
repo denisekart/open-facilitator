@@ -158,9 +158,16 @@ process + DB boundaries (§26.1 items 5+8 complete).
 **Depends on:** 13, 14
 
 ### Plan 16 — Memory broker: scopes, ACLs, retain/recall/reflect over PostgreSQL FTS, adapter memory client
-**Status:** 🟡 in-progress (executed against `16_MEMORY_BROKER_PLAN.md`; detail design: `16-memory-broker.md`)
+**Status:** 🟢 done (executed against `16_MEMORY_BROKER_PLAN.md`; detail design: `16-memory-broker.md`)
 **Objective:** Memory contract layer (§14.3 core ops) as a broker over Postgres FTS: scope ownership + ACL-before-search, frozen candidate→promoted lifecycle, `memory.used` law, per-Project retention, cross-team private block, injection audit; memory client in `@ofac/adapter`. Slice-5 exit (memory half), §26.1 item 11.
 **Depends on:** 09, 10
+
+**Phase D closed:** both slice-5 halves run end-to-end — completion truth is
+kernel-verified manifest documents (Plan 15), and memory is a brokered service:
+retain/recall/reflect over Postgres FTS with ACL-before-search, owner-team law,
+candidate→promoted lifecycle, usage attestation, per-Project retention and the
+cross-team private block, proven by `src/gateway/test/e2e/memory-broker.e2e.test.ts`
+over real Keycloak + Postgres + kernel boundaries (§26.1 items 11+12 complete).
 
 **Normalized against Phase C as-built:** the Phase D wire surface is already half-frozen — `event.artifact.available`, `event.memory.candidate`, `event.memory.used`, `artifactRef`, and an extensible (`additionalProperties:true`) `result-manifest.v1` exist with fixtures, so 13–16 add commands/behavior, not contract (additive amendments follow the Plan 11 precedent, both harnesses same commit); every new inbound command rides 10's admission/evidence plane and 09's role gate with new binding rows, no new auth mechanism; digests split by law — artifacts SHA-256-of-bytes (schema-locked), result manifests RFC 8785 reusing 11's dual-language machinery; artifact/memory ledgers copy the 11 ApprovalLedger template (same-tx audit + outbox), the 13/16 arms copy 11/12's `ApprovalIngress` shape; the kernel never names a vendor (09's standing directive) — SeaweedFS lives in containers only.
 

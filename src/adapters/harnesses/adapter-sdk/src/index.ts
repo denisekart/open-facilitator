@@ -23,6 +23,22 @@ export {
   type UploadOptions,
 } from "./artifacts.js";
 export {
+  createMemoryClient,
+  type CandidateProvenance,
+  type MemoryCandidateInput,
+  type MemoryClient,
+  type MemoryPolicyLabel,
+  type MemoryProvenance,
+  type MemoryType,
+  type RecallEntry,
+  type RecallPurpose,
+  type RecallRequest,
+  type RecallResponse,
+  type RetainReceipt,
+  type RetainRequest,
+  type UsageAttestation,
+} from "./memory.js";
+export {
   ExecutionRegistry,
   TERMINAL_TTL_MS,
   type RegistryEntry,

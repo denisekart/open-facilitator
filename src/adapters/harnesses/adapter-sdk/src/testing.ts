@@ -457,6 +457,8 @@ export interface StubKernel {
   readonly url: string;
   /** artifactId (lowercase guid, no dashes) → stored bytes + mediaType + kernel digest. */
   readonly artifacts: Map<string, { bytes: Buffer; mediaType: string; digest: string }>;
+  /** entryId → retained memory content (Plan 16 stub leg). */
+  readonly memories: Map<string, { content: string; scopeSelector: string }>;
   /** Every envelope the stub received (assert completed-event legs against it). */
   readonly events: Array<Record<string, unknown>>;
   close(): Promise<void>;
@@ -466,6 +468,7 @@ export async function startStubKernel(opts?: { rejectDigest?: boolean }): Promis
   const artifacts = new Map<string, { bytes: Buffer; mediaType: string; digest: string }>();
   // commandId → allocated artifactId (the pending slot).
   const pending = new Map<string, string>();
+  const memories = new Map<string, { content: string; scopeSelector: string }>();
   const events: Array<Record<string, unknown>> = [];
   const server = createServer((request, response) => {
     const chunks: Buffer[] = [];
@@ -501,6 +504,52 @@ export async function startStubKernel(opts?: { rejectDigest?: boolean }): Promis
               uploadLocation: `/api/link/v1/artifacts/${artifactId}/content`,
               method: "POST",
               expiresAt: new Date(Date.now() + 900_000).toISOString(),
+            },
+          });
+          return;
+        }
+        // Plan 16 memory legs: retain stores in-memory and answers the
+        // receipt in-band (candidate, like the kernel's D4 law); recall
+        // substring-matches the store and answers the D8 shape.
+        if (env["type"] === "org.facilitator.command.memory.retain.v1") {
+          const entryId = randomUUID();
+          memories.set(entryId, {
+            content: String(data["content"] ?? ""),
+            scopeSelector: String(data["scopeSelector"] ?? ""),
+          });
+          send(202, {
+            deliveryId: randomUUID(),
+            status: "accepted",
+            processedAt: new Date().toISOString(),
+            data: { entryId, status: "candidate", duplicate: false },
+          });
+          return;
+        }
+        if (env["type"] === "org.facilitator.command.memory.recall.v1") {
+          const query = String(data["query"] ?? "").toLowerCase();
+          send(202, {
+            deliveryId: randomUUID(),
+            status: "accepted",
+            processedAt: new Date().toISOString(),
+            data: {
+              requestId: randomUUID(),
+              providerProfile: "postgres-fts",
+              entries: [...memories.entries()]
+                .filter(([, row]) => row.content.toLowerCase().includes(query))
+                .map(([entryId, row]) => ({
+                  entryId,
+                  scopeId: row.scopeSelector,
+                  type: "observed_fact",
+                  content: row.content,
+                  contentHash: "sha256:" + "0".repeat(64),
+                  provenance: {},
+                  observedAt: new Date().toISOString(),
+                  revision: 1,
+                  status: "candidate",
+                  policyLabel: "team-only",
+                })),
+              truncated: false,
+              asOf: new Date().toISOString(),
             },
           });
           return;
@@ -547,6 +596,7 @@ export async function startStubKernel(opts?: { rejectDigest?: boolean }): Promis
     url,
     artifacts,
     events,
+    memories,
     close: () => {
       server.close();
       return closing.promise;

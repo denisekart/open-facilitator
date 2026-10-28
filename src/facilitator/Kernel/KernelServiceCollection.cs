@@ -5,6 +5,7 @@ using Facilitator.Kernel.Shared.Auth;
 using Facilitator.Kernel.Shared.Dispatch;
 using Facilitator.Kernel.Shared.Evidence;
 using Facilitator.Kernel.Shared.Identity;
+using Facilitator.Kernel.Shared.Memory;
 using Facilitator.Kernel.Shared.Persistence;
 using Facilitator.Kernel.Shared.Storage;
 using Facilitator.Kernel.Work;
@@ -39,6 +40,7 @@ public static class KernelServiceCollection
         builder.AddWorkFeature();
         builder.AddStorageFeature();
         builder.AddLinkFeature();
+        builder.AddMemoryFeature();
         return builder;
     }
 
@@ -94,6 +96,7 @@ public static class KernelServiceCollection
         builder.Services.AddScoped<ResultIngress>();
         builder.Services.AddScoped<IResultManifestLedger, ResultManifestLedger>();
         builder.Services.AddScoped<ApprovalIngress>();
+        builder.Services.AddScoped<MemoryIngress>();
         return builder;
     }
 
@@ -164,6 +167,25 @@ public static class KernelServiceCollection
         builder.Services.AddScoped<IArtifactLedger, ArtifactLedger>();
         builder.Services.AddSingleton<RetentionGcService>();
         builder.Services.AddHostedService(sp => sp.GetRequiredService<RetentionGcService>());
+        return builder;
+    }
+
+    /// <summary>Memory broker (Plan 16): options (fail-closed provider check), the provider port, the broker.</summary>
+    private static WebApplicationBuilder AddMemoryFeature(this WebApplicationBuilder builder)
+    {
+        var memory = builder.Configuration.GetSection(MemoryOptions.SectionName).Get<MemoryOptions>() ?? new MemoryOptions();
+        builder.Services.AddSingleton(memory);
+        builder.Services.AddSingleton<IMemoryProvider>(sp => memory.Provider switch
+        {
+            // Read once at composition: no hot-swap. postgres-fts is the only
+            // shipped profile (spec §14.7); hindsight/custom are documented seams.
+            "postgres-fts" => new PostgresFtsMemoryProvider(),
+            _ => throw new InvalidOperationException(
+                $"Memory:Provider '{memory.Provider}' is unknown (only 'postgres-fts' ships) — fail-closed."),
+        });
+        builder.Services.AddScoped<MemoryBroker>();
+        builder.Services.AddSingleton<MemoryRetentionService>();
+        builder.Services.AddHostedService(sp => sp.GetRequiredService<MemoryRetentionService>());
         return builder;
     }
 

@@ -50,7 +50,8 @@ public sealed class LinkIngress(
     TimeProvider timeProvider,
     Facilitator.Kernel.Work.ApprovalIngress approvals,
     Facilitator.Kernel.Work.ArtifactIngress artifacts,
-    Facilitator.Kernel.Work.ResultIngress results)
+    Facilitator.Kernel.Work.ResultIngress results,
+    Facilitator.Kernel.Work.MemoryIngress memory)
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
@@ -80,7 +81,21 @@ public sealed class LinkIngress(
                 ticketData = live is null ? null : Facilitator.Kernel.Work.ArtifactEndpoints.Ticket(live);
             }
 
-            return new LinkAdmission(null, "duplicate", inboxId, ticketData);
+            // Plan 16 law: a duplicate retain re-runs the idempotent broker
+            // path (content-hash dedupe returns the stored identity +
+            // duplicate:true); a duplicate recall re-runs (a recall is a read
+            // whose usage rows are per-delivery by design).
+            object? memoryData = null;
+            if (screen.Type == Facilitator.Kernel.Work.MemoryIngress.RetainType
+                || screen.Type == Facilitator.Kernel.Work.MemoryIngress.RecallType)
+            {
+                var arm = screen.Type == Facilitator.Kernel.Work.MemoryIngress.RetainType
+                    ? await memory.HandleRetainAsync(root, screen.Principal, ct)
+                    : await memory.HandleRecallAsync(root, screen.Principal, ct);
+                memoryData = arm.Data;
+            }
+
+            return new LinkAdmission(null, "duplicate", inboxId, ticketData ?? memoryData);
         }
 
         if (!screen.IsCommand)
@@ -118,6 +133,30 @@ public sealed class LinkIngress(
                 // the manifest; a refusal settles the inbox with the refused
                 // status, mirroring the artifact.available arm.
                 var arm = await results.HandleCompletedAsync(root, screen.Principal, ct);
+                if (arm.Refused)
+                {
+                    await inbox.MarkProcessedAsync(inboxId, arm.Status, ct);
+                    return new LinkAdmission(arm.Problem, null, null);
+                }
+
+                await inbox.MarkProcessedAsync(inboxId, null, ct);
+                metrics.InboxProcessed();
+                return new LinkAdmission(null, "accepted", inboxId);
+            }
+
+            if (screen.Type == Facilitator.Kernel.Work.MemoryIngress.CandidateType
+                || screen.Type == Facilitator.Kernel.Work.MemoryIngress.UsedType)
+            {
+                // Plan 16: the frozen memory events record their ledger effect;
+                // a refusal settles the inbox with the refused status, mirroring
+                // the manifest arm. Memory outages never refuse (accepted path).
+                // Events carry no evidence, so the authority is the enrolled
+                // workload itself — its team owns the landed entry.
+                var eventPrincipal = new Facilitator.Kernel.Shared.Evidence.EffectivePrincipal(
+                    workload, null, "workload-only");
+                var arm = screen.Type == Facilitator.Kernel.Work.MemoryIngress.CandidateType
+                    ? await memory.HandleCandidateAsync(root, eventPrincipal, ct)
+                    : await memory.HandleUsedAsync(root, eventPrincipal, ct);
                 if (arm.Refused)
                 {
                     await inbox.MarkProcessedAsync(inboxId, arm.Status, ct);
@@ -202,6 +241,25 @@ public sealed class LinkIngress(
             await inbox.MarkProcessedAsync(inboxId, null, ct);
             metrics.InboxProcessed();
             return new LinkAdmission(null, "confirmed", inboxId);
+        }
+
+        if (screen.Type == Facilitator.Kernel.Work.MemoryIngress.RetainType
+            || screen.Type == Facilitator.Kernel.Work.MemoryIngress.RecallType)
+        {
+            // Plan 16 D1: the retain receipt / recall response ride the ack
+            // in-band (the request_upload ticket precedent).
+            var arm = screen.Type == Facilitator.Kernel.Work.MemoryIngress.RetainType
+                ? await memory.HandleRetainAsync(root, screen.Principal, ct)
+                : await memory.HandleRecallAsync(root, screen.Principal, ct);
+            if (arm.Refused)
+            {
+                await inbox.MarkProcessedAsync(inboxId, arm.Status, ct);
+                return new LinkAdmission(arm.Problem, null, null);
+            }
+
+            await inbox.MarkProcessedAsync(inboxId, null, ct);
+            metrics.InboxProcessed();
+            return new LinkAdmission(null, "accepted", inboxId, arm.Data);
         }
 
         var workId = EnvelopeReader.WorkIdOf(root);

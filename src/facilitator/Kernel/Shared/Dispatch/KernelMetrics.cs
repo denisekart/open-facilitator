@@ -28,6 +28,12 @@ public sealed class KernelMetrics
     private readonly Counter<long> _manifestRecorded;
     private readonly Counter<long> _manifestSuperseded;
     private readonly Counter<long> _manifestDigestMismatch;
+    private readonly Counter<long> _memoryRetained;
+    private readonly Counter<long> _memoryRecalled;
+    private readonly Counter<long> _memoryUsed;
+    private readonly Counter<long> _memoryPromoted;
+    private readonly Counter<long> _memoryDenied;
+    private readonly Histogram<double> _memoryRecallLatency;
     private readonly Histogram<double> _deliveryLatency;
     private readonly Histogram<double> _ingressLatency;
     private readonly Histogram<double> _artifactStoreLatency;
@@ -65,6 +71,12 @@ public sealed class KernelMetrics
         _manifestRecorded = meter.CreateCounter<long>("facilitator.manifest.recorded", description: "Result manifests recorded into the ledger (tag: origin)");
         _manifestSuperseded = meter.CreateCounter<long>("facilitator.manifest.superseded", description: "Result-manifest chain heads superseded by a correction");
         _manifestDigestMismatch = meter.CreateCounter<long>("facilitator.manifest.digest_mismatch", description: "Manifest recompute-vs-declared digest rejections");
+        _memoryRetained = meter.CreateCounter<long>("facilitator.memory.retained", description: "Entries retained (tags: status, origin)");
+        _memoryRecalled = meter.CreateCounter<long>("facilitator.memory.recalled", description: "Recall queries served (tag: truncated)");
+        _memoryUsed = meter.CreateCounter<long>("facilitator.memory.used", description: "Usage rows written (auto-recall + attestations)");
+        _memoryPromoted = meter.CreateCounter<long>("facilitator.memory.promoted", description: "Candidates promoted to active");
+        _memoryDenied = meter.CreateCounter<long>("facilitator.memory.denied", description: "Broker denials (tag: reason)");
+        _memoryRecallLatency = meter.CreateHistogram<double>("facilitator.memory.recall.latency", unit: "ms", description: "Recall query latency");
     }
 
     /// <summary>Record one charged delivery attempt.</summary>
@@ -136,6 +148,29 @@ public sealed class KernelMetrics
 
     /// <summary>Record one manifest digest-recompute rejection.</summary>
     public void ManifestDigestMismatch() => _manifestDigestMismatch.Add(1);
+
+    /// <summary>Record one retained entry (or dedupe hit).</summary>
+    /// <param name="status">candidate | active (the landed status).</param>
+    /// <param name="origin">link | rest.</param>
+    public void MemoryRetained(string status, string origin) => _memoryRetained.Add(1,
+        new KeyValuePair<string, object?>("status", status), new KeyValuePair<string, object?>("origin", origin));
+
+    /// <summary>Record one served recall query.</summary>
+    /// <param name="truncated">true | false.</param>
+    public void MemoryRecalled(string truncated) => _memoryRecalled.Add(1, new KeyValuePair<string, object?>("truncated", truncated));
+
+    /// <summary>Record one memory_usage row written.</summary>
+    public void MemoryUsed() => _memoryUsed.Add(1);
+
+    /// <summary>Record one candidate promotion.</summary>
+    public void MemoryPromoted() => _memoryPromoted.Add(1);
+
+    /// <summary>Record one broker denial.</summary>
+    /// <param name="reason">Machine reason tag (quota, selector-unresolvable, ...).</param>
+    public void MemoryDenied(string reason) => _memoryDenied.Add(1, new KeyValuePair<string, object?>("reason", reason));
+
+    /// <summary>Record recall latency in milliseconds.</summary>
+    public void MemoryRecallLatency(double ms) => _memoryRecallLatency.Record(ms);
 
     /// <summary>Refresh the GC last-pass-age gauge (written by the GC loop each pass).</summary>
     public void SetGcLastPassAge(long seconds) => Volatile.Write(ref _gcLastPassAgeSeconds, seconds);

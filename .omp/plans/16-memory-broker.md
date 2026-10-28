@@ -1,6 +1,6 @@
 # Plan 16 — Memory broker: scopes, ACLs, retain/recall/reflect over PostgreSQL FTS, adapter memory client
 
-**Status:** 🟡 In progress — executed against `16_MEMORY_BROKER_PLAN.md` (its Implementation Status table is the record of evidence + divergences); flips green on CI (detail design: this file).
+**Status:** 🟢 done — executed against `16_MEMORY_BROKER_PLAN.md` (its Implementation Status table is the record of evidence + divergences); full gate green on `500ca19`+worktree: `make lint`/`make build`/`make test` (dotnet 254/254, vitest all packages, fixtures 88/88)/`make docs-check`/`pnpm -r typecheck` (detail design: this file).
 **Phase:** D (fourth, closes Phase D — slice-5 memory half). **Depends on:** 09 + 10 (principals, evidence, audit — as-built); consumes Plan 15's artifacts as `sourceRef` targets. Independent of the artifact *storage* backend: safe to interleave with 13–15 after 09/10.
 **Branching:** work and commit **directly on `main`** (standing directive from Plans 03–08). Do not push.
 **Questions may be asked during planning, but not during implementation.** In implementation, prefer straightforward fixes consistent with this plan; if several iterations fail, step back and simplify rather than adding machinery.

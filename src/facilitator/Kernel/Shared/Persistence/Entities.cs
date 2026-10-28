@@ -542,3 +542,97 @@ public sealed class ResultManifestEntity
     public string State { get; set; } = "recorded";
     public DateTime RecordedAt { get; set; }
 }
+
+/// <summary>
+/// facilitator.memory_scopes — one home scope per memory entry (Plan 16, spec §14.2):
+/// rows are provisioned lazily by retain (D6), owned by exactly one team. The
+/// canonical selector is the broker-resolved identity, never a worker claim.
+/// </summary>
+public sealed class MemoryScopeEntity
+{
+    public Guid ScopeId { get; set; }
+    /// <summary>work | project | team | private (CHECK).</summary>
+    public string Kind { get; set; } = string.Empty;
+    /// <summary>Owning team — the ACL anchor every readable-scope predicate starts from.</summary>
+    public string TeamSlug { get; set; } = string.Empty;
+    public Guid? ProjectId { get; set; }
+    public Guid? WorkId { get; set; }
+    /// <summary>Broker-resolved selector (e.g. <c>project:&lt;guid&gt;</c>); unique.</summary>
+    public string CanonicalSelector { get; set; } = string.Empty;
+    /// <summary>Retention override materialized from per-Project policy at provisioning (D7); null = default.</summary>
+    public int? RetentionDays { get; set; }
+    public DateTime CreatedAt { get; set; }
+}
+
+/// <summary>
+/// facilitator.memory_entries — the broker's searchable knowledge rows (Plan 16).
+/// <c>team_slug</c> is denormalized from the scope for the single-table ACL
+/// predicate (D2: ACL before search, always in SQL). Tombstoning empties
+/// <c>content</c> in the same tx (D5), which recomputes the stored tsvector
+/// generated column — the broker never reads or writes that column.
+/// </summary>
+public sealed class MemoryEntryEntity
+{
+    public Guid EntryId { get; set; }
+    public Guid ScopeId { get; set; }
+    /// <summary>Owner team (denormalized from the scope for the ACL predicate).</summary>
+    public string TeamSlug { get; set; } = string.Empty;
+    /// <summary>One of the seven §14.4 classifications (CHECK).</summary>
+    public string Type { get; set; } = string.Empty;
+    public string Content { get; set; } = string.Empty;
+    public string MediaType { get; set; } = "text/plain";
+    public string ContentSummary { get; set; } = string.Empty;
+    /// <summary>Wire digest of the content bytes ("sha256:&lt;64hex&gt;", CHECK).</summary>
+    public string ContentHash { get; set; } = string.Empty;
+    /// <summary>jsonb provenance document (source, evidenceRef, createdBy, createdAt, optional work/execution/digest).</summary>
+    public string ProvenanceJson { get; set; } = "{}";
+    public DateTime ObservedAt { get; set; }
+    public DateTime? EffectiveFrom { get; set; }
+    /// <summary>internal | public (CHECK).</summary>
+    public string Classification { get; set; } = "internal";
+    /// <summary>private | team-only | facilitator-visible | evidence-only (CHECK).</summary>
+    public string PolicyLabel { get; set; } = "team-only";
+    /// <summary>candidate | active | superseded | tombstoned (CHECK).</summary>
+    public string Status { get; set; } = "candidate";
+    public int Revision { get; set; } = 1;
+    /// <summary>The entry this revision supersedes; null on the first revision.</summary>
+    public Guid? SupersedesEntryId { get; set; }
+    public Guid[] ContradictsEntryIds { get; set; } = [];
+    /// <summary>Materialized at retain from the scope/Project policy (D7); null = never expires.</summary>
+    public DateTime? ExpiresAt { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public string CreatedBy { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// facilitator.memory_shares — explicit cross-team read grants (Plan 16, D2).
+/// One row per (entry, grantee); revocation stamps <c>RevokedAt</c> and a
+/// re-grant clears it, so a pair never has duplicate rows.
+/// </summary>
+public sealed class MemoryShareEntity
+{
+    public Guid ShareId { get; set; }
+    public Guid EntryId { get; set; }
+    public string GranteeTeamSlug { get; set; } = string.Empty;
+    public string GrantedBy { get; set; } = string.Empty;
+    public DateTime CreatedAt { get; set; }
+    public DateTime? RevokedAt { get; set; }
+}
+
+/// <summary>
+/// facilitator.memory_usage — the <c>memory.used</c> law as data (appendix §6.2,
+/// Plan 16 D3): one row per entry returned to an automated reader (kernel recall
+/// or an external attestation via <c>event.memory.used</c>). Rows survive entry
+/// deletion: the audit trail outlives the content.
+/// </summary>
+public sealed class MemoryUsageEntity
+{
+    public Guid UsageId { get; set; }
+    public Guid EntryId { get; set; }
+    /// <summary>Canonical actor string of the consumer.</summary>
+    public string Consumer { get; set; } = string.Empty;
+    public string Purpose { get; set; } = string.Empty;
+    public string Justification { get; set; } = string.Empty;
+    public Guid? WorkId { get; set; }
+    public DateTime CreatedAt { get; set; }
+}

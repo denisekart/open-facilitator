@@ -161,3 +161,54 @@ it boots an in-process Gateway listener, drives the full lifecycle against
 your adapter, and schema-validates your terminal event. Wire-level fixtures
 live in `protocol/conformance-fixtures/` (class `adapter`). The no-Docker
 walkthrough: `examples/slim/deterministic-research-worker/`.
+
+## Memory broker
+
+The kernel is a **broker, not a memory product**: it stores, indexes, and
+ACLs what teams retain, and enforces the read law — it does not decide what
+is worth remembering. Extraction, consolidation, and reflection live
+team-side (harness or provider); the kernel's `reflect` answer is a typed
+`unsupported`.
+
+### Provider profiles (as fact)
+
+|`Memory:Provider`|State|
+|---|---|
+|`postgres-fts`|The shipped reference profile: PostgreSQL tsvector index over the entry rows, ranked recall, no sidecar process|
+|`hindsight`, `custom`|Documented seams only — the `IMemoryProvider` port is the seam; naming an unshipped profile fails composition (fail-closed, read once at boot)|
+
+Disabling the surface is configuration (drop the `Memory` section ⇒ the
+`postgres-fts` default composes; a deployment that wants no memory simply
+gates every `memory.*` operation off, since the broker never runs a
+background process that needs it).
+
+### Scopes and the `work:` mapping law
+
+Entry scopes are `work:`, `project:`, `team:`, `private:` — provisioned
+lazily by the first retain into them (owner team + canonical selector). The
+frozen candidate-event `scope` enum has no `work:` member, so the mapping
+law is: **a `work:` selector addresses a project-scope entry carrying
+`workId` in its provenance**, and a candidate event with `scope: "workspace"`
+lands team-scoped-by-ownership. A `team:` write selector names exactly the
+caller's team; `scopeSelectors` on a recall are hints the broker intersects
+with the readable predicate.
+
+### Team-side profile
+
+Teams opt in through a `.facilitator/memory.yaml` profile (owner-verified
+configuration, not a privilege grant — spec §14.10/§14.11): `provider`,
+`retrieval.{enabled,maxItems,maxTokens,purposes}`, `retention.*`,
+`sharing.*`, `reflect.enabled`. The kernel reads none of it; it is the
+Gateway/harness-side statement of how the team uses the broker.
+
+### Retention homes
+
+Per-Project policy rides the `projects.config` jsonb key `memory`
+(Plan 14's carrier): `{"workCandidateDays": int, "candidateDays": int}` —
+work scopes read `workCandidateDays`, project scopes `candidateDays`,
+matching the `memory.yaml` `retention.*` names. The kernel-level fallback is
+`Memory:Retention:CandidateDays` (90). The retention pass
+(`MemoryRetentionService`, advisory lock 420003, interval
+`Memory:Gc:IntervalSeconds`) tombstones lapsed candidates under the same
+deletion law as a manual delete (content drop, share revocation, usage
+retention) and audits `memory.gc`.

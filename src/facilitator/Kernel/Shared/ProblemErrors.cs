@@ -206,4 +206,23 @@ public static class ProblemErrors
     public static ProblemDetails ManifestOutputUnresolvable(string manifestId) =>
         Create("manifest-output-unresolvable", "Manifest output unresolvable", StatusCodes.Status422UnprocessableEntity,
             $"manifest '{manifestId}' declares an output artifact the kernel cannot resolve");
+
+    /// <summary>404 unknown or foreign-team memory entry (non-disclosure: identical for every cause, the artifact/manifest precedent).</summary>
+    public static ProblemDetails MemoryNotFound(string entryId) =>
+        Create("memory-not-found", "Memory entry not found", StatusCodes.Status404NotFound,
+            $"no memory entry '{entryId}' visible to this principal");
+
+    /// <summary>422 the team's daily retain budget is spent (§14.8 write-amplification law).</summary>
+    public static ProblemDetails MemoryQuotaExceeded(string team) =>
+        Create("memory-quota-exceeded", "Memory quota exceeded", StatusCodes.Status422UnprocessableEntity,
+            $"team '{team}' has spent its daily retain budget");
+
+    /// <summary>422 a share contradicts the law (private entry) or names a team the roster lacks.</summary>
+    public static ProblemDetails MemoryShareDenied(string detail) =>
+        Create("memory-share-denied", "Memory share denied", StatusCodes.Status422UnprocessableEntity, detail);
+
+    /// <summary>422 the scope selector is malformed, unresolvable, or names a foreign team's scope for a write.</summary>
+    public static ProblemDetails MemoryScopeInvalid(string selector) =>
+        Create("memory-scope-invalid", "Memory scope invalid", StatusCodes.Status422UnprocessableEntity,
+            $"selector '{selector}' does not resolve to a scope this caller may write");
 }

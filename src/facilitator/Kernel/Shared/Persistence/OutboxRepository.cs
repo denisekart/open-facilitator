@@ -90,6 +90,23 @@ public sealed class OutboxRepository(
         await MarkDeliveredOnAsync(db, outboxId, timeProvider.GetUtcNow().UtcDateTime, ct);
     }
 
+    /// <summary>
+    /// Persist a trace-stamped envelope for a row this replica currently
+    /// leases (dispatcher's durable-queue extract-or-fresh law). Lease-guarded
+    /// so a row reclaimed by another replica is never clobbered; envelope is
+    /// the only column touched.
+    /// </summary>
+    public async Task RestampEnvelopeAsync(Guid outboxId, string owner, string envelopeJson, CancellationToken ct)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(ct);
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+             UPDATE facilitator.outbox
+                SET envelope = {envelopeJson}::jsonb
+              WHERE outbox_id = {outboxId} AND status = 'leased' AND lease_owner = {owner}
+             """, ct);
+    }
+
     /// <summary>Mark-delivered on a caller-owned context (participates in its tx — the link ack).</summary>
     public static async Task MarkDeliveredOnAsync(FacilitatorDbContext db, Guid outboxId, DateTime now, CancellationToken ct) =>
         await db.Database.ExecuteSqlInterpolatedAsync(

@@ -14,6 +14,7 @@ policy-gated. One seeded `work.assign` then dispatches end-to-end.
 ./referencectl up slim        # build + wait healthy + seed the demo path
 ./referencectl up slim --no-seed   # stack only (seeds own data)
 ./referencectl status         # service table + kernel + gateway probes
+./referencectl verify         # acceptance run: 11 steps over the --no-seed stack
 ./referencectl down           # down -v with -v; FULL=1 adds the overlay
 make compose-slim / compose-full / compose-down   # raw compose path
 ```

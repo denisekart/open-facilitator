@@ -21,6 +21,7 @@ execution authority team-side; small adapters wrap the harnesses.
 - `make test` — xUnit + vitest + conformance fixtures; the .NET suite has a
   < 10 min wall budget (testcontainers Postgres).
 - `make lint`, `make docs-check`, `pnpm -r --if-present typecheck`.
+- **Acceptance law:** the slim reference env is acceptance-required for every task and locally IS the gate (hosted ref-env CI jobs commented out, free-tier): `up slim --no-seed && referencectl verify` exits 0, from clean.
 - e2e tier: `make link-e2e` (needs Postgres at `FACILITATOR_PG`; own server per file).
 - Single slice: `dotnet test --filter "FullyQualifiedName~<Folder>"`,
   `pnpm -C <pkg> test`, `vitest run <file>`.
@@ -55,10 +56,8 @@ you touch — the nearest file wins.
   `src/facilitator/Kernel/Shared/Persistence/Entities.cs` + configuration
   under `Configurations/` + migration. New wire message type: schema in
   `protocol/json-schema/` → `pnpm protocol:codegen` → fixtures.
-- Enrollment/auth: `src/facilitator/Kernel/Link/LinkEndpoints.Enroll.cs` and
-  the `src/facilitator/Kernel/Shared/Auth` folder. Metrics/tracing:
-  `KernelMetrics.cs` + `KernelActivity.cs` under Shared/Dispatch. CLI:
-  `src/facilitator/Kernel/Shared/Cli`.
+- Enrollment/auth: `src/facilitator/Kernel/Link/LinkEndpoints.Enroll.cs` +
+  the `src/facilitator/Kernel/Shared/Auth` folder. Metrics/tracing: `KernelMetrics.cs` + `KernelActivity.cs` under Shared/Dispatch. CLI: `src/facilitator/Kernel/Shared/Cli`.
 
 ## omp workspace layer
 - Profiles: dotnet-aspire, svelte. Stack is .NET + TypeScript — ignore

@@ -57,6 +57,13 @@ public sealed class TestDbProbe : IAsyncDisposable
         return rows.Count == 0 ? null : Guid.Parse(Assert.Single(rows));
     }
 
+    /// <summary>The stored envelope jsonb text for a command's outbox row (post-dispatch, to observe the dispatcher's trace stamp).</summary>
+    public async Task<string?> OutboxEnvelopeByCommand(string commandId)
+    {
+        var rows = await TextList("SELECT envelope::text FROM facilitator.outbox WHERE command_id = $1", commandId);
+        return rows.Count == 0 ? null : Assert.Single(rows);
+    }
+
     /// <summary>Envelope jsonb snapshots for a work's outbox rows.</summary>
     public Task<List<string>> OutboxEnvelopes(Guid workId) =>
         TextList("SELECT envelope::text FROM facilitator.outbox WHERE work_id = $1", workId);

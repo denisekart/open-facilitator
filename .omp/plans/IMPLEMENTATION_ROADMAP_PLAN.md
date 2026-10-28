@@ -192,7 +192,7 @@ over real Keycloak + Postgres + kernel boundaries (§26.1 items 11+12 complete).
 **Depends on:** 17
 
 ### Plan 19 — Acceptance run: `referencectl verify`, CI tier, getting-started
-**Status:** ⬜ not-started (detail design: `19-slim-acceptance-verify-ci-docs.md`)
+**Status:** 🟡 acceptance run + trace propagation + docs landed, verified locally (`verify --json` 11/11 on a clean slim stack); the hosted CI tier is written but commented out (free-tier compute) — the acceptance run is a documented local gate (execution record: `19_SLIM_ACCEPTANCE_VERIFY_CI_PLAN.md`)
 **Objective:** §21.1 acceptance script as `referencectl verify` (incl. mid-task restarts + OTLP→Aspire correlation), PR-bring-up/main-nightly-verify dual-arch CI tier, `docs/getting-started.md` to §28. Slice-6 exit, §26.1 item 15 (slim half).
 **Depends on:** 17, 18
 

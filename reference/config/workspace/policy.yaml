@@ -1,11 +1,15 @@
 # Demo team policy: analyze runs free, publish parks for a human confirm.
 # First-match-wins, implicit final deny (docs/security.md "Team policy
-# engine"). Empty actorAnyOf matches every actor.
+# engine"). The confirm row matches the gateway workload caller (the assign
+# rides the link plane with the workload's claims) AND names the team group
+# as an eligible responder, so a team member (alice) can answer the approval
+# via the kernel respond route; empty actorAnyOf would leave only the
+# workload itself eligible.
 owner: team-alpha
 policies:
   - capability: research.publish
     resources: ["*"]
-    actorAnyOf: []
+    actorAnyOf: ["workload:gw.team-alpha", "group:/teams/team-alpha"]
     effect: confirm
   - capability: research.analyze
     resources: ["*"]

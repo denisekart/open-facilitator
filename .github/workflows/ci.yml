@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
   pull_request:
+  schedule:
+    - cron: '30 2 * * *'
+  workflow_dispatch:
 
 jobs:
   dotnet:
@@ -77,82 +80,121 @@ jobs:
       - run: docker build -t facilitator:ci -f src/facilitator/Dockerfile .
       - run: docker build -t node-runtime:ci -f Dockerfile.node .
 
-  ref-env-bringup:
-    # The slim reference environment boots authenticated, S3-backed and
-    # OTLP-exporting end-to-end (compose assertions, PR tier).
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    steps:
-      - uses: actions/checkout@v5
-      - run: docker build -t facilitator:ci -f src/facilitator/Dockerfile .
-      - name: "boot slim stack (referencectl: up + wait + seed)"
-        run: ./referencectl up slim
-      - name: demo workspace linked + dispatch completed
-        working-directory: reference
-        run: |
-          # Gateway ready with the deterministic worker registered as a child.
-          # Diagnostics bind the container's loopback only -> probe in place.
-          docker compose --env-file versions.env --env-file .env -f compose.slim.yaml \
-            exec -T demo-workspace node -e \
-            "fetch('http://127.0.0.1:8099/status').then(r=>r.ok?r.json():Promise.reject(r.status)).then(s=>process.stdout.write(JSON.stringify(s)))" \
-            | jq -e '.state=="ready" and ([.children[] | select(.state=="connected")] | length >= 1)'
-          # The seeded work.assign rode kernel → gateway → worker → artifact
-          # → receipt: the completed event must be in the kernel inbox.
-          for _ in $(seq 1 30); do
-            docker compose --env-file versions.env --env-file .env -f compose.slim.yaml \
-              exec -T postgres psql -U demo -d facilitator -tAc \
-              "SELECT 1 FROM facilitator.inbox WHERE payload->>'type'='org.facilitator.event.assignment.completed.v1'" \
-              | grep -q '^1$' && exit 0
-            sleep 2
-          done
-          docker compose --env-file versions.env --env-file .env -f compose.slim.yaml logs demo-workspace
-          exit 1
-      - name: host-side assertions
-        run: |
-          curl -sf http://localhost:8088/health
-          curl -sf http://localhost:8080/realms/facilitator/.well-known/openid-configuration >/dev/null
-          # 401 without a token
-          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8088/api/dead-letters)" = 401
-          # 200 with a facilitator-cli bearer
-          TOKEN=$(curl -sf http://localhost:8080/realms/facilitator/protocol/openid-connect/token \
-            -d grant_type=client_credentials -d client_id=facilitator-cli \
-            -d client_secret=e2e-cli-secret | jq -r .access_token)
-          curl -sf http://localhost:8088/api/dead-letters -H "Authorization: Bearer $TOKEN" >/dev/null
-      - name: telemetry arrives at the dashboard
-        run: |
-          # The GETs above generated ASP.NET Core spans; the dashboard's
-          # telemetry API must report them within its export interval.
-          # (OTEL_SERVICE_NAME pins the resource name in compose.)
-          for _ in $(seq 1 30); do
-            curl -sf http://localhost:18888/api/telemetry/spans 2>/dev/null \
-              | grep -q 'facilitator' && exit 0
-            sleep 2
-          done
-          curl -s http://localhost:18888/api/telemetry/spans; exit 1
-      - name: artifact bucket exists
-        working-directory: reference
-        run: |
-          AWS_ACCESS_KEY_ID=$(grep '^DEMO_S3_ACCESS_KEY=' .env | cut -d= -f2)
-          AWS_SECRET_ACCESS_KEY=$(grep '^DEMO_S3_SECRET_KEY=' .env | cut -d= -f2)
-          AWS_DEFAULT_REGION=us-east-1
-          export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_DEFAULT_REGION
-          docker run --rm --network host \
-            -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_DEFAULT_REGION \
-            "amazon/aws-cli:$(grep '^AWSCLI_TAG=' versions.env | cut -d= -f2)" \
-            --endpoint-url http://127.0.0.1:8333 s3 ls s3://facilitator-artifacts
-      - name: kernel booted clean
-        working-directory: reference
-        run: |
-          docker compose --env-file versions.env --env-file .env -f compose.slim.yaml logs facilitator
-          ! docker compose --env-file versions.env --env-file .env -f compose.slim.yaml \
-            logs --no-log-prefix facilitator | grep -q "Unhandled exception"
-      - name: teardown
-        if: always()
-        working-directory: reference
-        run: |
-          docker compose --env-file versions.env --env-file .env -f compose.slim.yaml logs || true
-          docker compose --env-file versions.env --env-file .env -f compose.slim.yaml down -v
-
+# ref-env-bringup + ref-env-verify are DISABLED on CI (free-tier GitHub compute).
+# The slim reference environment + the acceptance run remain ACCEPTANCE-REQUIRED:
+# run `./referencectl up slim --no-seed && ./referencectl verify --json` locally
+# before declaring any task done (see reference/AGENTS.md, reference/README.md).
+# Uncomment the two jobs below to re-enable the hosted gate.
+#   ref-env-bringup:
+#     # The slim reference environment boots authenticated, S3-backed and
+#     # OTLP-exporting end-to-end (compose assertions, PR tier).
+#     runs-on: ubuntu-latest
+#     timeout-minutes: 25
+#     steps:
+#       - uses: actions/checkout@v5
+#       - run: docker build -t facilitator:ci -f src/facilitator/Dockerfile .
+#       - name: "boot slim stack (referencectl: up + wait + seed)"
+#         run: ./referencectl up slim
+#       - name: demo workspace linked + dispatch completed
+#         working-directory: reference
+#         run: |
+#           # Gateway ready with the deterministic worker registered as a child.
+#           # Diagnostics bind the container's loopback only -> probe in place.
+#           docker compose --env-file versions.env --env-file .env -f compose.slim.yaml \
+#             exec -T demo-workspace node -e \
+#             "fetch('http://127.0.0.1:8099/status').then(r=>r.ok?r.json():Promise.reject(r.status)).then(s=>process.stdout.write(JSON.stringify(s)))" \
+#             | jq -e '.state=="ready" and ([.children[] | select(.state=="connected")] | length >= 1)'
+#           # The seeded work.assign rode kernel → gateway → worker → artifact
+#           # → receipt: the completed event must be in the kernel inbox.
+#           for _ in $(seq 1 30); do
+#             docker compose --env-file versions.env --env-file .env -f compose.slim.yaml \
+#               exec -T postgres psql -U demo -d facilitator -tAc \
+#               "SELECT 1 FROM facilitator.inbox WHERE payload->>'type'='org.facilitator.event.assignment.completed.v1'" \
+#               | grep -q '^1$' && exit 0
+#             sleep 2
+#           done
+#           docker compose --env-file versions.env --env-file .env -f compose.slim.yaml logs demo-workspace
+#           exit 1
+#       - name: host-side assertions
+#         run: |
+#           curl -sf http://localhost:8088/health
+#           curl -sf http://localhost:8080/realms/facilitator/.well-known/openid-configuration >/dev/null
+#           # 401 without a token
+#           test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8088/api/dead-letters)" = 401
+#           # 200 with a facilitator-cli bearer
+#           TOKEN=$(curl -sf http://localhost:8080/realms/facilitator/protocol/openid-connect/token \
+#             -d grant_type=client_credentials -d client_id=facilitator-cli \
+#             -d client_secret=e2e-cli-secret | jq -r .access_token)
+#           curl -sf http://localhost:8088/api/dead-letters -H "Authorization: Bearer $TOKEN" >/dev/null
+#       - name: telemetry arrives at the dashboard
+#         run: |
+#           # The GETs above generated ASP.NET Core spans; the dashboard's
+#           # telemetry API must report them within its export interval.
+#           # (OTEL_SERVICE_NAME pins the resource name in compose.)
+#           for _ in $(seq 1 30); do
+#             curl -sf http://localhost:18888/api/telemetry/spans 2>/dev/null \
+#               | grep -q 'facilitator' && exit 0
+#             sleep 2
+#           done
+#           curl -s http://localhost:18888/api/telemetry/spans; exit 1
+#       - name: artifact bucket exists
+#         working-directory: reference
+#         run: |
+#           AWS_ACCESS_KEY_ID=$(grep '^DEMO_S3_ACCESS_KEY=' .env | cut -d= -f2)
+#           AWS_SECRET_ACCESS_KEY=$(grep '^DEMO_S3_SECRET_KEY=' .env | cut -d= -f2)
+#           AWS_DEFAULT_REGION=us-east-1
+#           export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_DEFAULT_REGION
+#           docker run --rm --network host \
+#             -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_DEFAULT_REGION \
+#             "amazon/aws-cli:$(grep '^AWSCLI_TAG=' versions.env | cut -d= -f2)" \
+#             --endpoint-url http://127.0.0.1:8333 s3 ls s3://facilitator-artifacts
+#       - name: kernel booted clean
+#         working-directory: reference
+#         run: |
+#           docker compose --env-file versions.env --env-file .env -f compose.slim.yaml logs facilitator
+#           ! docker compose --env-file versions.env --env-file .env -f compose.slim.yaml \
+#             logs --no-log-prefix facilitator | grep -q "Unhandled exception"
+#       - name: teardown
+#         if: always()
+#         working-directory: reference
+#         run: |
+#           docker compose --env-file versions.env --env-file .env -f compose.slim.yaml logs || true
+#           docker compose --env-file versions.env --env-file .env -f compose.slim.yaml down -v
+#
+#   ref-env-verify:
+#     # The acceptance run against a booted-but-unseeded slim stack: every
+#     # spec 21.1 hop through public read models, the Postgres planes, S3, and
+#     # the dashboard — unattended, both hosted arches (main + nightly tier).
+#     if: github.event_name != 'pull_request'
+#     runs-on: ${{ matrix.os }}
+#     timeout-minutes: 35
+#     strategy:
+#       fail-fast: false
+#       matrix:
+#         os: [ubuntu-latest, ubuntu-24.04-arm]
+#     concurrency:
+#       group: ref-env-verify-${{ matrix.os }}-${{ github.ref }}
+#       cancel-in-progress: true
+#     steps:
+#       - uses: actions/checkout@v5
+#       - name: "boot slim stack unseeded (verify owns seeding)"
+#         run: ./referencectl up slim --no-seed
+#       - name: acceptance run
+#         run: |
+#           ./referencectl verify --json | tee verify-report.json
+#           exit "${PIPESTATUS[0]}"
+#       - name: failure diagnostics
+#         if: failure()
+#         working-directory: reference
+#         run: |
+#           docker compose --env-file versions.env --env-file .env -f compose.slim.yaml \
+#             logs --tail=200 facilitator demo-workspace || true
+#       - name: teardown
+#         if: always()
+#         working-directory: reference
+#         run: |
+#           docker compose --env-file versions.env --env-file .env -f compose.slim.yaml down -v
+#
   link-e2e:
     runs-on: ubuntu-latest
     services:

@@ -2,7 +2,7 @@
 
 **Portable, pluggable, multi-workspace orchestration of autonomous, assisted, and deterministic workloads across independently operated execution environments.**
 
-> **Status: first slice landed.** Plans 00–03 are real: buildable monorepo, frozen v1 wire contract (`protocol/`), the transactional kernel in `src/facilitator` — Postgres schema, Work state machines, transactional inbox/outbox, HTTP + CLI ingress — and the Link server: enrollment with per-endpoint link tokens, the SignalR hub at `/hubs/link`, the HTTP fallback, and the durable delivery ledger. Everything else named in the specs (modules, endpoints, CLIs, compose services) remains a target, not a reality.
+> **Status: slim reference environment runs end-to-end.** Plans 00–16 are real: buildable monorepo, frozen v1 wire contract (`protocol/`), the transactional kernel (`src/facilitator`), the Link hub, Gateway + deterministic worker, identity/policy/approvals, artifacts + memory. `./referencectl up slim` boots the whole slim stack (kernel, Postgres, Keycloak, SeaweedFS, Aspire dashboard, a linked demo workspace) and `./referencectl verify` proves every spec §21.1 hop unattended. Everything else named in the specs (admin SPA, full providers, multi-work provisioning) remains a target, not a reality.
 
 ## The idea in one paragraph
 
@@ -57,7 +57,7 @@ Repo root **is** the spec §22.1 `framework/` tree (Plan 00). Every directory ca
 ├── protocol/              # CloudEvents schemas, JSON Schema, OpenAPI, conformance fixtures (Plan 01)
 ├── features/              # Dev Container Features: gateway, workspace-link, harness-adapter (Plan 06)
 ├── examples/              # slim/deterministic-research-worker (06); full/coding-worker (14), research-worker + seed-repositories (14/15)
-├── reference/             # versions.env + .env.example now; Compose, referencectl, seeds, checks (Plan 11)
+├── reference/             # versions.env + .env.example, Compose, referencectl, seeds, checks/verify.sh
 ├── docs/specs/            # normative architecture (single source of truth)
 ├── .github/workflows/     # CI + release spine (see workflows/README.md)
 └── Makefile               # restore/build/test/lint/format + compose placeholders
@@ -83,15 +83,16 @@ Delivery is vertical slices with runnable exit tests (spec §26): transactional 
 3. **Daily loop:** `make restore` → `make build` → `make test` → `make lint`; `make format` before committing.
 4. **Running the kernel:** start Postgres 17 (`docker run -d -e POSTGRES_USER=demo -e POSTGRES_PASSWORD=demo -e POSTGRES_DB=facilitator -p 5432:5432 postgres:17-alpine`), then `ConnectionStrings__Facilitator="Host=localhost;Database=facilitator;Username=demo;Password=demo" dotnet run --project src/facilitator` — it auto-migrates and serves `/api` with the dev bootstrap token. The CLI rides the same public API: `dotnet run --project src/facilitator -- cli work create --objective "kernel check"`. Full loop: [`docs/getting-started.md`](docs/getting-started.md).
 5. **Running tests:** .NET — `dotnet test OpenFacilitator.slnx [-c Release] [--filter FullyQualifiedName~HealthEndpointTests]` (Docker required: the Plan 02 integration suite boots Postgres 17 via Testcontainers); TypeScript — per package `pnpm --filter @ofac/gateway test`, workspace-wide `pnpm -r test`, single file `pnpm --filter @ofac/workspace-link exec vitest run test/package.test.ts`.
-6. **CI is the merge gate** — see [`.github/workflows/README.md`](.github/workflows/README.md). Release = push a `v*` tag → images to GHCR.
+6. **CI is the merge gate** — see [`.github/workflows/README.md`](.github/workflows/README.md). The slim reference-env jobs are compute-gated off on free-tier CI, so the acceptance run is a **local** gate: `./referencectl up slim --no-seed && ./referencectl verify` must exit 0 before any task is called done. Release = push a `v*` tag → images to GHCR.
 
 This repo is also an omp agent workspace: project skills in `.omp/skills/` encode the spec rules agents must not violate (every implementation slice updates the matching skill in the same change), MCP servers are declared in `.omp/mcp.json`, plans land in `.omp/plans/`, and demo secrets are never committed (`.env`, `secrets/` are gitignored).
 
-Once the slim reference environment exists (Plan 11), the demo entry point will be:
+The demo entry point is live:
 
 ```bash
-cd reference && cp .env.example .env
-./referencectl up slim && ./referencectl seed slim && ./referencectl verify slim
+./referencectl up slim      # build + wait healthy + seed the demo path
+./referencectl verify       # acceptance run: every spec 21.1 hop, 11 steps
+./referencectl down -v
 ```
 
 ## License

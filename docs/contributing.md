@@ -24,6 +24,13 @@ The wire contract is schema-first: edit the JSON Schema under `protocol/`, add v
 
 `ci.yml` must be green on the PR: `dotnet` (build + test on the `global.json` SDK), `typescript` (lint + build + test on Node 22), `meta` (actionlint, yamllint, `reference/versions.env` key completeness), `docker-build` (Facilitator image compiles). Release jobs run only on `v*` tags — see `.github/workflows/README.md`.
 
+**Acceptance law (agents included):** the slim reference environment is part of every task's acceptance criteria. The hosted `ref-env-bringup`/`ref-env-verify` jobs are compute-gated off (free-tier), so before declaring any task done, run the whole gauntlet **locally**: `make build test lint docs-check`, `pnpm -r --if-present typecheck`, and against a booted-but-unseeded stack:
+
+```bash
+./referencectl down -v && ./referencectl up slim --no-seed
+./referencectl verify --json   # 11 steps, exit 0
+```
+
 ## Version pinning policy (spec §22.4)
 
 - All reference image tags live in `reference/versions.env`; the compose files

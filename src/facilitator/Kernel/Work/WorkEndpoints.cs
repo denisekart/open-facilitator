@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 
 using Facilitator.Kernel.Shared;
@@ -21,6 +22,10 @@ public static class WorkEndpoints
 
         group.MapPost("/works", async (HttpRequest request, IngressProcessor processor, HttpContext http, CancellationToken ct) =>
         {
+            // W3C response carrier: the client learns the request trace id and
+            // can correlate the dispatch trace the outbox stamps downstream.
+            http.Response.Headers["traceparent"] = Activity.Current?.Id;
+
             var body = await RequestBodies.ReadAsync(request, ct);
             if (body.TooLarge)
             {

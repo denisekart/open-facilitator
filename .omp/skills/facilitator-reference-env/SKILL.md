@@ -3,7 +3,7 @@ name: facilitator-reference-env
 description: Slim/full Docker Compose reference environments, versions.env pinning, referencectl bootstrap/seed/verify, localhost hostname wiring, and local debugging of the Open Facilitator Framework.
 ---
 
-> **Status (as-built):** `./referencectl up slim` (repo root) boots + seeds the demo path: PostgreSQL + Keycloak + SeaweedFS + Aspire dashboard + the Facilitator container + `demo-workspace` (one container, two processes: standalone Gateway `gw.team-alpha` + the deterministic worker over an in-container unix child leg — the mode-(b) embedded story). `reference/bootstrap/bootstrap.sh` seeds project + Work + a `work.assign` outbox row (`pg_notify` wakes the dispatcher); the SQL outbox insert stands in until the routing slice assigns works itself. NOT built yet: `checks/` scripts, full-overlay seed data. Where this document describes those, it is spec-proposed target, not reality.
+> **Status (as-built):** `./referencectl up slim` (repo root) boots + seeds the demo path: PostgreSQL + Keycloak + SeaweedFS + Aspire dashboard + the Facilitator container + `demo-workspace` (one container, two processes: standalone Gateway `gw.team-alpha` + the deterministic worker over an in-container unix child leg — the mode-(b) embedded story). `reference/bootstrap/seed-lib.sh` holds the seed primitives (compose/psql/token/project/work/dispatch), shared by `bootstrap.sh` (demo path) and the acceptance run; a SQL outbox insert stands in until the routing slice assigns works itself. `reference/checks/verify.sh` is the 11-step acceptance run (`referencectl verify`). NOT built yet: full-overlay seed data.
 
 # Reference Environment & Dev Loop
 
@@ -46,7 +46,34 @@ make compose-down          # down -v (FULL=1 to include the overlay)
 
 Observe: `docker compose ... ps` (all healthy), kernel `http://localhost:8088/health`, realm `.well-known` at `http://id.localhost:8080/realms/facilitator`, bucket browse `http://localhost:8333`, traces at the dashboard `http://localhost:18888`. Operator bearer: `facilitator-cli`/`e2e-cli-secret` client_credentials against the realm token endpoint.
 
-`referencectl` (built): `up slim [--no-seed]` (compose up --wait + bootstrap), `down [-v]`, `status` (compose ps + kernel `/health` + a `compose exec` probe of the Gateway's `127.0.0.1:8099/status` — diagnostics bind the demo-workspace container's loopback, never a published port), `token [--user U --password P]`, `work [--objective T]`. `verify` is reserved for the acceptance-check pass. Appendix ergonomics (`./dev up`, `./dev assign`, `./dev show deliveries`) share that unbuilt status.
+`referencectl` (built): `up slim [--no-seed]` (compose up --wait + bootstrap), `down [-v]`, `status` (compose ps + kernel `/health` + a `compose exec` probe of the Gateway's `127.0.0.1:8099/status` — diagnostics bind the demo-workspace container's loopback, never a published port), `token [--user U --password P]`, `work [--objective T]`, `verify [--json] [--only ids]` — the acceptance run (see below). Appendix ergonomics (`./dev up`, `./dev assign`, `./dev show deliveries`) share that unbuilt status.
+
+## Acceptance run (`reference/checks/verify.sh`)
+
+`./referencectl verify` proves every spec 21.1 hop against a booted-but-
+unseeded stack, seeds its own works, exit 0 iff all 11 steps pass:
+idp-login, work-create, dispatch-link, progress, artifact-stored,
+memory-candidate, approval-roundtrip, worker-restart-resume,
+kernel-restart-resume, trace-correlation, dead-letters-empty. Laws the
+script encodes (keep them when editing):
+- Waits ride inbox/timeline event kinds (`poll_until`), never wall-clock
+  sleeps; unrequested dependency steps run as prerequisites (steps own
+  run-global state: tokens, WORK_MAIN).
+- Restart checkpoints: approval parked across a `restart facilitator`
+  (durable await); worker leg = as-built reconcile law — a mid-execution
+  stop yields exactly ONE honest `assignment.failed(retryable)`, then an
+  operator re-dispatch completes with exactly 1 manifest, revision 1,
+  revisionOf null. The child quota is `maxInFlight: 1`: seed only after
+  the fleet is idle (an overlapping assign is honestly answered
+  child-busy and dropped).
+- Trace law: the dispatcher extracts the carrier parent, runs
+  `outbox.dispatch` under it, and restamps every link-channel row before
+  delivery (`RestampEnvelopeAsync`, lease-guarded); the worker echoes the
+  stamped `traceparent` verbatim, so outbox stamp == progress/completed
+  envelope traceparent == the Aspire span's trace id. Read the stamp out
+  of the outbox row — never a timing join.
+- Debug a leg: `verify --only <id>` (prereqs auto-run); the human plane
+  dumps kernel+workspace log tails on failure.
 
 ## Debugging hooks
 

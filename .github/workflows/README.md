@@ -6,6 +6,9 @@
 |`ci.yml` / `typescript`|Workspace lint + build + vitest on Node 22 (engines floor)|—|Plan 00; `@ofac/protocol` joins in Plan 01|
 |`ci.yml` / `meta`|actionlint + yamllint + `reference/versions.env` key completeness|—|Plan 00|
 |`ci.yml` / `docker-build`|Facilitator image compiles on every PR (no push)|—|Plan 00|
+|`ci.yml` / `protocol`|Codegen drift gate (generated TS + .NET + schemas) + OpenAPI stub validates|—|Plan 01|
+|`ci.yml` / `ref-env-bringup` **(CI-disabled)**|Slim reference env boots authenticated, S3-backed, OTLP-exporting. Commented out in `ci.yml` (free-tier compute); **runs locally and is acceptance-required** — see `reference/AGENTS.md`|—|Plan 19|
+|`ci.yml` / `ref-env-verify` **(CI-disabled)**|Acceptance run (`referencectl verify`, 11 steps) unattended on a booted-but-unseeded slim stack, amd64+arm64 matrix. Commented out in `ci.yml`; **runs locally and is acceptance-required**|—|Plan 19|
 |`ci.yml` / `link-e2e`|SDK + linkd against a live Facilitator + Postgres service: handshake/supersede, delivery+dedupe, receipt-loss redelivery, partition buffering, HTTP-poll keeper revival, crash replay|—|Plan 04|
 |`ci.yml` / `gateway-e2e`|Team Gateway against a live Facilitator + Postgres service: assign→echo-complete→inbox-processed, SIGKILL reconcile (lost + one retryable failed), graceful-restart duplicate, token rotation|—|Plan 05|
 |`ci.yml` / `features`|Feature install contract per arch (amd64+arm64): ubuntu+debian scenarios per Feature + a combo scenario composing all three (PATH contract, unit files, idempotent rebuild)|—|Plan 08|

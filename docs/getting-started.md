@@ -1,17 +1,24 @@
 # Getting started
 
-Status: the transactional kernel (PostgreSQL, HTTP ingress, Work state machines, the outbox dispatcher, the Workspace Link transport) runs locally or as a container; the slim reference environment boots the full provider stack plus a linked demo workspace via `./referencectl up slim` (see [`reference/README.md`](../reference/README.md)).
+Status: the slim reference environment runs the whole demo path — kernel,
+Postgres, Keycloak, S3 artifacts, OTLP telemetry, a linked team workspace
+with a deterministic worker — and `./referencectl verify` proves every
+spec §21.1 hop unattended. The walkthrough below is a real session against
+a fresh stack.
 
 ## 1. Environment
 
-**Recommended: devcontainer.** Open the repository in the included `.devcontainer` configuration — Docker-in-Docker, .NET SDK 10, Node 24, and pnpm 12 are preinstalled.
+**Recommended: devcontainer.** Open the repository in the included
+`.devcontainer` configuration — Docker-in-Docker, .NET SDK 10, Node 24, and
+pnpm 12 are preinstalled.
 
 **Manual path:**
 
-- .NET SDK `10.0.40x` (per `global.json`, `rollForward: latestFeature`)
-- Node.js ≥ 22
-- `corepack enable && corepack install` — installs the exact pnpm from `packageManager: pnpm@12.5.1`
-- Docker (required for `make test` — the integration suite runs PostgreSQL 17 via Testcontainers; also needed for image builds)
+- Docker + Compose v2 (the reference environment needs ~4 GiB free RAM)
+- `curl`, `jq`, `git`
+- .NET SDK `10.0.40x` (per `global.json`, `rollForward: latestFeature`) and
+  Node.js ≥ 22 only for the build/test loop below; the walkthrough itself
+  needs just Docker
 
 ## 2. Build & test loop
 
@@ -23,9 +30,8 @@ make lint      # dotnet format --verify-no-changes + eslint + prettier --check
 make format    # auto-fix .NET + TS/JSON/YAML formatting
 ```
 
-`./referencectl up slim` boots and seeds the reference environment end-to-end (builds the images, waits for every healthcheck, seeds a demo Work that dispatches to a linked Gateway + worker): `./referencectl status` probes it, `./referencectl down` tears it down, `./referencectl token` mints an API bearer. The raw compose path remains `make compose-slim` / `make compose-full` / `make compose-down`. First run generates `reference/.env` from `.env.example` — rotate the placeholder secrets for anything beyond a smoke run.
-
-`dotnet test` requires a running Docker daemon: the Plan 02 integration suite boots `postgres:17-alpine` via Testcontainers (image tag pinned in `reference/versions.env`).
+`dotnet test` requires a running Docker daemon: the integration suite boots
+PostgreSQL 17 via Testcontainers (tag pinned in `reference/versions.env`).
 
 ### Running individual tests
 
@@ -33,78 +39,139 @@ make format    # auto-fix .NET + TS/JSON/YAML formatting
 - TypeScript (one package): `pnpm --filter @ofac/gateway test`
 - TypeScript (one file): `pnpm --filter @ofac/workspace-link exec vitest run test/package.test.ts`
 
-## 3. Running the Facilitator locally
+## 3. Bring up the reference environment
 
 ```bash
-# 1. PostgreSQL 17 (matches reference/versions.env POSTGRES_TAG)
-docker run -d --name ofac-pg -e POSTGRES_USER=demo -e POSTGRES_PASSWORD=demo \
-  -e POSTGRES_DB=facilitator -p 5432:5432 postgres:17-alpine
-
-# 2. Dev IdP (Keycloak realm fixture, tag pinned in reference/versions.env)
-docker run -d --name facilitator-idp -p 8480:8080 \
-  -v "$PWD/reference/keycloak/realm.json:/opt/keycloak/data/import/realm.json:ro" \
-  "quay.io/keycloak/keycloak:$(grep '^KEYCLOAK_TAG=' reference/versions.env | cut -d= -f2)" \
-  start-dev --import-realm
-
-# 3. Start the kernel — auto-migrates on boot (Database:AutoMigrate, default
-#    true); the identity: block (appsettings.Development.json) points at the IdP
-ConnectionStrings__Facilitator="Host=localhost;Database=facilitator;Username=demo;Password=demo" \
-  dotnet run --project src/facilitator
-
-# 4. Mint a bearer (facilitator-cli service account holds the operator roles)
-KERNEL_TOKEN=$(curl -s localhost:8480/realms/facilitator/protocol/openid-connect/token \
-  -d grant_type=client_credentials -d client_id=facilitator-cli \
-  -d client_secret=e2e-cli-secret | jq -r .access_token)
-
-# 5. Create a Work and walk it through the state machine
-curl -s -X POST localhost:8088/api/works \
-  -H "Authorization: Bearer $KERNEL_TOKEN" -H 'Content-Type: application/json' \
-  -d '{"objective":"kernel check"}'
-curl -s -X POST localhost:8088/api/works/<workId>/transitions \
-  -H "Authorization: Bearer $KERNEL_TOKEN" -H 'Content-Type: application/json' \
-  -d '{"to":"planning","expectedVersion":1}'
+./referencectl up slim
 ```
 
-Responses and errors follow the kernel error contract ([`docs/protocol.md`](protocol.md#kernel-ingress-implemented-plan-02)); a missing or invalid bearer yields a `401` ProblemDetails, a role denial a `403` (identity model: [`docs/security.md`](security.md)).
+Builds the kernel + node-runtime images, boots Postgres, Keycloak (realm
+`facilitator`), SeaweedFS (S3), the Aspire dashboard, the Facilitator
+container, and `demo-workspace` (standalone Gateway `gw.team-alpha` +
+deterministic worker), waits for every healthcheck, then seeds one
+`work.assign` that dispatches end-to-end. `./referencectl status` probes the
+stack (service table + kernel `/health` + Gateway `/status` via `compose
+exec` — diagnostics bind the workspace container's loopback); the ports
+table lives in [`reference/README.md`](../reference/README.md). First run
+generates `reference/.env` from `.env.example` — rotate the placeholder
+secrets for anything beyond a smoke run. `./referencectl down -v` tears it
+all down.
 
-The Link server (Plan 03) rides the same process — enroll an endpoint with the dev enrollment secret (Plan 10: mode-(a) enrollment MUST name a roster team — dev config seeds `team-alpha`/`team-beta`), then use its `linkToken` as a bearer (contract: [`docs/protocol.md`](protocol.md#link-transport-implemented-plan-03); the scripted fake client lives in `tests/Facilitator.Tests/LinkTestHarness.cs`):
+The presigned artifact redirects name the in-network host `artifacts`
+(SigV4 forbids rewriting them), so for host-side downloads add
+`127.0.0.1 artifacts` to `/etc/hosts` (or use `curl --resolve
+artifacts:8333:127.0.0.1`, shown below).
+
+## 4. Log in: OIDC end to end
+
+The realm fixture (auto-imported) carries users `alice`/`alice` (and
+`demo-admin` for the admin console at
+`http://localhost:8080/keycloak/admin`). Every kernel API needs a bearer;
+two grants matter:
 
 ```bash
-curl -s -X POST localhost:8088/api/link/v1/enroll -H 'Content-Type: application/json' \
-  -d '{"token":"enroll-dev","endpointId":"gw-dev","instanceId":"i1","trustMode":"isolated-executor","team":"team-alpha"}'   # 201 → linkToken
-curl -s -X POST localhost:8088/api/link/v1/capabilities -H "Authorization: Bearer <linkToken>" \
-  -H 'Content-Type: application/json' -d '{"apiVersion":"facilitator.framework/v1","kind":"CapabilityManifest","ownerTeam":"team-alpha","capabilities":[{"id":"research.analyze","version":1,"execution":"asynchronous"}]}'   # 204
-curl -s "localhost:8088/api/link/v1/deliveries?wait=2&limit=16" -H "Authorization: Bearer <linkToken>"  # 404 session-not-found until a hub hello opens a session
+# operator/service token (client_credentials)
+./referencectl token
+# eyJhbGciOiJSUzI1NiIsInR5cCIgOi...   (JWT)
+
+# human token, password grant — the kernel maps the subject to a
+# kernel-side identity for audit + policy claims
+./referencectl token --user alice --password alice
+# eyJhbGciOiJSUzI1NiIsInR5cCIgOi...
 ```
 
-The client half (Plan 04) is the `@ofac/workspace-link` SDK + the `ofac-linkd` supervisor — one command does enroll, capabilities POST, connect, and serve (echo-mode receipts); the state file replays un-acked work after a crash:
+Bearers live ~5 minutes (realm default) — re-mint liberally.
+
+## 5. Run a Work
 
 ```bash
-pnpm -r build   # once, builds dist/bin/linkd.js
-node src/workspace-link/dist/bin/linkd.js run \
-  --url http://localhost:8088 --secret enroll-dev \
-  --endpoint gw-dev --team team-alpha --manifest manifest.json   # prints "linkd ready ..."
+./referencectl work --objective "survey the reference environment"
+# workId=6f0c1a67-... 
+# [ { "kind": "created", ... } ]
 ```
 
-The same assembly doubles as its own client, riding the public HTTP API only (defaults `--url http://localhost:8088`, bearer from env `FACILITATOR_TOKEN` — required, an OIDC access token):
+The seed's assign rides kernel → gateway → worker: progress events, a
+Markdown report uploaded through the artifact flow, and an
+`assignment.completed` receipt come back through the link plane. Watch the
+read models (pair from a real run — `W` = the work, tokens as above):
 
 ```bash
-export FACILITATOR_TOKEN=$KERNEL_TOKEN   # re-mint after ~4.5 min (300 s lifespan)
-dotnet run --project src/facilitator -- cli \
-  work create --objective "kernel check"
-dotnet run --project src/facilitator -- cli work get <workId>
-dotnet run --project src/facilitator -- cli work steer <workId> --directive "focus on tests" --expect-version 1
-dotnet run --project src/facilitator -- cli work timeline <workId>
+W=e5c6c58d-1240-45e3-87a6-f46e70b399a9
+ATOK=$(./referencectl token --user alice --password alice | tail -1)
+
+curl -s http://localhost:8088/api/works/$W/timeline -H "Authorization: Bearer $ATOK" \
+  | jq '[.[].kind]'
+# ["created","artifact.stored","artifact.stored","manifest.recorded","memory.candidate"]
+
+curl -s http://localhost:8088/api/works/$W/manifests -H "Authorization: Bearer $ATOK" \
+  | jq '.[0] | {revision, revisionOf}'
+# {"revision":1,"revisionOf":null}
+
+# the manifest doc names its report artifact; content redirects to a
+# presigned S3 URL (see the /etc/hosts note above)
+MID=$(curl -s http://localhost:8088/api/works/$W/manifests -H "Authorization: Bearer $ATOK" | jq -r '.[0].artifactId')
+AID=$(curl -sL --resolve artifacts:8333:127.0.0.1 \
+  "http://localhost:8088/api/artifacts/$MID/content" -H "Authorization: Bearer $ATOK" \
+  | jq -r '.outputs[0].artifactId')
+curl -sL --resolve artifacts:8333:127.0.0.1 \
+  "http://localhost:8088/api/artifacts/$AID/content" -H "Authorization: Bearer $ATOK" | head -2
+# # Research report e5c6c58d-1240-45e3-87a6-f46e70b399a9
+# Objective: slim verify: analyze the reference environment
 ```
 
-Migration management: `make db-update` (`dotnet tool restore && dotnet ef database update -p src/facilitator`, using `ConnectionStrings:Facilitator` from the environment). `GET /api/dev/deliveries` dumps the outbox delivery ledger so you can watch the dispatcher drain.
+Traces: open the Aspire dashboard at `http://localhost:18888`, resource
+`facilitator`. Every kernel span carries the work's trace id — the W3C
+`traceparent` the dispatcher stamped onto the assign envelope, which the
+worker echoes verbatim on its progress/completion envelopes, so
+`outbox.envelope->>'traceparent'` == event envelope == dashboard trace.
 
-## 4. CI and releases
+## 6. Acceptance run: `referencectl verify`
+
+The 11-step acceptance script (`reference/checks/verify.sh`) proves every
+spec §21.1 hop through public read models, the Postgres planes, S3, and the
+dashboard — no product hooks, no dev-only routes. Run it against a
+booted-but-unseeded stack (`up slim --no-seed`): it seeds its own works.
+Exit 0 iff every step passes; `--json` is the machine report, `--only <ids>`
+reruns a leg and its prerequisites. Transcript (clean stack, exit 0):
+
+```
+PASS idp-login (313ms) — both grants minted and accepted by the kernel
+PASS work-create (559ms) — work created + assigned
+PASS dispatch-link (306ms) — assign delivered over the link plane + gateway ready with a connected child
+PASS progress (128ms) — worker progress reached the kernel inbox
+PASS artifact-stored (3920ms) — manifest doc + report stored/verified + blob in S3 + Markdown bytes served
+PASS memory-candidate (235ms) — candidate ingressed + timeline row + 1 recall hit(s)
+PASS kernel-restart-resume (3444ms) — approval parked across a facilitator restart
+PASS approval-roundtrip (23187ms) — parked durably, resumed exactly: approved after restart, decided, completed
+PASS worker-restart-resume (6346ms) — worker killed mid-run: honest retryable failed, retry completed with exactly 1 manifest
+PASS trace-correlation (288ms) — facilitator stamp echoed by worker envelopes + dashboard spans
+PASS dead-letters-empty (26ms) — no dead letters
+```
+
+|Step|Proves|
+|---|---|
+|`idp-login`|Both grants mint and the kernel accepts them (roles + claim mapping wired)|
+|`work-create`|Work creation + assign outbox row via the seed primitives|
+|`dispatch-link`|Dispatcher → LinkSink → gateway session (row `delivered`, child connected)|
+|`progress`|Worker event rode the link back into the kernel inbox|
+|`artifact-stored`|Manifest doc + report stored/verified, blob in the bucket, bytes served|
+|`memory-candidate`|Candidate event ingressed, timeline row, recall hits|
+|`kernel-restart-resume`|A parked approval survives a `restart facilitator` (durable await)|
+|`approval-roundtrip`|Confirm → approval.required → respond → consumed → completion, exactly once|
+|`worker-restart-resume`|Mid-execution kill = ONE honest retryable `assignment.failed`; re-dispatch completes with exactly 1 manifest|
+|`trace-correlation`|Dispatcher-stamped `traceparent` == worker-echoed envelope traceparent == dashboard span trace|
+|`dead-letters-empty`|No hop failed hard anywhere in the run|
+
+This run is part of every task's acceptance criteria — see
+[`docs/contributing.md`](contributing.md).
+
+## 7. CI and releases
 
 - CI (`ci.yml`) is the merge gate: .NET build+test, TS lint+build+test, workflow/meta validation, and a Facilitator image build. Job-by-job scope: [`.github/workflows/README.md`](../.github/workflows/README.md).
+- The slim reference environment is part of every task's acceptance criteria — and locally IS the gate: the hosted `ref-env-bringup`/`ref-env-verify` jobs are commented out in `ci.yml` (free-tier GitHub compute). Before calling anything done: `./referencectl down -v && ./referencectl up slim --no-seed && ./referencectl verify` exits 0.
 - Releases trigger on `v*` tags: the Facilitator image is pushed to GHCR for `linux/amd64` + `linux/arm64`, and the Dev Container Features are published as OCI artifacts under `…/features/<name>`.
 
-## 5. Artifact registries
+## 8. Artifact registries
 
 | Artifact | Registry | Coordinate |
 |---|---|---|
@@ -113,7 +180,7 @@ Migration management: `make db-update` (`dotnet tool restore && dotnet ef databa
 | Dev Container Features (OCI per spec §8.5; `gateway`, `workspace-link`, `harness-adapter`) | GHCR | `ghcr.io/denisekart/open-facilitator/features/<name>:1` |
 | NuGet | — (public deps from nuget.org; first internal package → `https://nuget.pkg.github.com/denisekart/index.json`) | — |
 
-## 6. Connect an existing workspace: add one Feature
+## 9. Connect an existing workspace: add one Feature
 
 An existing team container becomes a linked, headless workspace by adding
 ONE Feature to its `devcontainer.json` (spec §28's onboarding law) — no base
@@ -146,3 +213,13 @@ Per-Feature options, the 1:1 env surface, state law, and troubleshooting:
 the sibling `workspace-link` / `harness-adapter` READMEs). A fully composed
 three-Feature example with an end-to-end walkthrough:
 [`examples/slim/deterministic-research-worker`](../examples/slim/deterministic-research-worker/README.md).
+
+The `up full` providers (the chat/VCS legs of spec §28: Mattermost, Forgejo,
+Kafka, Ollama) land in a later phase; today the overlay boots their
+containers but no seeded flows ride them.
+
+## 10. Tear down
+
+```bash
+./referencectl down -v   # FULL=1 includes the overlay
+```

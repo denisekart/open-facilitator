@@ -1,5 +1,23 @@
 # Advanced Topics
 
+## Kernel without Compose
+
+The transactional kernel runs bare for focused work: boot Postgres 17
+(tag pinned in `reference/versions.env`), point
+`ConnectionStrings__Facilitator` at it, and
+`dotnet run --project src/facilitator` — auto-migrate on boot, `/api`
+served, the dev IdP story per `reference/keycloak/realm.json`. The
+kernel assembly doubles as its own client riding the public HTTP API:
+`dotnet run --project src/facilitator -- cli work create --objective
+"kernel check"` (plus `work get|steer|timeline`). The Link client half is
+`@ofac/workspace-link` + the `ofac-linkd` supervisor — enroll, capabilities
+POST, connect, serve (echo-mode receipts), state file replay after a
+crash:
+`node src/workspace-link/dist/bin/linkd.js run --url http://localhost:8088
+--secret enroll-dev --endpoint gw-dev --team team-alpha --manifest
+manifest.json`. The full compose path (`./referencectl up slim`) is the
+supported demo environment; this section is the seam, not the gate.
+
 ## Gateway modes
 
 `@ofac/gateway` is the team-owned composition over the Workspace Link SDK

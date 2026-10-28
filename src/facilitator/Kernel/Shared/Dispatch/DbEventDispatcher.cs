@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 
 using Facilitator.Kernel.Shared.Persistence;
 
@@ -72,12 +74,42 @@ public sealed class DbEventDispatcher : IEventDispatcher
         }
 
         var delivered = 0;
-        foreach (var row in claimed)
+        foreach (var claimedRow in claimed)
         {
-            using var span = KernelActivity.Source.StartActivity("outbox.dispatch", ActivityKind.Internal);
+            var row = claimedRow;
+            // Durable-queue trace law: a queue hop links explicitly. The
+            // parent is extracted from the stored envelope's W3C traceparent
+            // carrier (extract-or-fresh); ambient Activity.Current is never
+            // captured implicitly across the durable boundary.
+            var parent = default(ActivityContext);
+            string? incoming = null;
+            if (row.Envelope.ValueKind == JsonValueKind.Object
+                && row.Envelope.TryGetProperty("traceparent", out var tp)
+                && tp.ValueKind == JsonValueKind.String)
+            {
+                incoming = tp.GetString();
+                ActivityContext.TryParse(incoming, null, isRemote: true, out parent);
+            }
+
+            using var span = KernelActivity.Source.StartActivity("outbox.dispatch", ActivityKind.Internal, parent);
             span?.SetTag("facilitator.delivery_id", row.OutboxId);
             span?.SetTag("facilitator.channel", ChannelOf(row.RecipientEndpointId));
             _metrics.DeliveryAttempt();
+
+            // Fresh-side law: when the envelope carried no traceparent, the
+            // freshly started dispatch trace is stamped into it and PERSISTED
+            // before delivery, so retry/restart replays re-extract the same
+            // trace (the extract side above) and the worker's derived events
+            // are causally linked to the facilitator. Link recipients only;
+            // envelopes that arrived traced keep their carrier untouched.
+            if (incoming is null && Activity.Current is { } current && ChannelOf(row.RecipientEndpointId) == "link")
+            {
+                var stamped = JsonNode.Parse(row.Envelope.GetRawText())!.AsObject();
+                stamped["traceparent"] = current.Id;
+                var stampedText = stamped.ToJsonString();
+                await _outbox.RestampEnvelopeAsync(row.OutboxId, _replicaId, stampedText, ct);
+                row = row with { Envelope = JsonDocument.Parse(stampedText).RootElement.Clone() };
+            }
 
             var stopwatch = Stopwatch.StartNew();
             try

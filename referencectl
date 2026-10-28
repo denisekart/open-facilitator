@@ -11,6 +11,8 @@
 #   ./referencectl token [--user U --password P]   mint an operator token (client
 #                                    credentials; --user mints a password-grant one)
 #   ./referencectl work [--objective TEXT]  create a Work and print its timeline
+#   ./referencectl verify [--json] [--only id,id]  run the acceptance steps against a
+#                                    booted stack (seeds its own works; exit 0 iff all pass)
 set -euo pipefail
 
 ROOT=$(cd -- "$(dirname -- "$0")" && pwd)
@@ -137,6 +139,16 @@ cmd_work() {
     -H "Authorization: Bearer $token" | jq .
 }
 
+cmd_verify() {
+  have jq
+  curl -fs --max-time 10 -o /dev/null "$KERNEL/health" \
+    || { echo "referencectl: kernel not reachable at $KERNEL — run 'referencectl up slim --no-seed' first" >&2; exit 2; }
+  # The acceptance runner: sources the step library and reports per step.
+  # shellcheck source=reference/checks/verify.sh
+  . "$REF/checks/verify.sh"
+  run_verify "$@"
+}
+
 verb=${1:-}
 [ $# -gt 0 ] && shift || true
 case "$verb" in
@@ -145,5 +157,6 @@ case "$verb" in
   status) cmd_status ;;
   token) cmd_token "$@" ;;
   work) cmd_work "$@" ;;
+  verify) cmd_verify "$@" ;;
   *) usage ;;
 esac

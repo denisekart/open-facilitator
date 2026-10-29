@@ -101,7 +101,7 @@ deny ⇒ `403 forbidden` (both RFC 9457, camelCase).
 | `GET /api/works/{id}/manifests` | OIDC bearer; gated `manifests.read` (mirrors `artifacts.read`, includes `team-member`) | Work's recorded manifest chain, newest-first; work-scope 404 non-disclosure |
 | `POST /api/works/{id}/approvals/{approvalId}/respond` | OIDC bearer; gated `approvals.respond` | Human decision; eligibility + single use below |
 | `/api/identity/roles*` | OIDC bearer; PUT/DELETE gated `identity.roles.manage` | runtime role rules |
-| `/api/dev/*`, `/api/dead-letters` | OIDC bearer (read surface) | dev-time ledger dumps; Plan 12 replaces with admin views |
+| `/api/admin/*` | OIDC bearer; gated `admin.read` (GETs) / `admin.mutate` (PATCH/POST) | Operator surface (Plan 20): roll-ups, search, detail, links, merged deliveries, metrics, runtime config (If-Match + `X-Change-Reason`; every PATCH audits `admin.config.patch` + a bounded history row), dead-letter replay, manifest re-mark |
 | `/api/link/v1*`, `/hubs/link` | link plane (`linkToken`) | enrollment + evidence, below |
 
 The kernel refuses to boot at all with an invalid/incomplete `identity:`
@@ -383,4 +383,3 @@ set — `decision`, `reason`, `workId`/`assignmentId`/`capabilityId`,
 | Concern | Plan |
 |---|---|
 | Refresh-token / session lifecycle for interactive UIs | 13+ |
-| Admin surface authorization (replacing `/api/dev/*`) | 13+ |

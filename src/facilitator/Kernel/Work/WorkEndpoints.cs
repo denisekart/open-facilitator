@@ -16,7 +16,7 @@ namespace Facilitator.Kernel.Work;
 public static class WorkEndpoints
 {
     /// <summary>Map the kernel work-API group.</summary>
-    public static IEndpointRouteBuilder MapWorkApi(this IEndpointRouteBuilder app, IHostEnvironment environment)
+    public static IEndpointRouteBuilder MapWorkApi(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api");
 
@@ -88,13 +88,6 @@ public static class WorkEndpoints
             return await ingress.IngestEventAsync(body.Text, ct);
         });
 
-        if (environment.IsDevelopment())
-        {
-            group.MapGet("/dev/deliveries", (DeliveryLedger ledger) =>
-                Results.Ok(ledger.Snapshot()
-                    .Select(d => new { deliveryId = d.DeliveryId, attempts = d.Attempts, deliveredAt = d.DeliveredAt })
-                    .ToArray()));
-        }
 
         return app;
     }

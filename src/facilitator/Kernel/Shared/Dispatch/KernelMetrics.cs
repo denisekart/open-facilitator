@@ -42,11 +42,30 @@ public sealed class KernelMetrics
     private long _deadLetters;
     private long _linkSessions;
     private long _gcLastPassAgeSeconds;
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, long> _counterTotals = new(StringComparer.Ordinal);
+    private readonly System.Diagnostics.Metrics.MeterListener _counterListener;
 
     /// <summary>Create the meter and all instruments.</summary>
     public KernelMetrics()
     {
         var meter = new Meter(MeterName);
+        // Admin metrics snapshot (Plan 20, §17): an in-process listener
+        // accumulates every long counter of this meter, so the roll-up needs
+        // no scrape backend (§17: no time-series query).
+        _counterListener = new System.Diagnostics.Metrics.MeterListener
+        {
+            InstrumentPublished = static (instrument, listener) =>
+            {
+                if (string.Equals(instrument.Meter.Name, MeterName, StringComparison.Ordinal)
+                    && instrument is System.Diagnostics.Metrics.Counter<long>)
+                {
+                    listener.EnableMeasurementEvents(instrument);
+                }
+            },
+        };
+        _counterListener.SetMeasurementEventCallback<long>((instrument, measurement, tags, state) =>
+            _counterTotals.AddOrUpdate(instrument.Name, measurement, (_, existing) => existing + measurement));
+        _counterListener.Start();
         _deliveryAttempts = meter.CreateCounter<long>("facilitator.delivery.attempts", description: "Outbox delivery attempts");
         _inboxProcessed = meter.CreateCounter<long>("facilitator.inbox.processed", description: "Inbox rows processed");
         _deliveryLatency = meter.CreateHistogram<double>("facilitator.delivery.latency", unit: "ms", description: "Sink call latency");
@@ -182,4 +201,11 @@ public sealed class KernelMetrics
         Volatile.Write(ref _inboxDepth, inboxDepth);
         Volatile.Write(ref _deadLetters, deadLetters);
     }
+
+    /// <summary>
+    /// Process-lifetime counter totals (the admin metrics snapshot, Plan 20),
+    /// served from the in-process listener installed in the constructor.
+    /// </summary>
+    public IReadOnlyDictionary<string, long> CounterTotals() =>
+        new System.Collections.Generic.Dictionary<string, long>(_counterTotals, StringComparer.Ordinal);
 }

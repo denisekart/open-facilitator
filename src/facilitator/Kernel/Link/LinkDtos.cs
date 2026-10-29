@@ -38,14 +38,6 @@ public sealed record EnrollResponseDto(
     [property: JsonPropertyName("linkToken")] string LinkToken,
     DateTime ExpiresAt);
 
-/// <summary>Wire shape of GET /api/dead-letters (appendix §5.6 visibility).</summary>
-/// <param name="DeadLetterId">Dead-letter row identity.</param>
-/// <param name="OutboxId">Dead-lettered outbox row.</param>
-/// <param name="Reason">Why the row dead-lettered.</param>
-/// <param name="Envelope">Original CloudEvent snapshot.</param>
-/// <param name="CreatedAt">Dead-letter time (UTC).</param>
-public sealed record DeadLetterDto(Guid DeadLetterId, Guid OutboxId, string Reason, JsonElement Envelope, DateTime CreatedAt);
-
 /// <summary>Server→client <c>welcome</c> frame (control.v1.json, exact fields).</summary>
 public sealed record WelcomeFrame(
     [property: JsonPropertyName("kind")] string Kind,

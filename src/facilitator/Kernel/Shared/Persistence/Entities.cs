@@ -636,3 +636,52 @@ public sealed class MemoryUsageEntity
     public Guid? WorkId { get; set; }
     public DateTime CreatedAt { get; set; }
 }
+
+/// <summary>
+/// facilitator.admin_config — the operator configuration store (Plan 20,
+/// spec §17.4): one row per editable resource, optimistic <c>row_version</c>
+/// fenced PATCH (If-Match), same-tx audit + bounded history. Stored intent
+/// only: a <c>Config:</c>-file value remains the runtime truth until a
+/// feature reads through.
+/// </summary>
+public sealed class AdminConfigEntity
+{
+    /// <summary>Resource name (PK, e.g. <c>notifications</c>).</summary>
+    public required string Resource { get; set; }
+
+    /// <summary>jsonb document validated against the resource's registered shape.</summary>
+    public required string Payload { get; set; }
+
+    /// <summary>Optimistic-concurrency counter (If-Match ETag).</summary>
+    public long RowVersion { get; set; }
+
+    /// <summary>Canonical actor of the last writer (oidc:iss|sub).</summary>
+    public required string Author { get; set; }
+
+    /// <summary>Change reason (X-Change-Reason, required).</summary>
+    public required string Reason { get; set; }
+
+    public DateTime UpdatedAt { get; set; }
+}
+
+/// <summary>
+/// facilitator.admin_config_history — bounded per-resource version trail
+/// (Plan 20): newest 20 versions per resource, written in the same tx as the
+/// config row. Rollback = PATCH to a prior payload.
+/// </summary>
+public sealed class AdminConfigVersionEntity
+{
+    public required string Resource { get; set; }
+
+    /// <summary>The row_version this snapshot carries.</summary>
+    public long Version { get; set; }
+
+    /// <summary>jsonb document, verbatim.</summary>
+    public required string Payload { get; set; }
+
+    public required string Author { get; set; }
+
+    public required string Reason { get; set; }
+
+    public DateTime UpdatedAt { get; set; }
+}

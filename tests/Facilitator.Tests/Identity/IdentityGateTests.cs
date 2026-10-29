@@ -70,7 +70,7 @@ public sealed class IdentityGateTests(PostgresFixture fixture)
             ["identity:roles:gate-probe:0:all:0:op"] = "exists",
             ["identity:authorization:operations:2:id"] = "gate.probe",
             ["identity:authorization:operations:2:methods:0"] = "GET",
-            ["identity:authorization:operations:2:paths:0"] = "/api/dev/deliveries",
+            ["identity:authorization:operations:2:paths:0"] = "/api/admin/metrics",
             ["identity:authorization:operations:2:rolesAnyOf:0"] = "gate-probe",
         };
         using var factory = new KernelTestFactory(fixture, noDispatcher: true, settings: settings);
@@ -87,7 +87,7 @@ public sealed class IdentityGateTests(PostgresFixture fixture)
             Assert.Equal(1, body.GetProperty("rowVersion").GetInt64());
         }
 
-        using (var probe = factory.CreateAuthedClient().GetAsync("/api/dev/deliveries"))
+        using (var probe = factory.CreateAuthedClient().GetAsync("/api/admin/metrics"))
         {
             Assert.Equal(HttpStatusCode.OK, (await probe).StatusCode);
         }
@@ -107,7 +107,7 @@ public sealed class IdentityGateTests(PostgresFixture fixture)
         }
 
         using var broken = new KernelTestFactory(fixture, noDispatcher: true, settings: settings);
-        using (var denied = await broken.CreateAuthedClient().GetAsync("/api/dev/deliveries"))
+        using (var denied = await broken.CreateAuthedClient().GetAsync("/api/admin/metrics"))
         {
             Assert.Equal(HttpStatusCode.Forbidden, denied.StatusCode);
         }

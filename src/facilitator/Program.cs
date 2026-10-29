@@ -1,4 +1,5 @@
 using Facilitator.Kernel;
+using Facilitator.Kernel.Admin;
 using Facilitator.Kernel.Link;
 using Facilitator.Kernel.Shared.Auth;
 using Facilitator.Kernel.Shared.Cli;
@@ -31,13 +32,14 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.UseMiddleware<IngressRoleGateMiddleware>();
 app.UseRateLimiter();
-app.MapWorkApi(app.Environment);
+app.MapWorkApi();
 app.MapApprovalsApi();
 app.MapArtifactsApi();
 app.MapResultManifestsApi();
 app.MapMemoryApi();
 app.MapLinkApi(app.Environment);
 app.MapIdentityApi();
+app.MapAdminApi();
 
 await app.RunAsync();
 

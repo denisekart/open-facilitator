@@ -347,17 +347,25 @@ export async function seedDelivery(
   return (response.body as { outboxId: string }).outboxId;
 }
 
-/** Kernel-side ack ledger rows (link acks land there too, LinkHub.AckAsync). */
+/** Durable delivery rows (Plan 20: /api/admin/deliveries replaced the
+ * in-memory dev ledger AND /api/dead-letters; link acks land there too,
+ * LinkHub.AckAsync). deliveryId = the durable row id. */
 export async function kernelDeliveries(baseUrl: string): Promise<{ deliveryId: string }[]> {
-  const response = await get(baseUrl, "/api/dev/deliveries", await kernelToken());
-  return response.body as { deliveryId: string }[];
+  const response = await get(baseUrl, "/api/admin/deliveries", await kernelToken());
+  const body = response.body as { items: { id: string }[] };
+  return body.items.map((item) => ({ deliveryId: item.id }));
 }
 
 export async function deadLetters(
   baseUrl: string,
 ): Promise<{ outboxId: string; reason: string }[]> {
-  const response = await get(baseUrl, "/api/dead-letters", await kernelToken());
-  return response.body as { outboxId: string; reason: string }[];
+  const response = await get(
+    baseUrl,
+    "/api/admin/deliveries?state=dead_letter",
+    await kernelToken(),
+  );
+  const body = response.body as { items: { id: string; reason: string | null }[] };
+  return body.items.map((item) => ({ outboxId: item.id, reason: item.reason ?? "" }));
 }
 
 export async function linkGet(baseUrl: string, path: string, token: string): Promise<Reply> {

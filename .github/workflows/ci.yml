@@ -51,7 +51,9 @@ jobs:
           pnpm protocol:codegen
           git diff --exit-code -- src/protocol/src/generated protocol/dotnet/Ofac.Protocol/Generated src/protocol/schemas
       - name: openapi stub validates
-        run: npx swagger-cli validate protocol/openapi/link-v1.yaml
+        run: |
+          npx swagger-cli validate protocol/openapi/link-v1.yaml
+          npx swagger-cli validate protocol/openapi/admin-v1.yaml
 
   meta:
     runs-on: ubuntu-latest
@@ -120,12 +122,12 @@ jobs:
 #           curl -sf http://localhost:8088/health
 #           curl -sf http://localhost:8080/realms/facilitator/.well-known/openid-configuration >/dev/null
 #           # 401 without a token
-#           test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8088/api/dead-letters)" = 401
+#           test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8088/api/admin/deliveries)" = 401
 #           # 200 with a facilitator-cli bearer
 #           TOKEN=$(curl -sf http://localhost:8080/realms/facilitator/protocol/openid-connect/token \
 #             -d grant_type=client_credentials -d client_id=facilitator-cli \
 #             -d client_secret=e2e-cli-secret | jq -r .access_token)
-#           curl -sf http://localhost:8088/api/dead-letters -H "Authorization: Bearer $TOKEN" >/dev/null
+#           curl -sf http://localhost:8088/api/admin/deliveries -H "Authorization: Bearer $TOKEN" >/dev/null
 #       - name: telemetry arrives at the dashboard
 #         run: |
 #           # The GETs above generated ASP.NET Core spans; the dashboard's

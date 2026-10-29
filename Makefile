@@ -27,6 +27,7 @@ docs-check:
 protocol:
 	pnpm protocol:codegen
 	npx swagger-cli validate protocol/openapi/link-v1.yaml
+	npx swagger-cli validate protocol/openapi/admin-v1.yaml
 	git diff --exit-code -- src/protocol/src/generated protocol/dotnet/Ofac.Protocol/Generated src/protocol/schemas
 
 link-e2e:

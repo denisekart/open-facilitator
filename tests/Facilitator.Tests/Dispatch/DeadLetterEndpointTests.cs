@@ -8,8 +8,9 @@ namespace Facilitator.Tests.Dispatch;
 
 /// <summary>
 /// appendix §5.6 (A:157): dead-lettered rows become visible on
-/// GET /api/dead-letters (kernel-token auth) with reason + the original
-/// envelope, newest first, capped at 50.
+/// GET /api/admin/deliveries?state=dead_letter (identity-gated, admin.read)
+/// with reason, newest first (Plan 20 replaced GET /api/dead-letters; the
+/// envelope round-trip is proven by the replay test — AdminSurfaceTests).
 /// </summary>
 [Collection("postgres:dispatch-link")]
 public sealed class DeadLetterEndpointTests(PostgresFixture fixture)
@@ -36,23 +37,23 @@ public sealed class DeadLetterEndpointTests(PostgresFixture fixture)
             await fixture.Db.ExpireOutboxBackoff(workId);
         }
 
-        var list = await KernelOps.GetJsonAsync(client, "/api/dead-letters", HttpStatusCode.OK);
-        Assert.True(list.GetArrayLength() >= 5, "every dead-lettered row is visible");
+        var list = await KernelOps.GetJsonAsync(client, "/api/admin/deliveries?state=dead_letter&limit=200", HttpStatusCode.OK);
+        var items = list.GetProperty("items");
+        Assert.True(items.GetArrayLength() >= 5, "every dead-lettered row is visible");
 
-        var mine = list.EnumerateArray()
-            .Where(d => d.GetProperty("envelope").TryGetProperty("subject", out var s) &&
-                        s.GetString()!.Contains(workId.ToString()))
+        var mine = items.EnumerateArray()
+            .Where(d => d.GetProperty("endpointId").GetString() == "kernel.log")
             .ToArray();
-        Assert.Equal(5, mine.Length);
+        Assert.True(mine.Length >= 5);
         foreach (var entry in mine)
         {
+            Assert.Equal("dead_letter", entry.GetProperty("state").GetString());
             Assert.Equal("sink refused the delivery", entry.GetProperty("reason").GetString());
-            Assert.True(entry.GetProperty("envelope").TryGetProperty("specversion", out _), "original envelope preserved");
-            Assert.True(Guid.TryParse(entry.GetProperty("deadLetterId").GetString(), out _), "deadLetterId is a guid");
+            Assert.True(Guid.TryParse(entry.GetProperty("id").GetString(), out _), "dead-letter id is a guid");
         }
 
         // newest-first ordering
-        var stamps = list.EnumerateArray().Select(d => d.GetProperty("createdAt").GetDateTime()).ToArray();
+        var stamps = items.EnumerateArray().Select(d => d.GetProperty("updatedAt").GetDateTime()).ToArray();
         Assert.Equal(stamps.OrderByDescending(t => t).ToArray(), stamps);
     }
 
@@ -61,7 +62,7 @@ public sealed class DeadLetterEndpointTests(PostgresFixture fixture)
     {
         using var factory = new KernelTestFactory(fixture, noDispatcher: true);
         using var anonymous = factory.CreateClient();
-        using var response = await anonymous.GetAsync("/api/dead-letters");
+        using var response = await anonymous.GetAsync("/api/admin/deliveries");
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 }

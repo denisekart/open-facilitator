@@ -1,0 +1,630 @@
+openapi: 3.1.0
+info:
+  title: Facilitator Admin API
+  version: 1.0.0
+  description: >
+    Hand-maintained mirror of the kernel /api/admin surface (spec section 17,
+    Plan 20) — the operator read models plus the three mutations the embedded
+    inspector may issue. These DTOs are kernel-API contract, not wire protocol:
+    unlike link-v1.yaml there are no JSON-Schema $refs and no conformance
+    fixtures; runtime tests (tests/Facilitator.Tests/Admin/AdminSurfaceTests.cs,
+    AdminConfigStoreTests.cs) are the drift check and this file the readable
+    contract. Authorization is 100% config-driven
+    (identity:authorization:operations bindings admin.read / admin.mutate);
+    every route below carries one of the two, so 401 and 403 apply everywhere.
+    Every error is RFC 9457 ProblemDetails with a
+    https://errors.openfacilitator.org/v1/{code} type.
+servers:
+  - url: /
+tags:
+  - name: read
+    description: Roll-ups and detail views (binding admin.read).
+  - name: mutate
+    description: Operator mutations (binding admin.mutate).
+paths:
+  /api/admin/summary:
+    get:
+      operationId: getSummary
+      tags: [read]
+      summary: One-roll-up health view of every plane.
+      responses:
+        "200":
+          description: The roll-up.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminSummary" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/admin/search:
+    get:
+      operationId: search
+      tags: [read]
+      summary: Universal search across works, projects, assignments, artifacts, memories, messages.
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema: { type: string, minLength: 1 }
+          description: Free-text query; absent/blank is 400 search-query-required.
+        - name: type
+          in: query
+          schema: { type: string, enum: [works, projects, assignments, artifacts, memories, messages] }
+          description: Restrict to one section.
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 20, default: 10 }
+          description: Per-section cap (clamped).
+      responses:
+        "200":
+          description: Sections of hits, each independently bounded.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminSearchResults" }
+        "400":
+          description: Missing/blank q — search-query-required.
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/admin/projects/{id}:
+    get:
+      operationId: getProject
+      tags: [read]
+      summary: Project detail with its work list.
+      parameters: [ { $ref: "#/components/parameters/ProjectId" } ]
+      responses:
+        "200":
+          description: The project.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminProjectDetail" }
+        "404":
+          description: project-not-found (no disclosure of off-team existence).
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/admin/work/{id}:
+    get:
+      operationId: getWork
+      tags: [read]
+      summary: Work aggregate detail — assignments with attempts, approvals, manifests.
+      parameters: [ { $ref: "#/components/parameters/WorkId" } ]
+      responses:
+        "200":
+          description: The work detail.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminWorkDetail" }
+        "404":
+          description: work-not-found.
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/admin/work/{id}/timeline:
+    get:
+      operationId: getWorkTimeline
+      tags: [read]
+      summary: The work timeline (identical WorkEventRow shape as GET /api/works/{id}/timeline).
+      parameters: [ { $ref: "#/components/parameters/WorkId" } ]
+      responses:
+        "200":
+          description: Timeline rows, oldest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/WorkEventRow" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/admin/links:
+    get:
+      operationId: getLinks
+      tags: [read]
+      summary: Gateway link state (lease = online authority) + assignments affected by offline gateways.
+      responses:
+        "200":
+          description: The links view.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminLinksView" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/admin/deliveries:
+    get:
+      operationId: getDeliveries
+      tags: [read]
+      summary: >
+        Merged plane view — kernel-plane outbox rows, link-plane delivery rows,
+        and dead-letter rows (superset that replaced /api/dev/deliveries and
+        GET /api/dead-letters).
+      parameters:
+        - name: state
+          in: query
+          schema: { type: string, enum: [pending, leased, delivered, dead_letter] }
+          description: Filter by state; anything else is ignored (all rows).
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+          description: Total cap (clamped).
+      responses:
+        "200":
+          description: Newest-first merged rows.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/AdminDeliveryRow" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/admin/metrics:
+    get:
+      operationId: getMetrics
+      tags: [read]
+      summary: Gauges + windowed per-hour table facts + process counter snapshot.
+      parameters:
+        - name: window
+          in: query
+          schema: { type: string, enum: ["1h", "24h"], default: "1h" }
+          description: Bucket window for the per-hour series (unrecognized = 1h).
+      responses:
+        "200":
+          description: The roll-up.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminMetrics" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/admin/config:
+    get:
+      operationId: listConfig
+      tags: [read]
+      summary: Registry of writable resources with stored-ness and version (never 404s).
+      responses:
+        "200":
+          description: One row per registry resource.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: false
+                  required: [resource, exists, rowVersion]
+                  properties:
+                    resource: { $ref: "#/components/schemas/ConfigResource" }
+                    exists: { type: boolean }
+                    rowVersion: { type: integer, format: int64, description: 0 when never written. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/admin/config/{resource}:
+    parameters: [ { $ref: "#/components/parameters/ConfigResource" } ]
+    get:
+      operationId: getConfig
+      tags: [read]
+      summary: Stored payload with its ETag (rowVersion).
+      responses:
+        "200":
+          description: The stored view.
+          headers:
+            ETag:
+              schema: { type: string }
+              description: Quoted rowVersion; feed it back as If-Match.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminConfigView" }
+        "404":
+          description: >
+            config-not-set (registry resource, never written) or
+            config-resource-unknown (not in the registry).
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    patch:
+      operationId: patchConfig
+      tags: [mutate]
+      summary: >
+        Replace the payload. The law: every write states the revision it saw —
+        If-Match is REQUIRED ('*' forces; a quoted integer ETag fences) and
+        X-Change-Reason is REQUIRED; both land in the audit + history trail.
+      parameters:
+        - name: If-Match
+          in: header
+          required: true
+          schema: { type: string }
+          description: "'*' (force/create) or the quoted ETag from GET; absent/malformed is 428."
+        - name: X-Change-Reason
+          in: header
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 512 }
+          description: Why the operator changed it; audited and kept in history.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              description: The full new payload for the resource (shape per registry validator).
+      responses:
+        "200":
+          description: Stored; response carries the new ETag.
+          headers:
+            ETag:
+              schema: { type: string }
+              description: Quoted new rowVersion.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminConfigView" }
+        "400":
+          description: config-invalid (header/body/shape) or config-payload-too-large.
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "404":
+          description: config-resource-unknown.
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "412":
+          description: config-version-conflict — If-Match did not fence; extensions.currentVersion is the stored one.
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "428":
+          description: config-precondition-missing — no/malformed If-Match.
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/admin/config/{resource}/history:
+    get:
+      operationId: getConfigHistory
+      tags: [read]
+      summary: Bounded change trail (newest first; the table keeps only the newest 20 rows).
+      parameters:
+        - { $ref: "#/components/parameters/ConfigResource" }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 20, default: 20 }
+      responses:
+        "200":
+          description: History entries, newest first (empty for a never-written resource).
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/AdminConfigHistoryEntry" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/admin/dead-letters/{deadLetterId}/replay:
+    post:
+      operationId: replayDeadLetter
+      tags: [mutate]
+      summary: >
+        Re-enqueue the dead-lettered outbox row from its byte-identical
+        snapshot (a replay never edits the payload); the ledger allows exactly
+        one replay command per dead letter.
+      parameters:
+        - name: deadLetterId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Replayed; the outbox row is pending again.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [deadLetterId, replayed]
+                properties:
+                  deadLetterId: { type: string, format: uuid }
+                  replayed: { type: boolean, enum: [true] }
+        "404":
+          description: dead-letter-not-found.
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "409":
+          description: version-conflict — already replayed.
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "422":
+          description: replay-envelope-invalid — snapshot fails contract validation.
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/admin/manifests/{manifestId}/re-mark:
+    post:
+      operationId: reMarkManifest
+      tags: [mutate]
+      summary: >
+        Human re-mark of a recorded manifest's resultState
+        (available|validated|rejected only — missing/superseded are chain-law owned).
+      parameters:
+        - name: manifestId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [resultState]
+              properties:
+                resultState: { type: string, enum: [available, validated, rejected] }
+      responses:
+        "200":
+          description: Re-marked.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [manifestId, resultState]
+                properties:
+                  manifestId: { type: string }
+                  resultState: { type: string, enum: [available, validated, rejected] }
+        "400":
+          description: manifest-re-mark-invalid.
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "404":
+          description: manifest-not-found.
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >
+        OIDC principal; each route needs the admin.read (GET) or admin.mutate
+        (PATCH/POST) operation binding from identity:authorization:operations.
+  parameters:
+    ProjectId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    WorkId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    ConfigResource:
+      name: resource
+      in: path
+      required: true
+      schema: { $ref: "#/components/schemas/ConfigResource" }
+  responses:
+    Unauthorized:
+      description: No valid bearer principal.
+      content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+    Forbidden:
+      description: Principal lacks the route's operation binding.
+      content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+  schemas:
+    Problem:
+      description: RFC 9457 ProblemDetails; type is https://errors.openfacilitator.org/v1/{code}.
+      type: object
+      required: [type, title, status]
+      properties:
+        type: { type: string }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+    ConfigResource:
+      type: string
+      enum: [notifications, retry-policy, nudge-policy, workload-scale, routing-defaults]
+    AdminSummary:
+      type: object
+      additionalProperties: false
+      required: [teams, projects, workByState, assignmentsByState, executionsByState, gatewaysOnline, gatewaysOffline, inboxByState, outboxByState, deadLettersTotal, approvalsByState, artifactsTotal, manifestsByResultState, memoryByStatus, linkSessionsLive]
+      properties:
+        teams: { type: integer }
+        projects: { type: integer }
+        workByState: { type: object, additionalProperties: { type: integer } }
+        assignmentsByState: { type: object, additionalProperties: { type: integer } }
+        executionsByState: { type: object, additionalProperties: { type: integer } }
+        gatewaysOnline: { type: integer }
+        gatewaysOffline: { type: integer }
+        inboxByState: { type: object, additionalProperties: { type: integer } }
+        outboxByState: { type: object, additionalProperties: { type: integer } }
+        deadLettersTotal: { type: integer }
+        oldestPendingOutboxAt: { type: [string, "null"], format: date-time }
+        approvalsByState: { type: object, additionalProperties: { type: integer } }
+        artifactsTotal: { type: integer }
+        manifestsByResultState: { type: object, additionalProperties: { type: integer } }
+        memoryByStatus: { type: object, additionalProperties: { type: integer } }
+        linkSessionsLive: { type: integer }
+    AdminSearchHit:
+      type: object
+      additionalProperties: false
+      required: [id, display, state, at]
+      properties:
+        id: { type: string }
+        display: { type: string }
+        state: { type: string }
+        at: { type: string, format: date-time }
+    AdminSearchResults:
+      type: object
+      additionalProperties: false
+      required: [query, works, projects, assignments, artifacts, memories, messages]
+      properties:
+        query: { type: string }
+        works: { type: array, items: { $ref: "#/components/schemas/AdminSearchHit" } }
+        projects: { type: array, items: { $ref: "#/components/schemas/AdminSearchHit" } }
+        assignments: { type: array, items: { $ref: "#/components/schemas/AdminSearchHit" } }
+        artifacts: { type: array, items: { $ref: "#/components/schemas/AdminSearchHit" } }
+        memories: { type: array, items: { $ref: "#/components/schemas/AdminSearchHit" } }
+        messages: { type: array, items: { $ref: "#/components/schemas/AdminSearchHit" } }
+    AdminLinkRow:
+      type: object
+      additionalProperties: false
+      required: [endpointId, team, trustMode, online]
+      properties:
+        endpointId: { type: string }
+        team: { type: string }
+        trustMode: { type: string }
+        capabilitiesDigest: { type: [string, "null"] }
+        online: { type: boolean, description: Lease-derived; stale gateways collapse to offline. }
+        sessionEpoch: { type: [integer, "null"], format: int64 }
+        leaseUntil: { type: [string, "null"], format: date-time }
+        lastHeartbeat: { type: [string, "null"], format: date-time }
+        replicaId: { type: [string, "null"], description: Best-effort per-replica socket attribution. }
+        liveSockets: { type: integer }
+    AdminAffectedAssignment:
+      type: object
+      additionalProperties: false
+      required: [assignmentId, workId, status]
+      properties:
+        assignmentId: { type: string, format: uuid }
+        workId: { type: string, format: uuid }
+        status: { type: string }
+    AdminLinksView:
+      type: object
+      additionalProperties: false
+      required: [gateways, affectedAssignments]
+      properties:
+        gateways: { type: array, items: { $ref: "#/components/schemas/AdminLinkRow" } }
+        affectedAssignments: { type: array, items: { $ref: "#/components/schemas/AdminAffectedAssignment" } }
+    AdminDeliveryRow:
+      type: object
+      additionalProperties: false
+      required: [plane, id, state, attempts, updatedAt]
+      properties:
+        plane: { type: string, enum: [outbox, link, dead_letter] }
+        id: { type: string, format: uuid }
+        state: { type: string }
+        attempts: { type: integer }
+        lastError: { type: [string, "null"] }
+        availableAt: { type: [string, "null"], format: date-time }
+        endpointId: { type: [string, "null"] }
+        sessionEpoch: { type: [integer, "null"], format: int64 }
+        redeliverAfter: { type: [string, "null"], format: date-time }
+        reason: { type: [string, "null"], description: Dead-letter row cause. }
+        updatedAt: { type: string, format: date-time }
+    AdminHourBucket:
+      type: object
+      additionalProperties: false
+      required: [hour, count]
+      properties:
+        hour: { type: string, format: date-time }
+        count: { type: integer, format: int64 }
+    AdminMetrics:
+      type: object
+      additionalProperties: false
+      required: [outboxPending, inboxPending, deadLetters, linkSessions, deadLettersPerHour, auditDeniesPerHour, artifactsStoredPerHour, artifactsRejectedPerHour, counters]
+      properties:
+        outboxPending: { type: integer, format: int64 }
+        inboxPending: { type: integer, format: int64 }
+        deadLetters: { type: integer, format: int64 }
+        linkSessions: { type: integer, format: int64 }
+        deadLettersPerHour: { type: array, items: { $ref: "#/components/schemas/AdminHourBucket" } }
+        auditDeniesPerHour: { type: array, items: { $ref: "#/components/schemas/AdminHourBucket" } }
+        artifactsStoredPerHour: { type: array, items: { $ref: "#/components/schemas/AdminHourBucket" } }
+        artifactsRejectedPerHour: { type: array, items: { $ref: "#/components/schemas/AdminHourBucket" } }
+        counters: { type: object, additionalProperties: { type: integer, format: int64 } }
+    AdminProjectDetail:
+      type: object
+      additionalProperties: false
+      required: [projectId, name, config, createdAt, works]
+      properties:
+        projectId: { type: string, format: uuid }
+        name: { type: string }
+        teamSlug: { type: [string, "null"] }
+        config: { type: object }
+        createdAt: { type: string, format: date-time }
+        works: { type: array, items: { $ref: "#/components/schemas/AdminWorkRow" } }
+    AdminWorkRow:
+      type: object
+      additionalProperties: false
+      required: [workId, objective, state, version, createdAt, updatedAt]
+      properties:
+        workId: { type: string, format: uuid }
+        objective: { type: string }
+        state: { type: string }
+        version: { type: integer, format: int64 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    AdminWorkDetail:
+      type: object
+      additionalProperties: false
+      required: [work, assignments, approvals, manifests]
+      properties:
+        work: { $ref: "#/components/schemas/AdminWorkRow" }
+        projectId: { type: [string, "null"] }
+        assignments: { type: array, items: { $ref: "#/components/schemas/AdminAssignmentRow" } }
+        approvals: { type: array, items: { $ref: "#/components/schemas/AdminApprovalRow" } }
+        manifests: { type: array, items: { $ref: "#/components/schemas/AdminManifestRow" } }
+    AdminAssignmentRow:
+      type: object
+      additionalProperties: false
+      required: [assignmentId, status, currentExecutionGeneration, createdAt, updatedAt, attempts]
+      properties:
+        assignmentId: { type: string, format: uuid }
+        status: { type: string }
+        currentExecutionGeneration: { type: integer }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        attempts: { type: array, items: { $ref: "#/components/schemas/AdminAttemptRow" } }
+    AdminAttemptRow:
+      type: object
+      additionalProperties: false
+      required: [executionId, generation, status, startedAt]
+      properties:
+        executionId: { type: string, format: uuid }
+        generation: { type: integer }
+        status: { type: string }
+        startedAt: { type: string, format: date-time }
+        endedAt: { type: [string, "null"], format: date-time }
+    AdminApprovalRow:
+      type: object
+      additionalProperties: false
+      required: [approvalId, state, actionDigest, createdAt]
+      properties:
+        approvalId: { type: string, format: uuid }
+        state: { type: string }
+        actionDigest: { type: string }
+        createdAt: { type: string, format: date-time }
+        decidedAt: { type: [string, "null"], format: date-time }
+    AdminManifestRow:
+      type: object
+      additionalProperties: false
+      required: [manifestId, revision, resultState, state, artifactId, outputArtifactIds, recordedAt]
+      properties:
+        manifestId: { type: string }
+        revision: { type: integer }
+        revisionOf: { type: [string, "null"] }
+        resultState: { type: string }
+        state: { type: string }
+        artifactId: { type: string, format: uuid }
+        outputArtifactIds: { type: array, items: { type: string } }
+        recordedAt: { type: string, format: date-time }
+    WorkEventRow:
+      description: Timeline row — identical to GET /api/works/{id}/timeline entries.
+      type: object
+      additionalProperties: true
+    AdminConfigView:
+      type: object
+      additionalProperties: false
+      required: [resource, payload, rowVersion, author, reason, updatedAt]
+      properties:
+        resource: { $ref: "#/components/schemas/ConfigResource" }
+        payload: { type: object }
+        rowVersion: { type: integer, format: int64, description: The ETag source. }
+        author: { type: string, description: Canonical actor of the last write. }
+        reason: { type: string, description: X-Change-Reason of the last write. }
+        updatedAt: { type: string, format: date-time }
+    AdminConfigHistoryEntry:
+      type: object
+      additionalProperties: false
+      required: [version, payload, author, reason, updatedAt]
+      properties:
+        version: { type: integer, format: int64 }
+        payload: { type: object }
+        author: { type: string }
+        reason: { type: string }
+        updatedAt: { type: string, format: date-time }
+security:
+  - bearerAuth: []

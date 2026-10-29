@@ -122,7 +122,7 @@ The Facilitator kernel (`src/facilitator`, namespace `Facilitator.Kernel`) consu
 |`GET /api/memory/export?scope=…`|NDJSON export of one readable scope's live entries (gated `memory.read`)|`200` NDJSON|
 |`GET /api/memory/{id}`|Entry view + live shares + usage count (gated `memory.read`; non-disclosure `404` for foreign/tombstoned/missing)|`200` entry DTO|
 |`POST /api/memory/{id}/promote` · `POST /api/memory/{id}/correct` · `POST /api/memory/{id}/shares` · `DELETE /api/memory/{id}/shares/{shareId}` · `DELETE /api/memory/{id}`|Owner-team curation (gated `memory.curate`): candidate→active (optional `targetScope` = own team selector only, else the typed `memory-scope-invalid` 422), revision chain (`supersedesEntryId`, the new revision lands `active`), share grant/revoke (grantee must exist; private unsharable), delete = tombstone + content drop + share revocation in one tx|`200` `{entryId, …}` (promote carries `status:"active"`, correct `superseded:true`, shares the `granteeTeam`), `204` on share-revoke and delete|
-|`GET /api/dev/deliveries`|Outbox delivery ledger dump (Plan 12 replaces with admin views)|`200` array|
+|`/api/admin/*`|Operator surface (Plan 20): summary roll-up, universal search, project/work detail + timeline, links, merged deliveries, metrics, config GET/PATCH (If-Match + `X-Change-Reason` law, bounded history), dead-letter replay, manifest re-mark. Gated `admin.read` (GETs) / `admin.mutate` (PATCH/POST) via the config bindings — contract mirror `protocol/openapi/admin-v1.yaml`|see `admin-v1.yaml`|
 
 ### Error contract
 
@@ -287,7 +287,6 @@ Over SignalR the receipt posts via the `Receipt` method with the full `receipt.v
 |`POST /api/link/v1/deliveries/{deliveryId}/receipt`|link bearer|`204` (idempotent re-receipt answers `204` again, overwriting the stored receipt jsonb)|`404 delivery-not-found` (unknown id or another endpoint's delivery), `400 schema-violation`, `413`|
 |`GET /api/link/v1/capabilities`|link bearer|`200` stored CapabilityManifest|`404 capabilities-not-found`|
 |`POST /api/link/v1/capabilities`|link bearer|`204` (stores manifest + SHA-256 digest)|`400 schema-violation`, `403 team-mismatch` (`ownerTeam` ≠ principal's team)|
-|`GET /api/dead-letters`|kernel bearer|`200` array `{deadLetterId, outboxId, reason, envelope, createdAt}`, newest 50 (appendix §5.6)|—|
 
 `wait` long-polls (per-endpoint wake channel + 1 s polling safety net + inline materialize/claim; NOTIFY `facilitator_outbox` is a wake hint only, §7.3) and `limit` is additionally bounded by `maxInFlight − inFlight`. HTTP principals get no `WelcomeFrame`: enrollment + bearer token IS the session bootstrap, **but a live `link_sessions` row is still REQUIRED for the delivery read** (404 `session-not-found` — enroll-then-poll without a handshake gets the 404; as-built that row is minted by a hub `hello`). Every successful `GET /deliveries` refreshes that row's lease (long-poll IS the heartbeat for a socketless principal, spec S:314). `/capabilities` (GET and POST) needs no session at all. Body size gate (413 at 262144) and dedupe keys are identical to Kernel ingress above; a link-originated `work.steer` runs the same `ApplySteerAsync` path as kernel ingress.
 

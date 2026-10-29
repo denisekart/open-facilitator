@@ -3,14 +3,18 @@
 ## Purpose
 The Facilitator kernel (.NET 10 / ASP.NET Core): durable coordination —
 ingress, work lifecycle, the workspace-Link server, dispatch — on PostgreSQL.
-One process, three folders: two features and one shared kernel
-(Storage, Memory broker, Auth, Dispatch, Persistence, CLI, metrics).
+One process, thin feature folders over one shared kernel
+(Storage, Memory broker, Auth, Dispatch, Persistence, CLI, metrics)
+plus the read-mostly Admin surface.
 
 ## Truth anchors
 - `Kernel/Work/` — work lifecycle (endpoints, ingress pipeline, state machine,
   `EfCoordinationStore` = this feature's persistence).
 - `Kernel/Link/` — workspace-link server (enroll, hub, admission, deliveries,
   receipts, ledger).
+- `Kernel/Admin/` — `/api/admin` operator surface (read stores, config store
+  with the If-Match/`X-Change-Reason` law, replay + re-mark mutations);
+  authorization is config bindings only (`admin.read`/`admin.mutate`).
 - `Kernel/Shared/` — not a feature: Auth, Dispatch, Persistence, CLI, metrics,
   Storage (artifact byte port + ledgers), Memory (broker + provider port).
 - `Kernel/KernelServiceCollection.cs` — composition root; `AddSharedKernel` /

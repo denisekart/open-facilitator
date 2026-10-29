@@ -66,6 +66,10 @@ public class FacilitatorDbContext(DbContextOptions<FacilitatorDbContext> options
 
     public DbSet<MemoryUsageEntity> MemoryUsage => Set<MemoryUsageEntity>();
 
+    public DbSet<AdminConfigEntity> AdminConfig => Set<AdminConfigEntity>();
+
+    public DbSet<AdminConfigVersionEntity> AdminConfigHistory => Set<AdminConfigVersionEntity>();
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder model)
     {

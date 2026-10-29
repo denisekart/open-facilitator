@@ -542,6 +542,151 @@ public sealed class TestDbProbe : IAsyncDisposable
         return rows;
     }
 
+    /// <summary>True when an outbox row with the command id exists in the given status (admin replay probes).</summary>
+    public Task<bool> OutboxRowByCommand(string commandId, string? state = null) =>
+        ScalarBool(
+            "SELECT count(*) FROM facilitator.outbox WHERE command_id = $1"
+            + (state is null ? string.Empty : " AND status = $2"),
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(commandId);
+                if (state is not null)
+                {
+                    cmd.Parameters.AddWithValue(state);
+                }
+            });
+
+    /// <summary>The dead-letter ids sourced from a work's outbox rows (replay seeding).</summary>
+    public async Task<List<string>> DeadLetterIdsForWork(Guid workId) =>
+        await TextList(
+            "SELECT d.dead_letter_id::text FROM facilitator.dead_letters d "
+            + "JOIN facilitator.outbox o ON o.outbox_id = d.outbox_id WHERE o.work_id = $1",
+            workId);
+
+    /// <summary>The dead-letter snapshot envelope by dead-letter id (replay byte-identity probe).</summary>
+    public async Task<string> DeadLetterSnapshot(Guid deadLetterId) =>
+        Assert.Single(await TextList("SELECT envelope::text FROM facilitator.dead_letters WHERE dead_letter_id = $1", deadLetterId));
+
+    /// <summary>Remove a config resource's rows (suite isolation on the shared DB).</summary>
+    public async Task AdminConfigPurge(string resource)
+    {
+        await NonQuery("DELETE FROM facilitator.admin_config_history WHERE resource = $1", cmd => cmd.Parameters.AddWithValue(resource));
+        await NonQuery("DELETE FROM facilitator.admin_config WHERE resource = $1", cmd => cmd.Parameters.AddWithValue(resource));
+    }
+
+    /// <summary>The result_state of a manifest row (null when absent).</summary>
+    public async Task<string?> ManifestResultState(string manifestId)
+    {
+        var rows = await TextList("SELECT result_state FROM facilitator.result_manifests WHERE manifest_id = $1", manifestId);
+        return rows.Count == 0 ? null : Assert.Single(rows);
+    }
+
+    /// <summary>The stored admin_config payload for a resource (null when never written).</summary>
+    public async Task<(long RowVersion, string Payload)?> AdminConfigRow(string resource)
+    {
+        await using var connection = await _dataSource.OpenConnectionAsync();
+        await using var cmd = new NpgsqlCommand(
+            "SELECT row_version, payload::text FROM facilitator.admin_config WHERE resource = $1", connection);
+        cmd.Parameters.AddWithValue(resource);
+        await using var reader = await cmd.ExecuteReaderAsync();
+        return await reader.ReadAsync() ? (reader.GetInt64(0), reader.GetString(1)) : null;
+    }
+
+    /// <summary>Versions stored in the bounded admin_config history for a resource (ascending).</summary>
+    public async Task<List<long>> AdminConfigHistoryVersions(string resource)
+    {
+        await using var connection = await _dataSource.OpenConnectionAsync();
+        await using var cmd = new NpgsqlCommand(
+            "SELECT version FROM facilitator.admin_config_history WHERE resource = $1 ORDER BY version", connection);
+        cmd.Parameters.AddWithValue(resource);
+        await using var reader = await cmd.ExecuteReaderAsync();
+        var versions = new List<long>();
+        while (await reader.ReadAsync())
+        {
+            versions.Add(reader.GetInt64(0));
+        }
+
+        return versions;
+    }
+
+    /// <summary>Hand-mint a gateway enrollment row (link views seed enrollments without a live hub session).</summary>
+    public Task SeedGatewayEnrollment(string endpointId, string teamSlug, string trustMode) =>
+        NonQuery(
+            "INSERT INTO facilitator.link_enrollments (enrollment_id, endpoint_id, team_id, token_sha256, trust_mode, "
+            + "enrolled_at, expires_at, role, accepts_delegated_claims) "
+            + "VALUES (gen_random_uuid(), $1, (SELECT team_id FROM facilitator.teams WHERE slug = $2), 'seed', $3, "
+            + "now(), now() + interval '1 hour', 'gateway', false)",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(endpointId);
+                cmd.Parameters.AddWithValue(teamSlug);
+                cmd.Parameters.AddWithValue(trustMode);
+            });
+
+    /// <summary>Hand-mint a live link session row for an endpoint.</summary>
+    public Task SeedLinkSession(string endpointId, long epoch, DateTime leaseUntil) =>
+        NonQuery(
+            "INSERT INTO facilitator.link_sessions (logical_endpoint_id, connection_instance_id, replica_id, "
+            + "session_epoch, lease_until, last_heartbeat) "
+            + "VALUES ($1, 'inst-seed', 'replica-seed', $2, $3, now())",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(endpointId);
+                cmd.Parameters.AddWithValue(epoch);
+                cmd.Parameters.AddWithValue(leaseUntil);
+            });
+
+    /// <summary>Hand-mint an assignment row for a team in a given status (link views seed affected assignments).</summary>
+    public Task SeedAssignmentForTeam(Guid workId, string teamSlug, string status) =>
+        NonQuery(
+            "INSERT INTO facilitator.assignments (assignment_id, work_id, team_id, status, "
+            + "current_execution_generation, created_at, updated_at) "
+            + "VALUES (gen_random_uuid(), $1, (SELECT team_id FROM facilitator.teams WHERE slug = $2), $3, 1, now(), now())",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(workId);
+                cmd.Parameters.AddWithValue(teamSlug);
+                cmd.Parameters.AddWithValue(status);
+            });
+
+    /// <summary>Hand-mint an approvals ledger row against a work (admin detail seeding).</summary>
+    public Task SeedApproval(Guid approvalId, Guid workId) =>
+        NonQuery(
+            "INSERT INTO facilitator.approvals (approval_id, work_id, action_digest, state, nonce, eligible_actors, "
+            + "expires_at, created_at) VALUES ($1, $2, 'sha256:' || repeat('c', 64), 'pending', $3, '[]', "
+            + "now() + interval '1 hour', now())",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(approvalId);
+                cmd.Parameters.AddWithValue(workId);
+                cmd.Parameters.AddWithValue($"nonce-{approvalId:N}");
+            });
+
+    /// <summary>The assignments minted for a work (admin detail seeding chains).</summary>
+    public Task<List<string>> AssignmentIdsForWork(Guid workId) =>
+        TextList("SELECT assignment_id::text FROM facilitator.assignments WHERE work_id = $1", workId);
+
+    /// <summary>Hand-mint an execution attempt for an assignment (admin detail seeding).</summary>
+    public Task SeedExecutionAttempt(Guid assignmentId, string status) =>
+        NonQuery(
+            "INSERT INTO facilitator.execution_attempts (execution_id, assignment_id, generation, status, started_at) "
+            + "VALUES (gen_random_uuid(), $1, 1, $2, now())",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(assignmentId);
+                cmd.Parameters.AddWithValue(status);
+            });
+
+    /// <summary>Rewrite a dead-letter snapshot envelope (replay fail-closed seeding).</summary>
+    public Task SetDeadLetterEnvelope(Guid deadLetterId, string envelopeJson) =>
+        NonQuery(
+            "UPDATE facilitator.dead_letters SET envelope = $2::jsonb WHERE dead_letter_id = $1",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(deadLetterId);
+                cmd.Parameters.AddWithValue(envelopeJson);
+            });
+
     /// <summary>Role names present in facilitator.identity_roles.</summary>
     public Task<List<string>> IdentityRoleNames() =>
         TextListRaw("SELECT role_name FROM facilitator.identity_roles ORDER BY role_name");

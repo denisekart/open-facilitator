@@ -14,4 +14,8 @@ public sealed class OutboxAdminStore(OutboxRepository outbox)
     /// <summary>Dev/test affordance: append one outbox row + wake the dispatchers.</summary>
     public Task<Guid> AppendDevWorkAsync(string recipientEndpointId, string eventType, string commandId, string envelopeJson, CancellationToken ct) =>
         outbox.AppendAsync(recipientEndpointId, eventType, commandId, envelopeJson, ct);
+
+    /// <summary>Admin replay (Plan 20): re-enqueue a dead-lettered envelope verbatim.</summary>
+    public Task<OutboxRepository.ReplayOutcome> ReplayAsync(Guid deadLetterId, string? actor, CancellationToken ct) =>
+        outbox.ReplayAsync(deadLetterId, actor, ct);
 }

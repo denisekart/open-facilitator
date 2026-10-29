@@ -5,6 +5,8 @@ using Facilitator.Kernel.Shared.Dispatch;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 
+using Npgsql;
+
 namespace Facilitator.Kernel.Shared.Persistence;
 
 /// <summary>One dead-letter row for admin visibility (raw columns, DTO mapping at the edge).</summary>
@@ -20,11 +22,16 @@ public sealed record DeadLetterRow(Guid DeadLetterId, Guid OutboxId, string Reas
 /// claim, claim-expired reclaim, mark-delivered, requeue-with-backoff,
 /// dead-letter, and the dev test-affordance insert (+wake). Raw SQL only where
 /// the stance allows it (claim, lease reclaim, backoff arithmetic); EF for the
-/// plain inserts.
+/// plain inserts. The admin replay (Plan 20) re-enqueues a dead-lettered
+/// envelope VERBATIM under a deterministic <c>replay:&lt;deadLetterId&gt;</c>
+/// command id, so double-replay collides on <c>outbox_command_id_key</c> and
+/// the ledger arbitrates idempotency — never the UI.
 /// </summary>
 public sealed class OutboxRepository(
     IDbContextFactory<FacilitatorDbContext> contextFactory,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    Ofac.Protocol.Validation.EnvelopeValidator envelopeValidator,
+    Facilitator.Kernel.Shared.Identity.AuditWriter audit)
 {
     private const int ClaimBatchSize = 20;
     private static readonly TimeSpan ClaimLease = TimeSpan.FromSeconds(30);
@@ -201,5 +208,84 @@ public sealed class OutboxRepository(
             .Select(d => new DeadLetterRow(d.DeadLetterId, d.OutboxId, d.Reason, d.Envelope, d.CreatedAt))
             .ToListAsync(ct);
         return rows;
+    }
+
+    /// <summary>Outcome of an admin dead-letter replay (Plan 20).</summary>
+    public enum ReplayOutcome
+    {
+        /// <summary>A fresh pending row landed (wake sent).</summary>
+        Replayed,
+
+        /// <summary>The deterministic replay command id exists — already replayed.</summary>
+        AlreadyReplayed,
+
+        /// <summary>No such dead-letter row.</summary>
+        NotFound,
+
+        /// <summary>The snapshot envelope fails the contract validator (fail-closed, no row).</summary>
+        EnvelopeInvalid,
+    }
+
+    /// <summary>
+    /// Re-enqueue a dead-lettered envelope verbatim: validate fail-closed,
+    /// insert a NEW outbox row (fresh id, deterministic
+    /// <c>replay:&lt;deadLetterId&gt;</c> command id) + audit row in one tx,
+    /// then wake the dispatchers. The source row stays <c>dead_letter</c> as
+    /// the diagnostic trail.
+    /// </summary>
+    public async Task<ReplayOutcome> ReplayAsync(Guid deadLetterId, string? actor, CancellationToken ct)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(ct);
+        var dead = await db.DeadLetters.AsNoTracking().FirstOrDefaultAsync(d => d.DeadLetterId == deadLetterId, ct);
+        if (dead is null)
+        {
+            return ReplayOutcome.NotFound;
+        }
+
+        var source = await db.Outbox.AsNoTracking().FirstOrDefaultAsync(o => o.OutboxId == dead.OutboxId, ct);
+        var verdict = envelopeValidator.Validate(dead.Envelope);
+        if (!verdict.Ok)
+        {
+            return ReplayOutcome.EnvelopeInvalid;
+        }
+
+        var now = timeProvider.GetUtcNow().UtcDateTime;
+        db.Outbox.Add(new OutboxEntity
+        {
+            OutboxId = Guid.NewGuid(),
+            RecipientEndpointId = source?.RecipientEndpointId ?? $"kernel.replay.{deadLetterId:N}",
+            AggregateType = source?.AggregateType ?? "work",
+            AggregateId = source?.AggregateId,
+            EventType = source?.EventType ?? ExtractType(dead.Envelope),
+            CommandId = $"replay:{deadLetterId}",
+            Envelope = dead.Envelope,
+            WorkId = source?.WorkId,
+            Status = "pending",
+            AvailableAt = now,
+            Attempts = 0,
+            CreatedAt = now,
+        });
+        audit.Append(db, new Facilitator.Kernel.Shared.Identity.AuditRecord(
+            actor, "admin.dead-letter.replay", $"/api/admin/dead-letters/{deadLetterId}", "allow", null, dead.OutboxId.ToString(), null,
+            System.Text.Json.JsonSerializer.Serialize(new { deadLetterId, sourceOutboxId = dead.OutboxId, reason = dead.Reason })));
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException e) when (e.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+        {
+            return ReplayOutcome.AlreadyReplayed;
+        }
+
+        await PostgresNotifications.NotifyOutboxAsync(db, null, ct);
+        return ReplayOutcome.Replayed;
+    }
+
+    private static string ExtractType(string envelope)
+    {
+        using var document = JsonDocument.Parse(envelope);
+        return document.RootElement.TryGetProperty("type", out var type) && type.ValueKind == JsonValueKind.String
+            ? type.GetString()!
+            : "org.facilitator.event.v1";
     }
 }

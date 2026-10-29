@@ -149,10 +149,14 @@ step_idp_login() {
     [ "$(printf '%s' "$t" | awk -F. '{print NF}')" = 3 ] \
       || { step_fail "token is not a JWT"; return 1; }
   done
-  verify_get "$VERIFY_TOKEN_CLI" /api/dead-letters >/dev/null \
+  verify_get "$VERIFY_TOKEN_CLI" /api/admin/deliveries?state=dead_letter >/dev/null \
     || { step_fail "kernel rejected the client_credentials token"; return 1; }
-  verify_get "$VERIFY_TOKEN_ALICE" /api/dead-letters >/dev/null \
+  verify_get "$VERIFY_TOKEN_ALICE" /api/admin/deliveries?state=dead_letter >/dev/null \
     || { step_fail "kernel rejected the alice token"; return 1; }
+  # Admin read surface (Plan 20): the alice (framework-admin) token must see
+  # the summary roll-up — proves the admin.read binding end-to-end.
+  verify_get "$VERIFY_TOKEN_ALICE" /api/admin/summary | jq -e '.workByState' >/dev/null \
+    || { step_fail "admin summary unreadable for alice"; return 1; }
   step_pass "both grants minted and accepted by the kernel"
   return 0
 }
@@ -544,7 +548,7 @@ verify_dashboard_trace() {
 
 step_dead_letters_empty() {
   local n
-  n=$(verify_get "$VERIFY_TOKEN_CLI" /api/dead-letters | jq 'length') || \
+  n=$(verify_get "$VERIFY_TOKEN_CLI" "/api/admin/deliveries?state=dead_letter" | jq '.items | length') || \
     { step_fail "dead-letters unreadable"; verify_dump_logs facilitator; return 1; }
   [ "${n:-0}" = 0 ] \
     || { step_fail "$n dead-letter row(s) — a hop failed hard somewhere"; verify_dump_logs facilitator; return 1; }

@@ -71,25 +71,24 @@ public class RestartSurvivalTests(PostgresFixture fixture)
         Assert.Equal(6, await fixture.Db.OutboxCountBy(workId, "delivered", attempts: 1));
         KernelOps.AssertEnvelopesValid(await fixture.Db.OutboxEnvelopes(workId));
 
-        // Ledger (per-host delivery surface): a row appears at most once per
-        // host, and redrains stay quiescent. A row drained earlier by another
-        // collection's live dispatcher (claims are global; collections run in
-        // parallel) was delivered by THAT host and never re-offered — the
-        // DB-side assert above (six delivered, attempts == 1) is the
-        // exactly-once proof; this one is the no-duplicate-per-host proof.
+        // Durable deliveries view (Plan 20: /api/admin/deliveries replaced
+        // the in-memory dev ledger): the table holds exactly one row per
+        // outbox id, so a redrain can never duplicate a delivery — the
+        // DB-side assert above (six delivered, attempts == 1) stays the
+        // exactly-once proof; this one is the one-row-per-id proof.
         using var clientB = factoryB.CreateAuthedClient();
         for (var i = 0; i < 5; i++)
         {
             await dispatcher.DrainOnceAsync(CancellationToken.None);
         }
 
-        var ledger = await KernelOps.GetJsonAsync(clientB, "/api/dev/deliveries", HttpStatusCode.OK);
-        var ledgerIds = ledger.EnumerateArray()
-            .Select(d => d.GetProperty("deliveryId").GetGuid().ToString("D"))
+        var deliveries = await KernelOps.GetJsonAsync(clientB, "/api/admin/deliveries?state=delivered&limit=200", HttpStatusCode.OK);
+        var deliveredIds = deliveries.GetProperty("items").EnumerateArray()
+            .Select(d => d.GetProperty("id").GetGuid().ToString("D"))
             .ToArray();
         foreach (var id in outboxIds)
         {
-            Assert.InRange(ledgerIds.Count(x => x == id), 0, 1);
+            Assert.Equal(1, deliveredIds.Count(x => x == id));
         }
 
         // --- Replay the same business command against the restarted kernel.

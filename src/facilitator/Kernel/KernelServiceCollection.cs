@@ -1,5 +1,6 @@
 using System.Threading.RateLimiting;
 
+using Facilitator.Kernel.Admin;
 using Facilitator.Kernel.Link;
 using Facilitator.Kernel.Shared.Auth;
 using Facilitator.Kernel.Shared.Dispatch;
@@ -90,6 +91,9 @@ public static class KernelServiceCollection
         builder.Services.AddSingleton<ISink, KernelLogSink>();
         builder.Services.AddSingleton<IEventDispatcher, DbEventDispatcher>();
         builder.Services.AddHostedService<OutboxDispatcher>();
+        builder.Services.AddScoped<AdminConfigStore>();
+        builder.Services.AddSingleton<AdminReadStores>();
+        builder.Services.AddScoped<AdminMutationStore>();
 
         builder.Services.AddProblemDetails();
         builder.AddOpenTelemetry();

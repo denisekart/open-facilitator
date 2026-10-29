@@ -8,10 +8,10 @@ using Ofac.Protocol.Validation;
 namespace Facilitator.Kernel.Link;
 
 /// <summary>
-/// The frozen HTTP fallback surface (protocol/openapi/link-v1.yaml, 1.0.1)
-/// plus the kernel-token dead-letter view. Endpoints stay thin; the envelope
-/// admission path is the SAME <see cref="LinkIngress.AdmitAsync"/> the hub's
-/// Envelope method calls, so both transports answer identically.
+/// The frozen HTTP fallback surface (protocol/openapi/link-v1.yaml, 1.0.1).
+/// Endpoints stay thin; the envelope admission path is the SAME
+/// <see cref="LinkIngress.AdmitAsync"/> the hub's Envelope method calls, so
+/// both transports answer identically.
 /// HTTP principals get no WelcomeFrame: enrollment + bearer token IS the
 /// session bootstrap, and every deliveries call implicitly refreshes the
 /// lease — a 404 <c>session-not-found</c> without a live <c>link_sessions</c>
@@ -38,26 +38,17 @@ public static partial class LinkEndpoints
         MapDeliveries(group);
         MapReceipt(group);
         MapCapabilities(group);
-        MapAdmin(app, environment);
+        MapDevAffordances(app, environment);
 
         return app;
     }
 
-    // Identity-gated surface (the role gate guards /api/* outside
-    // /api/link/v1): dead-letter visibility (appendix §5.6).
-    private static void MapAdmin(IEndpointRouteBuilder app, IHostEnvironment environment)
+    // Dev-only test affordance: seed a link-addressed outbox row so link
+    // delivery flows are provable end-to-end without a full assignment
+    // slice. (Plan 20 cut over the dead-letter view to
+    // GET /api/admin/deliveries?state=dead_letter.)
+    private static void MapDevAffordances(IEndpointRouteBuilder app, IHostEnvironment environment)
     {
-        app.MapGroup("/api").MapGet("/dead-letters", async (OutboxAdminStore admin, CancellationToken ct) =>
-        {
-            var rows = await admin.ListDeadLettersAsync(50, ct);
-            return Results.Ok(rows
-                .Select(d => new DeadLetterDto(d.DeadLetterId, d.OutboxId, d.Reason, JsonDocument.Parse(d.Envelope).RootElement.Clone(), d.CreatedAt))
-                .ToArray());
-        });
-
-        // Test affordance (bootstrap-kernel-token auth, Development only):
-        // insert a link-addressed outbox row so link delivery flows are
-        // provable end-to-end without a full assignment slice.
         if (environment.IsDevelopment())
         {
             app.MapGroup("/api").MapPost("/dev/link-outbox", async (HttpRequest request, OutboxAdminStore admin, CancellationToken ct) =>

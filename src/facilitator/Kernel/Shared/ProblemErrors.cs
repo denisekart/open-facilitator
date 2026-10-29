@@ -225,4 +225,49 @@ public static class ProblemErrors
     public static ProblemDetails MemoryScopeInvalid(string selector) =>
         Create("memory-scope-invalid", "Memory scope invalid", StatusCodes.Status422UnprocessableEntity,
             $"selector '{selector}' does not resolve to a scope this caller may write");
+
+    /// <summary>400 search arrived with an empty q.</summary>
+    public static ProblemDetails SearchQueryRequired() =>
+        Create("search-query-required", "Search query required", StatusCodes.Status400BadRequest,
+            "the q parameter must be non-empty");
+
+    /// <summary>404 config resource outside the registered set.</summary>
+    public static ProblemDetails ConfigResourceUnknown(string resource) =>
+        Create("config-resource-unknown", "Config resource unknown", StatusCodes.Status404NotFound,
+            $"'{resource}' is not a registered admin config resource");
+
+    /// <summary>400 config payload violates the resource's registered shape (or a required change reason is missing).</summary>
+    public static ProblemDetails ConfigInvalid(string detail) =>
+        Create("config-invalid", "Config invalid", StatusCodes.Status400BadRequest, detail);
+
+    /// <summary>400 config payload over the 16 KiB cap.</summary>
+    public static ProblemDetails ConfigPayloadTooLarge(string detail) =>
+        Create("config-payload-too-large", "Config payload too large", StatusCodes.Status400BadRequest, detail);
+
+    /// <summary>428 config PATCH arrived without an If-Match header.</summary>
+    public static ProblemDetails ConfigPreconditionMissing(string resource) =>
+        Create("config-precondition-missing", "Config precondition missing", StatusCodes.Status428PreconditionRequired,
+            $"PATCH /api/admin/config/{resource} requires an If-Match header (an ETag from GET, or '*' to force)");
+
+    /// <summary>412 config PATCH If-Match does not match the stored rowVersion.</summary>
+    public static ProblemDetails ConfigVersionConflict(string resource, long currentVersion)
+    {
+        var problem = Create("config-version-conflict", "Config version conflict", StatusCodes.Status412PreconditionFailed,
+            $"config resource '{resource}' changed concurrently (stored rowVersion {currentVersion}) — re-read and retry");
+        problem.Extensions["currentVersion"] = currentVersion;
+        return problem;
+    }
+
+    /// <summary>404 unknown dead-letter row.</summary>
+    public static ProblemDetails DeadLetterNotFound(Guid deadLetterId) =>
+        Create("dead-letter-not-found", "Dead letter not found", StatusCodes.Status404NotFound,
+            $"no dead letter {deadLetterId}");
+
+    /// <summary>422 a dead-letter replay envelope fails the contract validator (fail-closed, no row inserted).</summary>
+    public static ProblemDetails ReplayEnvelopeInvalid(string detail) =>
+        Create("replay-envelope-invalid", "Replay envelope invalid", StatusCodes.Status422UnprocessableEntity, detail);
+
+    /// <summary>400 manifest re-mark target outside the human-writable states.</summary>
+    public static ProblemDetails ManifestReMarkInvalid(string detail) =>
+        Create("manifest-re-mark-invalid", "Manifest re-mark invalid", StatusCodes.Status400BadRequest, detail);
 }

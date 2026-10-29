@@ -197,7 +197,7 @@ over real Keycloak + Postgres + kernel boundaries (§26.1 items 11+12 complete).
 **Depends on:** 17, 18
 
 ### Plan 20 — Admin API: §17.4 read models, dead-letter replay, versioned config
-**Status:** ⬜ not-started (detail design: `20-admin-read-models-config-api.md`)
+**Status:** 🟡 admin surface landed, verified locally (slim `verify` 11/11 + live replay/config proofs; execution record: `20_ADMIN_READ_MODELS_CONFIG_API_PLAN.md`)
 **Objective:** `/api/admin/*` server surface — summary/search/detail/timeline/links(trustMode)/deliveries/metrics, dead-letter replay, manifest re-mark, `PATCH config` + `If-Match`; dev-endpoint cutover.
 **Depends on:** 19
 

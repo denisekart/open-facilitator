@@ -60,10 +60,10 @@ describe.skipIf(!E2E)("gateway assign e2e", () => {
           assignmentId: `asg-${commandId}`,
         }),
       );
-      // As-built law: `/api/dev/deliveries` reads the in-memory DeliveryLedger,
-      // which only the kernel-log sink feeds (ISink.cs) — the link sink records
-      // nothing there. The kernel-side truth for link dispatch is the
-      // link_deliveries row itself (Plan 04's own e2e polls it via psql).
+      // As-built law (Plan 20): the kernel-side truth for link dispatch is
+      // the link_deliveries row (also visible on GET /api/admin/deliveries);
+      // the old in-memory dev ledger dump is gone. Plan 04's own e2e polls
+      // the row via psql.
       const row = await waitFor("link row acked", async () => {
         const r = await linkRow(harness.dbUrl, outboxId);
         // Frozen state law: pending | in_flight | acked — receipt acceptance

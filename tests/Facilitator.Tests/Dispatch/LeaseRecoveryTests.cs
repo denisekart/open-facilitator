@@ -39,7 +39,7 @@ public class LeaseRecoveryTests(PostgresFixture fixture)
         Assert.True(await dispatcher.DrainOnceAsync(CancellationToken.None) >= 1);
         Assert.Equal(1, await fixture.Db.OutboxCountBy(workId, "delivered", attempts: 2));
 
-        var ledger = await KernelOps.GetJsonAsync(client, "/api/dev/deliveries", HttpStatusCode.OK);
-        Assert.True(ledger.GetArrayLength() >= 1);
+        var deliveries = await KernelOps.GetJsonAsync(client, "/api/admin/deliveries?state=delivered", HttpStatusCode.OK);
+        Assert.True(deliveries.GetProperty("items").GetArrayLength() >= 1);
     }
 }

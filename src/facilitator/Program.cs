@@ -40,6 +40,12 @@ app.MapMemoryApi();
 app.MapLinkApi(app.Environment);
 app.MapIdentityApi();
 app.MapAdminApi();
+app.MapUiConfig(builder.Configuration);
+// Embedded operator SPA (spec §17): hashed assets + SPA fallback. Non-/api
+// paths ride past the role gate, so the static surface stays anonymous.
+app.UseDefaultFiles();
+app.UseStaticFiles();
+app.MapFallbackToFile("index.html");
 
 await app.RunAsync();
 

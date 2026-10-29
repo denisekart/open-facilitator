@@ -9,8 +9,9 @@ Repo root **is** the spec §22.1 `framework/` tree — no `framework/` subdirect
 |Target|What it does|
 |---|---|
 |`make restore`|`dotnet restore OpenFacilitator.slnx` + `pnpm install`|
-|`make build`|.NET Release build + `pnpm -r build` (depends on restore)|
-|`make test`|.NET tests (--no-build) + `pnpm -r test` (depends on build)|
+|`make build`|`pnpm -r build` (stages the SPA's wwwroot) then .NET Release build (depends on restore)|
+|`make test`|Kernel .NET tests (--no-build) + `pnpm -r test` + conformance fixtures (depends on build; browser tier is `make admin-e2e`)|
+|`make admin-e2e`|Browser tier: builds the SPA + kernel, installs chromium (staged Playwright `cli.js` via node), runs `tests/Facilitator.E2E` (Docker needed)|
 |`make lint`|`dotnet format --verify-no-changes` + eslint + prettier --check|
 |`make format`|`dotnet format` + `pnpm format`|
 |`make compose-slim` / `compose-full`|Boots the reference environment (`reference/compose.slim.yaml`, plus the `compose.full.yaml` overlay); `make compose-down` tears it down|
@@ -40,6 +41,10 @@ The wire contract is schema-first: edit the JSON Schema under `protocol/`, add v
   healthy stack (the CI `ref-env-bringup` job enforces the same on every PR).
 - .NET: Central Package Management — add `<PackageVersion>` to `Directory.Packages.props`, reference versionless in csproj.
 - TypeScript: shared toolchain versions live in the `catalog:` block of `pnpm-workspace.yaml`.
+- Admin SPA (`src/facilitator/ui`): Svelte 5 + vite. `pnpm -r build` emits hashed assets into
+  `src/facilitator/wwwroot/` — pure build output, git-ignored; the kernel boots without it and the
+  Docker build owns its own `pnpm --filter @ofac/ui build` stage. Browser tier: `make admin-e2e`
+  (Playwright chromium; CI job `admin-e2e`).
 
 ## Adding a new package
 

@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Microsoft.Playwright" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="Testcontainers.PostgreSql" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/facilitator/Facilitator.csproj" />
+  </ItemGroup>
+
+  <!-- One identity + database fixture set for both .NET tiers: the Plan-20
+       infrastructure files are LINKED, not copied (plan 21 decision 7). -->
+  <ItemGroup>
+    <Compile Include="../Facilitator.Tests/Infrastructure/PostgresFixture.cs" />
+    <Compile Include="../Facilitator.Tests/Infrastructure/KeycloakFixture.cs" />
+    <Compile Include="../Facilitator.Tests/Infrastructure/TestDbProbe.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+</Project>

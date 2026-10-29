@@ -11,6 +11,12 @@ export default tseslint.config(
       "docs/",
       "src/protocol/src/generated/",
       "protocol/dotnet/",
+      "**/*.svelte",
+      "src/facilitator/wwwroot/",
+      // .NET build output: the Playwright NuGet package stages a vendored
+      // npm tree (CommonJS) under tests/Facilitator.E2E/bin — not ours to lint.
+      "**/bin/",
+      "**/obj/",
     ],
   },
   {

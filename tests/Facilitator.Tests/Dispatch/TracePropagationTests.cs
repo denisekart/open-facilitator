@@ -80,7 +80,9 @@ public sealed class TracePropagationTests(PostgresFixture fixture)
         // The stamped envelope stays schema-conformant (envelope.json permits traceparent).
         KernelOps.AssertEnvelopesValid([stored.RootElement.GetRawText()]);
         // The sink received the stamped copy (in-memory, not the pre-stamp read).
-        var delivered = JsonDocument.Parse(Assert.Single(sink.Delivered));
+        // Only OUR row: parallel collections can land foreign link-channel
+        // outbox rows inside this manual drain window (shared container DB).
+        var delivered = JsonDocument.Parse(Assert.Single(sink.Delivered, d => d.Contains(commandId)));
         Assert.Equal(stamped, delivered.RootElement.GetProperty("traceparent").GetString());
         // Delivered, and the delivery's own span carries the stamped trace.
         Assert.NotNull(await fixture.Db.OutboxIdByCommand(commandId));
@@ -116,7 +118,7 @@ public sealed class TracePropagationTests(PostgresFixture fixture)
         Assert.NotNull(storedText2);
         var stored = JsonDocument.Parse(storedText2);
         Assert.Equal(seeded, stored.RootElement.GetProperty("traceparent").GetString());
-        Assert.Equal(seeded, JsonDocument.Parse(Assert.Single(sink.Delivered)).RootElement.GetProperty("traceparent").GetString());
+        Assert.Equal(seeded, JsonDocument.Parse(Assert.Single(sink.Delivered, d => d.Contains(commandId))).RootElement.GetProperty("traceparent").GetString());
     }
 
     [Fact]

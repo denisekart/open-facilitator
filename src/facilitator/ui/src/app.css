@@ -1,0 +1,91 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: var(--background);
+  --color-surface: var(--surface);
+  --color-raised: var(--surface-raised);
+  --color-edge: var(--border);
+  --color-ink: var(--text-primary);
+  --color-ink-2: var(--text-secondary);
+  --color-ink-3: var(--text-muted);
+  --color-accent: var(--accent-primary);
+  --color-danger: var(--destructive);
+  --color-ok: var(--success);
+  --color-warn: var(--warning);
+}
+
+:root {
+  --background: #09090b;
+  --surface: #18181b;
+  --surface-raised: #27272a;
+  --border: #3f3f46;
+  --text-primary: #fafafa;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
+  --accent-primary: #4f8cff;
+  --destructive: #ef4444;
+  --success: #22c55e;
+  --warning: #f59e0b;
+  color-scheme: dark;
+}
+
+body {
+  @apply bg-bg text-ink text-sm antialiased;
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    sans-serif;
+}
+
+.mono {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+}
+
+.card {
+  @apply rounded-lg border border-edge bg-surface p-4;
+}
+
+.badge {
+  @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium;
+}
+
+.btn {
+  @apply inline-flex items-center gap-1 rounded-md border border-edge bg-raised px-3 py-1.5 text-ink transition-colors hover:border-accent disabled:opacity-40;
+}
+
+.btn-primary {
+  @apply border-accent bg-accent/15;
+}
+
+.btn-danger {
+  @apply border-danger/60 bg-danger/10;
+}
+
+.input {
+  @apply w-full rounded-md border border-edge bg-surface px-3 py-1.5 text-ink placeholder:text-ink-3 focus:border-accent focus:outline-none;
+}
+
+.label {
+  @apply mb-1 block text-xs font-medium text-ink-2;
+}
+
+.table {
+  @apply w-full border-collapse text-left text-sm;
+}
+
+.table th {
+  @apply border-b border-edge px-2 py-1.5 text-xs font-medium text-ink-3 uppercase;
+}
+
+.table td {
+  @apply border-b border-edge/50 px-2 py-1.5 align-top;
+}
+
+.chip {
+  @apply cursor-pointer rounded-full border border-edge px-2.5 py-0.5 text-xs text-ink-2 transition-colors hover:border-accent;
+}
+
+.chip-active {
+  @apply border-accent bg-accent/15 text-ink;
+}

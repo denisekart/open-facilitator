@@ -11,6 +11,7 @@
     <Project Path="src/facilitator/Facilitator.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Facilitator.E2E/Facilitator.E2E.csproj" />
     <Project Path="tests/Facilitator.Tests/Facilitator.Tests.csproj" />
   </Folder>
 </Solution>

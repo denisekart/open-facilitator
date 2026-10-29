@@ -125,7 +125,35 @@ Traces: open the Aspire dashboard at `http://localhost:18888`, resource
 worker echoes verbatim on its progress/completion envelopes, so
 `outbox.envelope->>'traceparent'` == event envelope == dashboard trace.
 
-## 6. Acceptance run: `referencectl verify`
+## 6. Admin tour: the embedded inspector
+
+Plan 21 embeds the operator SPA in the kernel itself — no separate portal.
+With the slim stack up (section 3), open `http://localhost:8088`: the SPA
+redirects to Keycloak, sign in `alice`/`alice`, and you are in the
+inspector. Trace the acceptance-run Work without psql:
+
+1. Paste the work id (or a word from its objective) into the search bar →
+   the hit list filters by kind; open the Work hit.
+2. The inspector shows assignments (attempts table), manifests/artifacts
+   (content links ride the same presigned redirect as section 5 — add the
+   `127.0.0.1 artifacts` host entry), and the full timeline
+   (`/api/admin/work/{id}/timeline`).
+3. A `CorrelationId` chip copies the trace handle; the dashboards' trace
+   link opens the Aspire resource with that id (the kernel stores no
+   telemetry time-series — §17.4).
+4. **Links** view: gateways online/offline (a stale session collapses to
+   offline — the DB lease is the sole authority) + trust tier.
+   **Deliveries**: filter poisoned rows and replay a dead-letter once —
+   the second replay reports the ledger's `already replayed`.
+   **Config**: the five stored-intent resources (e.g. `nudge-policy`) edit
+   via versioned PATCH (`If-Match`); a concurrent writer's 409 reloads and
+   names the other author + reason. Writes are audited intent — a feature
+   reads a value through only when it opts in.
+
+The browser tier runs in CI as the `admin-e2e` job
+(`make admin-e2e` locally; chromium downloads on first run).
+
+## 7. Acceptance run: `referencectl verify`
 
 The 11-step acceptance script (`reference/checks/verify.sh`) proves every
 spec §21.1 hop through public read models, the Postgres planes, S3, and the
@@ -165,13 +193,13 @@ PASS dead-letters-empty (26ms) — no dead letters
 This run is part of every task's acceptance criteria — see
 [`docs/contributing.md`](contributing.md).
 
-## 7. CI and releases
+## 8. CI and releases
 
 - CI (`ci.yml`) is the merge gate: .NET build+test, TS lint+build+test, workflow/meta validation, and a Facilitator image build. Job-by-job scope: [`.github/workflows/README.md`](../.github/workflows/README.md).
 - The slim reference environment is part of every task's acceptance criteria — and locally IS the gate: the hosted `ref-env-bringup`/`ref-env-verify` jobs are commented out in `ci.yml` (free-tier GitHub compute). Before calling anything done: `./referencectl down -v && ./referencectl up slim --no-seed && ./referencectl verify` exits 0.
 - Releases trigger on `v*` tags: the Facilitator image is pushed to GHCR for `linux/amd64` + `linux/arm64`, and the Dev Container Features are published as OCI artifacts under `…/features/<name>`.
 
-## 8. Artifact registries
+## 9. Artifact registries
 
 | Artifact | Registry | Coordinate |
 |---|---|---|
@@ -180,7 +208,7 @@ This run is part of every task's acceptance criteria — see
 | Dev Container Features (OCI per spec §8.5; `gateway`, `workspace-link`, `harness-adapter`) | GHCR | `ghcr.io/denisekart/open-facilitator/features/<name>:1` |
 | NuGet | — (public deps from nuget.org; first internal package → `https://nuget.pkg.github.com/denisekart/index.json`) | — |
 
-## 9. Connect an existing workspace: add one Feature
+## 10. Connect an existing workspace: add one Feature
 
 An existing team container becomes a linked, headless workspace by adding
 ONE Feature to its `devcontainer.json` (spec §28's onboarding law) — no base
@@ -218,7 +246,7 @@ The `up full` providers (the chat/VCS legs of spec §28: Mattermost, Forgejo,
 Kafka, Ollama) land in a later phase; today the overlay boots their
 containers but no seeded flows ride them.
 
-## 10. Tear down
+## 11. Tear down
 
 ```bash
 ./referencectl down -v   # FULL=1 includes the overlay

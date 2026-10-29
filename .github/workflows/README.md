@@ -11,6 +11,7 @@
 |`ci.yml` / `ref-env-verify` **(CI-disabled)**|Acceptance run (`referencectl verify`, 11 steps) unattended on a booted-but-unseeded slim stack, amd64+arm64 matrix. Commented out in `ci.yml`; **runs locally and is acceptance-required**|—|Plan 19|
 |`ci.yml` / `link-e2e`|SDK + linkd against a live Facilitator + Postgres service: handshake/supersede, delivery+dedupe, receipt-loss redelivery, partition buffering, HTTP-poll keeper revival, crash replay|—|Plan 04|
 |`ci.yml` / `gateway-e2e`|Team Gateway against a live Facilitator + Postgres service: assign→echo-complete→inbox-processed, SIGKILL reconcile (lost + one retryable failed), graceful-restart duplicate, token rotation|—|Plan 05|
+|`ci.yml` / `admin-e2e`|Embedded admin SPA (Playwright chromium) against a real-Kestrel kernel on Testcontainers Postgres+Keycloak: anonymous redirect, identity chip, search→inspector→timeline, links online/offline, dead-letter replay + ledger notice, config PATCH + 409 conflict|—|Plan 21|
 |`ci.yml` / `features`|Feature install contract per arch (amd64+arm64): ubuntu+debian scenarios per Feature + a combo scenario composing all three (PATH contract, unit files, idempotent rebuild)|—|Plan 08|
 |`ci.yml` / `example-smoke`|Composed slim example end-to-end: Facilitator service + devcontainer with all three Features, ready lines, seeded assign → completion in inbox, live child on `/status`|—|Plan 08|
 |`release.yml` / `publish-npm`|inert seam (`vars.ENABLE_NPM_PUBLISH` unset)|`https://npm.pkg.github.com/denisekart`|Plan 01 flip (`private: false` + publish)|

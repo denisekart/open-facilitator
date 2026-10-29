@@ -4,6 +4,7 @@ packages:
   - "src/adapters/harnesses/deterministic"
   - "src/protocol"
   - "src/workspace-link"
+  - "src/facilitator/ui"
 
 allowBuilds:
   better-sqlite3: false
@@ -34,3 +35,14 @@ catalog:
   yaml: "^2.9.1"
   # @ofac/gateway OIDC claim verification (Plan 12 Step 3).
   jose: "^6.1.0"
+  # @ofac/ui (Plan 21): vite 8 + svelte 5 + tailwind 4 + oidc, versions resolved
+  # via npm registry 2026-11.
+  svelte: "^5.57.3"
+  vite: "^8.3.5"
+  "@sveltejs/vite-plugin-svelte": "^7.3.1"
+  svelte-check: "^4.7.7"
+  tailwindcss: "^4.3.3"
+  "@tailwindcss/vite": "^4.3.3"
+  oidc-client-ts: "^3.5.0"
+  # SPA unit tests run against a DOM.
+  jsdom: "^30.1.3"

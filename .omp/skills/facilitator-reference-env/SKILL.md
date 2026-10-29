@@ -46,6 +46,8 @@ make compose-down          # down -v (FULL=1 to include the overlay)
 
 Observe: `docker compose ... ps` (all healthy), kernel `http://localhost:8088/health`, realm `.well-known` at `http://id.localhost:8080/realms/facilitator`, bucket browse `http://localhost:8333`, traces at the dashboard `http://localhost:18888`. Operator bearer: `facilitator-cli`/`e2e-cli-secret` client_credentials against the realm token endpoint.
 
+Operator UI: `http://localhost:8088` serves the embedded admin SPA (Plan 21) — login `alice`/`alice`; the browser tier is `make admin-e2e`, so a psql-free walkthrough of the acceptance-run Work (search → inspector → timeline → trace chip, dead-letter replay, one config PATCH) is the manual acceptance leg.
+
 `referencectl` (built): `up slim [--no-seed]` (compose up --wait + bootstrap), `down [-v]`, `status` (compose ps + kernel `/health` + a `compose exec` probe of the Gateway's `127.0.0.1:8099/status` — diagnostics bind the demo-workspace container's loopback, never a published port), `token [--user U --password P]`, `work [--objective T]`, `verify [--json] [--only ids]` — the acceptance run (see below). Appendix ergonomics (`./dev up`, `./dev assign`, `./dev show deliveries`) share that unbuilt status.
 
 ## Acceptance run (`reference/checks/verify.sh`)

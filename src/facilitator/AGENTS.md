@@ -15,6 +15,9 @@ plus the read-mostly Admin surface.
 - `Kernel/Admin/` — `/api/admin` operator surface (read stores, config store
   with the If-Match/`X-Change-Reason` law, replay + re-mark mutations);
   authorization is config bindings only (`admin.read`/`admin.mutate`).
+- `ui/` — the embedded operator SPA (Svelte 5 + vite, `@ofac/ui`): `pnpm -r
+  build` stages hashed assets into `wwwroot/` (git-ignored output), served by
+  the static pipeline + `GET /ui-config`; browser tier in `tests/Facilitator.E2E`.
 - `Kernel/Shared/` — not a feature: Auth, Dispatch, Persistence, CLI, metrics,
   Storage (artifact byte port + ledgers), Memory (broker + provider port).
 - `Kernel/KernelServiceCollection.cs` — composition root; `AddSharedKernel` /

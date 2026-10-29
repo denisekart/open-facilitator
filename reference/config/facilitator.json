@@ -1,4 +1,8 @@
 {
+  "ui": {
+    "oidcAuthority": "http://id.localhost:8080/realms/facilitator",
+    "oidcClientId": "facilitator-api"
+  },
   "Storage": {
     "Provider": "filesystem"
   },

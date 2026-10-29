@@ -202,7 +202,7 @@ over real Keycloak + Postgres + kernel boundaries (§26.1 items 11+12 complete).
 **Depends on:** 19
 
 ### Plan 21 — Embedded Svelte inspector + Playwright E2E
-**Status:** ⬜ not-started (detail design: `21-admin-spa-inspector-e2e.md`)
+**Status:** 🟡 SPA + browser tier landed, E2E green (execution record: `21_ADMIN_SPA_INSPECTOR_E2E_PLAN.md` Implementation Status table)
 **Objective:** Svelte 5 SPA embedded in the kernel's `wwwroot` (single deployable): search → inspector → timeline, inline metrics, replay button, minimal §17.3 edit affordances; Playwright .NET against the slim stack. Closes Phase E.
 **Depends on:** 20
 

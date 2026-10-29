@@ -31,3 +31,8 @@ secrets/
 features/src/*/pkg/
 # omp session-local artifacts
 .omp/plans/*.local.md
+
+# Embedded SPA build output: vite empties + refills this whole dir (a
+# .gitkeep anchor would be wiped every build). Pure output like dist/ — the
+# kernel boots fine with no web root (SPA served only after `pnpm -r build`).
+src/facilitator/wwwroot/

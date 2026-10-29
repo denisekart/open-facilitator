@@ -17,7 +17,8 @@ jobs:
         with:
           cache: true
       - run: dotnet build OpenFacilitator.slnx -c Release
-      - run: dotnet test OpenFacilitator.slnx -c Release --no-build -- --blame-hang-timeout 2m
+      # Kernel suite only: the browser tier runs in `admin-e2e` (chromium-provisioned).
+      - run: dotnet test tests/Facilitator.Tests/Facilitator.Tests.csproj -c Release --no-build -- --blame-hang-timeout 2m
       - name: conformance fixtures (.NET harness)
         run: dotnet run --project protocol/tools/Validate.Fixtures -c Release
 
@@ -296,6 +297,30 @@ jobs:
           FACILITATOR_PG: postgresql://postgres:postgres@localhost:5432/postgres
           KEYCLOAK_URL: http://localhost:8480
         run: pnpm -C src/adapters/harnesses/deterministic test:e2e
+
+  admin-e2e:
+    # Browser tier (plan 21): the embedded SPA against a real-Kestrel kernel.
+    # Postgres + Keycloak ride in as Testcontainers inside the linked
+    # fixtures, so this job needs only the runner's Docker plus chromium.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: actions/setup-dotnet@v6
+        with:
+          cache: true
+      - run: pnpm install --frozen-lockfile
+      - name: build SPA (stages wwwroot before the kernel build embeds it)
+        run: pnpm -r build
+      - run: dotnet build OpenFacilitator.slnx -c Release
+      - name: install chromium
+        run: node tests/Facilitator.E2E/bin/Release/net10.0/.playwright/package/cli.js install --with-deps chromium
+      - name: admin inspector e2e
+        run: dotnet test tests/Facilitator.E2E -c Release --no-build
 
   features:
     # Feature install contract on both arches (spec §8.5): unit-test each

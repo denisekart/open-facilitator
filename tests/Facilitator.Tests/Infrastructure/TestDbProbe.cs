@@ -650,17 +650,43 @@ public sealed class TestDbProbe : IAsyncDisposable
             });
 
     /// <summary>Hand-mint an approvals ledger row against a work (admin detail seeding).</summary>
-    public Task SeedApproval(Guid approvalId, Guid workId) =>
+    public Task SeedApproval(Guid approvalId, Guid workId, string eligibleActorsJson = "[]") =>
         NonQuery(
             "INSERT INTO facilitator.approvals (approval_id, work_id, action_digest, state, nonce, eligible_actors, "
-            + "expires_at, created_at) VALUES ($1, $2, 'sha256:' || repeat('c', 64), 'pending', $3, '[]', "
+            + "expires_at, created_at) VALUES ($1, $2, 'sha256:' || repeat('c', 64), 'pending', $3, $4::jsonb, "
             + "now() + interval '1 hour', now())",
             cmd =>
             {
                 cmd.Parameters.AddWithValue(approvalId);
                 cmd.Parameters.AddWithValue(workId);
                 cmd.Parameters.AddWithValue($"nonce-{approvalId:N}");
+                cmd.Parameters.AddWithValue(eligibleActorsJson);
             });
+
+    /// <summary>Simulate a second writer on a config resource: bump the row, stamp attribution, history row (E2E 412 path).</summary>
+    public async Task AdminConfigConcurrentWrite(string resource, string payloadJson, string author, string reason)
+    {
+        await NonQuery(
+            "UPDATE facilitator.admin_config SET row_version = row_version + 1, payload = $2::jsonb, author = $3, "
+            + "reason = $4, updated_at = now() WHERE resource = $1",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(resource);
+                cmd.Parameters.AddWithValue(payloadJson);
+                cmd.Parameters.AddWithValue(author);
+                cmd.Parameters.AddWithValue(reason);
+            });
+        await NonQuery(
+            "INSERT INTO facilitator.admin_config_history (resource, version, payload, author, reason, updated_at) "
+            + "SELECT $1, row_version, payload, $3, $4, now() FROM facilitator.admin_config WHERE resource = $1",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(resource);
+                cmd.Parameters.AddWithValue(payloadJson);
+                cmd.Parameters.AddWithValue(author);
+                cmd.Parameters.AddWithValue(reason);
+            });
+    }
 
     /// <summary>The assignments minted for a work (admin detail seeding chains).</summary>
     public Task<List<string>> AssignmentIdsForWork(Guid workId) =>

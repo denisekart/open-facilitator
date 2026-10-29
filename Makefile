@@ -1,15 +1,17 @@
-.PHONY: restore build test lint format protocol db-update compose-slim compose-full clean link-e2e gateway-e2e worker-e2e example-slim-up docs-check
+.PHONY: restore build test lint format protocol db-update compose-slim compose-full clean link-e2e gateway-e2e worker-e2e admin-e2e example-slim-up docs-check
 
 restore:
 	dotnet restore OpenFacilitator.slnx
 	pnpm install
 
 build: restore
-	dotnet build OpenFacilitator.slnx -c Release --no-restore
+	# SPA first: the kernel build stages src/facilitator/wwwroot (vite output).
 	pnpm -r build
+	dotnet build OpenFacilitator.slnx -c Release --no-restore
 
 test: build
-	dotnet test OpenFacilitator.slnx -c Release --no-build
+	# Kernel suite only: the browser tier is `make admin-e2e` (provisioned separately).
+	dotnet test tests/Facilitator.Tests/Facilitator.Tests.csproj -c Release --no-build
 	pnpm -r test
 	dotnet run --project protocol/tools/Validate.Fixtures -c Release --no-build
 
@@ -30,6 +32,12 @@ protocol:
 	npx swagger-cli validate protocol/openapi/admin-v1.yaml
 	git diff --exit-code -- src/protocol/src/generated protocol/dotnet/Ofac.Protocol/Generated src/protocol/schemas
 
+
+admin-e2e: build
+	@echo "Browser tier: kernel SPA against Kestrel + Testcontainers (Docker needed);"
+	@echo "chromium downloads to ~/.cache/ms-playwright on first run."
+	node tests/Facilitator.E2E/bin/Release/net10.0/.playwright/package/cli.js install chromium
+	dotnet test tests/Facilitator.E2E/Facilitator.E2E.csproj -c Release --no-build
 link-e2e:
 	@echo "E2E tier: needs Postgres at FACILITATOR_PG (default: facilitator-dev on 5433)"
 	@echo "and the dev IdP at KEYCLOAK_URL (default: http://localhost:8480, see docs/getting-started.md §2);"

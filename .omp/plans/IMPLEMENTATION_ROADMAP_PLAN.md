@@ -4,13 +4,13 @@
 
 The repo is spec-only: `docs/specs/open_facilitator_framework_architecture.md` (normative architecture, §26 defines ten delivery slices) plus `docs/specs/open-facilitator-appendix.md` (normative clarifications: trustMode, actorEvidenceRef, RFC 8785 approval hashing, outbox/inbox, memory ACLs, conformance must-haves). Nothing is implemented. This roadmap is the top-level collection of numbered, autonomous implementation plans in execution order. Early plans establish architecture infrastructure (repo skeleton, protocol contracts, transactional kernel, transport); later plans deliver single vertical feature slices.
 
-**Deliverable of this plan:** create `docs/roadmap.md` containing exactly the plan catalogue below (sections "How to use" + plans 00–30), and nothing else. No code, no scaffold — implementation starts when Plan 00 is executed after its own replanning pass.
+**Deliverable of this plan:** create `docs/roadmap.md` containing exactly the plan catalogue below (sections "How to use" + plans 00–33), and nothing else. No code, no scaffold — implementation starts when Plan 00 is executed after its own replanning pass.
 
 ## How to use this roadmap
 
 - **Status legend:** ⬜ `not-started` → 🔵 `replanning` (mandatory gate) → 🟡 `in-progress` → 🟢 `done`.
 - **Every plan starts with a replanning pass** (status flips to 🔵): re-verify assumptions against the specs and the state left by prior plans, run the listed research, produce a per-plan detail design (`.omp/plans/<slug>.md`), and only then flip to 🟡. Decisions made during earlier plan executions are expected to force local re-optimization here; the roadmap scope/objective stays, the internal detail is re-derived.
-- Plans execute **in numeric order** except where a `Depends on` line names a strict subset. Phase B runs 05→06→07→08 in sequence; Phase C runs 09→10→11→12 in sequence; Phase D runs 13→14→15 in sequence, 16 independent of the storage leg (after 09/10); Phase E runs 17→18→19 then 20→21 in sequence; within Phase F, 22→23→24 and 25→26 chain, 27 last; Phase G is independent of 25/26.
+- Plans execute **in numeric order** except where a `Depends on` line names a strict subset. Phase B runs 05→06→07→08 in sequence; Phase C runs 09→10→11→12 in sequence; Phase D runs 13→14→15 in sequence, 16 independent of the storage leg (after 09/10); Phase E runs 17→18→19 then 20→21 in sequence; Phase F runs 22→23→24→25→26→27→28→29→30 in sequence; Phase G is independent of 27–30.
 - Each plan owns its tests and docs in the same change (AGENTS.md skill-maintenance rule applies: update `.omp/skills/` projections in the slice's change).
 - Cross-cutting conformance: shared fixtures live in `protocol/conformance-fixtures/` from Plan 01 onward; every later plan adds fixtures for its behavior. Spec §26.1's 15-item suite is the acceptance backlog; each plan below names which items it lands.
 
@@ -182,12 +182,12 @@ over real Keycloak + Postgres + kernel boundaries (§26.1 items 11+12 complete).
 **Split 2026-10-28 against Phase D reality** (plans 00–16 as-built, Phase D closed with manifest authority + memory broker proven e2e). The two 2026-10-27 entries were too coarse — the reference-env entry bundled image builds, compose topology, seeds, a new CLI, an acceptance harness, a CI tier, and a docs rewrite across two runtimes; the admin entry bundled a whole kernel API plane plus an SPA plus a new E2E tier — so Phase E is five plans, each with its own detail-design file, chain 17→18→19 (reference env) then 20→21 (operator surface):
 
 ### Plan 17 — Slim Compose, kernel-side: framework images + kernel/infra stack
-**Status:** ⬜ not-started (detail design: `17-slim-compose-images.md`)
+**Status:** 🟢 implemented (detail design + status table: `17-slim-compose-images.md`)
 **Objective:** Source-built node images for gateway/linkd/worker + `reference/compose.slim.yaml` booting Postgres, Keycloak, SeaweedFS, Aspire dashboard, and the Facilitator container, wired verbatim from `versions.env`/`.env.example`, healthchecked; real `make compose-slim`.
 **Depends on:** 08, 09, 13, 14, 15, 16
 
 ### Plan 18 — Gateway + worker in Compose, bootstrap seeds, referencectl
-**Status:** ⬜ not-started (detail design: `18-slim-workspace-seeds-referencectl.md`)
+**Status:** 🟢 implemented (detail design + status table: `18-slim-workspace-seeds-referencectl.md`)
 **Objective:** Gateway/worker container (supervisor story, localhost child leg), API-driven demo seeds, `referencectl up slim|down|status`; kernel-URL dev interim dies.
 **Depends on:** 17
 
@@ -208,110 +208,91 @@ over real Keycloak + Postgres + kernel boundaries (§26.1 items 11+12 complete).
 
 **Normalized against Phase D as-built:** no compose exists anywhere and only the kernel has a Dockerfile (17 builds the rest, source-first — no npm-publish dependency, 04's deferred image-shape question dies here); the Feature env-overlay names (`OFAC_ENROLL_SECRET`/`OFAC_LINK_TOKEN`/`OFAC_CHILD_SECRET`, `facilitatorUrl`) are the compose env contract, not a new one; 06's open cross-container child-leg question resolves to one container (sidecar decision owned by 18); 15's `kernelUrl`-unset dev path is deleted by 18 (its own kill rule); SeaweedFS config relocates from the .NET-test fixture to compose per 14's replanning caveat; 11's realm-mapper fix + 09's realm are the single identity source, 18 seeds via API only; admin surface starts from zero routes (only `/api/dead-letters` + dev endpoints exist — 20 cuts them over); §26.1 item 15's inspector claim splits: API assertions in 19, browser proof in 21; every live "Lands with Plan 11" doc stub is stale old numbering and is rewritten to fact-based prose by 17/18 (cross-plan no-plan-prose rule).
 
-**Downstream renumber +3 (2026-10-28):** old 19–24 Phase F → 22–27, old 25–27 Phase G → 28–30. `Depends on:` lines and cross-references updated throughout this file; this section owns the current mapping.
+**Downstream renumber +3 (2026-10-28):** old 19–24 Phase F → 22–27, old 25–27 Phase G → 28–30. `Depends on:` lines and cross-references updated throughout this file. **Superseded 2026-10-29 (+3):** Phase F was expanded into nine plans 22–30; Phase G shifted 28–30 → 31–33. See the Phase F section's note for the current mapping.
 
 ---
 
 ## Phase F — Providers, multi-work, scale, hardening
 
-### Plan 22 — Mattermost adapter: threads, reactions, echo suppression
-**Status:** ⬜ not-started
-**Objective:** First full provider adapter (spec slice 7, first leg): Mattermost Team Edition service in full Compose, inbound event verification → normalized inbox (`provider_events` dedupe per §7.1), `communication_bindings` thread tracking, verified account linking via single-use challenge (§11/§21.2 — never email-equality), threaded replies, low-noise reaction ack with idempotency ledger, bot echo suppression (§13.4), reaction-never-consent rule (§13.3).
-**Replanning gate:** pin adapter interface to 02's inbox port + 12's approval flow (reaction ≠ approval path explicit); confirm Mattermost TE bot-account API version tested; fix echo-suppression matching on exact provider actor IDs.
-**Scope:** `src/adapters/mattermost/` implementing the §13.5 CommunicationAdapter ops it supports (receive/reply/react/updateMessage/acknowledge + capability flags); outbound notificationId metadata; `docs`-driven reply fallbacks.
-**State after:** `@facilitator` mention in a thread creates/links a Work and the completion reply lands in the same thread; Facilitator's own posts never re-trigger processing.
-**Testing:** adapter contract tests + recorded-fixture tests; live-container E2E in full Compose; §26.1 item 9 (echo suppression, thread replies).
-**Documentation:** `docs/advanced.md` adapter authoring walkthrough (first worked example).
-**Architecture fit:** §13 — thin provider adapter at the kernel's edge; team-owned writes stay behind Gateway policy (12).
-**Depends on:** 19 (20/21 optional)
-**Additional resources:** spec §13 + appendix §10; Mattermost REST API v4 docs; Forgejo webhook docs as contrast for Plan 23.
+**Expanded 2026-10-29 against Phase E reality** (plans 00–21 as-built through the Admin SPA + acceptance run). The six 2026-10-28 entries were too coarse for single-autonomous-unit execution — the Forgejo entry bundled adapter + connector + coding worker + steering across three runtimes, the multi-work entry bundled DAG + generation + nudge + provisioning, and the decision-provider entry presumed a routing engine that never existed (Production-mode assign is seeded outbox SQL against a hardcoded endpoint) — so Phase F is nine plans, each with its own detail-design file, chain 22→23→24→25→26→27→28→29→30:
 
-### Plan 23 — Forgejo adapter + coding worker vertical slice
-**Status:** ⬜ not-started
-**Objective:** Full-profile coding leg: Forgejo (VCS + issues, one deployment) webhooks → normalized events; Gateway-side team-owned Forgejo connector (issue read, branch push, PR create — all through Gateway policy + approval when privileged, §9.2); coding-worker harness example (`examples/full/coding-worker`) completing §23.1's sequence: chat → Work → assignment → feature branch + PR → review comment steers the same Assignment (or relaunches a scaled-to-zero worker).
-**Replanning gate:** decide issue-ID→Work binding ownership (provider_events + communication_bindings reuse); fix connector idempotency strategy per appendix §5.4–5.5 (canonical payload hash + read-before-reconcile for PR creation); fix worker lifecycle vs 25's provisioning seam (worker may stay long-lived here, scale-to-zero deferred — state it).
-**Scope:** `src/adapters/forgejo/`, `examples/full/seed-repositories/`, webhook wiring to `/api/integrations/forgejo/webhook`, review-comment steering to running assignment, PR-URL bound to Work as artifact reference (13–15).
-**State after:** §21.2 demo steps 2–7 run in full Compose. Slice-7 coding half.
-**Testing:** webhook dedupe, PR-create idempotent retry (ambiguous timeout → reconcile), steering routing to live vs relaunched worker; live full-Compose E2E script.
-**Documentation:** `docs/advanced.md` provider-connector privilege ceilings; seed-repo README.
+### Plan 22 — Provider ingest plane + Mattermost adapter: threads, reactions, echo suppression
+**Status:** ⬜ not-started (detail design: `22-mattermost-provider-ingress.md`)
+**Objective:** Kernel provider-ingress plane (`/api/integrations/{provider}/events`, provider_events+inbox same-tx dedupe, `communication_bindings` woken) + first full adapter (Mattermost TE): mention→Work, thread replies, reaction-ack-never-consent, echo suppression, single-use account linking. §26.1 item 9 basis.
+**Depends on:** 19
+
+### Plan 23 — Forgejo adapter + team-owned connector
+**Status:** ⬜ not-started (detail design: `23-forgejo-adapter-connector.md`)
+**Objective:** Forgejo webhooks → normalized events on 22's plane (issue→Work, review→steer intent) + Gateway-side privileged connector (issue read, branch push, PR create — 12's policy/approval flow, read-before-reconcile idempotency) + seed-repository init story.
 **Depends on:** 22
-**Additional resources:** spec §9.2/§13.6/§23.1, appendix §5.4–5.5 (connector idempotency, GitHub-style prior art applies); Forgejo webhook/API docs.
 
-### Plan 24 — Kafka adapter + Ollama decision provider
-**Status:** ⬜ not-started
-**Objective:** Complete full-profile parity (§21.2 steps 8–9, 4): a Kafka KRaft input adapter (at-least-once consume → normalized inbox events, offsets never treated as business completion, §7.5) and the `IDecisionProvider` (§10.2) with a deterministic stub plus Ollama-backed implementation for routing disambiguation among allowed advertised candidates — model output is advisory only.
-**Replanning gate:** fix decision-provider call sites against the routing evaluation steps (§10.1) actually implemented in 02/09; bound model latency/limits; fix Kafka consumer group/offset governance vs inbox dedupe overlap.
-**Scope:** `src/adapters/kafka/`, `examples/full/research-worker` on the non-code path, Ollama container + permissive small model, decision audit recording the allowed-candidate set + chosen candidate + model reference.
-**Testing:** at-least-once redelivery test (no double business command, §26.1 item 14); decision provider contract tests incl. unauthorized-candidate rejection and model-down fallback to deterministic-first behavior.
-**Documentation:** `docs/advanced.md` model-advisory boundary + Kafka seam rationale (§7.5 "introduce when measurements show need").
-**Architecture fit:** §7.5/§10.2/§13 — proving the seam points: broker and model are optional adapters around the Postgres authority.
-**Depends on:** 23 (22 sufficient if 23 slips)
-**Additional resources:** spec §7.5/§10/§13.6/§21.2; Kafka KRaft single-node compose examples; Ollama API docs.
-
-### Plan 25 — Multi-work, dependencies, and zero-to-N provisioning
-**Status:** ⬜ not-started
-**Objective:** Deliver spec slice 8: Assignment `dependsOn` with conditions (`completed|result_validated|approved`, §4.2), one Work spanning two repositories/two independent executions (§23.2), steering that restarts a transient worker with context continuity, and the provisioning port (§18) with a local OCI launcher so workers scale zero→N and back.
-**Replanning gate:** fix DAG evaluation as pure deterministic kernel step (no AI), placement in 02's event loop; fix provisioning contract (`provisioningOperationId` idempotency per §7.4) vs Gateway's child lifecycle from 05; fix nudge semantics + rate caps (§6.4, §23.5) with stalled-vs-offline reconciliation.
-**Scope:** dependency gating in dispatcher, `work.steer` → execution generation bump with old-generation fencing (§7.4), provisioner adapter starting/stopping example worker containers, context re-hydration via artifacts + memory.
-**State after:** §23.2's two-repo sequence runs; killing a mid-flight worker container relaunches it on the same Assignment without lost context or duplicate side effects.
-**Testing:** two-assignment DAG (one blocked on `result_validated`), steer-during-run generation fencing test, launcher idempotency, nudge cap test (§26.1 items 10, 13).
-**Documentation:** `docs/advanced.md` dependencies + provisioning contract.
-**Architecture fit:** §4.2/§18/§23.2 — the scaling story on the execution side, still kernel-first.
+### Plan 24 — Coding worker vertical slice (§23.1 complete)
+**Status:** ⬜ not-started (detail design: `24-coding-worker-vertical-slice.md`)
+**Objective:** `examples/full/coding-worker` on `@ofac/adapter`: chat → Work → assignment → branch + PR via 23's connector → review comment steers the same Assignment. Closes §21.2 steps 2–7. Slice-7 coding half.
 **Depends on:** 23
-**Additional resources:** spec §4.2/§6.4/§18/§23.2/§23.5; OCI runtime CLI docs for the local launcher.
 
-### Plan 26 — Horizontal replicas: two Facilitators, one Postgres
-**Status:** ⬜ not-started
-**Objective:** Prove §7 at production shape: two Facilitator replicas behind the shared Postgres — inbox dedupe under concurrent duplicate webhooks, outbox lease handover on replica crash, `link_sessions` owner routing (LISTEN/NOTIFY hints, polling fallback), SignalR sticky-session guidance, and `workVersion` optimistic-conflict retries under a two-replica race.
-**Replanning gate:** audit 02/03 for hidden singleton assumptions (in-process caches, timers, hub state); decide compose topology (`compose.full.yaml` replica overlay vs separate file per §22's "one tested method" rule); fix crash-injection method for CI.
-**Scope:** replicaId/endpointId wiring, `referencectl` full-profile multi-replica mode, load-shed/backpressure defaults (§7.5).
-**State after:** concurrent duplicate webhook hits both replicas → one business command; SIGKILL a replica owning a live link → session lease expires, other replica's reconnected session resumes deliveries. Slice-9 exit test.
-**Testing:** dual-replica integration: duplicate-webhook race, outbox lease recovery, reconnect-epoch fencing, §26.1 item 4.
-**Documentation:** `docs/advanced.md` replication + SignalR affinity; runbook updates (begin Plan 27 doc set).
-**Architecture fit:** §7 — "connections are transient delivery optimizations, the database is the authority" becomes a tested claim.
+### Plan 25 — Kernel routing: capability matching + decision-provider seam
+**Status:** ⬜ not-started (detail design: `25-kernel-routing-decision-seam.md`)
+**Objective:** The routing the roadmap assumed since 02: deterministic capability-match assignment creation + addressed dispatch in the kernel, advisory-only `IDecisionProvider` seam (deterministic impl), `routing-defaults` becomes behavior, the hardcoded seed-SQL assign interim dies. §10.1.
+**Depends on:** 24
+
+### Plan 26 — Kafka input adapter + Ollama decision provider
+**Status:** ⬜ not-started (detail design: `26-kafka-adapter-ollama-decisions.md`)
+**Objective:** Kafka KRaft at-least-once input adapter on 22's plane (offsets ≠ business completion, §26.1 item 14 basis) + Ollama `IDecisionProvider` implementation (advisory-only, allow-listed, fallback-tested) + research-worker example. §21.2 steps 8–9.
 **Depends on:** 25
-**Additional resources:** spec §7; SignalR scale-out docs (affinity, `IUserIdProvider`); Postgres advisory-lock + LISTEN/NOTIFY docs.
 
-### Plan 27 — Operational hardening: dead letters, runbooks, conformance suite, production entry
-**Status:** ⬜ not-started
-**Objective:** Close §26.1–26.2: complete the shared conformance suite as an executable package (all 15 items green across Facilitator/Gateway/Link), administration audit trail + versioned preference changes (§17.1), dead-letter UX (replay button wired in 21 verified here), full runbook set (§27), backup/restore + upgrade/rollback drills, and the incident exercise: DB restart, provider outage, invalid token replay.
-**Replanning gate:** diff §26.1's 15 items against fixtures/tests existing from 01–26; enumerate the gaps and assign each to a harness (conformance package vs E2E); fix what "production-eligible" checks become automatable (`referencectl verify --full`).
-**Scope:** conformance-suite CLI (run against any conformant implementation, not just this one), bad-provider fault-injection fixtures, SBOM + digest-pinned release job (§22.6), version-negotiation test (protocol v1 vs a simulated v2 link). Prose scrub: strip every plan-number/phase/stage reference from everything outside `.omp/` and `docs/specs/` (code comments, READMEs, docs/, protocol descriptions, test comments) and rewrite each sentence as a statement of fact — the existing corpus already carries stale numbers after the Phase B renumber, so this is a one-time sweep, then the cross-plan rule below keeps it clean.
-**State after:** `referencectl verify` full profile passes from empty volumes; conformance package publishes a machine-readable pass/fail report; runbooks validated by executing the incident drill.
-**Testing:** the suite itself is the deliverable; drill logged in runbooks.
-**Documentation:** `docs/security.md` + runbook chapter (§27) finalized; `docs/getting-started.md` re-verified word-for-word by a clean-clone run; all `.omp/skills/` updated to implemented reality (AGENTS.md maintenance rule).
-**Architecture fit:** §26 — the conformance gate that turns "reference implementation" into "conformant framework," and §29.5's final statement made testable.
-**Depends on:** 21, 24, 26
-**Additional resources:** spec §26.1/§26.2/§27/§28/§22.6, appendix §9 (metrics/runbook snippets), §10.1 (must-have conformance list), §15 (MVP checklist).
+### Plan 27 — Dependencies, generation fencing, nudge
+**Status:** ⬜ not-started (detail design: `27-dependencies-generation-nudge.md`)
+**Objective:** Slice 8's coordination core: assignment `dependsOn` (completed|result_validated|approved) gated deterministically at the dispatch funnel, steer bumps execution generation with old-generation fencing, nudge consumed with rate caps + stalled state. §23.2 two-repo run. §26.1 items 10+13 basis.
+**Depends on:** 25, 24
+
+### Plan 28 — Provisioning port + local OCI launcher
+**Status:** ⬜ not-started (detail design: `28-provisioning-port-oci-launcher.md`)
+**Objective:** §18 provisioning as idempotent outbox commands + team-side docker launcher adapter: workers zero→N→zero, killed worker relaunches on the same assignment with continuity (verify's honest-failure law rewritten), `workload-scale` becomes behavior.
+**Depends on:** 27
+
+### Plan 29 — Horizontal replicas: two Facilitators, one Postgres
+**Status:** ⬜ not-started (detail design: `29-horizontal-replicas.md`)
+**Objective:** §7's claim tested at production shape: loop audit + lease-guarding, replica overlay + sticky-LB topology, duplicate-webhook race, lease handover under SIGKILL, session resume on the survivor. Slice-9 exit, §26.1 item 4.
+**Depends on:** 28
+
+### Plan 30 — Operational hardening: conformance package, runbooks, production entry
+**Status:** ⬜ not-started (detail design: `30-conformance-runbooks-production-entry.md`)
+**Objective:** Close §26.1–26.2: 15-item gap matrix → closed, executable implementation-agnostic conformance CLI with machine-readable report, `referencectl verify --full`, executed incident drills + runbook set (§27), SBOM + digest-pin law (§22.6), v2 negotiation test, plan-prose scrub. Closes Phase F.
+**Depends on:** 21, 26, 29
+
+**Normalized against Phase E as-built:** the full-profile services (forgejo/mattermost/kafka/ollama) already boot and are pinned in `versions.env` — 22/23/26 wake them, no new infra; `provider_events`/`communication_bindings` exist schema-only (22 owns them); the assign path is seeded SQL against `link.gw.team-alpha` (25 cuts it over); the free-tier law holds (ref-env CI jobs stay commented — provider/replica/provisioning legs are the documented **local** gate, `make provider-e2e` + `verify`); 19's honest-failure verify step is 28's in-place rewrite target; 20/21's admin surface is 30's re-verification input, not new construction; the stale "Plan 13 behaviour" comment at `Entities.cs:365` and the docs' live plan cites die in 30's scrub.
+
+**Downstream renumber +3 (2026-10-29):** old 28–30 Phase G → 31–33. `Depends on:` lines and cross-references updated throughout this file; this section owns the current mapping.
 
 ---
 
 ## Phase G — Ecosystem extensibility
 
-The framework's adoption thesis: first-party adapters are ordinary *implementations* of published contracts, not privileged code — anyone can build their own harness adapter, communication integration, or onboard an existing repo with their own LLM setup. This phase turns those seams into shippable, independently consumable products. Independent of 25/26/27; 28–29 depend on 15/16 (adapter client surface) and on 22/23 (worked provider/harness examples), 30 on 19.
+The framework's adoption thesis: first-party adapters are ordinary *implementations* of published contracts, not privileged code — anyone can build their own harness adapter, communication integration, or onboard an existing repo with their own LLM setup. This phase turns those seams into shippable, independently consumable products. Independent of 27–30; 31–32 depend on 15/16 (adapter client surface) and on 22–26 (worked provider/harness examples), 33 on 19.
 
-### Plan 28 — Communication adapter SDK: open protocol for third-party integrations
+### Plan 31 — Communication adapter SDK: open protocol for third-party integrations
 **Status:** ⬜ not-started
-**Objective:** Publish the CommunicationAdapter contract (§13.5) the same way the harness side published `@ofac/adapter`: JSON Schemas for provider-inbound events and adapter capability manifests under `protocol/json-schema/`, a TS SDK package (ingest/reply/react/ack ops, echo suppression, dedupe helpers), and a lifecycle conformance kit. Mattermost/Forgejo/Kafka (22–24) are then demonstrably just first implementations — a user's Slack/Discord/GitHub/Jira integration ships as an external package, developed against the published contract, not against repo internals.
-**Replanning gate:** extract the de-facto interface from 22/23's two shipped adapters; fix which ops are core vs optional capability flags; fix the adapter↔kernel ingress path (inbox `provider_events` posting vs Link command) and its auth (workload identity from 10).
+**Objective:** Publish the CommunicationAdapter contract (§13.5) the same way the harness side published `@ofac/adapter`: JSON Schemas for provider-inbound events and adapter capability manifests under `protocol/json-schema/`, a TS SDK package (ingest/reply/react/ack ops, echo suppression, dedupe helpers), and a lifecycle conformance kit. The Mattermost/Forgejo/Kafka adapters (Phase F) are then demonstrably just first implementations — a user's Slack/Discord/GitHub/Jira integration ships as an external package, developed against the published contract, not against repo internals.
+**Replanning gate:** extract the de-facto interface from 22/23's shipped adapters (the 26 Kafka leg is the third consumer); fix which ops are core vs optional capability flags; fix the adapter↔kernel ingress path (the provider-events posting plane) and its auth (workload identity from 10).
 **Testing:** 22/23's adapters cut over onto the SDK and pass its conformance kit unmodified-except-imports; a synthetic reference "toy provider" adapter written only against published docs+schemas passes the same suite.
 **Documentation:** `docs/advanced.md` "write your own integration" walkthrough mirroring the adapter-sdk one; SDK README with minimal example.
 **Depends on:** 22, 23
 
-### Plan 29 — Independently pullable harness adapters (Feature + registry story)
+### Plan 32 — Independently pullable harness adapters (Feature + registry story)
 **Status:** ⬜ not-started
 **Objective:** Each harness adapter is its own folder, its own package, and its own pullable artifact: the `ofac-harness-adapter` Feature's `adapter` option accepts an arbitrary adapter bundle (npm spec or OCI tarball digest) instead of only the baked-in `deterministic`, so any devcontainer composes any adapter — first-party or team-authored — without building this repo. First-party sibling adapters land as worked third-party-shaped implementations of `@ofac/adapter` (one folder each under `src/adapters/harnesses/`): the coding harness family (Pi, OpenCode, Codex-class CLIs) and one local-LLM harness (Ollama-backed) proving the "hook in your own model" story.
-**Replanning gate:** fix the bundle contract (entry binary, config env, supervisor unit expectations); decide the trust model for third-party bundles (digest pinning, no postinstall); pick the first two sibling adapters from 23/24's actual harness surfaces.
+**Replanning gate:** fix the bundle contract (entry binary, config env, supervisor unit expectations); decide the trust model for third-party bundles (digest pinning, no postinstall); pick the first two sibling adapters from 24's as-built example and the deterministic harness surface.
 **Testing:** Feature scenario test installs a non-baked adapter from a local tarball end-to-end; each sibling adapter passes `@ofac/adapter/testing` and a composed-devcontainer smoke.
 **Documentation:** `features/src/harness-adapter/README.md` rewrite for arbitrary bundles; each adapter folder's README as the copy-me template.
-**Depends on:** 15, 23
+**Depends on:** 15, 24
 
-### Plan 30 — Self-service onboarding: adopt-an-existing-repo skill + local-LLM hookup
+### Plan 33 — Self-service onboarding: adopt-an-existing-repo skill + local-LLM hookup
 **Status:** ⬜ not-started
 **Objective:** A user (or their agent) onboard a repository by pointing any LLM at a shipped entry document: a canonical `ONBOARDING.md` + agent skill (repo root and published as a standalone pullable doc/skill) that walks enrollment, Dev Container Feature or standalone `linkd` wiring, capability manifest authoring, and hooking the team's own harness + local LLM (Ollama/vLLM/etc.) via the adapter contract. Runbook-driven: the skill drives the *user's* agent, the framework only ships instructions + CLI.
 **Replanning gate:** fix the exact onboarding sequence against the shipped `referencectl`/enrollment UX (reference-env chain); decide skill packaging (in-repo file vs published doc vs both) so it's consumable without cloning.
 **Testing:** a fresh agent with only the skill document onboards a scratch repo against slim ref-env and completes one Work end-to-end.
-**Documentation:** the skill/`ONBOARDING.md` itself; `docs/getting-started.md` pointer; harness-adapter hookup section cross-linking Plan 29.
+**Documentation:** the skill/`ONBOARDING.md` itself; `docs/getting-started.md` pointer; harness-adapter hookup section cross-linking Plan 32.
 **Depends on:** 19
 
 ---

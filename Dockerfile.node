@@ -15,6 +15,7 @@ COPY src/workspace-link/package.json src/workspace-link/
 COPY src/gateway/package.json src/gateway/
 COPY src/adapters/harnesses/adapter-sdk/package.json src/adapters/harnesses/adapter-sdk/
 COPY src/adapters/harnesses/deterministic/package.json src/adapters/harnesses/deterministic/
+COPY src/adapters/communication/mattermost/package.json src/adapters/communication/mattermost/
 RUN pnpm install --frozen-lockfile
 COPY tsconfig.base.json ./
 COPY src/protocol/ src/protocol/
@@ -22,23 +23,29 @@ COPY src/workspace-link/ src/workspace-link/
 COPY src/gateway/ src/gateway/
 COPY src/adapters/harnesses/adapter-sdk/ src/adapters/harnesses/adapter-sdk/
 COPY src/adapters/harnesses/deterministic/ src/adapters/harnesses/deterministic/
+COPY src/adapters/communication/mattermost/ src/adapters/communication/mattermost/
 RUN pnpm -r build
 # --prod + injected workspace deps: each dir is a runnable closure (node_modules
 # with the workspace packages copied in), freshly built dist/ included via each
 # package's `files: ["dist"]`.
 RUN pnpm deploy --filter=@ofac/gateway --prod /deploy/gateway \
  && pnpm deploy --filter=@ofac/workspace-link --prod /deploy/linkd \
- && pnpm deploy --filter=@ofac/harness-deterministic --prod /deploy/worker
+ && pnpm deploy --filter=@ofac/harness-deterministic --prod /deploy/worker \
+ && pnpm deploy --filter=@ofac/mattermost-adapter --prod /deploy/mattermost-adapter
 
 # Debian slim, not Alpine: better-sqlite3 ships glibc prebuilds (see
 # pnpm-workspace.yaml allowBuilds); Alpine would force a node-gyp rebuild.
 FROM node:22-bookworm-slim AS runtime
 COPY --from=build /deploy /app
 # Writable state root for mounted consumers (compose demo-workspace: the
-# Gateway stateDir, worker workDir, and supervisor logs live under here).
-RUN install -d -o node -g node /var/lib/ofac
+# Gateway stateDir, worker workDir, and supervisor logs live under here) +
+# the bot-token handoff dir (Plan 22: named volume mounted at /provision,
+# pre-creating it node-owned so the volume inherits that ownership).
+RUN install -d -o node -g node /var/lib/ofac /provision
 USER node
 # Default process: the Gateway. linkd: `node /app/linkd/dist/bin/linkd.js run …`;
-# worker: `node /app/worker/dist/bin/worker.js run …` (Plan 18 compose services).
-# No EXPOSE: every process dials out to the kernel; no inbound contract yet.
+# worker: `node /app/worker/dist/bin/worker.js run …` (Plan 18 compose services);
+# provider adapter: `node /app/mattermost-adapter/dist/bin/adapter.js run`
+# (Plan 22). No EXPOSE: every process dials out to the kernel; the adapter's
+# /healthz is probed via the published compose port, not an image contract.
 CMD ["node", "/app/gateway/dist/bin/gateway.js", "run"]

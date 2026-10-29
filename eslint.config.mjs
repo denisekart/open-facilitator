@@ -25,7 +25,14 @@ export default tseslint.config(
     languageOptions: {
       ecmaVersion: 2024,
       sourceType: "module",
-      globals: { console: "readonly", process: "readonly", URL: "readonly", Bun: "readonly" },
+      globals: {
+        console: "readonly",
+        process: "readonly",
+        URL: "readonly",
+        Bun: "readonly",
+        fetch: "readonly",
+        setTimeout: "readonly",
+      },
     },
   },
 );

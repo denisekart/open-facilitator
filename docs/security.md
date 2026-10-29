@@ -113,6 +113,35 @@ block (`IdentityStartupCheck`, fail closed in every environment).
 - Envelopes fail closed: schema/envelope violations ⇒ `400`, command types outside the 7-type known-command table ⇒ `422 unknown-command`, and the rejected envelope is still persisted to the `inbox` as an audit record (state `failed`).
 - Duplicate admission (same `(event_source, event_id)`, `command_id`, or `(provider, provider_delivery_id)`) returns `200 {"status":"duplicate"}` and reprocesses nothing — replay is cheap and side-effect-free by construction.
 
+## Provider ingress (Plan 22)
+
+Provider events ride the **link plane**: the adapter authenticates with its
+`linkToken` like any link endpoint, and the `AdmissionGate` provider arm
+admits `org.facilitator.event.provider.*` only when the feature is enabled
+and the envelope's source tenant matches the configured provider tenant —
+disabled or mismatched ⇒ typed `unsupported` receipt + failed audit row,
+never silent acceptance. Provider-specific rules:
+
+- **Authentication before normalize.** The transport trust (Mattermost: the
+  bot WebSocket credential — 11.11 webhooks sign nothing on the
+  event-carrying form) is established before a normalized event exists; an
+  unauthenticated frame never reaches classification.
+- **Duplicate = the delivery id.** `(provider, provider_delivery_id)` is
+  unique; synthesized ids (e.g. the reaction `(user, post, emoji)`
+  composite) must be stable across inbound echo and outbound receipt so
+  replay can't double-fire an arm.
+- **Echo is recorded, never processed.** The bot's own posts arrive as
+  `message.v1` echoes: the kernel stores the provider post id in
+  `communication_bindings` and runs no arm — the bot never answers itself
+  into a new Work.
+- **A reaction is never consent.** `reaction.v1` audits
+  (`provider.reaction` timeline row) and gets the configured ack; it is not
+  an approval, transition, or steer signal anywhere in the kernel (§13.3).
+- **Link identity is redeemed on the human plane.** A `/link` DM mints a
+  one-shot code; redemption is an authenticated REST call
+  (`POST /api/link-identities/redeem`) so the linked identity is the
+  verified OIDC `(iss, sub)` — chat display names never bind accounts.
+
 ## Workload plane: enrollment + delegation evidence (appendix §3.2)
 
 **Enrollment** (`POST /api/link/v1/enroll`) minting a per-endpoint

@@ -18,7 +18,7 @@ Normative source: `docs/specs/open_facilitator_framework_architecture.md` §21�
 
 **Slim** (laptop, few GiB): Facilitator (ASP.NET Core + embedded admin SPA), PostgreSQL 17 (default datastore even in slim; inbox/outbox/leases/memory FTS), Keycloak 26 (`start-dev --import-realm`), SeaweedFS `weed mini` (S3 artifacts), standalone Aspire dashboard (OTLP viewer, in-memory retention), Node/TS embedded Gateway + deterministic research worker, CLI/HTTP requester. No Kafka, no Temporal, no model download required.
 
-**Full overlay** adds: Mattermost Team Edition (chat adapter target: `root_id` replies, reactions), Forgejo (SQLite; VCS **and** issues — one service), Kafka 4.x single-node KRaft (example ingest only), Ollama + `qwen2.5:1.5b` (optional semantic routing), coding + research worker fixtures, shared team-gateway + workspace-launcher.
+**Full overlay** adds: Mattermost Team Edition + the Plan 22 provider pair (`mattermost-init` one-shot provisions bot+PAT via REST onto the `mm_provision` volume — 11.11.1 has NO unauthenticated setup route, so bootstrap rides OPEN SIGNUP; `mattermost-adapter` runs from node-runtime, `/healthz` :8066), Forgejo (SQLite; VCS **and** issues — one service), Kafka 4.x single-node KRaft (example ingest only), Ollama + `qwen2.5:1.5b` (optional semantic routing), coding + research worker fixtures, shared team-gateway + workspace-launcher. The facilitator's `providers:mattermost` section rides `Providers__Mattermost__*` env in the overlay only — slim boots provider-less from the same mounted config. Live proof: `make provider-e2e` (six steps, `reference/checks/verify-full.sh`).
 
 Layer compose: `docker compose -f compose.slim.yaml -f compose.full.yaml`; ship one tested method, don't make newcomers invent network wiring.
 
@@ -32,7 +32,7 @@ Layer compose: `docker compose -f compose.slim.yaml -f compose.full.yaml`; ship 
 
 ## Hostnames & ports (one-host demo)
 
-`http://id.localhost:8080` Keycloak · Facilitator `:8088` · `http://git.localhost:3000` Forgejo · `http://chat.localhost:8065` Mattermost · `:8333` SeaweedFS S3 · `:9092` Kafka · `:11434` Ollama · `:18888/:18890` Aspire dashboard/OTLP. Provider webhook callbacks point at the container-internal Facilitator URL (e.g. `http://facilitator:8088/api/integrations/forgejo/webhook`).
+`http://id.localhost:8080` Keycloak · Facilitator `:8088` · `http://git.localhost:3000` Forgejo · `http://chat.localhost:8065` Mattermost · `:8333` SeaweedFS S3 · `:9092` Kafka · `:11434` Ollama · `:18888/:18890` Aspire dashboard/OTLP · `:8066` mattermost-adapter healthz. The Mattermost adapter dials OUT (bot WS + link plane, D1) — no provider callback into the kernel today; a future forgejo hook would point at the container-internal URL (e.g. `http://facilitator:8088/api/integrations/forgejo/webhook`).
 
 ## Dev loop
 

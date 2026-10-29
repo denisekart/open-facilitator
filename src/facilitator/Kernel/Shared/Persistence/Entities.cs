@@ -362,7 +362,8 @@ public sealed class ApprovalEntity
     public string? RequestedByEndpointId { get; set; }
 }
 
-/// <summary>facilitator.communication_bindings — Plan 13 behaviour, schema now.</summary>
+/// <summary>facilitator.communication_bindings — Plan 22: canonical conversation →
+/// Work binding (thread routing + reply addressing + outbound post ledger).</summary>
 public sealed class CommunicationBindingEntity
 {
     public Guid BindingId { get; set; }
@@ -380,6 +381,60 @@ public sealed class CommunicationBindingEntity
     public string? IdempotencyKey { get; set; }
 
     public DateTime CreatedAt { get; set; }
+}
+
+/// <summary>facilitator.provider_identities — §11.1 verified provider-account mapping
+/// (provider, tenant, accountId) → (oidc issuer, subject) with redemption provenance.</summary>
+public sealed class ProviderIdentityEntity
+{
+    public Guid IdentityId { get; set; }
+
+    public required string Provider { get; set; }
+
+    public required string Tenant { get; set; }
+
+    public required string AccountId { get; set; }
+
+    public required string OidcIssuer { get; set; }
+
+    public required string OidcSubject { get; set; }
+
+    /// <summary>The challenge row that provened this mapping (§11 single-use code).</summary>
+    public Guid? ChallengeId { get; set; }
+
+    public DateTime CreatedAt { get; set; }
+
+    public DateTime UpdatedAt { get; set; }
+}
+
+/// <summary>facilitator.provider_link_challenges — §11 single-use linking codes:
+/// minted by a /link mention, delivered by bot DM, redeemed on the human plane.</summary>
+public sealed class ProviderLinkChallengeEntity
+{
+    public Guid ChallengeId { get; set; }
+
+    /// <summary>sha256 hex of the code (raw code never stored).</summary>
+    public required string CodeSha256 { get; set; }
+
+    public required string Provider { get; set; }
+
+    public required string Tenant { get; set; }
+
+    public required string AccountId { get; set; }
+
+    /// <summary>Bot-DM delivery target (provider account id of the enroller).</summary>
+    public required string DeliverToAccountId { get; set; }
+
+    /// <summary>Human identity captured at redemption (D2: redemption is a human-plane call).</summary>
+    public string? OidcIssuer { get; set; }
+
+    public string? OidcSubject { get; set; }
+
+    public DateTime CreatedAt { get; set; }
+
+    public DateTime ExpiresAt { get; set; }
+
+    public DateTime? RedeemedAt { get; set; }
 }
 
 /// <summary>facilitator.audit — every authorization-gate decision, allow and deny (appendix §3.2 step 5).</summary>

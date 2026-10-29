@@ -36,9 +36,11 @@ export class SqliteLedger implements Ledger {
     if (existsSync(path)) chmodSync(path, 0o600);
     this.db.pragma("journal_mode = WAL");
     const version = this.db.pragma("user_version", { simple: true }) as number;
-    if (version === 0) {
-      this.db.exec(`BEGIN IMMEDIATE;${DDL}PRAGMA user_version = ${SCHEMA_VERSION};COMMIT;`);
-    } else if (version !== SCHEMA_VERSION) {
+    // DDL is CREATE-IF-NOT-EXISTS, so it runs unconditionally: another
+    // handle (e.g. an adapter's own state tables) may have stamped
+    // user_version on this same file first, and co-tenancy must still work.
+    this.db.exec(`BEGIN IMMEDIATE;${DDL}PRAGMA user_version = ${SCHEMA_VERSION};COMMIT;`);
+    if (version !== 0 && version !== SCHEMA_VERSION) {
       throw new Error(
         `ledger: unsupported schema version ${version} (this build writes ${SCHEMA_VERSION})`,
       );

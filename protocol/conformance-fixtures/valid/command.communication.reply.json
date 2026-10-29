@@ -1,0 +1,24 @@
+{
+  "specversion": "1.0",
+  "id": "01JCOMM-reply",
+  "source": "urn:facilitator:instance:demo",
+  "type": "org.facilitator.command.communication.reply.v1",
+  "subject": "work/work-123",
+  "time": "2026-10-29T09:05:00Z",
+  "datacontenttype": "application/json",
+  "dataschema": "https://schemas.openfacilitator.org/v1/command.communication.reply.v1.json",
+  "data": {
+    "commandId": "transition-1:reply",
+    "target": {
+      "provider": "mattermost",
+      "tenantOrOrganizationId": "demo-team",
+      "channelOrResourceId": "channel-123",
+      "rootThreadId": "post-root-123",
+      "subjectRef": "work/work-123",
+      "conversationKind": "thread",
+      "actorProviderAccountId": "account-001"
+    },
+    "text": "Work work-123 completed. Report: artifact://reports/r-1",
+    "idempotencyKey": "transition-1:reply"
+  }
+}

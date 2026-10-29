@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 
+using Facilitator.Kernel.Integrations;
 using Facilitator.Kernel.Shared;
 using Facilitator.Kernel.Shared.Auth;
 using Facilitator.Kernel.Shared.Dispatch;
@@ -42,7 +43,8 @@ public sealed class AdmissionGate(
     KernelMetrics metrics,
     EvidenceValidator evidence,
     LinkEnrollmentStore enrollments,
-    AuditWriter audit)
+    AuditWriter audit,
+    Facilitator.Kernel.Integrations.ProviderOptions providers)
 {
     /// <summary>Screen one raw envelope under an authenticated workload principal.</summary>
     public async Task<AdmissionVerdict> ScreenAsync(string rawBody, LinkPrincipal workload, CancellationToken ct)
@@ -110,9 +112,24 @@ public sealed class AdmissionGate(
             && cid.ValueKind == JsonValueKind.String
             ? cid.GetString()
             : null;
-        if (!isCommand)
+        var isProviderEvent = ProviderEventClass.IsProviderClass(type);
+        if (isProviderEvent && !ProviderEventClass.SupportedBy(providers, type))
+        {
+            // Fail-closed (§7.1 provider path): the class is on the wire, but a
+            // kernel without that provider refuses it (failed audit inbox row,
+            // the S:305 precedent) instead of settling it no-effect-accepted.
+            await AuditAsync(root, rawBody, ct);
+            return Refused(ProblemErrors.Unsupported($"provider event type '{type}' has no registered provider"));
+        }
+
+        if (!isCommand && !isProviderEvent)
         {
             // Events/receipts carry no delegation claim: workload-only, no audit row.
+            return new AdmissionVerdict(null, root, type, isCommand, commandId);
+        }
+
+        if (isProviderEvent)
+        {
             return new AdmissionVerdict(null, root, type, isCommand, commandId);
         }
 

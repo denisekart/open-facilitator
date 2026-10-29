@@ -27,6 +27,7 @@ public sealed class WorkEventEntityConfiguration : IEntityTypeConfiguration<Work
             CheckSql.InList("kind",
                 ["created", "state.transition", "steer", "command.accepted", "assignment.transition", "approval.decided",
                     "artifact.stored", "artifact.registered", "artifact.available", "artifact.gc",
-                    "manifest.recorded", "manifest.superseded", "memory.candidate", "memory.promoted"])));
+                    "manifest.recorded", "manifest.superseded", "memory.candidate", "memory.promoted",
+                    "provider.input", "provider.reaction"])));
     }
 }

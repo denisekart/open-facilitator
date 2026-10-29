@@ -1,0 +1,789 @@
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+
+using Facilitator.Kernel.Link;
+using Facilitator.Kernel.Shared;
+using Facilitator.Kernel.Shared.Auth;
+using Facilitator.Kernel.Shared.Dispatch;
+using Facilitator.Kernel.Shared.Persistence;
+
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+
+using Ofac.Protocol.Validation;
+
+namespace Facilitator.Kernel.Integrations;
+
+/// <summary>Ingress outcome of one provider-class event (already settled by the store).</summary>
+/// <param name="Status">Admission status wire value ("accepted"|"duplicate") when admitted.</param>
+/// <param name="InboxId">Inbox row identity, when one was written.</param>
+/// <param name="Problem">Refusal, when the event was refused.</param>
+public sealed record ProviderIngressOutcome(string? Status, Guid? InboxId, ProblemDetails? Problem, object? Data = null)
+{
+    /// <summary>The admission shape the link ingress returns for this outcome.</summary>
+    public LinkAdmission ToAdmission() => Problem is not null
+        ? new LinkAdmission(Problem, null, null)
+        : new LinkAdmission(null, Status, InboxId, Data);
+}
+
+/// <summary>Outcome of a human-plane code redemption (deviation D2).</summary>
+public enum RedeemOutcome
+{
+    /// <summary>Code valid: identity upserted, provenance + confirmation landed.</summary>
+    Redeemed,
+
+    /// <summary>No challenge carries this code hash.</summary>
+    Unknown,
+
+    /// <summary>Single-use fence: the code was consumed already.</summary>
+    Consumed,
+
+    /// <summary>The window elapsed.</summary>
+    Expired,
+}
+
+/// <summary>Normalized reply target (conversationTarget schema shape).</summary>
+public sealed record ConversationTarget(
+    string Provider,
+    string? Tenant,
+    string? Channel,
+    string? RootThreadId,
+    string? ParentMessageId,
+    string? SubjectRef,
+    string ConversationKind,
+    string? ActorProviderAccountId);
+
+/// <summary>
+/// The Plan 22 provider-ingest plane (locked decision 1): one transaction per
+/// normalized provider event — insert-or-duplicate <c>provider_events</c>
+/// (canonical-data sha), add the inbox row (wire-bytes sha + provider fields),
+/// then the business-effect arms appending outbox rows, all before commit.
+/// Duplicate on <c>(provider, provider_delivery_id)</c> answers
+/// <c>duplicate</c> with zero new rows: delivery metadata is never business
+/// completion (§7.5). Echo law (§13.4): events authored by the configured bot
+/// id settle as the outbound-post ledger update only (binding
+/// <c>parent_message_id</c>) — suppressed before the inbox, no arm effects.
+/// Reaction-never-consent (§13.3): the reaction arm writes the timeline note +
+/// configured ack ONLY; it has no path to <c>approval.respond</c> or any Work
+/// transition — the deny-list is structural (no transition call site exists in
+/// this arm) and test-enforced.
+/// </summary>
+public sealed class ProviderEventStore(
+    IDbContextFactory<FacilitatorDbContext> contextFactory,
+    EnvelopeValidator envelopeValidator,
+    KernelMetrics metrics,
+    ProviderOptions options,
+    TimeProvider timeProvider)
+{
+    /// <summary>Per-team home for provider-created Work: the manifest
+    /// ledger's team scope resolves Work → Project → Team, so a Work with no
+    /// project cannot carry a result manifest. Find-or-create by fixed name.
+    /// </summary>
+    public const string ProviderProjectName = "provider-ingress";
+
+    /// <summary>Emoji of the low-noise acknowledgement (notifications replyVsReaction=reaction).</summary>
+    public const string AckEmoji = "white_check_mark";
+
+    /// <summary>Acknowledgement emoji for ingested human reactions.</summary>
+    public const string ReactionAckEmoji = "eye";
+
+    private const string CodeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+    /// <summary>Challenge lifetime (§11: single-use, short).</summary>
+    public static readonly TimeSpan ChallengeTtl = TimeSpan.FromMinutes(15);
+
+    private const string InsertProviderEventSql = """
+        INSERT INTO facilitator.provider_events
+            (provider_event_id, provider, provider_delivery_id, body_sha256, body, verified_reference, received_at)
+        VALUES
+            (@id, @provider, @deliveryId, @bodySha, @body::jsonb, @verified, @receivedAt)
+        ON CONFLICT DO NOTHING
+        """;
+
+    private static readonly HttpClient BotIdentityClient = new() { Timeout = TimeSpan.FromSeconds(10) };
+
+    private string? resolvedBotId;
+
+    /// <summary>Exact-match echo identity (§13.4): the configured id wins; else
+    /// resolve once from the provider via <c>/users/me</c> under the bot token
+    /// (live bot ids are provider-generated, so compose cannot pin them). A
+    /// failed resolve stays unresolved (retry next event) — echo events then
+    /// fall to the message arm, which is side-effect-free for unbound threads.</summary>
+    private async Task<string?> ResolveBotIdAsync(CancellationToken ct)
+    {
+        if (options.BotUserId is { Length: > 0 } configured)
+        {
+            return configured;
+        }
+
+        if (Volatile.Read(ref resolvedBotId) is { Length: > 0 } cached)
+        {
+            return cached;
+        }
+
+        var token = options.BotToken;
+        if (string.IsNullOrEmpty(token) && options.BotTokenFile is { Length: > 0 } tokenFile)
+        {
+            // Written post-mint by the compose provision one-shot; absence
+            // simply keeps the resolver unresolved until it lands.
+            try
+            {
+                token = File.ReadAllText(tokenFile).Trim();
+            }
+            catch (IOException)
+            {
+                token = null;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                token = null;
+            }
+        }
+
+        if (token is not { Length: > 0 } || options.SiteUrl is not { Length: > 0 } site)
+        {
+            return null;
+        }
+
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, site.TrimEnd('/') + "/api/v4/users/me");
+            request.Headers.Add("Authorization", $"Bearer {token}");
+            using var response = await BotIdentityClient.SendAsync(request, ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                return null;
+            }
+
+            using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
+            var id = doc.RootElement.GetProperty("id").GetString();
+            Volatile.Write(ref resolvedBotId, id);
+            return id;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Admit one provider-class event envelope end to end (dedupe + arms),
+    /// owning its transaction. The caller (link ingress) has already screened
+    /// the envelope, so it is contract-valid here.
+    /// </summary>
+    public async Task<ProviderIngressOutcome> IngestAsync(JsonElement root, string rawBody, LinkPrincipal workload, CancellationToken ct)
+    {
+        var type = root.GetProperty("type").GetString() ?? string.Empty;
+        if (!ProviderEventClass.SupportedBy(options, type))
+        {
+            return new ProviderIngressOutcome(null, null, ProblemErrors.Unsupported($"provider event type '{type}' has no registered provider"));
+        }
+
+        var data = root.GetProperty("data");
+        var providerDeliveryId = data.GetProperty("providerDeliveryId").GetString()
+            ?? throw new InvalidOperationException("provider event without providerDeliveryId");
+        var provider = ProviderOptions.Mattermost;
+        var body = data.GetRawText();
+        var bodySha = "sha256:" + Convert.ToHexString(SHA256.HashData(ApprovalDigest.CanonicalBytes(data))).ToLowerInvariant();
+        var wireSha = "sha256:" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(rawBody))).ToLowerInvariant();
+        var actor = data.GetProperty("actorProviderAccountId").GetString() ?? string.Empty;
+        var reference = ReferenceOf(data);
+        var now = timeProvider.GetUtcNow().UtcDateTime;
+        var botId = await ResolveBotIdAsync(ct);
+
+        var providerEventId = Guid.NewGuid();
+
+        await using var db = await contextFactory.CreateDbContextAsync(ct);
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+
+        // 1. provider_events ledger: the (provider, delivery-id) unique is the
+        // business-dedupe spine, independent of envelope-id resends.
+        var affected = await db.Database.ExecuteSqlRawAsync(
+            InsertProviderEventSql,
+            [
+                new Npgsql.NpgsqlParameter("@id", providerEventId),
+                new Npgsql.NpgsqlParameter("@provider", provider),
+                new Npgsql.NpgsqlParameter("@deliveryId", providerDeliveryId),
+                new Npgsql.NpgsqlParameter("@bodySha", bodySha),
+                new Npgsql.NpgsqlParameter("@body", body),
+                new Npgsql.NpgsqlParameter("@verified", $"urn:ofac:provider:{provider}:{workload.TeamSlug}"),
+                new Npgsql.NpgsqlParameter("@receivedAt", now),
+            ], ct);
+        if (affected == 0)
+        {
+            // Saved judgment (the arm decision the first delivery settled):
+            // delivery metadata is never business completion, the retry sees
+            // the same answer with zero new rows. The ack identity is the
+            // existing ledger row (the hub Envelope ack dereferences it).
+            var saved = await db.ProviderEvents.AsNoTracking()
+                .Where(e => e.Provider == provider && e.ProviderDeliveryId == providerDeliveryId)
+                .Select(e => new { e.ProviderEventId, e.VerifiedReference })
+                .FirstOrDefaultAsync(ct);
+            await tx.RollbackAsync(ct);
+            metrics.LinkReceived();
+            metrics.InboxProcessed();
+            return new ProviderIngressOutcome(
+                "duplicate", saved?.ProviderEventId, null,
+                saved?.VerifiedReference is null ? null : new { judgment = saved.VerifiedReference });
+        }
+
+        // 2. Echo law (§13.4): a bot-authored event is the outbound-post ledger
+        // write — suppress before the inbox, persist to the binding.
+        if (botId is { Length: > 0 } bot && actor == bot)
+        {
+            var echoed = await db.CommunicationBindings
+                .FirstOrDefaultAsync(b => b.Provider == provider && b.Channel == reference.Channel && b.RootMessageId == reference.Root, ct);
+            if (echoed is not null && reference.MessageId is { Length: > 0 } mid)
+            {
+                echoed.ParentMessageId = mid;
+                await db.SaveChangesAsync(ct);
+            }
+
+            await db.ProviderEvents.Where(e => e.ProviderEventId == providerEventId)
+                .ExecuteUpdateAsync(s => s.SetProperty(e => e.VerifiedReference, "echo:post-ledger"), ct);
+            await tx.CommitAsync(ct);
+            metrics.LinkReceived();
+            metrics.InboxProcessed();
+            return new ProviderIngressOutcome("accepted", providerEventId, null, new { judgment = "echo:post-ledger" });
+        }
+
+        // 3. Inbox row (provider path): provider fields populated, settled.
+        var inbox = new InboxEntity
+        {
+            InboxId = Guid.NewGuid(),
+            EventSource = EnvelopeReader.SourceOf(root),
+            EventId = EnvelopeReader.EventIdOf(root),
+            Provider = provider,
+            ProviderDeliveryId = providerDeliveryId,
+            Payload = rawBody,
+            PayloadSha256 = wireSha,
+            State = "processed",
+            AvailableAt = now,
+            Attempt = 1,
+            ReceivedAt = now,
+            ProcessedAt = now,
+        };
+        db.Inbox.Add(inbox);
+
+        var ack = await NotificationPreferenceAsync(db, ct);
+        var (effectWork, judgment) = type switch
+        {
+            "org.facilitator.event.provider.mattermost.mention.v1" => await MentionArmAsync(db, workload, data, reference, providerDeliveryId, ack, now, ct),
+            "org.facilitator.event.provider.mattermost.reaction.v1" => await ReactionArmAsync(db, data, reference, providerDeliveryId, ack, now, ct),
+            _ => await MessageArmAsync(db, data, reference, providerDeliveryId, now, ct),
+        };
+        inbox.WorkId = effectWork;
+        await db.ProviderEvents.Where(e => e.ProviderEventId == providerEventId)
+            .ExecuteUpdateAsync(s => s.SetProperty(e => e.VerifiedReference, judgment), ct);
+
+        await db.SaveChangesAsync(ct);
+        await PostgresNotifications.NotifyOutboxAsync(db, effectWork?.ToString(), ct);
+        await tx.CommitAsync(ct);
+        metrics.LinkReceived();
+        metrics.InboxProcessed();
+        return new ProviderIngressOutcome("accepted", inbox.InboxId, null, new { judgment });
+    }
+
+    /// <summary>Redeem a linking code on the human plane (deviation D2): a
+    /// code-hashed lookup + single-use fence, the provider_identities upsert,
+    /// the audit row, and the confirmation reply — one transaction.</summary>
+    public async Task<(RedeemOutcome Outcome, object? Detail)> RedeemAsync(string code, string issuer, string subject, CancellationToken ct)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(ct);
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        var codeSha = "sha256:" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(code.Trim().ToUpperInvariant()))).ToLowerInvariant();
+        var now = timeProvider.GetUtcNow().UtcDateTime;
+        var challenge = await db.ProviderLinkChallenges.FirstOrDefaultAsync(c => c.CodeSha256 == codeSha, ct);
+        if (challenge is null)
+        {
+            await tx.RollbackAsync(ct);
+            return (RedeemOutcome.Unknown, null);
+        }
+
+        if (challenge.RedeemedAt is not null)
+        {
+            await tx.RollbackAsync(ct);
+            return (RedeemOutcome.Consumed, null);
+        }
+
+        if (now >= challenge.ExpiresAt)
+        {
+            await tx.RollbackAsync(ct);
+            return (RedeemOutcome.Expired, null);
+        }
+
+        challenge.RedeemedAt = now;
+        challenge.OidcIssuer = issuer;
+        challenge.OidcSubject = subject;
+        var identity = await db.ProviderIdentities.FirstOrDefaultAsync(i =>
+            i.Provider == challenge.Provider && i.Tenant == challenge.Tenant && i.AccountId == challenge.AccountId, ct);
+        if (identity is null)
+        {
+            db.ProviderIdentities.Add(new ProviderIdentityEntity
+            {
+                IdentityId = Guid.NewGuid(),
+                Provider = challenge.Provider,
+                Tenant = challenge.Tenant,
+                AccountId = challenge.AccountId,
+                OidcIssuer = issuer,
+                OidcSubject = subject,
+                ChallengeId = challenge.ChallengeId,
+                CreatedAt = now,
+                UpdatedAt = now,
+            });
+        }
+        else
+        {
+            identity.OidcIssuer = issuer;
+            identity.OidcSubject = subject;
+            identity.ChallengeId = challenge.ChallengeId;
+            identity.UpdatedAt = now;
+        }
+
+        db.Audit.Add(new AuditEventEntity
+        {
+            AuditId = Guid.NewGuid(),
+            OccurredAt = now,
+            Actor = $"oidc:{issuer}|{subject}",
+            Action = "identity.provider-link",
+            Resource = $"{challenge.Provider}/{challenge.Tenant}/{challenge.AccountId}",
+            Decision = "allow",
+            Reason = "challenge-redeemed",
+            EvidenceRef = $"challenge:{challenge.ChallengeId}",
+            PolicyVersion = "identity-v1",
+            Detail = JsonSerializer.Serialize(new Dictionary<string, string?>
+            {
+                ["challengeId"] = challenge.ChallengeId.ToString("N"),
+                ["accountId"] = challenge.AccountId,
+            }),
+        });
+        AppendCommand(db, ReplyEnvelope(
+            DmTarget(challenge.Provider, challenge.DeliverToAccountId),
+            $"Account {challenge.AccountId} linked to a Facilitator identity.",
+            $"link:{challenge.ChallengeId}:confirm",
+            $"link/{challenge.ChallengeId}",
+            now), now, workId: null);
+        await db.SaveChangesAsync(ct);
+        await PostgresNotifications.NotifyOutboxAsync(db, null, ct);
+        await tx.CommitAsync(ct);
+        return (RedeemOutcome.Redeemed, new
+        {
+            provider = challenge.Provider,
+            tenant = challenge.Tenant,
+            accountId = challenge.AccountId,
+        });
+    }
+
+    // ---- arms ---------------------------------------------------------------
+
+    // Mention (§13.2/§21.2 step 3): identity-gated, binding-idempotent Work
+    // creation or thread input, then the low-noise ack. /link mints a challenge
+    // and never a Work.
+    private async Task<(Guid? Work, string Judgment)> MentionArmAsync(
+        FacilitatorDbContext db, Facilitator.Kernel.Shared.Auth.LinkPrincipal workload, JsonElement data, Reference reference, string deliveryId, string replyVsReaction, DateTime now, CancellationToken ct)
+    {
+        var text = data.GetProperty("text").GetString() ?? string.Empty;
+        var actor = data.GetProperty("actorProviderAccountId").GetString() ?? string.Empty;
+
+        if (text.TrimStart().StartsWith("/link", StringComparison.Ordinal))
+        {
+            await MintChallengeAsync(db, reference, actor, now, ct);
+            return (null, "link:challenged");
+        }
+
+        var linked = await db.ProviderIdentities.AnyAsync(i =>
+            i.Provider == ProviderOptions.Mattermost && i.Tenant == reference.Tenant && i.AccountId == actor, ct);
+        if (!linked)
+        {
+            AppendCommand(db, ReplyEnvelope(
+                TargetOf(reference),
+                "Your Mattermost account is not linked to a Facilitator identity — send me a DM starting with /link to link it.",
+                $"mention:{deliveryId}:unlinked",
+                $"provider/mattermost/{reference.MessageId ?? deliveryId}",
+                now), now, workId: null);
+            return (null, "mention:unlinked");
+        }
+
+        var binding = await db.CommunicationBindings.FirstOrDefaultAsync(b =>
+            b.Provider == reference.Provider && b.Channel == reference.Channel && b.RootMessageId == reference.Root, ct);
+        if (binding?.WorkId is { } boundWork)
+        {
+            await AppendWorkInputAsync(db, boundWork, InputNote(reference, deliveryId, text), now, ct);
+            await AckAsync(db, reference, deliveryId, replyVsReaction, now, ct);
+            return (boundWork, $"work/{boundWork}:input");
+        }
+
+        if (binding is not null)
+        {
+            // Bound conversation without a Work (e.g. a bot-DM channel): ack,
+            // no Work.
+            await AckAsync(db, reference, deliveryId, replyVsReaction, now, ct);
+            return (null, "mention:bound-no-work");
+        }
+
+        var workId = Guid.NewGuid();
+        var objective = Trim(text);
+        // The result-manifest ledger scopes through Work -> Project -> Team:
+        // a provider-created Work lands in the workload team's provider
+        // project (find-or-create; fixed name ⇒ one project per team).
+        var project = await db.Projects.FirstOrDefaultAsync(
+            p => p.TeamId == workload.TeamId && p.Name == ProviderProjectName, ct);
+        if (project is null)
+        {
+            project = new ProjectEntity
+            {
+                ProjectId = Guid.NewGuid(),
+                TeamId = workload.TeamId,
+                Name = ProviderProjectName,
+                Config = "{}",
+                CreatedAt = now,
+            };
+            db.Projects.Add(project);
+        }
+        db.Works.Add(new WorkEntity
+        {
+            WorkId = workId,
+            ProjectId = project.ProjectId,
+            Objective = objective,
+            State = "open",
+            Version = 1,
+            CreatedAt = now,
+            UpdatedAt = now,
+        });
+        db.WorkEvents.Add(new WorkEventEntity
+        {
+            EventId = Guid.NewGuid(),
+            WorkId = workId,
+            WorkVersion = 1,
+            Kind = "created",
+            Actor = $"link:{ProviderOptions.Mattermost}:{actor}",
+            Detail = JsonSerializer.Serialize(new Dictionary<string, string> { ["objective"] = objective }),
+            CreatedAt = now,
+        });
+        AppendProgressRow(db, workId, "work created (mattermost mention)", now);
+        db.CommunicationBindings.Add(new CommunicationBindingEntity
+        {
+            BindingId = Guid.NewGuid(),
+            Provider = reference.Provider,
+            Channel = reference.Channel,
+            RootMessageId = reference.Root,
+            ParentMessageId = reference.MessageId,
+            WorkId = workId,
+            IdempotencyKey = deliveryId,
+            CreatedAt = now,
+        });
+        AppendAssignInterim(db, workId, objective, now);
+        await AckAsync(db, reference, deliveryId, replyVsReaction, now, ct);
+        return (workId, $"work/{workId}");
+    }
+
+    // Reaction (§13.3): timeline note + configured ack ONLY. There is
+    // deliberately no approval/transition call in this arm — reaction never
+    // feeds consent.
+    private async Task<(Guid? Work, string Judgment)> ReactionArmAsync(
+        FacilitatorDbContext db, JsonElement data, Reference reference, string deliveryId, string replyVsReaction, DateTime now, CancellationToken ct)
+    {
+        var emoji = data.GetProperty("emojiName").GetString() ?? string.Empty;
+        var actor = data.GetProperty("actorProviderAccountId").GetString() ?? string.Empty;
+        var binding = await db.CommunicationBindings.FirstOrDefaultAsync(b =>
+            b.Provider == reference.Provider && b.Channel == reference.Channel && b.RootMessageId == reference.Root, ct);
+        if (binding?.WorkId is { } workId)
+        {
+            var version = await db.Works.Where(w => w.WorkId == workId).Select(w => w.Version).FirstOrDefaultAsync(ct);
+            db.WorkEvents.Add(new WorkEventEntity
+            {
+                EventId = Guid.NewGuid(),
+                WorkId = workId,
+                WorkVersion = version,
+                Kind = "provider.reaction",
+                Actor = $"link:{ProviderOptions.Mattermost}:{actor}",
+                Detail = JsonSerializer.Serialize(new Dictionary<string, string?>
+                {
+                    ["emoji"] = emoji,
+                    ["postId"] = reference.MessageId,
+                    ["consent"] = "never",
+                }),
+                CreatedAt = now,
+            });
+        }
+
+        if (replyVsReaction == "reaction")
+        {
+            AppendCommand(db, ReactEnvelope(
+                TargetOf(reference),
+                ReactionAckEmoji,
+                $"reaction:{deliveryId}:ack",
+                $"provider/mattermost/{reference.MessageId ?? deliveryId}",
+                now), now, workId: binding?.WorkId);
+        }
+
+        return (binding?.WorkId, binding?.WorkId is { } w ? $"reaction:audited:work/{w}" : "reaction:audited:unbound");
+    }
+
+    // Message: /link anywhere (a DM is how §11 delivers the challenge to an
+    // unlinked account — DMs normalize message.v1, never mention.v1) mints a
+    // challenge; a bound-thread/DM follow-up feeds Work input; everything
+    // else is audited (the provider_events + inbox rows) with no effect. Code
+    // redemption rides the human plane (D2), so other DM text is never parsed.
+    private async Task<(Guid? Work, string Judgment)> MessageArmAsync(
+        FacilitatorDbContext db, JsonElement data, Reference reference, string deliveryId, DateTime now, CancellationToken ct)
+    {
+        var text = data.GetProperty("text").GetString() ?? string.Empty;
+        if (text.TrimStart().StartsWith("/link", StringComparison.Ordinal))
+        {
+            await MintChallengeAsync(db, reference,
+                data.GetProperty("actorProviderAccountId").GetString() ?? string.Empty, now, ct);
+            return (null, "link:challenged");
+        }
+
+        var binding = await db.CommunicationBindings.FirstOrDefaultAsync(b =>
+            b.Provider == reference.Provider && b.Channel == reference.Channel && b.RootMessageId == reference.Root, ct);
+        if (binding?.WorkId is not { } workId)
+        {
+            return (null, "message:unbound");
+        }
+
+        await AppendWorkInputAsync(db, workId, InputNote(reference, deliveryId, text: null), now, ct);
+        return (workId, $"work/{workId}:input");
+    }
+
+    // ---- helpers ------------------------------------------------------------
+
+    private static string InputNote(Reference reference, string deliveryId, string? text) =>
+        text is { Length: > 0 }
+            ? $"provider input (mattermost post {reference.MessageId ?? deliveryId}): {Trim(text)}"
+            : $"provider input (mattermost post {reference.MessageId ?? deliveryId})";
+
+    private Task MintChallengeAsync(FacilitatorDbContext db, Reference reference, string actor, DateTime now, CancellationToken ct)
+    {
+        var _ = ct;
+        var code = RandomCode();
+        db.ProviderLinkChallenges.Add(new ProviderLinkChallengeEntity
+        {
+            ChallengeId = Guid.NewGuid(),
+            CodeSha256 = "sha256:" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(code))).ToLowerInvariant(),
+            Provider = reference.Provider,
+            Tenant = reference.Tenant,
+            AccountId = actor,
+            DeliverToAccountId = actor,
+            CreatedAt = now,
+            ExpiresAt = now.Add(ChallengeTtl),
+        });
+        AppendCommand(db, ReplyEnvelope(
+            DmTarget(reference.Provider, actor),
+            $"Your Facilitator link code: {code} (single use, {ChallengeTtl.TotalMinutes:0} minutes). Redeem it via POST /api/link-identities/redeem.",
+            $"link:{reference.MessageId ?? actor}:dm",
+            $"provider/mattermost/{reference.MessageId ?? actor}",
+            now), now, workId: null);
+        return Task.CompletedTask;
+    }
+
+    private Task AckAsync(FacilitatorDbContext db, Reference reference, string deliveryId, string replyVsReaction, DateTime now, CancellationToken ct)
+    {
+        var _ = ct;
+        var envelope = replyVsReaction == "reply"
+            ? ReplyEnvelope(TargetOf(reference), "On it.", $"mention:{deliveryId}:ack", $"provider/mattermost/{reference.MessageId ?? deliveryId}", now)
+            : ReactEnvelope(TargetOf(reference), AckEmoji, $"mention:{deliveryId}:ack", $"provider/mattermost/{reference.MessageId ?? deliveryId}", now);
+        AppendCommand(db, envelope, now, workId: null);
+        return Task.CompletedTask;
+    }
+
+    private async Task AppendWorkInputAsync(FacilitatorDbContext db, Guid workId, string note, DateTime now, CancellationToken ct)
+    {
+        var version = await db.Works.Where(w => w.WorkId == workId).Select(w => w.Version).FirstOrDefaultAsync(ct);
+        db.WorkEvents.Add(new WorkEventEntity
+        {
+            EventId = Guid.NewGuid(),
+            WorkId = workId,
+            WorkVersion = version,
+            Kind = "provider.input",
+            Actor = "provider:mattermost",
+            Detail = JsonSerializer.Serialize(new Dictionary<string, string> { ["note"] = note }),
+            CreatedAt = now,
+        });
+        AppendProgressRow(db, workId, Trim(note), now);
+    }
+
+    private void AppendProgressRow(FacilitatorDbContext db, Guid workId, string note, DateTime now)
+    {
+        AppendCommand(db, ProviderEnvelopes.Progress(workId, note, now), now, workId);
+    }
+
+    /// <summary>Decision 7: the seed-lib assign-interim — a work.assign row to the
+    /// configured link endpoint (capability targeting until Plan 25 routing).</summary>
+    private void AppendAssignInterim(FacilitatorDbContext db, Guid workId, string objective, DateTime now)
+    {
+        if (options.AssignEndpointId is not { Length: > 0 })
+        {
+            return;
+        }
+
+        var envelope = ProviderEnvelopes.Assign(workId, Guid.NewGuid().ToString("N"), objective, options, now);
+        AppendCommand(db, envelope, now, workId, recipient: $"link.{options.AssignEndpointId}", commandId: $"work-assign:{workId}");
+    }
+
+    private void AppendCommand(
+        FacilitatorDbContext db,
+        JsonObject envelope,
+        DateTime now,
+        Guid? workId,
+        string? recipient = null,
+        string? commandId = null)
+    {
+        var json = envelope.ToJsonString();
+        var verdict = envelopeValidator.Validate(json);
+        if (!verdict.Ok)
+        {
+            // Kernel-emitted envelopes must be contract-valid; fail closed at
+            // insert rather than poison the outbox (Plan 02 law).
+            throw new InvalidOperationException($"kernel envelope rejected by the validator: {verdict.ErrorClass}: {verdict.Message}");
+        }
+
+        db.Outbox.Add(new OutboxEntity
+        {
+            OutboxId = Guid.NewGuid(),
+            CommandId = commandId ?? envelope["data"]?["idempotencyKey"]?.GetValue<string>() ?? Guid.NewGuid().ToString("N"),
+            RecipientEndpointId = recipient ?? $"link.{options.EndpointId}",
+            AggregateType = "work",
+            AggregateId = workId,
+            EventType = envelope["type"]!.GetValue<string>(),
+            Envelope = json,
+            WorkId = workId,
+            Status = "pending",
+            AvailableAt = now,
+            Attempts = 0,
+            CreatedAt = now,
+        });
+    }
+
+    private static async Task<string> NotificationPreferenceAsync(FacilitatorDbContext db, CancellationToken ct)
+    {
+        var row = await db.AdminConfig.AsNoTracking().FirstOrDefaultAsync(c => c.Resource == "notifications", ct);
+        if (row is null)
+        {
+            return "reaction";
+        }
+
+        try
+        {
+            using var doc = JsonDocument.Parse(row.Payload);
+            if (doc.RootElement.TryGetProperty("replyVsReaction", out var v) && v.GetString() is "reply" or "reaction")
+            {
+                return v.GetString()!;
+            }
+        }
+        catch (JsonException)
+        {
+            // fall through to the default
+        }
+
+        return "reaction";
+    }
+
+    private static string RandomCode()
+    {
+        var bytes = RandomNumberGenerator.GetBytes(6);
+        var chars = new char[6];
+        for (var i = 0; i < 6; i++)
+        {
+            chars[i] = CodeAlphabet[bytes[i] % CodeAlphabet.Length];
+        }
+
+        return new string(chars);
+    }
+
+    private static string Trim(string text) =>
+        text.Length <= 2000 ? text : text[..2000];
+
+    internal sealed record Reference(string Provider, string Tenant, string Channel, string Root, string? MessageId, string Kind);
+
+    internal static Reference ReferenceOf(JsonElement data)
+    {
+        var reference = data.GetProperty("reference");
+        var channel = reference.GetProperty("channelOrResourceId").GetString() ?? string.Empty;
+        var kind = reference.TryGetProperty("conversationKind", out var k) ? k.GetString() ?? "thread" : "thread";
+        var root = reference.TryGetProperty("rootThreadId", out var r) ? r.GetString() : null;
+        var messageId = reference.TryGetProperty("messageId", out var m) ? m.GetString() : null;
+        var tenant = reference.TryGetProperty("tenantOrOrganizationId", out var t) ? t.GetString() ?? string.Empty : string.Empty;
+        return new Reference(ProviderOptions.Mattermost, tenant, channel, root ?? messageId ?? channel, messageId, kind);
+    }
+
+    internal static ConversationTarget TargetOf(Reference reference) => new(
+        reference.Provider, reference.Tenant, reference.Channel, reference.Root, reference.MessageId, null, reference.Kind, null);
+
+    internal static ConversationTarget DmTarget(string provider, string accountId) => new(
+        provider, null, null, null, null, null, "dm", accountId);
+
+    internal static JsonObject ReplyEnvelope(ConversationTarget target, string text, string idempotencyKey, string subject, DateTime now) =>
+        CommunicationEnvelope("org.facilitator.command.communication.reply.v1", "command.communication.reply.v1.json", target, subject, now, idempotencyKey,
+            new JsonObject { ["text"] = text });
+
+    internal static JsonObject ReactEnvelope(ConversationTarget target, string emoji, string idempotencyKey, string subject, DateTime now) =>
+        CommunicationEnvelope("org.facilitator.command.communication.react.v1", "command.communication.react.v1.json", target, subject, now, idempotencyKey,
+            new JsonObject { ["emojiName"] = emoji });
+
+    internal static JsonObject CommunicationEnvelope(string type, string schemaFile, ConversationTarget target, string subject, DateTime now, string idempotencyKey, JsonObject dataTail)
+    {
+        var data = new JsonObject
+        {
+            ["commandId"] = idempotencyKey,
+            ["target"] = TargetNode(target),
+            ["idempotencyKey"] = idempotencyKey,
+        };
+        foreach (var property in dataTail.AsObject())
+        {
+            data[property.Key] = property.Value?.DeepClone();
+        }
+
+        return new JsonObject
+        {
+            ["specversion"] = "1.0",
+            ["id"] = Guid.NewGuid().ToString("N"),
+            ["source"] = "urn:facilitator:kernel",
+            ["type"] = type,
+            ["subject"] = subject,
+            ["time"] = now.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
+            ["datacontenttype"] = "application/json",
+            ["dataschema"] = $"https://schemas.openfacilitator.org/v1/{schemaFile}",
+            ["data"] = data,
+        };
+    }
+
+    internal static JsonObject TargetNode(ConversationTarget target)
+    {
+        var node = new JsonObject { ["provider"] = target.Provider, ["conversationKind"] = target.ConversationKind };
+        if (target.Tenant is { Length: > 0 } tenant)
+        {
+            node["tenantOrOrganizationId"] = tenant;
+        }
+
+        if (target.Channel is { Length: > 0 } channel)
+        {
+            node["channelOrResourceId"] = channel;
+        }
+
+        if (target.RootThreadId is { Length: > 0 } root)
+        {
+            node["rootThreadId"] = root;
+        }
+
+        if (target.ParentMessageId is { Length: > 0 } parent)
+        {
+            node["parentMessageId"] = parent;
+        }
+
+        if (target.SubjectRef is { Length: > 0 } subjectRef)
+        {
+            node["subjectRef"] = subjectRef;
+        }
+
+        if (target.ActorProviderAccountId is { Length: > 0 } account)
+        {
+            node["actorProviderAccountId"] = account;
+        }
+
+        return node;
+    }
+}

@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 
+using Facilitator.Kernel.Integrations;
 using Facilitator.Kernel.Shared;
 using Facilitator.Kernel.Shared.Dispatch;
 using Facilitator.Kernel.Shared.Persistence;
@@ -51,7 +52,8 @@ public sealed class LinkIngress(
     Facilitator.Kernel.Work.ApprovalIngress approvals,
     Facilitator.Kernel.Work.ArtifactIngress artifacts,
     Facilitator.Kernel.Work.ResultIngress results,
-    Facilitator.Kernel.Work.MemoryIngress memory)
+    Facilitator.Kernel.Work.MemoryIngress memory,
+    Facilitator.Kernel.Integrations.ProviderEventStore? providers = null)
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
@@ -62,6 +64,18 @@ public sealed class LinkIngress(
         if (screen.Problem is not null)
         {
             return new LinkAdmission(screen.Problem, null, null);
+        }
+
+        if (ProviderEventClass.IsProviderClass(screen.Type))
+        {
+            // Plan 22 provider plane: the store owns ONE transaction for
+            // provider_events + inbox + arm effects, so it takes the envelope
+            // before the shared dedupe insert (its own (provider, delivery-id)
+            // dedupe spine answers duplicate with the saved judgment). The gate
+            // already refused the class when no provider is registered, so the
+            // store is present whenever the class passes.
+            var outcome = await providers!.IngestAsync(screen.Root, rawBody, workload, ct);
+            return outcome.ToAdmission();
         }
 
         var root = screen.Root;

@@ -48,6 +48,10 @@ public class FacilitatorDbContext(DbContextOptions<FacilitatorDbContext> options
 
     public DbSet<CommunicationBindingEntity> CommunicationBindings => Set<CommunicationBindingEntity>();
 
+    public DbSet<ProviderIdentityEntity> ProviderIdentities => Set<ProviderIdentityEntity>();
+
+    public DbSet<ProviderLinkChallengeEntity> ProviderLinkChallenges => Set<ProviderLinkChallengeEntity>();
+
     public DbSet<AuditEventEntity> Audit => Set<AuditEventEntity>();
 
     public DbSet<IdentityRoleEntity> IdentityRoles => Set<IdentityRoleEntity>();

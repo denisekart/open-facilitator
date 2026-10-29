@@ -36,6 +36,7 @@ both verbatim and fail hard on a missing key.
 |`18890`|Aspire OTLP/HTTP|kernel exporter target|
 |`8099`|Gateway diagnostics|**not published** — binds the workspace container's loopback; `./referencectl status` probes it via `compose exec`|
 |`3000`/`8065`/`9092`/`11434`|full overlay|forgejo / mattermost / kafka / ollama|
+|`8066`|full overlay|mattermost-adapter `GET /healthz` (no inbound provider port — D1)|
 
 ## What the kernel runs with
 
@@ -52,6 +53,20 @@ curl -s http://localhost:8080/realms/facilitator/protocol/openid-connect/token \
   -d grant_type=client_credentials -d client_id=facilitator-cli \
   -d client_secret=e2e-cli-secret | jq -r .access_token
 ```
+
+## Full profile (`FULL=1` / `make compose-full`)
+
+The overlay adds forgejo, Mattermost Team Edition
+(site `http://chat.localhost:8065`), kafka, and ollama — plus the Plan 22
+provider-ingest pair: `mattermost-init` (one-shot: opens signup on first
+boot, creates the `facilitator` bot + PAT, publishes the PAT to the shared
+`mm_provision` volume, exits) and `mattermost-adapter` (runs the
+`@ofac/mattermost-adapter` from the node-runtime image; `GET /healthz` on
+:8066 loopback). The facilitator container gets its `providers:mattermost`
+section via `Providers__Mattermost__*` env, so the slim stack stays
+provider-less. Live proof: `make provider-e2e` (six steps: boot, link
+challenge, mention→Work, completion reply, echo suppression,
+reaction-never-consent).
 
 ## Security profile
 

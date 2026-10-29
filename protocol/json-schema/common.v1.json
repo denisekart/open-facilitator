@@ -94,6 +94,85 @@
         }
       },
       "title": "Deliverable"
+    },
+    "conversationTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "conversationKind"],
+      "properties": {
+        "provider": {
+          "$ref": "common.v1.json#/$defs/idToken"
+        },
+        "tenantOrOrganizationId": {
+          "$ref": "common.v1.json#/$defs/idToken"
+        },
+        "channelOrResourceId": {
+          "$ref": "common.v1.json#/$defs/idToken"
+        },
+        "rootThreadId": {
+          "$ref": "common.v1.json#/$defs/idToken"
+        },
+        "parentMessageId": {
+          "$ref": "common.v1.json#/$defs/idToken"
+        },
+        "subjectRef": {
+          "$ref": "common.v1.json#/$defs/idToken"
+        },
+        "conversationKind": {
+          "type": "string",
+          "enum": ["thread", "channel", "dm", "comment"]
+        },
+        "actorProviderAccountId": {
+          "$ref": "common.v1.json#/$defs/idToken"
+        }
+      },
+      "title": "ConversationTarget"
+    },
+    "conversationReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider",
+        "providerInstanceId",
+        "tenantOrOrganizationId",
+        "channelOrResourceId",
+        "conversationKind",
+        "authorProviderAccountId"
+      ],
+      "properties": {
+        "provider": {
+          "$ref": "common.v1.json#/$defs/idToken"
+        },
+        "providerInstanceId": {
+          "$ref": "common.v1.json#/$defs/idToken"
+        },
+        "tenantOrOrganizationId": {
+          "$ref": "common.v1.json#/$defs/idToken"
+        },
+        "channelOrResourceId": {
+          "$ref": "common.v1.json#/$defs/idToken"
+        },
+        "rootThreadId": {
+          "$ref": "common.v1.json#/$defs/idToken"
+        },
+        "parentMessageId": {
+          "$ref": "common.v1.json#/$defs/idToken"
+        },
+        "messageId": {
+          "$ref": "common.v1.json#/$defs/idToken"
+        },
+        "subjectRef": {
+          "$ref": "common.v1.json#/$defs/idToken"
+        },
+        "conversationKind": {
+          "type": "string",
+          "enum": ["thread", "channel", "dm", "comment"]
+        },
+        "authorProviderAccountId": {
+          "$ref": "common.v1.json#/$defs/idToken"
+        }
+      },
+      "title": "ConversationReference"
     }
   }
 }

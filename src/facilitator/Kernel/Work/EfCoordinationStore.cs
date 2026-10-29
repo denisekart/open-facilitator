@@ -18,7 +18,8 @@ namespace Facilitator.Kernel.Work;
 public sealed class EfCoordinationStore(
     IDbContextFactory<FacilitatorDbContext> contextFactory,
     EnvelopeValidator envelopeValidator,
-    TimeProvider timeProvider) : ICoordinationStore
+    TimeProvider timeProvider,
+    Facilitator.Kernel.Integrations.ProviderOptions? providers = null) : ICoordinationStore
 {
     private const string KernelLogChannel = "kernel.log";
 
@@ -95,9 +96,10 @@ public sealed class EfCoordinationStore(
         }
 
         var now = timeProvider.GetUtcNow().UtcDateTime;
+        var transitionEventId = Guid.NewGuid();
         db.WorkEvents.Add(new WorkEventEntity
         {
-            EventId = Guid.NewGuid(),
+            EventId = transitionEventId,
             WorkId = workId,
             WorkVersion = expectedVersion + 1,
             Kind = "state.transition",
@@ -112,6 +114,7 @@ public sealed class EfCoordinationStore(
         });
 
         AppendWorkProgress(db, workId, $"work {current.State}→{to.Wire()}", causationId: null, createdAt: now);
+        AppendProviderCompletionReply(db, workId, to, transitionEventId, now);
         await db.SaveChangesAsync(ct);
         await NotifyAsync(db, workId, ct);
         await tx.CommitAsync(ct);
@@ -260,6 +263,56 @@ public sealed class EfCoordinationStore(
         };
         db.Outbox.Add(row);
         return row;
+    }
+
+    /// <summary>Plan 22 completion hook: a terminal transition of a bound Work
+    /// appends one <c>command.communication.reply.v1</c> to the bound
+    /// conversation, inside the SAME transaction (the §13.2 reply law; the
+    /// deterministic <c>communication-reply:&lt;transitionEventId&gt;</c>
+    /// commandId makes retries idempotent on the ledger). No binding or no
+    /// registered provider ⇒ zero rows.</summary>
+    private void AppendProviderCompletionReply(
+        FacilitatorDbContext db, Guid workId, WorkState to, Guid transitionEventId, DateTime now)
+    {
+        if (providers is not { Enabled: true, EndpointId: { Length: > 0 } endpoint }
+            || !StateGuard.IsTerminal(to))
+        {
+            return;
+        }
+
+        var binding = db.CommunicationBindings.AsNoTracking().FirstOrDefault(b => b.WorkId == workId);
+        if (binding is null)
+        {
+            return;
+        }
+
+        var target = new Facilitator.Kernel.Integrations.ConversationTarget(
+            binding.Provider, null, binding.Channel, binding.RootMessageId, binding.ParentMessageId,
+            null, "thread", null);
+        var envelope = Facilitator.Kernel.Integrations.ProviderEventStore.ReplyEnvelope(
+            target, $"Work reached {to.Wire()}.", $"communication-reply:{transitionEventId}", $"work/{workId}", now);
+        var json = envelope.ToJsonString();
+        var verdict = envelopeValidator.Validate(json);
+        if (!verdict.Ok)
+        {
+            throw new InvalidOperationException($"kernel envelope rejected by the validator: {verdict.ErrorClass}: {verdict.Message}");
+        }
+
+        db.Outbox.Add(new OutboxEntity
+        {
+            OutboxId = Guid.NewGuid(),
+            RecipientEndpointId = $"link.{endpoint}",
+            AggregateType = "work",
+            AggregateId = workId,
+            EventType = "org.facilitator.command.communication.reply.v1",
+            CommandId = $"communication-reply:{transitionEventId}",
+            Envelope = json,
+            WorkId = workId,
+            Status = "pending",
+            AvailableAt = now,
+            Attempts = 0,
+            CreatedAt = now,
+        });
     }
 
     private static Task NotifyAsync(FacilitatorDbContext db, Guid workId, CancellationToken ct) =>

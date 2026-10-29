@@ -5,6 +5,7 @@ packages:
   - "src/protocol"
   - "src/workspace-link"
   - "src/facilitator/ui"
+  - "src/adapters/communication/mattermost"
 
 allowBuilds:
   better-sqlite3: false

@@ -440,6 +440,15 @@ namespace Facilitator.Migrations
 
                     b.HasKey("BindingId");
 
+                    b.HasIndex("IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("communication_bindings_idempotency_unique")
+                        .HasFilter("idempotency_key IS NOT NULL");
+
+                    b.HasIndex("Provider", "Channel", "RootMessageId")
+                        .IsUnique()
+                        .HasDatabaseName("communication_bindings_conversation_unique");
+
                     b.ToTable("communication_bindings", "facilitator");
                 });
 
@@ -1255,6 +1264,120 @@ namespace Facilitator.Migrations
                     b.ToTable("provider_events", "facilitator");
                 });
 
+            modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.ProviderIdentityEntity", b =>
+                {
+                    b.Property<Guid>("IdentityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("identity_id");
+
+                    b.Property<string>("AccountId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("account_id");
+
+                    b.Property<Guid?>("ChallengeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("challenge_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("OidcIssuer")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("oidc_issuer");
+
+                    b.Property<string>("OidcSubject")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("oidc_subject");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("provider");
+
+                    b.Property<string>("Tenant")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("tenant");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("IdentityId");
+
+                    b.HasIndex("Provider", "Tenant", "AccountId")
+                        .IsUnique()
+                        .HasDatabaseName("provider_identities_account_unique");
+
+                    b.ToTable("provider_identities", "facilitator");
+                });
+
+            modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.ProviderLinkChallengeEntity", b =>
+                {
+                    b.Property<Guid>("ChallengeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("challenge_id");
+
+                    b.Property<string>("AccountId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("account_id");
+
+                    b.Property<string>("CodeSha256")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("code_sha256");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DeliverToAccountId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("deliver_to_account_id");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("OidcIssuer")
+                        .HasColumnType("text")
+                        .HasColumnName("oidc_issuer");
+
+                    b.Property<string>("OidcSubject")
+                        .HasColumnType("text")
+                        .HasColumnName("oidc_subject");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("provider");
+
+                    b.Property<DateTime?>("RedeemedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("redeemed_at");
+
+                    b.Property<string>("Tenant")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("tenant");
+
+                    b.HasKey("ChallengeId");
+
+                    b.HasIndex("CodeSha256")
+                        .HasDatabaseName("provider_link_challenges_code_idx");
+
+                    b.HasIndex("Provider", "Tenant", "AccountId")
+                        .HasDatabaseName("provider_link_challenges_account_idx");
+
+                    b.ToTable("provider_link_challenges", "facilitator");
+                });
+
             modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.ResultManifestEntity", b =>
                 {
                     b.Property<string>("ManifestId")
@@ -1455,7 +1578,7 @@ namespace Facilitator.Migrations
 
                     b.ToTable("work_events", "facilitator", t =>
                         {
-                            t.HasCheckConstraint("work_events_kind_check", "kind IN ('created', 'state.transition', 'steer', 'command.accepted', 'assignment.transition', 'approval.decided', 'artifact.stored', 'artifact.registered', 'artifact.available', 'artifact.gc', 'manifest.recorded', 'manifest.superseded', 'memory.candidate', 'memory.promoted')");
+                            t.HasCheckConstraint("work_events_kind_check", "kind IN ('created', 'state.transition', 'steer', 'command.accepted', 'assignment.transition', 'approval.decided', 'artifact.stored', 'artifact.registered', 'artifact.available', 'artifact.gc', 'manifest.recorded', 'manifest.superseded', 'memory.candidate', 'memory.promoted', 'provider.input', 'provider.reaction')");
                         });
                 });
 

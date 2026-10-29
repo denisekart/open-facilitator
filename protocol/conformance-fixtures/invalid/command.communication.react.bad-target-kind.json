@@ -1,0 +1,19 @@
+{
+  "specversion": "1.0",
+  "id": "01JCOMM-react-bad-target",
+  "source": "urn:facilitator:instance:demo",
+  "type": "org.facilitator.command.communication.react.v1",
+  "subject": "provider/mattermost/post-789",
+  "time": "2026-10-29T09:00:01Z",
+  "datacontenttype": "application/json",
+  "dataschema": "https://schemas.openfacilitator.org/v1/command.communication.react.v1.json",
+  "data": {
+    "commandId": "post-789:ack",
+    "target": {
+      "provider": "mattermost",
+      "conversationKind": "sms"
+    },
+    "emojiName": "white_check_mark",
+    "idempotencyKey": "mention:post-789:ack"
+  }
+}

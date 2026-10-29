@@ -532,6 +532,84 @@
       "expect": "invalid",
       "class": "command",
       "errorClass": "schema-violation"
+    },
+    {
+      "file": "valid/event.provider.mattermost.mention.json",
+      "expect": "valid",
+      "class": "event",
+      "type": "org.facilitator.event.provider.mattermost.mention.v1"
+    },
+    {
+      "file": "valid/event.provider.mattermost.reaction.json",
+      "expect": "valid",
+      "class": "event",
+      "type": "org.facilitator.event.provider.mattermost.reaction.v1"
+    },
+    {
+      "file": "valid/event.provider.mattermost.message.json",
+      "expect": "valid",
+      "class": "event",
+      "type": "org.facilitator.event.provider.mattermost.message.v1"
+    },
+    {
+      "file": "valid/command.communication.reply.json",
+      "expect": "valid",
+      "class": "command",
+      "type": "org.facilitator.command.communication.reply.v1"
+    },
+    {
+      "file": "valid/command.communication.react.json",
+      "expect": "valid",
+      "class": "command",
+      "type": "org.facilitator.command.communication.react.v1"
+    },
+    {
+      "file": "valid/command.communication.update.json",
+      "expect": "valid",
+      "class": "command",
+      "type": "org.facilitator.command.communication.update.v1"
+    },
+    {
+      "file": "valid/command.communication.acknowledge.json",
+      "expect": "valid",
+      "class": "command",
+      "type": "org.facilitator.command.communication.acknowledge.v1"
+    },
+    {
+      "file": "invalid/event.provider.mention.no-delivery-id.json",
+      "expect": "invalid",
+      "class": "event",
+      "errorClass": "schema-violation"
+    },
+    {
+      "file": "invalid/event.provider.reaction.bad-conversation-kind.json",
+      "expect": "invalid",
+      "class": "event",
+      "errorClass": "schema-violation"
+    },
+    {
+      "file": "invalid/event.provider.message.reference-extra-field.json",
+      "expect": "invalid",
+      "class": "event",
+      "errorClass": "schema-violation"
+    },
+    {
+      "file": "invalid/command.communication.reply.no-idempotency-key.json",
+      "expect": "invalid",
+      "class": "command",
+      "errorClass": "schema-violation"
+    },
+    {
+      "file": "invalid/command.communication.react.bad-target-kind.json",
+      "expect": "invalid",
+      "class": "command",
+      "errorClass": "schema-violation"
+    },
+    {
+      "file": "invalid/command.communication.acknowledge.no-command-id.json",
+      "expect": "invalid",
+      "class": "command",
+      "errorClass": "schema-violation"
     }
   ]
 }

@@ -1,6 +1,7 @@
 using System.Threading.RateLimiting;
 
 using Facilitator.Kernel.Admin;
+using Facilitator.Kernel.Integrations;
 using Facilitator.Kernel.Link;
 using Facilitator.Kernel.Shared.Auth;
 using Facilitator.Kernel.Shared.Dispatch;
@@ -44,6 +45,7 @@ public static class KernelServiceCollection
         builder.AddStorageFeature();
         builder.AddLinkFeature();
         builder.AddMemoryFeature();
+        builder.AddIntegrationsFeature();
         return builder;
     }
 
@@ -217,6 +219,32 @@ public static class KernelServiceCollection
         builder.Services.AddScoped<MemoryBroker>();
         builder.Services.AddSingleton<MemoryRetentionService>();
         builder.Services.AddHostedService(sp => sp.GetRequiredService<MemoryRetentionService>());
+        return builder;
+    }
+
+    /// <summary>
+    /// Provider ingest plane (Plan 22): the <c>providers:mattermost</c> options
+    /// are registered ALWAYS (the admission gate + completion hook read the
+    /// flag); the store + ingress arm + human-plane routes exist only when
+    /// enabled. Enabled without the adapter's addressing fails composition
+    /// closed (Storage/Memory precedent).
+    /// </summary>
+    private static WebApplicationBuilder AddIntegrationsFeature(this WebApplicationBuilder builder)
+    {
+        var providers = builder.Configuration.GetSection(ProviderOptions.SectionName).Get<ProviderOptions>() ?? new ProviderOptions();
+        builder.Services.AddSingleton(providers);
+        if (!providers.Enabled)
+        {
+            return builder;
+        }
+
+        if (string.IsNullOrEmpty(providers.EndpointId) || string.IsNullOrEmpty(providers.Tenant))
+        {
+            throw new InvalidOperationException(
+                "Providers:Mattermost enabled but EndpointId/Tenant unset — fail-closed.");
+        }
+
+        builder.Services.AddSingleton<ProviderEventStore>();
         return builder;
     }
 

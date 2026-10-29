@@ -1,0 +1,23 @@
+{
+  "specversion": "1.0",
+  "id": "01JCOMM-update",
+  "source": "urn:facilitator:instance:demo",
+  "type": "org.facilitator.command.communication.update.v1",
+  "subject": "provider/mattermost/post-555",
+  "time": "2026-10-29T09:10:00Z",
+  "datacontenttype": "application/json",
+  "dataschema": "https://schemas.openfacilitator.org/v1/command.communication.update.v1.json",
+  "data": {
+    "commandId": "post-555:update-2",
+    "target": {
+      "provider": "mattermost",
+      "tenantOrOrganizationId": "demo-team",
+      "channelOrResourceId": "channel-123",
+      "rootThreadId": "post-root-123",
+      "parentMessageId": "post-555",
+      "conversationKind": "thread"
+    },
+    "text": "Work work-123 progress: MR created (updated).",
+    "idempotencyKey": "progress:evt-2:update"
+  }
+}

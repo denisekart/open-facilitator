@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openfacilitator.org/v1/command.communication.acknowledge.v1.json",
+  "title": "CommunicationAcknowledgeCommandV1Data",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["commandId", "target", "idempotencyKey"],
+  "properties": {
+    "commandId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "target": {
+      "$ref": "common.v1.json#/$defs/conversationTarget"
+    },
+    "idempotencyKey": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    }
+  }
+}

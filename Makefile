@@ -1,4 +1,4 @@
-.PHONY: restore build test lint format protocol db-update compose-slim compose-full clean link-e2e gateway-e2e worker-e2e admin-e2e example-slim-up docs-check
+.PHONY: restore build test lint format protocol db-update compose-slim compose-full compose-down clean link-e2e gateway-e2e worker-e2e admin-e2e example-slim-up docs-check provider-e2e
 
 restore:
 	dotnet restore OpenFacilitator.slnx
@@ -81,8 +81,16 @@ compose-slim:
 
 compose-full:
 	cd reference && cp -n .env.example .env && \
-	docker compose --env-file versions.env --env-file .env -f compose.slim.yaml -f compose.full.yaml up -d --build
+	docker compose --env-file versions.env --env-file .env -f compose.slim.yaml -f compose.full.yaml up -d --build --wait --wait-timeout 600
 	@echo "Slim stack + forgejo :3000, mattermost :8065, kafka :9092, ollama :11434 (loopback)"
+	@echo "Provider adapter :8066 (GET /healthz), kernel provider section ON. Live proof: make provider-e2e"
+
+# Provider-ingest live proof (Plan 22): the full stack must be up first
+# (`make compose-full`); six provider steps, verify-shaped report.
+# Step selection: make provider-e2e ARGS="--only provider-boot".
+provider-e2e:
+	@echo "Provider E2E tier: needs the FULL stack (make compose-full) — mattermost :8065, adapter :8066, kernel :8088."
+	REF="$(CURDIR)/reference" bash reference/checks/verify-full.sh $(ARGS)
 
 compose-down:
 	cd reference && docker compose --env-file versions.env --env-file .env \

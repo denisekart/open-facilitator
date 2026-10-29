@@ -147,6 +147,46 @@ export interface ArtifactRequestUploadCommandV1Data {
   workId?: string;
 }
 
+export interface CommunicationAcknowledgeCommandV1Data {
+  commandId: string;
+  idempotencyKey: string;
+  target: ConversationTarget;
+}
+
+export interface ConversationTarget {
+  actorProviderAccountId?: string;
+  channelOrResourceId?: string;
+  conversationKind: ConversationKind;
+  parentMessageId?: string;
+  provider: string;
+  rootThreadId?: string;
+  subjectRef?: string;
+  tenantOrOrganizationId?: string;
+}
+
+export type ConversationKind = "thread" | "channel" | "dm" | "comment";
+
+export interface CommunicationReactCommandV1Data {
+  commandId: string;
+  emojiName: string;
+  idempotencyKey: string;
+  target: ConversationTarget;
+}
+
+export interface CommunicationReplyCommandV1Data {
+  commandId: string;
+  idempotencyKey: string;
+  target: ConversationTarget;
+  text: string;
+}
+
+export interface CommunicationUpdateCommandV1Data {
+  commandId: string;
+  idempotencyKey: string;
+  target: ConversationTarget;
+  text: string;
+}
+
 export interface ContextFetchCommandV1Data {
   actorEvidenceRef: string;
   commandId: string;
@@ -447,6 +487,52 @@ export interface MemoryUsedEventV1Data {
   consumer: string;
   justification: string;
   memoryId: string;
+}
+
+export interface ProviderMattermostMentionEventV1Data {
+  actorProviderAccountId: string;
+  /**
+   * Verbatim provider event payload as received by the adapter.
+   */
+  payload?: { [key: string]: unknown };
+  providerDeliveryId: string;
+  reference: ConversationReference;
+  text: string;
+}
+
+export interface ConversationReference {
+  authorProviderAccountId: string;
+  channelOrResourceId: string;
+  conversationKind: ConversationKind;
+  messageId?: string;
+  parentMessageId?: string;
+  provider: string;
+  providerInstanceId: string;
+  rootThreadId?: string;
+  subjectRef?: string;
+  tenantOrOrganizationId: string;
+}
+
+export interface ProviderMattermostMessageEventV1Data {
+  actorProviderAccountId: string;
+  /**
+   * Verbatim provider event payload as received by the adapter.
+   */
+  payload?: { [key: string]: unknown };
+  providerDeliveryId: string;
+  reference: ConversationReference;
+  text: string;
+}
+
+export interface ProviderMattermostReactionEventV1Data {
+  actorProviderAccountId: string;
+  emojiName: string;
+  /**
+   * Verbatim provider event payload as received by the adapter.
+   */
+  payload?: { [key: string]: unknown };
+  providerDeliveryId: string;
+  reference: ConversationReference;
 }
 
 export interface WorkAcceptedEventV1Data {

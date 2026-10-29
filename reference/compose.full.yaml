@@ -24,6 +24,18 @@ services:
       MM_SQLSETTINGS_DRIVERNAME: postgres
       MM_SQLSETTINGS_DATASOURCE: postgres://demo:${DEMO_POSTGRES_PASSWORD:?set in .env}@postgres:5432/mattermost?sslmode=disable
       MM_SERVICESETTINGS_SITEURL: http://chat.localhost:8065
+      # Bootstrap law (Plan 22): 11.x has no unauthenticated setup route and
+      # local-mode CLI is off by default, so the admin is created over OPEN
+      # SIGNUP (a fresh server admits the first account unauthenticated ⇒
+      # sysadmin) and email verification stays off so that account can log in
+      # immediately. 11.x law: EnableOpenServer lives under TeamSettings
+      # (the ServiceSettings key was removed); the e2e tier's guest signups
+      # need it true.
+      MM_TEAMSETTINGS_ENABLEOPENSERVER: "true"
+      MM_EMAILSETTINGS_REQUIREEMAILVERIFICATION: "false"
+      # 11.x TE ships bot-account creation DISABLED (api.bot.create_disabled
+      # 403); the adapter's identity is a bot, so the one-shot needs it on.
+      MM_SERVICESETTINGS_ENABLEBOTACCOUNTCREATION: "true"
     volumes:
       - mattermost_data:/mattermost/data
     ports:
@@ -34,6 +46,78 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    # Image default healthcheck (mmctl --local): the TE image is UBI-micro,
+    # no shell, so no custom probe is possible. Nothing gates on it — the
+    # init one-shot polls /system/ping itself.
+
+  # Provisioning one-shot (Plan 22 step 4): admin + bot + PAT + team over
+  # REST, then publishes the bot token to a shared volume for the adapter
+  # (MATTERMOST_BOT_TOKEN_FILE) and the kernel (Providers:Mattermost:
+  # BotTokenFile). Exits 0 when done. Runs on node-runtime, NOT the TE image:
+  # UBI-micro carries no shell for a provisioning script.
+  mattermost-init:
+    image: ${OCI_REGISTRY:?set in versions.env}/node-runtime:${FRAMEWORK_TAG:?set in versions.env}
+    entrypoint: ["node", "/opt/ofac/mm-init.mjs"]
+    environment:
+      MM_ADMIN_PASSWORD: ${DEMO_MM_ADMIN_PASSWORD:?set in .env}
+    volumes:
+      - ./bootstrap/mm-init.mjs:/opt/ofac/mm-init.mjs:ro
+      - mm_provision:/provision
+    depends_on:
+      mattermost:
+        condition: service_started
+
+  # Provider ingest adapter (Plan 22): link-plane endpoint dials out to the
+  # kernel; inbound trust is the bot WebSocket credential (D1 — no webhook
+  # inbound contract). PORT only serves GET /healthz, published loopback for
+  # the e2e probe.
+  mattermost-adapter:
+    image: ${OCI_REGISTRY:?set in versions.env}/node-runtime:${FRAMEWORK_TAG:?set in versions.env}
+    command: ["node", "/app/mattermost-adapter/dist/bin/adapter.js", "run"]
+    environment:
+      OFAC_KERNEL_URL: http://facilitator:8080
+      OFAC_ENROLL_SECRET: ${DEMO_ENROLLMENT_TOKEN:?set in .env}
+      OFAC_ENDPOINT_ID: mm-adapter
+      OFAC_TEAM: team-alpha
+      # Site-host alias (same origin the browser sees): the adapter's tenant
+      # is derived from this URL's hostname, so the kernel's Providers:
+      # Mattermost:Tenant must read chat.localhost.
+      MATTERMOST_URL: http://chat.localhost:8065
+      MATTERMOST_BOT_TOKEN_FILE: /provision/mm-bot-token
+      OFAC_STATE_PATH: /var/lib/ofac/mm-adapter.sqlite3
+      PORT: "8066"
+    volumes:
+      - mm_provision:/provision:ro
+      - mm_adapter_state:/var/lib/ofac
+    ports:
+      - "127.0.0.1:8066:8066"
+    depends_on:
+      mattermost-init:
+        condition: service_completed_successfully
+      facilitator:
+        condition: service_healthy
+    # Enrollment is the adapter's first fetch; a still-migrating kernel must
+    # not kill the service permanently (healthy gate + bounded restart).
+    restart: on-failure:5
+
+  # Kernel provider wiring (Plan 22, decision 2): env-scoped to the full
+  # profile so the slim stack boots provider-less from the shared
+  # facilitator.json. The bot id is resolved lazily via /users/me with the
+  # provisioned PAT (provider-generated, unpinnable).
+  facilitator:
+    environment:
+      Providers__Mattermost__Enabled: "true"
+      Providers__Mattermost__EndpointId: mm-adapter
+      Providers__Mattermost__Tenant: chat.localhost
+      Providers__Mattermost__SiteUrl: http://mattermost:8065
+      Providers__Mattermost__BotTokenFile: /provision/mm-bot-token
+      Providers__Mattermost__AssignEndpointId: gw.team-alpha
+      Providers__Mattermost__AssignCapabilityId: research.analyze
+    volumes:
+      - mm_provision:/provision:ro
+    depends_on:
+      mattermost-init:
+        condition: service_completed_successfully
 
   kafka:
     image: apache/kafka:${KAFKA_TAG:?set in versions.env}
@@ -64,4 +148,8 @@ services:
 volumes:
   forgejo_data: {}
   mattermost_data: {}
+  # Bot-token handoff: mm-init (writer) → adapter + kernel (readers).
+  mm_provision: {}
+  # Adapter sqlite ledger (deliveries + post idempotency + replay cursor).
+  mm_adapter_state: {}
   ollama_models: {}

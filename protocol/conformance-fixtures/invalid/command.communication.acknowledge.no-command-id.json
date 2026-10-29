@@ -1,0 +1,18 @@
+{
+  "specversion": "1.0",
+  "id": "01JCOMM-ack-no-command-id",
+  "source": "urn:facilitator:instance:demo",
+  "type": "org.facilitator.command.communication.acknowledge.v1",
+  "subject": "provider/mattermost/post-789",
+  "time": "2026-10-29T09:00:02Z",
+  "datacontenttype": "application/json",
+  "dataschema": "https://schemas.openfacilitator.org/v1/command.communication.acknowledge.v1.json",
+  "data": {
+    "target": {
+      "provider": "mattermost",
+      "channelOrResourceId": "channel-123",
+      "conversationKind": "thread"
+    },
+    "idempotencyKey": "reaction:reaction-321:seen"
+  }
+}

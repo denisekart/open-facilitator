@@ -1,5 +1,6 @@
 using Facilitator.Kernel;
 using Facilitator.Kernel.Admin;
+using Facilitator.Kernel.Integrations;
 using Facilitator.Kernel.Link;
 using Facilitator.Kernel.Shared.Auth;
 using Facilitator.Kernel.Shared.Cli;
@@ -40,6 +41,7 @@ app.MapMemoryApi();
 app.MapLinkApi(app.Environment);
 app.MapIdentityApi();
 app.MapAdminApi();
+app.MapProviderIdentitiesApi();
 app.MapUiConfig(builder.Configuration);
 // Embedded operator SPA (spec §17): hashed assets + SPA fallback. Non-/api
 // paths ride past the role gate, so the static surface stays anonymous.

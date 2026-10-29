@@ -1,0 +1,31 @@
+{
+  "specversion": "1.0",
+  "id": "01JPROVIDER-mattermost-reaction",
+  "source": "urn:ofac:provider:mattermost:demo-team",
+  "type": "org.facilitator.event.provider.mattermost.reaction.v1",
+  "subject": "provider/mattermost/post-789",
+  "time": "2026-10-29T09:01:00Z",
+  "datacontenttype": "application/json",
+  "dataschema": "https://schemas.openfacilitator.org/v1/event.provider.mattermost.reaction.v1.json",
+  "data": {
+    "reference": {
+      "provider": "mattermost",
+      "providerInstanceId": "local-chat",
+      "tenantOrOrganizationId": "demo-team",
+      "channelOrResourceId": "channel-123",
+      "rootThreadId": "post-root-123",
+      "parentMessageId": "post-456",
+      "messageId": "post-789",
+      "conversationKind": "thread",
+      "authorProviderAccountId": "account-002"
+    },
+    "providerDeliveryId": "reaction-321",
+    "actorProviderAccountId": "account-002",
+    "emojiName": "thumbsup",
+    "payload": {
+      "user_id": "account-002",
+      "post_id": "post-789",
+      "emoji_name": "thumbsup"
+    }
+  }
+}

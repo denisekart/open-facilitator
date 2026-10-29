@@ -180,6 +180,58 @@ your adapter, and schema-validates your terminal event. Wire-level fixtures
 live in `protocol/conformance-fixtures/` (class `adapter`). The no-Docker
 walkthrough: `examples/slim/deterministic-research-worker/`.
 
+## Provider (communication) adapters
+
+A communication adapter is the other adapter kind: not a Gateway child, but
+a **link endpoint** (`role: child`, secret enrollment) that normalizes one
+provider's events into `org.facilitator.event.provider.<provider>.*` and
+executes `org.facilitator.command.communication.*` deliveries over the
+provider's API. Worked example: `@ofac/mattermost-adapter`
+(`src/adapters/communication/mattermost/`) — its README carries the config
+law; the seams that survive Plan 31's SDK extraction are `normalize` (pure
+classification), the provider client (interface = test seam), the transport
+listener, and the command handler.
+
+Authoring law, as the Mattermost adapter proves it:
+
+- **Inbound trust is the adapter's own credential, before normalize.**
+  Mattermost 11.11 webhooks carry no signing secret on the event-carrying
+  hook form, so inbound is the bot WebSocket (bot token) — no inbound port,
+  DMs work, thread context (`root_id`) survives. Whatever the transport,
+  authentication completes before a normalized event exists.
+- **Normalized events keep provider identity**: original ids, actor account
+  id, and the raw payload ride in `data`; the kernel's
+  `provider_events UNIQUE (provider, provider_delivery_id)` makes replay a
+  no-op. Identities the provider object doesn't carry (a Mattermost Reaction
+  has no `id` on 11.11) get a **synthesized stable composite** — never a
+  transport nonce.
+- **Outbound is idempotent per §13.3**: record the provider object id keyed
+  by the command's `idempotencyKey` in a durable ledger BEFORE answering the
+  receipt; replays answer `accepted` without touching the provider.
+- **Echo suppression is the kernel's judgment, the adapter's honesty**: the
+  bot publishes its own post back as a `message.v1` echo; the kernel records
+  the provider post id into `communication_bindings` and runs no arms.
+
+### Operation semantics (spec §13.5, as-built)
+
+|Command|Adapter behavior|Receipt|
+|---|---|---|
+|`communication.reply.v1`|`POST /posts` with `root_id` when the target names a thread|`accepted` + post id, ledgered|
+|`communication.react.v1`|`POST /reactions` as the bot; identity = `(user, post, emoji)` composite (11.11 objects carry no id)|`accepted` + composite, ledgered|
+|`communication.update.v1`|`PUT /posts/{id}` ONLY for a post the ledger proves this adapter created|`accepted` / `rejected` (foreign post)|
+|`communication.acknowledge.v1`|no-op (transport auto-ack covers delivery)|`accepted`, not ledgered|
+|`read` / `discover`|not advertised — an adapter declares only what it implements|`unsupported` by manifest absence|
+
+### Opt-in story
+
+Provider-less is the default: the kernel composes the provider arms only
+when a `providers:mattermost` options section (mounted `facilitator.json`
+or `Providers__Mattermost__*` env) is present with `enabled: true`; absent,
+provider-class events get typed `unsupported` receipts and zero routes or
+rows exist. The adapter is opt-in by existence — nothing enrolls it unless
+somebody runs the process. Adding a second provider (Forgejo, Plan 23)
+means a normalizer + arms on the same plane, not a new plane.
+
 ## Memory broker
 
 The kernel is a **broker, not a memory product**: it stores, indexes, and

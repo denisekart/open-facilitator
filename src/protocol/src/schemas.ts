@@ -21,6 +21,10 @@ import commandArtifactRequestUpload from "../schemas/command.artifact.request_up
 import commandArtifactConfirmUpload from "../schemas/command.artifact.confirm_upload.v1.json" with { type: "json" };
 import commandMemoryRetain from "../schemas/command.memory.retain.v1.json" with { type: "json" };
 import commandMemoryRecall from "../schemas/command.memory.recall.v1.json" with { type: "json" };
+import commandCommunicationReply from "../schemas/command.communication.reply.v1.json" with { type: "json" };
+import commandCommunicationReact from "../schemas/command.communication.react.v1.json" with { type: "json" };
+import commandCommunicationUpdate from "../schemas/command.communication.update.v1.json" with { type: "json" };
+import commandCommunicationAcknowledge from "../schemas/command.communication.acknowledge.v1.json" with { type: "json" };
 import eventWorkAccepted from "../schemas/event.work.accepted.v1.json" with { type: "json" };
 import eventWorkProgress from "../schemas/event.work.progress.v1.json" with { type: "json" };
 import eventWorkInputRequired from "../schemas/event.work.input_required.v1.json" with { type: "json" };
@@ -33,6 +37,9 @@ import eventApprovalDecided from "../schemas/event.approval.decided.v1.json" wit
 import eventApprovalRequired from "../schemas/event.approval.required.v1.json" with { type: "json" };
 import eventApprovalRevoked from "../schemas/event.approval.revoked.v1.json" with { type: "json" };
 import eventMemoryUsed from "../schemas/event.memory.used.v1.json" with { type: "json" };
+import eventProviderMattermostMention from "../schemas/event.provider.mattermost.mention.v1.json" with { type: "json" };
+import eventProviderMattermostReaction from "../schemas/event.provider.mattermost.reaction.v1.json" with { type: "json" };
+import eventProviderMattermostMessage from "../schemas/event.provider.mattermost.message.v1.json" with { type: "json" };
 import receiptV1 from "../schemas/receipt.v1.json" with { type: "json" };
 import controlV1 from "../schemas/control.v1.json" with { type: "json" };
 import resultManifestV1 from "../schemas/result-manifest.v1.json" with { type: "json" };
@@ -65,6 +72,10 @@ const all: JsonSchema[] = [
   commandArtifactConfirmUpload,
   commandMemoryRetain,
   commandMemoryRecall,
+  commandCommunicationReply,
+  commandCommunicationReact,
+  commandCommunicationUpdate,
+  commandCommunicationAcknowledge,
   eventWorkAccepted,
   eventWorkProgress,
   eventWorkInputRequired,
@@ -77,6 +88,9 @@ const all: JsonSchema[] = [
   eventApprovalRequired,
   eventApprovalRevoked,
   eventMemoryUsed,
+  eventProviderMattermostMention,
+  eventProviderMattermostReaction,
+  eventProviderMattermostMessage,
   receiptV1,
   controlV1,
   resultManifestV1,

@@ -720,6 +720,95 @@ public sealed class TestDbProbe : IAsyncDisposable
     /// <summary>One audit assertion row (typed window, no raw SQL in tests).</summary>
     public sealed record AuditRow(string? Actor, string Action, string Decision, string Reason, string Detail, string PolicyVersion, string EvidenceRef, string Resource);
 
+    // ---- Plan 22 provider plane -------------------------------------------------
+
+    /// <summary>provider_events rows for one delivery id (typed window).</summary>
+    public Task<long> ProviderEventCount(string provider, string deliveryId) =>
+        ScalarLong(
+            "SELECT count(*) FROM facilitator.provider_events WHERE provider = $1 AND provider_delivery_id = $2",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(provider);
+                cmd.Parameters.AddWithValue(deliveryId);
+            });
+
+    /// <summary>The verified_reference judgment stored for one delivery id.</summary>
+    public async Task<string?> ProviderEventJudgment(string deliveryId)
+    {
+        await using var connection = await _dataSource.OpenConnectionAsync();
+        await using var cmd = new NpgsqlCommand(
+            "SELECT coalesce(verified_reference, '') FROM facilitator.provider_events WHERE provider_delivery_id = $1",
+            connection);
+        cmd.Parameters.AddWithValue(deliveryId);
+        var value = await cmd.ExecuteScalarAsync();
+        return value as string is "" or null ? null : (string)value;
+    }
+
+    /// <summary>communication_bindings row for a conversation (Work id + parent ledger).</summary>
+    public async Task<(Guid? WorkId, string? ParentMessageId)> BindingFor(string channel, string root)
+    {
+        await using var connection = await _dataSource.OpenConnectionAsync();
+        await using var cmd = new NpgsqlCommand(
+            "SELECT coalesce(work_id::text, ''), coalesce(parent_message_id, '') "
+            + "FROM facilitator.communication_bindings WHERE provider = 'mattermost' AND channel = $1 AND root_message_id = $2",
+            connection);
+        cmd.Parameters.AddWithValue(channel);
+        cmd.Parameters.AddWithValue(root);
+        await using var reader = await cmd.ExecuteReaderAsync();
+        return await reader.ReadAsync()
+            ? (reader.GetString(0) is "" ? null : Guid.Parse(reader.GetString(0)), reader.GetString(1) is "" ? null : reader.GetString(1))
+            : (null, null);
+    }
+
+    /// <summary>The binding's Work id for a conversation (null row or null work ⇒ null).</summary>
+    public async Task<Guid?> BindingWorkId(string channel, string root) => (await BindingFor(channel, root)).WorkId;
+
+    /// <summary>provider_identities row for a (provider, tenant, account) triple.</summary>
+    public async Task<bool> ProviderIdentityExists(string provider, string tenant, string accountId) =>
+        await ScalarBool(
+            "SELECT count(*) FROM facilitator.provider_identities WHERE provider = $1 AND tenant = $2 AND account_id = $3",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(provider);
+                cmd.Parameters.AddWithValue(tenant);
+                cmd.Parameters.AddWithValue(accountId);
+            });
+
+    /// <summary>provider_link_challenges rows for one account (challenge provenance).</summary>
+    public Task<long> ProviderChallengeCount(string accountId) =>
+        ScalarLong("SELECT count(*) FROM facilitator.provider_link_challenges WHERE account_id = $1",
+            cmd => cmd.Parameters.AddWithValue(accountId));
+
+    /// <summary>The most recent challenge id for one account (confirmation-row assertion).</summary>
+    public async Task<string?> ProviderChallengeId(string accountId)
+    {
+        var rows = await TextList(
+            "SELECT challenge_id::text FROM facilitator.provider_link_challenges WHERE account_id = $1 ORDER BY created_at DESC LIMIT 1",
+            accountId);
+        return rows.Count == 0 ? null : rows[0];
+    }
+
+    /// <summary>Fence a challenge's expiry (expired-redemption seeding).</summary>
+    public Task SetChallengeExpiry(string accountId, bool expired) =>
+        NonQuery(
+            $"UPDATE facilitator.provider_link_challenges SET expires_at = {(expired ? "now() - interval '1 minute'" : "now() + interval '10 minutes'")} WHERE account_id = $1",
+            cmd => cmd.Parameters.AddWithValue(accountId));
+
+    /// <summary>Seed a linked provider identity directly (linked-mention tests without a full redeem flow).</summary>
+    public Task SeedProviderIdentity(string provider, string tenant, string accountId, string subject) =>
+        NonQuery(
+            "INSERT INTO facilitator.provider_identities "
+            + "(identity_id, provider, tenant, account_id, oidc_issuer, oidc_subject, created_at, updated_at) "
+            + "VALUES (gen_random_uuid(), $1, $2, $3, 'seed-issuer', $4, now(), now()) "
+            + "ON CONFLICT (provider, tenant, account_id) DO UPDATE SET oidc_subject = EXCLUDED.oidc_subject, updated_at = now()",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(provider);
+                cmd.Parameters.AddWithValue(tenant);
+                cmd.Parameters.AddWithValue(accountId);
+                cmd.Parameters.AddWithValue(subject);
+            });
+
     /// <inheritdoc />
     public async ValueTask DisposeAsync() => await _dataSource.DisposeAsync();
 

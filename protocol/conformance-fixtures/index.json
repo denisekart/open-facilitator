@@ -534,112 +534,112 @@
       "errorClass": "schema-violation"
     },
     {
-      "file": "valid/event.provider.mattermost.mention.json",
+      "file": "valid/event.provider.mention.json",
       "expect": "valid",
       "class": "event",
-      "type": "org.facilitator.event.provider.mattermost.mention.v1"
+      "type": "org.facilitator.event.provider.mention.v1"
     },
     {
-      "file": "valid/event.provider.mattermost.reaction.json",
+      "file": "valid/event.provider.reaction.json",
       "expect": "valid",
       "class": "event",
-      "type": "org.facilitator.event.provider.mattermost.reaction.v1"
+      "type": "org.facilitator.event.provider.reaction.v1"
     },
     {
-      "file": "valid/event.provider.mattermost.message.json",
+      "file": "valid/event.provider.message.json",
       "expect": "valid",
       "class": "event",
-      "type": "org.facilitator.event.provider.mattermost.message.v1"
+      "type": "org.facilitator.event.provider.message.v1"
     },
     {
-      "file": "valid/event.provider.forgejo.issue.opened.json",
+      "file": "valid/event.provider.issue.opened.json",
       "expect": "valid",
       "class": "event",
-      "type": "org.facilitator.event.provider.forgejo.issue.v1"
+      "type": "org.facilitator.event.provider.issue.v1"
     },
     {
-      "file": "valid/event.provider.forgejo.issue.labeled.json",
+      "file": "valid/event.provider.issue.labeled.json",
       "expect": "valid",
       "class": "event",
-      "type": "org.facilitator.event.provider.forgejo.issue.v1"
+      "type": "org.facilitator.event.provider.issue.v1"
     },
     {
-      "file": "valid/event.provider.forgejo.issue.commented.json",
+      "file": "valid/event.provider.issue.commented.json",
       "expect": "valid",
       "class": "event",
-      "type": "org.facilitator.event.provider.forgejo.issue.v1"
+      "type": "org.facilitator.event.provider.issue.v1"
     },
     {
-      "file": "valid/event.provider.forgejo.issue.closed.json",
+      "file": "valid/event.provider.issue.closed.json",
       "expect": "valid",
       "class": "event",
-      "type": "org.facilitator.event.provider.forgejo.issue.v1"
+      "type": "org.facilitator.event.provider.issue.v1"
     },
     {
-      "file": "valid/event.provider.forgejo.pull_request.opened.json",
+      "file": "valid/event.provider.change_request.opened.json",
       "expect": "valid",
       "class": "event",
-      "type": "org.facilitator.event.provider.forgejo.pull_request.v1"
+      "type": "org.facilitator.event.provider.change_request.v1"
     },
     {
-      "file": "valid/event.provider.forgejo.pull_request.synchronized.json",
+      "file": "valid/event.provider.change_request.synchronized.json",
       "expect": "valid",
       "class": "event",
-      "type": "org.facilitator.event.provider.forgejo.pull_request.v1"
+      "type": "org.facilitator.event.provider.change_request.v1"
     },
     {
-      "file": "valid/event.provider.forgejo.pull_request.reopened.json",
+      "file": "valid/event.provider.change_request.reopened.json",
       "expect": "valid",
       "class": "event",
-      "type": "org.facilitator.event.provider.forgejo.pull_request.v1"
+      "type": "org.facilitator.event.provider.change_request.v1"
     },
     {
-      "file": "valid/event.provider.forgejo.pull_request.reviewed.json",
+      "file": "valid/event.provider.change_request.reviewed.json",
       "expect": "valid",
       "class": "event",
-      "type": "org.facilitator.event.provider.forgejo.pull_request.v1"
+      "type": "org.facilitator.event.provider.change_request.v1"
     },
     {
-      "file": "valid/event.provider.forgejo.pull_request.commented.json",
+      "file": "valid/event.provider.change_request.commented.json",
       "expect": "valid",
       "class": "event",
-      "type": "org.facilitator.event.provider.forgejo.pull_request.v1"
+      "type": "org.facilitator.event.provider.change_request.v1"
     },
     {
-      "file": "valid/event.provider.forgejo.pull_request.merged.json",
+      "file": "valid/event.provider.change_request.merged.json",
       "expect": "valid",
       "class": "event",
-      "type": "org.facilitator.event.provider.forgejo.pull_request.v1"
+      "type": "org.facilitator.event.provider.change_request.v1"
     },
     {
-      "file": "valid/event.provider.forgejo.pull_request.closed.json",
+      "file": "valid/event.provider.change_request.closed.json",
       "expect": "valid",
       "class": "event",
-      "type": "org.facilitator.event.provider.forgejo.pull_request.v1"
+      "type": "org.facilitator.event.provider.change_request.v1"
     },
     {
-      "file": "valid/event.provider.forgejo.ci.pending.json",
+      "file": "valid/event.provider.pipeline.pending.json",
       "expect": "valid",
       "class": "event",
-      "type": "org.facilitator.event.provider.forgejo.ci.v1"
+      "type": "org.facilitator.event.provider.pipeline.v1"
     },
     {
-      "file": "valid/event.provider.forgejo.ci.success.json",
+      "file": "valid/event.provider.pipeline.success.json",
       "expect": "valid",
       "class": "event",
-      "type": "org.facilitator.event.provider.forgejo.ci.v1"
+      "type": "org.facilitator.event.provider.pipeline.v1"
     },
     {
-      "file": "valid/event.provider.forgejo.ci.failure.json",
+      "file": "valid/event.provider.pipeline.failure.json",
       "expect": "valid",
       "class": "event",
-      "type": "org.facilitator.event.provider.forgejo.ci.v1"
+      "type": "org.facilitator.event.provider.pipeline.v1"
     },
     {
-      "file": "valid/event.provider.forgejo.ci.error.json",
+      "file": "valid/event.provider.pipeline.error.json",
       "expect": "valid",
       "class": "event",
-      "type": "org.facilitator.event.provider.forgejo.ci.v1"
+      "type": "org.facilitator.event.provider.pipeline.v1"
     },
     {
       "file": "valid/command.communication.reply.json",
@@ -684,55 +684,61 @@
       "errorClass": "schema-violation"
     },
     {
-      "file": "invalid/event.provider.forgejo.issue.no-delivery-id.json",
+      "file": "invalid/event.provider.issue.no-delivery-id.json",
       "expect": "invalid",
       "class": "event",
       "errorClass": "schema-violation"
     },
     {
-      "file": "invalid/event.provider.forgejo.issue.bad-action.json",
+      "file": "invalid/event.provider.issue.bad-action.json",
       "expect": "invalid",
       "class": "event",
       "errorClass": "schema-violation"
     },
     {
-      "file": "invalid/event.provider.forgejo.issue.no-author.json",
+      "file": "invalid/event.provider.issue.no-author.json",
       "expect": "invalid",
       "class": "event",
       "errorClass": "schema-violation"
     },
     {
-      "file": "invalid/event.provider.forgejo.pull_request.no-delivery-id.json",
+      "file": "invalid/event.provider.issue.no-provider.json",
       "expect": "invalid",
       "class": "event",
       "errorClass": "schema-violation"
     },
     {
-      "file": "invalid/event.provider.forgejo.pull_request.bad-action.json",
+      "file": "invalid/event.provider.change_request.no-delivery-id.json",
       "expect": "invalid",
       "class": "event",
       "errorClass": "schema-violation"
     },
     {
-      "file": "invalid/event.provider.forgejo.pull_request.no-author.json",
+      "file": "invalid/event.provider.change_request.bad-action.json",
       "expect": "invalid",
       "class": "event",
       "errorClass": "schema-violation"
     },
     {
-      "file": "invalid/event.provider.forgejo.ci.no-delivery-id.json",
+      "file": "invalid/event.provider.change_request.no-author.json",
       "expect": "invalid",
       "class": "event",
       "errorClass": "schema-violation"
     },
     {
-      "file": "invalid/event.provider.forgejo.ci.bad-action.json",
+      "file": "invalid/event.provider.pipeline.no-delivery-id.json",
       "expect": "invalid",
       "class": "event",
       "errorClass": "schema-violation"
     },
     {
-      "file": "invalid/event.provider.forgejo.ci.no-author.json",
+      "file": "invalid/event.provider.pipeline.bad-action.json",
+      "expect": "invalid",
+      "class": "event",
+      "errorClass": "schema-violation"
+    },
+    {
+      "file": "invalid/event.provider.pipeline.no-author.json",
       "expect": "invalid",
       "class": "event",
       "errorClass": "schema-violation"

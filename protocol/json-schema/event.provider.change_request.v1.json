@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openfacilitator.org/v1/event.provider.change_request.v1.json",
+  "title": "ProviderChangeRequestEventV1Data",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "reference",
+    "provider",
+    "providerDeliveryId",
+    "actorProviderAccountId",
+    "action"
+  ],
+  "properties": {
+    "reference": {
+      "$ref": "common.v1.json#/$defs/conversationReference"
+    },
+    "provider": {
+      "$ref": "common.v1.json#/$defs/idToken",
+      "description": "Provider token owning this event; MUST equal reference.provider."
+    },
+    "providerDeliveryId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "actorProviderAccountId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "action": {
+      "type": "string",
+      "enum": [
+        "opened",
+        "synchronized",
+        "reopened",
+        "reviewed",
+        "commented",
+        "merged",
+        "closed"
+      ]
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 8192,
+      "description": "Review/comment body excerpt (for action=reviewed|commented)."
+    },
+    "payload": {
+      "type": "object",
+      "description": "Verbatim provider event payload as received by the adapter.",
+      "additionalProperties": true
+    }
+  }
+}

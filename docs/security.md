@@ -117,10 +117,12 @@ block (`IdentityStartupCheck`, fail closed in every environment).
 
 Provider events ride the **link plane**: the adapter authenticates with its
 `linkToken` like any link endpoint, and the `AdmissionGate` provider arm
-admits `org.facilitator.event.provider.*` only when the feature is enabled
-and the envelope's source tenant matches the configured provider tenant —
-disabled or mismatched ⇒ typed `unsupported` receipt + failed audit row,
-never silent acceptance. Provider-specific rules:
+admits a central provider domain type
+(`org.facilitator.event.provider.<domain>.v1`) only when a
+`Providers:<provider>` section is enabled, the envelope's `data.provider`
+names it, `reference.provider` matches, and the sending link endpoint is the
+section's `EndpointId` — otherwise typed `unsupported` refusal + failed
+audit row, never silent acceptance. Provider-specific rules:
 
 - **Authentication before normalize.** The transport trust (Mattermost: the
   bot WebSocket credential — 11.11 webhooks sign nothing on the
@@ -133,7 +135,7 @@ never silent acceptance. Provider-specific rules:
   The adapter comments as the bot so provider echo is recognizable, and it
   holds no forge-credential authority beyond replies: issue reads, branch
   pushes, and PR creates are connector ops — a Gateway child whose
-  `forgejo.pr.create` class is confirm-held by team policy, so every
+  `vcs.change_request.create` class is confirm-held by team policy, so every
   privileged write rides the approval flow with actor evidence.
 - **Duplicate = the delivery id.** `(provider, provider_delivery_id)` is
   unique; synthesized ids (e.g. the reaction `(user, post, emoji)`

@@ -80,9 +80,9 @@ describe("parseConnectorConfig", () => {
   it("flags gate the manifest; no flags at all is a config-level nothing-to-advertise", () => {
     const manifest = connectorManifest("team-alpha", { issues: true, vcs: false, ci: true });
     expect(manifest.capabilities.map((c) => c.id)).toEqual([
-      "forgejo.issue.read",
-      "forgejo.issue.comment",
-      "forgejo.ci.trigger",
+      "vcs.issue.read",
+      "vcs.issue.comment",
+      "vcs.pipeline.trigger",
     ]);
     expect(() => connectorManifest("team-alpha", { issues: false, vcs: false, ci: false })).toThrow(
       /no op domain enabled/,

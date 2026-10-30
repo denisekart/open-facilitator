@@ -1,7 +1,7 @@
 // @ofac/forgejo-adapter — the inbound forge provider module (Plan 23 step 3):
 // a link-plane endpoint (enroll → capabilities → SignalR) fronted by an HMAC
-// webhook receiver. Inbound forge webhooks normalize to
-// org.facilitator.event.provider.forgejo.{issue,pull_request,ci}.v1; outbound
+// webhook receiver. Inbound forge webhooks normalize to the central forge
+// domain events (data.provider = "forgejo"); outbound
 // command.communication.reply.v1 executes as a bot-identity comment under the
 // comment-ledger idempotency law (decision 4). Stateless apart from the
 // SQLite comment ledger — deployable next to the kernel or anywhere the forge

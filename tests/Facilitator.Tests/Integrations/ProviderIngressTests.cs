@@ -40,7 +40,7 @@ public sealed class ProviderIngressTests(PostgresFixture fixture) : IDisposable
         var link = factory.CreateLinkClient(await LinkTestHarness.EnrollAsync(factory.CreateAuthedClient(), "gw-disabled"));
 
         var delivery = "post-" + Guid.NewGuid().ToString("N");
-        var envelope = ProviderEvent("valid/event.provider.mattermost.mention.json", delivery, "chan-x", "root-x", "acct-x", text: "hello");
+        var envelope = ProviderEvent("valid/event.provider.mention.json", delivery, "chan-x", "root-x", "acct-x", text: "hello");
         using var response = await link.PostAsync("/api/link/v1/events",
             new StringContent(envelope, Encoding.UTF8, "application/json"));
 
@@ -63,7 +63,7 @@ public sealed class ProviderIngressTests(PostgresFixture fixture) : IDisposable
         var text = "summarize the retention alternatives";
 
         var first = await link.PostAsync("/api/link/v1/events", Content(ProviderEvent(
-            "valid/event.provider.mattermost.mention.json", delivery, channel, root, "acct-1", text: text)));
+            "valid/event.provider.mention.json", delivery, channel, root, "acct-1", text: text)));
         Assert.Equal(HttpStatusCode.Accepted, first.StatusCode);
         var receipt = await first.Content.ReadJsonAsync();
         Assert.Equal("accepted", receipt.GetProperty("status").GetString());
@@ -83,7 +83,7 @@ public sealed class ProviderIngressTests(PostgresFixture fixture) : IDisposable
 
         // Redelivery: duplicate, saved judgment, zero new arm effects.
         var second = await link.PostAsync("/api/link/v1/events", Content(ProviderEvent(
-            "valid/event.provider.mattermost.mention.json", delivery, channel, root, "acct-1", text: text)));
+            "valid/event.provider.mention.json", delivery, channel, root, "acct-1", text: text)));
         Assert.Equal(HttpStatusCode.OK, second.StatusCode);
         var dup = await second.Content.ReadJsonAsync();
         Assert.Equal("duplicate", dup.GetProperty("status").GetString());
@@ -101,7 +101,7 @@ public sealed class ProviderIngressTests(PostgresFixture fixture) : IDisposable
         var delivery = $"post-{Guid.NewGuid():N}";
 
         using var response = await link.PostAsync("/api/link/v1/events", Content(ProviderEvent(
-            "valid/event.provider.mattermost.mention.json", delivery, channel, root, "acct-unlinked", text: "do the thing")));
+            "valid/event.provider.mention.json", delivery, channel, root, "acct-unlinked", text: "do the thing")));
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
 
         var reply = await fixture.Db.OutboxEnvelopeByCommand($"mention:{delivery}:unlinked");
@@ -121,7 +121,7 @@ public sealed class ProviderIngressTests(PostgresFixture fixture) : IDisposable
         var delivery = "post-" + Guid.NewGuid().ToString("N");
 
         using var minted = await link.PostAsync("/api/link/v1/events", Content(ProviderEvent(
-            "valid/event.provider.mattermost.mention.json", delivery, channel, root, account, text: "/link")));
+            "valid/event.provider.mention.json", delivery, channel, root, account, text: "/link")));
         Assert.Equal(HttpStatusCode.Accepted, minted.StatusCode);
         Assert.Equal(1, await fixture.Db.ProviderChallengeCount(account));
         Assert.Null(await fixture.Db.BindingWorkId(channel, root));
@@ -148,7 +148,7 @@ public sealed class ProviderIngressTests(PostgresFixture fixture) : IDisposable
 
         var expiredDelivery = "post-" + Guid.NewGuid().ToString("N");
         await link.PostAsync("/api/link/v1/events", Content(ProviderEvent(
-            "valid/event.provider.mattermost.mention.json", expiredDelivery, channel, root, account, text: "/link")));
+            "valid/event.provider.mention.json", expiredDelivery, channel, root, account, text: "/link")));
         await fixture.Db.SetChallengeExpiry(account, expired: true);
         var expiredCode = Regex.Match((await fixture.Db.OutboxEnvelopeByCommand($"link:{expiredDelivery}:dm"))!,
             @"link code: ([A-Z2-9]{6})").Groups[1].Value;
@@ -168,7 +168,7 @@ public sealed class ProviderIngressTests(PostgresFixture fixture) : IDisposable
         var delivery = "post-" + Guid.NewGuid().ToString("N");
 
         using var minted = await link.PostAsync("/api/link/v1/events", Content(ProviderEvent(
-            "valid/event.provider.mattermost.message.json", delivery, dmChannel, dmChannel, account, text: "/link")));
+            "valid/event.provider.message.json", delivery, dmChannel, dmChannel, account, text: "/link")));
         Assert.Equal(HttpStatusCode.Accepted, minted.StatusCode);
         Assert.Equal(1, await fixture.Db.ProviderChallengeCount(account));
         var dm = await fixture.Db.OutboxEnvelopeByCommand($"link:{delivery}:dm");
@@ -185,12 +185,12 @@ public sealed class ProviderIngressTests(PostgresFixture fixture) : IDisposable
         var channel = $"chan-{Guid.NewGuid():N}";
         var root = $"root-{Guid.NewGuid():N}";
         await link.PostAsync("/api/link/v1/events", Content(ProviderEvent(
-            "valid/event.provider.mattermost.mention.json", $"post-{Guid.NewGuid():N}", channel, root, "acct-1", text: "bind this thread")));
+            "valid/event.provider.mention.json", $"post-{Guid.NewGuid():N}", channel, root, "acct-1", text: "bind this thread")));
         var workId = await BoundWork(channel, root);
 
         var reaction = "post-" + Guid.NewGuid().ToString("N");
         using var response = await link.PostAsync("/api/link/v1/events", Content(ProviderEvent(
-            "valid/event.provider.mattermost.reaction.json", reaction, channel, root, "acct-1", emoji: "thumbsup")));
+            "valid/event.provider.reaction.json", reaction, channel, root, "acct-1", emoji: "thumbsup")));
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
 
         Assert.Equal(1, await fixture.Db.TimelineEventCount(workId, "provider.reaction"));
@@ -213,12 +213,12 @@ public sealed class ProviderIngressTests(PostgresFixture fixture) : IDisposable
         var channel = $"chan-{Guid.NewGuid():N}";
         var root = $"root-{Guid.NewGuid():N}";
         await link.PostAsync("/api/link/v1/events", Content(ProviderEvent(
-            "valid/event.provider.mattermost.mention.json", $"post-{Guid.NewGuid():N}", channel, root, "acct-1", text: "bind me")));
+            "valid/event.provider.mention.json", $"post-{Guid.NewGuid():N}", channel, root, "acct-1", text: "bind me")));
         var workId = await BoundWork(channel, root);
 
         var botPost = "post-" + Guid.NewGuid().ToString("N");
         using var response = await link.PostAsync("/api/link/v1/events", Content(ProviderEvent(
-            "valid/event.provider.mattermost.message.json", botPost, channel, root, bot)));
+            "valid/event.provider.message.json", botPost, channel, root, bot)));
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
         var receipt = await response.Content.ReadJsonAsync();
         Assert.Equal("echo:post-ledger", receipt.GetProperty("data").GetProperty("judgment").GetString());
@@ -241,7 +241,7 @@ public sealed class ProviderIngressTests(PostgresFixture fixture) : IDisposable
         var channel = $"chan-{Guid.NewGuid():N}";
         var root = $"root-{Guid.NewGuid():N}";
         await link.PostAsync("/api/link/v1/events", Content(ProviderEvent(
-            "valid/event.provider.mattermost.mention.json", $"post-{Guid.NewGuid():N}", channel, root, "acct-1", text: "wind down")));
+            "valid/event.provider.mention.json", $"post-{Guid.NewGuid():N}", channel, root, "acct-1", text: "wind down")));
         var workId = await BoundWork(channel, root);
 
         await KernelOps.TransitionAsync(factory.CreateAuthedClient(), workId, "planning", 1);
@@ -264,7 +264,7 @@ public sealed class ProviderIngressTests(PostgresFixture fixture) : IDisposable
         var channel = $"chan-{Guid.NewGuid():N}";
         var root = $"root-{Guid.NewGuid():N}";
         await link.PostAsync("/api/link/v1/events", Content(ProviderEvent(
-            "valid/event.provider.mattermost.mention.json", $"post-{Guid.NewGuid():N}", channel, root, "acct-1", text: "routed work")));
+            "valid/event.provider.mention.json", $"post-{Guid.NewGuid():N}", channel, root, "acct-1", text: "routed work")));
         var workId = await BoundWork(channel, root);
 
         var envelope = await fixture.Db.OutboxEnvelopeByCommand($"work-assign:{workId}");
@@ -293,6 +293,7 @@ public sealed class ProviderIngressTests(PostgresFixture fixture) : IDisposable
             ["Providers:Mattermost:EndpointId"] = endpoint,
             ["Providers:Mattermost:Tenant"] = tenant,
             ["Providers:Mattermost:SiteUrl"] = "http://mattermost:8065",
+            ["Providers:Mattermost:LinkHintText"] = "Your Mattermost account is not linked to a Facilitator identity — send me a DM starting with /link to link it.",
         };
         if (botUserId is not null)
         {

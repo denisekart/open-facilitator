@@ -2,11 +2,11 @@
   "specversion": "1.0",
   "id": "01JPROVIDER-mattermost-reaction-badkind",
   "source": "urn:ofac:provider:mattermost:demo-team",
-  "type": "org.facilitator.event.provider.mattermost.reaction.v1",
+  "type": "org.facilitator.event.provider.reaction.v1",
   "subject": "provider/mattermost/post-789",
   "time": "2026-10-29T09:01:00Z",
   "datacontenttype": "application/json",
-  "dataschema": "https://schemas.openfacilitator.org/v1/event.provider.mattermost.reaction.v1.json",
+  "dataschema": "https://schemas.openfacilitator.org/v1/event.provider.reaction.v1.json",
   "data": {
     "reference": {
       "provider": "mattermost",
@@ -16,6 +16,7 @@
       "conversationKind": "forum",
       "authorProviderAccountId": "account-002"
     },
+    "provider": "mattermost",
     "providerDeliveryId": "reaction-321",
     "actorProviderAccountId": "account-002",
     "emojiName": "thumbsup"

@@ -29,16 +29,15 @@ import {
 } from "./fixtures/payloads.js";
 
 import type {
-  ProviderForgejoCiEventV1Data,
-  ProviderForgejoIssueEventV1Data,
-  ProviderForgejoPullRequestEventV1Data,
+  ProviderPipelineEventV1Data,
+  ProviderIssueEventV1Data,
+  ProviderChangeRequestEventV1Data,
 } from "@ofac/protocol";
 
-const issue = (data: unknown): ProviderForgejoIssueEventV1Data =>
-  data as ProviderForgejoIssueEventV1Data;
-const pr = (data: unknown): ProviderForgejoPullRequestEventV1Data =>
-  data as ProviderForgejoPullRequestEventV1Data;
-const ci = (data: unknown): ProviderForgejoCiEventV1Data => data as ProviderForgejoCiEventV1Data;
+const issue = (data: unknown): ProviderIssueEventV1Data => data as ProviderIssueEventV1Data;
+const pr = (data: unknown): ProviderChangeRequestEventV1Data =>
+  data as ProviderChangeRequestEventV1Data;
+const ci = (data: unknown): ProviderPipelineEventV1Data => data as ProviderPipelineEventV1Data;
 
 const ctx: NormalizeContext = {
   providerInstanceId: "local-git",

@@ -1,0 +1,33 @@
+{
+  "specversion": "1.0",
+  "id": "01JPROVIDER-mattermost-mention",
+  "source": "urn:ofac:provider:mattermost:demo-team",
+  "type": "org.facilitator.event.provider.mention.v1",
+  "subject": "provider/mattermost/post-789",
+  "time": "2026-10-29T09:00:00Z",
+  "datacontenttype": "application/json",
+  "dataschema": "https://schemas.openfacilitator.org/v1/event.provider.mention.v1.json",
+  "data": {
+    "reference": {
+      "provider": "mattermost",
+      "providerInstanceId": "local-chat",
+      "tenantOrOrganizationId": "demo-team",
+      "channelOrResourceId": "channel-123",
+      "rootThreadId": "post-root-123",
+      "parentMessageId": "post-456",
+      "messageId": "post-789",
+      "conversationKind": "thread",
+      "authorProviderAccountId": "account-001"
+    },
+    "provider": "mattermost",
+    "providerDeliveryId": "post-789",
+    "actorProviderAccountId": "account-001",
+    "text": "@facilitator Implement the validation change in issue WORK-123.",
+    "payload": {
+      "id": "post-789",
+      "root_id": "post-root-123",
+      "user_id": "account-001",
+      "channel_id": "channel-123"
+    }
+  }
+}

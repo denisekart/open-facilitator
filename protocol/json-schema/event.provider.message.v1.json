@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openfacilitator.org/v1/event.provider.message.v1.json",
+  "title": "ProviderMessageEventV1Data",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "reference",
+    "provider",
+    "providerDeliveryId",
+    "actorProviderAccountId",
+    "text"
+  ],
+  "properties": {
+    "reference": {
+      "$ref": "common.v1.json#/$defs/conversationReference"
+    },
+    "provider": {
+      "$ref": "common.v1.json#/$defs/idToken",
+      "description": "Provider token owning this event; MUST equal reference.provider."
+    },
+    "providerDeliveryId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "actorProviderAccountId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 8192
+    },
+    "payload": {
+      "type": "object",
+      "description": "Verbatim provider event payload as received by the adapter.",
+      "additionalProperties": true
+    }
+  }
+}

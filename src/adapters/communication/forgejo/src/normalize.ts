@@ -7,25 +7,27 @@
 //                                     as fresh Work input)
 //   issues opened|labeled|closed    → issue.v1 (workTrigger = labels ∩ config)
 //   issue_comment on an issue       → issue.v1 action "commented"
-//   issue_comment on a PR           → pull_request.v1 action "commented"
-//   pull_request (mapped actions)   → pull_request.v1 (closed+merged ⇒ merged)
-//   review / pull_request_review    → pull_request.v1 action "reviewed"
-//   status                          → ci.v1 (number resolved by the caller:
-//                                     the sha→PR lookup is I/O, so it rides in
-//                                     as a parameter; undefined ⇒ dropped)
+//   issue_comment on a PR           → change_request.v1 action "commented"
+//   pull_request (mapped actions)   → change_request.v1 (closed+merged ⇒ merged)
+//   review / pull_request_review    → change_request.v1 action "reviewed"
+//   status                          → pipeline.v1 (number resolved by the
+//                                     caller: the sha→PR lookup is I/O, so it
+//                                     rides in as a parameter; undefined ⇒ dropped)
 //   anything else                   → dropped
 //
 // The label policy lives HERE (decision 3): the kernel only reads workTrigger.
 import type {
   ConversationReference,
-  ProviderForgejoCiEventV1Data,
-  ProviderForgejoIssueEventV1Data,
-  ProviderForgejoPullRequestEventV1Data,
+  ProviderPipelineEventV1Data,
+  ProviderIssueEventV1Data,
+  ProviderChangeRequestEventV1Data,
 } from "@ofac/protocol";
 
-export const ISSUE_EVENT = "org.facilitator.event.provider.forgejo.issue.v1";
-export const PULL_REQUEST_EVENT = "org.facilitator.event.provider.forgejo.pull_request.v1";
-export const CI_EVENT = "org.facilitator.event.provider.forgejo.ci.v1";
+// Forge-domain vocabulary: the type names the PURPOSE; this adapter IS the
+// Forgejo→purpose mapping layer, so the provider token is in-package data.
+export const ISSUE_EVENT = "org.facilitator.event.provider.issue.v1";
+export const PULL_REQUEST_EVENT = "org.facilitator.event.provider.change_request.v1";
+export const CI_EVENT = "org.facilitator.event.provider.pipeline.v1";
 
 export type Payload = Record<string, unknown>;
 
@@ -40,10 +42,7 @@ export interface NormalizeContext {
 
 export interface NormalizedEvent {
   type: string;
-  data:
-    | ProviderForgejoIssueEventV1Data
-    | ProviderForgejoPullRequestEventV1Data
-    | ProviderForgejoCiEventV1Data;
+  data: ProviderIssueEventV1Data | ProviderChangeRequestEventV1Data | ProviderPipelineEventV1Data;
 }
 
 function str(value: unknown): string | undefined {
@@ -128,8 +127,9 @@ export function normalizeIssues(
   const label = str(obj(payload["label"])?.["name"]);
   const labels = label === undefined ? labelsOf(issue) : [label, ...labelsOf(issue)];
   const body = str(issue?.["body"]);
-  const data: ProviderForgejoIssueEventV1Data = {
+  const data: ProviderIssueEventV1Data = {
     reference: reference(ctx, repo, number, author),
+    provider: "forgejo",
     providerDeliveryId: deliveryId,
     actorProviderAccountId: author,
     action,
@@ -159,8 +159,9 @@ export function normalizeIssueComment(
   const messageId = id(comment["id"]);
   const onPr = obj(issue?.["pull_request"]) !== undefined;
   if (onPr) {
-    const data: ProviderForgejoPullRequestEventV1Data = {
+    const data: ProviderChangeRequestEventV1Data = {
       reference: reference(ctx, repo, number, author, messageId),
+      provider: "forgejo",
       providerDeliveryId: deliveryId,
       actorProviderAccountId: author,
       action: "commented",
@@ -170,8 +171,9 @@ export function normalizeIssueComment(
     return { type: PULL_REQUEST_EVENT, data };
   }
 
-  const data: ProviderForgejoIssueEventV1Data = {
+  const data: ProviderIssueEventV1Data = {
     reference: reference(ctx, repo, number, author, messageId),
+    provider: "forgejo",
     providerDeliveryId: deliveryId,
     actorProviderAccountId: author,
     action: "commented",
@@ -182,7 +184,7 @@ export function normalizeIssueComment(
   return { type: ISSUE_EVENT, data };
 }
 
-const PR_ACTIONS: Record<string, ProviderForgejoPullRequestEventV1Data["action"]> = {
+const PR_ACTIONS: Record<string, ProviderChangeRequestEventV1Data["action"]> = {
   opened: "opened",
   synchronized: "synchronized",
   reopened: "reopened",
@@ -211,8 +213,9 @@ export function normalizePullRequest(
   if (repo === undefined || number === "") return null;
   const author = str(obj(payload["sender"])?.["login"]) ?? "";
   const text = str(obj(payload["review"])?.["body"]) ?? str(pr?.["body"]);
-  const data: ProviderForgejoPullRequestEventV1Data = {
+  const data: ProviderChangeRequestEventV1Data = {
     reference: reference(ctx, repo, number, author),
+    provider: "forgejo",
     providerDeliveryId: deliveryId,
     actorProviderAccountId: author,
     action,
@@ -237,8 +240,9 @@ export function normalizeReview(
   if (repo === undefined || number === "") return null;
   const author = str(obj(payload["sender"])?.["login"]) ?? "";
   const text = str(review?.["body"]);
-  const data: ProviderForgejoPullRequestEventV1Data = {
+  const data: ProviderChangeRequestEventV1Data = {
     reference: reference(ctx, repo, number, author),
+    provider: "forgejo",
     providerDeliveryId: deliveryId,
     actorProviderAccountId: author,
     action: "reviewed",
@@ -277,11 +281,12 @@ export function normalizeStatus(
 
   const author = str(obj(payload["sender"])?.["login"]) ?? str(payload["commit_branch"]) ?? "ci";
   const description = str(payload["description"]);
-  const data: ProviderForgejoCiEventV1Data = {
+  const data: ProviderPipelineEventV1Data = {
     reference: reference(ctx, repo, number, author),
+    provider: "forgejo",
     providerDeliveryId: deliveryId,
     actorProviderAccountId: author,
-    action: action as ProviderForgejoCiEventV1Data["action"],
+    action: action as ProviderPipelineEventV1Data["action"],
     ...(description === undefined ? {} : { description }),
     payload,
   };

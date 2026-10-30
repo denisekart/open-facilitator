@@ -489,28 +489,27 @@ export interface MemoryUsedEventV1Data {
   memoryId: string;
 }
 
-export interface ProviderForgejoCiEventV1Data {
-  /**
-   * Commit-status state (Forgejo `status` webhook event).
-   */
-  action: ProviderForgejoCiEventV1DataAction;
+export interface ProviderChangeRequestEventV1Data {
+  action: ProviderChangeRequestEventV1DataAction;
   actorProviderAccountId: string;
-  /**
-   * Commit-status description verbatim.
-   */
-  description?: string;
   /**
    * Verbatim provider event payload as received by the adapter.
    */
   payload?: { [key: string]: unknown };
+  /**
+   * Provider token owning this event; MUST equal reference.provider.
+   */
+  provider: string;
   providerDeliveryId: string;
   reference: ConversationReference;
+  /**
+   * Review/comment body excerpt (for action=reviewed|commented).
+   */
+  text?: string;
 }
 
-/**
- * Commit-status state (Forgejo `status` webhook event).
- */
-export type ProviderForgejoCiEventV1DataAction = "pending" | "success" | "failure" | "error";
+export type ProviderChangeRequestEventV1DataAction =
+  "opened" | "synchronized" | "reopened" | "reviewed" | "commented" | "merged" | "closed";
 
 export interface ConversationReference {
   authorProviderAccountId: string;
@@ -525,13 +524,17 @@ export interface ConversationReference {
   tenantOrOrganizationId: string;
 }
 
-export interface ProviderForgejoIssueEventV1Data {
-  action: ProviderForgejoIssueEventV1DataAction;
+export interface ProviderIssueEventV1Data {
+  action: ProviderIssueEventV1DataAction;
   actorProviderAccountId: string;
   /**
    * Verbatim provider event payload as received by the adapter.
    */
   payload?: { [key: string]: unknown };
+  /**
+   * Provider token owning this event; MUST equal reference.provider.
+   */
+  provider: string;
   providerDeliveryId: string;
   reference: ConversationReference;
   /**
@@ -545,55 +548,76 @@ export interface ProviderForgejoIssueEventV1Data {
   workTrigger: boolean;
 }
 
-export type ProviderForgejoIssueEventV1DataAction = "opened" | "labeled" | "commented" | "closed";
+export type ProviderIssueEventV1DataAction = "opened" | "labeled" | "commented" | "closed";
 
-export interface ProviderForgejoPullRequestEventV1Data {
-  action: ProviderForgejoPullRequestEventV1DataAction;
+export interface ProviderMentionEventV1Data {
   actorProviderAccountId: string;
   /**
    * Verbatim provider event payload as received by the adapter.
    */
   payload?: { [key: string]: unknown };
-  providerDeliveryId: string;
-  reference: ConversationReference;
   /**
-   * Review/comment body excerpt (for action=reviewed|commented).
+   * Provider token owning this event; MUST equal reference.provider.
    */
-  text?: string;
-}
-
-export type ProviderForgejoPullRequestEventV1DataAction =
-  "opened" | "synchronized" | "reopened" | "reviewed" | "commented" | "merged" | "closed";
-
-export interface ProviderMattermostMentionEventV1Data {
-  actorProviderAccountId: string;
-  /**
-   * Verbatim provider event payload as received by the adapter.
-   */
-  payload?: { [key: string]: unknown };
+  provider: string;
   providerDeliveryId: string;
   reference: ConversationReference;
   text: string;
 }
 
-export interface ProviderMattermostMessageEventV1Data {
+export interface ProviderMessageEventV1Data {
   actorProviderAccountId: string;
   /**
    * Verbatim provider event payload as received by the adapter.
    */
   payload?: { [key: string]: unknown };
+  /**
+   * Provider token owning this event; MUST equal reference.provider.
+   */
+  provider: string;
   providerDeliveryId: string;
   reference: ConversationReference;
   text: string;
 }
 
-export interface ProviderMattermostReactionEventV1Data {
+export interface ProviderPipelineEventV1Data {
+  /**
+   * Pipeline/commit-status verdict as normalized by the adapter.
+   */
+  action: ProviderPipelineEventV1DataAction;
+  actorProviderAccountId: string;
+  /**
+   * Status description verbatim.
+   */
+  description?: string;
+  /**
+   * Verbatim provider event payload as received by the adapter.
+   */
+  payload?: { [key: string]: unknown };
+  /**
+   * Provider token owning this event; MUST equal reference.provider.
+   */
+  provider: string;
+  providerDeliveryId: string;
+  reference: ConversationReference;
+}
+
+/**
+ * Pipeline/commit-status verdict as normalized by the adapter.
+ */
+export type ProviderPipelineEventV1DataAction = "pending" | "success" | "failure" | "error";
+
+export interface ProviderReactionEventV1Data {
   actorProviderAccountId: string;
   emojiName: string;
   /**
    * Verbatim provider event payload as received by the adapter.
    */
   payload?: { [key: string]: unknown };
+  /**
+   * Provider token owning this event; MUST equal reference.provider.
+   */
+  provider: string;
   providerDeliveryId: string;
   reference: ConversationReference;
 }

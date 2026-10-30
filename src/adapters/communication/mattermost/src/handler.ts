@@ -16,7 +16,7 @@ import type {
   ConversationKind,
   ConversationReference,
   EnvelopeCommand,
-  ProviderMattermostMessageEventV1Data,
+  ProviderMessageEventV1Data,
 } from "@ofac/protocol";
 import {
   buildEvent,
@@ -131,8 +131,9 @@ export function createAdapterHandler(deps: HandlerDeps): LinkHandler {
       messageId: postId,
       ...(rootId === undefined ? {} : { rootThreadId: rootId, parentMessageId: rootId }),
     };
-    const data: ProviderMattermostMessageEventV1Data = {
+    const data: ProviderMessageEventV1Data = {
       reference,
+      provider: "mattermost",
       providerDeliveryId: postId,
       actorProviderAccountId: identity.botUserId,
       text,

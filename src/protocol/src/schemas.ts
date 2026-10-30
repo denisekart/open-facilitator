@@ -37,12 +37,12 @@ import eventApprovalDecided from "../schemas/event.approval.decided.v1.json" wit
 import eventApprovalRequired from "../schemas/event.approval.required.v1.json" with { type: "json" };
 import eventApprovalRevoked from "../schemas/event.approval.revoked.v1.json" with { type: "json" };
 import eventMemoryUsed from "../schemas/event.memory.used.v1.json" with { type: "json" };
-import eventProviderMattermostMention from "../schemas/event.provider.mattermost.mention.v1.json" with { type: "json" };
-import eventProviderMattermostReaction from "../schemas/event.provider.mattermost.reaction.v1.json" with { type: "json" };
-import eventProviderMattermostMessage from "../schemas/event.provider.mattermost.message.v1.json" with { type: "json" };
-import eventProviderForgejoIssue from "../schemas/event.provider.forgejo.issue.v1.json" with { type: "json" };
-import eventProviderForgejoPullRequest from "../schemas/event.provider.forgejo.pull_request.v1.json" with { type: "json" };
-import eventProviderForgejoCi from "../schemas/event.provider.forgejo.ci.v1.json" with { type: "json" };
+import eventProviderMention from "../schemas/event.provider.mention.v1.json" with { type: "json" };
+import eventProviderReaction from "../schemas/event.provider.reaction.v1.json" with { type: "json" };
+import eventProviderMessage from "../schemas/event.provider.message.v1.json" with { type: "json" };
+import eventProviderIssue from "../schemas/event.provider.issue.v1.json" with { type: "json" };
+import eventProviderChangeRequest from "../schemas/event.provider.change_request.v1.json" with { type: "json" };
+import eventProviderPipeline from "../schemas/event.provider.pipeline.v1.json" with { type: "json" };
 import receiptV1 from "../schemas/receipt.v1.json" with { type: "json" };
 import controlV1 from "../schemas/control.v1.json" with { type: "json" };
 import resultManifestV1 from "../schemas/result-manifest.v1.json" with { type: "json" };
@@ -91,12 +91,12 @@ const all: JsonSchema[] = [
   eventApprovalRequired,
   eventApprovalRevoked,
   eventMemoryUsed,
-  eventProviderMattermostMention,
-  eventProviderMattermostReaction,
-  eventProviderMattermostMessage,
-  eventProviderForgejoIssue,
-  eventProviderForgejoPullRequest,
-  eventProviderForgejoCi,
+  eventProviderMention,
+  eventProviderReaction,
+  eventProviderMessage,
+  eventProviderIssue,
+  eventProviderChangeRequest,
+  eventProviderPipeline,
   receiptV1,
   controlV1,
   resultManifestV1,

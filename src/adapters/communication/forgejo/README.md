@@ -2,7 +2,8 @@
 
 Forgejo communication adapter (Plan 23): one Node process that owns both
 edges — an inbound Forgejo **webhook receiver** (`POST /hooks/forgejo`) that
-normalizes deliveries into `org.facilitator.event.provider.forgejo.*` events,
+normalizes deliveries into `org.facilitator.event.provider.{issue,change_request,pipeline}.v1`
+events with `data.provider = "forgejo"`,
 and an outbound **link** to the Facilitator kernel (enroll → capabilities →
 `communication.reply.v1` command execution → event publish). All state
 (comment ledger, idempotency) is local SQLite; the kernel sees only the link.
@@ -20,19 +21,19 @@ Exit codes: 0 clean · 1 runtime failure · 2 config error.
 
 ## Environment (run)
 
-|Var|Meaning|
-|---|---|
-|`OFAC_KERNEL_URL`|Kernel base URL (link hub + ingress)|
-|`OFAC_ENROLL_SECRET`|Enrollment secret for this endpoint|
-|`OFAC_ENDPOINT_ID` `OFAC_TEAM`|Link identity|
-|`FORGEJO_URL`|Forgejo base URL (also the derived tenant id: host)|
-|`FORGEJO_TOKEN` or `FORGEJO_TOKEN_FILE`|Bot PAT, direct or 0400 file|
-|`FORGEJO_WEBHOOK_SECRET`|HMAC-SHA256 key for inbound deliveries|
-|`FORGEJO_BOT_USER`|Exact-match echo suppression identity|
-|`OFAC_PROVIDER_INSTANCE_ID`|Event reference axis (default `local-git`)|
-|`FORGEJO_WORK_LABELS`|Comma list; `labeled` ∩ set ⇒ `workTrigger` (default `ofac:work`)|
-|`OFAC_STATE_PATH`|SQLite path (default `./ofac-forgejo-adapter.sqlite3`)|
-|`PORT` / `OFAC_HEALTH_PORT`|Serves `/healthz` + `/hooks/forgejo` (default 8067)|
+| Var                                     | Meaning                                                           |
+| --------------------------------------- | ----------------------------------------------------------------- |
+| `OFAC_KERNEL_URL`                       | Kernel base URL (link hub + ingress)                              |
+| `OFAC_ENROLL_SECRET`                    | Enrollment secret for this endpoint                               |
+| `OFAC_ENDPOINT_ID` `OFAC_TEAM`          | Link identity                                                     |
+| `FORGEJO_URL`                           | Forgejo base URL (also the derived tenant id: host)               |
+| `FORGEJO_TOKEN` or `FORGEJO_TOKEN_FILE` | Bot PAT, direct or 0400 file                                      |
+| `FORGEJO_WEBHOOK_SECRET`                | HMAC-SHA256 key for inbound deliveries                            |
+| `FORGEJO_BOT_USER`                      | Exact-match echo suppression identity                             |
+| `OFAC_PROVIDER_INSTANCE_ID`             | Event reference axis (default `local-git`)                        |
+| `FORGEJO_WORK_LABELS`                   | Comma list; `labeled` ∩ set ⇒ `workTrigger` (default `ofac:work`) |
+| `OFAC_STATE_PATH`                       | SQLite path (default `./ofac-forgejo-adapter.sqlite3`)            |
+| `PORT` / `OFAC_HEALTH_PORT`             | Serves `/healthz` + `/hooks/forgejo` (default 8067)               |
 
 `init` adds `DEMO_FORGEJO_ADMIN_USER|PASSWORD|EMAIL`, `FORGEJO_INIT_ORG`,
 `FORGEJO_INIT_REPO`, `FORGEJO_INIT_ISSUE_TITLE`, `FORGEJO_HOOK_URL`,

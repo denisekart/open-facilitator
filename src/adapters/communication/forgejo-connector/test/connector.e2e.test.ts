@@ -1,7 +1,7 @@
 // E2E connector tier (Plan 23 step 4): the REAL forgejo-connector binary as
 // a fleet child of a live Gateway + Facilitator, against a fake forge
 // (in-process HTTP). Proves the decision-5 loop end-to-end: a confirm-scoped
-// `forgejo.pr.create` assign rides the kernel to the Gateway, the human
+// `vcs.change_request.create` assign rides the kernel to the Gateway, the human
 // approval round-trip happens over REST, the Gateway consumes and forwards,
 // the connector opens EXACTLY ONE PR at the forge, the child's completed
 // event carries the provider object id, and the child's own SQLite ledger
@@ -40,7 +40,7 @@ const CONNECTOR_BIN = join(
 const POLICY_YAML = `
 owner: team-alpha
 policies:
-  - capability: forgejo.pr.create
+  - capability: vcs.change_request.create
     resources: ["repository:*"]
     actorAnyOf: ["group:/teams/team-alpha"]
     effect: confirm
@@ -148,7 +148,7 @@ heartbeatSeconds: 5
       ...env,
       data: {
         ...(env.data as Record<string, unknown>),
-        capabilityId: "forgejo.pr.create",
+        capabilityId: "vcs.change_request.create",
         actorEvidenceRef: `oidc:${evidence}`,
         inputs: {
           repo: "demo/widgets",
@@ -199,7 +199,7 @@ heartbeatSeconds: 5
       summary: string;
       structuredResult: Record<string, unknown>;
     };
-    expect(manifest.summary).toBe("forgejo.pr.create -> PR demo/widgets#1");
+    expect(manifest.summary).toBe("vcs.change_request.create -> PR demo/widgets#1");
     expect(manifest.structuredResult["number"]).toBe(1);
 
     // Exactly ONE PR at the forge; the gateway ledger says one completed run.
@@ -216,7 +216,7 @@ heartbeatSeconds: 5
       .get(commandId) as { op: string; state: string; provider_object_id: string } | undefined;
     db.close();
     expect(action).toEqual({
-      op: "forgejo.pr.create",
+      op: "vcs.change_request.create",
       state: "executed",
       provider_object_id: "PR demo/widgets#1",
     });

@@ -48,7 +48,7 @@ const prInputs = {
 
 describe("pr.create", () => {
   it("happy path: one POST, settled ledger row, wire-presented id", async () => {
-    const result = await ops["forgejo.pr.create"]!("cmd-1", prInputs);
+    const result = await ops["vcs.change_request.create"]!("cmd-1", prInputs);
     expect(result.providerObjectId).toBe("PR demo/widgets#1");
     expect(forge.prPosts).toBe(1);
     const row = ledger.find("cmd-1");
@@ -58,8 +58,8 @@ describe("pr.create", () => {
   });
 
   it("replay of the same commandId returns the recorded id, zero second POST", async () => {
-    await ops["forgejo.pr.create"]!("cmd-1", prInputs);
-    const replay = await ops["forgejo.pr.create"]!("cmd-1", prInputs);
+    await ops["vcs.change_request.create"]!("cmd-1", prInputs);
+    const replay = await ops["vcs.change_request.create"]!("cmd-1", prInputs);
     expect(replay.providerObjectId).toBe("PR demo/widgets#1");
     expect(replay.structured["replayed"]).toBe(true);
     expect(forge.prPosts).toBe(1);
@@ -68,12 +68,12 @@ describe("pr.create", () => {
 
   it("ambiguous timeout: failed answer leaves a pending row; the retry reads, never re-POSTs", async () => {
     forge.loseNextPrResponse = true;
-    await expect(ops["forgejo.pr.create"]!("cmd-2", prInputs)).rejects.toThrow(/504/);
+    await expect(ops["vcs.change_request.create"]!("cmd-2", prInputs)).rejects.toThrow(/504/);
     // The PR EXISTS at the forge (the mutation landed) but the row is pending.
     expect(forge.prs).toHaveLength(1);
     expect(ledger.find("cmd-2")?.state).toBe("pending");
 
-    const recovered = await ops["forgejo.pr.create"]!("cmd-2", prInputs);
+    const recovered = await ops["vcs.change_request.create"]!("cmd-2", prInputs);
     expect(recovered.providerObjectId).toBe("PR demo/widgets#1");
     expect(forge.prPosts).toBe(1); // still exactly one POST ever
     expect(forge.prs).toHaveLength(1); // zero second PR
@@ -81,16 +81,16 @@ describe("pr.create", () => {
   });
 
   it("a same-commandId DIFFERENT payload is a conflict, not a silent re-run", async () => {
-    await ops["forgejo.pr.create"]!("cmd-3", prInputs);
+    await ops["vcs.change_request.create"]!("cmd-3", prInputs);
     await expect(
-      ops["forgejo.pr.create"]!("cmd-3", { ...prInputs, title: "drifted" }),
+      ops["vcs.change_request.create"]!("cmd-3", { ...prInputs, title: "drifted" }),
     ).rejects.toBeInstanceOf(ActionLedgerConflictError);
   });
 });
 
 describe("issue.comment / pr.comment", () => {
   it("posts once, stamping the command marker in the body", async () => {
-    const result = await ops["forgejo.issue.comment"]!("cmd-4", {
+    const result = await ops["vcs.issue.comment"]!("cmd-4", {
       repo: "demo/widgets",
       issue: 1,
       body: "Work complete.",
@@ -103,11 +103,11 @@ describe("issue.comment / pr.comment", () => {
     // Simulate the lost answer: the comment exists, but the ledger is pending.
     ledger.insert(
       "cmd-5",
-      "forgejo.issue.comment",
+      "vcs.issue.comment",
       payloadSha256({ repo: "demo/widgets", issue: 1, body: "hi" }),
     );
     forge.comments.push({ id: 42, html_url: "u", body: "hi\n\n<!-- ofac-cmd:cmd-5 -->" });
-    const result = await ops["forgejo.issue.comment"]!("cmd-5", {
+    const result = await ops["vcs.issue.comment"]!("cmd-5", {
       repo: "demo/widgets",
       issue: 1,
       body: "hi",
@@ -120,16 +120,16 @@ describe("issue.comment / pr.comment", () => {
 
 describe("issue.read", () => {
   it("reads once; replay costs zero provider calls", async () => {
-    const first = await ops["forgejo.issue.read"]!("cmd-6", { repo: "demo/widgets", issue: 7 });
+    const first = await ops["vcs.issue.read"]!("cmd-6", { repo: "demo/widgets", issue: 7 });
     expect(first.structured["title"]).toBe("issue 7 in demo/widgets");
-    const replay = await ops["forgejo.issue.read"]!("cmd-6", { repo: "demo/widgets", issue: 7 });
+    const replay = await ops["vcs.issue.read"]!("cmd-6", { repo: "demo/widgets", issue: 7 });
     expect(replay.structured["replayed"]).toBe(true);
   });
 });
 
 describe("vcs.branch.push", () => {
   it("creates once; a replayed command after an ambiguous timeout accepts the 409 as truth", async () => {
-    const result = await ops["forgejo.vcs.branch.push"]!("cmd-7", {
+    const result = await ops["vcs.branch.push"]!("cmd-7", {
       repo: "demo/widgets",
       branch: "bot/topic",
       from: "main",
@@ -139,10 +139,10 @@ describe("vcs.branch.push", () => {
     // Pending-row + 409 = the create landed before the answer was lost.
     ledger.insert(
       "cmd-8",
-      "forgejo.vcs.branch.push",
+      "vcs.branch.push",
       payloadSha256({ repo: "demo/widgets", branch: "bot/topic", from: "main" }),
     );
-    const recovered = await ops["forgejo.vcs.branch.push"]!("cmd-8", {
+    const recovered = await ops["vcs.branch.push"]!("cmd-8", {
       repo: "demo/widgets",
       branch: "bot/topic",
       from: "main",
@@ -152,7 +152,7 @@ describe("vcs.branch.push", () => {
 
   it("a fresh conflict still fails loudly", async () => {
     await expect(
-      ops["forgejo.vcs.branch.push"]!("cmd-9", {
+      ops["vcs.branch.push"]!("cmd-9", {
         repo: "demo/widgets",
         branch: "main",
         from: "main",
@@ -170,12 +170,12 @@ describe("ci.trigger", () => {
       description: "red",
       context: "ofac",
     };
-    const result = await ops["forgejo.ci.trigger"]!("cmd-10", inputs);
+    const result = await ops["vcs.pipeline.trigger"]!("cmd-10", inputs);
     expect(forge.statuses).toEqual([
       { sha: "abcdef1234567890", state: "failure", context: "ofac" },
     ]);
     expect(String(result.providerObjectId)).toContain("status demo/widgets@abcdef1234:ofac");
-    const replay = await ops["forgejo.ci.trigger"]!("cmd-10", inputs);
+    const replay = await ops["vcs.pipeline.trigger"]!("cmd-10", inputs);
     expect(replay.structured["replayed"]).toBe(true);
     expect(forge.statuses).toHaveLength(1);
   });
@@ -183,7 +183,7 @@ describe("ci.trigger", () => {
 
 describe("ledger durability + input validation", () => {
   it("the row survives a reopen (same file)", async () => {
-    await ops["forgejo.pr.create"]!("cmd-11", prInputs);
+    await ops["vcs.change_request.create"]!("cmd-11", prInputs);
     ledger.close();
     const reopened = new ActionLedger(join(dir, "actions.sqlite3"));
     expect(reopened.find("cmd-11")?.state).toBe("executed");
@@ -193,11 +193,11 @@ describe("ledger durability + input validation", () => {
   });
 
   it("missing inputs fail per-op with the key named", async () => {
-    await expect(ops["forgejo.pr.create"]!("cmd-12", { repo: "demo/widgets" })).rejects.toThrow(
-      /inputs\.head: required string/,
-    );
     await expect(
-      ops["forgejo.issue.read"]!("cmd-13", { repo: "demo/widgets", issue: "x" }),
+      ops["vcs.change_request.create"]!("cmd-12", { repo: "demo/widgets" }),
+    ).rejects.toThrow(/inputs\.head: required string/);
+    await expect(
+      ops["vcs.issue.read"]!("cmd-13", { repo: "demo/widgets", issue: "x" }),
     ).rejects.toThrow(/inputs\.issue: required positive integer/);
   });
 });

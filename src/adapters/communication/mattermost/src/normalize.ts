@@ -12,14 +12,17 @@
 //   anything else           → ignored (never normalize every public post)
 import type {
   ConversationReference,
-  ProviderMattermostMentionEventV1Data,
-  ProviderMattermostMessageEventV1Data,
-  ProviderMattermostReactionEventV1Data,
+  ProviderMentionEventV1Data,
+  ProviderMessageEventV1Data,
+  ProviderReactionEventV1Data,
 } from "@ofac/protocol";
 
-export const MENTION_EVENT = "org.facilitator.event.provider.mattermost.mention.v1";
-export const REACTION_EVENT = "org.facilitator.event.provider.mattermost.reaction.v1";
-export const MESSAGE_EVENT = "org.facilitator.event.provider.mattermost.message.v1";
+// Chat-domain vocabulary: the type names the PURPOSE; this adapter IS the
+// Mattermost→purpose mapping layer, so the provider token below is in-package
+// mapping data.
+export const MENTION_EVENT = "org.facilitator.event.provider.mention.v1";
+export const REACTION_EVENT = "org.facilitator.event.provider.reaction.v1";
+export const MESSAGE_EVENT = "org.facilitator.event.provider.message.v1";
 
 /** The wire subset of a Mattermost Post we classify on. */
 export interface MmPost {
@@ -57,9 +60,9 @@ export interface NormalizeContext {
 }
 
 export type NormalizedEvent =
-  | { type: typeof MENTION_EVENT; data: ProviderMattermostMentionEventV1Data }
-  | { type: typeof MESSAGE_EVENT; data: ProviderMattermostMessageEventV1Data }
-  | { type: typeof REACTION_EVENT; data: ProviderMattermostReactionEventV1Data };
+  | { type: typeof MENTION_EVENT; data: ProviderMentionEventV1Data }
+  | { type: typeof MESSAGE_EVENT; data: ProviderMessageEventV1Data }
+  | { type: typeof REACTION_EVENT; data: ProviderReactionEventV1Data };
 
 export interface NormalizeOptions {
   /** Startup replay suppresses bound-thread classification (mentions + DMs only). */
@@ -137,6 +140,7 @@ export async function normalizePost(
           post.id,
           rootId,
         ),
+        provider: "mattermost",
         providerDeliveryId: post.id,
         actorProviderAccountId: post.user_id,
         text,
@@ -162,6 +166,7 @@ export async function normalizePost(
           post.id,
           rootId,
         ),
+        provider: "mattermost",
         providerDeliveryId: post.id,
         actorProviderAccountId: post.user_id,
         text,
@@ -178,6 +183,7 @@ export async function normalizePost(
       type: MESSAGE_EVENT,
       data: {
         reference: reference(ctx, post.user_id, post.channel_id, "dm", post.id, rootId),
+        provider: "mattermost",
         providerDeliveryId: post.id,
         actorProviderAccountId: post.user_id,
         text,
@@ -190,6 +196,7 @@ export async function normalizePost(
       type: MESSAGE_EVENT,
       data: {
         reference: reference(ctx, post.user_id, post.channel_id, "thread", post.id, rootId),
+        provider: "mattermost",
         providerDeliveryId: post.id,
         actorProviderAccountId: post.user_id,
         text,
@@ -220,6 +227,7 @@ export async function normalizeReaction(
         reaction.post_id,
         undefined,
       ),
+      provider: "mattermost",
       providerDeliveryId: reaction.id,
       actorProviderAccountId: reaction.user_id,
       emojiName: reaction.emoji_name.slice(0, 64),

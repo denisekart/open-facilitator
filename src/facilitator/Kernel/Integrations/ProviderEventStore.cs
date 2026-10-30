@@ -108,13 +108,14 @@ public sealed class ProviderEventStore(
     private string? resolvedBotId;
 
     /// <summary>Exact-match echo identity (§13.4): the configured id wins; else
-    /// (Mattermost family only) resolve once from the provider via
-    /// <c>/users/me</c> under the bot token (live bot ids are provider-generated,
-    /// so compose cannot pin them). Non-chat providers (forgejo) configure
-    /// <see cref="ProviderOptions.BotUserId"/> — the adapter runs as the bot
-    /// user, so exact-match suffices, no REST probe. A failed resolve stays
-    /// unresolved (retry next event) — echo events then fall to the message
-    /// arm, which is side-effect-free for unbound threads.</summary>
+    /// resolve once from the provider via GET <see cref="ProviderOptions.BotIdentityProbeUrl"/>
+    /// under the bot token (live bot ids are provider-generated, so compose
+    /// cannot pin them). The probe is pure config data: providers that
+    /// configure <see cref="ProviderOptions.BotUserId"/> (adapters running as
+    /// the bot user) need no probe, and the kernel holds no vendor API shape.
+    /// A failed resolve stays unresolved (retry next event) — echo events then
+    /// fall to the message arm, which is side-effect-free for unbound
+    /// threads.</summary>
     private async Task<string?> ResolveBotIdAsync(ProviderOptions options, CancellationToken ct)
     {
         if (options.BotUserId is { Length: > 0 } configured)
@@ -122,7 +123,7 @@ public sealed class ProviderEventStore(
             return configured;
         }
 
-        if (options.Provider != ProviderOptions.Mattermost)
+        if (options.BotIdentityProbeUrl is not { Length: > 0 } probeUrl)
         {
             return null;
         }
@@ -151,14 +152,14 @@ public sealed class ProviderEventStore(
             }
         }
 
-        if (token is not { Length: > 0 } || options.SiteUrl is not { Length: > 0 } site)
+        if (token is not { Length: > 0 })
         {
             return null;
         }
 
         try
         {
-            using var request = new HttpRequestMessage(HttpMethod.Get, site.TrimEnd('/') + "/api/v4/users/me");
+            using var request = new HttpRequestMessage(HttpMethod.Get, probeUrl);
             request.Headers.Add("Authorization", $"Bearer {token}");
             using var response = await BotIdentityClient.SendAsync(request, ct);
             if (!response.IsSuccessStatusCode)
@@ -185,14 +186,20 @@ public sealed class ProviderEventStore(
     public async Task<ProviderIngressOutcome> IngestAsync(JsonElement root, string rawBody, LinkPrincipal workload, CancellationToken ct)
     {
         var type = root.GetProperty("type").GetString() ?? string.Empty;
-        if (ProviderEventClass.ProviderOf(type) is not { Length: > 0 } token
+        // Defense-in-depth vs the admission gate: the provider token is data
+        // (never the type), it must name a registered provider, the type must
+        // be a central domain type, and data.provider must agree with
+        // reference.provider.
+        var data = root.GetProperty("data");
+        var token = ProviderEventClass.ProviderOfPayload(root);
+        if (token is not { Length: > 0 }
             || !registry.TryGet(token, out var options)
-            || !ProviderEventClass.SupportedBy(registry, type))
+            || !ProviderEventClass.IsCentralType(type)
+            || data.GetProperty("reference").GetProperty("provider").GetString() != token)
         {
             return new ProviderIngressOutcome(null, null, ProblemErrors.Unsupported($"provider event type '{type}' has no registered provider"));
         }
 
-        var data = root.GetProperty("data");
         var providerDeliveryId = data.GetProperty("providerDeliveryId").GetString()
             ?? throw new InvalidOperationException("provider event without providerDeliveryId");
         var provider = options.Provider;
@@ -281,13 +288,13 @@ public sealed class ProviderEventStore(
         var ack = await NotificationPreferenceAsync(db, ct);
         var effect = type switch
         {
-            "org.facilitator.event.provider.mattermost.mention.v1" => await MentionArmAsync(db, workload, options, data, reference, providerDeliveryId, ack, now, ct),
-            "org.facilitator.event.provider.mattermost.reaction.v1" => await ReactionArmAsync(db, options, data, reference, providerDeliveryId, ack, now, ct),
-            "org.facilitator.event.provider.forgejo.issue.v1" => await ForgejoIssueArmAsync(db, workload, options, data, reference, providerDeliveryId, now, ct),
-            "org.facilitator.event.provider.forgejo.pull_request.v1" => await ForgejoPullRequestArmAsync(db, options, data, reference, providerDeliveryId, now, ct),
-            "org.facilitator.event.provider.forgejo.ci.v1" => await ForgejoCiArmAsync(db, data, reference, providerDeliveryId, now, ct),
-            _ when provider != ProviderOptions.Mattermost => new ArmEffect(null, "observe:unhandled"),
-            _ => await MessageArmAsync(db, options, data, reference, providerDeliveryId, now, ct),
+            ProviderEventClass.Mention => await MentionArmAsync(db, workload, options, data, reference, providerDeliveryId, ack, now, ct),
+            ProviderEventClass.Reaction => await ReactionArmAsync(db, options, data, reference, providerDeliveryId, ack, now, ct),
+            ProviderEventClass.Issue => await IssueArmAsync(db, workload, options, data, reference, providerDeliveryId, now, ct),
+            ProviderEventClass.ChangeRequest => await ChangeRequestArmAsync(db, provider, options, data, reference, providerDeliveryId, now, ct),
+            ProviderEventClass.Pipeline => await PipelineArmAsync(db, data, reference, providerDeliveryId, now, ct),
+            ProviderEventClass.Message => await MessageArmAsync(db, options, data, reference, providerDeliveryId, now, ct),
+            _ => new ArmEffect(null, "observe:unhandled"),
         };
         inbox.WorkId = effect.Work;
         await db.ProviderEvents.Where(e => e.ProviderEventId == providerEventId)
@@ -305,7 +312,7 @@ public sealed class ProviderEventStore(
             using var scope = scopeFactory.CreateScope();
             await scope.ServiceProvider.GetRequiredService<Facilitator.Kernel.Work.ICoordinationStore>()
                 .ApplySteerAsync(steer.WorkId, steer.Directive,
-                    $"forgejo-review:{providerDeliveryId}", steer.ExpectedVersion, ct);
+                    $"{provider}-review:{providerDeliveryId}", steer.ExpectedVersion, ct);
         }
         metrics.LinkReceived();
         metrics.InboxProcessed();
@@ -428,12 +435,18 @@ public sealed class ProviderEventStore(
             i.Provider == reference.Provider && i.Tenant == reference.Tenant && i.AccountId == actor, ct);
         if (!linked)
         {
-            AppendCommand(db, ReplyEnvelope(
-                TargetOf(reference),
-                "Your Mattermost account is not linked to a Facilitator identity — send me a DM starting with /link to link it.",
-                $"mention:{deliveryId}:unlinked",
-                $"provider/{reference.Provider}/{reference.MessageId ?? deliveryId}",
-                now), options, now, workId: null);
+            // The "how to link" copy is provider data (overlay config): no
+            // text configured ⇒ audit only, no reply, no lie.
+            if (options.LinkHintText is { Length: > 0 } hint)
+            {
+                AppendCommand(db, ReplyEnvelope(
+                    TargetOf(reference),
+                    hint,
+                    $"mention:{deliveryId}:unlinked",
+                    $"provider/{reference.Provider}/{reference.MessageId ?? deliveryId}",
+                    now), options, now, workId: null);
+            }
+
             return new ArmEffect(null, "mention:unlinked");
         }
 
@@ -580,14 +593,14 @@ public sealed class ProviderEventStore(
         return new ArmEffect(workId, $"work/{workId}:input");
     }
 
-    // ---- forgejo arms (Plan 23, decision 3) ---------------------------------
+    // ---- forge-domain arms --------------------------------------------------
     // Two effects only — Work input and Work creation — zero forge workflow.
     // The ADAPTER decides the Work-trigger label policy (workTrigger flag);
     // the kernel just reads the flag (malleability law). A forge actor's
     // identity is audit-only here (judgment law: identity:not-required) — §11
     // linking stays chat-first, so no provider_identities gate on these arms.
 
-    private async Task<ArmEffect> ForgejoIssueArmAsync(
+    private async Task<ArmEffect> IssueArmAsync(
         FacilitatorDbContext db, Facilitator.Kernel.Shared.Auth.LinkPrincipal workload, ProviderOptions options, JsonElement data, Reference reference, string deliveryId, DateTime now, CancellationToken ct)
     {
         var action = data.GetProperty("action").GetString() ?? string.Empty;
@@ -604,9 +617,9 @@ public sealed class ProviderEventStore(
 
         if (binding is null && action == "labeled" && workTrigger)
         {
-            var objective = Trim(text ?? $"Forgejo issue {reference.Channel}#{reference.Root}");
+            var objective = Trim(text ?? $"Issue {reference.Channel}#{reference.Root}");
             var workId = await CreateWorkFromProviderAsync(db, workload, options, reference, objective, deliveryId,
-                $"work created (forgejo issue #{reference.Root})", now, ct);
+                $"work created (issue #{reference.Root})", now, ct);
             // Ack comment effect (decision 4): the adapter posts it as a bot
             // comment; kind rides the reference ("comment").
             AppendCommand(db, ReplyEnvelope(TargetOf(reference), "On it.", $"issue:{deliveryId}:ack",
@@ -617,8 +630,8 @@ public sealed class ProviderEventStore(
         return new ArmEffect(null, $"observe:{action}");
     }
 
-    private async Task<ArmEffect> ForgejoPullRequestArmAsync(
-        FacilitatorDbContext db, ProviderOptions options, JsonElement data, Reference reference, string deliveryId, DateTime now, CancellationToken ct)
+    private async Task<ArmEffect> ChangeRequestArmAsync(
+        FacilitatorDbContext db, string provider, ProviderOptions options, JsonElement data, Reference reference, string deliveryId, DateTime now, CancellationToken ct)
     {
         var action = data.GetProperty("action").GetString() ?? string.Empty;
         var text = data.TryGetProperty("text", out var x) ? x.GetString() : null;
@@ -634,21 +647,21 @@ public sealed class ProviderEventStore(
             // Steer rides ICoordinationStore in its own tx → post-commit (the
             // LinkIngress steer-arm precedent). Judgment recorded pre-commit.
             var version = await db.Works.Where(w => w.WorkId == workId).Select(w => w.Version).FirstOrDefaultAsync(ct);
-            var directive = Trim(text ?? $"forgejo {action} on PR #{reference.Root}");
+            var directive = Trim(text ?? $"{provider} {action} on change request #{reference.Root}");
             return new ArmEffect(workId, $"steered:{workId}", (workId, directive, version));
         }
 
         if (action is "merged" or "closed")
         {
             await AppendWorkInputAsync(db, reference.Provider, workId,
-                InputNote(reference, deliveryId, $"PR #{reference.Root} {action}"), now, ct);
+                InputNote(reference, deliveryId, $"Change request #{reference.Root} {action}"), now, ct);
             return new ArmEffect(workId, $"work/{workId}:input");
         }
 
         return new ArmEffect(null, $"observe:{action}");
     }
 
-    private async Task<ArmEffect> ForgejoCiArmAsync(
+    private async Task<ArmEffect> PipelineArmAsync(
         FacilitatorDbContext db, JsonElement data, Reference reference, string deliveryId, DateTime now, CancellationToken ct)
     {
         var action = data.GetProperty("action").GetString() ?? string.Empty;
@@ -660,17 +673,17 @@ public sealed class ProviderEventStore(
             return new ArmEffect(null, "observe:unbound");
         }
 
-        // CI verdict lands in the progress text (decision 3): the note carries
-        // the status token verbatim ("failure" etc.).
+        // Pipeline verdict lands in the progress text: the note carries the
+        // verdict token verbatim ("failure" etc.).
         var note = $"provider input ({reference.Provider} status {deliveryId}): {action}" +
                    (description is { Length: > 0 } ? $" — {description}" : string.Empty);
         await AppendWorkInputAsync(db, reference.Provider, workId, note, now, ct);
         return new ArmEffect(workId, $"work/{workId}:input");
     }
 
-    // Shared Work-creation block (Plan 22 pattern, copied for forgejo per
-    // decision 3): project find-or-create + Work + created event + binding +
-    // interim assign, all in the arm's open transaction.
+    // Shared Work-creation block (provider arms): project find-or-create +
+    // Work + created event + binding + interim assign, all in the arm's open
+    // transaction.
     private async Task<Guid> CreateWorkFromProviderAsync(
         FacilitatorDbContext db, Facilitator.Kernel.Shared.Auth.LinkPrincipal workload, ProviderOptions options, Reference reference, string objective, string deliveryId, string progressNote, DateTime now, CancellationToken ct)
     {

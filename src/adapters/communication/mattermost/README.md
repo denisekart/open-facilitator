@@ -9,7 +9,7 @@ somebody runs this process.
 
 ```
 Mattermost ──(bot WebSocket v4: posted / reaction_added / direct_added)──▶ normalize ──▶ link event plane
-            org.facilitator.event.provider.mattermost.{mention,reaction,message}.v1
+            org.facilitator.event.provider.{mention,reaction,message}.v1 (data.provider = "mattermost")
 kernel ──(link delivery: command.communication.{reply,react,update,acknowledge}.v1)──▶ REST v4 (bot token)
 ```
 
@@ -29,7 +29,8 @@ sequence-numbered reconnect recovery (`/users/me/missed_events?seq=`) plus a
 startup posts-API replay (cursor in the SQLite state file, 24 h fallback
 window, mentions + DMs only) cover the gaps.
 
-Classification law (`src/normalize.ts`, pure and unit-tested):
+Our mapping (chat-domain vocabulary — `src/normalize.ts`, pure and unit-tested;
+the event type names the PURPOSE, the provider rides `data.provider`):
 
 - the bot's own posts → `message.v1` **echo** (the kernel records the
   delivery for the binding ledger and suppresses arm effects by botUserId),
@@ -60,19 +61,19 @@ successful reply/update, the bot's own `message.v1` echo rides back through
 
 ## Configuration (env-only)
 
-| Variable | Required | Default | Consumer / meaning |
-|---|---|---|---|
-| `OFAC_KERNEL_URL` | yes | — | link plane: enroll, capabilities, events, SignalR hub |
-| `OFAC_ENROLL_SECRET` | yes | — | enrollment secret (dev: `enroll-dev`); re-enroll rotates the link token on 401 |
-| `OFAC_ENDPOINT_ID` | yes | — | logical link endpoint (e.g. `mm-adapter`) the kernel addresses as `link.<id>` |
-| `OFAC_TEAM` | yes | — | kernel team roster slug the enrollment binds to |
-| `MATTERMOST_URL` | yes | — | provider base URL; its **host** is the event tenant identity |
-| `MATTERMOST_BOT_TOKEN` | yes | — | bot token: WS auth + every REST write |
-| `OFAC_PROVIDER_INSTANCE_ID` | no | `local-chat` | `reference.providerInstanceId` on every event |
-| `OFAC_BOT_MENTION` | no | `@facilitator` | mention trigger token |
-| `OFAC_STATE_PATH` | no | `./ofac-mm-adapter.sqlite3` | delivery ledger + post ledger + caches + replay cursor |
-| `PORT` / `OFAC_HEALTH_PORT` | no | off | optional `GET /healthz` → `{ok:true, botId, ws:"up"|"down"}` |
-| `OFAC_ADAPTER_LOG` | no | `info` | console log level |
+| Variable                    | Required | Default                     | Consumer / meaning                                                             |
+| --------------------------- | -------- | --------------------------- | ------------------------------------------------------------------------------ |
+| `OFAC_KERNEL_URL`           | yes      | —                           | link plane: enroll, capabilities, events, SignalR hub                          |
+| `OFAC_ENROLL_SECRET`        | yes      | —                           | enrollment secret (dev: `enroll-dev`); re-enroll rotates the link token on 401 |
+| `OFAC_ENDPOINT_ID`          | yes      | —                           | logical link endpoint (e.g. `mm-adapter`) the kernel addresses as `link.<id>`  |
+| `OFAC_TEAM`                 | yes      | —                           | kernel team roster slug the enrollment binds to                                |
+| `MATTERMOST_URL`            | yes      | —                           | provider base URL; its **host** is the event tenant identity                   |
+| `MATTERMOST_BOT_TOKEN`      | yes      | —                           | bot token: WS auth + every REST write                                          |
+| `OFAC_PROVIDER_INSTANCE_ID` | no       | `local-chat`                | `reference.providerInstanceId` on every event                                  |
+| `OFAC_BOT_MENTION`          | no       | `@facilitator`              | mention trigger token                                                          |
+| `OFAC_STATE_PATH`           | no       | `./ofac-mm-adapter.sqlite3` | delivery ledger + post ledger + caches + replay cursor                         |
+| `PORT` / `OFAC_HEALTH_PORT` | no       | off                         | optional `GET /healthz` → `{ok:true, botId, ws:"up"                            | "down"}` |
+| `OFAC_ADAPTER_LOG`          | no       | `info`                      | console log level                                                              |
 
 No webhook secret — D1: the inbound leg is the bot WebSocket, no inbound port.
 

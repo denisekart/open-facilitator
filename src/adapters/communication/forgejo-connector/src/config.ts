@@ -25,11 +25,11 @@ export interface ConnectorTransport {
 }
 
 export interface ConnectorFlags {
-  /** Gates `forgejo.issue.read` + `forgejo.issue.comment`. */
+  /** Gates `vcs.issue.read` + `vcs.issue.comment`. */
   readonly issues: boolean;
-  /** Gates `forgejo.vcs.branch.push` + `forgejo.pr.create` + `forgejo.pr.comment`. */
+  /** Gates `vcs.branch.push` + `vcs.change_request.create` + `vcs.change_request.comment`. */
   readonly vcs: boolean;
-  /** Gates `forgejo.ci.trigger`. */
+  /** Gates `vcs.pipeline.trigger`. */
   readonly ci: boolean;
 }
 
@@ -267,17 +267,15 @@ export function connectorManifest(team: string, flags: ConnectorFlags): Capabili
     supportsNudge: false,
   });
   const capabilities = [
-    ...(flags.issues
-      ? [descriptor("forgejo.issue.read"), descriptor("forgejo.issue.comment")]
-      : []),
+    ...(flags.issues ? [descriptor("vcs.issue.read"), descriptor("vcs.issue.comment")] : []),
     ...(flags.vcs
       ? [
-          descriptor("forgejo.vcs.branch.push"),
-          descriptor("forgejo.pr.create"),
-          descriptor("forgejo.pr.comment"),
+          descriptor("vcs.branch.push"),
+          descriptor("vcs.change_request.create"),
+          descriptor("vcs.change_request.comment"),
         ]
       : []),
-    ...(flags.ci ? [descriptor("forgejo.ci.trigger")] : []),
+    ...(flags.ci ? [descriptor("vcs.pipeline.trigger")] : []),
   ];
   if (capabilities.length === 0) {
     fail("flags", "no op domain enabled (set FORGEJO_ENABLE_ISSUES/VCS/CI)");

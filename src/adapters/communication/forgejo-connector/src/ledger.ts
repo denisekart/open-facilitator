@@ -17,7 +17,7 @@ const SCHEMA_VERSION = 1;
 const DDL_ACTIONS = `
 CREATE TABLE IF NOT EXISTS connector_actions (
   command_id        TEXT PRIMARY KEY,           -- the work.assign commandId (dedupe identity)
-  op                TEXT NOT NULL,              -- capabilityId, e.g. forgejo.pr.create
+  op                TEXT NOT NULL,              -- capabilityId, e.g. vcs.change_request.create
   payload_sha256    TEXT NOT NULL,              -- canonical inputs digest
   provider_object_id TEXT,                     -- 'PR 7' / 'comment 42' once observed
   state             TEXT NOT NULL CHECK (state IN ('pending','executed')),

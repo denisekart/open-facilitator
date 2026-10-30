@@ -1,0 +1,37 @@
+{
+  "specversion": "1.0",
+  "id": "01JFORGEJO-ci-success",
+  "source": "urn:ofac:provider:forgejo:team-alpha",
+  "type": "org.facilitator.event.provider.pipeline.v1",
+  "subject": "provider/forgejo/status-2",
+  "time": "2026-10-29T09:00:00Z",
+  "datacontenttype": "application/json",
+  "dataschema": "https://schemas.openfacilitator.org/v1/event.provider.pipeline.v1.json",
+  "data": {
+    "reference": {
+      "provider": "forgejo",
+      "providerInstanceId": "local-git",
+      "tenantOrOrganizationId": "demo",
+      "channelOrResourceId": "demo/widgets",
+      "rootThreadId": "2",
+      "subjectRef": "2",
+      "conversationKind": "comment",
+      "authorProviderAccountId": "ci-bot"
+    },
+    "provider": "forgejo",
+    "providerDeliveryId": "c1b2c3d4-0000-4000-8000-000000000002",
+    "actorProviderAccountId": "ci-bot",
+    "action": "success",
+    "description": "all checks passed",
+    "payload": {
+      "status": "success",
+      "sha": "bffeb74224043ba2feb48d137756c8a9331c449a",
+      "repository": {
+        "full_name": "demo/widgets"
+      },
+      "sender": {
+        "login": "ci-bot"
+      }
+    }
+  }
+}

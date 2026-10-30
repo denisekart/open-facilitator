@@ -1,0 +1,37 @@
+{
+  "specversion": "1.0",
+  "id": "01JFORGEJO-issue-labeled",
+  "source": "urn:ofac:provider:forgejo:team-alpha",
+  "type": "org.facilitator.event.provider.issue.v1",
+  "subject": "provider/forgejo/issue-1",
+  "time": "2026-10-29T09:00:00Z",
+  "datacontenttype": "application/json",
+  "dataschema": "https://schemas.openfacilitator.org/v1/event.provider.issue.v1.json",
+  "data": {
+    "reference": {
+      "provider": "forgejo",
+      "providerInstanceId": "local-git",
+      "tenantOrOrganizationId": "demo",
+      "channelOrResourceId": "demo/widgets",
+      "rootThreadId": "1",
+      "subjectRef": "1",
+      "conversationKind": "comment",
+      "authorProviderAccountId": "alice"
+    },
+    "provider": "forgejo",
+    "providerDeliveryId": "a1b2c3d4-0000-4000-8000-000000000001",
+    "actorProviderAccountId": "alice",
+    "action": "labeled",
+    "workTrigger": true,
+    "payload": {
+      "action": "labeled",
+      "number": 1,
+      "repository": {
+        "full_name": "demo/widgets"
+      },
+      "sender": {
+        "login": "alice"
+      }
+    }
+  }
+}

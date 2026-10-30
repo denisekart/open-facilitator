@@ -2,11 +2,11 @@
   "specversion": "1.0",
   "id": "01JPROVIDER-mattermost-message-extra",
   "source": "urn:ofac:provider:mattermost:demo-team",
-  "type": "org.facilitator.event.provider.mattermost.message.v1",
+  "type": "org.facilitator.event.provider.message.v1",
   "subject": "provider/mattermost/post-999",
   "time": "2026-10-29T09:02:00Z",
   "datacontenttype": "application/json",
-  "dataschema": "https://schemas.openfacilitator.org/v1/event.provider.mattermost.message.v1.json",
+  "dataschema": "https://schemas.openfacilitator.org/v1/event.provider.message.v1.json",
   "data": {
     "reference": {
       "provider": "mattermost",
@@ -17,6 +17,7 @@
       "authorProviderAccountId": "account-001",
       "displayName": "email-equality-slip"
     },
+    "provider": "mattermost",
     "providerDeliveryId": "post-999",
     "actorProviderAccountId": "account-001",
     "text": "4F2A9C"

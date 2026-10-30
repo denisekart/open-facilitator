@@ -111,8 +111,9 @@ services:
 
   # Kernel provider wiring (Plan 22, decision 2): env-scoped to the full
   # profile so the slim stack boots provider-less from the shared
-  # facilitator.json. The bot id is resolved lazily via /users/me with the
-  # provisioned PAT (provider-generated, unpinnable).
+  # facilitator.json. The bot id is resolved lazily via the configured probe
+  # URL (BotIdentityProbeUrl) with the provisioned PAT (provider-generated,
+  # unpinnable); the unlinked-mention hint copy is provider data too.
   facilitator:
     environment:
       Providers__Mattermost__Enabled: "true"
@@ -120,6 +121,8 @@ services:
       Providers__Mattermost__Tenant: chat.localhost
       Providers__Mattermost__SiteUrl: http://mattermost:8065
       Providers__Mattermost__BotTokenFile: /provision/mm-bot-token
+      Providers__Mattermost__BotIdentityProbeUrl: http://mattermost:8065/api/v4/users/me
+      Providers__Mattermost__LinkHintText: "Your Mattermost account is not linked to a Facilitator identity — send me a DM starting with /link to link it."
       Providers__Mattermost__AssignEndpointId: gw.team-alpha
       Providers__Mattermost__AssignCapabilityId: research.analyze
       # Plan 23: the forgejo arm needs no REST probe (bot id is a config
@@ -228,7 +231,6 @@ services:
         condition: service_completed_successfully
 
   kafka:
-
     image: apache/kafka:${KAFKA_TAG:?set in versions.env}
     hostname: kafka
     environment:

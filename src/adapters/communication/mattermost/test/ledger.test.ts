@@ -128,7 +128,7 @@ describe("reply idempotency law", () => {
     const published: EnvelopeEvent[] = [];
     await handler.onCommand(replyCommand(), fakeCtx(published));
     const echo = published[0];
-    expect(echo?.type).toBe("org.facilitator.event.provider.mattermost.message.v1");
+    expect(echo?.type).toBe("org.facilitator.event.provider.message.v1");
     const data = echo?.data as Record<string, unknown>;
     expect(data["providerDeliveryId"]).toBe("made-post-0");
     const reference = data["reference"] as Record<string, unknown>;

@@ -91,7 +91,7 @@ export function createOps(deps: OpDeps): OpTable {
   }
 
   const prCreate: OpRunner = async (commandId, inputs) => {
-    const op = "forgejo.pr.create";
+    const op = "vcs.change_request.create";
     const repo = required(inputs, "repo", op);
     const head = required(inputs, "head", op);
     const base = required(inputs, "base", op);
@@ -112,7 +112,7 @@ export function createOps(deps: OpDeps): OpTable {
   };
 
   const issueRead: OpRunner = async (commandId, inputs) => {
-    const op = "forgejo.issue.read";
+    const op = "vcs.issue.read";
     const repo = required(inputs, "repo", op);
     const issue = requiredNumber(inputs, "issue", op);
     // Read-only: still ledgered, so a delivery replay costs zero provider calls.
@@ -131,7 +131,7 @@ export function createOps(deps: OpDeps): OpTable {
   const makeComment =
     (pr: boolean): OpRunner =>
     async (commandId, inputs) => {
-      const op = pr ? "forgejo.pr.comment" : "forgejo.issue.comment";
+      const op = pr ? "vcs.change_request.comment" : "vcs.issue.comment";
       const repo = required(inputs, "repo", op);
       const number = requiredNumber(inputs, "issue", op);
       const body = required(inputs, "body", op);
@@ -150,7 +150,7 @@ export function createOps(deps: OpDeps): OpTable {
     };
 
   const branchPush: OpRunner = async (commandId, inputs) => {
-    const op = "forgejo.vcs.branch.push";
+    const op = "vcs.branch.push";
     const repo = required(inputs, "repo", op);
     const branch = required(inputs, "branch", op);
     const fromRef = required(inputs, "from", op);
@@ -179,7 +179,7 @@ export function createOps(deps: OpDeps): OpTable {
   };
 
   const ciTrigger: OpRunner = async (commandId, inputs) => {
-    const op = "forgejo.ci.trigger";
+    const op = "vcs.pipeline.trigger";
     const repo = required(inputs, "repo", op);
     const sha = required(inputs, "sha", op);
     const state = required(inputs, "state", op);
@@ -198,11 +198,11 @@ export function createOps(deps: OpDeps): OpTable {
   };
 
   return {
-    "forgejo.pr.create": prCreate,
-    "forgejo.issue.read": issueRead,
-    "forgejo.issue.comment": makeComment(false),
-    "forgejo.pr.comment": makeComment(true),
-    "forgejo.vcs.branch.push": branchPush,
-    "forgejo.ci.trigger": ciTrigger,
+    "vcs.change_request.create": prCreate,
+    "vcs.issue.read": issueRead,
+    "vcs.issue.comment": makeComment(false),
+    "vcs.change_request.comment": makeComment(true),
+    "vcs.branch.push": branchPush,
+    "vcs.pipeline.trigger": ciTrigger,
   };
 }

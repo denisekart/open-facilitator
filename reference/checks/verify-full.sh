@@ -397,7 +397,7 @@ step_forgejo_connector_pr() {
       time: now | todate, datacontenttype: "application/json",
       dataschema: "https://schemas.openfacilitator.org/v1/command.work.assign.v1.json",
       data: { commandId: $commandId, actorEvidenceRef: "seed: verify-pr",
-        workId: $workId, targetId: "demo", capabilityId: "forgejo.pr.create",
+        workId: $workId, targetId: "demo", capabilityId: "vcs.change_request.create",
         expectedContextVersion: 1,
         inputs: { objective: "verify connector leg", sourceRefs: [],
           repo: "demo/widgets", head: "bot/topic", base: "main",

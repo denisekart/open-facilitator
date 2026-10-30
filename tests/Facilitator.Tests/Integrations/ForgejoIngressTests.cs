@@ -45,7 +45,7 @@ public sealed class ForgejoIngressTests(PostgresFixture fixture) : IDisposable
         var delivery = $"dlv-{Guid.NewGuid():N}";
 
         var first = await link.PostAsync("/api/link/v1/events", Content(ForgejoEvent(
-            "valid/event.provider.forgejo.issue.labeled.json", delivery, Repo, issue, "alice")));
+            "valid/event.provider.issue.labeled.json", delivery, Repo, issue, "alice")));
         Assert.Equal(HttpStatusCode.Accepted, first.StatusCode);
         var receipt = await first.Content.ReadJsonAsync();
         Assert.Equal("accepted", receipt.GetProperty("status").GetString());
@@ -71,7 +71,7 @@ public sealed class ForgejoIngressTests(PostgresFixture fixture) : IDisposable
 
         // Redelivery: duplicate, saved judgment, zero new arm effects.
         var second = await link.PostAsync("/api/link/v1/events", Content(ForgejoEvent(
-            "valid/event.provider.forgejo.issue.labeled.json", delivery, Repo, issue, "alice")));
+            "valid/event.provider.issue.labeled.json", delivery, Repo, issue, "alice")));
         Assert.Equal(HttpStatusCode.OK, second.StatusCode);
         var dup = await second.Content.ReadJsonAsync();
         Assert.Equal("duplicate", dup.GetProperty("status").GetString());
@@ -88,7 +88,7 @@ public sealed class ForgejoIngressTests(PostgresFixture fixture) : IDisposable
         var delivery = $"dlv-{Guid.NewGuid():N}";
 
         var response = await link.PostAsync("/api/link/v1/events", Content(ForgejoEvent(
-            "valid/event.provider.forgejo.issue.opened.json", delivery, Repo, issue, "alice")));
+            "valid/event.provider.issue.opened.json", delivery, Repo, issue, "alice")));
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
 
         // workTrigger false ⇒ observation only: no binding, no Work.
@@ -102,12 +102,12 @@ public sealed class ForgejoIngressTests(PostgresFixture fixture) : IDisposable
         var (factory, link, _, _) = await EnabledForgejoPlane();
         var issue = IssueNumber();
         await link.PostAsync("/api/link/v1/events", Content(ForgejoEvent(
-            "valid/event.provider.forgejo.issue.labeled.json", $"dlv-{Guid.NewGuid():N}", Repo, issue, "alice")));
+            "valid/event.provider.issue.labeled.json", $"dlv-{Guid.NewGuid():N}", Repo, issue, "alice")));
         var workId = (await fixture.Db.BindingWorkId("forgejo", Repo, issue))!.Value;
 
         var delivery = $"dlv-{Guid.NewGuid():N}";
         await link.PostAsync("/api/link/v1/events", Content(ForgejoEvent(
-            "valid/event.provider.forgejo.issue.commented.json", delivery, Repo, issue, "bob", text: "also cover the timeout path")));
+            "valid/event.provider.issue.commented.json", delivery, Repo, issue, "bob", text: "also cover the timeout path")));
 
         Assert.Equal(1, await fixture.Db.TimelineEventCount(workId, "provider.input"));
         Assert.Equal($"work/{workId}:input", await fixture.Db.ProviderEventJudgment(delivery));
@@ -125,12 +125,12 @@ public sealed class ForgejoIngressTests(PostgresFixture fixture) : IDisposable
         var (factory, link, _, _) = await EnabledForgejoPlane();
         var pr = IssueNumber();
         await link.PostAsync("/api/link/v1/events", Content(ForgejoEvent(
-            "valid/event.provider.forgejo.issue.labeled.json", $"dlv-{Guid.NewGuid():N}", Repo, pr, "alice")));
+            "valid/event.provider.issue.labeled.json", $"dlv-{Guid.NewGuid():N}", Repo, pr, "alice")));
         var workId = (await fixture.Db.BindingWorkId("forgejo", Repo, pr))!.Value;
 
         var delivery = $"dlv-{Guid.NewGuid():N}";
         var response = await link.PostAsync("/api/link/v1/events", Content(ForgejoEvent(
-            "valid/event.provider.forgejo.pull_request.reviewed.json", delivery, Repo, pr, "reviewer",
+            "valid/event.provider.change_request.reviewed.json", delivery, Repo, pr, "reviewer",
             text: "approve with the retry clause reworded")));
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
 
@@ -148,7 +148,7 @@ public sealed class ForgejoIngressTests(PostgresFixture fixture) : IDisposable
         var delivery = $"dlv-{Guid.NewGuid():N}";
 
         var response = await link.PostAsync("/api/link/v1/events", Content(ForgejoEvent(
-            "valid/event.provider.forgejo.pull_request.reviewed.json", delivery, Repo, pr, "reviewer")));
+            "valid/event.provider.change_request.reviewed.json", delivery, Repo, pr, "reviewer")));
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
 
         Assert.Equal("observe:unbound", await fixture.Db.ProviderEventJudgment(delivery));
@@ -162,12 +162,12 @@ public sealed class ForgejoIngressTests(PostgresFixture fixture) : IDisposable
         var (factory, link, _, _) = await EnabledForgejoPlane();
         var issue = IssueNumber();
         await link.PostAsync("/api/link/v1/events", Content(ForgejoEvent(
-            "valid/event.provider.forgejo.issue.labeled.json", $"dlv-{Guid.NewGuid():N}", Repo, issue, "alice")));
+            "valid/event.provider.issue.labeled.json", $"dlv-{Guid.NewGuid():N}", Repo, issue, "alice")));
         var workId = (await fixture.Db.BindingWorkId("forgejo", Repo, issue))!.Value;
 
         var delivery = $"dlv-{Guid.NewGuid():N}";
         await link.PostAsync("/api/link/v1/events", Content(ForgejoEvent(
-            "valid/event.provider.forgejo.ci.failure.json", delivery, Repo, issue, "ci-bot")));
+            "valid/event.provider.pipeline.failure.json", delivery, Repo, issue, "ci-bot")));
 
         Assert.Equal($"work/{workId}:input", await fixture.Db.ProviderEventJudgment(delivery));
         var note = Assert.Single(await fixture.Db.TimelineDetail(workId, "provider.input"));
@@ -183,7 +183,7 @@ public sealed class ForgejoIngressTests(PostgresFixture fixture) : IDisposable
         var (factory, link, _, endpoint) = await EnabledForgejoPlane(mattermost: false);
         var issue = IssueNumber();
         await link.PostAsync("/api/link/v1/events", Content(ForgejoEvent(
-            "valid/event.provider.forgejo.issue.labeled.json", $"dlv-{Guid.NewGuid():N}", Repo, issue, "alice")));
+            "valid/event.provider.issue.labeled.json", $"dlv-{Guid.NewGuid():N}", Repo, issue, "alice")));
         var workId = (await fixture.Db.BindingWorkId("forgejo", Repo, issue))!.Value;
 
         await KernelOps.TransitionAsync(factory.CreateAuthedClient(), workId, "planning", 1);
@@ -210,13 +210,55 @@ public sealed class ForgejoIngressTests(PostgresFixture fixture) : IDisposable
         var link = factory.CreateLinkClient(await LinkTestHarness.EnrollAsync(factory.CreateAuthedClient(), "gw-mm-only"));
 
         var delivery = $"dlv-{Guid.NewGuid():N}";
-        var envelope = ForgejoEvent("valid/event.provider.forgejo.issue.labeled.json", delivery, Repo, IssueNumber(), "alice");
+        var envelope = ForgejoEvent("valid/event.provider.issue.labeled.json", delivery, Repo, IssueNumber(), "alice");
         using var response = await link.PostAsync("/api/link/v1/events",
             new StringContent(envelope, Encoding.UTF8, "application/json"));
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
         var problem = await response.Content.ReadJsonAsync();
         Assert.Equal(ProblemBase + "unsupported", problem.GetProperty("type").GetString());
+        Assert.Equal(0, await fixture.Db.ProviderEventCount("forgejo", delivery));
+    }
+
+    [Fact]
+    public async Task ProviderEventFromWrongEndpointRefused()
+    {
+        // Sender binding: an enabled forgejo section, but the sending link
+        // endpoint is NOT the section's EndpointId — typed refusal + failed
+        // audit row, zero provider_events rows.
+        var (factory, _, _, _) = await EnabledForgejoPlane();
+        var impostor = factory.CreateLinkClient(await LinkTestHarness.EnrollAsync(
+            factory.CreateAuthedClient(), "gw-impostor-" + Guid.NewGuid().ToString("N")[..6]));
+
+        var delivery = $"dlv-{Guid.NewGuid():N}";
+        var envelope = WithId(ForgejoEvent("valid/event.provider.issue.labeled.json", delivery, Repo, IssueNumber(), "alice"), "evt-mismatch-" + delivery);
+        using var response = await impostor.PostAsync("/api/link/v1/events",
+            new StringContent(envelope, Encoding.UTF8, "application/json"));
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        var problem = await response.Content.ReadJsonAsync();
+        Assert.Equal(ProblemBase + "unsupported", problem.GetProperty("type").GetString());
+        Assert.Contains("does not match provider", problem.GetProperty("detail").GetString());
+        Assert.True(await fixture.Db.InboxFailedFor("evt-mismatch-" + delivery), "failed audit row");
+        Assert.Equal(0, await fixture.Db.ProviderEventCount("forgejo", delivery));
+    }
+
+    [Fact]
+    public async Task ProviderTokenMismatchAgainstReferenceRefused()
+    {
+        // data.provider MUST equal reference.provider: a wrong-claimed token
+        // from the right endpoint refuses typed unsupported + failed audit row.
+        var (_, link, _, _) = await EnabledForgejoPlane();
+        var delivery = $"dlv-{Guid.NewGuid():N}";
+        var envelope = WithId(ForgejoEvent("valid/event.provider.issue.labeled.json", delivery, Repo, IssueNumber(), "alice"), "evt-mismatch-" + delivery);
+        envelope = envelope.Replace("\"provider\":\"forgejo\",\"providerDeliveryId\"", "\"provider\":\"gitlab-fake\",\"providerDeliveryId\"");
+        using var response = await link.PostAsync("/api/link/v1/events",
+            new StringContent(envelope, Encoding.UTF8, "application/json"));
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        var problem = await response.Content.ReadJsonAsync();
+        Assert.Equal(ProblemBase + "unsupported", problem.GetProperty("type").GetString());
+        Assert.True(await fixture.Db.InboxFailedFor("evt-mismatch-" + delivery), "failed audit row");
         Assert.Equal(0, await fixture.Db.ProviderEventCount("forgejo", delivery));
     }
 
@@ -276,6 +318,14 @@ public sealed class ForgejoIngressTests(PostgresFixture fixture) : IDisposable
             data["text"] = text;
         }
 
+        return doc.ToJsonString();
+    }
+
+    /// <summary>Pin the envelope id so the failed-audit probe can find the row.</summary>
+    private static string WithId(string envelope, string id)
+    {
+        var doc = JsonNode.Parse(envelope)!.AsObject();
+        doc["id"] = id;
         return doc.ToJsonString();
     }
 }

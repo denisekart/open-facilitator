@@ -2,11 +2,11 @@
   "specversion": "1.0",
   "id": "01JPROVIDER-mattermost-mention-nodelivery",
   "source": "urn:ofac:provider:mattermost:demo-team",
-  "type": "org.facilitator.event.provider.mattermost.mention.v1",
+  "type": "org.facilitator.event.provider.mention.v1",
   "subject": "provider/mattermost/post-789",
   "time": "2026-10-29T09:00:00Z",
   "datacontenttype": "application/json",
-  "dataschema": "https://schemas.openfacilitator.org/v1/event.provider.mattermost.mention.v1.json",
+  "dataschema": "https://schemas.openfacilitator.org/v1/event.provider.mention.v1.json",
   "data": {
     "reference": {
       "provider": "mattermost",
@@ -16,6 +16,7 @@
       "conversationKind": "thread",
       "authorProviderAccountId": "account-001"
     },
+    "provider": "mattermost",
     "actorProviderAccountId": "account-001",
     "text": "@facilitator no provider delivery id here"
   }

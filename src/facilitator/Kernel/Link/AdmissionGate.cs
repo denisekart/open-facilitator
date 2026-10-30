@@ -113,13 +113,37 @@ public sealed class AdmissionGate(
             ? cid.GetString()
             : null;
         var isProviderEvent = ProviderEventClass.IsProviderClass(type);
-        if (isProviderEvent && !ProviderEventClass.SupportedBy(providers, type))
+        if (isProviderEvent)
         {
             // Fail-closed (§7.1 provider path): the class is on the wire, but a
-            // kernel without that provider refuses it (failed audit inbox row,
-            // the S:305 precedent) instead of settling it no-effect-accepted.
-            await AuditAsync(root, rawBody, ct);
-            return Refused(ProblemErrors.Unsupported($"provider event type '{type}' has no registered provider"));
+            // kernel without that provider, a type outside the central domain
+            // set, or a sender that is not the provider section's own endpoint
+            // refuses it (failed audit inbox row, the S:305 precedent) instead
+            // of settling it no-effect-accepted. Provider is data: the token
+            // rides envelope data, never the type (schema-guaranteed here,
+            // because EnvelopeValidator validated data against the dataschema).
+            var token = ProviderEventClass.ProviderOfPayload(root);
+            var referenceProvider = root.GetProperty("data").GetProperty("reference")
+                .TryGetProperty("provider", out var rp) && rp.ValueKind == JsonValueKind.String
+                ? rp.GetString() : null;
+            if (!providers.TryGet(token ?? string.Empty, out var options) || token != referenceProvider)
+            {
+                await AuditAsync(root, rawBody, ct);
+                return Refused(ProblemErrors.Unsupported($"provider event type '{type}' has no registered provider"));
+            }
+
+            if (!ProviderEventClass.IsCentralType(type))
+            {
+                await AuditAsync(root, rawBody, ct);
+                return Refused(ProblemErrors.Unsupported($"provider event type '{type}' is not a central domain type"));
+            }
+
+            if (workload.EndpointId != options.EndpointId)
+            {
+                await AuditAsync(root, rawBody, ct);
+                return Refused(ProblemErrors.Unsupported(
+                    $"provider event from endpoint '{workload.EndpointId}' does not match provider '{token}' section EndpointId"));
+            }
         }
 
         if (!isCommand && !isProviderEvent)

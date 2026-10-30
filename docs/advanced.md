@@ -184,7 +184,9 @@ walkthrough: `examples/slim/deterministic-research-worker/`.
 
 A communication adapter is the other adapter kind: not a Gateway child, but
 a **link endpoint** (`role: child`, secret enrollment) that normalizes one
-provider's events into `org.facilitator.event.provider.<provider>.*` and
+provider's events into the central domain types
+(`org.facilitator.event.provider.<domain>.v1`, with `data.provider` naming
+the provider — the adapter owns the provider→purpose mapping) and
 executes `org.facilitator.command.communication.*` deliveries over the
 provider's API. Worked examples: `@ofac/mattermost-adapter`
 (`src/adapters/communication/mattermost/`, facilitator-owned chat leg) and
@@ -244,16 +246,18 @@ comment as the bot, ledger-keyed the same way).
 
 ### Opt-in story
 
-Provider-less is the default: the kernel composes a provider's arms only
-when that provider's options section (`providers:mattermost`,
-`providers:forgejo` — mounted `facilitator.json` or
-`Providers__<Provider>__*` env) is present with `enabled: true`; absent,
-that provider's events get typed `unsupported` receipts and zero routes or
-rows exist. Each provider is a registry entry on one plane — a normalizer
-schema set + arms + an options section — not a new plane, and the
-addressing is per-provider too (the forgejo section carries its own
-`assignEndpointId` for the review-steer path). The adapter is opt-in by
-existence — nothing enrolls it unless somebody runs the process.
+Provider-less is the default: the kernel arms switch on the central domain
+types, and a provider token joins the registry only when its options section
+(`providers:mattermost`, `providers:forgejo` — mounted `facilitator.json` or
+`Providers__<Provider>__*` env, section key lowercased = the token) is
+present with `enabled: true`; absent, that provider's events get typed
+`unsupported` refusals and zero routes or rows exist. Each provider is a
+registry entry on one plane — adapter-side mapping + the shared arms + an
+options section — not a new plane, and the addressing is per-provider too
+(each section carries its own `assignEndpointId` for the review-steer path).
+A new forge ships as normalizer + connector policy + one config section:
+zero core-protocol change. The adapter is opt-in by existence — nothing
+enrolls it unless somebody runs the process.
 
 ## Memory broker
 

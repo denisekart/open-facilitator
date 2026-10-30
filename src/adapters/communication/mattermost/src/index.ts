@@ -2,7 +2,7 @@
 // endpoint (enroll → capabilities → SignalR) with a Mattermost bot-WebSocket
 // listener in front (D1: 11.11 webhooks carry no signing secret, so inbound
 // trust rides the bot credential instead). Inbound posts/reactions normalize
-// to org.facilitator.event.provider.mattermost.*; outbound
+// to the central chat-domain events (data.provider = "mattermost"); outbound
 // command.communication.* execute over REST v4 under the post-ledger
 // idempotency law.
 import { createServer, type Server } from "node:http";

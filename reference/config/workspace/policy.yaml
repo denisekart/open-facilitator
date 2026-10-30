@@ -21,27 +21,27 @@ policies:
   # confirm. actorAnyOf names the team group so a member (alice) can answer
   # the approval via the kernel respond route; the empty list on allow rows
   # means any authenticated caller (policy.ts actorMatches).
-  - capability: forgejo.issue.read
+  - capability: vcs.issue.read
     resources: ["*"]
     actorAnyOf: []
     effect: allow
-  - capability: forgejo.issue.comment
+  - capability: vcs.issue.comment
     resources: ["*"]
     actorAnyOf: []
     effect: allow
-  - capability: forgejo.pr.comment
+  - capability: vcs.change_request.comment
     resources: ["*"]
     actorAnyOf: []
     effect: allow
-  - capability: forgejo.vcs.branch.push
+  - capability: vcs.branch.push
     resources: ["*"]
     actorAnyOf: ["workload:gw.team-alpha", "group:/teams/team-alpha"]
     effect: confirm
-  - capability: forgejo.pr.create
+  - capability: vcs.change_request.create
     resources: ["*"]
     actorAnyOf: ["workload:gw.team-alpha", "group:/teams/team-alpha"]
     effect: confirm
-  - capability: forgejo.ci.trigger
+  - capability: vcs.pipeline.trigger
     resources: ["*"]
     actorAnyOf: ["workload:gw.team-alpha", "group:/teams/team-alpha"]
     effect: confirm

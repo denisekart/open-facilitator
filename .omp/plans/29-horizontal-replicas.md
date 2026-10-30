@@ -1,6 +1,6 @@
 # Plan 29 — Horizontal replicas: two Facilitators, one Postgres
 
-**Status:** ⬜ not-started (flips 🔵 at the replanning gate, then 🟡)
+**Status:** ♻️ superseded by plan 35 (Phase D of `35-production-shape-milestone.md`; its locked decisions carry over there)
 **Depends on:** 28 as-built (provisioning processor adds a second background loop that must survive the replica audit). **Phase F leg 8 of 9.**
 **On approval:** this file is the working detail design; keep the Implementation Status table current.
 **Granularity:** single plan — a correctness audit + topology + fault-injection tests; the doc set it starts continues in 30.

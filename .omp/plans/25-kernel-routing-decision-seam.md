@@ -1,6 +1,6 @@
 # Plan 25 — Kernel routing: deterministic capability matching + the decision-provider seam
 
-**Status:** ⬜ not-started (flips 🔵 at the replanning gate, then 🟡)
+**Status:** ♻️ superseded by plan 35 (Phase A of `35-production-shape-milestone.md`; its locked decisions carry over there)
 **Depends on:** 24 as-built (its provider-created Works make the seeded-assign interim untenable). **Phase F leg 4 of 9.**
 **On approval:** this file is the working detail design; keep the Implementation Status table current.
 **Granularity:** single plan — one kernel subsystem (routing) + one two-implementation port (decision provider, deterministic impl now, model impl in 26). Split candidate if it inflates: routing engine vs routing-defaults/config activation.

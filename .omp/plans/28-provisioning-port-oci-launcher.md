@@ -1,6 +1,6 @@
 # Plan 28 — Provisioning port + local OCI launcher: workers scale zero-to-N
 
-**Status:** ⬜ not-started (flips 🔵 at the replanning gate, then 🟡)
+**Status:** ♻️ superseded by plan 35 (Phase C of `35-production-shape-milestone.md`; its locked decisions carry over there)
 **Depends on:** 27 as-built (generation semantics + nudge/stalled states are the launcher's signals). **Phase F leg 7 of 9.**
 **On approval:** this file is the working detail design; keep the Implementation Status table current.
 **Granularity:** one port + one adapter (local OCI/docker launcher). A second provisioning backend (k8s etc.) is out of scope by §18's own admission — seam + one implementation + tests.

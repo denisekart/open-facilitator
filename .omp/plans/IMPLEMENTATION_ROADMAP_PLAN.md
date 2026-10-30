@@ -252,13 +252,13 @@ over real Keycloak + Postgres + kernel boundaries (§26.1 items 11+12 complete).
 
 ### Plan 24 — Coding worker vertical slice (§23.1 complete)
 
-**Status:** ⬜ not-started (detail design: `24-coding-worker-vertical-slice.md`)
+**Status:** 🟡 in-progress (detail design: `24-coding-worker-vertical-slice.md`)
 **Objective:** `examples/full/coding-worker` on `@ofac/adapter`: chat → Work → assignment → branch + PR via 23's connector → review comment steers the same Assignment. Closes §21.2 steps 2–7. Slice-7 coding half.
 **Depends on:** 23
 
 ### Plan 25 — Kernel routing: capability matching + decision-provider seam
 
-**Status:** ⬜ not-started (detail design: `25-kernel-routing-decision-seam.md`)
+**Status:** ♻️ superseded by 35 (Phase A of `35-production-shape-milestone.md`)
 **Objective:** The routing the roadmap assumed since 02: deterministic capability-match assignment creation + addressed dispatch in the kernel, advisory-only `IDecisionProvider` seam (deterministic impl), `routing-defaults` becomes behavior, the hardcoded seed-SQL assign interim dies. §10.1.
 **Depends on:** 24
 
@@ -270,27 +270,33 @@ over real Keycloak + Postgres + kernel boundaries (§26.1 items 11+12 complete).
 
 ### Plan 27 — Dependencies, generation fencing, nudge
 
-**Status:** ⬜ not-started (detail design: `27-dependencies-generation-nudge.md`)
+**Status:** ♻️ superseded by 35 (Phase B of `35-production-shape-milestone.md`)
 **Objective:** Slice 8's coordination core: assignment `dependsOn` (completed|result_validated|approved) gated deterministically at the dispatch funnel, steer bumps execution generation with old-generation fencing, nudge consumed with rate caps + stalled state. §23.2 two-repo run. §26.1 items 10+13 basis.
 **Depends on:** 25, 24
 
 ### Plan 28 — Provisioning port + local OCI launcher
 
-**Status:** ⬜ not-started (detail design: `28-provisioning-port-oci-launcher.md`)
+**Status:** ♻️ superseded by 35 (Phase C of `35-production-shape-milestone.md`)
 **Objective:** §18 provisioning as idempotent outbox commands + team-side docker launcher adapter: workers zero→N→zero, killed worker relaunches on the same assignment with continuity (verify's honest-failure law rewritten), `workload-scale` becomes behavior.
 **Depends on:** 27
 
 ### Plan 29 — Horizontal replicas: two Facilitators, one Postgres
 
-**Status:** ⬜ not-started (detail design: `29-horizontal-replicas.md`)
+**Status:** ♻️ superseded by 35 (Phase D of `35-production-shape-milestone.md`)
 **Objective:** §7's claim tested at production shape: loop audit + lease-guarding, replica overlay + sticky-LB topology, duplicate-webhook race, lease handover under SIGKILL, session resume on the survivor. Slice-9 exit, §26.1 item 4.
 **Depends on:** 28
 
 ### Plan 30 — Operational hardening: conformance package, runbooks, production entry
 
-**Status:** ⬜ not-started (detail design: `30-conformance-runbooks-production-entry.md`)
+**Status:** ♻️ superseded by 35 (Phase E of `35-production-shape-milestone.md`)
 **Objective:** Close §26.1–26.2: 15-item gap matrix → closed, executable implementation-agnostic conformance CLI with machine-readable report, `referencectl verify --full`, executed incident drills + runbook set (§27), SBOM + digest-pin law (§22.6), v2 negotiation test, plan-prose scrub. Closes Phase F.
 **Depends on:** 21, 26, 29
+
+### Plan 35 (goal) — Production-shape milestone: routing, coordination core, provisioning, replicas, conformance
+
+**Status:** 🔵 planned (detail design: `35-production-shape-milestone.md`)
+**Objective:** One goal run merging 25+27+28+29+30 (phases A–E): kernel capability routing + advisory decision seam, dependsOn DAG + generation fencing + bounded nudge, §18 provisioning + local OCI launcher (zero→N→zero, continuity), two-replica operation + fault matrix, conformance package + executed drills + release hardening. Plan 26 stays open and separate; §26.1 item 14 is explicitly deferred to it.
+**Depends on:** 24, 21, 34 (and its own phases in order A→E)
 
 **Normalized against Phase E as-built:** the full-profile services (forgejo/mattermost/kafka/ollama) already boot and are pinned in `versions.env` — 22/23/26 wake them, no new infra; `provider_events`/`communication_bindings` exist schema-only (22 owns them); the assign path is seeded SQL against `link.gw.team-alpha` (25 cuts it over); the free-tier law holds (ref-env CI jobs stay commented — provider/replica/provisioning legs are the documented **local** gate, `make provider-e2e` + `verify`); 19's honest-failure verify step is 28's in-place rewrite target; 20/21's admin surface is 30's re-verification input, not new construction; the stale "Plan 13 behaviour" comment at `Entities.cs:365` and the docs' live plan cites die in 30's scrub.
 

@@ -1,6 +1,6 @@
 # Plan 27 — Multi-work: dependsOn DAG, steer generation fencing, nudge consumption
 
-**Status:** ⬜ not-started (flips 🔵 at the replanning gate, then 🟡)
+**Status:** ♻️ superseded by plan 35 (Phase B of `35-production-shape-milestone.md`; its locked decisions carry over there)
 **Depends on:** 25 as-built (routing creates assignments — the DAG gates its dispatch); 24 (steer-consumption counterparties). **Phase F leg 6 of 9.**
 **On approval:** this file is the working detail design; keep the Implementation Status table current.
 **Granularity:** one kernel-semantics plan (DAG + generation + nudge = one coherent state-machine widening). Provisioning (§18) is deliberately **not** here — it's 28. Split first if the nudge policy loop grows its own scheduler.

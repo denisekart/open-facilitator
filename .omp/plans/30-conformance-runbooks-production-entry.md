@@ -1,6 +1,6 @@
 # Plan 30 — Operational hardening: conformance package, runbooks, production entry
 
-**Status:** ⬜ not-started (flips 🔵 at the replanning gate, then 🟡)
+**Status:** ♻️ superseded by plan 35 (Phase E of `35-production-shape-milestone.md`; its locked decisions carry over there)
 **Depends on:** 21, 26, 29 (i.e. everything: the full profile, replicas, and the operator surface are in place). **Phase F leg 9 of 9 — closes the phase.**
 **On approval:** this file is the working detail design; keep the Implementation Status table current.
 **Granularity:** split-safety note — conformance package, runbook/drills, and release/SBOM are three faces of one gate; split into 30a (executable conformance CLI + gap closure) / 30b (runbooks + drills + SBOM/release) if the §26.1 gap list from step 0 comes back large.

@@ -136,7 +136,11 @@ public sealed class PrDispatchTests(PostgresFixture fixture) : IDisposable
         {
             ["prRequest"] = new JsonObject
             {
-                ["repo"] = Repo, ["head"] = head, ["base"] = "main", ["title"] = "t", ["body"] = "b",
+                ["repo"] = Repo,
+                ["head"] = head,
+                ["base"] = "main",
+                ["title"] = "t",
+                ["body"] = "b",
             },
         };
         var manifestId = "man-rs-" + workId.ToString("N")[..8];
@@ -161,6 +165,46 @@ public sealed class PrDispatchTests(PostgresFixture fixture) : IDisposable
     }
 
     [Fact]
+    public async Task BotOpenedEventResolvesMarkerDespiteEchoLaw()
+    {
+        // The connector opens the PR as the bot user, so the live resolver
+        // input IS a bot-authored event: the echo-law exemption for
+        // change_request opened/reopened keeps it on the CR arm — echo
+        // suppression here would strand every bot-minted PR unbound.
+        var (adapter, worker, _, workId) = await CodingPlaneAsync();
+        var wireAssignment = WireAssignmentId(workId);
+        var head = "ofac/" + workId.ToString("N")[..12];
+
+        var structured = new JsonObject
+        {
+            ["prRequest"] = new JsonObject
+            {
+                ["repo"] = Repo,
+                ["head"] = head,
+                ["base"] = "main",
+                ["title"] = "t",
+                ["body"] = "b",
+            },
+        };
+        var manifestId = "man-rb-" + workId.ToString("N")[..8];
+        var (bytes, digest) = ResultManifestTestKit.ManifestBytes(
+            ResultManifestTestKit.ManifestDoc(manifestId, structuredResult: structured));
+        var artifactId = await ResultManifestTestKit.UploadManifestAsync(worker, workId, bytes);
+        await KernelOps.PostJsonAsync(adapter, "/api/link/v1/events",
+            Completed(workId, wireAssignment, manifestId, artifactId, digest),
+            HttpStatusCode.Accepted);
+
+        var pr = new Random().Next(10000, 99999).ToString();
+        var posted = await adapter.PostAsync("/api/link/v1/events",
+            Content(OpenedEvent($"dlv-{Guid.NewGuid():N}", Repo, pr, head, actor: "ofac-bot")));
+        Assert.Equal(HttpStatusCode.Accepted, posted.StatusCode);
+        var receipt = await posted.Content.ReadJsonAsync();
+        Assert.Equal($"pr-bound:{pr}", receipt.GetProperty("data").GetProperty("judgment").GetString());
+
+        Assert.Equal(workId, (await fixture.Db.BindingFor("forgejo", Repo, pr)).WorkId);
+    }
+
+    [Fact]
     public async Task UnclaimedCapabilityKeepsManifestOpaque()
     {
         // The global (unlabeled) lane assigns analysis.summarize, which no
@@ -173,7 +217,11 @@ public sealed class PrDispatchTests(PostgresFixture fixture) : IDisposable
         {
             ["prRequest"] = new JsonObject
             {
-                ["repo"] = Repo, ["head"] = Head, ["base"] = "main", ["title"] = "t", ["body"] = "b",
+                ["repo"] = Repo,
+                ["head"] = Head,
+                ["base"] = "main",
+                ["title"] = "t",
+                ["body"] = "b",
             },
         };
         var manifestId = "man-oc-" + workId.ToString("N")[..8];
@@ -200,23 +248,23 @@ public sealed class PrDispatchTests(PostgresFixture fixture) : IDisposable
         var fjEndpoint = "gw-fj-" + Guid.NewGuid().ToString("N")[..8];
         var manEndpoint = "man-" + Guid.NewGuid().ToString("N")[..6];
         var factory = new KernelTestFactory(fixture, noDispatcher: true, settings: new Dictionary<string, string?>
-            {
-                ["Providers:Forgejo:Enabled"] = "true",
-                ["Providers:Forgejo:EndpointId"] = fjEndpoint,
-                ["Providers:Forgejo:Tenant"] = "git.localhost",
-                ["Providers:Forgejo:SiteUrl"] = "http://forgejo:3000",
-                ["Providers:Forgejo:BotUserId"] = "ofac-bot",
-                ["Providers:Forgejo:AssignEndpointId"] = "gw-global-unused",
-                ["Providers:Forgejo:AssignRules:0:Label"] = "ofac:coding",
-                ["Providers:Forgejo:AssignRules:0:CapabilityId"] = "coding.implement",
-                ["Providers:Forgejo:AssignRules:0:EndpointId"] = codingEndpoint,
-                ["Providers:Forgejo:PrRequestCapability"] = "coding.implement",
-                ["Link:WorkloadIdentities:2:ClientId"] = "ofac-gateway-alpha",
-                ["Link:WorkloadIdentities:2:EndpointId"] = manEndpoint,
-                ["Link:WorkloadIdentities:2:Team"] = "team-alpha",
-                ["Link:WorkloadIdentities:2:Role"] = "child",
-                ["Link:WorkloadIdentities:2:AcceptsDelegatedClaims"] = "true",
-            });
+        {
+            ["Providers:Forgejo:Enabled"] = "true",
+            ["Providers:Forgejo:EndpointId"] = fjEndpoint,
+            ["Providers:Forgejo:Tenant"] = "git.localhost",
+            ["Providers:Forgejo:SiteUrl"] = "http://forgejo:3000",
+            ["Providers:Forgejo:BotUserId"] = "ofac-bot",
+            ["Providers:Forgejo:AssignEndpointId"] = "gw-global-unused",
+            ["Providers:Forgejo:AssignRules:0:Label"] = "ofac:coding",
+            ["Providers:Forgejo:AssignRules:0:CapabilityId"] = "coding.implement",
+            ["Providers:Forgejo:AssignRules:0:EndpointId"] = codingEndpoint,
+            ["Providers:Forgejo:PrRequestCapability"] = "coding.implement",
+            ["Link:WorkloadIdentities:2:ClientId"] = "ofac-gateway-alpha",
+            ["Link:WorkloadIdentities:2:EndpointId"] = manEndpoint,
+            ["Link:WorkloadIdentities:2:Team"] = "team-alpha",
+            ["Link:WorkloadIdentities:2:Role"] = "child",
+            ["Link:WorkloadIdentities:2:AcceptsDelegatedClaims"] = "true",
+        });
         _factories.Add(factory);
         var authed = factory.CreateAuthedClient();
         var adapter = factory.CreateLinkClient(await LinkTestHarness.EnrollAsync(authed, fjEndpoint));
@@ -289,18 +337,22 @@ public sealed class PrDispatchTests(PostgresFixture fixture) : IDisposable
     }
 
     /// <summary>The change_request opened fixture rewritten for a fresh PR
-    /// whose verbatim payload carries <c>pull_request.head.ref</c>.</summary>
-    private static string OpenedEvent(string deliveryId, string repo, string number, string headRef)
+    /// whose verbatim payload carries <c>pull_request.head.ref</c>. The
+    /// <paramref name="actor"/> rides both actor fields (the kernel echo law
+    /// keys on <c>actorProviderAccountId</c>).</summary>
+    private static string OpenedEvent(string deliveryId, string repo, string number, string headRef, string actor = "alice")
     {
         var doc = JsonNode.Parse(PostgresFixture.ReadFixture("valid/event.provider.change_request.opened.json"))!.AsObject();
         doc["id"] = "evt-" + Guid.NewGuid().ToString("N");
         doc["subject"] = $"provider/forgejo/pr-{number}";
         var data = doc["data"]!.AsObject();
         data["providerDeliveryId"] = deliveryId;
+        data["actorProviderAccountId"] = actor;
         var reference = data["reference"]!.AsObject();
         reference["channelOrResourceId"] = repo;
         reference["rootThreadId"] = number;
         reference["subjectRef"] = number;
+        reference["authorProviderAccountId"] = actor;
         var payload = data["payload"]!.AsObject();
         payload["number"] = int.Parse(number, System.Globalization.CultureInfo.InvariantCulture);
         payload["pull_request"] = new JsonObject

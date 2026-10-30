@@ -1,0 +1,11 @@
+// Typecheck-only config for the test tier. The build tsconfig covers `src`
+// alone; vitest transpiles without checking, so tests need this pass.
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "lib": ["ES2024", "DOM"],
+    "types": ["node"]
+  },
+  "include": ["src", "test", "vitest.config.ts"]
+}

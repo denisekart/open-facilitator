@@ -248,8 +248,17 @@ public sealed class ProviderEventStore(
         }
 
         // 2. Echo law (§13.4): a bot-authored event is the outbound-post ledger
-        // write — suppress before the inbox, persist to the binding.
-        if (botId is { Length: > 0 } bot && actor == bot)
+        // write — suppress before the inbox, persist to the binding. One
+        // exemption (mirrored in the adapter's normalizer): a bot's own
+        // change_request opened/reopened is a load-bearing state change — the
+        // head-branch resolver binds the parked `branch:<ref>` marker to the
+        // minted PR number only if this event reaches the CR arm, and nothing
+        // answers it, so no self-answering loop can form.
+        var botStateChange = type == ProviderEventClass.ChangeRequest
+            && data.TryGetProperty("action", out var actionEl)
+            && actionEl.ValueKind == JsonValueKind.String
+            && actionEl.GetString() is "opened" or "reopened";
+        if (!botStateChange && botId is { Length: > 0 } bot && actor == bot)
         {
             var echoed = await db.CommunicationBindings
                 .FirstOrDefaultAsync(b => b.Provider == provider && b.Channel == reference.Channel && b.RootMessageId == reference.Root, ct);
@@ -518,7 +527,7 @@ public sealed class ProviderEventStore(
             IdempotencyKey = deliveryId,
             CreatedAt = now,
         });
-        AppendAssignInterim(db, options, workId, objective, reference, data, now);
+        AppendAssignInterim(db, options, workId, objective, reference, null, now);
         await AckAsync(db, options, reference, deliveryId, replyVsReaction, now, ct);
         return new ArmEffect(workId, $"work/{workId}");
     }
@@ -618,8 +627,9 @@ public sealed class ProviderEventStore(
         if (binding is null && action == "labeled" && workTrigger)
         {
             var objective = Trim(text ?? $"Issue {reference.Channel}#{reference.Root}");
+            var rule = MatchAssignRule(options, data);
             var workId = await CreateWorkFromProviderAsync(db, workload, options, reference, objective, deliveryId,
-                $"work created (issue #{reference.Root})", data, now, ct);
+                $"work created (issue #{reference.Root})", rule, now, ct);
             // Ack comment effect (decision 4): the adapter posts it as a bot
             // comment; kind rides the reference ("comment").
             AppendCommand(db, ReplyEnvelope(TargetOf(reference), "On it.", $"issue:{deliveryId}:ack",
@@ -749,23 +759,38 @@ public sealed class ProviderEventStore(
     // Work + created event + binding + interim assign, all in the arm's open
     // transaction.
     private async Task<Guid> CreateWorkFromProviderAsync(
-        FacilitatorDbContext db, Facilitator.Kernel.Shared.Auth.LinkPrincipal workload, ProviderOptions options, Reference reference, string objective, string deliveryId, string progressNote, JsonElement? triggerEvent, DateTime now, CancellationToken ct)
+        FacilitatorDbContext db, Facilitator.Kernel.Shared.Auth.LinkPrincipal workload, ProviderOptions options, Reference reference, string objective, string deliveryId, string progressNote, AssignRule? rule, DateTime now, CancellationToken ct)
     {
+        // A rule-matched lane may name the OWNING team (the endpoint's
+        // fleet): the manifest ledger team-scopes a work's artifacts, so
+        // the work lives on the coding team or its worker could never
+        // record a manifest. Unrostered team ⇒ the workload's own team
+        // (fail-open: a provider config typo must not drop the Work).
+        var teamId = workload.TeamId;
+        if (rule?.Team is { Length: > 0 } teamSlug
+            && await db.Teams.AsNoTracking().Where(t => t.Slug == teamSlug)
+                .Select(t => t.TeamId).FirstOrDefaultAsync(ct) is { } rostered && rostered != default)
+        {
+            // Fail-open: an unrostered team keeps the workload's own team —
+            // a provider config typo must not drop the Work.
+            teamId = rostered;
+        }
         var workId = Guid.NewGuid();
         var project = await db.Projects.FirstOrDefaultAsync(
-            p => p.TeamId == workload.TeamId && p.Name == ProviderProjectName, ct);
+            p => p.TeamId == teamId && p.Name == ProviderProjectName, ct);
         if (project is null)
         {
             project = new ProjectEntity
             {
                 ProjectId = Guid.NewGuid(),
-                TeamId = workload.TeamId,
+                TeamId = teamId,
                 Name = ProviderProjectName,
                 Config = "{}",
                 CreatedAt = now,
             };
             db.Projects.Add(project);
         }
+
 
         db.Works.Add(new WorkEntity
         {
@@ -799,7 +824,7 @@ public sealed class ProviderEventStore(
             IdempotencyKey = deliveryId,
             CreatedAt = now,
         });
-        AppendAssignInterim(db, options, workId, objective, reference, triggerEvent, now);
+        AppendAssignInterim(db, options, workId, objective, reference, rule, now);
         return workId;
     }
 
@@ -883,9 +908,8 @@ public sealed class ProviderEventStore(
     /// <c>work-assign-coding:</c> command id (the re-dispatch arm reads the
     /// original envelope back by it). No rule match ⇒ today's global
     /// endpoint/capability behavior, byte-for-byte.</summary>
-    private void AppendAssignInterim(FacilitatorDbContext db, ProviderOptions options, Guid workId, string objective, Reference reference, JsonElement? triggerEvent, DateTime now)
+    private void AppendAssignInterim(FacilitatorDbContext db, ProviderOptions options, Guid workId, string objective, Reference reference, AssignRule? rule, DateTime now)
     {
-        var rule = MatchAssignRule(options, triggerEvent);
         var endpointId = rule?.EndpointId is { Length: > 0 } ruleEndpoint
             ? ruleEndpoint
             : options.AssignEndpointId;

@@ -1,0 +1,29 @@
+# Standalone Gateway for the compose coding-workspace container: the
+# team-coding fleet (coding worker + its own forgejo ops connector), so the
+# PR legs (branch push, change_request create/comment) execute behind the
+# OWNING team's policy. Identity: mode-(a) enrollment — the kernel's shared
+# Link enrollment token (OFAC_ENROLL_SECRET) mints the channel; team-coding is
+# kernel-rostered (Link:Teams). No workload OIDC block: the coding lane needs
+# no Keycloak client.
+apiVersion: facilitator.framework/v1
+kind: Gateway
+gatewayId: gw.coding
+team: team-coding
+role: gateway
+facilitatorUrl: http://facilitator:8080
+trustMode: isolated-executor
+stateDir: /var/lib/ofac/gateway
+mode: standalone
+children:
+  # Late hello over the child socket; hello auth falls back to
+  # OFAC_CHILD_SECRET, so no per-child token entries.
+  - name: coding-worker
+  - name: forgejo-connector
+childTransport:
+  socket:
+    path: child.sock
+diagnostics:
+  port: 8100
+heartbeatSeconds: 5
+policy:
+  path: policy.yaml

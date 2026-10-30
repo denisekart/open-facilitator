@@ -1,0 +1,37 @@
+# Team-coding policy: the coding lane runs UNATTENDED, so the PR-mutating
+# ops are allow (deliberate posture difference from the demo workspace,
+# where vcs.branch.push/vcs.change_request.create/vcs.pipeline.trigger sit at
+# confirm and the review legs prove that loop). First-match-wins + implicit
+# deny, same engine, different posture.
+owner: team-coding
+policies:
+  - capability: coding.implement
+    resources: ["*"]
+    actorAnyOf: []
+    effect: allow
+  - capability: vcs.issue.read
+    resources: ["*"]
+    actorAnyOf: []
+    effect: allow
+  - capability: vcs.issue.comment
+    resources: ["*"]
+    actorAnyOf: []
+    effect: allow
+  - capability: vcs.change_request.comment
+    resources: ["*"]
+    actorAnyOf: []
+    effect: allow
+  # Allow (not confirm): the demo must not stall on a human approval for a
+  # two-command PR.
+  - capability: vcs.branch.push
+    resources: ["*"]
+    actorAnyOf: []
+    effect: allow
+  - capability: vcs.change_request.create
+    resources: ["*"]
+    actorAnyOf: []
+    effect: allow
+  - capability: vcs.pipeline.trigger
+    resources: ["*"]
+    actorAnyOf: []
+    effect: allow

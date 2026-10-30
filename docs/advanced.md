@@ -172,6 +172,17 @@ executions survive a socket swap; amnesiac ones honestly answer `unknown`).
 `SessionStore` is the seam for a harness that can re-attach to a native run
 id — no in-repo implementation yet.
 
+### Deployment lifecycle (full profile)
+
+The full-profile example worker (`examples/full/coding-worker`) runs
+long-lived inside its workspace container under the supervisor, so steer
+delivery has two observable shapes: an in-run steer rides the open link as a
+`command.work.steer.v1` row, and a post-completion steer re-dispatches the
+original assign envelope (directive in `inputs.steers`) — the worker
+re-hydrates from the branch/PR lineage instead of a live process. Scaling
+the workspace itself to zero is Plan 28's provisioning story; re-dispatch
+generations fence against a resumed older worker under Plan 27's fencing.
+
 ### Conformance
 
 `@ofac/adapter/testing`'s `runAdapterLifecycleContract({...})` is the gate:
@@ -229,7 +240,10 @@ Authoring law, as both adapters prove it:
   receipt; replays answer `accepted` without touching the provider.
 - **Echo suppression is the kernel's judgment, the adapter's honesty**: the
   bot publishes its own post back as a `message.v1` echo; the kernel records
-  the provider post id into `communication_bindings` and runs no arms.
+  the provider post id into `communication_bindings` and runs no arms. One
+  exemption: a bot-authored `change_request.v1` `opened`/`reopened` is a state
+  change the head-branch resolver must see (a connector-minted PR would else
+  strand unbound) and nothing answers it, so it runs the arm instead.
 
 ### Operation semantics (spec §13.5, as-built — Mattermost)
 

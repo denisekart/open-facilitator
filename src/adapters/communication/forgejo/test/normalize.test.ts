@@ -135,6 +135,26 @@ describe("normalizePullRequest", () => {
   it("drops an unmapped action", () => {
     expect(normalizePullRequest({ ...prOpened, action: "assigned" }, "dlv-13", ctx)).toBeNull();
   });
+
+  it("a bot-opened PR survives the echo filter (resolver input, not an echo)", () => {
+    const event = normalizePullRequest(
+      { ...prOpened, sender: { login: "ofac-bot" } },
+      "dlv-15",
+      ctx,
+    );
+    expect(event?.data.action).toBe("opened");
+    expect(event?.data.actorProviderAccountId).toBe("ofac-bot");
+  });
+
+  it("a bot synchronized event still drops (echo law, no resolver role)", () => {
+    expect(
+      normalizePullRequest(
+        { ...prOpened, action: "synchronized", sender: { login: "ofac-bot" } },
+        "dlv-16",
+        ctx,
+      ),
+    ).toBeNull();
+  });
 });
 
 describe("normalizeReview", () => {

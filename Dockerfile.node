@@ -18,6 +18,7 @@ COPY src/adapters/harnesses/deterministic/package.json src/adapters/harnesses/de
 COPY src/adapters/communication/mattermost/package.json src/adapters/communication/mattermost/
 COPY src/adapters/communication/forgejo/package.json src/adapters/communication/forgejo/
 COPY src/adapters/communication/forgejo-connector/package.json src/adapters/communication/forgejo-connector/
+COPY examples/full/coding-worker/package.json examples/full/coding-worker/
 RUN pnpm install --frozen-lockfile
 COPY tsconfig.base.json ./
 COPY src/protocol/ src/protocol/
@@ -28,6 +29,7 @@ COPY src/adapters/harnesses/deterministic/ src/adapters/harnesses/deterministic/
 COPY src/adapters/communication/mattermost/ src/adapters/communication/mattermost/
 COPY src/adapters/communication/forgejo/ src/adapters/communication/forgejo/
 COPY src/adapters/communication/forgejo-connector/ src/adapters/communication/forgejo-connector/
+COPY examples/full/coding-worker/ examples/full/coding-worker/
 RUN pnpm -r build
 # --prod + injected workspace deps: each dir is a runnable closure (node_modules
 # with the workspace packages copied in), freshly built dist/ included via each
@@ -37,11 +39,15 @@ RUN pnpm deploy --filter=@ofac/gateway --prod /deploy/gateway \
  && pnpm deploy --filter=@ofac/harness-deterministic --prod /deploy/worker \
  && pnpm deploy --filter=@ofac/mattermost-adapter --prod /deploy/mattermost-adapter \
  && pnpm deploy --filter=@ofac/forgejo-adapter --prod /deploy/forgejo-adapter \
- && pnpm deploy --filter=@ofac/forgejo-connector --prod /deploy/forgejo-connector
+ && pnpm deploy --filter=@ofac/forgejo-connector --prod /deploy/forgejo-connector \
+ && pnpm deploy --filter=@ofac/example-coding-worker --prod /deploy/coding-worker
 
 # Debian slim, not Alpine: better-sqlite3 ships glibc prebuilds (see
 # pnpm-workspace.yaml allowBuilds); Alpine would force a node-gyp rebuild.
 FROM node:22-bookworm-slim AS runtime
+# git: the coding worker's clone/commit/push lane spawns it (git-minimal on
+# bookworm ≈ +20MB; image size is irrelevant next to correctness).
+RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
 COPY --from=build /deploy /app
 # Writable state root for mounted consumers (compose demo-workspace: the
 # Gateway stateDir, worker workDir, and supervisor logs live under here) +

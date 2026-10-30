@@ -7,7 +7,7 @@
     "Provider": "filesystem"
   },
   "Link": {
-    "Teams": ["team-alpha", "team-beta"],
+    "Teams": ["team-alpha", "team-beta", "team-coding"],
     "Evidence": { "Audience": "facilitator-link" },
     "WorkloadIdentities": [
       {

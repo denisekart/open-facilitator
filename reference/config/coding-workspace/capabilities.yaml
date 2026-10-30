@@ -1,0 +1,15 @@
+# Coding lane: one capability, steerable. The kernel routes a Work here when
+# the issue event carries the ofac:coding label (Providers:Forgejo:AssignRules).
+apiVersion: facilitator.framework/v1
+kind: CapabilityManifest
+ownerTeam: team-coding
+capabilities:
+  - id: coding.implement
+    version: 1
+    execution: asynchronous
+    acceptedContexts: [uri-reference]
+    outputKinds: [coding.change]
+    outputMediaTypes: [text/markdown]
+    supportsSteering: true
+    supportsCancellation: true
+    supportsNudge: false

@@ -1,0 +1,15 @@
+# Coding worker for the compose coding-workspace container. Over the
+# localhost child leg it attaches to the in-container Gateway (standalone
+# fleet). No tokens in this file: OFAC_CHILD_SECRET supplies the child-wire
+# token and the unit's self-enrollment exports OFAC_KERNEL_TOKEN (the
+# worker's kernel credential for the artifact byte path — the result manifest).
+apiVersion: facilitator.framework/v1
+kind: HarnessAdapter
+childWorkspaceId: gw.coding/coding-worker
+kernelUrl: http://facilitator:8080
+transport:
+  socket:
+    path: /var/lib/ofac/gateway/child.sock
+manifestFile: /opt/ofac/config/capabilities.yaml
+workDir: /var/lib/ofac/worker
+heartbeatSeconds: 5

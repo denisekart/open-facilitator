@@ -27,6 +27,10 @@ export interface InitConfig {
   repo: string;
   sampleTitle: string;
   workLabel: string;
+  /** Optional second seed (coding lane): an issue titled thus, carrying this
+   *  label — same reconcile law as the work-label sample. Unset ⇒ no-op. */
+  codingIssueTitle?: string | undefined;
+  codingLabel?: string | undefined;
   hookUrl: string;
   webhookSecret: string;
   botTokenFile: string;
@@ -43,6 +47,7 @@ export interface InitReport {
   org: "created" | "exists";
   repo: "created" | "exists";
   issue: "created" | "exists";
+  codingIssue?: "created" | "exists" | undefined;
   webhook: "created" | "exists";
 }
 
@@ -209,76 +214,95 @@ export async function runInit(config: InitConfig, deps: InitDeps = {}): Promise<
     },
   );
 
-  // 4. label + sample issue (title-keyed reconcile). Forgejo 16 renamed the
-  // label field `title`→`name` (422 "[Name]: Required" verified live); send
-  // both — pre-16 ignores `name`, 16 ignores `title`. List-first (hook law):
-  // a rerun POSTing blind grows duplicates.
-  const labelRows = asArray(
+  // 4. labels + sample issues (title-keyed reconcile, one pass per seed:
+  // the ofac:work sample always, the coding-lane pair only when configured).
+  // Forgejo 16 renamed the label field `title`→`name` (422 "[Name]: Required"
+  // verified live); send both — pre-16 ignores `name`, 16 ignores `title`.
+  // List-first (hook law): a rerun POSTing blind grows duplicates.
+  let issue: InitReport["issue"] = "exists";
+  let codingIssue: InitReport["codingIssue"];
+  const seeds: { label: string; title: string; mark: (r: "created" | "exists") => void }[] = [
+    {
+      label: config.workLabel,
+      title: config.sampleTitle,
+      mark: (r) => {
+        issue = r;
+      },
+    },
+    ...(config.codingIssueTitle !== undefined && config.codingLabel !== undefined
+      ? [
+          {
+            label: config.codingLabel,
+            title: config.codingIssueTitle,
+            mark: (r: "created" | "exists") => {
+              codingIssue = r;
+            },
+          },
+        ]
+      : []),
+  ];
+  let labelRows = asArray(
     (await call(fetchImpl, base, "GET", `/api/v1/repos/${config.repo}/labels`, { token })).json,
   );
-  if (!labelRows.map(asRecord).some((row) => (row["name"] ?? row["title"]) === config.workLabel)) {
-    await call(fetchImpl, base, "POST", `/api/v1/repos/${config.repo}/labels`, {
-      token,
-      json: { title: config.workLabel, name: config.workLabel, color: "#1d76db" },
-    });
-  }
   const issues = asArray(
     (await call(fetchImpl, base, "GET", `/api/v1/repos/${config.repo}/issues?state=all`, { token }))
       .json,
   );
-  let issue: InitReport["issue"] = "exists";
-  let sampleNumber: number;
-  if (!issues.some((row) => asRecord(row)["title"] === config.sampleTitle)) {
-    const created = await call(fetchImpl, base, "POST", `/api/v1/repos/${config.repo}/issues`, {
-      token,
-      json: {
-        title: config.sampleTitle,
-        body: `Seeded by forgejo-init: label ${config.workLabel} triggers a Work.`,
-      },
-    });
-    if (created.status !== 201) throw new Error(`issue create failed: HTTP ${created.status}`);
-    issue = "created";
-    sampleNumber = Number(asRecord(created.json)["number"] ?? 0);
-  } else {
-    sampleNumber = Number(
-      issues.map(asRecord).find((row) => row["title"] === config.sampleTitle)?.["number"] ?? 0,
-    );
-  }
-
-  // Label the sample whether it was created now or on an earlier run (a run
-  // that predates the label step must converge, not stay half-seeded).
-  // Re-check the issue's own labels first: a labeled issue means the
-  // labeled webhook already fired once.
-  const labels = asArray(
-    (await call(fetchImpl, base, "GET", `/api/v1/repos/${config.repo}/labels`, { token })).json,
-  );
-  const labelId = labels
-    .map(asRecord)
-    .find((row) => (row["name"] ?? row["title"]) === config.workLabel)?.["id"];
-  const sampleDetail = asRecord(
-    (
-      await call(fetchImpl, base, "GET", `/api/v1/repos/${config.repo}/issues/${sampleNumber}`, {
+  for (const seed of seeds) {
+    if (!labelRows.map(asRecord).some((row) => (row["name"] ?? row["title"]) === seed.label)) {
+      await call(fetchImpl, base, "POST", `/api/v1/repos/${config.repo}/labels`, {
         token,
-      })
-    ).json,
-  );
-  const sampleLabels = asArray(sampleDetail["labels"] ?? []);
-  if (
-    labelId !== undefined &&
-    sampleNumber > 0 &&
-    !sampleLabels.map(asRecord).some((row) => (row["name"] ?? row["title"]) === config.workLabel)
-  ) {
-    await call(
-      fetchImpl,
-      base,
-      "POST",
-      `/api/v1/repos/${config.repo}/issues/${sampleNumber}/labels`,
-      {
+        json: { title: seed.label, name: seed.label, color: "#1d76db" },
+      });
+      labelRows = asArray(
+        (await call(fetchImpl, base, "GET", `/api/v1/repos/${config.repo}/labels`, { token })).json,
+      );
+    }
+    let number: number;
+    if (!issues.some((row) => asRecord(row)["title"] === seed.title)) {
+      const created = await call(fetchImpl, base, "POST", `/api/v1/repos/${config.repo}/issues`, {
+        token,
+        json: {
+          title: seed.title,
+          body: `Seeded by forgejo-init: label ${seed.label} triggers a Work.`,
+        },
+      });
+      if (created.status !== 201) throw new Error(`issue create failed: HTTP ${created.status}`);
+      seed.mark("created");
+      number = Number(asRecord(created.json)["number"] ?? 0);
+    } else {
+      seed.mark("exists");
+      number = Number(
+        issues.map(asRecord).find((row) => row["title"] === seed.title)?.["number"] ?? 0,
+      );
+    }
+
+    // Label the sample whether it was created now or on an earlier run (a run
+    // that predates the label step must converge, not stay half-seeded).
+    // Re-check the issue's own labels first: a labeled issue means the
+    // labeled webhook already fired once.
+    const labelId = labelRows
+      .map(asRecord)
+      .find((row) => (row["name"] ?? row["title"]) === seed.label)?.["id"];
+    const detail = asRecord(
+      (
+        await call(fetchImpl, base, "GET", `/api/v1/repos/${config.repo}/issues/${number}`, {
+          token,
+        })
+      ).json,
+    );
+    const mine = asArray(detail["labels"] ?? []);
+    if (
+      labelId !== undefined &&
+      number > 0 &&
+      !mine.map(asRecord).some((row) => (row["name"] ?? row["title"]) === seed.label)
+    ) {
+      await call(fetchImpl, base, "POST", `/api/v1/repos/${config.repo}/issues/${number}/labels`, {
         token,
         json: { labels: [labelId] },
-      },
-    );
-    log(`sample issue #${sampleNumber} labeled`);
+      });
+      log(`sample issue #${number} labeled ${seed.label}`);
+    }
   }
 
   // 5. webhook: list-first, exactly one pointing at the adapter. 16.x event
@@ -349,5 +373,5 @@ export async function runInit(config: InitConfig, deps: InitDeps = {}): Promise<
   renameSync(tmp, config.botTokenFile);
   log(`bot token → ${config.botTokenFile}`);
 
-  return { admin, bot, org, repo, issue, webhook };
+  return { admin, bot, org, repo, issue, codingIssue, webhook };
 }

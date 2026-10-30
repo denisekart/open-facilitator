@@ -47,7 +47,8 @@ VERIFY_REQUESTED=()
 FULL_ORDER=(provider-boot provider-link-challenge provider-mention
   provider-completion-reply provider-echo-suppression provider-reaction-no-consent
   forgejo-boot forgejo-seed forgejo-issue-work forgejo-comment-input
-  forgejo-connector-pr forgejo-review-steer forgejo-ci-note)
+  forgejo-connector-pr forgejo-review-steer forgejo-ci-note
+  coding-issue-work coding-pr coding-review-steer coding-redispatch)
 full_deps_of() {
   case "$1" in
     provider-link-challenge) echo provider-boot ;;
@@ -58,6 +59,10 @@ full_deps_of() {
     forgejo-comment-input) echo forgejo-issue-work ;;
     forgejo-connector-pr) echo forgejo-issue-work ;;
     forgejo-review-steer | forgejo-ci-note) echo forgejo-connector-pr ;;
+    coding-issue-work) echo forgejo-seed ;;
+    coding-pr) echo coding-issue-work ;;
+    coding-review-steer) echo coding-pr ;;
+    coding-redispatch) echo coding-review-steer ;;
     *) ;;
   esac
 }
@@ -504,6 +509,168 @@ step_forgejo_ci_note() {
     || { step_fail "no provider.input note with the failure verdict 45s after the status"; full_logs forgejo-adapter facilitator; return 1; }
   step_pass "commit-status failure annotated $FJ_WORK (status on PR head + signed ci delivery)"
 }
+# --- Coding-worker legs (Plan 24 step 6: §23.1) --------------------------------
+# A fresh ofac:coding-labeled issue arms a coding Work (rule-matched assign to
+# gw.coding, team-coding), the coding worker clones/changes/pushes, the kernel
+# manifest reader opens the PR through the coding connector, a PR review
+# steers through re-dispatch (restart-with-context), and the re-dispatched
+# run lands a "steer incorporated" comment. Append-only on the seed repo.
+
+FJ_CODING_ISSUE=""
+FJ_CODING_WORK=""
+FJ_CODING_PR=""
+FJ_CODING_HEAD=""
+
+fj_coding_outbox() { # <command_id>
+  full_psql "SELECT 1 FROM facilitator.outbox WHERE work_id = '$FJ_CODING_WORK' AND command_id = '$1' LIMIT 1" | grep -q 1
+}
+fj_coding_envelope_has() { # <LIKE pattern> — envelope text search on this work's rows
+  full_psql "SELECT 1 FROM facilitator.outbox WHERE work_id = '$FJ_CODING_WORK' AND envelope::text LIKE '%$1%' LIMIT 1" | grep -q 1
+}
+fj_issue_comment_with() { # <needle> — bot comment carrying the text on the coding issue
+  forgejo_api GET "/api/v1/repos/demo/widgets/issues/$FJ_CODING_ISSUE/comments" |
+    jq -e --arg n "$1" '[.[] | select(.user.login == "facilitator-bot" and (.body | contains($n)))] | length >= 1' >/dev/null
+}
+fj_coding_steers() { # -> steer timeline row count for the coding work
+  full_psql "SELECT count(*) FROM facilitator.work_events WHERE work_id = '$FJ_CODING_WORK' AND kind = 'steer'" | head -n1
+}
+
+step_coding_issue_work() {
+  local title="verify coding $(date +%s)$RANDOM" label_id
+  FJ_CODING_ISSUE=$(forgejo_api POST /api/v1/repos/demo/widgets/issues \
+    "$(jq -cn --arg t "$title" '{title:$t, body:"verify leg: the coding lane turns a labeled issue into a change"}')" | jq -re .number) \
+    || { step_fail "coding issue creation refused"; return 1; }
+  label_id=$(forgejo_api GET /api/v1/repos/demo/widgets/labels | jq -re '[.[] | select(.name=="ofac:coding")] | .[0].id') \
+    || { step_fail "ofac:coding label missing"; full_logs forgejo-init; return 1; }
+  forgejo_api POST "/api/v1/repos/demo/widgets/issues/$FJ_CODING_ISSUE/labels" \
+    "$(jq -cn --argjson l "$label_id" '{labels:[$l]}')" >/dev/null \
+    || { step_fail "coding label attach refused"; return 1; }
+  fj_coding_binding() {
+    FJ_CODING_WORK=$(full_psql "SELECT work_id FROM facilitator.communication_bindings WHERE provider = 'forgejo' AND channel = 'demo/widgets' AND root_message_id = '$FJ_CODING_ISSUE' LIMIT 1" | head -n1)
+    [ -n "$FJ_CODING_WORK" ]
+  }
+  poll_until 60 fj_coding_binding >/dev/null \
+    || { step_fail "no binding row 60s after labeling issue #$FJ_CODING_ISSUE"; full_logs forgejo-adapter facilitator; return 1; }
+  # Rule-matched assign (24 1a): coding command id, gw.coding recipient,
+  # coding.implement capability, and the issue/repo re-hydration inputs.
+  poll_until 30 fj_coding_outbox "work-assign-coding:$FJ_CODING_WORK" \
+    || { step_fail "no work-assign-coding outbox row for $FJ_CODING_WORK"; full_logs facilitator coding-workspace; return 1; }
+  full_psql "SELECT 1 FROM facilitator.outbox WHERE command_id = 'work-assign-coding:$FJ_CODING_WORK'
+      AND recipient_endpoint_id = 'link.gw.coding'
+      AND envelope->'data'->>'capabilityId' = 'coding.implement'
+      AND envelope->'data'->'inputs'->>'issue' = '$FJ_CODING_ISSUE' LIMIT 1" | grep -q 1 \
+    || { step_fail "coding assign row is not rule-shaped (endpoint/capability/inputs)"; full_logs facilitator; return 1; }
+  # The rule's Team threads the Work's own team (manifest ledger law).
+  full_psql "SELECT t.slug FROM facilitator.works w
+      JOIN facilitator.projects p ON p.project_id = w.project_id
+      JOIN facilitator.teams t ON t.team_id = p.team_id
+     WHERE w.work_id = '$FJ_CODING_WORK'" | grep -q team-coding \
+    || { step_fail "coding Work is not on team-coding"; full_logs facilitator; return 1; }
+  fj_coding_ack() {
+    forgejo_api GET "/api/v1/repos/demo/widgets/issues/$FJ_CODING_ISSUE/comments" |
+      jq -e '[.[] | select(.user.login == "facilitator-bot")] | length >= 1' >/dev/null
+  }
+  poll_until 30 fj_coding_ack \
+    || { step_fail "no facilitator-bot ack comment on coding issue #$FJ_CODING_ISSUE"; full_logs forgejo-adapter; return 1; }
+  step_pass "labeled issue #$FJ_CODING_ISSUE armed team-coding Work $FJ_CODING_WORK (rule assign to gw.coding + ack)"
+}
+
+step_coding_pr() {
+  # Worker: clone -> ofac/<assignment8> -> changelog + test -> push. Kernel
+  # reader: prRequest -> pr-create row (no approval: team-coding policy is
+  # allow). Connector: opens exactly one PR carrying "Closes #<issue>".
+  # Resolver: the branch:<head> marker is copied onto a PR-number binding.
+  fj_coding_pr_open() {
+    local rows
+    rows=$(forgejo_api GET "/api/v1/repos/demo/widgets/pulls?state=all" \
+      | jq -c --argjson i "$FJ_CODING_ISSUE" \
+        '[.[] | select(.head.ref | startswith("ofac/")) | select(.body | contains("Closes #\($i)"))]') || return 1
+    [ "$(echo "$rows" | jq -r 'length')" = "1" ] || return 1
+    [ "$(echo "$rows" | jq -r '.[0].state')" = open ] || return 1
+    FJ_CODING_PR=$(echo "$rows" | jq -r '.[0].number')
+    FJ_CODING_HEAD=$(echo "$rows" | jq -r '.[0].head.ref')
+    [ "$FJ_CODING_PR" != null ] && [ -n "$FJ_CODING_HEAD" ]
+  }
+  poll_until 180 fj_coding_pr_open >/dev/null \
+    || { step_fail "no coding PR 180s after labeling issue #$FJ_CODING_ISSUE"; full_logs coding-workspace facilitator; return 1; }
+  forgejo_api GET "/api/v1/repos/demo/widgets/pulls/$FJ_CODING_PR" \
+    | jq -e --argjson i "$FJ_CODING_ISSUE" '(.body | contains("Closes #\($i)"))' >/dev/null \
+    || { step_fail "PR #$FJ_CODING_PR body carries no Closes # reference"; return 1; }
+  fj_coding_pr_binding() {
+    full_psql "SELECT 1 FROM facilitator.communication_bindings WHERE provider = 'forgejo' AND channel = 'demo/widgets' AND root_message_id = '$FJ_CODING_PR' AND work_id = '$FJ_CODING_WORK' LIMIT 1" | grep -q 1
+  }
+  poll_until 60 fj_coding_pr_binding >/dev/null \
+    || { step_fail "head-branch resolver never bound PR #$FJ_CODING_PR to $FJ_CODING_WORK"; full_logs forgejo-adapter facilitator; return 1; }
+  fj_coding_completed_manifest() {
+    full_psql "SELECT 1 FROM facilitator.inbox WHERE payload->>'type' = 'org.facilitator.event.assignment.completed.v1'
+        AND payload->'data'->>'workId' = '$FJ_CODING_WORK'
+        AND payload->'data'->>'resultManifestRef' IS NOT NULL LIMIT 1" | grep -q 1
+  }
+  poll_until 30 fj_coding_completed_manifest >/dev/null \
+    || { step_fail "coding completed event carries no manifest ref"; full_logs coding-workspace facilitator; return 1; }
+  local approvals
+  approvals=$(full_psql "SELECT count(*) FROM facilitator.approvals WHERE work_id = '$FJ_CODING_WORK'" | head -n1)
+  [ "${approvals:-9}" = "0" ] \
+    || { step_fail "team-coding allow-policy lane raised $approvals approval rows"; return 1; }
+  step_pass "coding PR #$FJ_CODING_PR (head $FJ_CODING_HEAD) opened unattended, Closes #$FJ_CODING_ISSUE, resolver bound it, manifest recorded"
+}
+
+step_coding_review_steer() {
+  local directive="reword the changelog entry for clarity"
+  forgejo_api POST "/api/v1/repos/demo/widgets/pulls/$FJ_CODING_PR/reviews" \
+    "$(jq -cn --arg b "$directive" '{body:$b, event:"COMMENTED"}')" >/dev/null \
+    || { step_fail "review POST refused"; return 1; }
+  fj_coding_steered() {
+    full_psql "SELECT 1 FROM facilitator.work_events WHERE work_id = '$FJ_CODING_WORK' AND kind = 'steer' AND detail::text LIKE '%changelog entry for clarity%' LIMIT 1" | grep -q 1
+  }
+  poll_until 45 fj_coding_steered \
+    || { step_fail "no steer timeline row 45s after the PR review"; full_logs forgejo-adapter facilitator; return 1; }
+  # No live execution (the first run completed): §23.1 re-dispatch branch —
+  # a cloned assign envelope keyed work-redispatch:<steerId> carrying the
+  # directive in inputs.steers, addressed to the ORIGINAL recipient.
+  fj_coding_redispatched() {
+    full_psql "SELECT 1 FROM facilitator.outbox WHERE work_id = '$FJ_CODING_WORK'
+        AND command_id LIKE 'work-redispatch:%' AND envelope::text LIKE '%changelog entry for clarity%'
+        AND recipient_endpoint_id = 'link.gw.coding' LIMIT 1" | grep -q 1
+  }
+  poll_until 30 fj_coding_redispatched \
+    || { step_fail "no work-redispatch row carrying the directive"; full_logs facilitator; return 1; }
+  # Re-hydration proof: the re-dispatched run posts its steer comment.
+  poll_until 120 fj_issue_comment_with "steer incorporated: $directive" \
+    || { step_fail "no 'steer incorporated' comment 120s after the re-dispatch"; full_logs coding-workspace facilitator; return 1; }
+  local version
+  version=$(full_psql "SELECT version FROM facilitator.works WHERE work_id = '$FJ_CODING_WORK'" | head -n1)
+  [ "${version:-0}" -ge 2 ] \
+    || { step_fail "Work version not bumped by the steer (got ${version:-?})"; return 1; }
+  step_pass "PR review steered $FJ_CODING_WORK -> re-dispatch to gw.coding -> steer comment on issue #$FJ_CODING_ISSUE (version $version)"
+}
+
+step_coding_redispatch() {
+  # §23.1's restart leg: the owning workspace is DOWN when the second review
+  # lands. The steer still records + re-dispatches (kernel-side, outbox
+  # queues); restart delivers it, the worker reconciles, the comment lands.
+  full_compose stop coding-workspace \
+    || { step_fail "could not stop coding-workspace"; return 1; }
+  local directive2="add the timeout clause to the changelog note"
+  forgejo_api POST "/api/v1/repos/demo/widgets/pulls/$FJ_CODING_PR/reviews" \
+    "$(jq -cn --arg b "$directive2" '{body:$b, event:"APPROVED"}')" >/dev/null \
+    || { step_fail "second review POST refused"; full_compose start coding-workspace >/dev/null; return 1; }
+  fj_queued() {
+    full_psql "SELECT 1 FROM facilitator.outbox WHERE work_id = '$FJ_CODING_WORK'
+        AND command_id LIKE 'work-redispatch:%' AND envelope::text LIKE '%timeout clause%' LIMIT 1" | grep -q 1
+  }
+  poll_until 45 fj_queued \
+    || { step_fail "no queued re-dispatch while coding-workspace is down"; full_logs facilitator; full_compose start coding-workspace >/dev/null; return 1; }
+  full_compose start coding-workspace \
+    || { step_fail "could not restart coding-workspace"; return 1; }
+  poll_until 180 fj_issue_comment_with "steer incorporated: $directive2" \
+    || { step_fail "post-restart steer comment never landed"; full_logs coding-workspace facilitator; return 1; }
+  local steers
+  steers=$(fj_coding_steers)
+  [ "${steers:-0}" -ge 2 ] \
+    || { step_fail "expected >= 2 steer timeline rows, got ${steers:-?}"; return 1; }
+  step_pass "review while offline queued the re-dispatch; restart re-hydrated and the second steer comment landed ($steers steers on $FJ_CODING_WORK)"
+}
 
 # --- runner (same record/report shape as the slim verify) ---------------------
 
@@ -532,6 +699,10 @@ full_run_step() { # <id>
     forgejo-connector-pr) step_forgejo_connector_pr ;;
     forgejo-review-steer) step_forgejo_review_steer ;;
     forgejo-ci-note) step_forgejo_ci_note ;;
+    coding-issue-work) step_coding_issue_work ;;
+    coding-pr) step_coding_pr ;;
+    coding-review-steer) step_coding_review_steer ;;
+    coding-redispatch) step_coding_redispatch ;;
     *) verify_step_skip "$id" "unknown step" ;;
   esac
 }

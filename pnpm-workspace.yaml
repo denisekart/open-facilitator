@@ -8,6 +8,7 @@ packages:
   - "src/adapters/communication/mattermost"
   - "src/adapters/communication/forgejo"
   - "src/adapters/communication/forgejo-connector"
+  - "examples/full/coding-worker"
 
 allowBuilds:
   better-sqlite3: false

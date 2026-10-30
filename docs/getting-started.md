@@ -242,13 +242,25 @@ the sibling `workspace-link` / `harness-adapter` READMEs). A fully composed
 three-Feature example with an end-to-end walkthrough:
 [`examples/slim/deterministic-research-worker`](../examples/slim/deterministic-research-worker/README.md).
 
+### The full-profile walkthrough (spec §23.1)
+
 The `up full` providers (the chat/VCS legs of spec §28) are live:
-Mattermost + the Plan 22 ingest pair, and Forgejo + the Plan 23 pair
-(`forgejo-init` seeds org/repo/label/webhook + the bot PAT; the adapter
-normalizes HMAC-verified hook deliveries; the connector child executes
-policy-held PR writes). Live proof: `make provider-e2e` runs the 13
-provider steps against the FULL overlay. Kafka and Ollama boot as example
-ingest / optional routing only.
+Mattermost + the ingest pair, and Forgejo + the VCS pair (`forgejo-init`
+seeds org/repo/labels/webhook + the bot PAT; the adapter normalizes
+HMAC-verified hook deliveries; the connector child executes policy-held PR
+writes). The coding lane closes the demo end to end: labeling an issue
+`ofac:coding` creates a Work on team-coding and a rule-matched assign to the
+coding gateway (`gw.coding`); the coding worker clones the repo, appends a
+changelog entry + a deterministic test on branch `ofac/<assignment>`, pushes,
+and its completion manifest asks the kernel for a PR — the kernel posts the
+request as a connector op, the team-side connector (bot PAT, kernel holds no
+token) opens exactly one PR carrying `Closes #<issue>`. A PR review then
+steers the Work: while an execution is live the steer rides the open link;
+after the run completed, the kernel re-dispatches the original assign with
+the directive in its inputs, the restarted worker re-hydrates from the branch
+and posts a "steer incorporated" comment. Live proof: `make provider-e2e`
+runs the 17 provider steps against the FULL overlay. Kafka and Ollama boot as
+example ingest / optional routing only.
 
 ## 11. Tear down
 

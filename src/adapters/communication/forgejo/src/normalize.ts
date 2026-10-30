@@ -2,9 +2,9 @@
 // payload in, one normalized provider event out — or null when the delivery
 // must be DROPPED (audit line only, 200 back):
 //
-//   sender.login === botUser        → dropped (echo law, exact-match: the
-//                                     comment we just posted must not re-enter
-//                                     as fresh Work input)
+//   sender.login === botUser        → dropped (echo law, exact-match), EXCEPT
+//                                     a bot-opened/reopened PR: a state change
+//                                     the resolver must see, no loop possible
 //   issues opened|labeled|closed    → issue.v1 (workTrigger = labels ∩ config)
 //   issue_comment on an issue       → issue.v1 action "commented"
 //   issue_comment on a PR           → change_request.v1 action "commented"
@@ -198,7 +198,6 @@ export function normalizePullRequest(
   deliveryId: string,
   ctx: NormalizeContext,
 ): NormalizedEvent | null {
-  if (senderDropped(payload, ctx)) return null;
   const raw = str(payload["action"]);
   if (raw === undefined) return null;
   const pr = obj(payload["pull_request"]);
@@ -207,6 +206,14 @@ export function normalizePullRequest(
     if (raw === "closed") action = pr?.["merged"] === true ? "merged" : "closed";
     else return null;
   }
+
+  // Echo law (decision 5) with one exemption: a bot-opened PR is a
+  // load-bearing state change (the head-branch resolver binds the pending
+  // marker to the minted PR number), not a conversation echo — there is
+  // nothing for it to answer, so no loop can form. Every other bot-side
+  // PR activity (synchronized from a worker push, a bot comment's
+  // side-events) still drops.
+  if (senderDropped(payload, ctx) && action !== "opened" && action !== "reopened") return null;
 
   const repo = repoOf(payload);
   const number = num(payload["number"]) ?? num(pr?.["number"]) ?? "";

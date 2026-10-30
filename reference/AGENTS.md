@@ -10,8 +10,9 @@ compute-gated off; see `Develop here`).
 
 ## Truth anchors
 - `compose.slim.yaml` / `compose.full.yaml` — the stacks: providers plus
-  `demo-workspace` (node-runtime image, supervisor entrypoint);
-  interpolation ONLY from `versions.env` + `.env` (two `--env-file` flags).
+  `demo-workspace` and (full only) `coding-workspace` (node-runtime image,
+  supervisor entrypoint); interpolation ONLY from `versions.env` + `.env`
+  (two `--env-file` flags).
 - `../referencectl` — the operator loop: up/down/status/token/work; it owns
   the compose invocation and the bootstrap call.
 - `versions.env` — the single pin source: every reference image tag, the
@@ -21,7 +22,9 @@ compute-gated off; see `Develop here`).
   env vars override it. `keycloak/realm.json` — shared dev/test IdP fixture.
 - `postgres-init/01-databases.sql` — side databases on first boot only.
 - `container/units/` — supervisor units for `demo-workspace` (mirror the
-  Feature-baked ones; duplication is deliberate); `config/workspace/` —
+  Feature-baked ones; duplication is deliberate); `container/coding-units/` +
+  `config/coding-workspace/` — the same payload for `coding-workspace`
+  (team-coding posture: PR ops at allow); `config/workspace/` —
   Gateway/worker/policy/manifest configs; `bootstrap/seed-lib.sh` — the seed
   primitives (compose/psql/token/work) shared by `bootstrap.sh` (demo path)
   and the acceptance run — a raw-SQL `work.assign` outbox insert stands in

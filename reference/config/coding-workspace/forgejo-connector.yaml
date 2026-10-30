@@ -1,0 +1,14 @@
+# Forgejo ops connector of the CODING fleet: a second connector instance
+# (own sqlite ledger — per-instance idempotency, the shared bot PAT) so the
+# prRequest/PR-comment dispatch rides team-coding's gateway + policy. Env
+# overlay (config.ts): FORGEJO_URL, FORGEJO_TOKEN|FORGEJO_TOKEN_FILE,
+# FORGEJO_ENABLE_ISSUES/VCS/CI, OFAC_CHILD_SECRET, OFAC_KERNEL_URL,
+# OFAC_ADAPTER_LOG.
+childWorkspaceId: gw.coding/forgejo-connector
+team: team-coding
+statePath: /var/lib/ofac/forgejo-connector.sqlite3
+transport:
+  socket:
+    # The Gateway's child wire (gateway.yaml childTransport under stateDir).
+    path: /var/lib/ofac/gateway/child.sock
+heartbeatSeconds: 5

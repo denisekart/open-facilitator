@@ -139,6 +139,17 @@ services:
       Providers__Forgejo__BotUserId: facilitator-bot
       Providers__Forgejo__AssignEndpointId: gw.team-alpha
       Providers__Forgejo__AssignCapabilityId: research.analyze
+      # Label-routed interim assign: an issue labeled ofac:coding routes the
+      # coding capability to the coding team's gateway instead of the global
+      # research lane. PrRequestCapability marks the capability whose completed
+      # manifest may carry prRequest/commentRequests (connector dispatch).
+      Providers__Forgejo__AssignRules__0__Label: ofac:coding
+      Providers__Forgejo__AssignRules__0__CapabilityId: coding.implement
+      Providers__Forgejo__AssignRules__0__EndpointId: gw.coding
+      # The coding Work lives on team-coding: the manifest ledger team-scopes
+      # a work's artifacts, and the coding worker's fleet owns them.
+      Providers__Forgejo__AssignRules__0__Team: team-coding
+      Providers__Forgejo__PrRequestCapability: coding.implement
     volumes:
       - mm_provision:/provision:ro
     depends_on:
@@ -166,6 +177,12 @@ services:
       FORGEJO_WEBHOOK_SECRET: ${DEMO_FORGEJO_WEBHOOK_SECRET:?set in .env}
       FORGEJO_BOT_USER: facilitator-bot
       DEMO_FORGEJO_ADMIN_PASSWORD: ${DEMO_FORGEJO_ADMIN_PASSWORD:?set in .env}
+      # Coding-lane seed: second sample issue + its label (same reconcile
+      # law). The label lands as the admin (not the bot), so the labeled
+      # webhook is NOT echo-dropped: bootstrap itself arms the coding Work
+      # and the e2e leg polls the chain rather than driving it.
+      FORGEJO_INIT_CODING_ISSUE_TITLE: "Seed: add a changelog entry"
+      FORGEJO_INIT_CODING_LABEL: ofac:coding
     volumes:
       - forgejo_provision:/provision
     depends_on:
@@ -193,6 +210,9 @@ services:
       FORGEJO_TOKEN_FILE: /provision/forgejo-bot-token
       FORGEJO_WEBHOOK_SECRET: ${DEMO_FORGEJO_WEBHOOK_SECRET:?set in .env}
       FORGEJO_BOT_USER: facilitator-bot
+      # Echo suppression + Work-trigger policy cover both lanes: a human
+      # labeling an issue ofac:coding arms a coding Work.
+      FORGEJO_WORK_LABELS: ofac:work,ofac:coding
       OFAC_STATE_PATH: /var/lib/ofac/forgejo-adapter.sqlite3
       PORT: "8067"
     volumes:
@@ -229,6 +249,50 @@ services:
         condition: service_healthy
       forgejo-init:
         condition: service_completed_successfully
+
+  # Team-coding's own workspace container: Gateway gw.coding + the coding
+  # worker + a second forgejo connector instance (own sqlite ledger, shared
+  # bot PAT via the provision volume). A full-profile service: the coding
+  # lane exists only when the forgejo provider does. Mode-(a) enrollment
+  # (shared Link__EnrollmentToken), own child-wire fleet secret; the worker
+  # self-enrolls coding-worker-child@team-coding for the artifact byte path.
+  # Units copy law: ./container/coding-units mirrors ./container/units.
+  coding-workspace:
+    image: ${OCI_REGISTRY:?set in versions.env}/node-runtime:${FRAMEWORK_TAG:?set in versions.env}
+    entrypoint: ["/bin/sh", "/opt/ofac/ofac-supervisor.sh"]
+    environment:
+      UNITS_DIR: /opt/ofac/units
+      OFAC_LOG_DIR: /var/lib/ofac/logs
+      GATEWAY_CONFIG: /opt/ofac/config/gateway.yaml
+      WORKER_CONFIG: /opt/ofac/config/worker.yaml
+      OFAC_ENROLL_SECRET: ${DEMO_ENROLLMENT_TOKEN:?set in .env}
+      OFAC_KERNEL_URL: http://facilitator:8080
+      OFAC_WORKER_TEAM: team-coding
+      OFAC_WORKER_ENDPOINT: coding-worker-child
+      OFAC_CHILD_SECRET: ${CODING_CHILD_SECRET:?set in .env}
+      # The connector unit (40-) keys off FORGEJO_URL; the worker's git lane
+      # reads the same pair (PAT per-run from the provisioned token file).
+      FORGEJO_URL: http://forgejo:3000
+      FORGEJO_TOKEN_FILE: /provision/forgejo-bot-token
+      FORGEJO_ENABLE_ISSUES: "true"
+      FORGEJO_ENABLE_VCS: "true"
+    volumes:
+      - coding_workspace_state:/var/lib/ofac
+      - ../features/shared/ofac-supervisor.sh:/opt/ofac/ofac-supervisor.sh:ro
+      - ./container/coding-units:/opt/ofac/units:ro
+      - ./config/coding-workspace:/opt/ofac/config:ro
+      - forgejo_provision:/provision:ro
+    depends_on:
+      facilitator:
+        condition: service_healthy
+      forgejo-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8100/status').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
 
   kafka:
     image: apache/kafka:${KAFKA_TAG:?set in versions.env}
@@ -268,3 +332,6 @@ volumes:
   forgejo_provision: {}
   forgejo_adapter_state: {}
   ollama_models: {}
+  # Coding fleet's state: gateway ledger, worker workdirs, the second
+  # connector's sqlite ledger.
+  coding_workspace_state: {}

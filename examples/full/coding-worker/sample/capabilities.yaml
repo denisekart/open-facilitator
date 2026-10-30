@@ -1,0 +1,15 @@
+# The manifest the coding worker advertises: the coding.implement v1
+# descriptor the kernel's label-routing rule sends `ofac:coding` issues to.
+apiVersion: facilitator.framework/v1
+kind: CapabilityManifest
+ownerTeam: team-coding
+capabilities:
+  - id: coding.implement
+    version: 1
+    execution: asynchronous
+    acceptedContexts: [uri-reference]
+    outputKinds: [coding.change]
+    outputMediaTypes: [text/markdown]
+    supportsSteering: true
+    supportsCancellation: true
+    supportsNudge: false

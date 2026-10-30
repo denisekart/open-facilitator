@@ -108,6 +108,12 @@ public sealed class AssignRule
 
     /// <summary>Envelope targetId override; null ⇒ the provider default.</summary>
     public string? TargetId { get; init; }
+
+    /// <summary>Team slug the rule-matched Work is created under (blank ⇒
+    /// the ingesting workload's team). The owning team must match the
+    /// endpoint's fleet: the result-manifest ledger team-scopes a work's
+    /// artifacts, so a cross-team worker could never record its manifest.</summary>
+    public string? Team { get; init; }
 }
 
 /// <summary>

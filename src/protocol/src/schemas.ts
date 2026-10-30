@@ -40,6 +40,9 @@ import eventMemoryUsed from "../schemas/event.memory.used.v1.json" with { type: 
 import eventProviderMattermostMention from "../schemas/event.provider.mattermost.mention.v1.json" with { type: "json" };
 import eventProviderMattermostReaction from "../schemas/event.provider.mattermost.reaction.v1.json" with { type: "json" };
 import eventProviderMattermostMessage from "../schemas/event.provider.mattermost.message.v1.json" with { type: "json" };
+import eventProviderForgejoIssue from "../schemas/event.provider.forgejo.issue.v1.json" with { type: "json" };
+import eventProviderForgejoPullRequest from "../schemas/event.provider.forgejo.pull_request.v1.json" with { type: "json" };
+import eventProviderForgejoCi from "../schemas/event.provider.forgejo.ci.v1.json" with { type: "json" };
 import receiptV1 from "../schemas/receipt.v1.json" with { type: "json" };
 import controlV1 from "../schemas/control.v1.json" with { type: "json" };
 import resultManifestV1 from "../schemas/result-manifest.v1.json" with { type: "json" };
@@ -91,6 +94,9 @@ const all: JsonSchema[] = [
   eventProviderMattermostMention,
   eventProviderMattermostReaction,
   eventProviderMattermostMessage,
+  eventProviderForgejoIssue,
+  eventProviderForgejoPullRequest,
+  eventProviderForgejoCi,
   receiptV1,
   controlV1,
   resultManifestV1,

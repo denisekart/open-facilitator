@@ -1,0 +1,35 @@
+{
+  "specversion": "1.0",
+  "id": "01JFORGEJO-issue-commented",
+  "source": "urn:ofac:provider:forgejo:team-alpha",
+  "type": "org.facilitator.event.provider.forgejo.issue.v1",
+  "subject": "provider/forgejo/comment-10",
+  "time": "2026-10-29T09:00:00Z",
+  "datacontenttype": "application/json",
+  "dataschema": "https://schemas.openfacilitator.org/v1/event.provider.forgejo.issue.v1.json",
+  "data": {
+    "reference": {
+      "provider": "forgejo",
+      "providerInstanceId": "local-git",
+      "tenantOrOrganizationId": "demo",
+      "channelOrResourceId": "demo/widgets",
+      "rootThreadId": "1",
+      "messageId": "10",
+      "subjectRef": "1",
+      "conversationKind": "comment",
+      "authorProviderAccountId": "alice"
+    },
+    "providerDeliveryId": "a1b2c3d4-0000-4000-8000-000000000002",
+    "actorProviderAccountId": "alice",
+    "action": "commented",
+    "workTrigger": false,
+    "text": "Please also cover the timeout path.",
+    "payload": {
+      "action": "created",
+      "comment": { "id": 10, "body": "Please also cover the timeout path." },
+      "issue": { "number": 1 },
+      "repository": { "full_name": "demo/widgets" },
+      "sender": { "login": "alice" }
+    }
+  }
+}

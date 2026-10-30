@@ -1244,11 +1244,25 @@ namespace Ofac.Protocol
         public string memoryId { get; set; }
     }
 
-    public partial class ProviderMattermostMentionEventV1Data
+    public partial class ProviderForgejoCiEventV1Data
     {
+        /// <summary>
+        /// Commit-status state (Forgejo `status` webhook event).
+        /// </summary>
+        [JsonPropertyName("action")]
+        public ProviderForgejoCiEventV1DataAction action { get; set; }
+
         [JsonPropertyName("actorProviderAccountId")]
         [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
         public string actorProviderAccountId { get; set; }
+
+        /// <summary>
+        /// Commit-status description verbatim.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("description")]
+        [JsonConverter(typeof(IndecentMinMaxLengthCheckConverter))]
+        public string? description { get; set; }
 
         /// <summary>
         /// Verbatim provider event payload as received by the adapter.
@@ -1263,10 +1277,6 @@ namespace Ofac.Protocol
 
         [JsonPropertyName("reference")]
         public ConversationReference reference { get; set; }
-
-        [JsonPropertyName("text")]
-        [JsonConverter(typeof(IndecentMinMaxLengthCheckConverter))]
-        public string text { get; set; }
     }
 
     public partial class ConversationReference
@@ -1313,6 +1323,102 @@ namespace Ofac.Protocol
         [JsonPropertyName("tenantOrOrganizationId")]
         [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
         public string tenantOrOrganizationId { get; set; }
+    }
+
+    public partial class ProviderForgejoIssueEventV1Data
+    {
+        [JsonPropertyName("action")]
+        public ProviderForgejoIssueEventV1DataAction action { get; set; }
+
+        [JsonPropertyName("actorProviderAccountId")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string actorProviderAccountId { get; set; }
+
+        /// <summary>
+        /// Verbatim provider event payload as received by the adapter.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("payload")]
+        public Dictionary<string, object>? payload { get; set; }
+
+        [JsonPropertyName("providerDeliveryId")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string providerDeliveryId { get; set; }
+
+        [JsonPropertyName("reference")]
+        public ConversationReference reference { get; set; }
+
+        /// <summary>
+        /// Issue/comment body excerpt feeding Work input (for action=commented).
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("text")]
+        [JsonConverter(typeof(IndecentMinMaxLengthCheckConverter))]
+        public string? text { get; set; }
+
+        /// <summary>
+        /// Set by the adapter from its label config: the issue carries a Work-triggering label. The
+        /// kernel reads the flag, it never interprets labels.
+        /// </summary>
+        [JsonPropertyName("workTrigger")]
+        public bool workTrigger { get; set; }
+    }
+
+    public partial class ProviderForgejoPullRequestEventV1Data
+    {
+        [JsonPropertyName("action")]
+        public ProviderForgejoPullRequestEventV1DataAction action { get; set; }
+
+        [JsonPropertyName("actorProviderAccountId")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string actorProviderAccountId { get; set; }
+
+        /// <summary>
+        /// Verbatim provider event payload as received by the adapter.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("payload")]
+        public Dictionary<string, object>? payload { get; set; }
+
+        [JsonPropertyName("providerDeliveryId")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string providerDeliveryId { get; set; }
+
+        [JsonPropertyName("reference")]
+        public ConversationReference reference { get; set; }
+
+        /// <summary>
+        /// Review/comment body excerpt (for action=reviewed|commented).
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("text")]
+        [JsonConverter(typeof(IndecentMinMaxLengthCheckConverter))]
+        public string? text { get; set; }
+    }
+
+    public partial class ProviderMattermostMentionEventV1Data
+    {
+        [JsonPropertyName("actorProviderAccountId")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string actorProviderAccountId { get; set; }
+
+        /// <summary>
+        /// Verbatim provider event payload as received by the adapter.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("payload")]
+        public Dictionary<string, object>? payload { get; set; }
+
+        [JsonPropertyName("providerDeliveryId")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string providerDeliveryId { get; set; }
+
+        [JsonPropertyName("reference")]
+        public ConversationReference reference { get; set; }
+
+        [JsonPropertyName("text")]
+        [JsonConverter(typeof(IndecentMinMaxLengthCheckConverter))]
+        public string text { get; set; }
     }
 
     public partial class ProviderMattermostMessageEventV1Data
@@ -1546,6 +1652,15 @@ namespace Ofac.Protocol
 
     public enum Scope { Private, Project, Team, Workspace };
 
+    /// <summary>
+    /// Commit-status state (Forgejo `status` webhook event).
+    /// </summary>
+    public enum ProviderForgejoCiEventV1DataAction { Error, Failure, Pending, Success };
+
+    public enum ProviderForgejoIssueEventV1DataAction { Closed, Commented, Labeled, Opened };
+
+    public enum ProviderForgejoPullRequestEventV1DataAction { Closed, Commented, Merged, Opened, Reopened, Reviewed, Synchronized };
+
     public enum WorkspaceHeartbeatEventV1DataStatus { Busy, Draining, Error, Idle };
 
     public enum ReceiptV1Status { Accepted, Duplicate, Rejected, Unsupported };
@@ -1574,6 +1689,9 @@ namespace Ofac.Protocol
                 TrustModeConverter.Singleton,
                 ApprovalDecidedEventV1DataDecisionConverter.Singleton,
                 ScopeConverter.Singleton,
+                ProviderForgejoCiEventV1DataActionConverter.Singleton,
+                ProviderForgejoIssueEventV1DataActionConverter.Singleton,
+                ProviderForgejoPullRequestEventV1DataActionConverter.Singleton,
                 WorkspaceHeartbeatEventV1DataStatusConverter.Singleton,
                 ReceiptV1StatusConverter.Singleton,
                 new DateOnlyConverter(),
@@ -2796,6 +2914,153 @@ namespace Ofac.Protocol
         }
 
         public static readonly ScopeConverter Singleton = new ScopeConverter();
+    }
+
+    internal class ProviderForgejoCiEventV1DataActionConverter : JsonConverter<ProviderForgejoCiEventV1DataAction>
+    {
+        public override bool CanConvert(Type t) => t == typeof(ProviderForgejoCiEventV1DataAction);
+
+        public override ProviderForgejoCiEventV1DataAction Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            var value = reader.GetString();
+            switch (value)
+            {
+                case "error":
+                    return ProviderForgejoCiEventV1DataAction.Error;
+                case "failure":
+                    return ProviderForgejoCiEventV1DataAction.Failure;
+                case "pending":
+                    return ProviderForgejoCiEventV1DataAction.Pending;
+                case "success":
+                    return ProviderForgejoCiEventV1DataAction.Success;
+            }
+            throw new Exception("Cannot unmarshal type ProviderForgejoCiEventV1DataAction");
+        }
+
+        public override void Write(Utf8JsonWriter writer, ProviderForgejoCiEventV1DataAction value, JsonSerializerOptions options)
+        {
+            switch (value)
+            {
+                case ProviderForgejoCiEventV1DataAction.Error:
+                    JsonSerializer.Serialize(writer, "error", options);
+                    return;
+                case ProviderForgejoCiEventV1DataAction.Failure:
+                    JsonSerializer.Serialize(writer, "failure", options);
+                    return;
+                case ProviderForgejoCiEventV1DataAction.Pending:
+                    JsonSerializer.Serialize(writer, "pending", options);
+                    return;
+                case ProviderForgejoCiEventV1DataAction.Success:
+                    JsonSerializer.Serialize(writer, "success", options);
+                    return;
+            }
+            throw new Exception("Cannot marshal type ProviderForgejoCiEventV1DataAction");
+        }
+
+        public static readonly ProviderForgejoCiEventV1DataActionConverter Singleton = new ProviderForgejoCiEventV1DataActionConverter();
+    }
+
+    internal class ProviderForgejoIssueEventV1DataActionConverter : JsonConverter<ProviderForgejoIssueEventV1DataAction>
+    {
+        public override bool CanConvert(Type t) => t == typeof(ProviderForgejoIssueEventV1DataAction);
+
+        public override ProviderForgejoIssueEventV1DataAction Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            var value = reader.GetString();
+            switch (value)
+            {
+                case "closed":
+                    return ProviderForgejoIssueEventV1DataAction.Closed;
+                case "commented":
+                    return ProviderForgejoIssueEventV1DataAction.Commented;
+                case "labeled":
+                    return ProviderForgejoIssueEventV1DataAction.Labeled;
+                case "opened":
+                    return ProviderForgejoIssueEventV1DataAction.Opened;
+            }
+            throw new Exception("Cannot unmarshal type ProviderForgejoIssueEventV1DataAction");
+        }
+
+        public override void Write(Utf8JsonWriter writer, ProviderForgejoIssueEventV1DataAction value, JsonSerializerOptions options)
+        {
+            switch (value)
+            {
+                case ProviderForgejoIssueEventV1DataAction.Closed:
+                    JsonSerializer.Serialize(writer, "closed", options);
+                    return;
+                case ProviderForgejoIssueEventV1DataAction.Commented:
+                    JsonSerializer.Serialize(writer, "commented", options);
+                    return;
+                case ProviderForgejoIssueEventV1DataAction.Labeled:
+                    JsonSerializer.Serialize(writer, "labeled", options);
+                    return;
+                case ProviderForgejoIssueEventV1DataAction.Opened:
+                    JsonSerializer.Serialize(writer, "opened", options);
+                    return;
+            }
+            throw new Exception("Cannot marshal type ProviderForgejoIssueEventV1DataAction");
+        }
+
+        public static readonly ProviderForgejoIssueEventV1DataActionConverter Singleton = new ProviderForgejoIssueEventV1DataActionConverter();
+    }
+
+    internal class ProviderForgejoPullRequestEventV1DataActionConverter : JsonConverter<ProviderForgejoPullRequestEventV1DataAction>
+    {
+        public override bool CanConvert(Type t) => t == typeof(ProviderForgejoPullRequestEventV1DataAction);
+
+        public override ProviderForgejoPullRequestEventV1DataAction Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            var value = reader.GetString();
+            switch (value)
+            {
+                case "closed":
+                    return ProviderForgejoPullRequestEventV1DataAction.Closed;
+                case "commented":
+                    return ProviderForgejoPullRequestEventV1DataAction.Commented;
+                case "merged":
+                    return ProviderForgejoPullRequestEventV1DataAction.Merged;
+                case "opened":
+                    return ProviderForgejoPullRequestEventV1DataAction.Opened;
+                case "reopened":
+                    return ProviderForgejoPullRequestEventV1DataAction.Reopened;
+                case "reviewed":
+                    return ProviderForgejoPullRequestEventV1DataAction.Reviewed;
+                case "synchronized":
+                    return ProviderForgejoPullRequestEventV1DataAction.Synchronized;
+            }
+            throw new Exception("Cannot unmarshal type ProviderForgejoPullRequestEventV1DataAction");
+        }
+
+        public override void Write(Utf8JsonWriter writer, ProviderForgejoPullRequestEventV1DataAction value, JsonSerializerOptions options)
+        {
+            switch (value)
+            {
+                case ProviderForgejoPullRequestEventV1DataAction.Closed:
+                    JsonSerializer.Serialize(writer, "closed", options);
+                    return;
+                case ProviderForgejoPullRequestEventV1DataAction.Commented:
+                    JsonSerializer.Serialize(writer, "commented", options);
+                    return;
+                case ProviderForgejoPullRequestEventV1DataAction.Merged:
+                    JsonSerializer.Serialize(writer, "merged", options);
+                    return;
+                case ProviderForgejoPullRequestEventV1DataAction.Opened:
+                    JsonSerializer.Serialize(writer, "opened", options);
+                    return;
+                case ProviderForgejoPullRequestEventV1DataAction.Reopened:
+                    JsonSerializer.Serialize(writer, "reopened", options);
+                    return;
+                case ProviderForgejoPullRequestEventV1DataAction.Reviewed:
+                    JsonSerializer.Serialize(writer, "reviewed", options);
+                    return;
+                case ProviderForgejoPullRequestEventV1DataAction.Synchronized:
+                    JsonSerializer.Serialize(writer, "synchronized", options);
+                    return;
+            }
+            throw new Exception("Cannot marshal type ProviderForgejoPullRequestEventV1DataAction");
+        }
+
+        public static readonly ProviderForgejoPullRequestEventV1DataActionConverter Singleton = new ProviderForgejoPullRequestEventV1DataActionConverter();
     }
 
     internal class WorkspaceHeartbeatEventV1DataStatusConverter : JsonConverter<WorkspaceHeartbeatEventV1DataStatus>

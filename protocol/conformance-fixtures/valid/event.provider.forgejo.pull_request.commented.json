@@ -1,0 +1,34 @@
+{
+  "specversion": "1.0",
+  "id": "01JFORGEJO-pr-commented",
+  "source": "urn:ofac:provider:forgejo:team-alpha",
+  "type": "org.facilitator.event.provider.forgejo.pull_request.v1",
+  "subject": "provider/forgejo/comment-11",
+  "time": "2026-10-29T09:00:00Z",
+  "datacontenttype": "application/json",
+  "dataschema": "https://schemas.openfacilitator.org/v1/event.provider.forgejo.pull_request.v1.json",
+  "data": {
+    "reference": {
+      "provider": "forgejo",
+      "providerInstanceId": "local-git",
+      "tenantOrOrganizationId": "demo",
+      "channelOrResourceId": "demo/widgets",
+      "rootThreadId": "2",
+      "messageId": "11",
+      "subjectRef": "2",
+      "conversationKind": "comment",
+      "authorProviderAccountId": "bob"
+    },
+    "providerDeliveryId": "b1b2c3d4-0000-4000-8000-000000000005",
+    "actorProviderAccountId": "bob",
+    "action": "commented",
+    "text": "Nit: rename head branch to feature/topic.",
+    "payload": {
+      "action": "created",
+      "comment": { "id": 11, "body": "Nit: rename head branch to feature/topic." },
+      "issue": { "number": 2, "pull_request": { "merged": false } },
+      "repository": { "full_name": "demo/widgets" },
+      "sender": { "login": "bob" }
+    }
+  }
+}

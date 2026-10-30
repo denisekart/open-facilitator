@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openfacilitator.org/v1/event.provider.forgejo.issue.v1.json",
+  "title": "ProviderForgejoIssueEventV1Data",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "reference",
+    "providerDeliveryId",
+    "actorProviderAccountId",
+    "action",
+    "workTrigger"
+  ],
+  "properties": {
+    "reference": {
+      "$ref": "common.v1.json#/$defs/conversationReference"
+    },
+    "providerDeliveryId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "actorProviderAccountId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "action": {
+      "type": "string",
+      "enum": ["opened", "labeled", "commented", "closed"]
+    },
+    "workTrigger": {
+      "type": "boolean",
+      "description": "Set by the adapter from its label config: the issue carries a Work-triggering label. The kernel reads the flag, it never interprets labels."
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 8192,
+      "description": "Issue/comment body excerpt feeding Work input (for action=commented)."
+    },
+    "payload": {
+      "type": "object",
+      "description": "Verbatim provider event payload as received by the adapter.",
+      "additionalProperties": true
+    }
+  }
+}

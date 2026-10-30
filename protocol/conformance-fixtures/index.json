@@ -552,6 +552,96 @@
       "type": "org.facilitator.event.provider.mattermost.message.v1"
     },
     {
+      "file": "valid/event.provider.forgejo.issue.opened.json",
+      "expect": "valid",
+      "class": "event",
+      "type": "org.facilitator.event.provider.forgejo.issue.v1"
+    },
+    {
+      "file": "valid/event.provider.forgejo.issue.labeled.json",
+      "expect": "valid",
+      "class": "event",
+      "type": "org.facilitator.event.provider.forgejo.issue.v1"
+    },
+    {
+      "file": "valid/event.provider.forgejo.issue.commented.json",
+      "expect": "valid",
+      "class": "event",
+      "type": "org.facilitator.event.provider.forgejo.issue.v1"
+    },
+    {
+      "file": "valid/event.provider.forgejo.issue.closed.json",
+      "expect": "valid",
+      "class": "event",
+      "type": "org.facilitator.event.provider.forgejo.issue.v1"
+    },
+    {
+      "file": "valid/event.provider.forgejo.pull_request.opened.json",
+      "expect": "valid",
+      "class": "event",
+      "type": "org.facilitator.event.provider.forgejo.pull_request.v1"
+    },
+    {
+      "file": "valid/event.provider.forgejo.pull_request.synchronized.json",
+      "expect": "valid",
+      "class": "event",
+      "type": "org.facilitator.event.provider.forgejo.pull_request.v1"
+    },
+    {
+      "file": "valid/event.provider.forgejo.pull_request.reopened.json",
+      "expect": "valid",
+      "class": "event",
+      "type": "org.facilitator.event.provider.forgejo.pull_request.v1"
+    },
+    {
+      "file": "valid/event.provider.forgejo.pull_request.reviewed.json",
+      "expect": "valid",
+      "class": "event",
+      "type": "org.facilitator.event.provider.forgejo.pull_request.v1"
+    },
+    {
+      "file": "valid/event.provider.forgejo.pull_request.commented.json",
+      "expect": "valid",
+      "class": "event",
+      "type": "org.facilitator.event.provider.forgejo.pull_request.v1"
+    },
+    {
+      "file": "valid/event.provider.forgejo.pull_request.merged.json",
+      "expect": "valid",
+      "class": "event",
+      "type": "org.facilitator.event.provider.forgejo.pull_request.v1"
+    },
+    {
+      "file": "valid/event.provider.forgejo.pull_request.closed.json",
+      "expect": "valid",
+      "class": "event",
+      "type": "org.facilitator.event.provider.forgejo.pull_request.v1"
+    },
+    {
+      "file": "valid/event.provider.forgejo.ci.pending.json",
+      "expect": "valid",
+      "class": "event",
+      "type": "org.facilitator.event.provider.forgejo.ci.v1"
+    },
+    {
+      "file": "valid/event.provider.forgejo.ci.success.json",
+      "expect": "valid",
+      "class": "event",
+      "type": "org.facilitator.event.provider.forgejo.ci.v1"
+    },
+    {
+      "file": "valid/event.provider.forgejo.ci.failure.json",
+      "expect": "valid",
+      "class": "event",
+      "type": "org.facilitator.event.provider.forgejo.ci.v1"
+    },
+    {
+      "file": "valid/event.provider.forgejo.ci.error.json",
+      "expect": "valid",
+      "class": "event",
+      "type": "org.facilitator.event.provider.forgejo.ci.v1"
+    },
+    {
       "file": "valid/command.communication.reply.json",
       "expect": "valid",
       "class": "command",
@@ -589,6 +679,60 @@
     },
     {
       "file": "invalid/event.provider.message.reference-extra-field.json",
+      "expect": "invalid",
+      "class": "event",
+      "errorClass": "schema-violation"
+    },
+    {
+      "file": "invalid/event.provider.forgejo.issue.no-delivery-id.json",
+      "expect": "invalid",
+      "class": "event",
+      "errorClass": "schema-violation"
+    },
+    {
+      "file": "invalid/event.provider.forgejo.issue.bad-action.json",
+      "expect": "invalid",
+      "class": "event",
+      "errorClass": "schema-violation"
+    },
+    {
+      "file": "invalid/event.provider.forgejo.issue.no-author.json",
+      "expect": "invalid",
+      "class": "event",
+      "errorClass": "schema-violation"
+    },
+    {
+      "file": "invalid/event.provider.forgejo.pull_request.no-delivery-id.json",
+      "expect": "invalid",
+      "class": "event",
+      "errorClass": "schema-violation"
+    },
+    {
+      "file": "invalid/event.provider.forgejo.pull_request.bad-action.json",
+      "expect": "invalid",
+      "class": "event",
+      "errorClass": "schema-violation"
+    },
+    {
+      "file": "invalid/event.provider.forgejo.pull_request.no-author.json",
+      "expect": "invalid",
+      "class": "event",
+      "errorClass": "schema-violation"
+    },
+    {
+      "file": "invalid/event.provider.forgejo.ci.no-delivery-id.json",
+      "expect": "invalid",
+      "class": "event",
+      "errorClass": "schema-violation"
+    },
+    {
+      "file": "invalid/event.provider.forgejo.ci.bad-action.json",
+      "expect": "invalid",
+      "class": "event",
+      "errorClass": "schema-violation"
+    },
+    {
+      "file": "invalid/event.provider.forgejo.ci.no-author.json",
       "expect": "invalid",
       "class": "event",
       "errorClass": "schema-violation"

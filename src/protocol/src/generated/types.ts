@@ -489,16 +489,28 @@ export interface MemoryUsedEventV1Data {
   memoryId: string;
 }
 
-export interface ProviderMattermostMentionEventV1Data {
+export interface ProviderForgejoCiEventV1Data {
+  /**
+   * Commit-status state (Forgejo `status` webhook event).
+   */
+  action: ProviderForgejoCiEventV1DataAction;
   actorProviderAccountId: string;
+  /**
+   * Commit-status description verbatim.
+   */
+  description?: string;
   /**
    * Verbatim provider event payload as received by the adapter.
    */
   payload?: { [key: string]: unknown };
   providerDeliveryId: string;
   reference: ConversationReference;
-  text: string;
 }
+
+/**
+ * Commit-status state (Forgejo `status` webhook event).
+ */
+export type ProviderForgejoCiEventV1DataAction = "pending" | "success" | "failure" | "error";
 
 export interface ConversationReference {
   authorProviderAccountId: string;
@@ -511,6 +523,57 @@ export interface ConversationReference {
   rootThreadId?: string;
   subjectRef?: string;
   tenantOrOrganizationId: string;
+}
+
+export interface ProviderForgejoIssueEventV1Data {
+  action: ProviderForgejoIssueEventV1DataAction;
+  actorProviderAccountId: string;
+  /**
+   * Verbatim provider event payload as received by the adapter.
+   */
+  payload?: { [key: string]: unknown };
+  providerDeliveryId: string;
+  reference: ConversationReference;
+  /**
+   * Issue/comment body excerpt feeding Work input (for action=commented).
+   */
+  text?: string;
+  /**
+   * Set by the adapter from its label config: the issue carries a Work-triggering label. The
+   * kernel reads the flag, it never interprets labels.
+   */
+  workTrigger: boolean;
+}
+
+export type ProviderForgejoIssueEventV1DataAction = "opened" | "labeled" | "commented" | "closed";
+
+export interface ProviderForgejoPullRequestEventV1Data {
+  action: ProviderForgejoPullRequestEventV1DataAction;
+  actorProviderAccountId: string;
+  /**
+   * Verbatim provider event payload as received by the adapter.
+   */
+  payload?: { [key: string]: unknown };
+  providerDeliveryId: string;
+  reference: ConversationReference;
+  /**
+   * Review/comment body excerpt (for action=reviewed|commented).
+   */
+  text?: string;
+}
+
+export type ProviderForgejoPullRequestEventV1DataAction =
+  "opened" | "synchronized" | "reopened" | "reviewed" | "commented" | "merged" | "closed";
+
+export interface ProviderMattermostMentionEventV1Data {
+  actorProviderAccountId: string;
+  /**
+   * Verbatim provider event payload as received by the adapter.
+   */
+  payload?: { [key: string]: unknown };
+  providerDeliveryId: string;
+  reference: ConversationReference;
+  text: string;
 }
 
 export interface ProviderMattermostMessageEventV1Data {

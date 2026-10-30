@@ -43,7 +43,7 @@ public static class ProviderEnvelopes
             {
                 ["commandId"] = $"work-assign:{workId}",
                 ["workId"] = workId.ToString(),
-                ["targetId"] = options.AssignTargetId,
+                ["targetId"] = options.AssignTargetId ?? options.Provider + "-interim",
                 ["capabilityId"] = options.AssignCapabilityId,
                 ["expectedContextVersion"] = 1,
                 ["inputs"] = new JsonObject

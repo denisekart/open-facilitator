@@ -102,6 +102,24 @@ public sealed class TestDbProbe : IAsyncDisposable
                 cmd.Parameters.AddWithValue(kind);
             });
 
+    /// <summary>Detail payloads of timeline rows of one kind for a work.</summary>
+    public async Task<List<string>> TimelineDetail(Guid workId, string kind)
+    {
+        await using var connection = await _dataSource.OpenConnectionAsync();
+        await using var cmd = new NpgsqlCommand(
+            "SELECT detail FROM facilitator.work_events WHERE work_id = $1 AND kind = $2 ORDER BY created_at", connection);
+        cmd.Parameters.AddWithValue(workId);
+        cmd.Parameters.AddWithValue(kind);
+        var rows = new List<string>();
+        await using var reader = await cmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            rows.Add(reader.GetString(0));
+        }
+
+        return rows;
+    }
+
     /// <summary>State of the inbox row for an envelope id, when one exists.</summary>
     public async Task<string?> InboxState(string eventId)
     {
@@ -745,15 +763,20 @@ public sealed class TestDbProbe : IAsyncDisposable
     }
 
     /// <summary>communication_bindings row for a conversation (Work id + parent ledger).</summary>
-    public async Task<(Guid? WorkId, string? ParentMessageId)> BindingFor(string channel, string root)
+    public Task<(Guid? WorkId, string? ParentMessageId)> BindingFor(string channel, string root) =>
+        BindingFor("mattermost", channel, root);
+
+    /// <summary>communication_bindings row for one provider's conversation.</summary>
+    public async Task<(Guid? WorkId, string? ParentMessageId)> BindingFor(string provider, string channel, string root)
     {
         await using var connection = await _dataSource.OpenConnectionAsync();
         await using var cmd = new NpgsqlCommand(
             "SELECT coalesce(work_id::text, ''), coalesce(parent_message_id, '') "
-            + "FROM facilitator.communication_bindings WHERE provider = 'mattermost' AND channel = $1 AND root_message_id = $2",
+            + "FROM facilitator.communication_bindings WHERE provider = $3 AND channel = $1 AND root_message_id = $2",
             connection);
         cmd.Parameters.AddWithValue(channel);
         cmd.Parameters.AddWithValue(root);
+        cmd.Parameters.AddWithValue(provider);
         await using var reader = await cmd.ExecuteReaderAsync();
         return await reader.ReadAsync()
             ? (reader.GetString(0) is "" ? null : Guid.Parse(reader.GetString(0)), reader.GetString(1) is "" ? null : reader.GetString(1))
@@ -761,7 +784,10 @@ public sealed class TestDbProbe : IAsyncDisposable
     }
 
     /// <summary>The binding's Work id for a conversation (null row or null work ⇒ null).</summary>
-    public async Task<Guid?> BindingWorkId(string channel, string root) => (await BindingFor(channel, root)).WorkId;
+    public Task<Guid?> BindingWorkId(string channel, string root) => BindingWorkId("mattermost", channel, root);
+
+    /// <summary>The binding's Work id for one provider's conversation.</summary>
+    public async Task<Guid?> BindingWorkId(string provider, string channel, string root) => (await BindingFor(provider, channel, root)).WorkId;
 
     /// <summary>provider_identities row for a (provider, tenant, account) triple.</summary>
     public async Task<bool> ProviderIdentityExists(string provider, string tenant, string accountId) =>

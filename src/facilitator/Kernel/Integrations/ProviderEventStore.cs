@@ -74,7 +74,8 @@ public sealed class ProviderEventStore(
     IDbContextFactory<FacilitatorDbContext> contextFactory,
     EnvelopeValidator envelopeValidator,
     KernelMetrics metrics,
-    ProviderOptions options,
+    ProviderRegistry registry,
+    IServiceScopeFactory scopeFactory,
     TimeProvider timeProvider)
 {
     /// <summary>Per-team home for provider-created Work: the manifest
@@ -107,15 +108,23 @@ public sealed class ProviderEventStore(
     private string? resolvedBotId;
 
     /// <summary>Exact-match echo identity (§13.4): the configured id wins; else
-    /// resolve once from the provider via <c>/users/me</c> under the bot token
-    /// (live bot ids are provider-generated, so compose cannot pin them). A
-    /// failed resolve stays unresolved (retry next event) — echo events then
-    /// fall to the message arm, which is side-effect-free for unbound threads.</summary>
-    private async Task<string?> ResolveBotIdAsync(CancellationToken ct)
+    /// (Mattermost family only) resolve once from the provider via
+    /// <c>/users/me</c> under the bot token (live bot ids are provider-generated,
+    /// so compose cannot pin them). Non-chat providers (forgejo) configure
+    /// <see cref="ProviderOptions.BotUserId"/> — the adapter runs as the bot
+    /// user, so exact-match suffices, no REST probe. A failed resolve stays
+    /// unresolved (retry next event) — echo events then fall to the message
+    /// arm, which is side-effect-free for unbound threads.</summary>
+    private async Task<string?> ResolveBotIdAsync(ProviderOptions options, CancellationToken ct)
     {
         if (options.BotUserId is { Length: > 0 } configured)
         {
             return configured;
+        }
+
+        if (options.Provider != ProviderOptions.Mattermost)
+        {
+            return null;
         }
 
         if (Volatile.Read(ref resolvedBotId) is { Length: > 0 } cached)
@@ -176,7 +185,9 @@ public sealed class ProviderEventStore(
     public async Task<ProviderIngressOutcome> IngestAsync(JsonElement root, string rawBody, LinkPrincipal workload, CancellationToken ct)
     {
         var type = root.GetProperty("type").GetString() ?? string.Empty;
-        if (!ProviderEventClass.SupportedBy(options, type))
+        if (ProviderEventClass.ProviderOf(type) is not { Length: > 0 } token
+            || !registry.TryGet(token, out var options)
+            || !ProviderEventClass.SupportedBy(registry, type))
         {
             return new ProviderIngressOutcome(null, null, ProblemErrors.Unsupported($"provider event type '{type}' has no registered provider"));
         }
@@ -184,14 +195,14 @@ public sealed class ProviderEventStore(
         var data = root.GetProperty("data");
         var providerDeliveryId = data.GetProperty("providerDeliveryId").GetString()
             ?? throw new InvalidOperationException("provider event without providerDeliveryId");
-        var provider = ProviderOptions.Mattermost;
+        var provider = options.Provider;
         var body = data.GetRawText();
         var bodySha = "sha256:" + Convert.ToHexString(SHA256.HashData(ApprovalDigest.CanonicalBytes(data))).ToLowerInvariant();
         var wireSha = "sha256:" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(rawBody))).ToLowerInvariant();
         var actor = data.GetProperty("actorProviderAccountId").GetString() ?? string.Empty;
-        var reference = ReferenceOf(data);
+        var reference = ReferenceOf(data, provider);
         var now = timeProvider.GetUtcNow().UtcDateTime;
-        var botId = await ResolveBotIdAsync(ct);
+        var botId = await ResolveBotIdAsync(options, ct);
 
         var providerEventId = Guid.NewGuid();
 
@@ -268,22 +279,37 @@ public sealed class ProviderEventStore(
         db.Inbox.Add(inbox);
 
         var ack = await NotificationPreferenceAsync(db, ct);
-        var (effectWork, judgment) = type switch
+        var effect = type switch
         {
-            "org.facilitator.event.provider.mattermost.mention.v1" => await MentionArmAsync(db, workload, data, reference, providerDeliveryId, ack, now, ct),
-            "org.facilitator.event.provider.mattermost.reaction.v1" => await ReactionArmAsync(db, data, reference, providerDeliveryId, ack, now, ct),
-            _ => await MessageArmAsync(db, data, reference, providerDeliveryId, now, ct),
+            "org.facilitator.event.provider.mattermost.mention.v1" => await MentionArmAsync(db, workload, options, data, reference, providerDeliveryId, ack, now, ct),
+            "org.facilitator.event.provider.mattermost.reaction.v1" => await ReactionArmAsync(db, options, data, reference, providerDeliveryId, ack, now, ct),
+            "org.facilitator.event.provider.forgejo.issue.v1" => await ForgejoIssueArmAsync(db, workload, options, data, reference, providerDeliveryId, now, ct),
+            "org.facilitator.event.provider.forgejo.pull_request.v1" => await ForgejoPullRequestArmAsync(db, options, data, reference, providerDeliveryId, now, ct),
+            "org.facilitator.event.provider.forgejo.ci.v1" => await ForgejoCiArmAsync(db, data, reference, providerDeliveryId, now, ct),
+            _ when provider != ProviderOptions.Mattermost => new ArmEffect(null, "observe:unhandled"),
+            _ => await MessageArmAsync(db, options, data, reference, providerDeliveryId, now, ct),
         };
-        inbox.WorkId = effectWork;
+        inbox.WorkId = effect.Work;
         await db.ProviderEvents.Where(e => e.ProviderEventId == providerEventId)
-            .ExecuteUpdateAsync(s => s.SetProperty(e => e.VerifiedReference, judgment), ct);
+            .ExecuteUpdateAsync(s => s.SetProperty(e => e.VerifiedReference, effect.Judgment), ct);
 
         await db.SaveChangesAsync(ct);
-        await PostgresNotifications.NotifyOutboxAsync(db, effectWork?.ToString(), ct);
+        await PostgresNotifications.NotifyOutboxAsync(db, effect.Work?.ToString(), ct);
         await tx.CommitAsync(ct);
+        // Review steers ride ICoordinationStore in ITS OWN transaction (the
+        // LinkIngress steer-arm precedent), so they run post-commit; the
+        // judgment is already on the ledger row, keeping duplicate replay
+        // honest even if the steer itself version-conflicts.
+        if (effect.Steer is { } steer)
+        {
+            using var scope = scopeFactory.CreateScope();
+            await scope.ServiceProvider.GetRequiredService<Facilitator.Kernel.Work.ICoordinationStore>()
+                .ApplySteerAsync(steer.WorkId, steer.Directive,
+                    $"forgejo-review:{providerDeliveryId}", steer.ExpectedVersion, ct);
+        }
         metrics.LinkReceived();
         metrics.InboxProcessed();
-        return new ProviderIngressOutcome("accepted", inbox.InboxId, null, new { judgment });
+        return new ProviderIngressOutcome("accepted", inbox.InboxId, null, new { judgment = effect.Judgment });
     }
 
     /// <summary>Redeem a linking code on the human plane (deviation D2): a
@@ -359,12 +385,17 @@ public sealed class ProviderEventStore(
                 ["accountId"] = challenge.AccountId,
             }),
         });
-        AppendCommand(db, ReplyEnvelope(
-            DmTarget(challenge.Provider, challenge.DeliverToAccountId),
-            $"Account {challenge.AccountId} linked to a Facilitator identity.",
-            $"link:{challenge.ChallengeId}:confirm",
-            $"link/{challenge.ChallengeId}",
-            now), now, workId: null);
+        // Confirmation rides the challenge's own provider endpoint (per-provider
+        // addressing); a provider deregistered since the mint simply gets no reply.
+        if (registry.Find(challenge.Provider) is { } challengeProvider)
+        {
+            AppendCommand(db, ReplyEnvelope(
+                DmTarget(challenge.Provider, challenge.DeliverToAccountId),
+                $"Account {challenge.AccountId} linked to a Facilitator identity.",
+                $"link:{challenge.ChallengeId}:confirm",
+                $"link/{challenge.ChallengeId}",
+                now), challengeProvider, now, workId: null);
+        }
         await db.SaveChangesAsync(ct);
         await PostgresNotifications.NotifyOutboxAsync(db, null, ct);
         await tx.CommitAsync(ct);
@@ -381,46 +412,46 @@ public sealed class ProviderEventStore(
     // Mention (§13.2/§21.2 step 3): identity-gated, binding-idempotent Work
     // creation or thread input, then the low-noise ack. /link mints a challenge
     // and never a Work.
-    private async Task<(Guid? Work, string Judgment)> MentionArmAsync(
-        FacilitatorDbContext db, Facilitator.Kernel.Shared.Auth.LinkPrincipal workload, JsonElement data, Reference reference, string deliveryId, string replyVsReaction, DateTime now, CancellationToken ct)
+    private async Task<ArmEffect> MentionArmAsync(
+        FacilitatorDbContext db, Facilitator.Kernel.Shared.Auth.LinkPrincipal workload, ProviderOptions options, JsonElement data, Reference reference, string deliveryId, string replyVsReaction, DateTime now, CancellationToken ct)
     {
         var text = data.GetProperty("text").GetString() ?? string.Empty;
         var actor = data.GetProperty("actorProviderAccountId").GetString() ?? string.Empty;
 
         if (text.TrimStart().StartsWith("/link", StringComparison.Ordinal))
         {
-            await MintChallengeAsync(db, reference, actor, now, ct);
-            return (null, "link:challenged");
+            await MintChallengeAsync(db, options, reference, actor, now, ct);
+            return new ArmEffect(null, "link:challenged");
         }
 
         var linked = await db.ProviderIdentities.AnyAsync(i =>
-            i.Provider == ProviderOptions.Mattermost && i.Tenant == reference.Tenant && i.AccountId == actor, ct);
+            i.Provider == reference.Provider && i.Tenant == reference.Tenant && i.AccountId == actor, ct);
         if (!linked)
         {
             AppendCommand(db, ReplyEnvelope(
                 TargetOf(reference),
                 "Your Mattermost account is not linked to a Facilitator identity — send me a DM starting with /link to link it.",
                 $"mention:{deliveryId}:unlinked",
-                $"provider/mattermost/{reference.MessageId ?? deliveryId}",
-                now), now, workId: null);
-            return (null, "mention:unlinked");
+                $"provider/{reference.Provider}/{reference.MessageId ?? deliveryId}",
+                now), options, now, workId: null);
+            return new ArmEffect(null, "mention:unlinked");
         }
 
         var binding = await db.CommunicationBindings.FirstOrDefaultAsync(b =>
             b.Provider == reference.Provider && b.Channel == reference.Channel && b.RootMessageId == reference.Root, ct);
         if (binding?.WorkId is { } boundWork)
         {
-            await AppendWorkInputAsync(db, boundWork, InputNote(reference, deliveryId, text), now, ct);
-            await AckAsync(db, reference, deliveryId, replyVsReaction, now, ct);
-            return (boundWork, $"work/{boundWork}:input");
+            await AppendWorkInputAsync(db, reference.Provider, boundWork, InputNote(reference, deliveryId, text), now, ct);
+            await AckAsync(db, options, reference, deliveryId, replyVsReaction, now, ct);
+            return new ArmEffect(boundWork, $"work/{boundWork}:input");
         }
 
         if (binding is not null)
         {
             // Bound conversation without a Work (e.g. a bot-DM channel): ack,
             // no Work.
-            await AckAsync(db, reference, deliveryId, replyVsReaction, now, ct);
-            return (null, "mention:bound-no-work");
+            await AckAsync(db, options, reference, deliveryId, replyVsReaction, now, ct);
+            return new ArmEffect(null, "mention:bound-no-work");
         }
 
         var workId = Guid.NewGuid();
@@ -458,11 +489,11 @@ public sealed class ProviderEventStore(
             WorkId = workId,
             WorkVersion = 1,
             Kind = "created",
-            Actor = $"link:{ProviderOptions.Mattermost}:{actor}",
+            Actor = $"link:{reference.Provider}:{actor}",
             Detail = JsonSerializer.Serialize(new Dictionary<string, string> { ["objective"] = objective }),
             CreatedAt = now,
         });
-        AppendProgressRow(db, workId, "work created (mattermost mention)", now);
+        AppendProgressRow(db, options, workId, $"work created ({reference.Provider} mention)", now);
         db.CommunicationBindings.Add(new CommunicationBindingEntity
         {
             BindingId = Guid.NewGuid(),
@@ -474,16 +505,16 @@ public sealed class ProviderEventStore(
             IdempotencyKey = deliveryId,
             CreatedAt = now,
         });
-        AppendAssignInterim(db, workId, objective, now);
-        await AckAsync(db, reference, deliveryId, replyVsReaction, now, ct);
-        return (workId, $"work/{workId}");
+        AppendAssignInterim(db, options, workId, objective, now);
+        await AckAsync(db, options, reference, deliveryId, replyVsReaction, now, ct);
+        return new ArmEffect(workId, $"work/{workId}");
     }
 
     // Reaction (§13.3): timeline note + configured ack ONLY. There is
     // deliberately no approval/transition call in this arm — reaction never
     // feeds consent.
-    private async Task<(Guid? Work, string Judgment)> ReactionArmAsync(
-        FacilitatorDbContext db, JsonElement data, Reference reference, string deliveryId, string replyVsReaction, DateTime now, CancellationToken ct)
+    private async Task<ArmEffect> ReactionArmAsync(
+        FacilitatorDbContext db, ProviderOptions options, JsonElement data, Reference reference, string deliveryId, string replyVsReaction, DateTime now, CancellationToken ct)
     {
         var emoji = data.GetProperty("emojiName").GetString() ?? string.Empty;
         var actor = data.GetProperty("actorProviderAccountId").GetString() ?? string.Empty;
@@ -498,7 +529,7 @@ public sealed class ProviderEventStore(
                 WorkId = workId,
                 WorkVersion = version,
                 Kind = "provider.reaction",
-                Actor = $"link:{ProviderOptions.Mattermost}:{actor}",
+                Actor = $"link:{reference.Provider}:{actor}",
                 Detail = JsonSerializer.Serialize(new Dictionary<string, string?>
                 {
                     ["emoji"] = emoji,
@@ -515,11 +546,11 @@ public sealed class ProviderEventStore(
                 TargetOf(reference),
                 ReactionAckEmoji,
                 $"reaction:{deliveryId}:ack",
-                $"provider/mattermost/{reference.MessageId ?? deliveryId}",
-                now), now, workId: binding?.WorkId);
+                $"provider/{reference.Provider}/{reference.MessageId ?? deliveryId}",
+                now), options, now, workId: binding?.WorkId);
         }
 
-        return (binding?.WorkId, binding?.WorkId is { } w ? $"reaction:audited:work/{w}" : "reaction:audited:unbound");
+        return new ArmEffect(binding?.WorkId, binding?.WorkId is { } w ? $"reaction:audited:work/{w}" : "reaction:audited:unbound");
     }
 
     // Message: /link anywhere (a DM is how §11 delivers the challenge to an
@@ -527,36 +558,188 @@ public sealed class ProviderEventStore(
     // challenge; a bound-thread/DM follow-up feeds Work input; everything
     // else is audited (the provider_events + inbox rows) with no effect. Code
     // redemption rides the human plane (D2), so other DM text is never parsed.
-    private async Task<(Guid? Work, string Judgment)> MessageArmAsync(
-        FacilitatorDbContext db, JsonElement data, Reference reference, string deliveryId, DateTime now, CancellationToken ct)
+    private async Task<ArmEffect> MessageArmAsync(
+        FacilitatorDbContext db, ProviderOptions options, JsonElement data, Reference reference, string deliveryId, DateTime now, CancellationToken ct)
     {
         var text = data.GetProperty("text").GetString() ?? string.Empty;
         if (text.TrimStart().StartsWith("/link", StringComparison.Ordinal))
         {
-            await MintChallengeAsync(db, reference,
+            await MintChallengeAsync(db, options, reference,
                 data.GetProperty("actorProviderAccountId").GetString() ?? string.Empty, now, ct);
-            return (null, "link:challenged");
+            return new ArmEffect(null, "link:challenged");
         }
 
         var binding = await db.CommunicationBindings.FirstOrDefaultAsync(b =>
             b.Provider == reference.Provider && b.Channel == reference.Channel && b.RootMessageId == reference.Root, ct);
         if (binding?.WorkId is not { } workId)
         {
-            return (null, "message:unbound");
+            return new ArmEffect(null, "message:unbound");
         }
 
-        await AppendWorkInputAsync(db, workId, InputNote(reference, deliveryId, text: null), now, ct);
-        return (workId, $"work/{workId}:input");
+        await AppendWorkInputAsync(db, reference.Provider, workId, InputNote(reference, deliveryId, text: null), now, ct);
+        return new ArmEffect(workId, $"work/{workId}:input");
     }
+
+    // ---- forgejo arms (Plan 23, decision 3) ---------------------------------
+    // Two effects only — Work input and Work creation — zero forge workflow.
+    // The ADAPTER decides the Work-trigger label policy (workTrigger flag);
+    // the kernel just reads the flag (malleability law). A forge actor's
+    // identity is audit-only here (judgment law: identity:not-required) — §11
+    // linking stays chat-first, so no provider_identities gate on these arms.
+
+    private async Task<ArmEffect> ForgejoIssueArmAsync(
+        FacilitatorDbContext db, Facilitator.Kernel.Shared.Auth.LinkPrincipal workload, ProviderOptions options, JsonElement data, Reference reference, string deliveryId, DateTime now, CancellationToken ct)
+    {
+        var action = data.GetProperty("action").GetString() ?? string.Empty;
+        var workTrigger = data.TryGetProperty("workTrigger", out var t) && t.ValueKind == JsonValueKind.True;
+        var text = data.TryGetProperty("text", out var x) ? x.GetString() : null;
+        var binding = await db.CommunicationBindings.FirstOrDefaultAsync(b =>
+            b.Provider == reference.Provider && b.Channel == reference.Channel && b.RootMessageId == reference.Root, ct);
+
+        if (binding?.WorkId is { } boundWork && action is "opened" or "labeled" or "commented" or "closed")
+        {
+            await AppendWorkInputAsync(db, reference.Provider, boundWork, InputNote(reference, deliveryId, text), now, ct);
+            return new ArmEffect(boundWork, $"work/{boundWork}:input");
+        }
+
+        if (binding is null && action == "labeled" && workTrigger)
+        {
+            var objective = Trim(text ?? $"Forgejo issue {reference.Channel}#{reference.Root}");
+            var workId = await CreateWorkFromProviderAsync(db, workload, options, reference, objective, deliveryId,
+                $"work created (forgejo issue #{reference.Root})", now, ct);
+            // Ack comment effect (decision 4): the adapter posts it as a bot
+            // comment; kind rides the reference ("comment").
+            AppendCommand(db, ReplyEnvelope(TargetOf(reference), "On it.", $"issue:{deliveryId}:ack",
+                $"provider/{reference.Provider}/{reference.Root}", now), options, now, workId);
+            return new ArmEffect(workId, $"work/{workId}");
+        }
+
+        return new ArmEffect(null, $"observe:{action}");
+    }
+
+    private async Task<ArmEffect> ForgejoPullRequestArmAsync(
+        FacilitatorDbContext db, ProviderOptions options, JsonElement data, Reference reference, string deliveryId, DateTime now, CancellationToken ct)
+    {
+        var action = data.GetProperty("action").GetString() ?? string.Empty;
+        var text = data.TryGetProperty("text", out var x) ? x.GetString() : null;
+        var binding = await db.CommunicationBindings.FirstOrDefaultAsync(b =>
+            b.Provider == reference.Provider && b.Channel == reference.Channel && b.RootMessageId == reference.Root, ct);
+        if (binding?.WorkId is not { } workId)
+        {
+            return new ArmEffect(null, "observe:unbound");
+        }
+
+        if (action is "reviewed" or "commented")
+        {
+            // Steer rides ICoordinationStore in its own tx → post-commit (the
+            // LinkIngress steer-arm precedent). Judgment recorded pre-commit.
+            var version = await db.Works.Where(w => w.WorkId == workId).Select(w => w.Version).FirstOrDefaultAsync(ct);
+            var directive = Trim(text ?? $"forgejo {action} on PR #{reference.Root}");
+            return new ArmEffect(workId, $"steered:{workId}", (workId, directive, version));
+        }
+
+        if (action is "merged" or "closed")
+        {
+            await AppendWorkInputAsync(db, reference.Provider, workId,
+                InputNote(reference, deliveryId, $"PR #{reference.Root} {action}"), now, ct);
+            return new ArmEffect(workId, $"work/{workId}:input");
+        }
+
+        return new ArmEffect(null, $"observe:{action}");
+    }
+
+    private async Task<ArmEffect> ForgejoCiArmAsync(
+        FacilitatorDbContext db, JsonElement data, Reference reference, string deliveryId, DateTime now, CancellationToken ct)
+    {
+        var action = data.GetProperty("action").GetString() ?? string.Empty;
+        var description = data.TryGetProperty("description", out var d) ? d.GetString() : null;
+        var binding = await db.CommunicationBindings.FirstOrDefaultAsync(b =>
+            b.Provider == reference.Provider && b.Channel == reference.Channel && b.RootMessageId == reference.Root, ct);
+        if (binding?.WorkId is not { } workId)
+        {
+            return new ArmEffect(null, "observe:unbound");
+        }
+
+        // CI verdict lands in the progress text (decision 3): the note carries
+        // the status token verbatim ("failure" etc.).
+        var note = $"provider input ({reference.Provider} status {deliveryId}): {action}" +
+                   (description is { Length: > 0 } ? $" — {description}" : string.Empty);
+        await AppendWorkInputAsync(db, reference.Provider, workId, note, now, ct);
+        return new ArmEffect(workId, $"work/{workId}:input");
+    }
+
+    // Shared Work-creation block (Plan 22 pattern, copied for forgejo per
+    // decision 3): project find-or-create + Work + created event + binding +
+    // interim assign, all in the arm's open transaction.
+    private async Task<Guid> CreateWorkFromProviderAsync(
+        FacilitatorDbContext db, Facilitator.Kernel.Shared.Auth.LinkPrincipal workload, ProviderOptions options, Reference reference, string objective, string deliveryId, string progressNote, DateTime now, CancellationToken ct)
+    {
+        var workId = Guid.NewGuid();
+        var project = await db.Projects.FirstOrDefaultAsync(
+            p => p.TeamId == workload.TeamId && p.Name == ProviderProjectName, ct);
+        if (project is null)
+        {
+            project = new ProjectEntity
+            {
+                ProjectId = Guid.NewGuid(),
+                TeamId = workload.TeamId,
+                Name = ProviderProjectName,
+                Config = "{}",
+                CreatedAt = now,
+            };
+            db.Projects.Add(project);
+        }
+
+        db.Works.Add(new WorkEntity
+        {
+            WorkId = workId,
+            ProjectId = project.ProjectId,
+            Objective = objective,
+            State = "open",
+            Version = 1,
+            CreatedAt = now,
+            UpdatedAt = now,
+        });
+        db.WorkEvents.Add(new WorkEventEntity
+        {
+            EventId = Guid.NewGuid(),
+            WorkId = workId,
+            WorkVersion = 1,
+            Kind = "created",
+            Actor = $"link:{reference.Provider}:{options.BotUserId ?? "provider"}",
+            Detail = JsonSerializer.Serialize(new Dictionary<string, string> { ["objective"] = objective }),
+            CreatedAt = now,
+        });
+        AppendProgressRow(db, options, workId, progressNote, now);
+        db.CommunicationBindings.Add(new CommunicationBindingEntity
+        {
+            BindingId = Guid.NewGuid(),
+            Provider = reference.Provider,
+            Channel = reference.Channel,
+            RootMessageId = reference.Root,
+            ParentMessageId = reference.MessageId,
+            WorkId = workId,
+            IdempotencyKey = deliveryId,
+            CreatedAt = now,
+        });
+        AppendAssignInterim(db, options, workId, objective, now);
+        return workId;
+    }
+
+    /// <summary>Arm outcome: the Work it touched (inbox stamp), the judgment
+    /// recorded on the provider_events ledger, and an optional deferred steer
+    /// (work, directive, expected version) the caller applies post-commit via
+    /// ICoordinationStore — review steers cannot join the arm's tx.</summary>
+    internal sealed record ArmEffect(Guid? Work, string Judgment, (Guid WorkId, string Directive, long ExpectedVersion)? Steer = null);
 
     // ---- helpers ------------------------------------------------------------
 
     private static string InputNote(Reference reference, string deliveryId, string? text) =>
         text is { Length: > 0 }
-            ? $"provider input (mattermost post {reference.MessageId ?? deliveryId}): {Trim(text)}"
-            : $"provider input (mattermost post {reference.MessageId ?? deliveryId})";
+            ? $"provider input ({reference.Provider} post {reference.MessageId ?? deliveryId}): {Trim(text)}"
+            : $"provider input ({reference.Provider} post {reference.MessageId ?? deliveryId})";
 
-    private Task MintChallengeAsync(FacilitatorDbContext db, Reference reference, string actor, DateTime now, CancellationToken ct)
+    private Task MintChallengeAsync(FacilitatorDbContext db, ProviderOptions options, Reference reference, string actor, DateTime now, CancellationToken ct)
     {
         var _ = ct;
         var code = RandomCode();
@@ -575,22 +758,22 @@ public sealed class ProviderEventStore(
             DmTarget(reference.Provider, actor),
             $"Your Facilitator link code: {code} (single use, {ChallengeTtl.TotalMinutes:0} minutes). Redeem it via POST /api/link-identities/redeem.",
             $"link:{reference.MessageId ?? actor}:dm",
-            $"provider/mattermost/{reference.MessageId ?? actor}",
-            now), now, workId: null);
+            $"provider/{reference.Provider}/{reference.MessageId ?? actor}",
+            now), options, now, workId: null);
         return Task.CompletedTask;
     }
 
-    private Task AckAsync(FacilitatorDbContext db, Reference reference, string deliveryId, string replyVsReaction, DateTime now, CancellationToken ct)
+    private Task AckAsync(FacilitatorDbContext db, ProviderOptions options, Reference reference, string deliveryId, string replyVsReaction, DateTime now, CancellationToken ct)
     {
         var _ = ct;
         var envelope = replyVsReaction == "reply"
-            ? ReplyEnvelope(TargetOf(reference), "On it.", $"mention:{deliveryId}:ack", $"provider/mattermost/{reference.MessageId ?? deliveryId}", now)
-            : ReactEnvelope(TargetOf(reference), AckEmoji, $"mention:{deliveryId}:ack", $"provider/mattermost/{reference.MessageId ?? deliveryId}", now);
-        AppendCommand(db, envelope, now, workId: null);
+            ? ReplyEnvelope(TargetOf(reference), "On it.", $"mention:{deliveryId}:ack", $"provider/{reference.Provider}/{reference.MessageId ?? deliveryId}", now)
+            : ReactEnvelope(TargetOf(reference), AckEmoji, $"mention:{deliveryId}:ack", $"provider/{reference.Provider}/{reference.MessageId ?? deliveryId}", now);
+        AppendCommand(db, envelope, options, now, workId: null);
         return Task.CompletedTask;
     }
 
-    private async Task AppendWorkInputAsync(FacilitatorDbContext db, Guid workId, string note, DateTime now, CancellationToken ct)
+    private async Task AppendWorkInputAsync(FacilitatorDbContext db, string provider, Guid workId, string note, DateTime now, CancellationToken ct)
     {
         var version = await db.Works.Where(w => w.WorkId == workId).Select(w => w.Version).FirstOrDefaultAsync(ct);
         db.WorkEvents.Add(new WorkEventEntity
@@ -599,21 +782,21 @@ public sealed class ProviderEventStore(
             WorkId = workId,
             WorkVersion = version,
             Kind = "provider.input",
-            Actor = "provider:mattermost",
+            Actor = $"provider:{provider}",
             Detail = JsonSerializer.Serialize(new Dictionary<string, string> { ["note"] = note }),
             CreatedAt = now,
         });
-        AppendProgressRow(db, workId, Trim(note), now);
+        AppendProgressRow(db, registry.Find(provider), workId, Trim(note), now);
     }
 
-    private void AppendProgressRow(FacilitatorDbContext db, Guid workId, string note, DateTime now)
+    private void AppendProgressRow(FacilitatorDbContext db, ProviderOptions? options, Guid workId, string note, DateTime now)
     {
-        AppendCommand(db, ProviderEnvelopes.Progress(workId, note, now), now, workId);
+        AppendCommand(db, ProviderEnvelopes.Progress(workId, note, now), options, now, workId);
     }
 
     /// <summary>Decision 7: the seed-lib assign-interim — a work.assign row to the
     /// configured link endpoint (capability targeting until Plan 25 routing).</summary>
-    private void AppendAssignInterim(FacilitatorDbContext db, Guid workId, string objective, DateTime now)
+    private void AppendAssignInterim(FacilitatorDbContext db, ProviderOptions options, Guid workId, string objective, DateTime now)
     {
         if (options.AssignEndpointId is not { Length: > 0 })
         {
@@ -621,12 +804,13 @@ public sealed class ProviderEventStore(
         }
 
         var envelope = ProviderEnvelopes.Assign(workId, Guid.NewGuid().ToString("N"), objective, options, now);
-        AppendCommand(db, envelope, now, workId, recipient: $"link.{options.AssignEndpointId}", commandId: $"work-assign:{workId}");
+        AppendCommand(db, envelope, options, now, workId, recipient: $"link.{options.AssignEndpointId}", commandId: $"work-assign:{workId}");
     }
 
     private void AppendCommand(
         FacilitatorDbContext db,
         JsonObject envelope,
+        ProviderOptions? options,
         DateTime now,
         Guid? workId,
         string? recipient = null,
@@ -645,7 +829,7 @@ public sealed class ProviderEventStore(
         {
             OutboxId = Guid.NewGuid(),
             CommandId = commandId ?? envelope["data"]?["idempotencyKey"]?.GetValue<string>() ?? Guid.NewGuid().ToString("N"),
-            RecipientEndpointId = recipient ?? $"link.{options.EndpointId}",
+            RecipientEndpointId = recipient ?? $"link.{(options ?? throw new InvalidOperationException("AppendCommand needs the owning provider for default addressing")).EndpointId}",
             AggregateType = "work",
             AggregateId = workId,
             EventType = envelope["type"]!.GetValue<string>(),
@@ -699,7 +883,7 @@ public sealed class ProviderEventStore(
 
     internal sealed record Reference(string Provider, string Tenant, string Channel, string Root, string? MessageId, string Kind);
 
-    internal static Reference ReferenceOf(JsonElement data)
+    internal static Reference ReferenceOf(JsonElement data, string provider)
     {
         var reference = data.GetProperty("reference");
         var channel = reference.GetProperty("channelOrResourceId").GetString() ?? string.Empty;
@@ -707,7 +891,7 @@ public sealed class ProviderEventStore(
         var root = reference.TryGetProperty("rootThreadId", out var r) ? r.GetString() : null;
         var messageId = reference.TryGetProperty("messageId", out var m) ? m.GetString() : null;
         var tenant = reference.TryGetProperty("tenantOrOrganizationId", out var t) ? t.GetString() ?? string.Empty : string.Empty;
-        return new Reference(ProviderOptions.Mattermost, tenant, channel, root ?? messageId ?? channel, messageId, kind);
+        return new Reference(provider, tenant, channel, root ?? messageId ?? channel, messageId, kind);
     }
 
     internal static ConversationTarget TargetOf(Reference reference) => new(

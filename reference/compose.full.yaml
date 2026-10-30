@@ -7,6 +7,15 @@ services:
     environment:
       FORGEJO__database__DB_TYPE: sqlite3
       FORGEJO__server__ROOT_URL: http://git.localhost:3000/
+      # Headless bootstrap (Plan 23): without the lock the image serves only
+      # the install wizard, so forgejo-init's first-admin signup 404s. Locked
+      # + zero users = installed instance with open signup; Gitea's
+      # CheckAdminPrivilege law promotes the first anonymous signup to admin.
+      FORGEJO__security__INSTALL_LOCK: "true"
+      # 16.x webhooks are SSRF-filtered (default allowlist: loopback only) —
+      # the hook may dial the adapter service, nothing else (verified live:
+      # every delivery denied "webhook can only call allowed HTTP servers").
+      FORGEJO__webhook__ALLOWED_HOST_LIST: forgejo-adapter
     volumes:
       - forgejo_data:/data
     ports:
@@ -113,13 +122,113 @@ services:
       Providers__Mattermost__BotTokenFile: /provision/mm-bot-token
       Providers__Mattermost__AssignEndpointId: gw.team-alpha
       Providers__Mattermost__AssignCapabilityId: research.analyze
+      # Plan 23: the forgejo arm needs no REST probe (bot id is a config
+      # value, decision 1), so no token file for the kernel. D3:
+      # AssignCapabilityId research.analyze, not the plan's literal
+      # analysis.summarize — the deterministic worker advertises
+      # research.analyze, so the interim assign EXECUTES and the completion
+      # comment closes the loop (22's precedent); analysis.summarize has no
+      # executor here.
+      Providers__Forgejo__Enabled: "true"
+      Providers__Forgejo__EndpointId: forgejo-adapter
+      Providers__Forgejo__Tenant: git.localhost
+      Providers__Forgejo__SiteUrl: http://forgejo:3000
+      Providers__Forgejo__BotUserId: facilitator-bot
+      Providers__Forgejo__AssignEndpointId: gw.team-alpha
+      Providers__Forgejo__AssignCapabilityId: research.analyze
     volumes:
       - mm_provision:/provision:ro
     depends_on:
       mattermost-init:
         condition: service_completed_successfully
+      forgejo-init:
+        condition: service_completed_successfully
+
+  # ── Plan 23: forgejo provider plane (mirror of the mattermost block) ────
+  # Bootstrap one-shot: first-admin signup (no anonymous admin-REST route on
+  # 16.x — the plan's contingency: signup form while INSTALL_LOCK is set and
+  # zero users exist), bot account + repo write, org/repo/label/sample-issue,
+  # webhook registration at the adapter, bot PAT published to
+  # forgejo_provision (0444-atomic, mm-init law). Exits 0 when done.
+  forgejo-init:
+    image: ${OCI_REGISTRY:?set in versions.env}/node-runtime:${FRAMEWORK_TAG:?set in versions.env}
+    command: ["node", "/app/forgejo-adapter/dist/bin/adapter.js", "init"]
+    environment:
+      OFAC_KERNEL_URL: http://facilitator:8080
+      OFAC_ENROLL_SECRET: ${DEMO_ENROLLMENT_TOKEN:?set in .env}
+      OFAC_ENDPOINT_ID: forgejo-adapter
+      OFAC_TEAM: team-alpha
+      FORGEJO_URL: http://git.localhost:3000
+      FORGEJO_TOKEN_FILE: /provision/forgejo-bot-token
+      FORGEJO_WEBHOOK_SECRET: ${DEMO_FORGEJO_WEBHOOK_SECRET:?set in .env}
+      FORGEJO_BOT_USER: facilitator-bot
+      DEMO_FORGEJO_ADMIN_PASSWORD: ${DEMO_FORGEJO_ADMIN_PASSWORD:?set in .env}
+    volumes:
+      - forgejo_provision:/provision
+    depends_on:
+      forgejo:
+        condition: service_started
+    # Forgejo's first boot runs migrations for a while; the one-shot polls
+    # readiness itself, but a crash mid-bootstrap must not stay crashed.
+    restart: on-failure:5
+
+  # Provider ingest adapter (Plan 23): webhook HMAC in, link-plane endpoint
+  # out. /healthz published loopback for the e2e probe; the forge's webhook
+  # targets it in-network (init registers that exact URL).
+  forgejo-adapter:
+    image: ${OCI_REGISTRY:?set in versions.env}/node-runtime:${FRAMEWORK_TAG:?set in versions.env}
+    command: ["node", "/app/forgejo-adapter/dist/bin/adapter.js", "run"]
+    environment:
+      OFAC_KERNEL_URL: http://facilitator:8080
+      OFAC_ENROLL_SECRET: ${DEMO_ENROLLMENT_TOKEN:?set in .env}
+      OFAC_ENDPOINT_ID: forgejo-adapter
+      OFAC_TEAM: team-alpha
+      # Site-host alias (same origin the browser sees): the adapter's tenant
+      # is this URL's hostname, so the kernel's Providers:Forgejo:Tenant must
+      # read git.localhost.
+      FORGEJO_URL: http://git.localhost:3000
+      FORGEJO_TOKEN_FILE: /provision/forgejo-bot-token
+      FORGEJO_WEBHOOK_SECRET: ${DEMO_FORGEJO_WEBHOOK_SECRET:?set in .env}
+      FORGEJO_BOT_USER: facilitator-bot
+      OFAC_STATE_PATH: /var/lib/ofac/forgejo-adapter.sqlite3
+      PORT: "8067"
+    volumes:
+      - forgejo_provision:/provision:ro
+      - forgejo_adapter_state:/var/lib/ofac
+    ports:
+      - "127.0.0.1:8067:8067"
+    depends_on:
+      forgejo-init:
+        condition: service_completed_successfully
+      facilitator:
+        condition: service_healthy
+    restart: on-failure:5
+  # Ops connector (Plan 23, decision 8): runs as a supervisor unit inside
+  # demo-workspace, attaches to the Gateway over the child socket. Env opt-in
+  # (the 40- unit exits 0 without FORGEJO_URL — slim never sets it). The bot
+  # token file lands from forgejo-init via the shared volume; the overlay
+  # gates startup on init completion so the read never races.
+  demo-workspace:
+    environment:
+      FORGEJO_URL: http://forgejo:3000
+      FORGEJO_TOKEN_FILE: /provision/forgejo-bot-token
+      FORGEJO_ENABLE_ISSUES: "true"
+      FORGEJO_ENABLE_VCS: "true"
+      FORGEJO_ENABLE_CI: "true"
+    volumes:
+      - workspace_state:/var/lib/ofac
+      - ../features/shared/ofac-supervisor.sh:/opt/ofac/ofac-supervisor.sh:ro
+      - ./container/units:/opt/ofac/units:ro
+      - ./config/workspace:/opt/ofac/config:ro
+      - forgejo_provision:/provision:ro
+    depends_on:
+      facilitator:
+        condition: service_healthy
+      forgejo-init:
+        condition: service_completed_successfully
 
   kafka:
+
     image: apache/kafka:${KAFKA_TAG:?set in versions.env}
     hostname: kafka
     environment:
@@ -152,4 +261,8 @@ volumes:
   mm_provision: {}
   # Adapter sqlite ledger (deliveries + post idempotency + replay cursor).
   mm_adapter_state: {}
+  # Forgejo bot-token handoff (init writes → adapter + connector read) and
+  # the adapter's sqlite delivery ledger.
+  forgejo_provision: {}
+  forgejo_adapter_state: {}
   ollama_models: {}

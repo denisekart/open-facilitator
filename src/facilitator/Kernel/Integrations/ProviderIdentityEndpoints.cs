@@ -23,7 +23,7 @@ public static class ProviderIdentityEndpoints
     /// <summary>Map <c>POST /api/link-identities/redeem</c> + list; no-op when disabled.</summary>
     public static IEndpointRouteBuilder MapProviderIdentitiesApi(this IEndpointRouteBuilder app)
     {
-        if (!app.ServiceProvider.GetRequiredService<ProviderOptions>().Enabled)
+        if (!app.ServiceProvider.GetRequiredService<ProviderRegistry>().AnyEnabled)
         {
             return app;
         }

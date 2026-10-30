@@ -15,3 +15,33 @@ policies:
     resources: ["*"]
     actorAnyOf: []
     effect: allow
+  # Plan 23 forgejo ops (exact capability rows: the engine has no
+  # capability glob). Reads and comments run free; anything that mutates
+  # forge-visible state (push, PR create, CI trigger) parks for a human
+  # confirm. actorAnyOf names the team group so a member (alice) can answer
+  # the approval via the kernel respond route; the empty list on allow rows
+  # means any authenticated caller (policy.ts actorMatches).
+  - capability: forgejo.issue.read
+    resources: ["*"]
+    actorAnyOf: []
+    effect: allow
+  - capability: forgejo.issue.comment
+    resources: ["*"]
+    actorAnyOf: []
+    effect: allow
+  - capability: forgejo.pr.comment
+    resources: ["*"]
+    actorAnyOf: []
+    effect: allow
+  - capability: forgejo.vcs.branch.push
+    resources: ["*"]
+    actorAnyOf: ["workload:gw.team-alpha", "group:/teams/team-alpha"]
+    effect: confirm
+  - capability: forgejo.pr.create
+    resources: ["*"]
+    actorAnyOf: ["workload:gw.team-alpha", "group:/teams/team-alpha"]
+    effect: confirm
+  - capability: forgejo.ci.trigger
+    resources: ["*"]
+    actorAnyOf: ["workload:gw.team-alpha", "group:/teams/team-alpha"]
+    effect: confirm

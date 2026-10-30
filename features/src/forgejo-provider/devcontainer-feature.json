@@ -1,0 +1,19 @@
+{
+  "id": "ofac-forgejo-provider",
+  "version": "1.0.0",
+  "name": "Open Facilitator Forgejo Provider",
+  "documentationURL": "https://github.com/denisekart/open-facilitator/tree/main/features/src/forgejo-provider",
+  "description": "Installs the forgejo ops connector as a self-contained Node bundle plus supervisor unit 40-forgejo-connector.sh, opt-in via FORGEJO_URL: without it the unit exits 0 and the container behaves exactly as without this Feature. Pairs with ofac-gateway (the connector attaches to the team Gateway's child socket).",
+  "options": {
+    "configPath": {
+      "type": "string",
+      "default": ".facilitator/forgejo-connector.yaml",
+      "description": "Connector config the unit starts with; FORGEJO_CONNECTOR_CONFIG env overrides at runtime."
+    }
+  },
+  "containerEnv": {},
+  "entrypoint": "/usr/local/share/openfacilitator/ofac-supervisor.sh",
+  "installsAfter": [
+    "ghcr.io/devcontainers/features/node"
+  ]
+}

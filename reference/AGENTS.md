@@ -27,6 +27,10 @@ compute-gated off; see `Develop here`).
   and the acceptance run — a raw-SQL `work.assign` outbox insert stands in
   for the routing slice; `checks/verify.sh` — the 11-step acceptance run,
   sourced by `referencectl verify`.
+- Provider init is a one-shot per forge (`mattermost-init`, `forgejo-init` =
+  `forgejo-adapter init`): consumers gate on `service_completed_successfully`
+  and read bot credentials from the shared provision volume, never env.
+  Provider live proof rides `checks/verify-full.sh` (`make provider-e2e`).
 - Target design: `../docs/specs/open_facilitator_framework_architecture.md`
   §21–22 (reference environment).
 

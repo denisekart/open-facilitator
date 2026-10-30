@@ -113,7 +113,7 @@ block (`IdentityStartupCheck`, fail closed in every environment).
 - Envelopes fail closed: schema/envelope violations ⇒ `400`, command types outside the 7-type known-command table ⇒ `422 unknown-command`, and the rejected envelope is still persisted to the `inbox` as an audit record (state `failed`).
 - Duplicate admission (same `(event_source, event_id)`, `command_id`, or `(provider, provider_delivery_id)`) returns `200 {"status":"duplicate"}` and reprocesses nothing — replay is cheap and side-effect-free by construction.
 
-## Provider ingress (Plan 22)
+## Provider ingress (Plans 22 + 23)
 
 Provider events ride the **link plane**: the adapter authenticates with its
 `linkToken` like any link endpoint, and the `AdmissionGate` provider arm
@@ -126,6 +126,15 @@ never silent acceptance. Provider-specific rules:
   bot WebSocket credential — 11.11 webhooks sign nothing on the
   event-carrying form) is established before a normalized event exists; an
   unauthenticated frame never reaches classification.
+- **Forgejo: HMAC before normalize, privileged writes behind policy.** The
+  webhook receiver verifies the shared-secret HMAC-SHA256 over the raw body
+  (`X-Forgejo-Signature` bare-hex; `X-Hub-Signature-256` also accepted)
+  constant-time, 401 before parsing; `X-Forgejo-Delivery` is the dedupe key.
+  The adapter comments as the bot so provider echo is recognizable, and it
+  holds no forge-credential authority beyond replies: issue reads, branch
+  pushes, and PR creates are connector ops — a Gateway child whose
+  `forgejo.pr.create` class is confirm-held by team policy, so every
+  privileged write rides the approval flow with actor evidence.
 - **Duplicate = the delivery id.** `(provider, provider_delivery_id)` is
   unique; synthesized ids (e.g. the reaction `(user, post, emoji)`
   composite) must be stable across inbound echo and outbound receipt so

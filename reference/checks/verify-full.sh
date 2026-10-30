@@ -23,6 +23,14 @@ VERIFY_MM_ADMIN_EMAIL=${MM_ADMIN_EMAIL:-admin@ofac.local}
 # The admin password lives in the compose env file the stack itself booted with.
 VERIFY_MM_ADMIN_PASSWORD=$(cd "$VERIFY_REF" && awk -F= '/^DEMO_MM_ADMIN_PASSWORD=/{print $2}' .env)
 [ -n "$VERIFY_MM_ADMIN_PASSWORD" ] || { echo "verify-full: DEMO_MM_ADMIN_PASSWORD missing from reference/.env" >&2; exit 2; }
+VERIFY_FORGEJO=${FORGEJO_URL:-http://127.0.0.1:3000}
+VERIFY_FORGEJO_ADAPTER=${FORGEJO_ADAPTER_URL:-http://127.0.0.1:8067}
+VERIFY_FORGEJO_ADMIN=${FORGEJO_ADMIN_USER:-ofac-admin}
+# mm law: the admin password lives in the compose env file the stack booted with.
+VERIFY_FORGEJO_ADMIN_PASSWORD=$(cd "$VERIFY_REF" && awk -F= '/^DEMO_FORGEJO_ADMIN_PASSWORD=/{print $2}' .env)
+[ -n "$VERIFY_FORGEJO_ADMIN_PASSWORD" ] || { echo "verify-full: DEMO_FORGEJO_ADMIN_PASSWORD missing from reference/.env" >&2; exit 2; }
+VERIFY_FORGEJO_HOOK_SECRET=$(cd "$VERIFY_REF" && awk -F= '/^DEMO_FORGEJO_WEBHOOK_SECRET=/{print $2}' .env)
+[ -n "$VERIFY_FORGEJO_HOOK_SECRET" ] || { echo "verify-full: DEMO_FORGEJO_WEBHOOK_SECRET missing from reference/.env" >&2; exit 2; }
 
 # seed-lib owns the token primitives (verify.sh only sources it inside
 # run_verify, which we don't call).
@@ -37,12 +45,19 @@ VERIFY_REQUESTED=()
 
 # Step order + declared dependencies (same continue-and-report law as slim).
 FULL_ORDER=(provider-boot provider-link-challenge provider-mention
-  provider-completion-reply provider-echo-suppression provider-reaction-no-consent)
+  provider-completion-reply provider-echo-suppression provider-reaction-no-consent
+  forgejo-boot forgejo-seed forgejo-issue-work forgejo-comment-input
+  forgejo-connector-pr forgejo-review-steer forgejo-ci-note)
 full_deps_of() {
   case "$1" in
     provider-link-challenge) echo provider-boot ;;
     provider-mention) echo provider-boot provider-link-challenge ;;
     provider-completion-reply | provider-echo-suppression | provider-reaction-no-consent) echo provider-mention ;;
+    forgejo-boot) ;;
+    forgejo-seed | forgejo-issue-work) echo forgejo-boot ;;
+    forgejo-comment-input) echo forgejo-issue-work ;;
+    forgejo-connector-pr) echo forgejo-issue-work ;;
+    forgejo-review-steer | forgejo-ci-note) echo forgejo-connector-pr ;;
     *) ;;
   esac
 }
@@ -283,6 +298,213 @@ full_reaction_acked() {
     jq -e '[.[] | select(.emoji_name=="eye")] | length >= 1' >/dev/null
 }
 
+# --- Forgejo REST helpers (Plan 23 step 6) ------------------------------------
+# D6: every call rides HTTP Basic with the admin password (Forgejo accepts
+# Basic wherever a token would; the plan's login-POST token adds nothing).
+# Author = ofac-admin ≠ bot facilitator-bot, so these events pass the
+# adapter's echo filter exactly as a human's would.
+forgejo_api() { # forgejo_api METHOD PATH [BODY]
+  local method=$1 path=$2 body=${3:-}
+  local args=(-fsS --max-time 15 -X "$method" -u "$VERIFY_FORGEJO_ADMIN:$VERIFY_FORGEJO_ADMIN_PASSWORD" "$VERIFY_FORGEJO$path")
+  [ -n "$body" ] && args+=(-H 'Content-Type: application/json' -d "$body")
+  curl "${args[@]}"
+}
+full_inbox_has() { # <event_type> <work_id>
+  full_psql "SELECT 1 FROM facilitator.inbox WHERE payload->>'type' = '$1' AND payload->'data'->>'workId' = '$2' LIMIT 1" | grep -q 1
+}
+
+FJ_ISSUE=""
+FJ_WORK=""
+FJ_PR=""
+FJ_PR_SHA=""
+
+step_forgejo_boot() {
+  local health
+  health=$(curl -fs --max-time 5 "$VERIFY_FORGEJO_ADAPTER/healthz") \
+    || { step_fail "forgejo adapter /healthz unreachable on $VERIFY_FORGEJO_ADAPTER"; full_logs forgejo-adapter; return 1; }
+  echo "$health" | jq -e '.ok == true and .endpointId == "forgejo-adapter"' >/dev/null \
+    || { step_fail "forgejo adapter not ready: $health"; full_logs forgejo-adapter; return 1; }
+  full_psql "SELECT 1 FROM facilitator.link_sessions WHERE logical_endpoint_id = 'forgejo-adapter' LIMIT 1" | grep -q 1 \
+    || { step_fail "no live link_sessions row for the forgejo-adapter endpoint"; full_logs forgejo-adapter facilitator; return 1; }
+  step_pass "forgejo adapter healthy, kernel sees the live session"
+}
+
+step_forgejo_seed() {
+  forgejo_api GET /api/v1/repos/demo/widgets | jq -e '.full_name == "demo/widgets"' >/dev/null \
+    || { step_fail "seed repo demo/widgets missing"; full_logs forgejo-init forgejo; return 1; }
+  forgejo_api GET /api/v1/repos/demo/widgets/issues/1 | jq -e '.title == "Seed: summarize the repository layout"' >/dev/null \
+    || { step_fail "sample issue #1 missing"; full_logs forgejo-init; return 1; }
+  forgejo_api GET /api/v1/repos/demo/widgets/hooks \
+    | jq -e '[.[] | select(.config.url == "http://forgejo-adapter:8067/hooks/forgejo")] | length >= 1' >/dev/null \
+    || { step_fail "no webhook registered at the adapter"; full_logs forgejo-init forgejo-adapter; return 1; }
+  step_pass "seed repo, sample issue, and adapter webhook all exist"
+}
+
+step_forgejo_issue_work() {
+  local title="verify forgejo $(date +%s)$RANDOM" label_id
+  FJ_ISSUE=$(forgejo_api POST /api/v1/repos/demo/widgets/issues \
+    "$(jq -cn --arg t "$title" '{title:$t, body:"verify leg: labeling adds a Work"}')" | jq -re .number) \
+    || { step_fail "issue creation refused"; return 1; }
+  label_id=$(forgejo_api GET /api/v1/repos/demo/widgets/labels | jq -re '[.[] | select(.name=="ofac:work")] | .[0].id') \
+    || { step_fail "ofac:work label missing"; full_logs forgejo-init; return 1; }
+  forgejo_api POST "/api/v1/repos/demo/widgets/issues/$FJ_ISSUE/labels" \
+    "$(jq -cn --argjson l "$label_id" '{labels:[$l]}')" >/dev/null \
+    || { step_fail "labeling refused"; return 1; }
+  fj_binding() {
+    FJ_WORK=$(full_psql "SELECT work_id FROM facilitator.communication_bindings WHERE provider = 'forgejo' AND channel = 'demo/widgets' AND root_message_id = '$FJ_ISSUE' LIMIT 1" | head -n1)
+    [ -n "$FJ_WORK" ]
+  }
+  poll_until 45 fj_binding >/dev/null \
+    || { step_fail "no binding row 45s after labeling issue #$FJ_ISSUE"; full_logs forgejo-adapter facilitator; return 1; }
+  fj_ack() {
+    forgejo_api GET "/api/v1/repos/demo/widgets/issues/$FJ_ISSUE/comments" |
+      jq -e '[.[] | select(.user.login == "facilitator-bot")] | length >= 1' >/dev/null
+  }
+  poll_until 30 fj_ack \
+    || { step_fail "no facilitator-bot ack comment on issue #$FJ_ISSUE"; full_logs forgejo-adapter; return 1; }
+  step_pass "labeled issue #$FJ_ISSUE created Work $FJ_WORK + bot ack comment"
+}
+
+step_forgejo_comment_input() {
+  forgejo_api POST "/api/v1/repos/demo/widgets/issues/$FJ_ISSUE/comments" \
+    '{"body":"verify: also cover the timeout path"}' >/dev/null \
+    || { step_fail "comment POST refused"; return 1; }
+  fj_input() {
+    full_psql "SELECT 1 FROM facilitator.work_events WHERE work_id = '$FJ_WORK' AND kind = 'provider.input' AND detail::text LIKE '%timeout path%' LIMIT 1" | grep -q 1
+  }
+  poll_until 30 fj_input \
+    || { step_fail "no provider.input note 30s after the issue comment"; full_logs forgejo-adapter facilitator; return 1; }
+  step_pass "issue comment landed as provider.input on $FJ_WORK"
+}
+
+step_forgejo_connector_pr() {
+  # Head branch exists so the PR has something to point at (409 on rerun:
+  # tolerated, the connector reconciles by head anyway).
+  forgejo_api POST /api/v1/repos/demo/widgets/branches \
+    '{"new_branch_name":"bot/topic","old_branch_name":"main"}' >/dev/null || true
+  VERIFY_TOKEN_ALICE=${VERIFY_TOKEN_ALICE:-$(seed_mint_user_token alice alice)} \
+    || { step_fail "alice token mint failed"; return 1; }
+  # The raw-outbox assign the plan prescribes (seed_dispatch's shape, the
+  # connector's op inputs): confirm-held by policy, so an approval row must
+  # appear and alice's respond must release exactly one PR.
+  local command_id assignment_id envelope
+  command_id=$(seed_new_uuid); assignment_id=$(seed_new_uuid)
+  envelope=$(jq -cn --arg commandId "$command_id" --arg workId "$FJ_WORK" --arg assignmentId "$assignment_id" '{
+      specversion: "1.0", id: $commandId,
+      source: "urn:facilitator:instance:demo",
+      type: "org.facilitator.command.work.assign.v1",
+      subject: "work/\($workId)/assignment/\($assignmentId)",
+      time: now | todate, datacontenttype: "application/json",
+      dataschema: "https://schemas.openfacilitator.org/v1/command.work.assign.v1.json",
+      data: { commandId: $commandId, actorEvidenceRef: "seed: verify-pr",
+        workId: $workId, targetId: "demo", capabilityId: "forgejo.pr.create",
+        expectedContextVersion: 1,
+        inputs: { objective: "verify connector leg", sourceRefs: [],
+          repo: "demo/widgets", head: "bot/topic", base: "main",
+          title: "verify: connector leg", body: "opened by the forgejo verify leg" },
+        expectedDeliverables: [{ kind: "pr.ref", mediaType: "application/json" }],
+        deadline: "2036-10-23T18:00:00Z", assignmentId: $assignmentId }
+    }')
+  full_psql "INSERT INTO facilitator.outbox
+    (outbox_id, recipient_endpoint_id, aggregate_type, aggregate_id, event_type,
+     command_id, envelope, work_id, status, available_at, attempts, created_at)
+   VALUES (gen_random_uuid(), 'link.gw.team-alpha', 'work', '$FJ_WORK',
+     'org.facilitator.command.work.assign.v1', '$command_id',
+     '$envelope'::jsonb, '$FJ_WORK', 'pending', now(), 0, now());
+   SELECT pg_notify('facilitator_outbox', '');" >/dev/null \
+    || { step_fail "assign outbox insert failed"; return 1; }
+  fj_approval_id() {
+    verify_get "$VERIFY_TOKEN_ALICE" "/api/works/$FJ_WORK/approvals" \
+      | jq -re '[.[] | select(.state == "pending")] | .[0].approvalId // empty' 2>/dev/null
+  }
+  local approval_id
+  approval_id=$(poll_capture 60 fj_approval_id) \
+    || { step_fail "no approval row 60s after the pr.create assign"; full_logs demo-workspace facilitator; return 1; }
+  verify_post "$VERIFY_TOKEN_ALICE" "/api/works/$FJ_WORK/approvals/$approval_id/respond" \
+    '{"decision":"approved","comment":"verify auto-approve"}' >/dev/null \
+    || { step_fail "approval respond refused ($approval_id)"; full_logs facilitator; return 1; }
+  poll_until 90 full_pr_open >/dev/null \
+    || { step_fail "no exactly-one open PR from bot/topic 90s after approval"; full_logs demo-workspace facilitator; return 1; }
+  poll_until 60 full_connector_completed >/dev/null \
+    || { step_fail "connector assignment.completed never landed for $FJ_WORK"; full_logs demo-workspace facilitator; return 1; }
+  # D5: the as-built pull_request arm binds by (forgejo, repo, PR number) —
+  # the branch→issue link resolver is Plan 24's. Seed the PR-number binding
+  # for the review/CI legs (same fixture style as this step's outbox row).
+  full_psql "INSERT INTO facilitator.communication_bindings
+      (binding_id, provider, channel, root_message_id, work_id, idempotency_key, created_at)
+    VALUES (gen_random_uuid(), 'forgejo', 'demo/widgets', '$FJ_PR', '$FJ_WORK',
+      'verify-pr-link-$FJ_PR', now())
+    ON CONFLICT (provider, channel, root_message_id)
+      DO UPDATE SET work_id = EXCLUDED.work_id;" >/dev/null \
+    || { step_fail "PR-number binding insert failed"; return 1; }
+  step_pass "approved pr.create opened exactly one PR #$FJ_PR (sha ${FJ_PR_SHA:0:8}), binding seeded for review/CI legs"
+}
+full_pr_open() {
+  local rows
+  rows=$(forgejo_api GET "/api/v1/repos/demo/widgets/pulls?state=all" \
+    | jq -c '[.[] | select(.head.ref == "bot/topic")]') || return 1
+  [ "$(echo "$rows" | jq -r '[.[] | select(.state=="open")] | length')" = "1" ] || return 1
+  FJ_PR=$(echo "$rows" | jq -r '.[0].number')
+  FJ_PR_SHA=$(echo "$rows" | jq -r '.[0].head.sha')
+  [ "$FJ_PR" != null ] && [ -n "$FJ_PR_SHA" ] && [ "$FJ_PR_SHA" != null ]
+}
+full_connector_completed() {
+  full_inbox_has org.facilitator.event.assignment.completed.v1 "$FJ_WORK"
+}
+
+step_forgejo_review_steer() {
+  forgejo_api POST "/api/v1/repos/demo/widgets/pulls/$FJ_PR/reviews" \
+    '{"body":"approve with the retry clause reworded","event":"APPROVED"}' >/dev/null \
+    || { step_fail "review POST refused"; return 1; }
+  fj_steered() {
+    full_psql "SELECT 1 FROM facilitator.work_events WHERE work_id = '$FJ_WORK' AND kind = 'steer' LIMIT 1" | grep -q 1
+  }
+  poll_until 45 fj_steered \
+    || { step_fail "no steer timeline row 45s after the PR review"; full_logs forgejo-adapter facilitator; return 1; }
+  local version
+  version=$(full_psql "SELECT version FROM facilitator.works WHERE work_id = '$FJ_WORK'" | head -n1)
+  [ "${version:-0}" -ge 2 ] \
+    || { step_fail "Work version not bumped by the steer (got ${version:-?})"; return 1; }
+  step_pass "PR review steered $FJ_WORK (version now $version)"
+}
+
+step_forgejo_ci_note() {
+  # 1. the PR head carries a failure status (the API accepts + stores it).
+  forgejo_api POST "/api/v1/repos/demo/widgets/statuses/$FJ_PR_SHA" \
+    '{"state":"failure","description":"verify ci leg","context":"ofac/verify"}' >/dev/null \
+    || { step_fail "commit status POST refused"; return 1; }
+  # 2. 16.0.7 does NOT fire `status` webhooks at all — the event name is
+  # absent from the hook vocabulary (open feature request forgejo/forgejo
+  # #9325). So the delivery is synthesized here with the shared hook secret,
+  # byte-identical to the shape a 16 with #9325 will send: this proves the
+  # adapter's HMAC verify + sha→PR resolution + ci.v1 normalization and the
+  # kernel's ci arm; only Forgejo's own queueing of this one event is stubbed.
+  local body dlv sig
+  body=$(jq -cn --arg repo "demo/widgets" --arg sha "$FJ_PR_SHA" \
+    --arg who "ofac-admin" '{
+      status: "failure", sha: $sha, description: "verify ci leg",
+      context: "ofac/verify",
+      repository: { full_name: $repo },
+      sender: { login: $who }
+    }')
+  dlv=$(seed_new_uuid)
+  sig=$(printf '%s' "$body" |
+    openssl dgst -sha256 -hmac "$VERIFY_FORGEJO_HOOK_SECRET" -hex | awk '{print $NF}')
+  curl -fsS --max-time 10 -X POST "$VERIFY_FORGEJO_ADAPTER/hooks/forgejo" \
+    -H 'Content-Type: application/json' \
+    -H "X-Forgejo-Delivery: $dlv" \
+    -H "X-Forgejo-Event: status" \
+    -H "X-Forgejo-Signature: $sig" \
+    --data-binary "$body" >/dev/null \
+    || { step_fail "signed status delivery refused"; return 1; }
+  fj_ci_note() {
+    full_psql "SELECT 1 FROM facilitator.work_events WHERE work_id = '$FJ_WORK' AND kind = 'provider.input' AND detail::text LIKE '%failure%' LIMIT 1" | grep -q 1
+  }
+  poll_until 45 fj_ci_note \
+    || { step_fail "no provider.input note with the failure verdict 45s after the status"; full_logs forgejo-adapter facilitator; return 1; }
+  step_pass "commit-status failure annotated $FJ_WORK (status on PR head + signed ci delivery)"
+}
+
 # --- runner (same record/report shape as the slim verify) ---------------------
 
 full_run_step() { # <id>
@@ -303,6 +525,13 @@ full_run_step() { # <id>
     provider-completion-reply) step_provider_completion_reply ;;
     provider-echo-suppression) step_provider_echo_suppression ;;
     provider-reaction-no-consent) step_provider_reaction_no_consent ;;
+    forgejo-boot) step_forgejo_boot ;;
+    forgejo-seed) step_forgejo_seed ;;
+    forgejo-issue-work) step_forgejo_issue_work ;;
+    forgejo-comment-input) step_forgejo_comment_input ;;
+    forgejo-connector-pr) step_forgejo_connector_pr ;;
+    forgejo-review-steer) step_forgejo_review_steer ;;
+    forgejo-ci-note) step_forgejo_ci_note ;;
     *) verify_step_skip "$id" "unknown step" ;;
   esac
 }

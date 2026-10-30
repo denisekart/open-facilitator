@@ -44,7 +44,7 @@ public sealed class AdmissionGate(
     EvidenceValidator evidence,
     LinkEnrollmentStore enrollments,
     AuditWriter audit,
-    Facilitator.Kernel.Integrations.ProviderOptions providers)
+    Facilitator.Kernel.Integrations.ProviderRegistry providers)
 {
     /// <summary>Screen one raw envelope under an authenticated workload principal.</summary>
     public async Task<AdmissionVerdict> ScreenAsync(string rawBody, LinkPrincipal workload, CancellationToken ct)

@@ -223,28 +223,23 @@ public static class KernelServiceCollection
     }
 
     /// <summary>
-    /// Provider ingest plane (Plan 22): the <c>providers:mattermost</c> options
-    /// are registered ALWAYS (the admission gate + completion hook read the
-    /// flag); the store + ingress arm + human-plane routes exist only when
-    /// enabled. Enabled without the adapter's addressing fails composition
-    /// closed (Storage/Memory precedent).
+    /// Provider ingest plane (Plan 22, widened by Plan 23 decision 1): the
+    /// <c>Providers</c> registry is registered ALWAYS — an empty registry on
+    /// slim composition (the admission gate + completion hook read it); the
+    /// store + ingress arms + human-plane routes exist only when at least one
+    /// provider section is enabled. A section enabled without addressing fails
+    /// composition closed (Storage/Memory precedent, enforced in
+    /// <see cref="ProviderRegistry.Load"/>).
     /// </summary>
     private static WebApplicationBuilder AddIntegrationsFeature(this WebApplicationBuilder builder)
     {
-        var providers = builder.Configuration.GetSection(ProviderOptions.SectionName).Get<ProviderOptions>() ?? new ProviderOptions();
-        builder.Services.AddSingleton(providers);
-        if (!providers.Enabled)
+        var registry = ProviderRegistry.Load(builder.Configuration);
+        builder.Services.AddSingleton(registry);
+        if (registry.AnyEnabled)
         {
-            return builder;
+            builder.Services.AddSingleton<ProviderEventStore>();
         }
 
-        if (string.IsNullOrEmpty(providers.EndpointId) || string.IsNullOrEmpty(providers.Tenant))
-        {
-            throw new InvalidOperationException(
-                "Providers:Mattermost enabled but EndpointId/Tenant unset — fail-closed.");
-        }
-
-        builder.Services.AddSingleton<ProviderEventStore>();
         return builder;
     }
 

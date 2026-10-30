@@ -12,7 +12,12 @@ facilitatorUrl: http://facilitator:8080
 trustMode: isolated-executor
 stateDir: /var/lib/ofac/gateway
 mode: standalone
-children: []
+children:
+  # Plan 23: the forgejo ops connector registers late over the child socket.
+  # Full-profile reality: in slim nobody ever connects and the entry sits
+  # inert (offline child = rejected-assign law); hello auth falls back to
+  # OFAC_CHILD_SECRET, so no per-child token here.
+  - name: forgejo-connector
 childTransport:
   socket:
     path: child.sock

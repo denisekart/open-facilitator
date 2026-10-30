@@ -1,0 +1,15 @@
+# Forgejo ops connector (Plan 23, decision 5): a second child of the demo
+# Gateway, privileged forge writes behind team policy. Full-profile only:
+# the 40- supervisor unit stays inert (exit 0) unless FORGEJO_URL is set,
+# and the policy rows + kernel section for forgejo exist only with the full
+# overlay. Env overlay (config.ts): FORGEJO_URL, FORGEJO_TOKEN|
+# FORGEJO_TOKEN_FILE, FORGEJO_ENABLE_ISSUES/VCS/CI, OFAC_CHILD_SECRET (wins
+# over `token`), OFAC_KERNEL_URL, OFAC_ADAPTER_LOG.
+childWorkspaceId: gw.team-alpha/forgejo-connector
+team: team-alpha
+statePath: /var/lib/ofac/forgejo-connector.sqlite3
+transport:
+  socket:
+    # The Gateway's child wire (gateway.yaml childTransport under stateDir).
+    path: /var/lib/ofac/gateway/child.sock
+heartbeatSeconds: 5

@@ -2,8 +2,9 @@
 
 ## Purpose
 Dev Container Features (`src/gateway`, `src/workspace-link`,
-`src/harness-adapter`) that inject a Gateway or Workspace Link runtime into
-any team-owned container, published as OCI images
+`src/harness-adapter`, `src/forgejo-provider`) that inject a Gateway,
+Workspace Link, harness adapter, or the Forgejo ops connector runtime
+into any team-owned container, published as OCI images
 (`ghcr.io/denisekart/open-facilitator/features/<name>:1`).
 
 ## Layout & install contract
@@ -17,7 +18,7 @@ any team-owned container, published as OCI images
   `/usr/local/lib/openfacilitator/<name>`, PATH shim, idempotent via
   `.installed-version`.
 - One supervisor (`shared/ofac-supervisor.sh`, staged into each `pkg/`) is
-  every Feature's `entrypoint`; units `units/{10-gateway,20-linkd,30-harness-adapter}.sh`
+  every Feature's `entrypoint`; units `units/{10-gateway,20-linkd,30-harness-adapter,40-forgejo-connector}.sh`
   carry baked option defaults, numeric-prefix order, per-runtime
   restart-vs-terminal law, and forward TERM to the runtime child. No
   lifecycle hooks (spec §8.2: never rely on them).

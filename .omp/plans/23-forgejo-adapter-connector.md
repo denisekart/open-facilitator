@@ -1,6 +1,6 @@
 # Plan 23 — Forgejo adapter: webhooks in, team-owned connector out
 
-**Status:** ⬜ not-started (flips 🔵 at the replanning gate, then 🟡)
+**Status:** ✅ fully implemented (2026-10-30; live-proven: 13/13 `make provider-e2e` on the full overlay + slim `verify` from clean)
 **Depends on:** 22 as-built (provider ingest plane, `communication_bindings` law, node-image adapter family). **Phase F leg 2 of 9.**
 **On approval:** this file is the working detail design; keep the Implementation Status table current.
 **Granularity:** split-safety note — this plan is the Forgejo **read/webhook side + privileged write connector** only; the coding-worker harness and the §23.1 end-to-end sequence are Plan 24. If connector + webhook server exceed one reviewable unit, split connector from webhook adapter (they are separate deployables anyway: adapter = stateless webhook normalizer, connector = Gateway-side privileged executor).
@@ -68,13 +68,13 @@ build/lint/test/docs-check; fixture harnesses cover new schemas; forgejo leg of 
 ## Implementation Status
 | Step | Status | Notes |
 |---|---|---|
-| 0 Research | Not started | |
-| 1 Protocol additions | Not started | |
-| 2 Webhook adapter | Not started | |
-| 3 Kernel arms | Not started | |
-| 4 Forgejo connector | Not started | |
-| 5 Compose + seeds | Not started | |
-| 6 Live proof | Not started | |
-| 7 Docs + skills | Not started | |
+| 0 Research | Fully implemented | Anchors re-verified 2026-10-30 (line drift corrected in-session); webhook/first-admin facts doc-verified, corrected live below |
+| 1 Protocol additions | Fully implemented | 3 forgejo event schemas + fixtures (valid+invalid), codegen + index green |
+| 2 Webhook adapter | Fully implemented | `@ofac/forgejo-adapter`: HMAC-before-normalize (bare hex `X-Forgejo-Signature` + `X-Hub-Signature-256`), delivery-id passthrough, echo law, reply-only capability, SQLite comment ledger |
+| 3 Kernel arms | Fully implemented | `ProviderRegistry` binds `Providers:*` children; issue/pull_request/ci arms in `ProviderEventStore`, review steer deferred post-commit (steer-arm precedent) |
+| 4 Forgejo connector | Fully implemented | `@ofac/forgejo-connector` Gateway child, env-flag-gated manifest, `connector_actions` ledger read-before-reconcile, `pr.create` confirm-held by team policy |
+| 5 Compose + seeds | Fully implemented | `forgejo-init` one-shot (sign-up first admin when none — 16.0.7 has no unauth setup route), supervisor unit in demo-workspace, `forgejo-connector.yaml` |
+| 6 Live proof | Fully implemented | 7 forgejo steps green; deviation: **Forgejo 16.0.7 fires no `status` webhooks** (open FR forgejo/forgejo#9325) — the CI step POSTs the status via API (real provider state) then synthesizes a signed `status` delivery to the adapter's hook; init registers only the 16-recognized coarse event names (`issues`, `issue_comment`, `pull_request`) and PATCH-reconciles a stale event list |
+| 7 Docs + skills | Fully implemented | advanced.md ownership model + per-provider opt-in, security.md forgejo rules, seed-repos + connector READMEs, adapters signpost, reference-env + architecture skills synced |
 
 Status vocabulary: Not started → In progress → Partially implemented → Fully implemented, or Blocked (with reason). Record deviations from locked decisions with a one-line reason.

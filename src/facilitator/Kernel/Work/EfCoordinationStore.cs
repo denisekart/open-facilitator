@@ -19,7 +19,7 @@ public sealed class EfCoordinationStore(
     IDbContextFactory<FacilitatorDbContext> contextFactory,
     EnvelopeValidator envelopeValidator,
     TimeProvider timeProvider,
-    Facilitator.Kernel.Integrations.ProviderOptions? providers = null) : ICoordinationStore
+    Facilitator.Kernel.Integrations.ProviderRegistry? providers = null) : ICoordinationStore
 {
     private const string KernelLogChannel = "kernel.log";
 
@@ -274,14 +274,14 @@ public sealed class EfCoordinationStore(
     private void AppendProviderCompletionReply(
         FacilitatorDbContext db, Guid workId, WorkState to, Guid transitionEventId, DateTime now)
     {
-        if (providers is not { Enabled: true, EndpointId: { Length: > 0 } endpoint }
-            || !StateGuard.IsTerminal(to))
+        if (!StateGuard.IsTerminal(to))
         {
             return;
         }
 
         var binding = db.CommunicationBindings.AsNoTracking().FirstOrDefault(b => b.WorkId == workId);
-        if (binding is null)
+        // Per-provider addressing: the reply rides the binding's own provider.
+        if (binding is null || providers?.Find(binding.Provider) is not { EndpointId: { Length: > 0 } endpoint })
         {
             return;
         }

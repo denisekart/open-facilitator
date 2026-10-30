@@ -186,19 +186,36 @@ A communication adapter is the other adapter kind: not a Gateway child, but
 a **link endpoint** (`role: child`, secret enrollment) that normalizes one
 provider's events into `org.facilitator.event.provider.<provider>.*` and
 executes `org.facilitator.command.communication.*` deliveries over the
-provider's API. Worked example: `@ofac/mattermost-adapter`
-(`src/adapters/communication/mattermost/`) — its README carries the config
-law; the seams that survive Plan 31's SDK extraction are `normalize` (pure
-classification), the provider client (interface = test seam), the transport
-listener, and the command handler.
+provider's API. Worked examples: `@ofac/mattermost-adapter`
+(`src/adapters/communication/mattermost/`, facilitator-owned chat leg) and
+`@ofac/forgejo-adapter` (`src/adapters/communication/forgejo/`, team-owned
+forge leg) — their READMEs carry the config law; the seams that survive
+Plan 31's SDK extraction are `normalize` (pure classification), the provider
+client (interface = test seam), the transport listener, and the command
+handler.
 
-Authoring law, as the Mattermost adapter proves it:
+**Ownership model**: the kernel facilitates, it is not a security boundary,
+and it is never team-operated. Chat is a facilitator-owned integration in
+the reference system; VCS/issues/CI are **team-owned** — their adapters live
+in the team's domain, near the forge, under the team's Gateway (a Gateway
+child, like `@ofac/forgejo-connector`, or a dedicated workspace; the seam is
+deployment-neutral because everything dials OUT to the link plane: the same
+binaries run as compose sidecars in the reference env or on team infra).
+Nothing may assume the kernel host owns forge credentials. Chat adapters
+being facilitator-owned is today's reference placement, not law — a
+team-owned communication adapter is one deployment away.
+
+Authoring law, as both adapters prove it:
 
 - **Inbound trust is the adapter's own credential, before normalize.**
   Mattermost 11.11 webhooks carry no signing secret on the event-carrying
   hook form, so inbound is the bot WebSocket (bot token) — no inbound port,
-  DMs work, thread context (`root_id`) survives. Whatever the transport,
-  authentication completes before a normalized event exists.
+  DMs work, thread context (`root_id`) survives. The Forgejo adapter's
+  inbound is a webhook endpoint, so trust is the shared hook secret:
+  constant-time HMAC-SHA256 over the raw bytes (`X-Forgejo-Signature`
+  bare-hex, `X-Hub-Signature-256: sha256=<hex>` also accepted), 401 before
+  any parsing. Whatever the transport, authentication completes before a
+  normalized event exists.
 - **Normalized events keep provider identity**: original ids, actor account
   id, and the raw payload ride in `data`; the kernel's
   `provider_events UNIQUE (provider, provider_delivery_id)` makes replay a
@@ -212,7 +229,10 @@ Authoring law, as the Mattermost adapter proves it:
   bot publishes its own post back as a `message.v1` echo; the kernel records
   the provider post id into `communication_bindings` and runs no arms.
 
-### Operation semantics (spec §13.5, as-built)
+### Operation semantics (spec §13.5, as-built — Mattermost)
+
+The Forgejo adapter advertises only `communication.reply.v1` (issue/PR
+comment as the bot, ledger-keyed the same way).
 
 |Command|Adapter behavior|Receipt|
 |---|---|---|
@@ -224,13 +244,16 @@ Authoring law, as the Mattermost adapter proves it:
 
 ### Opt-in story
 
-Provider-less is the default: the kernel composes the provider arms only
-when a `providers:mattermost` options section (mounted `facilitator.json`
-or `Providers__Mattermost__*` env) is present with `enabled: true`; absent,
-provider-class events get typed `unsupported` receipts and zero routes or
-rows exist. The adapter is opt-in by existence — nothing enrolls it unless
-somebody runs the process. Adding a second provider (Forgejo, Plan 23)
-means a normalizer + arms on the same plane, not a new plane.
+Provider-less is the default: the kernel composes a provider's arms only
+when that provider's options section (`providers:mattermost`,
+`providers:forgejo` — mounted `facilitator.json` or
+`Providers__<Provider>__*` env) is present with `enabled: true`; absent,
+that provider's events get typed `unsupported` receipts and zero routes or
+rows exist. Each provider is a registry entry on one plane — a normalizer
+schema set + arms + an options section — not a new plane, and the
+addressing is per-provider too (the forgejo section carries its own
+`assignEndpointId` for the review-steer path). The adapter is opt-in by
+existence — nothing enrolls it unless somebody runs the process.
 
 ## Memory broker
 

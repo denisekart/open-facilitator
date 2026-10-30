@@ -2,14 +2,15 @@
 
 ## Purpose
 Adapters grouped by function: `communication/` holds provider adapters
-(Mattermost, Forgejo, Kafka — spec §13; each speaks the link plane, never the
-kernel core), `harnesses/` holds execution-harness adapters. Place a new
-adapter by what it talks to: an external system that feeds events in or takes
-messages out ⇒ `communication/<name>/`; a workspace execution harness (runs
-assignments) ⇒ `harnesses/<name>/`. Communication subdirectories are
-spec-derived stubs — a README stating their future role. Harnesses have
-shipped: `harnesses/adapter-sdk` (the HarnessAdapter lifecycle library) and
-`harnesses/deterministic` (the worked-example worker).
+(spec §13; each speaks the link plane, never the kernel core), `harnesses/`
+holds execution-harness adapters. Place a new adapter by what it talks to:
+an external system that feeds events in or takes messages out ⇒
+`communication/<name>/`; a workspace execution harness (runs assignments) ⇒
+`harnesses/<name>/`. Shipped: `mattermost` (facilitator-owned chat leg),
+`forgejo` + `forgejo-connector` (team-owned forge: webhook normalizer +
+Gateway-child ops executor), `harnesses/adapter-sdk` (the HarnessAdapter
+lifecycle library), and `harnesses/deterministic` (the worked-example
+worker). `kafka` is a spec-derived stub — a README stating its future role.
 
 ## Truth anchors
 - `../../docs/specs/open_facilitator_framework_architecture.md` §13 —

@@ -222,7 +222,7 @@ over real Keycloak + Postgres + kernel boundaries (§26.1 items 11+12 complete).
 **Depends on:** 19
 
 ### Plan 23 — Forgejo adapter + team-owned connector
-**Status:** ⬜ not-started (detail design: `23-forgejo-adapter-connector.md`)
+**Status:** 🟡 implemented locally — 13/13 `make provider-e2e` + slim verify from clean green locally, flips green on CI (detail design + status table: `23-forgejo-adapter-connector.md`)
 **Objective:** Forgejo webhooks → normalized events on 22's plane (issue→Work, review→steer intent) + Gateway-side privileged connector (issue read, branch push, PR create — 12's policy/approval flow, read-before-reconcile idempotency) + seed-repository init story.
 **Depends on:** 22
 
@@ -302,4 +302,5 @@ The framework's adoption thesis: first-party adapters are ordinary *implementati
 - **Skill/doc co-update:** every plan updates the `.omp/skills/` projections it invalidates in the same change.
 - **Fixtures-first testing:** anything asserted about wire behavior must exist as a `protocol/conformance-fixtures/` entry, run by both .NET and TS harnesses.
 - **No forward shims:** a later plan may replace an earlier interim (auth tokens in 02/03→09/10, policy stub in 05→12, local artifact FS→S3 in 13→14, FTS→optional vector seam) by clean cutover, not by keeping both paths.
+- **Integration placement law (established 22+23, binding on every plan that adds an integration):** a provider integration is a **team-domain process dialing out to the link plane**, never a kernel module. Inbound: an adapter that completes transport trust before normalize and publishes judgment-flag events; kernel arms stay thin readers of those flags (registry ceiling: options section + switch case — no per-provider hosted services or workflow in the kernel). Privileged outbound: a connector as a Gateway fleet child — capability-routed `work.assign`, the Gateway's policy/approval umbrella, a durable action ledger with read-before-reconcile; the external-system credential never leaves that process. Reply addressing resolves from the binding's provider section, never a singleton. Facilitator-owned chat is a placement, not a kernel privilege — a team-owned comms adapter must cost only deployment. A new forge (e.g. GitLab fast-follow) must therefore be schemas + normalizer + options section + connector config with **zero kernel change**; anything bigger is a design smell to raise at the 🔵 gate.
 - **No plan prose outside the plan layer:** code, code comments, schemas, and shipped documentation state facts, never delivery sequencing — no plan numbers, phases, stages, or "lands with / until Plan NN" (`.omp/` and `docs/specs/` excepted). Forward-looking notes name the capability ("until admin views exist"), not the schedule.

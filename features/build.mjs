@@ -20,6 +20,7 @@ const FEATURES = [
   { feature: "gateway", pkg: "@ofac/gateway", entry: "dist/bin/gateway.js" },
   { feature: "workspace-link", pkg: "@ofac/workspace-link", entry: "dist/bin/linkd.js" },
   { feature: "harness-adapter", pkg: "@ofac/harness-deterministic", entry: "dist/bin/worker.js" },
+  { feature: "forgejo-provider", pkg: "@ofac/forgejo-connector", entry: "dist/bin/connector.js" },
 ];
 
 const run = (cmd, args, opts = {}) =>

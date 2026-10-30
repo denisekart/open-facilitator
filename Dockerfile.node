@@ -16,6 +16,8 @@ COPY src/gateway/package.json src/gateway/
 COPY src/adapters/harnesses/adapter-sdk/package.json src/adapters/harnesses/adapter-sdk/
 COPY src/adapters/harnesses/deterministic/package.json src/adapters/harnesses/deterministic/
 COPY src/adapters/communication/mattermost/package.json src/adapters/communication/mattermost/
+COPY src/adapters/communication/forgejo/package.json src/adapters/communication/forgejo/
+COPY src/adapters/communication/forgejo-connector/package.json src/adapters/communication/forgejo-connector/
 RUN pnpm install --frozen-lockfile
 COPY tsconfig.base.json ./
 COPY src/protocol/ src/protocol/
@@ -24,6 +26,8 @@ COPY src/gateway/ src/gateway/
 COPY src/adapters/harnesses/adapter-sdk/ src/adapters/harnesses/adapter-sdk/
 COPY src/adapters/harnesses/deterministic/ src/adapters/harnesses/deterministic/
 COPY src/adapters/communication/mattermost/ src/adapters/communication/mattermost/
+COPY src/adapters/communication/forgejo/ src/adapters/communication/forgejo/
+COPY src/adapters/communication/forgejo-connector/ src/adapters/communication/forgejo-connector/
 RUN pnpm -r build
 # --prod + injected workspace deps: each dir is a runnable closure (node_modules
 # with the workspace packages copied in), freshly built dist/ included via each
@@ -31,7 +35,9 @@ RUN pnpm -r build
 RUN pnpm deploy --filter=@ofac/gateway --prod /deploy/gateway \
  && pnpm deploy --filter=@ofac/workspace-link --prod /deploy/linkd \
  && pnpm deploy --filter=@ofac/harness-deterministic --prod /deploy/worker \
- && pnpm deploy --filter=@ofac/mattermost-adapter --prod /deploy/mattermost-adapter
+ && pnpm deploy --filter=@ofac/mattermost-adapter --prod /deploy/mattermost-adapter \
+ && pnpm deploy --filter=@ofac/forgejo-adapter --prod /deploy/forgejo-adapter \
+ && pnpm deploy --filter=@ofac/forgejo-connector --prod /deploy/forgejo-connector
 
 # Debian slim, not Alpine: better-sqlite3 ships glibc prebuilds (see
 # pnpm-workspace.yaml allowBuilds); Alpine would force a node-gyp rebuild.

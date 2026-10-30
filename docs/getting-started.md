@@ -242,9 +242,13 @@ the sibling `workspace-link` / `harness-adapter` READMEs). A fully composed
 three-Feature example with an end-to-end walkthrough:
 [`examples/slim/deterministic-research-worker`](../examples/slim/deterministic-research-worker/README.md).
 
-The `up full` providers (the chat/VCS legs of spec §28: Mattermost, Forgejo,
-Kafka, Ollama) land in a later phase; today the overlay boots their
-containers but no seeded flows ride them.
+The `up full` providers (the chat/VCS legs of spec §28) are live:
+Mattermost + the Plan 22 ingest pair, and Forgejo + the Plan 23 pair
+(`forgejo-init` seeds org/repo/label/webhook + the bot PAT; the adapter
+normalizes HMAC-verified hook deliveries; the connector child executes
+policy-held PR writes). Live proof: `make provider-e2e` runs the 13
+provider steps against the FULL overlay. Kafka and Ollama boot as example
+ingest / optional routing only.
 
 ## 11. Tear down
 

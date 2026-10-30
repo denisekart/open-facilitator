@@ -78,6 +78,12 @@ public interface IResultManifestLedger
     /// <summary>Work-scoped chain, newest revision first: null (⇒ 404) when the work is unknown or foreign to the reader.</summary>
     Task<IReadOnlyList<ResultManifestView>?> ListForWorkAsync(
         Guid workId, IReadOnlyList<string> groups, IReadOnlySet<string> roles, CancellationToken ct);
+
+    /// <summary>The stored, verified manifest document bytes re-parsed — the
+    /// Plan 24 completed-manifest reader's view of the just-recorded chain
+    /// head (stored bytes are the law; the wire restatement never is). Null
+    /// when the artifact is absent, unverified, or unreadable.</summary>
+    Task<JsonDocument?> ReadStoredAsync(Guid manifestArtifactId, CancellationToken ct);
 }
 
 /// <summary>Ledger-backed <see cref="IResultManifestLedger"/>.</summary>
@@ -378,6 +384,36 @@ public sealed class ResultManifestLedger(
                 m.ManifestId, m.WorkId, m.AssignmentId, m.ExecutionId, m.Revision, m.RevisionOf,
                 m.Digest, m.StructuredDigest, m.ArtifactId, m.ResultState, m.State, m.RecordedAt))
             .ToArray();
+    }
+
+    /// <inheritdoc />
+    public async Task<JsonDocument?> ReadStoredAsync(Guid manifestArtifactId, CancellationToken ct)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(ct);
+        var artifact = await db.Artifacts.AsNoTracking()
+            .FirstOrDefaultAsync(a => a.ArtifactId == manifestArtifactId, ct);
+        if (artifact is null || artifact.State != "stored" || artifact.Verification != "verified")
+        {
+            return null;
+        }
+
+        await using var stored = await store.GetAsync(
+            ArtifactKeys.RelativePathOf(artifact.Digest["sha256:".Length..]), ct);
+        if (stored is null)
+        {
+            return null;
+        }
+
+        using var buffer = new MemoryStream();
+        await stored.CopyToAsync(buffer, ct);
+        try
+        {
+            return JsonDocument.Parse(buffer.ToArray());
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
     }
 
     private static void AppendTimeline(

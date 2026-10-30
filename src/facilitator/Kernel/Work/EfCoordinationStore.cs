@@ -181,6 +181,7 @@ public sealed class EfCoordinationStore(
 
         var outbox = AppendWorkProgress(db, workId, directive, causationId: commandId, createdAt: now);
         outbox.CommandId = commandId;
+        await AppendSteerDeliveryAsync(db, workId, directive, commandId, expectedVersion + 1, now, ct);
 
         await db.SaveChangesAsync(ct);
         await NotifyAsync(db, workId, ct);
@@ -209,6 +210,114 @@ public sealed class EfCoordinationStore(
             .ToListAsync(ct);
         rows.Reverse();
         return rows;
+    }
+
+    private const string WorkAssignType = "org.facilitator.command.work.assign.v1";
+
+    private static readonly string[] AttemptTerminal = ["stopped", "failed", "lost"];
+
+    /// <summary>Plan 24(1b/1c): a steer reaches the owning gateway. The
+    /// outbox row that CARRIED the assign is the assignment→endpoint ledger
+    /// (<c>assignments</c>/<c>link_deliveries</c> pin no endpoint — the
+    /// outbox recipient survives as <c>link.&lt;endpoint&gt;</c>), so this
+    /// arm reads the latest assign envelope back by its
+    /// <c>work-assign*</c>/<c>work-redispatch</c> command id. A live
+    /// execution (the work's latest execution attempt not yet terminal) ⇒
+    /// an <c>org.facilitator.command.work.steer.v1</c> row to
+    /// <c>link.&lt;endpoint&gt;</c>: the gateway's <c>onInteraction</c>
+    /// delivers it to the bound child or honestly rejects
+    /// (<c>no-binding</c>/<c>child-disconnected</c>) — a rejected steer is
+    /// a normal result, the timeline row + progress note stand either way.
+    /// No live execution ⇒ §23.1's restart-with-context leg: a fresh
+    /// <c>work.assign</c> re-dispatch reusing the ORIGINAL envelope's
+    /// capability/target/inputs (the worker re-hydrates from the branch +
+    /// PR lineage), keyed <c>work-redispatch:&lt;steerCommandId&gt;</c> so
+    /// replay is idempotent on the unique command id. No assign row (a
+    /// REST-created Work) ⇒ timeline record only, today's behavior.</summary>
+    private async Task AppendSteerDeliveryAsync(
+        FacilitatorDbContext db, Guid workId, string directive, string commandId, long contextVersion, DateTime now, CancellationToken ct)
+    {
+        var original = await db.Outbox.AsNoTracking()
+            .Where(o => o.WorkId == workId && o.EventType == WorkAssignType
+                && (o.CommandId.StartsWith("work-assign:")
+                    || o.CommandId.StartsWith("work-assign-coding:")
+                    || o.CommandId.StartsWith("work-redispatch:")))
+            .OrderByDescending(o => o.CreatedAt)
+            .FirstOrDefaultAsync(ct);
+        if (original is null)
+        {
+            return;
+        }
+
+        using var doc = JsonDocument.Parse(original.Envelope);
+        var data = doc.RootElement.GetProperty("data");
+        var latest = await db.ExecutionAttempts.AsNoTracking()
+            .Where(a => a.Assignment!.WorkId == workId)
+            .OrderByDescending(a => a.StartedAt).ThenByDescending(a => a.Generation)
+            .FirstOrDefaultAsync(ct);
+        if (latest is not null && !AttemptTerminal.Contains(latest.Status))
+        {
+            var steer = Facilitator.Kernel.Integrations.ProviderEnvelopes.Steer(
+                workId,
+                data.GetProperty("assignmentId").GetString() ?? latest.AssignmentId.ToString("N"),
+                data.GetProperty("targetId").GetString() ?? "kernel",
+                directive,
+                contextVersion,
+                now,
+                $"work-steer:{commandId}");
+            AppendDeliveryRow(db, steer, original.RecipientEndpointId, $"work-steer:{commandId}", workId, now);
+            return;
+        }
+
+        // Re-dispatch: clone the original assign envelope verbatim, new
+        // identity (fresh CloudEvent id + assignmentId + command id).
+        var redispatch = System.Text.Json.Nodes.JsonNode.Parse(original.Envelope)!.AsObject();
+        var newAssignment = Guid.NewGuid().ToString("N");
+        var redispatchCommandId = $"work-redispatch:{commandId}";
+        redispatch["id"] = Guid.NewGuid().ToString("N");
+        redispatch["time"] = now.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
+        redispatch["subject"] = $"work/{workId}/assignment/{newAssignment}";
+        var redispatchData = redispatch["data"]!.AsObject();
+        redispatchData["commandId"] = redispatchCommandId;
+        redispatchData["assignmentId"] = newAssignment;
+        // The re-dispatched run has no steer channel of its own yet (the
+        // review leg is the FIRST thing it will see), so the directive rides
+        // its inputs: `steers` accumulates one entry per re-dispatch leg;
+        // the harness folds them into the change + the "steer incorporated"
+        // commentRequest (24 5, steering law).
+        var inputs = redispatchData["inputs"]?.AsObject() ?? new System.Text.Json.Nodes.JsonObject();
+        var steers = inputs["steers"] as System.Text.Json.Nodes.JsonArray ?? new System.Text.Json.Nodes.JsonArray();
+        steers.Add(directive.Length <= 2048 ? directive : directive[..2048]);
+        inputs["steers"] = steers;
+        redispatchData["inputs"] = inputs;
+        AppendDeliveryRow(db, redispatch, original.RecipientEndpointId, redispatchCommandId, workId, now);
+    }
+
+    private void AppendDeliveryRow(
+        FacilitatorDbContext db, System.Text.Json.Nodes.JsonObject envelope, string recipient, string commandId, Guid workId, DateTime now)
+    {
+        var json = envelope.ToJsonString();
+        var verdict = envelopeValidator.Validate(json);
+        if (!verdict.Ok)
+        {
+            throw new InvalidOperationException($"kernel envelope rejected by the validator: {verdict.ErrorClass}: {verdict.Message}");
+        }
+
+        db.Outbox.Add(new OutboxEntity
+        {
+            OutboxId = Guid.NewGuid(),
+            RecipientEndpointId = recipient,
+            AggregateType = "work",
+            AggregateId = workId,
+            EventType = envelope["type"]!.GetValue<string>(),
+            CommandId = commandId,
+            Envelope = json,
+            WorkId = workId,
+            Status = "pending",
+            AvailableAt = now,
+            Attempts = 0,
+            CreatedAt = now,
+        });
     }
 
     private static async Task WorkLockAsync(FacilitatorDbContext db, Guid workId, CancellationToken ct) =>

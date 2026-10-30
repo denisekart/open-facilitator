@@ -446,6 +446,23 @@ public sealed class TestDbProbe : IAsyncDisposable
         string RevisionOf, string Digest, string StructuredDigest, string ArtifactId,
         string ResultState, string State, DateTime RecordedAt);
 
+    /// <summary>Ledger rows recorded under one manifest digest.</summary>
+    public Task<long> ManifestRowCountByDigest(string digest) =>
+        ScalarLong("SELECT count(*) FROM facilitator.result_manifests WHERE digest = $1",
+            cmd => cmd.Parameters.AddWithValue(digest));
+
+    /// <summary>conversation root ids bound for one provider channel.</summary>
+    public async Task<List<string>> BindingRoots(string provider, string channel)
+    {
+        await using var connection = await _dataSource.OpenConnectionAsync();
+        await using var cmd = new NpgsqlCommand(
+            "SELECT root_message_id FROM facilitator.communication_bindings WHERE provider = $1 AND channel = $2",
+            connection);
+        cmd.Parameters.AddWithValue(provider);
+        cmd.Parameters.AddWithValue(channel);
+        return await ReadStrings(cmd);
+    }
+
     /// <summary>The broker row for one entry (null when absent), typed window for memory assertions.</summary>
     public async Task<MemoryEntryRow?> MemoryEntry(Guid entryId)
     {

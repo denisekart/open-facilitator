@@ -5,10 +5,11 @@ using Facilitator.Kernel.Work;
 namespace Facilitator.Kernel.Integrations;
 
 /// <summary>
-/// Kernel-emitted envelopes for the provider plane: the work.progress note and
+/// Kernel-emitted envelopes for the provider plane: the work.progress note,
 /// the decision-7 interim <c>work.assign</c> (the seed-lib SQL pattern —
-/// capability targeting to a named link endpoint until Plan 25 routing).
-/// Every envelope passes <c>EnvelopeValidator</c> at insert (Plan 02 law).
+/// capability targeting to a named link endpoint until Plan 25 routing), and
+/// the 24(1b) <c>work.steer</c> delivery to the owning gateway. Every
+/// envelope passes <c>EnvelopeValidator</c> at insert (Plan 02 law).
 /// </summary>
 public static class ProviderEnvelopes
 {
@@ -23,12 +24,27 @@ public static class ProviderEnvelopes
         return envelope;
     }
 
-    /// <summary>Interim work.assign envelope to <c>options.AssignEndpointId</c>:
-    /// deterministic shape mirroring the seed-lib interim row — objective in,
-    /// one deliverable expected, actor evidence is the kernel mention pointer.</summary>
-    public static JsonObject Assign(Guid workId, string assignmentId, string objective, ProviderOptions options, DateTime now)
+    /// <summary>Interim work.assign envelope addressed to a resolved link
+    /// endpoint: deterministic shape mirroring the seed-lib interim row —
+    /// objective in, one deliverable expected, actor evidence is the kernel
+    /// mention pointer. Capability + targetId arrive resolved (a label rule's
+    /// pair or the provider's global interim defaults).</summary>
+    public static JsonObject Assign(Guid workId, string assignmentId, string objective, string capabilityId, string targetId, DateTime now, JsonObject? extraInputs = null, string? commandId = null)
     {
         var objectiveRef = objective.Length <= 512 ? objective : objective[..512];
+        var inputs = new JsonObject
+        {
+            ["objective"] = objectiveRef,
+            ["sourceRefs"] = new JsonArray(),
+        };
+        if (extraInputs is not null)
+        {
+            foreach (var property in extraInputs.AsObject())
+            {
+                inputs[property.Key] = property.Value?.DeepClone();
+            }
+        }
+
         return new JsonObject
         {
             ["specversion"] = "1.0",
@@ -41,16 +57,12 @@ public static class ProviderEnvelopes
             ["dataschema"] = "https://schemas.openfacilitator.org/v1/command.work.assign.v1.json",
             ["data"] = new JsonObject
             {
-                ["commandId"] = $"work-assign:{workId}",
+                ["commandId"] = commandId ?? $"work-assign:{workId}",
                 ["workId"] = workId.ToString(),
-                ["targetId"] = options.AssignTargetId ?? options.Provider + "-interim",
-                ["capabilityId"] = options.AssignCapabilityId,
+                ["targetId"] = targetId,
+                ["capabilityId"] = capabilityId,
                 ["expectedContextVersion"] = 1,
-                ["inputs"] = new JsonObject
-                {
-                    ["objective"] = objectiveRef,
-                    ["sourceRefs"] = new JsonArray(),
-                },
+                ["inputs"] = inputs,
                 ["expectedDeliverables"] = new JsonArray(new JsonObject
                 {
                     ["kind"] = "analysis.report",
@@ -62,4 +74,69 @@ public static class ProviderEnvelopes
             },
         };
     }
+
+    /// <summary>The 24(1b) steer delivery envelope: schema-shaped
+    /// <c>command.work.steer.v1</c> addressed to the assignment's owning
+    /// gateway, where <c>onInteraction</c> delivers it to the bound child or
+    /// honestly rejects (<c>no-binding</c> / <c>child-disconnected</c>) — a
+    /// rejected steer is a normal result; the timeline row already exists.</summary>
+    public static JsonObject Steer(Guid workId, string assignmentId, string targetId, string directive, long expectedContextVersion, DateTime now, string commandId) =>
+        new()
+        {
+            ["specversion"] = "1.0",
+            ["id"] = Guid.NewGuid().ToString("N"),
+            ["source"] = EnvelopeFactory.KernelSource,
+            ["type"] = "org.facilitator.command.work.steer.v1",
+            ["subject"] = $"work/{workId}/assignment/{assignmentId}",
+            ["time"] = now.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
+            ["datacontenttype"] = "application/json",
+            ["dataschema"] = "https://schemas.openfacilitator.org/v1/command.work.steer.v1.json",
+            ["data"] = new JsonObject
+            {
+                ["commandId"] = commandId,
+                ["workId"] = workId.ToString(),
+                ["targetId"] = targetId,
+                ["actorEvidenceRef"] = $"kernel:steer:{commandId}",
+                ["deadline"] = (now + AssignDeadline).ToString("yyyy-MM-ddTHH:mm:ssZ"),
+                ["assignmentId"] = assignmentId,
+                ["directive"] = directive.Length <= 16384 ? directive : directive[..16384],
+                ["expectedContextVersion"] = expectedContextVersion,
+            },
+        };
+
+    /// <summary>Kernel→connector dispatch (Plan 24 1d): a manifest-declared
+    /// provider operation rides a plain <c>work.assign</c> to the owning
+    /// gateway, where the team's policy routes the op capability to its
+    /// connector unit. Opaque inputs; deliverable kind names the intent.</summary>
+    public static JsonObject ConnectorCommand(
+        Guid workId, string capabilityId, string targetId, string provider,
+        JsonObject inputs, string deliverableKind, DateTime now, string commandId) =>
+        new()
+        {
+            ["specversion"] = "1.0",
+            ["id"] = Guid.NewGuid().ToString("N"),
+            ["source"] = EnvelopeFactory.KernelSource,
+            ["type"] = "org.facilitator.command.work.assign.v1",
+            ["subject"] = $"work/{workId}/assignment/{Guid.NewGuid():N}",
+            ["time"] = now.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
+            ["datacontenttype"] = "application/json",
+            ["dataschema"] = "https://schemas.openfacilitator.org/v1/command.work.assign.v1.json",
+            ["data"] = new JsonObject
+            {
+                ["commandId"] = commandId,
+                ["workId"] = workId.ToString(),
+                ["targetId"] = targetId,
+                ["capabilityId"] = capabilityId,
+                ["expectedContextVersion"] = 1,
+                ["inputs"] = inputs,
+                ["expectedDeliverables"] = new JsonArray(new JsonObject
+                {
+                    ["kind"] = deliverableKind,
+                    ["mediaType"] = "text/markdown",
+                }),
+                ["actorEvidenceRef"] = $"kernel:{provider}-dispatch:{workId}",
+                ["deadline"] = (now + AssignDeadline).ToString("yyyy-MM-ddTHH:mm:ssZ"),
+                ["assignmentId"] = Guid.NewGuid().ToString("N"),
+            },
+        };
 }

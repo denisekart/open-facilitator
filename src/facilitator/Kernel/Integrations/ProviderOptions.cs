@@ -74,6 +74,40 @@ public sealed class ProviderOptions
     /// <summary>Envelope targetId of the interim assignment; null ⇒
     /// <c>&lt;provider&gt;-interim</c>.</summary>
     public string? AssignTargetId { get; init; }
+
+    /// <summary>Label-routed assign rules: when a Work-creating issue event
+    /// carries a rule's label (case-insensitive, read out of the event's
+    /// verbatim <c>payload</c>), the interim assign rides the rule's
+    /// capability/endpoint instead of the global
+    /// <see cref="AssignEndpointId"/>/<see cref="AssignCapabilityId"/> pair.
+    /// A rule with a blank endpoint falls back to the global endpoint.
+    /// Interim routing until Plan 25 capability routing lands.</summary>
+    public List<AssignRule> AssignRules { get; init; } = [];
+
+    /// <summary>The completed-manifest arm of <c>ResultIngress</c> reads
+    /// <c>structuredResult.prRequest</c> / <c>commentRequests</c> only when
+    /// the completing assignment's capability equals this value (provider-
+    /// scoped: other providers ignore the manifest field). Null ⇒ the reader
+    /// is off for this provider.</summary>
+    public string? PrRequestCapability { get; init; }
+}
+
+/// <summary>One <c>Providers:&lt;name&gt;:AssignRules[n]</c> row: trigger
+/// label ⇒ capability + owning link endpoint for the interim assign.</summary>
+public sealed class AssignRule
+{
+    /// <summary>Issue label (case-insensitive) that selects this rule.</summary>
+    public string? Label { get; init; }
+
+    /// <summary>Capability id riding the assign envelope when this rule fires.</summary>
+    public string? CapabilityId { get; init; }
+
+    /// <summary>Link endpoint id the assign is addressed to (blank ⇒ the
+    /// provider's global <c>AssignEndpointId</c>).</summary>
+    public string? EndpointId { get; init; }
+
+    /// <summary>Envelope targetId override; null ⇒ the provider default.</summary>
+    public string? TargetId { get; init; }
 }
 
 /// <summary>
@@ -134,6 +168,10 @@ public sealed class ProviderRegistry
     /// <summary>Enabled options for a token, or null.</summary>
     public ProviderOptions? Find(string provider) =>
         providers.TryGetValue(provider, out var options) ? options : null;
+
+    /// <summary>Enabled options, any token (the completed-manifest reader's
+    /// provider-wide capability scan).</summary>
+    public IEnumerable<ProviderOptions> All() => providers.Values;
 }
 
 /// <summary>

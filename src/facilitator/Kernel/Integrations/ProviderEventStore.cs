@@ -518,7 +518,7 @@ public sealed class ProviderEventStore(
             IdempotencyKey = deliveryId,
             CreatedAt = now,
         });
-        AppendAssignInterim(db, options, workId, objective, now);
+        AppendAssignInterim(db, options, workId, objective, reference, data, now);
         await AckAsync(db, options, reference, deliveryId, replyVsReaction, now, ct);
         return new ArmEffect(workId, $"work/{workId}");
     }
@@ -619,7 +619,7 @@ public sealed class ProviderEventStore(
         {
             var objective = Trim(text ?? $"Issue {reference.Channel}#{reference.Root}");
             var workId = await CreateWorkFromProviderAsync(db, workload, options, reference, objective, deliveryId,
-                $"work created (issue #{reference.Root})", now, ct);
+                $"work created (issue #{reference.Root})", data, now, ct);
             // Ack comment effect (decision 4): the adapter posts it as a bot
             // comment; kind rides the reference ("comment").
             AppendCommand(db, ReplyEnvelope(TargetOf(reference), "On it.", $"issue:{deliveryId}:ack",
@@ -639,6 +639,41 @@ public sealed class ProviderEventStore(
             b.Provider == reference.Provider && b.Channel == reference.Channel && b.RootMessageId == reference.Root, ct);
         if (binding?.WorkId is not { } workId)
         {
+            // §24(1e) head-branch resolver: the PR-number binding cannot
+            // exist at manifest time (the number is minted provider-side),
+            // so the prRequest reader parked a marker binding keyed by the
+            // head branch (`branch:<ref>`). An opened/reopened event whose
+            // verbatim payload carries that head ref resolves the marker:
+            // copy its WorkId onto a PR-number-keyed binding so every
+            // later leg (reviewed/commented/merged) routes through the
+            // plain lookup above. The marker row stands (harmless: a re-
+            // opened PR re-runs this arm and the unique conversation index
+            // skips the insert).
+            if (action is "opened" or "reopened")
+            {
+                var headRef = PayloadHeadRef(data);
+                var marker = headRef is { Length: > 0 }
+                    ? await db.CommunicationBindings.FirstOrDefaultAsync(b =>
+                        b.Provider == reference.Provider && b.Channel == reference.Channel
+                        && b.RootMessageId == "branch:" + headRef, ct)
+                    : null;
+                if (marker?.WorkId is { } resolved)
+                {
+                    // ON CONFLICT DO NOTHING: a redelivery of the same
+                    // opened event (or a binding row that raced us here)
+                    // reconciles to the first writer's row.
+                    await db.Database.ExecuteSqlInterpolatedAsync(
+                        $"""
+                         INSERT INTO facilitator.communication_bindings
+                             (binding_id, provider, channel, root_message_id, parent_message_id, work_id, idempotency_key, created_at)
+                         VALUES (gen_random_uuid(), {reference.Provider}, {reference.Channel}, {reference.Root},
+                                 {marker.ParentMessageId}, {resolved}, {"pr-binding:" + deliveryId}, {now})
+                         ON CONFLICT DO NOTHING
+                         """, ct);
+                    return new ArmEffect(resolved, $"pr-bound:{reference.Root}");
+                }
+            }
+
             return new ArmEffect(null, "observe:unbound");
         }
 
@@ -659,6 +694,35 @@ public sealed class ProviderEventStore(
         }
 
         return new ArmEffect(null, $"observe:{action}");
+    }
+
+    /// <summary>The PR head branch of a change-request event's verbatim
+    /// provider payload (<c>pull_request.head.ref</c>, the Gitea-family
+    /// shape; <c>head.ref</c> top-level also honored). Null when absent.</summary>
+    internal static string? PayloadHeadRef(JsonElement data)
+    {
+        if (!data.TryGetProperty("payload", out var payload) || payload.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+
+        foreach (var holder in new[] { "pull_request", "pr" })
+        {
+            if (payload.TryGetProperty(holder, out var pr) && pr.ValueKind == JsonValueKind.Object
+                && pr.TryGetProperty("head", out var head) && head.ValueKind == JsonValueKind.Object
+                && head.TryGetProperty("ref", out var reference) && reference.ValueKind == JsonValueKind.String)
+            {
+                return reference.GetString();
+            }
+        }
+
+        if (payload.TryGetProperty("head", out var top) && top.ValueKind == JsonValueKind.Object
+            && top.TryGetProperty("ref", out var topRef) && topRef.ValueKind == JsonValueKind.String)
+        {
+            return topRef.GetString();
+        }
+
+        return null;
     }
 
     private async Task<ArmEffect> PipelineArmAsync(
@@ -685,7 +749,7 @@ public sealed class ProviderEventStore(
     // Work + created event + binding + interim assign, all in the arm's open
     // transaction.
     private async Task<Guid> CreateWorkFromProviderAsync(
-        FacilitatorDbContext db, Facilitator.Kernel.Shared.Auth.LinkPrincipal workload, ProviderOptions options, Reference reference, string objective, string deliveryId, string progressNote, DateTime now, CancellationToken ct)
+        FacilitatorDbContext db, Facilitator.Kernel.Shared.Auth.LinkPrincipal workload, ProviderOptions options, Reference reference, string objective, string deliveryId, string progressNote, JsonElement? triggerEvent, DateTime now, CancellationToken ct)
     {
         var workId = Guid.NewGuid();
         var project = await db.Projects.FirstOrDefaultAsync(
@@ -735,7 +799,7 @@ public sealed class ProviderEventStore(
             IdempotencyKey = deliveryId,
             CreatedAt = now,
         });
-        AppendAssignInterim(db, options, workId, objective, now);
+        AppendAssignInterim(db, options, workId, objective, reference, triggerEvent, now);
         return workId;
     }
 
@@ -807,17 +871,105 @@ public sealed class ProviderEventStore(
         AppendCommand(db, ProviderEnvelopes.Progress(workId, note, now), options, now, workId);
     }
 
-    /// <summary>Decision 7: the seed-lib assign-interim — a work.assign row to the
-    /// configured link endpoint (capability targeting until Plan 25 routing).</summary>
-    private void AppendAssignInterim(FacilitatorDbContext db, ProviderOptions options, Guid workId, string objective, DateTime now)
+    /// <summary>Decision 7 + 24(1a): the seed-lib assign-interim — a work.assign row
+    /// to the resolved link endpoint (capability targeting until Plan 25
+    /// routing). Label rules (<see cref="ProviderOptions.AssignRules"/>) win over
+    /// the global pair when the triggering issue event's verbatim
+    /// <c>payload</c> carries the rule's label (label policy lives in the
+    /// adapter, the kernel just reads what it set — malleability law); a
+    /// rule-matched assign is addressed to the rule's endpoint, carries the
+    /// rule's capability, gains <c>repo</c>/<c>issue</c> inputs (the coding
+    /// worker's re-hydration coordinates), and rides the
+    /// <c>work-assign-coding:</c> command id (the re-dispatch arm reads the
+    /// original envelope back by it). No rule match ⇒ today's global
+    /// endpoint/capability behavior, byte-for-byte.</summary>
+    private void AppendAssignInterim(FacilitatorDbContext db, ProviderOptions options, Guid workId, string objective, Reference reference, JsonElement? triggerEvent, DateTime now)
     {
-        if (options.AssignEndpointId is not { Length: > 0 })
+        var rule = MatchAssignRule(options, triggerEvent);
+        var endpointId = rule?.EndpointId is { Length: > 0 } ruleEndpoint
+            ? ruleEndpoint
+            : options.AssignEndpointId;
+        if (endpointId is not { Length: > 0 })
         {
             return;
         }
 
-        var envelope = ProviderEnvelopes.Assign(workId, Guid.NewGuid().ToString("N"), objective, options, now);
-        AppendCommand(db, envelope, options, now, workId, recipient: $"link.{options.AssignEndpointId}", commandId: $"work-assign:{workId}");
+        var capabilityId = rule?.CapabilityId is { Length: > 0 } ruleCapability
+            ? ruleCapability
+            : options.AssignCapabilityId;
+        var targetId = rule?.TargetId ?? options.AssignTargetId ?? options.Provider + "-interim";
+        var extraInputs = rule is null
+            ? null
+            : new JsonObject { ["repo"] = reference.Channel, ["issue"] = reference.Root };
+        var commandId = rule is null ? $"work-assign:{workId}" : $"work-assign-coding:{workId}";
+        var envelope = ProviderEnvelopes.Assign(workId, Guid.NewGuid().ToString("N"), objective, capabilityId, targetId, now, extraInputs, commandId);
+        AppendCommand(db, envelope, options, now, workId,
+            recipient: $"link.{endpointId}",
+            commandId: commandId);
+    }
+
+    /// <summary>First assign rule whose label appears (case-insensitive) in the
+    /// event payload's label set, else null.</summary>
+    internal static AssignRule? MatchAssignRule(ProviderOptions options, JsonElement? triggerEvent)
+    {
+        if (options.AssignRules.Count == 0 || triggerEvent is not { } data)
+        {
+            return null;
+        }
+
+        var labels = PayloadLabels(data);
+        if (labels.Count == 0)
+        {
+            return null;
+        }
+
+        return options.AssignRules.FirstOrDefault(rule =>
+            rule.Label is { Length: > 0 } label && labels.Contains(label.ToLowerInvariant()));
+    }
+
+    /// <summary>The adapter forwards the provider body verbatim in
+    /// <c>data.payload</c>; label names live under top-level <c>label.name</c>,
+    /// top-level <c>labels[]</c>, and <c>issue.labels[]</c> (Gitea-family
+    /// shapes, mirroring what the forgejo adapter reads). Lowercased set.</summary>
+    internal static HashSet<string> PayloadLabels(JsonElement data)
+    {
+        var labels = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (!data.TryGetProperty("payload", out var payload) || payload.ValueKind != JsonValueKind.Object)
+        {
+            return labels;
+        }
+
+        CollectLabelNames(labels, payload);
+        if (payload.TryGetProperty("issue", out var issue) && issue.ValueKind == JsonValueKind.Object)
+        {
+            CollectLabelNames(labels, issue);
+        }
+
+        return labels;
+    }
+
+    private static void CollectLabelNames(HashSet<string> labels, JsonElement container)
+    {
+        if (container.TryGetProperty("label", out var single)
+            && single.ValueKind == JsonValueKind.Object
+            && single.TryGetProperty("name", out var name)
+            && name.ValueKind == JsonValueKind.String)
+        {
+            labels.Add(name.GetString()!);
+        }
+
+        if (container.TryGetProperty("labels", out var array) && array.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var label in array.EnumerateArray())
+            {
+                if (label.ValueKind == JsonValueKind.Object
+                    && label.TryGetProperty("name", out var itemName)
+                    && itemName.ValueKind == JsonValueKind.String)
+                {
+                    labels.Add(itemName.GetString()!);
+                }
+            }
+        }
     }
 
     private void AppendCommand(

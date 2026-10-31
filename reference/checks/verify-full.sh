@@ -617,8 +617,11 @@ step_coding_pr() {
 
 step_coding_review_steer() {
   local directive="reword the changelog entry for clarity"
+  # Forgejo's own review-state literals are COMMENT/APPROVED/REQUEST_CHANGES
+  # (16.x `structs.ReviewStateType`): a GitHub-style "COMMENTED" is an unknown
+  # event and lands as a PENDING review that fires no webhook at all.
   forgejo_api POST "/api/v1/repos/demo/widgets/pulls/$FJ_CODING_PR/reviews" \
-    "$(jq -cn --arg b "$directive" '{body:$b, event:"COMMENTED"}')" >/dev/null \
+    "$(jq -cn --arg b "$directive" '{body:$b, event:"COMMENT"}')" >/dev/null \
     || { step_fail "review POST refused"; return 1; }
   fj_coding_steered() {
     full_psql "SELECT 1 FROM facilitator.work_events WHERE work_id = '$FJ_CODING_WORK' AND kind = 'steer' AND detail::text LIKE '%changelog entry for clarity%' LIMIT 1" | grep -q 1

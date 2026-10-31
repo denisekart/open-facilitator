@@ -2,8 +2,11 @@
 // Startup order (mirrors linkd's template, extended with the reconcile law):
 // enroll-or-mount token → capabilities POST (embedded fleet-of-one; fleet
 // modes POST on child churn, never at boot) → ledgers → transport → gateway
-// handler → createLinkClient → start() → first welcome ⇒ RECONCILE (§6.3) →
-// child listener (shared|standalone) → ready line → heartbeats.
+// handler → child listener (shared|standalone; bound BEFORE the link session
+// opens so a command the kernel pushes on session-open meets its child, not
+// a boot-window `child-disconnected`: the plan 24 restart leg's re-hydrated
+// assign must never die in that window) → start() → first welcome ⇒
+// RECONCILE (§6.3) → ready line → heartbeats.
 //
 // Stamp law: a binding row's connectionGeneration is the leaseEpoch of the
 // session that accepted the command, its childGeneration the link's fence
@@ -97,6 +100,15 @@ const ERROR_BASE = "https://errors.openfacilitator.org/v1/";
 /** Union re-POST debounce: child churn settles before the kernel sees it. */
 const UNION_POST_DEBOUNCE_MS = 1000;
 
+/**
+ * Boot-race hold: the kernel pushes a session's queued commands the instant
+ * the link opens, but a same-container socket child dials the child listener
+ * ~100 ms later. A command routed to a known-offline child waits this long
+ * for a registration before answering honestly. The hold only ever delays a
+ * `child-disconnected` rejection; it never accepts what a rejection would.
+ */
+const CHILD_ONLINE_GRACE_MS = 5000;
+
 export type GatewayRuntimeState = "starting" | "ready" | "draining" | "closed";
 
 export interface GatewayStatus {
@@ -133,6 +145,9 @@ export interface CreateGatewayRuntimeDeps {
   policy?: PolicyEvaluator;
   /** Override actor-claim extraction (unit tests inject workload-only claims). */
   claimsOf?: ((actorEvidenceRef: string) => Promise<ActorClaims>) | undefined;
+  /** Boot-race hold over an offline route; default CHILD_ONLINE_GRACE_MS.
+   *  Tests pin the honest rejection fast with a small value. */
+  childOnlineGraceMs?: number | undefined;
 }
 
 /** One policy decision + everything the audit line cites about it. */
@@ -310,17 +325,6 @@ export class GatewayRuntime {
       eventSource: `urn:workspace:${this.config.gatewayId}`,
     });
     this.client = client;
-    const session = await client.start();
-
-    // Child events flow live from here on; anything queued pre-welcome ships too.
-    if (this.embedded !== null) {
-      this.embedded.setPublisher((env) => this.forwardEvent(env, this.embeddedMember()));
-      await this.forwardQueued();
-    }
-
-    await this.reconcile();
-    await this.reconcileApprovals();
-    this._reconciled = true;
 
     if (this.config.childTransport !== undefined) {
       this.listener = await startChildListener(this.config.childTransport, {
@@ -333,6 +337,19 @@ export class GatewayRuntime {
         onDisconnected: (childId) => this.onChildDisconnected(childId),
       });
     }
+    const session = await client.start();
+
+    // Child events flow live from the publisher law below; a pre-welcome
+    // publishEvent buffers durably in the ledger outbox and ships once the
+    // session is up (SDK transport law).
+    if (this.embedded !== null) {
+      this.embedded.setPublisher((env) => this.forwardEvent(env, this.embeddedMember()));
+      await this.forwardQueued();
+    }
+
+    await this.reconcile();
+    await this.reconcileApprovals();
+    this._reconciled = true;
 
     this._state = "ready";
     this.heartbeatTimer = setInterval(
@@ -471,7 +488,10 @@ export class GatewayRuntime {
       true,
     );
     this.scheduleUnionPost();
-    if (known) void this.probeChild(link.childId);
+    // A pre-ready registration is probed by the boot-time reconcile pass
+    // itself (the child is online by then); probing here would double-report
+    // a lost execution.
+    if (known && this._reconciled) void this.probeChild(link.childId);
     else
       this.logger.info("child registered", {
         childId: link.childId,
@@ -661,8 +681,19 @@ export class GatewayRuntime {
       return { kind: "unsupported", reason: `no-child-advertises: ${data.capabilityId}` };
     }
     if (!route.online) {
-      // S:318 honesty: the advertiser is known and gone; retry upstream.
-      return { kind: "rejected", reason: "child-disconnected" };
+      // S:318 honesty: the advertiser is known and gone; retry upstream —
+      // but a child mid-boot (kernel pushes on session-open, a socket child
+      // dials ~100 ms later) gets one bounded hold first, so a re-hydrated
+      // assign landing in that window is EXECUTED, not killed by a receipt
+      // the kernel would lawfully ack as terminal (plan 24 restart law).
+      if (
+        !(await this.fleet.waitUntilOnline(
+          route.childId,
+          this.deps.childOnlineGraceMs ?? CHILD_ONLINE_GRACE_MS,
+        ))
+      ) {
+        return { kind: "rejected", reason: "child-disconnected" };
+      }
     }
     const member = this.fleet.member(route.childId);
     if (member === undefined) return { kind: "rejected", reason: "child-disconnected" };

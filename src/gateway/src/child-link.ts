@@ -263,6 +263,8 @@ export class ChildFleet {
   private readonly descriptors = new Map<string, { childId: string; json: string }>();
   /** capabilityId → childId over offline members (honest rejections only). */
   private readonly offlineCaps = new Map<string, string>();
+  /** childId → pending `waitUntilOnline` resolvers (boot-race hold). */
+  private readonly onlineWaiters = new Map<string, Set<(online: boolean) => void>>();
 
   constructor(private readonly logger: LinkLogger) {}
 
@@ -319,6 +321,39 @@ export class ChildFleet {
         this.onlineCaps.set(capability.id, member.childId);
       }
     }
+    this.fireOnlineWaiters(member.childId);
+  }
+
+  /**
+   * Boot-race hold (runtime assign path): resolve `true` the moment
+   * `childId` registers, `false` after `graceMs` — an offline route waits
+   * briefly for a child that is mid-boot rather than answering early with a
+   * rejection a running child would never have produced.
+   */
+  waitUntilOnline(childId: string, graceMs: number): Promise<boolean> {
+    if (this.online.has(childId)) return Promise.resolve(true);
+    return new Promise((resolve) => {
+      let settled = false;
+      const settle = (online: boolean): void => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        this.onlineWaiters.get(childId)?.delete(settle);
+        resolve(online);
+      };
+      const timer = setTimeout(() => settle(false), graceMs);
+      timer.unref?.();
+      const waiters = this.onlineWaiters.get(childId) ?? new Set();
+      waiters.add(settle);
+      this.onlineWaiters.set(childId, waiters);
+    });
+  }
+
+  private fireOnlineWaiters(childId: string): void {
+    const waiters = this.onlineWaiters.get(childId);
+    if (waiters === undefined || waiters.size === 0) return;
+    this.onlineWaiters.delete(childId);
+    for (const settle of waiters) settle(true);
   }
 
   /** Socket died / child closed: capabilities leave the union, honest routes stay. */

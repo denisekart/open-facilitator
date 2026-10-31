@@ -19,6 +19,7 @@ import { SqliteLedger, digestOfManifest } from "@ofac/workspace-link/node";
 import { afterEach, describe, expect, it } from "vitest";
 import { parseConfig, type GatewayConfig } from "../../src/config.js";
 import { builtinChildManifest } from "../../src/child.js";
+import { digestOf } from "../../src/child-link.js";
 import { ExecutionLedger, type GatewayPaths } from "../../src/ledger.js";
 import { createGatewayRuntime, type GatewayRuntime } from "../../src/runtime.js";
 import { connectChild, type ChildConnection } from "../../src/connect.js";
@@ -161,7 +162,11 @@ interface Fleet {
 
 let live: Fleet | null = null;
 
-async function fleetBoot(yamlChildren: string, transportBlock: string): Promise<Fleet> {
+async function fleetBoot(
+  yamlChildren: string,
+  transportBlock: string,
+  deps: { childOnlineGraceMs?: number; seedOfflineChild?: CapabilityManifestV1 } = {},
+): Promise<Fleet> {
   const stateDir = mkdtempSync(join(tmpdir(), "gw-fleet-"));
   const cfg = parseConfig(
     `
@@ -189,11 +194,22 @@ heartbeatSeconds: 3600
     link: new SqliteLedger(join(stateDir, "link.sqlite3")),
     execution: new ExecutionLedger(join(stateDir, "gateway.sqlite3")),
   };
+  if (deps.seedOfflineChild !== undefined) {
+    // A fleet shadow from a previous life (restart): the runtime seeds it
+    // offline, so an assign during the boot window routes to a known child.
+    paths.execution.upsertChild(
+      `${cfg.gatewayId}/alpha`,
+      digestOf(deps.seedOfflineChild),
+      JSON.stringify(deps.seedOfflineChild),
+      true,
+    );
+  }
   const rt = createGatewayRuntime(cfg, {
     transportFactory: () => mock,
     fetchImpl: kernel.fetchImpl,
     ledgerFactory: () => paths,
     logger,
+    ...deps,
   });
   const fleet: Fleet = {
     cfg,
@@ -324,8 +340,10 @@ describe("shared-mode fleet routing", () => {
     await a.conn.close();
   });
 
-  it("offline advertiser: rejected child-disconnected, no row", async () => {
-    const f = await fleetBoot(TWO_CHILDREN, TRANSPORT);
+  it("offline advertiser: rejected child-disconnected after the grace, no row", async () => {
+    // A truly-dead child never registers: the bounded hold expires and the
+    // honest rejection still answers (the seam keeps the test fast).
+    const f = await fleetBoot(TWO_CHILDREN, TRANSPORT, { childOnlineGraceMs: 250 });
     const a = await f.attach("alpha", manifestAdvert(["research.analyze"], "alpha"));
     await a.conn.close();
     await waitFor("fleet marks offline", () => {
@@ -337,6 +355,24 @@ describe("shared-mode fleet routing", () => {
     expect(receipt.status).toBe("rejected");
     expect(receipt.reason).toBe("child-disconnected");
     expect(f.paths.execution.all()).toHaveLength(0);
+  });
+
+  it("boot-race law: assign pushed on session-open EXECUTES once the child dials within the grace", async () => {
+    // Plan 24 restart leg: after a restart the kernel pushes the queued
+    // re-hydrated assign the instant the link opens, while the worker's
+    // socket child is still mid-boot. The listener is bound BEFORE the
+    // session and the offline route holds, so the command runs instead of
+    // dying as an acked child-disconnected receipt.
+    const manifest = manifestAdvert(["research.analyze"], "alpha");
+    const f = await fleetBoot(TWO_CHILDREN, TRANSPORT, { seedOfflineChild: manifest });
+    f.mock.pushDeliver(assign("cmd-boot", "research.analyze"));
+    // The child dials 150 ms into the boot window (after rt.start resolved).
+    await new Promise((r) => setTimeout(r, 150));
+    const a = await f.attach("alpha", manifest);
+    const receipt = await waitFor("accepted receipt", () => f.mock.receipts[0] ?? false);
+    expect(receipt.status).toBe("accepted");
+    expect(f.paths.execution.all()).toHaveLength(1);
+    await a.conn.close();
   });
 
   it("quota: second assign while first runs answers child-busy", async () => {

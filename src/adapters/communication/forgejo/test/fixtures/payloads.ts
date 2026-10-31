@@ -65,9 +65,15 @@ export const prClosedMerged = {
   pull_request: { number: 2, merged: true, head: { sha: "abc123" } },
 };
 
+// Forgejo 16.x fires review submissions under per-action kinds carrying
+// `review: {type, content}` (verified live against 16.0.7).
 export const reviewSubmitted = {
-  action: "submitted",
-  review: { id: 4, body: "Approve with the retry clause reworded.", state: "approved" },
+  action: "reviewed",
+  review: {
+    id: 4,
+    type: "pull_request_approved",
+    content: "Approve with the retry clause reworded.",
+  },
   repository: { full_name: "demo/widgets" },
   sender: { login: "reviewer" },
   pull_request: { number: 2, head: { sha: "abc123" } },

@@ -49,7 +49,10 @@ sees ONE endpoint: child churn debounces a re-POST of the fleet UNION
 manifest (ownerTeam = the gateway's team); nothing POSTs at boot, so a
 standalone gateway is legal with zero children. Commands route to the
 advertising child under its `maxInFlight` quota (over-quota answers
-`child-busy`); an offline advertiser answers `child-disconnected`. A
+`child-busy`); an offline advertiser answers `child-disconnected` after a
+bounded 5 s hold — the child listener is bound before the link session opens,
+so a command the kernel pushes on session-open meets a child still mid-boot
+instead of dying in that window. A
 re-registering child is probed with `status` for every durable `running`
 row it owns: `unknown` means the child died mid-flight — the row goes
 `lost` with ONE retryable `assignment.failed(child-lost-execution)`,

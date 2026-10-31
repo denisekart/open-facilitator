@@ -184,6 +184,13 @@ export function normalizeIssueComment(
   return { type: ISSUE_EVENT, data };
 }
 
+/** Review-directive text: 16.x sends `review: {type, content}` (verified live
+ *  against 16.0.7); the GitHub-style `body` shape is kept as a fallback. */
+function reviewText(payload: Payload): string | undefined {
+  const review = obj(payload["review"]);
+  return str(review?.["content"]) ?? str(review?.["body"]);
+}
+
 const PR_ACTIONS: Record<string, ProviderChangeRequestEventV1Data["action"]> = {
   opened: "opened",
   synchronized: "synchronized",
@@ -219,7 +226,9 @@ export function normalizePullRequest(
   const number = num(payload["number"]) ?? num(pr?.["number"]) ?? "";
   if (repo === undefined || number === "") return null;
   const author = str(obj(payload["sender"])?.["login"]) ?? "";
-  const text = str(obj(payload["review"])?.["body"]) ?? str(pr?.["body"]);
+  // 16.x fires PR-side events with `review: {type, content}` (verified live);
+  // the GitHub-style `body` field never appears on this provider.
+  const text = reviewText(payload) ?? str(pr?.["body"]);
   const data: ProviderChangeRequestEventV1Data = {
     reference: reference(ctx, repo, number, author),
     provider: "forgejo",
@@ -233,7 +242,11 @@ export function normalizePullRequest(
 }
 
 /** `review` / `pull_request_review` (review submitted as its own event kind):
- *  maps into pull_request.v1 action "reviewed" (decision 6). */
+ *  maps into pull_request.v1 action "reviewed" (decision 6). Forgejo 16.x
+ *  fires review submissions under per-action kinds (`pull_request_approved`,
+ *  `pull_request_review_comment`, `pull_request_rejected`) carrying
+ *  `review: {type, content}` — the review directive lives in `content`
+ *  (verified live against 16.0.7). */
 export function normalizeReview(
   payload: Payload,
   deliveryId: string,
@@ -241,12 +254,10 @@ export function normalizeReview(
 ): NormalizedEvent | null {
   if (senderDropped(payload, ctx)) return null;
   const repo = repoOf(payload);
-  const review = obj(payload["review"]);
-  const pr = obj(payload["pull_request"]);
-  const number = num(pr?.["number"]) ?? "";
+  const number = num(obj(payload["pull_request"])?.["number"]) ?? "";
   if (repo === undefined || number === "") return null;
   const author = str(obj(payload["sender"])?.["login"]) ?? "";
-  const text = str(review?.["body"]);
+  const text = reviewText(payload);
   const data: ProviderChangeRequestEventV1Data = {
     reference: reference(ctx, repo, number, author),
     provider: "forgejo",

@@ -51,9 +51,22 @@ export class SqliteLedger implements Ledger {
     const now = new Date().toISOString();
     const run = this.db.transaction((): InsertResult => {
       const hit = this.db
-        .prepare("SELECT 1 FROM ledger WHERE delivery_id = ? OR dedupe_key = ?")
-        .get(deliveryId, dedupeKey);
-      if (hit) return "duplicate";
+        .prepare(
+          "SELECT delivery_id AS rowId, state FROM ledger WHERE delivery_id = ? OR dedupe_key = ?",
+        )
+        .get(deliveryId, dedupeKey) as { rowId: string; state: string } | undefined;
+      if (hit) {
+        if (hit.state !== "failed") return "duplicate";
+        // Retryable-rejection law: a `failed` row was rejected without side
+        // effects (the kernel only re-offers child-busy/child-disconnected/
+        // child-offline receipts), so the re-offered delivery re-runs.
+        this.db
+          .prepare(
+            "UPDATE ledger SET state = 'received', envelope = ?, error = NULL, updated_at = ? WHERE delivery_id = ?",
+          )
+          .run(JSON.stringify(envelope), now, hit.rowId);
+        return "fresh";
+      }
       this.db
         .prepare(
           "INSERT INTO ledger (delivery_id, dedupe_key, state, envelope, error, received_at, updated_at) VALUES (?, ?, 'received', ?, NULL, ?, ?)",

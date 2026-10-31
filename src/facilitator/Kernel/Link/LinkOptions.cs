@@ -19,6 +19,11 @@ public sealed class LinkOptions
     /// <summary>In-flight delivery lease before redelivery (Link:InFlightLeaseSeconds).</summary>
     public required int InFlightLeaseSeconds { get; init; }
 
+    /// <summary>Redelivery backoff for a transiently-rejected delivery
+    /// (child-busy/child-disconnected/child-offline receipt) before the pump
+    /// re-offers it (Link:RedeliverBackoffSeconds, default 5).</summary>
+    public int RedeliverBackoffSeconds { get; init; } = 5;
+
     /// <summary>Protocol versions this server supports (handshake intersection).</summary>
     public static IReadOnlyList<string> SupportedProtocolVersions { get; } = ["v1"];
 
@@ -55,6 +60,7 @@ public sealed class LinkOptions
             MaxInFlight = maxInFlight,
             HeartbeatSeconds = heartbeat,
             InFlightLeaseSeconds = configuration.GetValue("Link:InFlightLeaseSeconds", 120),
+            RedeliverBackoffSeconds = configuration.GetValue("Link:RedeliverBackoffSeconds", 5),
             Teams = configuration.GetSection("Link:Teams").Get<string[]>() ?? [],
             WorkloadIdentities = configuration.GetSection("Link:WorkloadIdentities").Get<WorkloadIdentityBinding[]>() ?? [],
             EvidenceAudience = configuration.GetValue("Link:Evidence:Audience", "facilitator-link"),

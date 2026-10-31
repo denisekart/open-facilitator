@@ -204,11 +204,24 @@ public sealed class LinkLedger(
         return row is null ? null : (row.State, row.EndpointId);
     }
 
+    /// <summary>Receipt-rejection budget; mirrors <c>DbEventDispatcher.MaxAttempts</c>.
+    /// After this many offers a rejected delivery is terminally recorded like
+    /// any other receipt, so a poison delivery still drains.</summary>
+    public const int MaxReceiptAttempts = 5;
+
     /// <summary>
-    /// Record a receipt: ledger row → acked (receipt jsonb verbatim, timeline
-    /// free — a duplicate receipt for an acked delivery just overwrites the
-    /// jsonb) AND the matching outbox row → delivered, in ONE transaction so
-    /// the dispatcher never double-charges (spec §5.3, A:309).
+    /// Record a receipt. Terminal receipts (<c>accepted</c>, <c>duplicate</c>,
+    /// and rejections with a permanent reason: policy, no-binding, unsupported)
+    /// flip the ledger row to acked AND the matching outbox row to delivered in
+    /// ONE transaction so the dispatcher never double-charges (spec §5.3,
+    /// A:309). A RETRYABLE rejection — <c>child-busy</c> / <c>child-disconnected</c>
+    /// / <c>child-offline</c>, the transient-capacity reasons the gateway
+    /// documents as "honest, retryable upstream" — is NOT terminal: the receipt
+    /// jsonb is recorded, the row stays in-flight behind a short redelivery
+    /// backoff (which also charges the window, i.e. it applies flow control),
+    /// and only after <see cref="MaxReceiptAttempts"/> offers does it settle.
+    /// Terminally acking a busy rejection would silently lose the command
+    /// (plan 35 prereq: a steer comment rejected child-busy never landed).
     /// </summary>
     public async Task<bool> AckAsync(Guid deliveryId, string endpointId, string receiptJson, CancellationToken ct)
     {
@@ -228,20 +241,62 @@ public sealed class LinkLedger(
                  ({deliveryId}, {endpointId}, 0, 'pending', NULL, NULL, NULL, 0, NULL)
              ON CONFLICT (delivery_id) DO NOTHING
              """, ct);
-        var rows = await db.Database.ExecuteSqlInterpolatedAsync(
-            $"""
-             UPDATE facilitator.link_deliveries
-                SET state = 'acked', acked_at = COALESCE(acked_at, {now}), receipt = {receiptJson}::jsonb
-              WHERE delivery_id = {deliveryId} AND endpoint_id = {endpointId}
-             """, ct);
+
+        var requeue = IsRetryableRejection(receiptJson)
+            && await db.LinkDeliveries.AsNoTracking().Where(d => d.DeliveryId == deliveryId)
+                   .Select(d => d.Attempts).FirstOrDefaultAsync(ct) < MaxReceiptAttempts;
+
+        var rows = requeue
+            ? await db.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                 UPDATE facilitator.link_deliveries
+                    SET state = 'in_flight', receipt = {receiptJson}::jsonb,
+                        redeliver_after = {now} + make_interval(secs => {options.RedeliverBackoffSeconds})
+                  WHERE delivery_id = {deliveryId} AND endpoint_id = {endpointId}
+                 """, ct)
+            : await db.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                 UPDATE facilitator.link_deliveries
+                    SET state = 'acked', acked_at = COALESCE(acked_at, {now}), receipt = {receiptJson}::jsonb
+                  WHERE delivery_id = {deliveryId} AND endpoint_id = {endpointId}
+                 """, ct);
         if (rows == 0)
         {
             return false;
         }
 
-        await OutboxRepository.MarkDeliveredOnAsync(db, deliveryId, now, ct);
+        if (!requeue)
+        {
+            await OutboxRepository.MarkDeliveredOnAsync(db, deliveryId, now, ct);
+        }
+
         await tx.CommitAsync(ct);
         return true;
+    }
+
+    /// <summary>True for a <c>rejected</c> receipt whose reason names a
+    /// transient endpoint condition (child quota full / child link down) as
+    /// opposed to a permanent refusal (policy, no-binding, unknown child).</summary>
+    internal static bool IsRetryableRejection(string receiptJson)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(receiptJson);
+            if (doc.RootElement.ValueKind != JsonValueKind.Object
+                || doc.RootElement.GetProperty("status").GetString() != "rejected")
+            {
+                return false;
+            }
+
+            var reason = doc.RootElement.TryGetProperty("reason", out var r) ? r.GetString() ?? string.Empty : string.Empty;
+            return reason.StartsWith("child-busy", StringComparison.Ordinal)
+                || reason.StartsWith("child-disconnected", StringComparison.Ordinal)
+                || reason.StartsWith("child-offline", StringComparison.Ordinal);
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
     }
 
     private static void Add(DbCommand command, string name, object value)

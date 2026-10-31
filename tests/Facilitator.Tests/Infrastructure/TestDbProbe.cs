@@ -197,14 +197,16 @@ public sealed class TestDbProbe : IAsyncDisposable
                 cmd.Parameters.AddWithValue(state);
             });
 
-    /// <summary>True when the delivery is acked with a receipt carrying the given status.</summary>
-    public async Task<bool> DeliveryReceiptStatus(Guid deliveryId, string receiptStatus) =>
+    /// <summary>True when the delivery carries a receipt with the given status
+    /// in the given ledger state (default: terminally acked).</summary>
+    public async Task<bool> DeliveryReceiptStatus(Guid deliveryId, string receiptStatus, string state = "acked") =>
         await ScalarBool(
-            "SELECT count(*) FROM facilitator.link_deliveries WHERE delivery_id = $1 AND state = 'acked' AND receipt->>'status' = $2",
+            "SELECT count(*) FROM facilitator.link_deliveries WHERE delivery_id = $1 AND state = $3 AND receipt->>'status' = $2",
             cmd =>
             {
                 cmd.Parameters.AddWithValue(deliveryId);
                 cmd.Parameters.AddWithValue(receiptStatus);
+                cmd.Parameters.AddWithValue(state);
             });
 
     /// <summary>True when the delivery is fully acked (state + settle time + structured receipt).</summary>

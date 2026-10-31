@@ -17,7 +17,21 @@ export class MemoryLedger implements Ledger {
   private clock = 0;
 
   insertIfNew(deliveryId: string, envelope: unknown, dedupeKey: string): InsertResult {
-    if (this.rows.has(deliveryId) || this.byKey.has(dedupeKey)) return "duplicate";
+    const byDelivery = this.rows.get(deliveryId);
+    const byKey = this.byKey.has(dedupeKey) ? this.rows.get(this.byKey.get(dedupeKey)!) : undefined;
+    const hit = byDelivery ?? byKey;
+    if (hit) {
+      if (hit.state !== "failed") return "duplicate";
+      // Retryable-rejection law: a `failed` row was rejected without side
+      // effects (the kernel only re-offers child-busy/child-disconnected/
+      // child-offline receipts), so the re-offered delivery re-runs.
+      hit.state = "received";
+      hit.envelope = envelope;
+      hit.error = undefined;
+      hit.updatedAt = ++this.clock;
+      this.byKey.set(dedupeKey, hit.deliveryId);
+      return "fresh";
+    }
     this.rows.set(deliveryId, {
       deliveryId,
       state: "received",

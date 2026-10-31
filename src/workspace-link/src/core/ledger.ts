@@ -16,7 +16,11 @@ export interface Ledger {
    * Atomic check-and-insert on the dedupe identity: `commandId` for known
    * command types, CloudEvents `(source,id)` otherwise (server law S:301).
    * "duplicate" answers on a `delivery_id` OR `dedupe_key` hit — the handler
-   * must NOT run and a `duplicate` receipt is the answer.
+   * must NOT run and a `duplicate` receipt is the answer. EXCEPTION
+   * (retryable-rejection law): a `failed` row was rejected without side
+   * effects — the kernel re-offers exactly child-busy/child-disconnected/
+   * child-offline receipts — so a re-offer re-runs: the row resets to
+   * `received` and "fresh" answers.
    */
   insertIfNew(deliveryId: string, envelope: unknown, dedupeKey: string): InsertResult;
   markState(deliveryId: string, state: LedgerState, error?: string): void;

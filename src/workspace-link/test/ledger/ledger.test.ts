@@ -57,6 +57,22 @@ describe("SqliteLedger", () => {
     second.close();
   });
 
+  it("a failed row re-freshes on re-offer; processed/unsupported stay duplicate", () => {
+    // Retryable-rejection law: the kernel re-offers child-busy rejections on
+    // the SAME deliveryId; the handler must re-run (fresh), not answer
+    // duplicate. A processed row keeps the duplicate answer.
+    const ledger = new SqliteLedger(join(dir, "refresh.sqlite3"));
+    ledger.insertIfNew("del-r", { v: 1 }, "cmd-r");
+    ledger.markState("del-r", "failed", "child-busy: gw.x/alpha");
+    expect(ledger.insertIfNew("del-r", { v: 2 }, "cmd-r")).toBe("fresh");
+    expect(ledger.stats().failed).toBe(0);
+    ledger.markState("del-r", "processed");
+    expect(ledger.insertIfNew("del-r", { v: 3 }, "cmd-r")).toBe("duplicate");
+    ledger.markState("del-r", "unsupported");
+    expect(ledger.insertIfNew("del-r", { v: 4 }, "cmd-r")).toBe("duplicate");
+    ledger.close();
+  });
+
   it("known-command identity: one row per commandId, delivered twice", () => {
     const ledger = new SqliteLedger(join(dir, "dedupe.sqlite3"));
     const env = {

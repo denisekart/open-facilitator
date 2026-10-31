@@ -72,6 +72,32 @@ public sealed class TestDbProbe : IAsyncDisposable
     public Task<List<string>> OutboxRecipients(Guid workId) =>
         TextList("SELECT DISTINCT recipient_endpoint_id FROM facilitator.outbox WHERE work_id = $1", workId);
 
+    /// <summary>A work's assignment ledger rows (status, capability, generation).</summary>
+    public async Task<List<(string Status, string Capability, int Generation)>> AssignmentRowsForWork(Guid workId)
+    {
+        await using var connection = await _dataSource.OpenConnectionAsync();
+        await using var cmd = new NpgsqlCommand(
+            "SELECT status, coalesce(capability_id, ''), current_execution_generation "
+            + "FROM facilitator.assignments WHERE work_id = $1 ORDER BY created_at", connection);
+        cmd.Parameters.AddWithValue(workId);
+        var rows = new List<(string, string, int)>();
+        await using var reader = await cmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            rows.Add((reader.GetString(0), reader.GetString(1), reader.GetInt32(2)));
+        }
+
+        return rows;
+    }
+
+    /// <summary>Crash-replay seeding: force a command's outbox row back to
+    /// pending (the sink committed but the mark did not land).</summary>
+    public Task RequeueOutboxByCommand(string commandId) =>
+        NonQuery(
+            "UPDATE facilitator.outbox SET status = 'pending', attempts = 0, available_at = now() - interval '1 hour', "
+            + "lease_owner = NULL, leased_until = NULL WHERE command_id = $1",
+            cmd => cmd.Parameters.AddWithValue(commandId));
+
     /// <summary>Age a work's pending rows past their backoff so the dispatcher may claim them now.</summary>
     public Task ExpireOutboxBackoff(Guid workId) =>
         NonQuery("UPDATE facilitator.outbox SET available_at = now() - interval '1 hour' WHERE work_id = $1 AND status = 'pending'",
@@ -371,6 +397,15 @@ public sealed class TestDbProbe : IAsyncDisposable
         ScalarLong("SELECT count(*) FROM facilitator.artifacts WHERE command_id = $1",
             cmd => cmd.Parameters.AddWithValue(commandId));
 
+    /// <summary>Idempotently ensure a roster team row exists (fleet/work team
+    /// isolation: routing tests mint per-test unique teams so a leaked
+    /// enrollment from another suite can never share their candidate slot).</summary>
+    public Task SeedTeam(string slug) =>
+        NonQuery(
+            "INSERT INTO facilitator.teams (team_id, slug, created_at) "
+            + "VALUES (gen_random_uuid(), $1, now()) ON CONFLICT (slug) DO NOTHING",
+            cmd => cmd.Parameters.AddWithValue(slug));
+
     /// <summary>Hand-mint a facilitator.projects row on a roster team (work team-scoping tests).</summary>
     public async Task<Guid> SeedProject(string teamSlug)
     {
@@ -660,18 +695,69 @@ public sealed class TestDbProbe : IAsyncDisposable
                 cmd.Parameters.AddWithValue(trustMode);
             });
 
-    /// <summary>Hand-mint a live link session row for an endpoint.</summary>
-    public Task SeedLinkSession(string endpointId, long epoch, DateTime leaseUntil) =>
+    /// <summary>Hand-mint a live link session row for an endpoint (optional
+    /// opened_at for deterministic oldest-online ordering).</summary>
+    public Task SeedLinkSession(string endpointId, long epoch, DateTime leaseUntil, DateTime? openedAt = null) =>
         NonQuery(
             "INSERT INTO facilitator.link_sessions (logical_endpoint_id, connection_instance_id, replica_id, "
-            + "session_epoch, lease_until, last_heartbeat) "
-            + "VALUES ($1, 'inst-seed', 'replica-seed', $2, $3, now())",
+            + "session_epoch, lease_until, last_heartbeat, opened_at) "
+            + "VALUES ($1, 'inst-seed', 'replica-seed', $2, $3, now(), coalesce($4, now()))",
             cmd =>
             {
                 cmd.Parameters.AddWithValue(endpointId);
                 cmd.Parameters.AddWithValue(epoch);
                 cmd.Parameters.AddWithValue(leaseUntil);
+                cmd.Parameters.AddWithValue((object?)openedAt ?? DBNull.Value);
             });
+
+    /// <summary>Drop test fleets by endpoint prefix (per-test isolation: a
+    /// leaked live session would join a later test's candidate set).</summary>
+    public async Task PurgeFleets(string endpointPrefix)
+    {
+        await NonQuery(
+            "DELETE FROM facilitator.link_sessions WHERE logical_endpoint_id LIKE $1",
+            cmd => cmd.Parameters.AddWithValue(endpointPrefix + "%"));
+        await NonQuery(
+            "DELETE FROM facilitator.link_enrollments WHERE endpoint_id LIKE $1",
+            cmd => cmd.Parameters.AddWithValue(endpointPrefix + "%"));
+    }
+
+    /// <summary>Store a capability manifest on an enrollment (the funnel's
+    /// candidate source; the POST route writes the same column).</summary>
+    public Task SeedCapabilityManifest(string endpointId, string manifestJson) =>
+        NonQuery(
+            "UPDATE facilitator.link_enrollments SET capability_manifest = $2::jsonb WHERE endpoint_id = $1",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(endpointId);
+                cmd.Parameters.AddWithValue(manifestJson);
+            });
+
+    /// <summary>The routing funnel's audit row for one intent command id.</summary>
+    public async Task<RoutingDecisionRow?> RoutingDecision(string intentCommandId)
+    {
+        await using var connection = await _dataSource.OpenConnectionAsync();
+        await using var cmd = new NpgsqlCommand(
+            "SELECT allowed_candidates::text, coalesce(chosen_endpoint_id, ''), status, basis, "
+            + "coalesce(provider_ref, ''), attempt_count FROM facilitator.routing_decisions "
+            + "WHERE intent_command_id = $1", connection);
+        cmd.Parameters.AddWithValue(intentCommandId);
+        await using var reader = await cmd.ExecuteReaderAsync();
+        if (!await reader.ReadAsync())
+        {
+            return null;
+        }
+
+        return new RoutingDecisionRow(
+            reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3),
+            reader.GetString(4), reader.GetInt32(5));
+    }
+
+
+    /// <summary>One routing-decision audit row (typed window, no raw SQL in tests).</summary>
+    public sealed record RoutingDecisionRow(
+        string AllowedCandidates, string ChosenEndpointId, string Status, string Basis,
+        string ProviderRef, int AttemptCount);
 
     /// <summary>Hand-mint an assignment row for a team in a given status (link views seed affected assignments).</summary>
     public Task SeedAssignmentForTeam(Guid workId, string teamSlug, string status) =>

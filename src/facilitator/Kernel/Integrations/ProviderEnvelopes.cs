@@ -24,12 +24,12 @@ public static class ProviderEnvelopes
         return envelope;
     }
 
-    /// <summary>Interim work.assign envelope addressed to a resolved link
-    /// endpoint: deterministic shape mirroring the seed-lib interim row —
-    /// objective in, one deliverable expected, actor evidence is the kernel
-    /// mention pointer. Capability + targetId arrive resolved (a label rule's
-    /// pair or the provider's global interim defaults).</summary>
-    public static JsonObject Assign(Guid workId, string assignmentId, string objective, string capabilityId, string targetId, DateTime now, JsonObject? extraInputs = null, string? commandId = null)
+    /// <summary>work.assign envelope addressed to a resolved link endpoint:
+    /// deterministic shape mirroring the e2e tier's assignEnvelope — objective
+    /// in, one deliverable expected. Capability + targetId arrive resolved (a
+    /// routing intent's pair); the actor evidence defaults to the kernel
+    /// mention pointer, overridable by the routing intent's own attribution.</summary>
+    public static JsonObject Assign(Guid workId, string assignmentId, string objective, string capabilityId, string targetId, DateTime now, JsonObject? extraInputs = null, string? commandId = null, string? actorEvidenceRef = null)
     {
         var objectiveRef = objective.Length <= 512 ? objective : objective[..512];
         var inputs = new JsonObject
@@ -68,7 +68,7 @@ public static class ProviderEnvelopes
                     ["kind"] = "analysis.report",
                     ["mediaType"] = "text/markdown",
                 }),
-                ["actorEvidenceRef"] = $"kernel:provider-ingest:{workId}",
+                ["actorEvidenceRef"] = actorEvidenceRef ?? $"kernel:provider-ingest:{workId}",
                 ["deadline"] = (now + AssignDeadline).ToString("yyyy-MM-ddTHH:mm:ssZ"),
                 ["assignmentId"] = assignmentId,
             },

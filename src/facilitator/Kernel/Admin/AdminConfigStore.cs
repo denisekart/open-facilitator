@@ -227,8 +227,12 @@ public sealed class AdminConfigStore(
             IntField(payload, "idleShutdownMinutes", 1, 1440),
             RangeOrder(payload)),
         ["routing-defaults"] = payload => FirstError(
-            UnknownFields(payload, "provider"),
-            StringField(payload, "provider", 1, 128)),
+            UnknownFields(payload, "provider", "preferTeam"),
+            EnumField(payload, "provider", ["deterministic", "model", ""]),
+            OptionalStringField(payload, "preferTeam", 1, 128)),
+        // ^ "model" is stored-accepted for Plan 26's seam: no registered
+        // implementation falls back deterministic with a model-fallback audit
+        // flag (RoutingSink), so no config-schema change lands later.
     };
 
     private static string? FirstError(params string?[] errors) => errors.FirstOrDefault(static e => e is not null);
@@ -283,6 +287,9 @@ public sealed class AdminConfigStore(
 
         return null;
     }
+
+    private static string? OptionalStringField(JsonElement payload, string name, int minLen, int maxLen) =>
+        payload.TryGetProperty(name, out _) ? StringField(payload, name, minLen, maxLen) : null;
 
     private static string? RangeOrder(JsonElement payload)
     {

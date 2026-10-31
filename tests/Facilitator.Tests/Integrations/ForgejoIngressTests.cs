@@ -21,12 +21,24 @@ namespace Facilitator.Tests.Integrations;
 /// fail-closed.
 /// </summary>
 [Collection("postgres:dispatch-link")]
-public sealed class ForgejoIngressTests(PostgresFixture fixture) : IDisposable
+public sealed class ForgejoIngressTests(PostgresFixture fixture) : IAsyncLifetime, IDisposable
 {
     private const string ProblemBase = "https://errors.openfacilitator.org/v1/";
     private const string Repo = "demo/widgets";
 
     private readonly List<KernelTestFactory> _factories = [];
+
+    /// <inheritdoc />
+    public Task InitializeAsync() => Task.CompletedTask;
+
+    /// <inheritdoc />
+    public async Task DisposeAsync()
+    {
+        // A leaked live fleet would join a later test's candidate set: the
+        // funnel routes preference-null intents to ANY live fleet with the
+        // interim capability on the work's team.
+        await fixture.Db.PurgeFleets("gw-assign-");
+    }
 
     public void Dispose()
     {
@@ -64,8 +76,15 @@ public sealed class ForgejoIngressTests(PostgresFixture fixture) : IDisposable
         Assert.Contains("command.communication.reply.v1", ack);
         Assert.Contains($"link.{endpoint}", await fixture.Db.OutboxRecipients(workId.Value));
 
-        // Interim assign from the forgejo section (decision 3, 22's shape).
-        var assign = await fixture.Db.OutboxEnvelopeByCommand($"work-assign:{workId}");
+        // Interim assign through the routing funnel (decision 3, 22's shape,
+        // 35's seam): the fleet for the lane is live, so drain until the
+        // preference-satisfied effect row lands under the N-format key.
+        await FleetHarness.SeedFleetAsync(fixture.Db, assignEndpoint, "team-alpha", "analysis.summarize");
+        await RoutingHarness.DrainUntilAsync(
+            factory,
+            () => fixture.Db.OutboxEnvelopeByCommand($"work-assign:{workId.Value:N}"),
+            "interim assign effect");
+        var assign = await fixture.Db.OutboxEnvelopeByCommand($"work-assign:{workId.Value:N}");
         Assert.NotNull(assign);
         Assert.Contains("forgejo-interim", assign);
 

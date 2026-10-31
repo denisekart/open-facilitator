@@ -45,6 +45,44 @@ public sealed class IngressProcessor(
             : null;
         commandId ??= Guid.NewGuid().ToString("N");
 
+        // Routing intents (§10): an explicit `assignments[]` array, or the
+        // implicit single assignment from the top-level capability pair.
+        // The funnel resolves the endpoint; a create without any capability
+        // stays a bare Work (operator dispatches later).
+        List<RoutingIntentSeed>? seeds = null;
+        if (body.TryGetProperty("assignments", out var arr) && arr.ValueKind == JsonValueKind.Array)
+        {
+            seeds = [];
+            foreach (var item in arr.EnumerateArray())
+            {
+                var cap = item.TryGetProperty("capabilityId", out var c) ? c.GetString() : null;
+                if (string.IsNullOrWhiteSpace(cap))
+                {
+                    return IngressPipeline.Problem(ProblemErrors.SchemaViolation("assignments[].capabilityId is required"));
+                }
+
+                seeds.Add(new RoutingIntentSeed(
+                    cap,
+                    Objective: Str(item, "objective"),
+                    TargetId: Str(item, "targetId"),
+                    PreferenceEndpointId: Str(item, "preferenceEndpointId"),
+                    ActorEvidenceRef: Str(item, "actorEvidenceRef"),
+                    Inputs: item.TryGetProperty("inputs", out var inp) && inp.ValueKind == JsonValueKind.Object ? inp.Clone() : null));
+            }
+        }
+        else if (body.TryGetProperty("capabilityId", out var topCap) && topCap.ValueKind == JsonValueKind.String && topCap.GetString() is { Length: > 0 } topCapability)
+        {
+            seeds =
+            [
+                new RoutingIntentSeed(
+                    topCapability,
+                    Objective: objective,
+                    TargetId: Str(body, "targetId"),
+                    PreferenceEndpointId: Str(body, "preferenceEndpointId"),
+                    ActorEvidenceRef: Str(body, "actorEvidenceRef")),
+            ];
+        }
+
         var (inboxId, duplicate) = await inbox.InsertInboxAsync(
             Guid.NewGuid(), "urn:facilitator:http", Guid.NewGuid().ToString("N"), commandId,
             body.GetRawText(), null, "pending", null, ct);
@@ -54,7 +92,7 @@ public sealed class IngressProcessor(
         }
 
         var work = await pipeline.WithSpanAsync("ingress.process", async () =>
-            await store.CreateWorkAsync(objective, projectId, actor, ct));
+            await store.CreateWorkAsync(objective, projectId, actor, ct, seeds));
         await inbox.MarkProcessedAsync(inboxId, null, ct);
         metrics.InboxProcessed();
         return Results.Created($"/api/works/{work.WorkId}", WorkDtoMapper.ToDto(work));
@@ -115,4 +153,38 @@ public sealed class IngressProcessor(
             () => Results.Ok(new { status = "duplicate", inboxId }),
             ct);
     }
+
+    /// <summary>Operator re-dispatch: a fresh routing intent for an existing
+    /// Work (the retry / restart-with-context leg). Body:
+    /// <c>{capabilityId, objective?, targetId?, preferenceEndpointId?,
+    /// actorEvidenceRef?, inputs?, commandId?}</c>; commandId keys the
+    /// effect-row ledger for replay idempotency.</summary>
+    public async Task<IResult> RedispatchAsync(Guid workId, JsonElement body, CancellationToken ct)
+    {
+        var capability = body.TryGetProperty("capabilityId", out var c) ? c.GetString() : null;
+        if (string.IsNullOrWhiteSpace(capability))
+        {
+            return IngressPipeline.Problem(ProblemErrors.SchemaViolation("capabilityId is required"));
+        }
+
+        var commandId = body.TryGetProperty("commandId", out var cid) && cid.ValueKind == JsonValueKind.String
+            ? cid.GetString()
+            : null;
+        var seed = new RoutingIntentSeed(
+            capability,
+            Objective: Str(body, "objective"),
+            TargetId: Str(body, "targetId"),
+            PreferenceEndpointId: Str(body, "preferenceEndpointId"),
+            ActorEvidenceRef: Str(body, "actorEvidenceRef"),
+            Inputs: body.TryGetProperty("inputs", out var inp) && inp.ValueKind == JsonValueKind.Object ? inp.Clone() : null);
+
+        var ok = await pipeline.WithSpanAsync("ingress.process", async () =>
+            await store.RedispatchAsync(workId, seed, commandId, ct));
+        return ok
+            ? Results.Accepted($"/api/works/{workId}", new { status = "redispatch-requested" })
+            : IngressPipeline.Problem(ProblemErrors.WorkNotFound(workId));
+    }
+
+    private static string? Str(JsonElement obj, string name) =>
+        obj.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
 }

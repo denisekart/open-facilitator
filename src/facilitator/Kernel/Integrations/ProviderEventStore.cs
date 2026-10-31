@@ -527,7 +527,7 @@ public sealed class ProviderEventStore(
             IdempotencyKey = deliveryId,
             CreatedAt = now,
         });
-        AppendAssignInterim(db, options, workId, objective, reference, null, now);
+        AppendRoutingIntentForWork(db, options, workId, objective, reference, null, project.TeamId, now);
         await AckAsync(db, options, reference, deliveryId, replyVsReaction, now, ct);
         return new ArmEffect(workId, $"work/{workId}");
     }
@@ -824,7 +824,7 @@ public sealed class ProviderEventStore(
             IdempotencyKey = deliveryId,
             CreatedAt = now,
         });
-        AppendAssignInterim(db, options, workId, objective, reference, rule, now);
+        AppendRoutingIntentForWork(db, options, workId, objective, reference, rule, teamId, now);
         return workId;
     }
 
@@ -896,40 +896,47 @@ public sealed class ProviderEventStore(
         AppendCommand(db, ProviderEnvelopes.Progress(workId, note, now), options, now, workId);
     }
 
-    /// <summary>Decision 7 + 24(1a): the seed-lib assign-interim — a work.assign row
-    /// to the resolved link endpoint (capability targeting until Plan 25
-    /// routing). Label rules (<see cref="ProviderOptions.AssignRules"/>) win over
-    /// the global pair when the triggering issue event's verbatim
-    /// <c>payload</c> carries the rule's label (label policy lives in the
-    /// adapter, the kernel just reads what it set — malleability law); a
-    /// rule-matched assign is addressed to the rule's endpoint, carries the
-    /// rule's capability, gains <c>repo</c>/<c>issue</c> inputs (the coding
-    /// worker's re-hydration coordinates), and rides the
-    /// <c>work-assign-coding:</c> command id (the re-dispatch arm reads the
-    /// original envelope back by it). No rule match ⇒ today's global
-    /// endpoint/capability behavior, byte-for-byte.</summary>
-    private void AppendAssignInterim(FacilitatorDbContext db, ProviderOptions options, Guid workId, string objective, Reference reference, AssignRule? rule, DateTime now)
+    /// <summary>The provider arm's routing intent (spec §10): a work-created
+    /// event contributes <c>{team, capability, inputs, commandIdBase}</c> to
+    /// the funnel instead of addressing an endpoint — the funnel resolves the
+    /// candidate (rule/global <c>AssignEndpointId</c> survives as an optional
+    /// preference, audited <c>preference-satisfied|preference-ignored</c>).
+    /// Label rules win over the global pair when the triggering issue event's
+    /// verbatim <c>payload</c> carries the rule's label (label policy lives in
+    /// the adapter, the kernel just reads what it set — malleability law); a
+    /// rule-matched intent carries the rule's capability and gains
+    /// <c>repo</c>/<c>issue</c> inputs (the coding worker's re-hydration
+    /// coordinates) and rides the <c>work-assign-coding:</c> command-id base
+    /// (the re-dispatch arm reads the original envelope back by it).</summary>
+    private void AppendRoutingIntentForWork(FacilitatorDbContext db, ProviderOptions options, Guid workId, string objective, Reference reference, AssignRule? rule, Guid teamId, DateTime now)
     {
-        var endpointId = rule?.EndpointId is { Length: > 0 } ruleEndpoint
-            ? ruleEndpoint
-            : options.AssignEndpointId;
-        if (endpointId is not { Length: > 0 })
+        var capabilityId = rule?.CapabilityId is { Length: > 0 } ruleCapability
+            ? ruleCapability
+            : options.AssignCapabilityId;
+        if (capabilityId is not { Length: > 0 })
         {
             return;
         }
 
-        var capabilityId = rule?.CapabilityId is { Length: > 0 } ruleCapability
-            ? ruleCapability
-            : options.AssignCapabilityId;
         var targetId = rule?.TargetId ?? options.AssignTargetId ?? options.Provider + "-interim";
         var extraInputs = rule is null
             ? null
             : new JsonObject { ["repo"] = reference.Channel, ["issue"] = reference.Root };
-        var commandId = rule is null ? $"work-assign:{workId}" : $"work-assign-coding:{workId}";
-        var envelope = ProviderEnvelopes.Assign(workId, Guid.NewGuid().ToString("N"), objective, capabilityId, targetId, now, extraInputs, commandId);
-        AppendCommand(db, envelope, options, now, workId,
-            recipient: $"link.{endpointId}",
-            commandId: commandId);
+        var teamSlug = db.Teams.AsNoTracking().Where(t => t.TeamId == teamId)
+            .Select(t => t.Slug).FirstOrDefault();
+        var intent = new Facilitator.Kernel.Work.RoutingIntent(
+            workId,
+            capabilityId,
+            teamSlug,
+            PreferenceEndpointId: rule?.EndpointId is { Length: > 0 } ruleEndpoint ? ruleEndpoint : options.AssignEndpointId,
+            TargetId: targetId,
+            CommandIdBase: rule is null ? "work-assign" : "work-assign-coding",
+            EffectKey: workId.ToString("N"),
+            Objective: objective,
+            SourceRefsJson: "[]",
+            ExtraInputsJson: extraInputs?.ToJsonString(),
+            ActorEvidenceRef: $"kernel:provider-ingest:{workId}");
+        db.Outbox.Add(Facilitator.Kernel.Work.RoutingIntentEnvelope.OutboxRow(intent, now, envelopeValidator));
     }
 
     /// <summary>First assign rule whose label appears (case-insensitive) in the

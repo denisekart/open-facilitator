@@ -19,11 +19,19 @@ namespace Facilitator.Tests.Integrations;
 /// <c>communication.reply</c> row addressed to the adapter's link endpoint.
 /// </summary>
 [Collection("postgres:dispatch-link")]
-public sealed class ProviderIngressTests(PostgresFixture fixture) : IDisposable
+public sealed class ProviderIngressTests(PostgresFixture fixture) : IAsyncLifetime, IDisposable
 {
     private const string ProblemBase = "https://errors.openfacilitator.org/v1/";
 
     private readonly List<KernelTestFactory> _factories = [];
+
+    /// <inheritdoc />
+    public Task InitializeAsync() => Task.CompletedTask;
+
+    /// <inheritdoc />
+    public async Task DisposeAsync() =>
+        // A leaked live fleet would join a later test's candidate set.
+        await fixture.Db.PurgeFleets("gw-assign-");
 
     public void Dispose()
     {
@@ -259,7 +267,7 @@ public sealed class ProviderIngressTests(PostgresFixture fixture) : IDisposable
     public async Task AssignInterimRidesConfiguredEndpoint()
     {
         var assignEndpoint = "gw-assign-" + Guid.NewGuid().ToString("N")[..6];
-        var (_, link, tenant, _) = await EnabledPlane(assignEndpointId: assignEndpoint);
+        var (factory, link, tenant, _) = await EnabledPlane(assignEndpointId: assignEndpoint);
         await fixture.Db.SeedProviderIdentity("mattermost", tenant, "acct-1", "subject-1");
         var channel = $"chan-{Guid.NewGuid():N}";
         var root = $"root-{Guid.NewGuid():N}";
@@ -267,8 +275,14 @@ public sealed class ProviderIngressTests(PostgresFixture fixture) : IDisposable
             "valid/event.provider.mention.json", $"post-{Guid.NewGuid():N}", channel, root, "acct-1", text: "routed work")));
         var workId = await BoundWork(channel, root);
 
-        var envelope = await fixture.Db.OutboxEnvelopeByCommand($"work-assign:{workId}");
-        Assert.NotNull(envelope);
+        // The interim assign rides the routing funnel (35's seam): the lane
+        // fleet is live, so drain until the preference-satisfied effect row
+        // lands under the N-format key, recipient link.<assign endpoint>.
+        await FleetHarness.SeedFleetAsync(fixture.Db, assignEndpoint, "team-alpha", "analysis.summarize");
+        var envelope = await RoutingHarness.DrainUntilAsync(
+            factory,
+            () => fixture.Db.OutboxEnvelopeByCommand($"work-assign:{workId:N}"),
+            "interim assign effect");
         Assert.Contains("command.work.assign.v1", envelope);
         Assert.Contains($"link.{assignEndpoint}", await fixture.Db.OutboxRecipients(workId));
     }

@@ -19,15 +19,29 @@ namespace Facilitator.Tests.Integrations;
 /// dispatch a <c>vcs.change_request.comment</c>. A later pull_request
 /// <c>opened</c> whose payload head ref matches the marker resolves it onto a
 /// PR-number-keyed binding. Assignments whose capability no provider claims
-/// keep the manifest opaque.
+/// keep the manifest opaque. The interim assign rides the routing funnel, so
+/// each plane seeds a live fleet for its lane and awaits the effect row
+/// before the manifest leg.
 /// </summary>
 [Collection("postgres:dispatch-link")]
-public sealed class PrDispatchTests(PostgresFixture fixture) : IDisposable
+public sealed class PrDispatchTests(PostgresFixture fixture) : IAsyncLifetime, IDisposable
 {
     private const string Repo = "demo/widgets";
     private const string Head = "ofac/aaaaaaaa-1234";
 
     private readonly List<KernelTestFactory> _factories = [];
+
+    /// <inheritdoc />
+    public Task InitializeAsync() => Task.CompletedTask;
+
+    /// <inheritdoc />
+    public async Task DisposeAsync()
+    {
+        // A leaked live fleet would join a later test's candidate set.
+        await fixture.Db.PurgeFleets("gw-coding-");
+        await fixture.Db.PurgeFleets("gw-global-");
+        await fixture.Db.PurgeFleets("man-");
+    }
 
     public void Dispose()
     {
@@ -40,8 +54,8 @@ public sealed class PrDispatchTests(PostgresFixture fixture) : IDisposable
     [Fact]
     public async Task PrRequestDispatchesCreateAndParksBranchMarker()
     {
-        var (adapter, worker, codingEndpoint, workId) = await CodingPlaneAsync();
-        var wireAssignment = WireAssignmentId(workId);
+        var (adapter, worker, codingEndpoint, _, workId, _) = await CodingPlaneAsync();
+        var wireAssignment = WireAssignmentId($"work-assign-coding:{workId:N}");
         var head = "ofac/" + workId.ToString("N")[..12];
 
         var structured = new JsonObject
@@ -91,8 +105,8 @@ public sealed class PrDispatchTests(PostgresFixture fixture) : IDisposable
     [Fact]
     public async Task CommentRequestsEachDispatchACommentAssign()
     {
-        var (adapter, worker, _, workId) = await CodingPlaneAsync();
-        var wireAssignment = WireAssignmentId(workId);
+        var (adapter, worker, _, _, workId, _) = await CodingPlaneAsync();
+        var wireAssignment = WireAssignmentId($"work-assign-coding:{workId:N}");
 
         var structured = new JsonObject
         {
@@ -127,8 +141,8 @@ public sealed class PrDispatchTests(PostgresFixture fixture) : IDisposable
     [Fact]
     public async Task OpenedEventResolvesBranchMarkerOntoPrBinding()
     {
-        var (adapter, worker, _, workId) = await CodingPlaneAsync();
-        var wireAssignment = WireAssignmentId(workId);
+        var (adapter, worker, _, _, workId, _) = await CodingPlaneAsync();
+        var wireAssignment = WireAssignmentId($"work-assign-coding:{workId:N}");
         var head = "ofac/" + workId.ToString("N")[..12];
 
         // Park the marker through the real leg (1d).
@@ -151,7 +165,7 @@ public sealed class PrDispatchTests(PostgresFixture fixture) : IDisposable
             Completed(workId, wireAssignment, manifestId, artifactId, digest),
             HttpStatusCode.Accepted);
 
-        // The provider's pull_request opened event: number 231 (fresh), head
+        // The provider's pull_request opened event: number fresh, head
         // ref matching the marker.
         var pr = new Random().Next(10000, 99999).ToString();
         var posted = await adapter.PostAsync("/api/link/v1/events",
@@ -171,8 +185,8 @@ public sealed class PrDispatchTests(PostgresFixture fixture) : IDisposable
         // input IS a bot-authored event: the echo-law exemption for
         // change_request opened/reopened keeps it on the CR arm — echo
         // suppression here would strand every bot-minted PR unbound.
-        var (adapter, worker, _, workId) = await CodingPlaneAsync();
-        var wireAssignment = WireAssignmentId(workId);
+        var (adapter, worker, _, _, workId, _) = await CodingPlaneAsync();
+        var wireAssignment = WireAssignmentId($"work-assign-coding:{workId:N}");
         var head = "ofac/" + workId.ToString("N")[..12];
 
         var structured = new JsonObject
@@ -210,8 +224,8 @@ public sealed class PrDispatchTests(PostgresFixture fixture) : IDisposable
         // The global (unlabeled) lane assigns analysis.summarize, which no
         // provider claims as PrRequestCapability: the manifest's prRequest
         // records, nothing dispatches.
-        var (adapter, worker, codingEndpoint, workId) = await CodingPlaneAsync(label: "ofac:other");
-        var wireAssignment = WireAssignmentId($"work-assign:{workId}");
+        var (adapter, worker, codingEndpoint, laneEndpoint, workId, _) = await CodingPlaneAsync(label: "ofac:other");
+        var wireAssignment = WireAssignmentId($"work-assign:{workId:N}");
 
         var structured = new JsonObject
         {
@@ -234,6 +248,7 @@ public sealed class PrDispatchTests(PostgresFixture fixture) : IDisposable
 
         Assert.Equal(1, await fixture.Db.ManifestRowCountByDigest(digest));
         Assert.DoesNotContain($"link.{codingEndpoint}", await fixture.Db.OutboxRecipients(workId));
+        Assert.Contains($"link.{laneEndpoint}", await fixture.Db.OutboxRecipients(workId));
         Assert.DoesNotContain("branch:" + Head, await fixture.Db.BindingRoots("forgejo", Repo));
     }
 
@@ -241,10 +256,13 @@ public sealed class PrDispatchTests(PostgresFixture fixture) : IDisposable
 
     /// <summary>A forgejo plane with the coding rule + claimed capability, an
     /// adapter link client, a mode-B worker link client (manifest upload +
-    /// completed events), and one Work armed through a labeled issue event.</summary>
-    private async Task<(HttpClient Adapter, HttpClient Worker, string CodingEndpoint, Guid WorkId)> CodingPlaneAsync(string label = "ofac:coding")
+    /// completed events), and one Work armed through a labeled issue event.
+    /// The lane's fleet is live and its routing effect is awaited, so the
+    /// wire assignmentId (the envelope's) exists when this returns.</summary>
+    private async Task<(HttpClient Adapter, HttpClient Worker, string CodingEndpoint, string LaneEndpoint, Guid WorkId, KernelTestFactory Factory)> CodingPlaneAsync(string label = "ofac:coding")
     {
         var codingEndpoint = "gw-coding-" + Guid.NewGuid().ToString("N")[..6];
+        var globalEndpoint = "gw-global-" + Guid.NewGuid().ToString("N")[..6];
         var fjEndpoint = "gw-fj-" + Guid.NewGuid().ToString("N")[..8];
         var manEndpoint = "man-" + Guid.NewGuid().ToString("N")[..6];
         var factory = new KernelTestFactory(fixture, noDispatcher: true, settings: new Dictionary<string, string?>
@@ -254,7 +272,7 @@ public sealed class PrDispatchTests(PostgresFixture fixture) : IDisposable
             ["Providers:Forgejo:Tenant"] = "git.localhost",
             ["Providers:Forgejo:SiteUrl"] = "http://forgejo:3000",
             ["Providers:Forgejo:BotUserId"] = "ofac-bot",
-            ["Providers:Forgejo:AssignEndpointId"] = "gw-global-unused",
+            ["Providers:Forgejo:AssignEndpointId"] = globalEndpoint,
             ["Providers:Forgejo:AssignRules:0:Label"] = "ofac:coding",
             ["Providers:Forgejo:AssignRules:0:CapabilityId"] = "coding.implement",
             ["Providers:Forgejo:AssignRules:0:EndpointId"] = codingEndpoint,
@@ -270,20 +288,33 @@ public sealed class PrDispatchTests(PostgresFixture fixture) : IDisposable
         var adapter = factory.CreateLinkClient(await LinkTestHarness.EnrollAsync(authed, fjEndpoint));
         var worker = factory.CreateLinkClient(await ArtifactTestKit.EnrollModeBAsync(authed, manEndpoint, "ofac-gateway-alpha", "gateway-alpha-secret"));
 
+        // Lane fleet: the rule lane needs coding.implement live on the rule
+        // endpoint, the global lane analysis.summarize on the global one.
+        // team-alpha is the adapter's enrollment team (the work's team).
+        await FleetHarness.SeedFleetAsync(
+            fixture.Db,
+            label == "ofac:coding" ? codingEndpoint : globalEndpoint,
+            "team-alpha",
+            label == "ofac:coding" ? "coding.implement" : "analysis.summarize");
+
         var issue = new Random().Next(10000, 99999).ToString();
         var posted = await adapter.PostAsync("/api/link/v1/events",
             Content(IssueEvent($"dlv-{Guid.NewGuid():N}", Repo, issue, "alice", label)));
         Assert.Equal(HttpStatusCode.Accepted, posted.StatusCode);
         var workId = await fixture.Db.BindingWorkId("forgejo", Repo, issue);
         Assert.NotNull(workId);
-        return (adapter, worker, codingEndpoint, workId.Value);
+        await RoutingHarness.DrainUntilAsync(
+            factory,
+            () => fixture.Db.OutboxEnvelopeByCommand(
+                label == "ofac:coding"
+                    ? $"work-assign-coding:{workId.Value:N}"
+                    : $"work-assign:{workId.Value:N}"),
+            "interim assign effect");
+        return (adapter, worker, codingEndpoint, label == "ofac:coding" ? codingEndpoint : globalEndpoint, workId.Value, factory);
     }
 
-
-    /// <summary>The wire assignmentId of the work's assign command.</summary>
-    private string WireAssignmentId(Guid workId) =>
-        WireAssignmentId($"work-assign-coding:{workId}");
-
+    /// <summary>The wire assignmentId of an assign envelope (post-funnel, the
+    /// envelope's data.assignmentId — the gateway binds on it).</summary>
     private string WireAssignmentId(string commandId)
     {
         var envelope = fixture.Db.OutboxEnvelopeByCommand(commandId).GetAwaiter().GetResult();
@@ -344,7 +375,6 @@ public sealed class PrDispatchTests(PostgresFixture fixture) : IDisposable
     {
         var doc = JsonNode.Parse(PostgresFixture.ReadFixture("valid/event.provider.change_request.opened.json"))!.AsObject();
         doc["id"] = "evt-" + Guid.NewGuid().ToString("N");
-        doc["subject"] = $"provider/forgejo/pr-{number}";
         var data = doc["data"]!.AsObject();
         data["providerDeliveryId"] = deliveryId;
         data["actorProviderAccountId"] = actor;
@@ -355,11 +385,7 @@ public sealed class PrDispatchTests(PostgresFixture fixture) : IDisposable
         reference["authorProviderAccountId"] = actor;
         var payload = data["payload"]!.AsObject();
         payload["number"] = int.Parse(number, System.Globalization.CultureInfo.InvariantCulture);
-        payload["pull_request"] = new JsonObject
-        {
-            ["number"] = int.Parse(number, System.Globalization.CultureInfo.InvariantCulture),
-            ["head"] = new JsonObject { ["ref"] = headRef },
-        };
+        payload["pull_request"] = new JsonObject { ["head"] = new JsonObject { ["ref"] = headRef } };
         return doc.ToJsonString();
     }
 }

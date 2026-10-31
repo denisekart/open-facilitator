@@ -71,6 +71,17 @@ public static class WorkEndpoints
             return await RequestBodyJson.ParseAsync(body, document => processor.TransitionAsync(id, document.RootElement.Clone(), ActorOf(http), ct));
         });
 
+        group.MapPost("/works/{id:guid}/redispatch", async (Guid id, HttpRequest request, IngressProcessor processor, CancellationToken ct) =>
+        {
+            var body = await RequestBodies.ReadAsync(request, ct);
+            if (body.TooLarge)
+            {
+                return Results.Problem(ProblemErrors.PayloadTooLarge(body.Bytes));
+            }
+
+            return await RequestBodyJson.ParseAsync(body, document => processor.RedispatchAsync(id, document.RootElement.Clone(), ct));
+        });
+
         group.MapGet("/works/{id:guid}/timeline", async (Guid id, ICoordinationStore store, CancellationToken ct) =>
         {
             var rows = await store.TimelineAsync(id, ct);

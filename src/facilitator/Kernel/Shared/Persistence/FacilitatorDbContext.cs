@@ -74,6 +74,8 @@ public class FacilitatorDbContext(DbContextOptions<FacilitatorDbContext> options
 
     public DbSet<AdminConfigVersionEntity> AdminConfigHistory => Set<AdminConfigVersionEntity>();
 
+    public DbSet<RoutingDecisionEntity> RoutingDecisions => Set<RoutingDecisionEntity>();
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder model)
     {

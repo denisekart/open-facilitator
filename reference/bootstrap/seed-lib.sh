@@ -64,18 +64,24 @@ seed_project() {
 }
 
 seed_work() {
-  # $1 token, $2 objective, $3 capabilityId, $4 projectId → WORK_ID.
-  # The kernel accepts capabilityId then ignores it (the capability rides the
-  # assign envelope); it stays in the body for when routing reads it. The
-  # kernel may still be finishing migrations/JWKS warmup behind /health, so
-  # the create rides that window with bounded retries.
+  # $1 token, $2 objective, $3 capabilityId, $4 projectId,
+  # [$5 actorEvidenceRef, $6 targetId, $7 preferenceEndpointId] → WORK_ID.
+  # The create carries the assignment INTENT (kernel routing spec): the
+  # routing funnel resolves the endpoint and writes the work.assign effect —
+  # no raw-SQL insert, no addressed gateway. The kernel may still be
+  # finishing migrations/JWKS warmup behind /health, so the create rides
+  # that window with bounded retries.
   local token=$1 objective=$2 capability=$3 project_id=$4
-  local resp code body work_id last_err="(no attempt)"
-  shift 4
+  local evidence=${5:-identity-evidence:seed} target=${6:-demo} prefer=${7:-}
+  local resp code body work_id last_err="(no attempt)" json
+  json=$(jq -cn --arg objective "$objective" --arg capability "$capability" --arg projectId "$project_id" \
+    --arg evidence "$evidence" --arg target "$target" --arg prefer "$prefer" \
+    '{objective: $objective, capabilityId: $capability, projectId: $projectId,
+      actorEvidenceRef: $evidence, targetId: $target}
+     + (if $prefer == "" then {} else {preferenceEndpointId: $prefer} end)')
   for _ in $(seq 1 30); do
     resp=$(curl -s --max-time 10 -w '\n%{http_code}' -X POST "$SEED_KERNEL/api/works" \
-      -H "Authorization: Bearer $token" -H 'content-type: application/json' \
-      -d "{\"objective\":\"$objective\",\"capabilityId\":\"$capability\",\"projectId\":\"$project_id\"}")
+      -H "Authorization: Bearer $token" -H 'content-type: application/json' -d "$json")
     code=${resp##*$'\n'}
     body=${resp%$'\n'*}
     work_id=
@@ -90,51 +96,23 @@ seed_work() {
   printf '%s' "$work_id"
 }
 
-seed_dispatch() {
-  # $1 work_id, $2 project_id (unused in the envelope today; routing will
-  # want it), $3 capabilityId, $4 actorEvidenceRef tag, $5 inputs objective
-  # (what the demo worker reports on) → ASSIGNMENT_ID.
-  # A work.assign outbox row addressed to the demo Gateway, shaped exactly
-  # like the e2e tier's assignEnvelope. Until the routing slice assigns works
-  # itself, this SQL insert is the Production-mode assign path; the dispatcher
-  # wakes on the NOTIFY (and covers it with its poll anyway).
-  local work_id=$1 capability=$3 evidence=$4 objective=${5:-seed-lib dispatch}
-  local command_id assignment_id envelope
-  command_id=$(seed_new_uuid)
-  assignment_id=$(seed_new_uuid)
-  envelope=$(jq -cn \
-    --arg commandId "$command_id" --arg workId "$work_id" --arg assignmentId "$assignment_id" \
-    --arg capability "$capability" --arg evidence "$evidence" --arg objective "$objective" '{
-      specversion: "1.0",
-      id: $commandId,
-      source: "urn:facilitator:instance:demo",
-      type: "org.facilitator.command.work.assign.v1",
-      subject: "work/\($workId)/assignment/\($assignmentId)",
-      time: now | todate,
-      datacontenttype: "application/json",
-      dataschema: "https://schemas.openfacilitator.org/v1/command.work.assign.v1.json",
-      data: {
-        commandId: $commandId,
-        actorEvidenceRef: $evidence,
-        workId: $workId,
-        targetId: "demo",
-        capabilityId: $capability,
-        expectedContextVersion: 1,
-        inputs: { objective: $objective, sourceRefs: [] },
-        expectedDeliverables: [{ kind: "analysis.report", mediaType: "text/markdown" }],
-        deadline: "2036-10-23T18:00:00Z",
-        assignmentId: $assignmentId
-      }
-    }')
-  seed_compose exec -T postgres psql -U demo -d facilitator -tA \
-    -v workId="$work_id" -v commandId="$command_id" -v envelope="$envelope" <<'SQL' >/dev/null || return 1
-INSERT INTO facilitator.outbox
-    (outbox_id, recipient_endpoint_id, aggregate_type, aggregate_id, event_type,
-     command_id, envelope, work_id, status, available_at, attempts, created_at)
-  VALUES (gen_random_uuid(), 'link.gw.team-alpha', 'work', :'workId',
-          'org.facilitator.command.work.assign.v1', :'commandId',
-          :'envelope'::jsonb, :'workId', 'pending', now(), 0, now());
-SELECT pg_notify('facilitator_outbox', '');
-SQL
-  printf '%s' "$assignment_id"
+seed_redispatch() {
+  # $1 token, $2 work_id, $3 capabilityId, [$4 actorEvidenceRef,
+  # $5 targetId, $6 commandId, $7 inputs-json-object] → 0.
+  # Operator re-dispatch verb: a fresh routing intent on an EXISTING work
+  # (the retry / restart-with-context leg).
+  local token=$1 work_id=$2 capability=$3
+  local evidence=${4:-identity-evidence:seed} target=${5:-demo} command_id=${6:-} inputs=${7:-}
+  local resp code last_err="(no attempt)" json
+  json=$(jq -cn --arg capability "$capability" --arg evidence "$evidence" --arg target "$target" \
+    --arg commandId "$command_id" --argjson inputs "${inputs:-null}" \
+    '{capabilityId: $capability, actorEvidenceRef: $evidence, targetId: $target}
+     + (if $commandId == "" then {} else {commandId: $commandId} end)
+     + (if $inputs == null then {} else {inputs: $inputs} end)')
+  resp=$(curl -s --max-time 10 -w '\n%{http_code}' -X POST "$SEED_KERNEL/api/works/$work_id/redispatch" \
+    -H "Authorization: Bearer $token" -H 'content-type: application/json' -d "$json")
+  code=${resp##*$'\n'}
+  last_err="http=$code ${resp%$'\n'*}"
+  [ "$code" = 202 ] || { echo "seed: redispatch failed: $last_err" >&2; return 1; }
+  return 0
 }

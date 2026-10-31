@@ -10,6 +10,10 @@ plus the read-mostly Admin surface.
 ## Truth anchors
 - `Kernel/Work/` — work lifecycle (endpoints, ingress pipeline, state machine,
   `EfCoordinationStore` = this feature's persistence).
+- `Kernel/Routing/` — the routing funnel (`RoutingSink`, dispatcher channel
+  `routing`): the ONLY producer of `work.assign` rows + the
+  `routing_decisions` audit ledger; intents are appended by Work/Provider
+  writers as `routing:<base>:<key>` outbox rows.
 - `Kernel/Link/` — workspace-link server (enroll, hub, admission, deliveries,
   receipts, ledger).
 - `Kernel/Admin/` — `/api/admin` operator surface (read stores, config store

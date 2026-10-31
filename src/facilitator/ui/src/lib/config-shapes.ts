@@ -42,7 +42,10 @@ export const CONFIG_RESOURCES: ResourceSpec[] = [
   },
   {
     resource: "routing-defaults",
-    fields: [{ kind: "string", name: "provider", min: 1, max: 128 }],
+    fields: [
+      { kind: "enum", name: "provider", values: ["deterministic", "model"] },
+      { kind: "string", name: "preferTeam", min: 1, max: 128 },
+    ],
   },
 ];
 

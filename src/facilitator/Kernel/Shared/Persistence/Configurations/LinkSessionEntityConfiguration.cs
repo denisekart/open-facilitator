@@ -20,5 +20,6 @@ public sealed class LinkSessionEntityConfiguration : IEntityTypeConfiguration<Li
         e.Property(x => x.LeaseUntil).HasColumnName("lease_until").IsRequired();
         e.Property(x => x.LastHeartbeat).HasColumnName("last_heartbeat").IsRequired();
         e.Property(x => x.CapabilitiesDigest).HasColumnName("capabilities_digest");
+        e.Property(x => x.OpenedAt).HasColumnName("opened_at").IsRequired();
     }
 }

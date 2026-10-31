@@ -829,6 +829,10 @@ namespace Facilitator.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("lease_until");
 
+                    b.Property<DateTime>("OpenedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("opened_at");
+
                     b.Property<string>("ReplicaId")
                         .IsRequired()
                         .HasColumnType("text")
@@ -1464,6 +1468,87 @@ namespace Facilitator.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.RoutingDecisionEntity", b =>
+                {
+                    b.Property<Guid>("DecisionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("decision_id");
+
+                    b.Property<string>("AllowedCandidates")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("allowed_candidates");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempt_count");
+
+                    b.Property<string>("Basis")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("basis");
+
+                    b.Property<string>("CapabilityId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("capability_id");
+
+                    b.Property<string>("ChosenEndpointId")
+                        .HasColumnType("text")
+                        .HasColumnName("chosen_endpoint_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("IntentCommandId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("intent_command_id");
+
+                    b.Property<DateTime>("LastRoutingAttemptAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_routing_attempt_at");
+
+                    b.Property<string>("ProviderRef")
+                        .HasColumnType("text")
+                        .HasColumnName("provider_ref");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<string>("TeamSlug")
+                        .HasColumnType("text")
+                        .HasColumnName("team_slug");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("WorkId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("work_id");
+
+                    b.HasKey("DecisionId");
+
+                    b.HasIndex("IntentCommandId")
+                        .IsUnique()
+                        .HasDatabaseName("routing_decisions_intent_unique");
+
+                    b.HasIndex("WorkId");
+
+                    b.HasIndex("Status", "LastRoutingAttemptAt")
+                        .HasDatabaseName("routing_decisions_pending")
+                        .HasFilter("status = 'pending'");
+
+                    b.ToTable("routing_decisions", "facilitator", t =>
+                        {
+                            t.HasCheckConstraint("routing_decisions_status_check", "status IN ('pending', 'routed', 'abandoned')");
+                        });
+                });
+
             modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.TeamEntity", b =>
                 {
                     b.Property<Guid>("TeamId")
@@ -1671,6 +1756,16 @@ namespace Facilitator.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("result_manifests_work_id_fkey");
+                });
+
+            modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.RoutingDecisionEntity", b =>
+                {
+                    b.HasOne("Facilitator.Kernel.Shared.Persistence.WorkEntity", null)
+                        .WithMany()
+                        .HasForeignKey("WorkId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("routing_decisions_work_id_fkey");
                 });
 
             modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.WorkEntity", b =>

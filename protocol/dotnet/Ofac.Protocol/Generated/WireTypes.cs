@@ -1513,6 +1513,96 @@ namespace Ofac.Protocol
         public ConversationReference reference { get; set; }
     }
 
+    /// <summary>
+    /// Kernel-internal routing intent: a Work needs an assignment for a capability. Emitted by
+    /// every Work-creating arm (REST ingress and provider ingest); consumed by the kernel
+    /// routing funnel, which resolves candidates, chooses one, and writes the work.assign row as
+    /// the routing effect. Never leaves the kernel.
+    /// </summary>
+    public partial class EventRoutingRequestedV1
+    {
+        [JsonPropertyName("actorEvidenceRef")]
+        public string actorEvidenceRef { get; set; }
+
+        [JsonPropertyName("capabilityId")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string capabilityId { get; set; }
+
+        /// <summary>
+        /// Base of the chosen assignment's command id: the effect row is '&lt;base&gt;:&lt;effectKey&gt;'
+        /// (effectKey defaults to the workId), keeping routing replay-idempotent.
+        /// </summary>
+        [JsonPropertyName("commandIdBase")]
+        public string commandIdBase { get; set; }
+
+        /// <summary>
+        /// Effect-identity override: the assign effect row is '&lt;commandIdBase&gt;:&lt;effectKey&gt;' instead
+        /// of '&lt;commandIdBase&gt;:&lt;workId&gt;'. A re-dispatch intent uses the steer command id, preserving
+        /// the envelope read-back command-id ledger (work-redispatch:&lt;steerId&gt;) across the routing
+        /// cutover.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("effectKey")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string? effectKey { get; set; }
+
+        /// <summary>
+        /// Rule-configured extra inputs (JSON object) merged into the assign's inputs.extras.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("extraInputsJson")]
+        [JsonConverter(typeof(MinMaxLengthCheckConverter4))]
+        public string? extraInputsJson { get; set; }
+
+        [JsonPropertyName("intentId")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string intentId { get; set; }
+
+        [JsonPropertyName("objective")]
+        [JsonConverter(typeof(IndecentMinMaxLengthCheckConverter))]
+        public string objective { get; set; }
+
+        /// <summary>
+        /// Caller's preferred endpoint (e.g. a provider config's fixed AssignEndpointId). Honored
+        /// only when the endpoint is an allowed candidate; otherwise the deterministic order decides
+        /// and the audit records the fallback.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("preferenceEndpointId")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string? preferenceEndpointId { get; set; }
+
+        /// <summary>
+        /// JSON array serialized to inputs.sourceRefs of the assign effect (provider re-hydration
+        /// lineage).
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("referenceJson")]
+        [JsonConverter(typeof(MinMaxLengthCheckConverter4))]
+        public string? referenceJson { get; set; }
+
+        /// <summary>
+        /// Envelope targetId resolved by the caller (rule target, provider default); rides verbatim
+        /// into the assign effect.
+        /// </summary>
+        [JsonPropertyName("targetId")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string targetId { get; set; }
+
+        /// <summary>
+        /// Soft team context (slug). Omitted when the work carries no team; the funnel then routes
+        /// team-agnostically. Cross-team exclusion always applies against the work's owning team.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("team")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string? team { get; set; }
+
+        [JsonPropertyName("workId")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string workId { get; set; }
+    }
+
     public partial class WorkAcceptedEventV1Data
     {
         [JsonPropertyName("acceptedAt")]
@@ -3103,6 +3193,33 @@ namespace Ofac.Protocol
         }
 
         public static readonly ProviderPipelineEventV1DataActionConverter Singleton = new ProviderPipelineEventV1DataActionConverter();
+    }
+
+    internal class MinMaxLengthCheckConverter4 : JsonConverter<string>
+    {
+        public override bool CanConvert(Type t) => t == typeof(string);
+
+        public override string Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            var value = reader.GetString();
+            if (value.Length <= 8192)
+            {
+                return value;
+            }
+            throw new Exception("Cannot unmarshal type string");
+        }
+
+        public override void Write(Utf8JsonWriter writer, string value, JsonSerializerOptions options)
+        {
+            if (value.Length <= 8192)
+            {
+                JsonSerializer.Serialize(writer, value, options);
+                return;
+            }
+            throw new Exception("Cannot marshal type string");
+        }
+
+        public static readonly MinMaxLengthCheckConverter4 Singleton = new MinMaxLengthCheckConverter4();
     }
 
     internal class WorkspaceHeartbeatEventV1DataStatusConverter : JsonConverter<WorkspaceHeartbeatEventV1DataStatus>

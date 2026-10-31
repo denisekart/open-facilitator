@@ -89,6 +89,12 @@
       "type": "org.facilitator.event.work.progress.v1"
     },
     {
+      "file": "valid/event.routing.requested.json",
+      "expect": "valid",
+      "class": "event",
+      "type": "org.facilitator.event.routing.requested.v1"
+    },
+    {
       "file": "valid/event.work.input_required.json",
       "expect": "valid",
       "class": "event",

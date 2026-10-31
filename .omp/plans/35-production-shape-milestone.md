@@ -124,8 +124,9 @@ Plan 26 (Kafka adapter, Ollama provider, research-worker example); k8s or non-OC
 
 | Phase | Status | Notes |
 |---|---|---|
+| Prereq (plan 24 legs) | Fully implemented | 2026-10-31: provider-e2e 17/17 from clean rebuild. Fourth defect found + closed en route: a `child-busy` rejection was terminally acked (command lost) — retryable rejections (child-busy/-disconnected/-offline) now requeue in `LinkLedger.AckAsync` (backoff `Link:RedeliverBackoffSeconds`, 5-attempt budget, ReceiptRetryTests xUnit); the client ledger re-freshes `failed` rows so the re-offer re-runs (vitest pin). `coding-redispatch` probes the queued INTENT row (effect row is funnel-pending while the endpoint is down). |
 | 0 §26.1 gap matrix (Phase E step 0 may run early, read-only) | Not started | |
-| A Kernel routing + decision seam | Not started | |
+| A Kernel routing + decision seam | Fully implemented | Exit met 2026-10-31: slim verify 11/11 from clean (`up slim --no-seed`), provider-e2e 17/17, criterion-2 grep clean, `routing_decisions` rows carry allowed+chosen+basis for every Work. Deviation: the funnel ships as dispatcher sink `Kernel/Routing/RoutingSink.cs` (channel `routing`), not a standalone `RoutingProcessor` host — same lease/SKIP-LOCK law, one fewer loop. |
 | B DAG + generation + nudge | Not started | |
 | C Provisioning + OCI launcher | Not started | |
 | D Horizontal replicas | Not started | |

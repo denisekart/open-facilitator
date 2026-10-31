@@ -1,0 +1,21 @@
+{
+  "specversion": "1.0",
+  "id": "01JROUTING-intent-1",
+  "source": "urn:facilitator:kernel",
+  "type": "org.facilitator.event.routing.requested.v1",
+  "subject": "work/work-123/routing/routing-intent-1",
+  "time": "2026-10-22T18:00:00Z",
+  "datacontenttype": "application/json",
+  "dataschema": "https://schemas.openfacilitator.org/v1/event.routing.requested.v1.json",
+  "data": {
+    "intentId": "routing-intent-1",
+    "workId": "work-123",
+    "capabilityId": "coding.implement",
+    "team": "team-coding",
+    "commandIdBase": "work-assign-coding",
+    "targetId": "demo/widgets",
+    "objective": "Add a changelog entry.",
+    "referenceJson": "{\"provider\":\"forgejo\",\"issue\":8}",
+    "actorEvidenceRef": "kernel:provider-ingest:work-123"
+  }
+}

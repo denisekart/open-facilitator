@@ -3,6 +3,7 @@ using System.Threading.RateLimiting;
 using Facilitator.Kernel.Admin;
 using Facilitator.Kernel.Integrations;
 using Facilitator.Kernel.Link;
+using Facilitator.Kernel.Shared;
 using Facilitator.Kernel.Shared.Auth;
 using Facilitator.Kernel.Shared.Dispatch;
 using Facilitator.Kernel.Shared.Evidence;
@@ -169,6 +170,12 @@ public static class KernelServiceCollection
         builder.Services.AddSingleton<LinkReceipts>();
         builder.Services.AddScoped<LinkIngress>();
         builder.Services.AddSingleton<ISink, LinkSink>();
+
+        // The routing funnel: intent rows ride the dispatcher's own choke
+        // point (channel 'routing'); the deterministic seam is the default
+        // provider, an advisory preference source only.
+        builder.Services.AddSingleton<IDecisionProvider, DeterministicDecisionProvider>();
+        builder.Services.AddSingleton<ISink, Routing.RoutingSink>();
 
         var heartbeat = TimeSpan.FromSeconds(linkOptions.HeartbeatSeconds);
         builder.Services.AddSignalR(options =>

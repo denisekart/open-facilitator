@@ -127,14 +127,14 @@ verify_token_alice() {
   [ -n "$VERIFY_TOKEN_ALICE" ]
 }
 
-# Seeds a work end-to-end (project + work + dispatch) and echoes the work id.
+# Seeds a work end-to-end (project + work carrying its assignment intent —
+# the kernel routing funnel resolves the endpoint) and echoes the work id.
 verify_seed_leg() { # <evidence-tag> <capability> <objective>
   local tag=$1 capability=$2 objective=$3 token project work
   verify_token_cli || return 1
   token=$VERIFY_TOKEN_CLI
   project=$(seed_project slim-demo) || return 1
-  work=$(seed_work "$token" "$objective" "$capability" "$project") || return 1
-  seed_dispatch "$work" "$project" "$capability" "identity-evidence:$tag" "$objective" >/dev/null || return 1
+  work=$(seed_work "$token" "$objective" "$capability" "$project" "identity-evidence:$tag") || return 1
   printf '%s' "$work"
 }
 
@@ -477,11 +477,12 @@ step_worker_restart_resume() {
   nfailed=$(verify_psql "SELECT count(*) FROM facilitator.inbox WHERE payload->>'type' = 'org.facilitator.event.assignment.failed.v1' AND payload->'data'->>'workId' = '$WORK_W3'")
   [ "${nfailed:-0}" = 1 ] \
     || { step_fail_record worker-restart-resume "$(( $(verify_now_ms) - started ))" "expected exactly 1 failed event, got $nfailed"; return 1; }
-  # Resume: a fresh dispatch of the SAME work rides the reconnected link and
-  # completes; no duplicate side effects survive the crash. seed_project is
-  # the idempotent lookup (verify_seed_leg's assignment rode a subshell).
-  seed_dispatch "$WORK_W3" "$(seed_project slim-demo)" research.analyze \
-    "identity-evidence:verify-restart-w" "slim verify: restart-resume witness run" >/dev/null \
+  # Resume: an operator re-dispatch of the SAME work rides the reconnected
+  # link (a fresh routing intent; the funnel re-resolves the endpoint) and
+  # completes; no duplicate side effects survive the crash.
+  verify_token_cli || { step_fail_record worker-restart-resume "$(( $(verify_now_ms) - started ))" "token re-mint failed"; return 1; }
+  seed_redispatch "$VERIFY_TOKEN_CLI" "$WORK_W3" research.analyze \
+    "identity-evidence:verify-restart-w" \
     || { step_fail_record worker-restart-resume "$(( $(verify_now_ms) - started ))" "retry dispatch failed"; return 1; }
   if ! poll_until 120 verify_inbox_has org.facilitator.event.assignment.completed.v1 "$WORK_W3"; then
     step_fail_record worker-restart-resume "$(( $(verify_now_ms) - started ))" "witness work did not complete 120s after retry dispatch"
@@ -647,7 +648,7 @@ run_verify() {
       exitCode: $exit,
       steps: [ splits("\n") | select(length > 0)
                | capture("^(?<id>[^|]+)\\|(?<status>[^|]+)\\|(?<durationMs>[0-9]+)\\|(?<detail>.*)$")
-               | { id, status, durationMs: (.durationMs | tonumber), detail } ] }')
+               | { id, status, durationMs: (.durationMs | tonumber), detail } ] }' "$VERIFY_RESULTS")
   report=$(jq --argjson now "$(verify_now_ms)" --argjson started "$VERIFY_T0" \
     '.durationMs = ($now - $started)' <<<"$report")
 

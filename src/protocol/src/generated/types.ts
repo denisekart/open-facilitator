@@ -622,6 +622,57 @@ export interface ProviderReactionEventV1Data {
   reference: ConversationReference;
 }
 
+/**
+ * Kernel-internal routing intent: a Work needs an assignment for a capability. Emitted by
+ * every Work-creating arm (REST ingress and provider ingest); consumed by the kernel
+ * routing funnel, which resolves candidates, chooses one, and writes the work.assign row as
+ * the routing effect. Never leaves the kernel.
+ */
+export interface EventRoutingRequestedV1 {
+  actorEvidenceRef: string;
+  capabilityId: string;
+  /**
+   * Base of the chosen assignment's command id: the effect row is '<base>:<effectKey>'
+   * (effectKey defaults to the workId), keeping routing replay-idempotent.
+   */
+  commandIdBase: string;
+  /**
+   * Effect-identity override: the assign effect row is '<commandIdBase>:<effectKey>' instead
+   * of '<commandIdBase>:<workId>'. A re-dispatch intent uses the steer command id, preserving
+   * the envelope read-back command-id ledger (work-redispatch:<steerId>) across the routing
+   * cutover.
+   */
+  effectKey?: string;
+  /**
+   * Rule-configured extra inputs (JSON object) merged into the assign's inputs.extras.
+   */
+  extraInputsJson?: string;
+  intentId: string;
+  objective: string;
+  /**
+   * Caller's preferred endpoint (e.g. a provider config's fixed AssignEndpointId). Honored
+   * only when the endpoint is an allowed candidate; otherwise the deterministic order decides
+   * and the audit records the fallback.
+   */
+  preferenceEndpointId?: string;
+  /**
+   * JSON array serialized to inputs.sourceRefs of the assign effect (provider re-hydration
+   * lineage).
+   */
+  referenceJson?: string;
+  /**
+   * Envelope targetId resolved by the caller (rule target, provider default); rides verbatim
+   * into the assign effect.
+   */
+  targetId: string;
+  /**
+   * Soft team context (slug). Omitted when the work carries no team; the funnel then routes
+   * team-agnostically. Cross-team exclusion always applies against the work's owning team.
+   */
+  team?: string;
+  workId: string;
+}
+
 export interface WorkAcceptedEventV1Data {
   acceptedAt: string;
   assignmentId: string;

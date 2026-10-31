@@ -51,9 +51,9 @@ public sealed class LinkService(
         await using var command = db.Database.GetDbConnection().CreateCommand();
         command.CommandText = """
             INSERT INTO facilitator.link_sessions
-                (logical_endpoint_id, connection_instance_id, replica_id, session_epoch, lease_until, last_heartbeat, capabilities_digest)
+                (logical_endpoint_id, connection_instance_id, replica_id, session_epoch, lease_until, last_heartbeat, capabilities_digest, opened_at)
             VALUES
-                (@endpoint, @instance, @replica, 1, @lease, @now, @digest)
+                (@endpoint, @instance, @replica, 1, @lease, @now, @digest, @now)
             ON CONFLICT (logical_endpoint_id) DO UPDATE
                SET connection_instance_id = @instance,
                    replica_id = @replica,

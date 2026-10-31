@@ -134,6 +134,14 @@ public sealed class DbEventDispatcher : IEventDispatcher
 
                 await HandleFailureAsync(row, "sink refused the delivery", noRoute: false, ct);
             }
+            catch (RoutePendingException pending)
+            {
+                // The funnel's no-route law: requeue with backoff, no DLQ
+                // budget consumed — the candidate may simply not have booted
+                // yet, and the routing-decision row carries the reason.
+                _metrics.DeliveryLatency(stopwatch.Elapsed.TotalMilliseconds);
+                await _outbox.RequeueAsync(row.OutboxId, pending.Reason, ct);
+            }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 _metrics.DeliveryLatency(stopwatch.Elapsed.TotalMilliseconds);

@@ -64,8 +64,15 @@ public abstract record SteerResult
 /// </summary>
 public interface ICoordinationStore
 {
-    /// <summary>Create a Work at <c>open</c> version 1 with its <c>created</c> timeline row and outbox progress event.</summary>
-    Task<WorkView> CreateWorkAsync(string objective, Guid? projectId, string actor, CancellationToken ct);
+    /// <summary>Create a Work at <c>open</c> version 1 with its <c>created</c> timeline row and outbox progress event.
+    /// When <paramref name="assignments"/> is non-empty, each entry appends a routing intent effect in the same
+    /// transaction (the funnel owns everything after); legacy callers pass none and get no dispatch.</summary>
+    Task<WorkView> CreateWorkAsync(string objective, Guid? projectId, string actor, CancellationToken ct, IReadOnlyList<RoutingIntentSeed>? assignments = null);
+
+    /// <summary>Operator re-dispatch: a fresh routing intent for an EXISTING
+    /// Work (restart-with-context / retry legs). <paramref name="idempotencyKey"/>
+    /// keys the effect row; null ⇒ fresh identity. Unknown work ⇒ false.</summary>
+    Task<bool> RedispatchAsync(Guid workId, RoutingIntentSeed seed, string? idempotencyKey, CancellationToken ct);
 
     /// <summary>Guard-checked, version-fenced state transition.</summary>
     Task<TransitionResult> ApplyTransitionAsync(Guid workId, WorkState to, long expectedVersion, string actor, string? reason, CancellationToken ct);

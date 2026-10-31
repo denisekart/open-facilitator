@@ -24,7 +24,7 @@ public sealed class EfCoordinationStore(
     private const string KernelLogChannel = "kernel.log";
 
     /// <inheritdoc />
-    public async Task<WorkView> CreateWorkAsync(string objective, Guid? projectId, string actor, CancellationToken ct)
+    public async Task<WorkView> CreateWorkAsync(string objective, Guid? projectId, string actor, CancellationToken ct, IReadOnlyList<RoutingIntentSeed>? assignments = null)
     {
         var workId = Guid.NewGuid();
         var now = timeProvider.GetUtcNow().UtcDateTime;
@@ -56,12 +56,82 @@ public sealed class EfCoordinationStore(
         });
 
         AppendWorkProgress(db, workId, "work created", causationId: null, createdAt: now);
+
+        // The REST twin of the provider arms: every requested assignment
+        // rides as a routing intent in this same transaction — the funnel
+        // resolves the endpoint. Team = the project's team (cross-team
+        // exclusion is the funnel's law); identity is deterministic per
+        // (work, index) so a replayed create collides on the ledger.
+        if (assignments is { Count: > 0 })
+        {
+            var teamSlug = projectId is { } pid
+                ? await db.Projects.AsNoTracking()
+                    .Where(p => p.ProjectId == pid)
+                    .Select(p => p.Team!.Slug).FirstOrDefaultAsync(ct)
+                : null;
+            for (var i = 0; i < assignments.Count; i++)
+            {
+                var seed = assignments[i];
+                var intent = new RoutingIntent(
+                    workId,
+                    seed.CapabilityId,
+                    teamSlug,
+                    seed.PreferenceEndpointId,
+                    TargetId: seed.TargetId is { Length: > 0 } target ? target : "kernel",
+                    CommandIdBase: "work-assign",
+                    EffectKey: i == 0 ? workId.ToString("N") : $"{workId:N}-{i}",
+                    Objective: seed.Objective is { Length: > 0 } obj ? obj : objective,
+                    SourceRefsJson: null,
+                    ExtraInputsJson: seed.Inputs is { ValueKind: JsonValueKind.Object } inputs ? inputs.GetRawText() : null,
+                    ActorEvidenceRef: seed.ActorEvidenceRef is { Length: > 0 } evidence
+                        ? evidence : $"kernel:rest-ingress:{workId}");
+                db.Outbox.Add(RoutingIntentEnvelope.OutboxRow(intent, now, envelopeValidator));
+            }
+        }
         await db.SaveChangesAsync(ct);
         await NotifyAsync(db, workId, ct);
         await tx.CommitAsync(ct);
 
         var created = await LoadAsync(db, workId, ct);
         return created ?? throw new InvalidOperationException($"work {workId} vanished right after creation");
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> RedispatchAsync(Guid workId, RoutingIntentSeed seed, string? idempotencyKey, CancellationToken ct)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(ct);
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+
+        await WorkLockAsync(db, workId, ct);
+        var work = await db.Works.AsNoTracking()
+            .Where(w => w.WorkId == workId)
+            .Select(w => new { w.Objective, TeamSlug = w.Project!.Team!.Slug, w.ProjectId })
+            .FirstOrDefaultAsync(ct);
+        if (work is null)
+        {
+            return false;
+        }
+
+        var now = timeProvider.GetUtcNow().UtcDateTime;
+        var intent = new RoutingIntent(
+            workId,
+            seed.CapabilityId,
+            work.TeamSlug,
+            seed.PreferenceEndpointId,
+            TargetId: seed.TargetId is { Length: > 0 } target ? target : "kernel",
+            CommandIdBase: "work-redispatch",
+            EffectKey: idempotencyKey is { Length: > 0 } key ? key : Guid.NewGuid().ToString("N"),
+            Objective: seed.Objective is { Length: > 0 } obj ? obj : work.Objective,
+            SourceRefsJson: null,
+            ExtraInputsJson: seed.Inputs is { ValueKind: JsonValueKind.Object } inputs ? inputs.GetRawText() : null,
+            ActorEvidenceRef: seed.ActorEvidenceRef is { Length: > 0 } evidence
+                ? evidence : $"kernel:rest-ingress:{workId}");
+        db.Outbox.Add(RoutingIntentEnvelope.OutboxRow(intent, now, envelopeValidator));
+        AppendWorkProgress(db, workId, "re-dispatch requested", causationId: null, createdAt: now);
+        await db.SaveChangesAsync(ct);
+        await NotifyAsync(db, workId, ct);
+        await tx.CommitAsync(ct);
+        return true;
     }
 
     /// <inheritdoc />
@@ -228,12 +298,15 @@ public sealed class EfCoordinationStore(
     /// delivers it to the bound child or honestly rejects
     /// (<c>no-binding</c>/<c>child-disconnected</c>) — a rejected steer is
     /// a normal result, the timeline row + progress note stand either way.
-    /// No live execution ⇒ §23.1's restart-with-context leg: a fresh
-    /// <c>work.assign</c> re-dispatch reusing the ORIGINAL envelope's
-    /// capability/target/inputs (the worker re-hydrates from the branch +
-    /// PR lineage), keyed <c>work-redispatch:&lt;steerCommandId&gt;</c> so
-    /// replay is idempotent on the unique command id. No assign row (a
-    /// REST-created Work) ⇒ timeline record only, today's behavior.</summary>
+    /// No live execution ⇒ §23.1's restart-with-context leg: a fresh routing
+    /// intent re-dispatches through the funnel (no arm addresses an endpoint
+    /// directly) reusing the ORIGINAL envelope's capability/target/inputs
+    /// (the worker re-hydrates from the branch + PR lineage); the original
+    /// recipient rides as the intent's endpoint preference. The effect keeps
+    /// the <c>work-redispatch:&lt;steerCommandId&gt;</c> command id, so the
+    /// envelope read-back ledger survives the routing cutover and replay is
+    /// idempotent on the unique command id. No assign row (a REST-created
+    /// Work) ⇒ timeline record only, today's behavior.</summary>
     private async Task AppendSteerDeliveryAsync(
         FacilitatorDbContext db, Guid workId, string directive, string commandId, long contextVersion, DateTime now, CancellationToken ct)
     {
@@ -269,28 +342,45 @@ public sealed class EfCoordinationStore(
             return;
         }
 
-        // Re-dispatch: clone the original assign envelope verbatim, new
-        // identity (fresh CloudEvent id + assignmentId + command id).
-        var redispatch = System.Text.Json.Nodes.JsonNode.Parse(original.Envelope)!.AsObject();
-        var newAssignment = Guid.NewGuid().ToString("N");
-        var redispatchCommandId = $"work-redispatch:{commandId}";
-        redispatch["id"] = Guid.NewGuid().ToString("N");
-        redispatch["time"] = now.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
-        redispatch["subject"] = $"work/{workId}/assignment/{newAssignment}";
-        var redispatchData = redispatch["data"]!.AsObject();
-        redispatchData["commandId"] = redispatchCommandId;
-        redispatchData["assignmentId"] = newAssignment;
-        // The re-dispatched run has no steer channel of its own yet (the
-        // review leg is the FIRST thing it will see), so the directive rides
-        // its inputs: `steers` accumulates one entry per re-dispatch leg;
-        // the harness folds them into the change + the "steer incorporated"
-        // commentRequest (24 5, steering law).
-        var inputs = redispatchData["inputs"]?.AsObject() ?? new System.Text.Json.Nodes.JsonObject();
-        var steers = inputs["steers"] as System.Text.Json.Nodes.JsonArray ?? new System.Text.Json.Nodes.JsonArray();
+        // Re-dispatch: a routing intent for the funnel. Identity is the steer
+        // command id (effect `<base>:<steerId>` preserves the envelope
+        // read-back ledger across the routing cutover); the envelope rebuilds
+        // from the original's data. The re-dispatched run has no steer
+        // channel of its own yet (the review leg is the FIRST thing it will
+        // see), so the directive rides its inputs: `steers` accumulates one
+        // entry per re-dispatch leg; the harness folds them into the change +
+        // the "steer incorporated" commentRequest (steering law).
+        var originalData = System.Text.Json.Nodes.JsonNode.Parse(original.Envelope)!.AsObject()["data"]!.AsObject();
+        var originalInputs = originalData["inputs"]?.AsObject() ?? new System.Text.Json.Nodes.JsonObject();
+        var objective = originalInputs["objective"]?.GetValue<string>() ?? string.Empty;
+        var extraInputs = originalInputs.DeepClone().AsObject();
+        extraInputs.Remove("objective", out _);
+        extraInputs.Remove("sourceRefs", out _);
+        var steers = extraInputs["steers"] as System.Text.Json.Nodes.JsonArray ?? new System.Text.Json.Nodes.JsonArray();
         steers.Add(directive.Length <= 2048 ? directive : directive[..2048]);
-        inputs["steers"] = steers;
-        redispatchData["inputs"] = inputs;
-        AppendDeliveryRow(db, redispatch, original.RecipientEndpointId, redispatchCommandId, workId, now);
+        extraInputs["steers"] = steers;
+        // The base is `work-redispatch` — the 24 ledger byte-for-byte
+        // (effect = `work-redispatch:<steerId>`); the steer arm's
+        // `work-assign*`/`work-redispatch` read-back keeps matching.
+        const string baseCommandId = "work-redispatch";
+        var workTeamSlug = await db.Works.AsNoTracking()
+            .Where(w => w.WorkId == workId)
+            .Select(w => w.Project!.Team!.Slug).FirstOrDefaultAsync(ct);
+        var redispatchIntent = new RoutingIntent(
+            workId,
+            originalData["capabilityId"]!.GetValue<string>(),
+            workTeamSlug,
+            PreferenceEndpointId: original.RecipientEndpointId.StartsWith("link.", StringComparison.Ordinal)
+                ? original.RecipientEndpointId["link.".Length..] : original.RecipientEndpointId,
+            TargetId: originalData["targetId"]!.GetValue<string>(),
+            CommandIdBase: baseCommandId,
+            EffectKey: commandId,
+            Objective: objective,
+            SourceRefsJson: originalInputs["sourceRefs"]?.ToJsonString() is { Length: > 0 } refs && refs != "[]" ? refs : null,
+            ExtraInputsJson: extraInputs.Count > 0 ? extraInputs.ToJsonString() : null,
+            ActorEvidenceRef: originalData["actorEvidenceRef"]?.GetValue<string>()
+                ?? $"kernel:steer:{commandId}");
+        db.Outbox.Add(RoutingIntentEnvelope.OutboxRow(redispatchIntent, now, envelopeValidator));
     }
 
     private void AppendDeliveryRow(

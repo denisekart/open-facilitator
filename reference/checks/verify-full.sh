@@ -551,11 +551,14 @@ step_coding_issue_work() {
   }
   poll_until 60 fj_coding_binding >/dev/null \
     || { step_fail "no binding row 60s after labeling issue #$FJ_CODING_ISSUE"; full_logs forgejo-adapter facilitator; return 1; }
-  # Rule-matched assign (24 1a): coding command id, gw.coding recipient,
-  # coding.implement capability, and the issue/repo re-hydration inputs.
-  poll_until 30 fj_coding_outbox "work-assign-coding:$FJ_CODING_WORK" \
+  # Rule-matched routing intent resolved by the funnel: coding command id
+  # (effect ledger), gw.coding chosen (rule endpoint preference satisfied —
+  # the coding gateway advertises coding.implement on team-coding), and the
+  # issue/repo re-hydration inputs.
+  local effect_key=${FJ_CODING_WORK//-/}
+  poll_until 30 fj_coding_outbox "work-assign-coding:$effect_key" \
     || { step_fail "no work-assign-coding outbox row for $FJ_CODING_WORK"; full_logs facilitator coding-workspace; return 1; }
-  full_psql "SELECT 1 FROM facilitator.outbox WHERE command_id = 'work-assign-coding:$FJ_CODING_WORK'
+  full_psql "SELECT 1 FROM facilitator.outbox WHERE command_id = 'work-assign-coding:$effect_key'
       AND recipient_endpoint_id = 'link.gw.coding'
       AND envelope->'data'->>'capabilityId' = 'coding.implement'
       AND envelope->'data'->'inputs'->>'issue' = '$FJ_CODING_ISSUE' LIMIT 1" | grep -q 1 \
@@ -650,8 +653,11 @@ step_coding_review_steer() {
 
 step_coding_redispatch() {
   # §23.1's restart leg: the owning workspace is DOWN when the second review
-  # lands. The steer still records + re-dispatches (kernel-side, outbox
-  # queues); restart delivers it, the worker reconciles, the comment lands.
+  # lands. The steer still records + queues the re-dispatch kernel-side (the
+  # routing INTENT row commits with the steer; the funnel holds it pending
+  # `no-capacity` while the endpoint is offline, so the effect row only
+  # appears once the workspace is back); restart delivers it, the worker
+  # reconciles, the comment lands.
   full_compose stop coding-workspace \
     || { step_fail "could not stop coding-workspace"; return 1; }
   local directive2="add the timeout clause to the changelog note"
@@ -660,7 +666,7 @@ step_coding_redispatch() {
     || { step_fail "second review POST refused"; full_compose start coding-workspace >/dev/null; return 1; }
   fj_queued() {
     full_psql "SELECT 1 FROM facilitator.outbox WHERE work_id = '$FJ_CODING_WORK'
-        AND command_id LIKE 'work-redispatch:%' AND envelope::text LIKE '%timeout clause%' LIMIT 1" | grep -q 1
+        AND command_id LIKE 'routing:work-redispatch:%' AND envelope::text LIKE '%timeout clause%' LIMIT 1" | grep -q 1
   }
   poll_until 45 fj_queued \
     || { step_fail "no queued re-dispatch while coding-workspace is down"; full_logs facilitator; full_compose start coding-workspace >/dev/null; return 1; }
@@ -749,7 +755,7 @@ run_verify_full() {
       exitCode: $exit,
       steps: [ splits("\n") | select(length > 0)
                | capture("^(?<id>[^|]+)\\|(?<status>[^|]+)\\|(?<durationMs>[0-9]+)\\|(?<detail>.*)$")
-               | { id, status, durationMs: (.durationMs | tonumber), detail } ] }')
+               | { id, status, durationMs: (.durationMs | tonumber), detail } ] }' "$VERIFY_RESULTS")
   report=$(jq --argjson now "$(verify_now_ms)" --argjson started "$VERIFY_T0" \
     '.durationMs = ($now - $started)' <<<"$report")
   if [ "$json" = 1 ]; then printf '%s\n' "$report"; else

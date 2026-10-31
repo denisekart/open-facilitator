@@ -256,6 +256,46 @@ public sealed class LinkSessionEntity
     public DateTime LastHeartbeat { get; set; }
 
     public string? CapabilitiesDigest { get; set; }
+
+    /// <summary>When this endpoint's session was FIRST opened (preserved
+    /// across re-opens; the row is deleted on close so a fresh enrollment
+    /// resets it). The routing funnel's "oldest online" tie-break reads it.</summary>
+    public DateTime OpenedAt { get; set; }
+}
+
+/// <summary>facilitator.routing_decisions — one audit row per routing intent:
+/// the kernel-computed allowed set, the chosen endpoint, the basis, and (for
+/// an undecided pass) the requeue reason the scale-up trigger reads.</summary>
+public sealed class RoutingDecisionEntity
+{
+    public Guid DecisionId { get; set; }
+
+    public required Guid WorkId { get; set; }
+
+    public required string IntentCommandId { get; set; }
+
+    public required string CapabilityId { get; set; }
+
+    public string? TeamSlug { get; set; }
+
+    /// <summary>jsonb ordered array of allowed endpoint ids.</summary>
+    public required string AllowedCandidates { get; set; }
+
+    public string? ChosenEndpointId { get; set; }
+
+    public required string Status { get; set; }
+
+    public required string Basis { get; set; }
+
+    public string? ProviderRef { get; set; }
+
+    public DateTime LastRoutingAttemptAt { get; set; }
+
+    public int AttemptCount { get; set; }
+
+    public DateTime CreatedAt { get; set; }
+
+    public DateTime UpdatedAt { get; set; }
 }
 
 /// <summary>facilitator.link_enrollments — Plan 03 enrollment records (appendix §4).</summary>

@@ -13,7 +13,7 @@ namespace Facilitator.Tests.Dispatch;
 /// envelope round-trip is proven by the replay test — AdminSurfaceTests).
 /// </summary>
 [Collection("postgres:dispatch-link")]
-public sealed class DeadLetterEndpointTests(PostgresFixture fixture)
+public sealed class DeadLetterEndpointTests(DispatchDbFixture fixture)
 {
     private sealed class PoisonSink : ISink
     {

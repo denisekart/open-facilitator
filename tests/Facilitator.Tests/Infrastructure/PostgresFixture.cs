@@ -5,42 +5,52 @@ using Testcontainers.PostgreSql;
 namespace Facilitator.Tests.Infrastructure;
 
 /// <summary>
-/// One Postgres 17 container for the WHOLE suite: the container starts lazily
-/// once (the first fixture created across any collection wins the race) and
-/// every feature collection's instance points at it. Tests isolate via
-/// distinct GUID works/endpoints, not fresh databases; migrations serialize
-/// behind the advisory lock inside the kernel's DatabaseInitializer. DB state
-/// is inspected through the typed <see cref="Db"/> probe, never raw SQL.
+/// One Postgres 17 container shared by every feature collection that stays
+/// on the main DB: the container starts lazily once (the first fixture
+/// created across any collection wins the race). Tests isolate via distinct
+/// GUID works/endpoints, not fresh databases; migrations serialize behind
+/// the advisory lock inside the kernel's DatabaseInitializer. DB state is
+/// inspected through the typed <see cref="Db"/> probe, never raw SQL.
+/// The dispatcher/link collection overrides the container
+/// (<see cref="DispatchDbFixture"/>): a global outbox claim is collection-
+/// scoped only when no foreign replica's dispatcher shares the DB.
 /// </summary>
-public sealed class PostgresFixture : IAsyncLifetime
+public class PostgresFixture : IAsyncLifetime
 {
     private static readonly Task<PostgreSqlContainer> Shared =
-        new Lazy<Task<PostgreSqlContainer>>(() => StartSharedAsync()).Value;
+        new Lazy<Task<PostgreSqlContainer>>(() => StartAsync(setMainEnv: true)).Value;
 
     private readonly TestDbProbe _probe;
 
     /// <inheritdoc />
     public PostgresFixture() => _probe = new TestDbProbe(ConnectionString);
 
+    /// <summary>The container this fixture family points at (main shared by default).</summary>
+    protected virtual Task<PostgreSqlContainer> Container => Shared;
+
     /// <summary>Container connection string (valid after initialization).</summary>
-    public string ConnectionString => Shared.Result.GetConnectionString();
+    public string ConnectionString => Container.Result.GetConnectionString();
 
     /// <summary>Typed DB probe (parameterized, feature-named queries).</summary>
     public TestDbProbe Db => _probe;
 
-    private static async Task<PostgreSqlContainer> StartSharedAsync()
+    internal static async Task<PostgreSqlContainer> StartAsync(bool setMainEnv)
     {
         var container = new PostgreSqlBuilder("docker.io/library/postgres:17-alpine").Build();
         await container.StartAsync();
-        Environment.SetEnvironmentVariable("ConnectionStrings__Facilitator", container.GetConnectionString());
+        if (setMainEnv)
+        {
+            Environment.SetEnvironmentVariable("ConnectionStrings__Facilitator", container.GetConnectionString());
+        }
+
         return container;
     }
 
     /// <inheritdoc />
-    public Task InitializeAsync() => Shared;
+    public Task InitializeAsync() => Container;
 
     /// <inheritdoc />
-    public async Task DisposeAsync() => await _probe.DisposeAsync();
+    public virtual async Task DisposeAsync() => await _probe.DisposeAsync();
 
     /// <summary>
     /// Absolute path of <c>protocol/conformance-fixtures</c>, found by walking

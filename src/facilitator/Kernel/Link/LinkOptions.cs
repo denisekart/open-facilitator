@@ -24,6 +24,13 @@ public sealed class LinkOptions
     /// re-offers it (Link:RedeliverBackoffSeconds, default 5).</summary>
     public int RedeliverBackoffSeconds { get; init; } = 5;
 
+    /// <summary>Whether this replica's pump sweeps expired session leases
+    /// (Link:LeaseSweeperEnabled, default true). Every replica MAY sweep:
+    /// a lease expiring is wall-clock truth, and the sweep only closes
+    /// sockets early. Fake-clock test hosts disable it so an advanced
+    /// fake clock never deletes a foreign host's live sessions.</summary>
+    public bool LeaseSweeperEnabled { get; init; } = true;
+
     /// <summary>Protocol versions this server supports (handshake intersection).</summary>
     public static IReadOnlyList<string> SupportedProtocolVersions { get; } = ["v1"];
 
@@ -61,6 +68,7 @@ public sealed class LinkOptions
             HeartbeatSeconds = heartbeat,
             InFlightLeaseSeconds = configuration.GetValue("Link:InFlightLeaseSeconds", 120),
             RedeliverBackoffSeconds = configuration.GetValue("Link:RedeliverBackoffSeconds", 5),
+            LeaseSweeperEnabled = configuration.GetValue("Link:LeaseSweeperEnabled", true),
             Teams = configuration.GetSection("Link:Teams").Get<string[]>() ?? [],
             WorkloadIdentities = configuration.GetSection("Link:WorkloadIdentities").Get<WorkloadIdentityBinding[]>() ?? [],
             EvidenceAudience = configuration.GetValue("Link:Evidence:Audience", "facilitator-link"),

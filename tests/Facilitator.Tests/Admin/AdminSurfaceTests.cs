@@ -18,7 +18,7 @@ namespace Facilitator.Tests.Admin;
 /// race the poison drain.
 /// </summary>
 [Collection("postgres:dispatch-link")]
-public sealed class AdminSurfaceTests(PostgresFixture fixture)
+public sealed class AdminSurfaceTests(DispatchDbFixture fixture)
 {
     private sealed class PoisonSink : ISink
     {

@@ -1,0 +1,19 @@
+{
+  "specversion": "1.0",
+  "id": "01JCOMMAND-provision-stop",
+  "source": "urn:facilitator:instance:main",
+  "type": "org.facilitator.command.provision.stop.v1",
+  "subject": "workload/gw.team-alpha",
+  "time": "2026-10-22T18:00:00Z",
+  "datacontenttype": "application/json",
+  "dataschema": "https://schemas.openfacilitator.org/v1/command.provision.stop.v1.json",
+  "data": {
+    "commandId": "cmd-132",
+    "operationId": "provop-2",
+    "workloadId": "gw.team-alpha",
+    "team": "team-alpha",
+    "actorEvidenceRef": "identity-evidence:ref-132",
+    "deadline": "2026-10-23T18:00:00Z",
+    "reason": "idle-shutdown"
+  }
+}

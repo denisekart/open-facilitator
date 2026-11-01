@@ -3,7 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
-using Facilitator.Tests.Infrastructure;
+
 
 namespace Facilitator.Tests.Integrations;
 
@@ -21,7 +21,7 @@ namespace Facilitator.Tests.Integrations;
 /// until the assign/redispatch effect lands.
 /// </summary>
 [Collection("postgres:dispatch-link")]
-public sealed class SteerDeliveryTests(PostgresFixture fixture) : IAsyncLifetime, IDisposable
+public sealed class SteerDeliveryTests(DispatchDbFixture fixture) : IAsyncLifetime, IDisposable
 {
     private const string Repo = "demo/widgets";
 

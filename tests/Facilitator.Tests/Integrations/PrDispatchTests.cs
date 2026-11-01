@@ -4,7 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 
 using Facilitator.Tests.Artifacts;
-using Facilitator.Tests.Infrastructure;
+
 using Facilitator.Tests.Results;
 
 namespace Facilitator.Tests.Integrations;
@@ -24,7 +24,7 @@ namespace Facilitator.Tests.Integrations;
 /// before the manifest leg.
 /// </summary>
 [Collection("postgres:dispatch-link")]
-public sealed class PrDispatchTests(PostgresFixture fixture) : IAsyncLifetime, IDisposable
+public sealed class PrDispatchTests(DispatchDbFixture fixture) : IAsyncLifetime, IDisposable
 {
     private const string Repo = "demo/widgets";
     private const string Head = "ofac/aaaaaaaa-1234";

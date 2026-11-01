@@ -16,7 +16,7 @@ namespace Facilitator.Tests.Link;
 /// duplicate via the SAME inbox-dedupe seam as Plan 02 ingress.
 /// </summary>
 [Collection("postgres:dispatch-link")]
-public sealed class HttpFallbackParityTests(PostgresFixture fixture)
+public sealed class HttpFallbackParityTests(DispatchDbFixture fixture)
 {
     [Fact]
     public async Task DeliveriesRequireALiveSessionButCapabilitiesDoNot()

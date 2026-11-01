@@ -14,7 +14,7 @@ namespace Facilitator.Tests.Link;
 /// clock — no wall-clock sleeps.
 /// </summary>
 [Collection("postgres:dispatch-link")]
-public sealed class ReceiptLossTests(PostgresFixture fixture)
+public sealed class ReceiptLossTests(DispatchDbFixture fixture)
 {
     [Fact]
     public async Task UnreceiptedDeliveryReOffersWithSameIdAndSecondReceiptIsNoop()

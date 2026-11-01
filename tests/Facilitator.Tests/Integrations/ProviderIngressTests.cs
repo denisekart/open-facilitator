@@ -4,7 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 
-using Facilitator.Tests.Infrastructure;
+
 
 namespace Facilitator.Tests.Integrations;
 
@@ -19,7 +19,7 @@ namespace Facilitator.Tests.Integrations;
 /// <c>communication.reply</c> row addressed to the adapter's link endpoint.
 /// </summary>
 [Collection("postgres:dispatch-link")]
-public sealed class ProviderIngressTests(PostgresFixture fixture) : IAsyncLifetime, IDisposable
+public sealed class ProviderIngressTests(DispatchDbFixture fixture) : IAsyncLifetime, IDisposable
 {
     private const string ProblemBase = "https://errors.openfacilitator.org/v1/";
 

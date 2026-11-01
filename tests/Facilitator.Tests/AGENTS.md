@@ -19,7 +19,10 @@ internals.
 ## Develop here
 - Run one slice: `dotnet test --filter "FullyQualifiedName~<Folder>"`.
 - New Postgres-backed test class: join an existing per-feature collection
-  (`[Collection("postgres:<feature>")]`); never spin a new container.
+  (`[Collection("postgres:<feature>")]`); never spin a container per class.
+  The dispatch-link family runs on its OWN container (`DispatchDbFixture`):
+  a global outbox claim or a lease sweep on a foreign replica's dispatcher
+  or fake clock destroys this family's drain/sweep assertions.
 - DB assertions go through `TestDbProbe` methods; raw SQL strings do not appear
   in test files.
 - Timing: keep waits bounded and generous-but-small; the whole suite has a

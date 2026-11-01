@@ -1,0 +1,93 @@
+# Plan 35 Phase C overlay (slim + full): the provisioning plane. The kernel's
+# ProvisioningProcessor holds the scale law; the oci-launcher executes it
+# against the host Docker socket; the elastic-worker IMAGE is the workload it
+# manages (never a compose service — compose would mask the law). The demo
+# env is the launch-approved surface: exactly this image, exactly this
+# network.
+services:
+  facilitator:
+    environment:
+      # The provisioning decision core arms on this row + these specs.
+      # NetworkMode is the compose project's default network (pre-created by
+      # the facilitator's own dependency chain before any container launches).
+      # The $-prefixed env VALUES are the launcher's expansion contract:
+      # secrets travel by NAME, resolved from the launcher's own env.
+      # The kill-9 continuity leg's timing law: a 5s heartbeat (the SDK
+      # adopts the welcome's advertised value) pins the session lease at 15s,
+      # so the session-loss sweeper's two passes (5s each) fail a dead
+      # gateway's execution ~25s after the kill — far inside the leg's 90s
+      # window. Without it the default 30s heartbeat leases 90s and the leg
+      # races the lease.
+      Link__HeartbeatSeconds: "5"
+      Provision__LauncherEndpoint: oci-launcher
+      Provision__SweepIntervalSeconds: "10"
+      Provision__Workloads__0__WorkloadId: gw.team-beta
+      Provision__Workloads__0__Team: team-beta
+      Provision__Workloads__0__Image: ${OCI_REGISTRY:?set in versions.env}/elastic-worker:${FRAMEWORK_TAG:?set in versions.env}
+      Provision__Workloads__0__Network: facilitator-demo_default
+      Provision__Workloads__0__Entrypoint__0: /bin/sh
+      Provision__Workloads__0__Entrypoint__1: /opt/ofac/ofac-supervisor.sh
+      Provision__Workloads__0__Env__UNITS_DIR: /opt/ofac/units
+      Provision__Workloads__0__Env__OFAC_LOG_DIR: /var/lib/ofac/logs
+      Provision__Workloads__0__Env__OFAC_KERNEL_URL: http://facilitator:8080
+      Provision__Workloads__0__Env__OFAC_WORKER_TEAM: team-beta
+      Provision__Workloads__0__Env__OFAC_WORKER_ENDPOINT: elastic-worker-child
+      Provision__Workloads__0__Env__OFAC_ENROLL_SECRET: $$DEMO_ENROLLMENT_TOKEN
+      Provision__Workloads__0__Env__OFAC_CHILD_SECRET: $$DEMO_CHILD_SECRET
+      # A dead unit must surface as an exited container (the launcher's
+      # relaunch law), not a supervisor restart loop.
+      Provision__Workloads__0__Env__OFAC_SUPERVISOR_MAX_RESTARTS: "3"
+      Provision__Workloads__0__Labels__io.facilitator.managed: kernel-provisioned
+    # No depends_on the launcher: an unstarted launcher just means provision
+    # commands queue undelivered (the honest link-plane law); a depends edge
+    # would cycle (the launcher already depends on the kernel).
+
+  # The launcher (§18): link endpoint `oci-launcher`, Docker Engine over the
+  # host's unix socket. It launches ONLY allowlisted images onto allowlisted
+  # networks; the env VALUES its workloads carry are expanded from THIS
+  # container's env (name-indirection law), hence the two demo literals ride
+  # in here as themselves.
+  provisioning-launcher:
+    image: ${OCI_REGISTRY:?set in versions.env}/node-runtime:${FRAMEWORK_TAG:?set in versions.env}
+    # The Engine socket is root:docker on the host and node-runtime's
+    # non-root user carries neither — this container rides root (it is a
+    # thin socket proxy; the containers IT creates run as the workload
+    # image's own user).
+    user: root
+    command: ["node", "/app/provisioning-oci/dist/bin/launcher.js", "run", "--config", "/opt/ofac/config/adapter.yaml"]
+    environment:
+      OFAC_ENROLL_SECRET: ${DEMO_ENROLLMENT_TOKEN:?set in .env}
+      OFAC_ENDPOINT_ID: oci-launcher
+      OFAC_TEAM: team-alpha
+      DOCKER_HOST: unix:///var/run/docker.sock
+      OFAC_STATE_PATH: /var/lib/ofac/oci-launcher.sqlite3
+      OFAC_PROV_ALLOWED_IMAGES: ${OCI_REGISTRY:?set in versions.env}/elastic-worker:${FRAMEWORK_TAG:?set in versions.env}
+      OFAC_PROV_ALLOWED_NETWORKS: facilitator-demo_default
+      # The workload spec's $-names resolve against THIS env.
+      DEMO_ENROLLMENT_TOKEN: ${DEMO_ENROLLMENT_TOKEN:?set in .env}
+      DEMO_CHILD_SECRET: ${DEMO_CHILD_SECRET:?set in .env}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - launcher_state:/var/lib/ofac
+      - ./config/launcher:/opt/ofac/config:ro
+    depends_on:
+      facilitator:
+        condition: service_healthy
+    restart: on-failure:5
+
+  # The managed workload's IMAGE (built, never `up`ed — the kernel launches
+  # containers from it). Same node-runtime + the elastic config/supervisor/
+  # units baked in; state on the container layer: a relaunched gateway
+  # re-registers (the law the kill-9 leg exercises).
+  elastic-worker:
+    build:
+      context: ..
+      dockerfile: reference/container/Dockerfile.elastic
+      args:
+        OFAC_REGISTRY: ${OCI_REGISTRY:?set in versions.env}
+        OFAC_TAG: ${FRAMEWORK_TAG:?set in versions.env}
+    image: ${OCI_REGISTRY:?set in versions.env}/elastic-worker:${FRAMEWORK_TAG:?set in versions.env}
+    profiles: [build-only]
+
+volumes:
+  launcher_state: {}

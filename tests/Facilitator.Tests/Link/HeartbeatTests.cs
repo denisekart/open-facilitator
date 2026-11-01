@@ -12,10 +12,10 @@ namespace Facilitator.Tests.Link;
 /// no wall-clock sleeps beyond the pump's own 2 s tick).
 /// </summary>
 [Collection("postgres:dispatch-link")]
-public sealed class HeartbeatTests(PostgresFixture fixture)
+public sealed class HeartbeatTests(DispatchDbFixture fixture)
 {
     private static readonly IReadOnlyDictionary<string, string?> Fast =
-        new Dictionary<string, string?> { ["Link:HeartbeatSeconds"] = "5" };
+        new Dictionary<string, string?> { ["Link:HeartbeatSeconds"] = "5", ["Link:LeaseSweeperEnabled"] = "true" };
 
     [Fact]
     public async Task HeartbeatRefreshesLeaseAndStaleEpochIsRefused()

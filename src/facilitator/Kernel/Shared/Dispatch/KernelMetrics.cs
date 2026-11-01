@@ -34,6 +34,8 @@ public sealed class KernelMetrics
     private readonly Counter<long> _memoryPromoted;
     private readonly Counter<long> _memoryDenied;
     private readonly Histogram<double> _memoryRecallLatency;
+    private readonly Counter<long> _provisioningOps;
+    private readonly Counter<long> _sessionLoss;
     private readonly Histogram<double> _deliveryLatency;
     private readonly Histogram<double> _ingressLatency;
     private readonly Histogram<double> _artifactStoreLatency;
@@ -95,6 +97,8 @@ public sealed class KernelMetrics
         _memoryUsed = meter.CreateCounter<long>("facilitator.memory.used", description: "Usage rows written (auto-recall + attestations)");
         _memoryPromoted = meter.CreateCounter<long>("facilitator.memory.promoted", description: "Candidates promoted to active");
         _memoryDenied = meter.CreateCounter<long>("facilitator.memory.denied", description: "Broker denials (tag: reason)");
+        _provisioningOps = meter.CreateCounter<long>("facilitator.provisioning.ops", description: "Provisioning ops appended by the scale-law sweep (tags: operation, reason)");
+        _sessionLoss = meter.CreateCounter<long>("facilitator.link.session_loss", description: "Executions failed by the session-loss law (tag: reason)");
         _memoryRecallLatency = meter.CreateHistogram<double>("facilitator.memory.recall.latency", unit: "ms", description: "Recall query latency");
     }
 
@@ -190,6 +194,16 @@ public sealed class KernelMetrics
 
     /// <summary>Record recall latency in milliseconds.</summary>
     public void MemoryRecallLatency(double ms) => _memoryRecallLatency.Record(ms);
+
+    /// <summary>Record one provisioning op appended by the sweep (Plan 35 C).</summary>
+    /// <param name="operation">start | stop.</param>
+    /// <param name="reason">worker-lost | stalled-scaleup | no-capacity | min-workers | idle-shutdown.</param>
+    public void ProvisioningOp(string operation, string reason) => _provisioningOps.Add(1,
+        new KeyValuePair<string, object?>("operation", operation), new KeyValuePair<string, object?>("reason", reason));
+
+    /// <summary>Record one execution failed by the session-loss law (Plan 35 C).</summary>
+    public void SessionLoss(string reason) => _sessionLoss.Add(1,
+        new KeyValuePair<string, object?>("reason", reason));
 
     /// <summary>Refresh the GC last-pass-age gauge (written by the GC loop each pass).</summary>
     public void SetGcLastPassAge(long seconds) => Volatile.Write(ref _gcLastPassAgeSeconds, seconds);

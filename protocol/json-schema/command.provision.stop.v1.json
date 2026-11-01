@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openfacilitator.org/v1/command.provision.stop.v1.json",
+  "title": "ProvisionStopCommandV1Data",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "commandId",
+    "operationId",
+    "workloadId",
+    "team",
+    "actorEvidenceRef",
+    "deadline"
+  ],
+  "properties": {
+    "commandId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "operationId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "workloadId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "team": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "actorEvidenceRef": {
+      "$ref": "common.v1.json#/$defs/evidenceRef"
+    },
+    "deadline": {
+      "$ref": "common.v1.json#/$defs/rfc3339DateTime"
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    }
+  }
+}

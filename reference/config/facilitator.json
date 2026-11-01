@@ -161,6 +161,7 @@
             "/api/admin/work/{id}/timeline",
             "/api/admin/links",
             "/api/admin/deliveries",
+            "/api/admin/provisioning",
             "/api/admin/metrics",
             "/api/admin/config",
             "/api/admin/config/{resource}",

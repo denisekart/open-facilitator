@@ -12,7 +12,7 @@ namespace Facilitator.Tests.Cli;
 /// HTTP API — create + get round-trip through JSON, no backdoor.
 /// </summary>
 [Collection("postgres:dispatch-link")]
-public class CliSmokeTests(PostgresFixture fixture)
+public class CliSmokeTests(DispatchDbFixture fixture)
 {
     [Fact]
     public async Task CliMode_RidesPublicApi_CreateAndGetRoundTrip()

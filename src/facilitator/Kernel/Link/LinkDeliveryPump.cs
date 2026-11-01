@@ -165,6 +165,11 @@ public sealed class LinkDeliveryPump(
 
     private async Task SweepAsync(CancellationToken ct)
     {
+        if (!options.LeaseSweeperEnabled)
+        {
+            return;
+        }
+
         var expired = await sessions.SweepExpiredAsync(ct);
         foreach (var session in expired)
         {

@@ -149,3 +149,32 @@ The funnel (`Kernel/Routing/RoutingSink.cs`, dispatcher channel `routing`) is th
   `facilitator.nudges` (assignment, generation, episode, count); admin DTOs surface
   `nudgeCount` + `stalled` (cap spent) per assignment alongside `dependsOn` and
   `currentExecutionGeneration`.
+
+## Provisioning continuity (Plan 35 C)
+- **Scale law** (`Kernel/Provisioning/ProvisioningProcessor.cs`, periodic +
+  `SweepOnceAsync`): gate = admin_config `workload-scale` (ABSENT ⇒ manual
+  mode, silent) + `Provision:Workloads` specs. Arms: min-shortfall/no-capacity
+  scale-up, `idleShutdownMinutes` scale-down, worker-lost relaunch (a FAILED
+  attempt at the assignment's current generation ⇒ START + re-dispatch intent
+  at gen+1 — the SAME assignment, the fence law makes straggers 422). Escalation
+  order nudge-capped ⇒ stalled ⇒ scale-up, never reverse. Ledger
+  `facilitator.provisioning_operations` (op id = hash(work,assignment,gen,op),
+  replay-safe); state mirrors the link lease (two-sweep demotion). Envelopes
+  `command.provision.start|stop.v1` to `Provision:LauncherEndpoint`.
+- **Session-loss law** (`Kernel/Work/SessionLossSweeper.cs`): a kill-9'd
+  gateway posts nothing, so the kernel does — an open working attempt at its
+  assignment's current generation whose owner holds no live lease gets marked
+  on the first offline sweep and failed on the SECOND (hysteresis; a
+  reconnect clears the mark). Synthesized `event.assignment.failed.v1`
+  (`id=session-loss:<executionN>`, source kernel, `reason=session-lease-expired`,
+  `retryable=true`) rides the inbox + ResultIngress finalize path; the inbox
+  unique is the cross-replica dedupe. Same `workload-scale` gate as the scale
+  law: manual-mode deployments keep worker failures manual.
+- **Launcher** (`src/adapters/provisioning-oci`): link endpoint owning Docker
+  Engine over a mounted socket; launches ONLY allowlisted images/networks,
+  manages only its own `io.facilitator.managed`-labeled detached containers
+  (never the compose project); reconcile-by-label read-before-act; workload
+  env VALUES expand by NAME from the launcher's own env (secrets travel by
+  name). Compose overlay `reference/compose.provisioning.yaml` pins
+  `Link__HeartbeatSeconds=5`: lease 15 s + two 5-s sweeps fail a dead
+  gateway's execution ~25 s after the kill.

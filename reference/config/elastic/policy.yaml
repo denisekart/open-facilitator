@@ -1,0 +1,9 @@
+# Team policy for the launcher-managed elastic worker. research.analyze
+# runs free (the provisioning legs seed analyze works unattended); the
+# implicit final deny covers everything else the manifest doesn't advertise.
+owner: team-beta
+policies:
+  - capability: research.analyze
+    resources: ["*"]
+    actorAnyOf: []
+    effect: allow

@@ -3,7 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
-using Facilitator.Tests.Infrastructure;
+
 
 namespace Facilitator.Tests.Integrations;
 
@@ -21,7 +21,7 @@ namespace Facilitator.Tests.Integrations;
 /// fail-closed.
 /// </summary>
 [Collection("postgres:dispatch-link")]
-public sealed class ForgejoIngressTests(PostgresFixture fixture) : IAsyncLifetime, IDisposable
+public sealed class ForgejoIngressTests(DispatchDbFixture fixture) : IAsyncLifetime, IDisposable
 {
     private const string ProblemBase = "https://errors.openfacilitator.org/v1/";
     private const string Repo = "demo/widgets";

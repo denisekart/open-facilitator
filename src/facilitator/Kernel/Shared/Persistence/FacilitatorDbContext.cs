@@ -78,6 +78,8 @@ public class FacilitatorDbContext(DbContextOptions<FacilitatorDbContext> options
 
     public DbSet<NudgeLedgerEntity> Nudges => Set<NudgeLedgerEntity>();
 
+    public DbSet<ProvisioningOpEntity> ProvisioningOps => Set<ProvisioningOpEntity>();
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder model)
     {

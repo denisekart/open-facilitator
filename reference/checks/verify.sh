@@ -70,7 +70,7 @@ verify_dump_logs() {
   verify_human "--- last 20 lines: ${*} ---"
   for svc in "$@"; do
     (cd "$VERIFY_REF" && docker compose --env-file versions.env --env-file .env \
-      -f compose.slim.yaml -p facilitator-demo logs --tail=20 --no-log-prefix "$svc" 2>&1) \
+      -f compose.slim.yaml -f compose.provisioning.yaml -p facilitator-demo logs --tail=20 --no-log-prefix "$svc" 2>&1) \
       | sed "s/^/[$svc] /" >&2
   done
 }
@@ -92,7 +92,7 @@ verify_inbox_has() { # <event_type> <work_id> -> the payload text (non-zero: no 
   printf '%s' "$row"
 }
 verify_psql() { (cd "$VERIFY_REF" && docker compose --env-file versions.env --env-file .env \
-  -f compose.slim.yaml -p facilitator-demo exec -T postgres psql -U demo -d facilitator -tAc "$1"); }
+  -f compose.slim.yaml -f compose.provisioning.yaml -p facilitator-demo exec -T postgres psql -U demo -d facilitator -tAc "$1"); }
 
 verify_get() { # <token> <path> -> body (non-2xx: non-zero)
   curl -fs --max-time 10 "$VERIFY_KERNEL$2" -H "Authorization: Bearer $1"
@@ -109,7 +109,7 @@ verify_timeline_has() { # <token> <work_id> <kind>
 
 verify_gateway_status() {
   (cd "$VERIFY_REF" && docker compose --env-file versions.env --env-file .env \
-    -f compose.slim.yaml -p facilitator-demo exec -T demo-workspace node -e \
+    -f compose.slim.yaml -f compose.provisioning.yaml -p facilitator-demo exec -T demo-workspace node -e \
     "fetch('http://127.0.0.1:8099/status').then(r=>r.ok?r.json():Promise.reject(r.status)).then(s=>process.stdout.write(JSON.stringify(s)))")
 }
 
@@ -278,7 +278,7 @@ verify_fetch_in_network() { # <url> <bearer>
   local inurl=${1/$VERIFY_KERNEL/http:\/\/facilitator:8080}
   (cd "$VERIFY_REF" && env VERIFY_FETCH_URL="$inurl" VERIFY_FETCH_TOKEN="$2" \
     docker compose --env-file versions.env --env-file .env \
-    -f compose.slim.yaml -p facilitator-demo exec -T \
+    -f compose.slim.yaml -f compose.provisioning.yaml -p facilitator-demo exec -T \
     -e VERIFY_FETCH_URL -e VERIFY_FETCH_TOKEN demo-workspace node -e \
     'fetch(process.env.VERIFY_FETCH_URL,{headers:{authorization:"Bearer "+process.env.VERIFY_FETCH_TOKEN}}).then(r=>r.ok?r.text():Promise.reject(r.status)).then(t=>process.stdout.write(t))')
 }
@@ -361,7 +361,7 @@ step_approval_and_kernel_restart() {
 
   # Parked: the durable-state checkpoint — restart the kernel under it.
   (cd "$VERIFY_REF" && docker compose --env-file versions.env --env-file .env \
-    -f compose.slim.yaml -p facilitator-demo restart --no-deps facilitator) >&2 \
+    -f compose.slim.yaml -f compose.provisioning.yaml -p facilitator-demo restart --no-deps facilitator) >&2 \
     || {
       step_fail_record approval-roundtrip "$(( $(verify_now_ms) - started ))" "facilitator restart command failed"
       step_fail_record kernel-restart-resume "$(( $(verify_now_ms) - started ))" "restart command failed"
@@ -441,60 +441,71 @@ step_pass() { step_pass_record "$VERIFY_CURRENT_STEP" "$(( $(verify_now_ms) - VE
 step_fail() { step_fail_record "$VERIFY_CURRENT_STEP" "$(( $(verify_now_ms) - VERIFY_CURRENT_STARTED ))" "$*"; }
 
 step_worker_restart_resume() {
-  local started=$1 n records rev revof failed
-  # The child quota is maxInFlight=1: a witness dispatched while an earlier
-  # leg's work still runs is honestly answered child-busy and dropped. Wait
-  # for the fleet to drain before seeding (the law the quota exists for).
-  if ! poll_until 60 verify_child_idle; then
-    step_fail_record worker-restart-resume "$(( $(verify_now_ms) - started ))" "child never went idle (stuck in-flight execution)"
-    verify_dump_logs facilitator demo-workspace
+  # Plan 35 Phase C inversion: the killed worker is the kernel-PROVISIONED
+  # elastic container (team-beta), not the compose demo-workspace. The
+  # continuity law: kill-9 => exactly ONE honest retryable failed => the
+  # kernel's worker-lost arm relaunches the container through the launcher
+  # AND re-queues the work's routing intent (new generation) => completion
+  # with exactly one manifest revision 1 — with NO operator redispatch verb.
+  local started=$1 n records rev revof failed nfailed
+  verify_token_cli \
+    || { step_fail_record worker-restart-resume "$(( $(verify_now_ms) - started ))" "token mint failed"; return 1; }
+  # Own the scale law for this leg: min1/max1 keeps min-shortfall from
+  # racing the kill-restart; idle 10 minutes keeps the idle arm from
+  # firing mid-leg.
+  seed_workload_scale_policy "$VERIFY_TOKEN_CLI" 1 1 10 >/dev/null \
+    || { step_fail_record worker-restart-resume "$(( $(verify_now_ms) - started ))" "workload-scale policy PATCH failed"; return 1; }
+  local leg_t0
+  leg_t0=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  # The elastic fleet must be live before seeding team-beta work: min1
+  # boots it at policy time; wait for the child to register + idle.
+  if ! poll_elastic_idle 120; then
+    step_fail_record worker-restart-resume "$(( $(verify_now_ms) - started ))" "provisioned elastic never went live+idle (launcher/kernel logs)"
+    verify_dump_logs facilitator provisioning-launcher
     return 1
   fi
-  WORK_W3=$(verify_seed_leg verify-restart-w research.analyze \
-    "slim verify: restart-resume witness run") \
+  local project work
+  project=$(seed_project team-beta-witness team-beta) \
+    || { step_fail_record worker-restart-resume "$(( $(verify_now_ms) - started ))" "team-beta witness project seed failed"; return 1; }
+  work=$(seed_work "$VERIFY_TOKEN_CLI" "slim verify: provisioned-worker restart witness" research.analyze "$project" "identity-evidence:verify-restart-w") \
     || { step_fail_record worker-restart-resume "$(( $(verify_now_ms) - started ))" "seeding the restart witness work failed"; return 1; }
-  # 120s: a link plane still settling after earlier legs' restarts can
-  # delay first delivery (lease reclaim cycles) — the witness must not
-  # race that convergence.
+  WORK_W3=$work
+  # 120s: a link plane still settling can delay first delivery (lease
+  # reclaim cycles) — the witness must not race that convergence.
   if ! poll_until 120 verify_inbox_has org.facilitator.event.work.progress.v1 "$WORK_W3"; then
     step_fail_record worker-restart-resume "$(( $(verify_now_ms) - started ))" "witness run never reported progress"
-    verify_dump_logs facilitator demo-workspace
+    verify_dump_logs facilitator provisioning-launcher
     return 1
   fi
-  # Kill the run mid-flight (the progress window just opened). The as-built
-  # reconcile law (spec 6.3): a stop mid-execution settles the binding lost
-  # with exactly ONE honest retryable assignment.failed — never a phantom
-  # completion, never a silent re-execution.
-  (cd "$VERIFY_REF" && docker compose --env-file versions.env --env-file .env \
-    -f compose.slim.yaml -p facilitator-demo restart --no-deps demo-workspace) >&2 \
-    || { step_fail_record worker-restart-resume "$(( $(verify_now_ms) - started ))" "demo-workspace restart command failed"; return 1; }
+  # Kill-9 the provisioned container mid-flight (the progress window just
+  # opened). Compose knows nothing about it — the launcher owns it, so the
+  # kill rides the docker socket the launcher shares.
+  docker kill ofac-gw-team-beta >&2 \
+    || { step_fail_record worker-restart-resume "$(( $(verify_now_ms) - started ))" "docker kill ofac-gw-team-beta failed (container name/label law drifted?)"; return 1; }
   failed=$(poll_capture 90 verify_inbox_has org.facilitator.event.assignment.failed.v1 "$WORK_W3") \
     || { step_fail_record worker-restart-resume "$(( $(verify_now_ms) - started ))" "killed run never reported a terminal event within 90s"
-         verify_dump_logs facilitator demo-workspace; return 1; }
+          verify_dump_logs facilitator provisioning-launcher; return 1; }
   jq -e '.data.retryable == true' <<<"$failed" >/dev/null \
     || { step_fail_record worker-restart-resume "$(( $(verify_now_ms) - started ))" "failed event is not retryable: $(jq -c .data <<<"$failed")"; return 1; }
-  local nfailed
   nfailed=$(verify_psql "SELECT count(*) FROM facilitator.inbox WHERE payload->>'type' = 'org.facilitator.event.assignment.failed.v1' AND payload->'data'->>'workId' = '$WORK_W3'")
   [ "${nfailed:-0}" = 1 ] \
     || { step_fail_record worker-restart-resume "$(( $(verify_now_ms) - started ))" "expected exactly 1 failed event, got $nfailed"; return 1; }
-  # Resume: an operator re-dispatch of the SAME work rides the reconnected
-  # link (a fresh routing intent; the funnel re-resolves the endpoint) and
-  # completes; no duplicate side effects survive the crash.
-  verify_token_cli || { step_fail_record worker-restart-resume "$(( $(verify_now_ms) - started ))" "token re-mint failed"; return 1; }
-  seed_redispatch "$VERIFY_TOKEN_CLI" "$WORK_W3" research.analyze \
-    "identity-evidence:verify-restart-w" \
-    || { step_fail_record worker-restart-resume "$(( $(verify_now_ms) - started ))" "retry dispatch failed"; return 1; }
-  if ! poll_until 120 verify_inbox_has org.facilitator.event.assignment.completed.v1 "$WORK_W3"; then
-    step_fail_record worker-restart-resume "$(( $(verify_now_ms) - started ))" "witness work did not complete 120s after retry dispatch"
-    verify_dump_logs facilitator demo-workspace
+  # NO seed_redispatch here (the old leg's operator verb): the kernel's
+  # worker-lost arm relaunches AND re-dispatches at the new generation.
+  # 180s covers relaunch (docker create+start + gateway hello) + re-route
+  # + run.
+  if ! poll_until 180 verify_inbox_has org.facilitator.event.assignment.completed.v1 "$WORK_W3"; then
+    step_fail_record worker-restart-resume "$(( $(verify_now_ms) - started ))" "witness work did not complete 180s after kernel auto-relaunch"
+    verify_dump_logs facilitator provisioning-launcher
     return 1
   fi
+  verify_token_alice || { step_fail_record worker-restart-resume "$(( $(verify_now_ms) - started ))" "alice token mint failed"; return 1; }
   # The inbox row lands before ResultIngress files the manifest — ride the
   # read model, never a single-shot GET (an unrecorded manifest must fail
   # the poll, not errexit the leg).
   if ! poll_until 60 verify_timeline_has "$VERIFY_TOKEN_ALICE" "$WORK_W3" manifest.recorded; then
     step_fail_record worker-restart-resume "$(( $(verify_now_ms) - started ))" "resume completed but no manifest.recorded timeline row"
-    verify_dump_logs facilitator demo-workspace
+    verify_dump_logs facilitator provisioning-launcher
     return 1
   fi
   n=$(verify_get "$VERIFY_TOKEN_ALICE" "/api/works/$WORK_W3/manifests" | jq 'length')
@@ -503,9 +514,36 @@ step_worker_restart_resume() {
   revof=$(verify_get "$VERIFY_TOKEN_ALICE" "/api/works/$WORK_W3/manifests" | jq -c '.[0].revisionOf')
   { [ "${n:-0}" = 1 ] && [ "${records:-0}" = 1 ] && [ "${rev:-0}" = 1 ] && { [ "$revof" = null ] || [ "$revof" = '"null"' ]; }; } \
     || { step_fail_record worker-restart-resume "$(( $(verify_now_ms) - started ))" "resume duplicated side effects (manifests=$n manifest.recorded=$records revision=$rev revisionOf=$revof)"; return 1; }
+  # The continuity law's ledger face: a worker-lost start op exists since
+  # leg start (the kernel ordered the relaunch, the launcher obeyed).
+  verify_psql "SELECT 1 FROM facilitator.provisioning_operations WHERE workload_id = 'gw.team-beta' AND operation = 'start' AND reason ILIKE 'worker-lost%' AND created_at >= '$leg_t0' LIMIT 1" | grep -q 1 \
+    || { step_fail_record worker-restart-resume "$(( $(verify_now_ms) - started ))" "no worker-lost relaunch op in the provisioning ledger"; return 1; }
   step_pass_record worker-restart-resume "$(( $(verify_now_ms) - started ))" \
-    "worker killed mid-run: honest retryable failed, retry completed with exactly 1 manifest revision 1"
+    "provisioned worker killed mid-run: honest retryable failed, kernel auto-relaunch+re-dispatch completed with exactly 1 manifest revision 1"
   return 0
+}
+
+poll_elastic_idle() { # <deadline_s> — elastic live (session lease) + zero in-flight
+  local deadline=$((SECONDS + $1))
+  until verify_psql "SELECT 1 FROM facilitator.link_sessions WHERE logical_endpoint_id = 'gw.team-beta' AND lease_until > now() LIMIT 1" | grep -q 1; do
+    [ "$SECONDS" -lt "$deadline" ] || return 1
+    sleep 2
+  done
+  # The child connects as a gateway CHILD (elastic-worker-child); the
+  # gateway's own diagnostics report in-flight executions.
+  local deadline2=$((SECONDS + 30))
+  until elastic_child_idle; do
+    [ "$SECONDS" -lt "$deadline2" ] || return 1
+    sleep 2
+  done
+}
+
+elastic_child_idle() {
+  # Same in-container probe + quota law as verify_child_idle, aimed at the
+  # launcher-managed container (it shares the compose network).
+  docker exec ofac-gw-team-beta node -e \
+    "fetch('http://127.0.0.1:8099/status').then(r=>r.ok?r.json():Promise.reject(r.status)).then(s=>process.stdout.write(JSON.stringify(s)))" 2>/dev/null \
+    | jq -e '[.children[] | select(.state=="connected") | .inFlight] | length >= 1 and (map(. == 0) | all)' >/dev/null
 }
 
 step_trace_correlation() {
@@ -647,8 +685,8 @@ run_verify() {
       durationMs: 0,
       exitCode: $exit,
       steps: [ splits("\n") | select(length > 0)
-               | capture("^(?<id>[^|]+)\\|(?<status>[^|]+)\\|(?<durationMs>[0-9]+)\\|(?<detail>.*)$")
-               | { id, status, durationMs: (.durationMs | tonumber), detail } ] }' "$VERIFY_RESULTS")
+              | capture("^(?<id>[^|]+)\\|(?<status>[^|]+)\\|(?<durationMs>[0-9]+)\\|(?<detail>.*)$")
+              | { id, status, durationMs: (.durationMs | tonumber), detail } ] }' "$VERIFY_RESULTS")
   report=$(jq --argjson now "$(verify_now_ms)" --argjson started "$VERIFY_T0" \
     '.durationMs = ($now - $started)' <<<"$report")
 

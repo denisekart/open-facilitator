@@ -12,7 +12,7 @@ namespace Facilitator.Tests.Link;
 /// allowed. oidc: happy paths run against Keycloak in the realm-fixture suite.
 /// </summary>
 [Collection("postgres:dispatch-link")]
-public sealed class EvidenceAdmissionTests(PostgresFixture fixture)
+public sealed class EvidenceAdmissionTests(DispatchDbFixture fixture)
 {
     [Fact]
     public async Task UnknownKernelEvidenceDeniesWithAuditRow()

@@ -9,10 +9,12 @@ acceptance run — a LOCAL gate on every task (the hosted ref-env CI jobs are
 compute-gated off; see `Develop here`).
 
 ## Truth anchors
-- `compose.slim.yaml` / `compose.full.yaml` — the stacks: providers plus
-  `demo-workspace` and (full only) `coding-workspace` (node-runtime image,
-  supervisor entrypoint); interpolation ONLY from `versions.env` + `.env`
-  (two `--env-file` flags).
+- `compose.slim.yaml` / `compose.provisioning.yaml` / `compose.full.yaml` —
+  the stacks: providers plus `demo-workspace` and (full only)
+  `coding-workspace` (node-runtime image, supervisor entrypoint); the
+  provisioning overlay (launcher + kernel `Provision__*` + the build-only
+  `elastic-worker` image) rides EVERY compose invocation, slim included;
+  interpolation ONLY from `versions.env` + `.env` (two `--env-file` flags).
 - `../referencectl` — the operator loop: up/down/status/token/work; it owns
   the compose invocation and the bootstrap call.
 - `versions.env` — the single pin source: every reference image tag, the

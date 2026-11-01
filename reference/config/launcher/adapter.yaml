@@ -1,0 +1,14 @@
+# OCI provisioning launcher (§18, plan 35 Phase C): link-plane endpoint
+# receiving org.facilitator.command.provision.start|stop.v1 and executing
+# them against the Docker Engine socket. Mode-(a) enrollment (shared secret,
+# like every adapter); the allowlists are the approved-image/network gate
+# (env: OFAC_PROV_ALLOWED_IMAGES / OFAC_PROV_ALLOWED_NETWORKS) — the elastic
+# workload is the only image the reference env may launch, on the compose
+# network only.
+kernelUrl: http://facilitator:8080
+enrollSecretEnv: OFAC_ENROLL_SECRET
+endpointId: oci-launcher
+team: team-alpha
+statePath: /var/lib/ofac/oci-launcher.sqlite3
+gcMinutes: 60
+stopGraceSeconds: 10

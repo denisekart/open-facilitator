@@ -136,6 +136,21 @@ public sealed record AdminApprovalRow(Guid ApprovalId, string State, string Acti
 /// <summary>Manifest row (artifact refs) on the work-detail surface.</summary>
 public sealed record AdminManifestRow(string ManifestId, int Revision, string? RevisionOf, string ResultState, string State, Guid ArtifactId, IReadOnlyList<string> OutputArtifactIds, DateTime RecordedAt);
 
+/// <summary>One provisioning_operations ledger row (Plan 35 C, GET
+/// /api/admin/provisioning): the launcher ops the scale-law sweep appended.</summary>
+public sealed record AdminProvisioningRow(
+    string OperationId,
+    string WorkloadId,
+    string Team,
+    string Operation,
+    string State,
+    Guid? WorkId,
+    Guid? AssignmentId,
+    int? Generation,
+    string? Reason,
+    DateTime CreatedAt,
+    DateTime UpdatedAt);
+
 /// <summary>
 /// The admin read models (Plan 20, spec §17.2): bounded <c>GroupBy</c> counts
 /// and <c>Take</c>-limited projections over the existing ledgers — one
@@ -408,6 +423,20 @@ public sealed class AdminReadStores(
         }
 
         return items.OrderByDescending(i => i.UpdatedAt).Take(take).ToList();
+    }
+
+    /// <summary>Newest provisioning ops (Plan 35 C): the scale-law ledger,
+    /// newest-100, camelCase via the ASP.NET defaults.</summary>
+    public async Task<IReadOnlyList<AdminProvisioningRow>> ProvisioningAsync(CancellationToken ct)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(ct);
+        return await db.ProvisioningOps.AsNoTracking()
+            .OrderByDescending(o => o.CreatedAt)
+            .Take(100)
+            .Select(o => new AdminProvisioningRow(
+                o.OperationId, o.WorkloadId, o.Team, o.Operation, o.State,
+                o.WorkId, o.AssignmentId, o.Generation, o.Reason, o.CreatedAt, o.UpdatedAt))
+            .ToListAsync(ct);
     }
 
     /// <summary>Inline metrics roll-up: SQL gauges + windowed per-hour table facts + process counter snapshot.</summary>

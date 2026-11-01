@@ -1,0 +1,14 @@
+# Launcher-managed elastic worker image (plan 35 Phase C): the SAME
+# node-runtime, plus this workspace's config, the supervisor, and the units
+# baked in at the paths the kernel's Provisioning:Workloads:gw.team-beta spec
+# launches (entrypoint /opt/ofac/ofac-supervisor.sh, config baked at
+# /opt/ofac/config). Config-only — no rebuilt node bytes, no drift from the
+# compose workspace, and NO host bind mounts, so the launcher's approved
+# surface stays image + network only (state lives on the container layer: a
+# relaunched gateway re-registers, which is the law the kill-9 leg exercises).
+ARG OFAC_REGISTRY
+ARG OFAC_TAG
+FROM ${OFAC_REGISTRY}/node-runtime:${OFAC_TAG}
+COPY --chown=node:node reference/config/elastic/ /opt/ofac/config/
+COPY --chown=node:node features/shared/ofac-supervisor.sh /opt/ofac/ofac-supervisor.sh
+COPY --chown=node:node reference/container/units/ /opt/ofac/units/

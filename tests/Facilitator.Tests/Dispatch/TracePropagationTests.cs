@@ -17,7 +17,7 @@ namespace Facilitator.Tests.Dispatch;
 /// trace and worker-emitted events are causally linked to the facilitator.
 /// </summary>
 [Collection("postgres:dispatch-link")]
-public sealed class TracePropagationTests(PostgresFixture fixture)
+public sealed class TracePropagationTests(DispatchDbFixture fixture)
 {
     private static readonly Regex W3C = new("^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$", RegexOptions.Compiled);
 

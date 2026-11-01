@@ -29,7 +29,7 @@ usage() {
 have() { command -v "$1" >/dev/null 2>&1 || { echo "referencectl: '$1' required" >&2; exit 2; }; }
 have docker; have curl; have jq
 
-overlays=(-f compose.slim.yaml)
+overlays=(-f compose.slim.yaml -f compose.provisioning.yaml)
 [ -n "${FULL:-}" ] && overlays+=(-f compose.full.yaml)
 compose() { (cd "$REF" && docker compose --env-file versions.env --env-file .env "${overlays[@]}" -p facilitator-demo "$@"); }
 
@@ -58,6 +58,13 @@ cmd_up() {
   done
   have jq
   [ -f "$REF/.env" ] || "$REF/bootstrap/generate-secrets.sh"
+  # Deterministic image bake before `up`: the elastic-worker image is
+  # FROM node-runtime (built by the demo-workspace service) and profile
+  # build-only (compose `up` would mask the scale law), so neither the
+  # node-runtime base nor the workload image exists yet — bake both now;
+  # the kernel's min-workers start needs them at the first sweep.
+  compose build demo-workspace
+  compose --profile build-only build elastic-worker
   if ! compose up -d --build --wait --wait-timeout 240; then
     echo "referencectl: stack not healthy in 240s — service status:" >&2
     compose ps --format '{{.Name}} {{.Status}}' >&2

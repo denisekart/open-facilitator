@@ -16,7 +16,7 @@ namespace Facilitator.Tests.Link;
 /// (team-unknown, gw. prefix) live in <c>EnrollmentTests</c>.
 /// </summary>
 [Collection("postgres:dispatch-link")]
-public sealed class WorkloadIdentityTests(PostgresFixture fixture)
+public sealed class WorkloadIdentityTests(DispatchDbFixture fixture)
 {
     private const string ProblemBase = "https://errors.openfacilitator.org/v1/";
 

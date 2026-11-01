@@ -1,0 +1,39 @@
+{
+  "specversion": "1.0",
+  "id": "01JCOMMAND-provision-start",
+  "source": "urn:facilitator:instance:main",
+  "type": "org.facilitator.command.provision.start.v1",
+  "subject": "workload/gw.team-alpha",
+  "time": "2026-10-22T18:00:00Z",
+  "datacontenttype": "application/json",
+  "dataschema": "https://schemas.openfacilitator.org/v1/command.provision.start.v1.json",
+  "data": {
+    "commandId": "cmd-131",
+    "operationId": "provop-1",
+    "workloadId": "gw.team-alpha",
+    "team": "team-alpha",
+    "actorEvidenceRef": "identity-evidence:ref-131",
+    "deadline": "2026-10-23T18:00:00Z",
+    "reason": "no-capacity",
+    "spec": {
+      "image": "registry.local/node-runtime:1",
+      "entrypoint": ["/bin/sh", "/opt/ofac/ofac-supervisor.sh"],
+      "network": "facilitator-demo_default",
+      "env": {
+        "OFAC_KERNEL_URL": "http://facilitator:8080",
+        "OFAC_WORKER_TEAM": "team-alpha"
+      },
+      "volumes": [
+        {
+          "source": "workspace_state",
+          "target": "/var/lib/ofac",
+          "readOnly": false
+        }
+      ],
+      "labels": {
+        "ofac.workload": "gw.team-alpha"
+      },
+      "stopGraceSeconds": 10
+    }
+  }
+}

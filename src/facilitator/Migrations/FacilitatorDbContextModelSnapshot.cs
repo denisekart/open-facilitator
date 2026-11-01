@@ -1417,6 +1417,69 @@ namespace Facilitator.Migrations
                     b.ToTable("provider_link_challenges", "facilitator");
                 });
 
+            modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.ProvisioningOpEntity", b =>
+                {
+                    b.Property<string>("OperationId")
+                        .HasColumnType("text")
+                        .HasColumnName("operation_id");
+
+                    b.Property<Guid?>("AssignmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("assignment_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int?>("Generation")
+                        .HasColumnType("integer")
+                        .HasColumnName("generation");
+
+                    b.Property<string>("Operation")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("operation");
+
+                    b.Property<string>("Reason")
+                        .HasColumnType("text")
+                        .HasColumnName("reason");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("state");
+
+                    b.Property<string>("Team")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("team");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("WorkId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("work_id");
+
+                    b.Property<string>("WorkloadId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("workload_id");
+
+                    b.HasKey("OperationId");
+
+                    b.HasIndex("WorkloadId")
+                        .HasDatabaseName("provisioning_operations_workload_idx");
+
+                    b.ToTable("provisioning_operations", "facilitator", t =>
+                        {
+                            t.HasCheckConstraint("provisioning_operations_operation_check", "operation IN ('start', 'stop')");
+
+                            t.HasCheckConstraint("provisioning_operations_state_check", "state IN ('requested', 'running', 'stopped', 'failed')");
+                        });
+                });
+
             modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.ResultManifestEntity", b =>
                 {
                     b.Property<string>("ManifestId")

@@ -11,7 +11,7 @@ namespace Facilitator.Tests.Link;
 /// receipt-class envelopes are 400, and 262144 bytes is the hard 413 gate.
 /// </summary>
 [Collection("postgres:dispatch-link")]
-public sealed class LinkIngressTests(PostgresFixture fixture)
+public sealed class LinkIngressTests(DispatchDbFixture fixture)
 {
     private const string ProblemBase = "https://errors.openfacilitator.org/v1/";
 

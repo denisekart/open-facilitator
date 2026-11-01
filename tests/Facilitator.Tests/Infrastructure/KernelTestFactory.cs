@@ -91,6 +91,14 @@ public sealed class KernelTestFactory : WebApplicationFactory<Program>
         // No test races a live GC pass: the loop sleeps an hour (fake-clock
         // suites drive passes explicitly via RunOnceAsync; override per test).
         builder.UseSetting("Storage:Gc:IntervalSeconds", "3600");
+        builder.UseSetting("SessionLoss:SweepIntervalSeconds", "3600");
+        // A fake advance is that host's fiction: sweeping leases on a fake
+        // clock deletes FOREIGN hosts' live sessions in the shared DB. Fake
+        // hosts skip the sweep unless a test opts in explicitly.
+        if (_fakeClock && (_settings is null || !_settings.ContainsKey("Link:LeaseSweeperEnabled")))
+        {
+            builder.UseSetting("Link:LeaseSweeperEnabled", "false");
+        }
         if (_settings is not null)
         {
             foreach (var (key, value) in _settings)

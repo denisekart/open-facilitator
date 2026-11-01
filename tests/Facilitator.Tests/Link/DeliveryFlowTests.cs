@@ -12,7 +12,7 @@ namespace Facilitator.Tests.Link;
 /// the pump/ledger are the sole actors on link rows.
 /// </summary>
 [Collection("postgres:dispatch-link")]
-public sealed class DeliveryFlowTests(PostgresFixture fixture)
+public sealed class DeliveryFlowTests(DispatchDbFixture fixture)
 {
     [Fact]
     public async Task QueuedAssignReachesSocketAndReceiptFlipsLedgerAndOutbox()

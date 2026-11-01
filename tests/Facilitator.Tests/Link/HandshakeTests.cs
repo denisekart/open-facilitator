@@ -11,7 +11,7 @@ namespace Facilitator.Tests.Link;
 /// Proven on the real wire: SignalR client over WebSockets against Kestrel.
 /// </summary>
 [Collection("postgres:dispatch-link")]
-public sealed class HandshakeTests(PostgresFixture fixture)
+public sealed class HandshakeTests(DispatchDbFixture fixture)
 {
     [Fact]
     public async Task HelloReturnsWelcomeV1AndEpochsGrowAcrossReconnects()

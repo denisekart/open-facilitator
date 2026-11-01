@@ -9,7 +9,7 @@ namespace Facilitator.Tests.Link;
 /// truth. An acked delivery never replays. Real wire: SignalR over WebSockets.
 /// </summary>
 [Collection("postgres:dispatch-link")]
-public sealed class ReplayOnReconnectTests(PostgresFixture fixture)
+public sealed class ReplayOnReconnectTests(DispatchDbFixture fixture)
 {
     [Fact]
     public async Task DroppedSocketReplaysOnlyTheUnackedDeliveryOnReconnect()

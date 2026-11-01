@@ -15,8 +15,10 @@ SEED_REALM=${SEED_REALM:-facilitator}
 SEED_REF=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 
 seed_compose() {
+  # The provisioning overlay is part of the slim acceptance env (plan 35
+  # Phase C): kernel scale law + OCI launcher ride every stack operation.
   (cd "$SEED_REF" && docker compose --env-file versions.env --env-file .env \
-    -f compose.slim.yaml -p facilitator-demo "$@")
+    -f compose.slim.yaml -f compose.provisioning.yaml -p facilitator-demo "$@")
 }
 
 seed_psql() { seed_compose exec -T postgres psql -U demo -d facilitator -tAc "$1"; }
@@ -49,18 +51,33 @@ seed_mint_user_token() {
 
 seed_project() {
   # $1: project name (idempotent per name; the row a prior run left is reused).
-  local name=$1 project_id
+  # $2: owning team slug (default team-alpha — witness works for the
+  # provisioned team-beta fleet ride a team-beta project).
+  local name=$1 team=${2:-team-alpha} project_id
   project_id=$(seed_psql "SELECT project_id FROM facilitator.projects WHERE name = '$name'" | head -n1)
   if [ -z "$project_id" ]; then
     # -tA still prints the INSERT command tag after the RETURNING row; the id
     # is the first line, the tag would poison the JSON body with a newline.
     project_id=$(seed_psql "INSERT INTO facilitator.projects (project_id, team_id, name, config, created_at)
-      VALUES (gen_random_uuid(), (SELECT team_id FROM facilitator.teams WHERE slug = 'team-alpha'),
+      VALUES (gen_random_uuid(), (SELECT team_id FROM facilitator.teams WHERE slug = '$team'),
               '$name', '{}', now())
       RETURNING project_id" | head -n1)
   fi
   [ -n "$project_id" ] || { echo "seed: project '$name' not found and insert returned nothing" >&2; return 1; }
   printf '%s' "$project_id"
+}
+
+seed_workload_scale_policy() {
+  # $1: CLI token; [$2 min, $3 max, $4 idle-minutes]. Blind-upserts the
+  # workload-scale row (If-Match:* — create-or-replace, no version dance),
+  # opting the elastic workload into the kernel's scale law. Defaults boot
+  # one worker at stack start and idle-stop it after 10 minutes so an
+  # acceptance run neither waits on nor trips the idle arm mid-run.
+  local token=$1 min=${2:-1} max=${3:-1} idle=${4:-10}
+  curl -fs --max-time 10 -X PATCH "$SEED_KERNEL/api/admin/config/workload-scale" \
+    -H "Authorization: Bearer $token" -H 'content-type: application/json' \
+    -H 'If-Match: *' -H 'X-Change-Reason: reference-env provisioning policy' \
+    -d "{\"minWorkers\":$min,\"maxWorkers\":$max,\"idleShutdownMinutes\":$idle}"
 }
 
 seed_work() {
@@ -78,7 +95,7 @@ seed_work() {
     --arg evidence "$evidence" --arg target "$target" --arg prefer "$prefer" \
     '{objective: $objective, capabilityId: $capability, projectId: $projectId,
       actorEvidenceRef: $evidence, targetId: $target}
-     + (if $prefer == "" then {} else {preferenceEndpointId: $prefer} end)')
+    + (if $prefer == "" then {} else {preferenceEndpointId: $prefer} end)')
   for _ in $(seq 1 30); do
     resp=$(curl -s --max-time 10 -w '\n%{http_code}' -X POST "$SEED_KERNEL/api/works" \
       -H "Authorization: Bearer $token" -H 'content-type: application/json' -d "$json")
@@ -107,8 +124,8 @@ seed_redispatch() {
   json=$(jq -cn --arg capability "$capability" --arg evidence "$evidence" --arg target "$target" \
     --arg commandId "$command_id" --argjson inputs "${inputs:-null}" \
     '{capabilityId: $capability, actorEvidenceRef: $evidence, targetId: $target}
-     + (if $commandId == "" then {} else {commandId: $commandId} end)
-     + (if $inputs == null then {} else {inputs: $inputs} end)')
+    + (if $commandId == "" then {} else {commandId: $commandId} end)
+    + (if $inputs == null then {} else {inputs: $inputs} end)')
   resp=$(curl -s --max-time 10 -w '\n%{http_code}' -X POST "$SEED_KERNEL/api/works/$work_id/redispatch" \
     -H "Authorization: Bearer $token" -H 'content-type: application/json' -d "$json")
   code=${resp##*$'\n'}

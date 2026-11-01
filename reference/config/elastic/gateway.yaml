@@ -1,0 +1,26 @@
+# Launcher-managed elastic worker (§18, plan 35 Phase C): the SAME gateway
+# code, booted by the OCI launcher instead of compose. Identity reuses the
+# plan-10 realm workload (ofac-worker-alpha → gw.team-beta, delegation
+# refused) — no new keycloak client. Empty fleet, late child hello over the
+# unix socket under stateDir (mode (b) standalone, like demo-workspace).
+apiVersion: facilitator.framework/v1
+kind: Gateway
+gatewayId: gw.team-beta
+team: team-beta
+role: gateway
+facilitatorUrl: http://facilitator:8080
+trustMode: isolated-executor
+stateDir: /var/lib/ofac/gateway
+mode: standalone
+childTransport:
+  socket:
+    path: child.sock
+workload:
+  tokenUrl: http://id.localhost:8080/realms/facilitator/protocol/openid-connect/token
+  clientId: ofac-worker-alpha
+  clientSecret: worker-alpha-secret
+diagnostics:
+  port: 8099
+heartbeatSeconds: 5
+policy:
+  path: policy.yaml

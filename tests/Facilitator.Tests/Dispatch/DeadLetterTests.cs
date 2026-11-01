@@ -12,7 +12,7 @@ namespace Facilitator.Tests.Dispatch;
 /// drains so each attempt is immediate and deterministic.
 /// </summary>
 [Collection("postgres:dispatch-link")]
-public class DeadLetterTests(PostgresFixture fixture)
+public class DeadLetterTests(DispatchDbFixture fixture)
 {
     private sealed class PoisonSink : ISink
     {

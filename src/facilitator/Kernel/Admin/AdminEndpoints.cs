@@ -65,6 +65,9 @@ public static class AdminEndpoints
         group.MapGet("/deliveries", async (string? state, int? limit, AdminReadStores stores, CancellationToken ct) =>
             Results.Ok(new { items = await stores.DeliveriesAsync(state, limit ?? 50, ct) }));
 
+        group.MapGet("/provisioning", async (AdminReadStores stores, CancellationToken ct) =>
+            Results.Ok(new { items = await stores.ProvisioningAsync(ct) }));
+
         group.MapGet("/metrics", async (string? window, AdminReadStores stores, CancellationToken ct) =>
             Results.Ok(await stores.MetricsAsync(window, ct)));
 

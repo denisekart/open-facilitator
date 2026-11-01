@@ -48,7 +48,8 @@ FULL_ORDER=(provider-boot provider-link-challenge provider-mention
   provider-completion-reply provider-echo-suppression provider-reaction-no-consent
   forgejo-boot forgejo-seed forgejo-issue-work forgejo-comment-input
   forgejo-connector-pr forgejo-review-steer forgejo-ci-note
-  coding-issue-work coding-pr coding-review-steer coding-redispatch two-repo-dependency)
+  coding-issue-work coding-pr coding-review-steer coding-redispatch
+  two-repo-dependency provision-cold-start provision-kill9)
 full_deps_of() {
   case "$1" in
     provider-link-challenge) echo provider-boot ;;
@@ -64,6 +65,7 @@ full_deps_of() {
     coding-review-steer) echo coding-pr ;;
     coding-redispatch) echo coding-review-steer ;;
     two-repo-dependency) ;;
+    provision-cold-start | provision-kill9) ;;
     *) ;;
   esac
 }
@@ -92,7 +94,7 @@ full_logs() {
 }
 full_compose() {
   (cd "$VERIFY_REF" && docker compose --env-file versions.env --env-file .env \
-    -f compose.slim.yaml -f compose.full.yaml -p facilitator-demo "$@")
+    -f compose.slim.yaml -f compose.provisioning.yaml -f compose.full.yaml -p facilitator-demo "$@")
 }
 
 # --- steps --------------------------------------------------------------------
@@ -413,11 +415,11 @@ step_forgejo_connector_pr() {
     }')
   full_psql "INSERT INTO facilitator.outbox
     (outbox_id, recipient_endpoint_id, aggregate_type, aggregate_id, event_type,
-     command_id, envelope, work_id, status, available_at, attempts, created_at)
-   VALUES (gen_random_uuid(), 'link.gw.team-alpha', 'work', '$FJ_WORK',
-     'org.facilitator.command.work.assign.v1', '$command_id',
-     '$envelope'::jsonb, '$FJ_WORK', 'pending', now(), 0, now());
-   SELECT pg_notify('facilitator_outbox', '');" >/dev/null \
+    command_id, envelope, work_id, status, available_at, attempts, created_at)
+  VALUES (gen_random_uuid(), 'link.gw.team-alpha', 'work', '$FJ_WORK',
+    'org.facilitator.command.work.assign.v1', '$command_id',
+    '$envelope'::jsonb, '$FJ_WORK', 'pending', now(), 0, now());
+  SELECT pg_notify('facilitator_outbox', '');" >/dev/null \
     || { step_fail "assign outbox insert failed"; return 1; }
   fj_approval_id() {
     verify_get "$VERIFY_TOKEN_ALICE" "/api/works/$FJ_WORK/approvals" \
@@ -568,7 +570,7 @@ step_coding_issue_work() {
   full_psql "SELECT t.slug FROM facilitator.works w
       JOIN facilitator.projects p ON p.project_id = w.project_id
       JOIN facilitator.teams t ON t.team_id = p.team_id
-     WHERE w.work_id = '$FJ_CODING_WORK'" | grep -q team-coding \
+    WHERE w.work_id = '$FJ_CODING_WORK'" | grep -q team-coding \
     || { step_fail "coding Work is not on team-coding"; full_logs facilitator; return 1; }
   fj_coding_ack() {
     forgejo_api GET "/api/v1/repos/demo/widgets/issues/$FJ_CODING_ISSUE/comments" |
@@ -700,7 +702,7 @@ step_two_repo_dependency() {
       assignments: [
         {capabilityId: "research.analyze", objective: ($objective + " [api]"), targetId: "demo-api"},
         {capabilityId: "research.analyze", objective: ($objective + " [ui]"), targetId: "demo-ui",
-         dependsOn: [{index: 0, condition: "completed"}]}
+        dependsOn: [{index: 0, condition: "completed"}]}
       ]}')
   code=$(curl -s --max-time 15 -o /tmp/tr-create.json -w '%{http_code}' -X POST "$VERIFY_KERNEL/api/works" \
     -H "Authorization: Bearer $VERIFY_TOKEN_CLI" -H 'content-type: application/json' -d "$body")
@@ -787,7 +789,7 @@ step_two_repo_dependency() {
       datacontenttype: "application/json",
       dataschema: "https://schemas.openfacilitator.org/v1/event.assignment.completed.v1.json",
       data: {workId: $work, assignmentId: $a, executionId: ("tr-exec-" + $tag),
-             executionGeneration: 1, resultManifest: {manifestId: ("tr-manifest-" + $tag), outputs: []}}}')
+            executionGeneration: 1, resultManifest: {manifestId: ("tr-manifest-" + $tag), outputs: []}}}')
   local fence_body
   fence_body=$(mktemp)
   code=$(curl -s --max-time 15 -o "$fence_body" -w '%{http_code}' -X POST "$VERIFY_KERNEL/api/ingress/events" \
@@ -814,6 +816,200 @@ step_two_repo_dependency() {
   [ "$code" = 422 ] && grep -q 'dependency-violation' /tmp/tr-cycle.json \
     || { step_fail "cycle batch answered HTTP $code without dependency-violation: $(cat /tmp/tr-cycle.json)"; return 1; }
   step_pass "two-repo Work: gated dispatch -> wake -> 2 executions, steer -> gen-2 re-dispatch, straggler fenced 422, cycle rejected"
+}
+
+# --- provisioning legs (plan 35 Phase C) -------------------------------------
+
+elastic_running() { # container exists and is running
+  [ "$(docker inspect -f '{{.State.Running}}' ofac-gw-team-beta 2>/dev/null || true)" = true ]
+}
+
+elastic_stopped() { ! elastic_running; } # poll_until takes a command, not a shell word
+
+elastic_new_id() { docker inspect -f '{{.Id}}' ofac-gw-team-beta 2>/dev/null || echo gone; }
+
+step_provision_cold_start() {
+  # The full idle->zero->cold-start chain on the provisioning plane:
+  # min1 bootstraps the enrollment (the fleet's first contact), min0 +
+  # idle=1 lets the kernel scale it to ZERO through its own stop op, then a
+  # capability-referenced work arrives at a fleet with an advertised slot
+  # and no live session: the funnel audits no-capacity, the kernel orders
+  # the start, the launcher boots the container from nothing, the requeued
+  # intent routes to it, and the work completes with exactly one manifest.
+  verify_token_cli || { step_fail "token mint failed"; return 1; }
+  verify_token_alice || { step_fail "alice token mint failed"; return 1; }
+  local leg_t0
+  leg_t0=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  # Phase 1: claim min1 so a first-run stack (no enrollment anywhere)
+  # bootstraps the elastic workload through the min-shortfall arm.
+  seed_workload_scale_policy "$VERIFY_TOKEN_CLI" 1 1 1 >/dev/null \
+    || { step_fail "workload-scale min1 PATCH failed"; return 1; }
+  if ! poll_elastic_idle 180; then
+    step_fail "elastic never went live+idle under min1 (launcher offline? kernel sweep cadence?)"
+    full_logs facilitator provisioning-launcher
+    return 1
+  fi
+  local old_id
+  old_id=$(elastic_new_id)
+  # Phase 2: min0 + idle=1 — the kernel owns the scale-down: no live
+  # assignment, idle window elapses, stop op, container gone, ledger row.
+  seed_workload_scale_policy "$VERIFY_TOKEN_CLI" 0 1 1 >/dev/null \
+    || { step_fail "workload-scale min0 PATCH failed"; return 1; }
+  if ! poll_until 150 elastic_stopped; then
+    step_fail "elastic never idled to zero after min0+idle=1 (idle arm silent)"
+    full_logs facilitator provisioning-launcher
+    return 1
+  fi
+  full_psql "SELECT 1 FROM facilitator.provisioning_operations WHERE workload_id = 'gw.team-beta'
+      AND operation = 'stop' AND reason ILIKE 'idle-shutdown%' AND created_at >= '$leg_t0' LIMIT 1" | grep -q 1 \
+    || { step_fail "no idle-shutdown stop op in the provisioning ledger"; return 1; }
+  # Phase 3: cold start — team-beta work arrives; the advertised slot (the
+  # enrollment the bootstrap left behind, unexpired) makes this no-capacity,
+  # not no-candidate, so the funnel requeues instead of dead-lettering and
+  # the kernel orders a start for the missing capacity.
+  local project work
+  project=$(seed_project team-beta-witness team-beta) \
+    || { step_fail "team-beta witness project seed failed"; return 1; }
+  work=$(seed_work "$VERIFY_TOKEN_CLI" "full verify: cold-start witness" research.analyze "$project" "identity-evidence:provision-cold") \
+    || { step_fail "cold-start witness work seed failed"; return 1; }
+  full_ps_nc() {
+    full_psql "SELECT 1 FROM facilitator.routing_decisions WHERE work_id = '$work'
+        AND basis = 'no-capacity' LIMIT 1" | grep -q 1
+  }
+  poll_until 30 full_ps_nc >/dev/null \
+    || { step_fail "cold-start intent never audited basis=no-capacity for $work"; full_logs facilitator; return 1; }
+  full_ps_startop() {
+    full_psql "SELECT 1 FROM facilitator.provisioning_operations WHERE workload_id = 'gw.team-beta'
+        AND operation = 'start' AND reason ILIKE 'no-capacity%' AND created_at >= '$leg_t0' LIMIT 1" | grep -q 1
+  }
+  # The kernel sweep loop runs on its own cadence (default 60 s): the arm
+  # fires on the first sweep AFTER the audit row, so poll, don't peek.
+  poll_until 90 full_ps_startop >/dev/null \
+    || { step_fail "no no-capacity start op ordered for the cold start"; full_logs facilitator provisioning-launcher; return 1; }
+  if ! poll_until 90 elastic_running; then
+    step_fail "launcher never booted the container for the no-capacity start op"
+    full_logs facilitator provisioning-launcher
+    return 1
+  fi
+  [ "$(elastic_new_id)" != "$old_id" ] \
+    || { step_fail "relaunched container kept the old id (launcher reconcile skipped the stop? no-capacity op was a no-op)"; return 1; }
+  # The requeued intent must route once the child registers: same audit
+  # row, basis flips to routed (the funnel re-upsert per attempt).
+  full_ps_routed() {
+    full_psql "SELECT 1 FROM facilitator.routing_decisions WHERE work_id = '$work'
+        AND status = 'routed' AND chosen_endpoint_id = 'gw.team-beta' LIMIT 1" | grep -q 1
+  }
+  poll_until 90 full_ps_routed >/dev/null \
+    || { step_fail "no-capacity intent never routed to gw.team-beta after relaunch"; full_logs facilitator; return 1; }
+  if ! poll_until 120 verify_inbox_has org.facilitator.event.assignment.completed.v1 "$work"; then
+    step_fail "cold-start witness never completed"
+    full_logs facilitator provisioning-launcher
+    return 1
+  fi
+  local n rev
+  n=$(verify_get "$VERIFY_TOKEN_ALICE" "/api/works/$work/manifests" | jq 'length')
+  rev=$(verify_get "$VERIFY_TOKEN_ALICE" "/api/works/$work/manifests" | jq '.[0].revision')
+  { [ "${n:-0}" = 1 ] && [ "${rev:-0}" = 1 ]; } \
+    || { step_fail "cold start duplicated side effects (manifests=$n revision=$rev)"; return 1; }
+  step_pass "idle->zero->cold-start: min1 bootstrap, idle-shutdown to zero, no-capacity audit + kernel-ordered boot, routed, 1 manifest rev 1"
+}
+
+step_provision_kill9() {
+  # Kill-9 continuity ON the provisioning plane with NO operator verb: the
+  # kernel's worker-lost arm relaunches (fresh container id, reason
+  # 'worker-lost') AND re-dispatches the work at generation 2 with one
+  # deterministic intent/effect pair; the old attempt's straggler terminal
+  # event is fenced 422 stale-generation; exactly one manifest rev 1 lands.
+  verify_token_cli || { step_fail "token mint failed"; return 1; }
+  verify_token_alice || { step_fail "alice token mint failed"; return 1; }
+  local leg_t0
+  leg_t0=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  # min0: the ONLY relaunch path allowed is the worker-lost arm.
+  seed_workload_scale_policy "$VERIFY_TOKEN_CLI" 0 1 10 >/dev/null \
+    || { step_fail "workload-scale min0 PATCH failed"; return 1; }
+  # The fleet may be live (cold-start leg just ran it) or zero (idle arm
+  # took it); either way min0 + a fresh no-capacity boot gets us live.
+  if ! elastic_running; then
+    seed_workload_scale_policy "$VERIFY_TOKEN_CLI" 1 1 10 >/dev/null \
+      || { step_fail "workload-scale min1 PATCH failed"; return 1; }
+    poll_until 120 elastic_running >/dev/null \
+      || { step_fail "elastic never booted under min1"; full_logs facilitator provisioning-launcher; return 1; }
+    seed_workload_scale_policy "$VERIFY_TOKEN_CLI" 0 1 10 >/dev/null
+  fi
+  poll_elastic_idle 60 \
+    || { step_fail "elastic live but child never idled"; full_logs facilitator provisioning-launcher; return 1; }
+  local project work old_id
+  project=$(seed_project team-beta-witness team-beta) \
+    || { step_fail "team-beta witness project seed failed"; return 1; }
+  work=$(seed_work "$VERIFY_TOKEN_CLI" "full verify: kill9 continuity witness" research.analyze "$project" "identity-evidence:provision-kill9") \
+    || { step_fail "kill9 witness work seed failed"; return 1; }
+  if ! poll_until 120 verify_inbox_has org.facilitator.event.work.progress.v1 "$work"; then
+    step_fail "kill9 witness never reported progress"
+    full_logs facilitator provisioning-launcher
+    return 1
+  fi
+  old_id=$(elastic_new_id)
+  docker kill ofac-gw-team-beta >&2 \
+    || { step_fail "docker kill ofac-gw-team-beta failed"; return 1; }
+  local failed
+  failed=$(poll_capture 90 verify_inbox_has org.facilitator.event.assignment.failed.v1 "$work") \
+    || { step_fail "killed run never reported a terminal event within 90s"; full_logs facilitator provisioning-launcher; return 1; }
+  jq -e '.data.retryable == true' <<<"$failed" >/dev/null \
+    || { step_fail "failed event is not retryable: $(jq -c .data <<<"$failed")"; return 1; }
+  local nfailed
+  nfailed=$(full_psql "SELECT count(*) FROM facilitator.inbox WHERE payload->>'type' = 'org.facilitator.event.assignment.failed.v1' AND payload->'data'->>'workId' = '$work'" | head -n1)
+  [ "${nfailed:-0}" = 1 ] \
+    || { step_fail "expected exactly 1 failed event, got $nfailed"; return 1; }
+  # The worker-lost ledger face: a start op ordered BY THE KERNEL for the
+  # dead assignment, and a fresh container behind it. The relaunch arm rides
+  # the provisioning sweep (10 s), so the row lands AFTER the synthesized
+  # failed event — poll it, don't grep once.
+  ps_worker_lost_op() {
+    full_psql "SELECT 1 FROM facilitator.provisioning_operations WHERE workload_id = 'gw.team-beta'
+        AND operation = 'start' AND reason ILIKE 'worker-lost%' AND created_at >= '$leg_t0' LIMIT 1" | grep -q 1
+  }
+  poll_until 60 ps_worker_lost_op >/dev/null \
+    || { step_fail "no worker-lost relaunch op after kill-9"; full_logs facilitator provisioning-launcher; return 1; }
+  poll_until 120 elastic_running >/dev/null \
+    || { step_fail "launcher never relaunched the container after kill-9"; full_logs provisioning-launcher; return 1; }
+  [ "$(elastic_new_id)" != "$old_id" ] \
+    || { step_fail "relaunch reused the killed container id"; return 1; }
+  # NO operator redispatch: exactly ONE auto re-dispatch pair, generation 2.
+  local npair
+  full_ps_rd() {
+    full_psql "SELECT 1 FROM facilitator.outbox WHERE work_id = '$work'
+        AND command_id LIKE 'routing:work-redispatch:%' LIMIT 1" | grep -q 1
+  }
+  poll_until 90 full_ps_rd >/dev/null \
+    || { step_fail "no kernel-ordered re-dispatch intent after worker-lost"; full_logs facilitator; return 1; }
+  # The funnel converts INTENT -> effect assign on its own sweep, seconds
+  # after the intent row: poll for the effect, then assert exactly-one law.
+  full_ps_effect() {
+    [ "$(full_psql "SELECT count(*) FROM facilitator.outbox WHERE work_id = '$work'
+        AND command_id LIKE 'work-redispatch:%'" | head -n1)" -ge 1 ]
+  }
+  poll_until 90 full_ps_effect >/dev/null \
+    || { step_fail "no kernel-ordered re-dispatch effect after worker-lost"; full_logs facilitator; return 1; }
+  npair=$(full_psql "SELECT count(*) FROM facilitator.outbox WHERE work_id = '$work'
+      AND command_id LIKE 'work-redispatch:%'" | head -n1)
+  [ "${npair:-0}" = 1 ] \
+    || { step_fail "expected exactly 1 auto re-dispatch effect, got $npair"; return 1; }
+  full_psql "SELECT 1 FROM facilitator.outbox WHERE work_id = '$work'
+      AND command_id LIKE 'work-redispatch:%'
+      AND envelope->'data'->>'executionGeneration' = '2' LIMIT 1" | grep -q 1 \
+    || { step_fail "auto re-dispatch is not at generation 2"; return 1; }
+  if ! poll_until 180 verify_inbox_has org.facilitator.event.assignment.completed.v1 "$work"; then
+    step_fail "work never completed on the relaunched worker"
+    full_logs facilitator provisioning-launcher
+    return 1
+  fi
+  local n rev revof
+  n=$(verify_get "$VERIFY_TOKEN_ALICE" "/api/works/$work/manifests" | jq 'length')
+  rev=$(verify_get "$VERIFY_TOKEN_ALICE" "/api/works/$work/manifests" | jq '.[0].revision')
+  revof=$(verify_get "$VERIFY_TOKEN_ALICE" "/api/works/$work/manifests" | jq -c '.[0].revisionOf')
+  { [ "${n:-0}" = 1 ] && [ "${rev:-0}" = 1 ] && { [ "$revof" = null ] || [ "$revof" = '"null"' ]; }; } \
+    || { step_fail "continuity duplicated side effects (manifests=$n revision=$rev revisionOf=$revof)"; return 1; }
+  step_pass "kill-9 on provisioned worker: 1 retryable failed, kernel worker-lost relaunch+gen-2 re-dispatch, 1 manifest rev 1, no operator verb"
 }
 
 # --- runner (same record/report shape as the slim verify) ---------------------
@@ -848,6 +1044,8 @@ full_run_step() { # <id>
     coding-review-steer) step_coding_review_steer ;;
     coding-redispatch) step_coding_redispatch ;;
     two-repo-dependency) step_two_repo_dependency ;;
+    provision-cold-start) step_provision_cold_start ;;
+    provision-kill9) step_provision_kill9 ;;
     *) verify_step_skip "$id" "unknown step" ;;
   esac
 }
@@ -890,8 +1088,8 @@ run_verify_full() {
       startedAt: ($started | tostring),
       exitCode: $exit,
       steps: [ splits("\n") | select(length > 0)
-               | capture("^(?<id>[^|]+)\\|(?<status>[^|]+)\\|(?<durationMs>[0-9]+)\\|(?<detail>.*)$")
-               | { id, status, durationMs: (.durationMs | tonumber), detail } ] }' "$VERIFY_RESULTS")
+              | capture("^(?<id>[^|]+)\\|(?<status>[^|]+)\\|(?<durationMs>[0-9]+)\\|(?<detail>.*)$")
+              | { id, status, durationMs: (.durationMs | tonumber), detail } ] }' "$VERIFY_RESULTS")
   report=$(jq --argjson now "$(verify_now_ms)" --argjson started "$VERIFY_T0" \
     '.durationMs = ($now - $started)' <<<"$report")
   if [ "$json" = 1 ]; then printf '%s\n' "$report"; else

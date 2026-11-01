@@ -9,7 +9,7 @@ namespace Facilitator.Tests.Link;
 /// trustMode is carried, and the enrollment binds to the config-seeded team roster.
 /// </summary>
 [Collection("postgres:dispatch-link")]
-public sealed class EnrollmentTests(PostgresFixture fixture)
+public sealed class EnrollmentTests(DispatchDbFixture fixture)
 {
     private const string ProblemBase = "https://errors.openfacilitator.org/v1/";
 

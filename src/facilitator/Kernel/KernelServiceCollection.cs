@@ -47,6 +47,7 @@ public static class KernelServiceCollection
         builder.AddLinkFeature();
         builder.AddMemoryFeature();
         builder.AddIntegrationsFeature();
+        builder.AddProvisioningFeature();
         return builder;
     }
 
@@ -184,6 +185,15 @@ public static class KernelServiceCollection
             ?? new Work.NudgeSweeper.NudgeOptions());
         builder.Services.AddSingleton<Work.NudgeSweeper>();
         builder.Services.AddHostedService(sp => sp.GetRequiredService<Work.NudgeSweeper>());
+
+        // The session-loss law (Plan 35 C): per-replica loop; per-execution
+        // hysteresis keeps a blip from failing anything, the inbox unique
+        // keeps replicas converging on one failed event.
+        builder.Services.AddSingleton(
+            builder.Configuration.GetSection(Work.SessionLossSweeper.SessionLossOptions.SectionName).Get<Work.SessionLossSweeper.SessionLossOptions>()
+            ?? new Work.SessionLossSweeper.SessionLossOptions());
+        builder.Services.AddSingleton<Work.SessionLossSweeper>();
+        builder.Services.AddHostedService(sp => sp.GetRequiredService<Work.SessionLossSweeper>());
 
         var heartbeat = TimeSpan.FromSeconds(linkOptions.HeartbeatSeconds);
         builder.Services.AddSignalR(options =>

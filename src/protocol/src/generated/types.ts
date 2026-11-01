@@ -247,6 +247,43 @@ export type Type =
   | "hypothesis"
   | "preference";
 
+export interface ProvisionStartCommandV1Data {
+  actorEvidenceRef: string;
+  commandId: string;
+  deadline: string;
+  operationId: string;
+  reason?: string;
+  spec: Spec;
+  team: string;
+  workloadId: string;
+}
+
+export interface Spec {
+  entrypoint?: string[];
+  env?: { [key: string]: string };
+  image: string;
+  labels?: { [key: string]: string };
+  network?: string;
+  stopGraceSeconds?: number;
+  volumes?: Volume[];
+}
+
+export interface Volume {
+  readOnly?: boolean;
+  source: string;
+  target: string;
+}
+
+export interface ProvisionStopCommandV1Data {
+  actorEvidenceRef: string;
+  commandId: string;
+  deadline: string;
+  operationId: string;
+  reason?: string;
+  team: string;
+  workloadId: string;
+}
+
 export interface WorkAssignCommandV1Data {
   actorEvidenceRef: string;
   assignmentId: string;

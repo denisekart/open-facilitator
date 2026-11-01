@@ -1,0 +1,17 @@
+# Manifest the elastic worker advertises: research.analyze under team-beta so
+# cold-start scale-up can route a capability-referenced work there (the
+# team-beta routing-leg fixture pins exactly this binding). ownerTeam must
+# equal the Gateway enrollment's team.
+apiVersion: facilitator.framework/v1
+kind: CapabilityManifest
+ownerTeam: team-beta
+capabilities:
+  - id: research.analyze
+    version: 1
+    execution: asynchronous
+    acceptedContexts: [uri-reference]
+    outputKinds: [analysis.report]
+    outputMediaTypes: [text/markdown]
+    supportsSteering: true
+    supportsCancellation: true
+    supportsNudge: false

@@ -332,6 +332,7 @@ The receipt timestamp is the frozen `processedAt` — the spec §5.2 example's `
 |`Link:TokenLifetimeHours`|720|Link-token expiry issued at enroll|
 |`Link:MaxInFlight`|16|Per-session in-flight window (≥1); advertised in `welcome`, enforced at claim|
 |`Link:HeartbeatSeconds`|30 (5..600)|Client heartbeat cadence in `welcome`; SignalR keepalive = this, client timeout = 2×|
+|`Link:LeaseSweeperEnabled`|true|Replica's link pump sweeps expired session leases (closes tracked sockets with a typed goodbye); fake-clock test hosts disable it|
 |`Link:InFlightLeaseSeconds`|120|Redelivery deadline after each claim|
 |`Link:Teams`|`[]`|Team roster slugs seeded at startup; mode-(a) enrollment must name one|
 |`Link:WorkloadIdentities`|`[]`|Mode-(b) pre-registrations: `{clientId, endpointId, team, role, acceptsDelegatedClaims}`|

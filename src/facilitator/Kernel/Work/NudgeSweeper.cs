@@ -147,7 +147,7 @@ public sealed class NudgeSweeper(
                 continue; // stalled: budget spent, awaiting progress or a human
             }
 
-            var owner = await OwningEndpointAsync(db, a.WorkId, a.AssignmentId, ct);
+            var owner = await ExecutionLedger.OwningEndpointAsync(db, a.WorkId, a.AssignmentId, ct);
             if (owner is not { Length: > 0 })
             {
                 continue; // no command ever rode to an endpoint (synthetic lane)
@@ -287,44 +287,5 @@ public sealed class NudgeSweeper(
         }
 
         return map;
-    }
-
-    /// <summary>The endpoint that carried this assignment (latest assign or
-    /// redispatch row's recipient), the same ownership read the steer arm uses:
-    /// the work's assign-family rows come out of SQL, the envelope's
-    /// assignmentId is matched in memory (jsonb has no translatable LIKE).</summary>
-    private static async Task<string?> OwningEndpointAsync(FacilitatorDbContext db, Guid workId, Guid assignmentId, CancellationToken ct)
-    {
-        var rows = await db.Outbox.AsNoTracking()
-            .Where(o => o.WorkId == workId
-                && o.EventType == "org.facilitator.command.work.assign.v1"
-                && (o.CommandId.StartsWith("work-assign:")
-                    || o.CommandId.StartsWith("work-assign-coding:")
-                    || o.CommandId.StartsWith("work-redispatch:")))
-            .OrderByDescending(o => o.CreatedAt)
-            .Select(o => new { o.Envelope, o.RecipientEndpointId })
-            .ToListAsync(ct);
-        // Same read-back as the steer arm: parse the envelope, do not text-match
-        // it (jsonb output normalizes whitespace).
-        var needle = assignmentId.ToString("N");
-        var row = rows.FirstOrDefault(r => HasAssignmentId(r.Envelope, needle))?.RecipientEndpointId;
-        return row?.StartsWith("link.", StringComparison.Ordinal) == true ? row["link.".Length..] : row;
-    }
-
-    /// <summary>True when an assign-family envelope's data carries exactly
-    /// this assignment id (the ownership ledger read-back).</summary>
-    private static bool HasAssignmentId(string envelope, string assignmentIdN)
-    {
-        try
-        {
-            using var doc = JsonDocument.Parse(envelope);
-            return doc.RootElement.TryGetProperty("data", out var data)
-                && data.TryGetProperty("assignmentId", out var id)
-                && id.GetString() == assignmentIdN;
-        }
-        catch (JsonException)
-        {
-            return false;
-        }
     }
 }

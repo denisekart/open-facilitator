@@ -3,7 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
-using Facilitator.Tests.Infrastructure;
+
 
 namespace Facilitator.Tests.Integrations;
 
@@ -20,7 +20,7 @@ namespace Facilitator.Tests.Integrations;
 /// <see cref="RoutingHarness"/>; per-test fleets ride unique endpoint names.
 /// </summary>
 [Collection("postgres:dispatch-link")]
-public sealed class AssignRuleRoutingTests(PostgresFixture fixture) : IAsyncLifetime, IDisposable
+public sealed class AssignRuleRoutingTests(DispatchDbFixture fixture) : IAsyncLifetime, IDisposable
 {
     private const string Repo = "demo/widgets";
 

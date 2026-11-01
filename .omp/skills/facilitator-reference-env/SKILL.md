@@ -18,9 +18,9 @@ Normative source: `docs/specs/open_facilitator_framework_architecture.md` §21�
 
 **Slim** (laptop, few GiB): Facilitator (ASP.NET Core + embedded admin SPA), PostgreSQL 17 (default datastore even in slim; inbox/outbox/leases/memory FTS), Keycloak 26 (`start-dev --import-realm`), SeaweedFS `weed mini` (S3 artifacts), standalone Aspire dashboard (OTLP viewer, in-memory retention), Node/TS embedded Gateway + deterministic research worker, CLI/HTTP requester. No Kafka, no Temporal, no model download required.
 
-**Full overlay** adds: Mattermost Team Edition + the Plan 22 provider pair (`mattermost-init` one-shot provisions bot+PAT via REST onto the `mm_provision` volume — 11.11.1 has NO unauthenticated setup route, so bootstrap rides OPEN SIGNUP; `mattermost-adapter` runs from node-runtime, `/healthz` :8066), Forgejo (SQLite; VCS **and** issues — one service) + the Plan 23 pair (`forgejo-init` — `forgejo-adapter init` — signs up the first admin via `POST /user/sign_up` when none exists, seeds org/repo/labels/sample issues/webhook + bot PAT onto `forgejo_provision`; `forgejo-adapter` webhook normalizer `/healthz`+`/hooks/forgejo` :8067; the `forgejo-connector` runs as a supervisor unit inside `demo-workspace`, env-gated by `FORGEJO_URL`), a **second workspace container `coding-workspace`** (team-coding: Gateway `gw.coding` + the coding worker + its own connector instance, own sqlite ledger, shared bot PAT; `config/coding-workspace/` + `container/coding-units/` mirror the demo ones; `CODING_CHILD_SECRET` child-wire fleet key, `OFAC_WORKER_TEAM=team-coding`), Kafka 4.x single-node KRaft (example ingest only), Ollama + `qwen2.5:1.5b` (optional semantic routing), shared team-gateway + workspace-launcher. The facilitator's provider sections ride `Providers__Mattermost__*` / `Providers__Forgejo__*` env in the overlay only — slim boots provider-less from the same mounted config; the coding lane is `Providers__Forgejo__AssignRules__N__*` (label→endpoint/capability/team) + `PrRequestCapability`. Live proof: `make provider-e2e` (18 steps: 6 mattermost + 7 forgejo + 4 coding `coding-*` + 1 two-repo DAG leg, `reference/checks/verify-full.sh`; the CI leg synthesizes a signed `status` delivery straight to the adapter — Forgejo 16.0.7 does not fire status webhooks, open feature request #9325).
+ **Full overlay** adds: Mattermost Team Edition + the Plan 22 provider pair (`mattermost-init` one-shot provisions bot+PAT via REST onto the `mm_provision` volume — 11.11.1 has NO unauthenticated setup route, so bootstrap rides OPEN SIGNUP; `mattermost-adapter` runs from node-runtime, `/healthz` :8066), Forgejo (SQLite; VCS **and** issues — one service) + the Plan 23 pair (`forgejo-init` — `forgejo-adapter init` — signs up the first admin via `POST /user/sign_up` when none exists, seeds org/repo/labels/sample issues/webhook + bot PAT onto `forgejo_provision`; `forgejo-adapter` webhook normalizer `/healthz`+`/hooks/forgejo` :8067; the `forgejo-connector` runs as a supervisor unit inside `demo-workspace`, env-gated by `FORGEJO_URL`), a **second workspace container for the coding lane** (`coding-workspace`: same node-runtime, `CODING_CHILD_SECRET` child-wire fleet key, `OFAC_WORKER_TEAM=team-coding`), Kafka 4.x single-node KRaft (example ingest only), Ollama + `qwen2.5:1.5b` (optional semantic routing), shared team-gateway + workspace-launcher. The facilitator's provider sections ride `Providers__Mattermost__*` / `Providers__Forgejo__*` env in the overlay only — slim boots provider-less from the same mounted config; the coding lane is `Providers__Forgejo__AssignRules__N__*` (label→endpoint/capability/team) + `PrRequestCapability`. The PROVISIONING overlay (`compose.provisioning.yaml`, slim+full, plan 35 Phase C) adds the `provisioning-launcher` link endpoint (Docker socket, allowlisted image+network) + the kernel's `Provision__*` config; the `elastic-worker` (team-beta, `gw.team-beta`) is a build-only image the KERNEL launches — never a compose service. Live proof: `make provider-e2e` (20 steps: 6 mattermost + 7 forgejo + 4 coding `coding-*` + 1 two-repo DAG leg + 2 provisioning `provision-*` legs, `reference/checks/verify-full.sh`; the CI leg synthesizes a signed `status` delivery straight to the adapter — Forgejo 16.0.7 does not fire status webhooks, open feature request #9325).
 
-Layer compose: `docker compose -f compose.slim.yaml -f compose.full.yaml`; ship one tested method, don't make newcomers invent network wiring.
+Layer compose: `docker compose -f compose.slim.yaml -f compose.provisioning.yaml [-f compose.full.yaml]`; ship one tested method, don't make newcomers invent network wiring.
 
 ## Hard requirements
 
@@ -62,12 +62,22 @@ script encodes (keep them when editing):
   sleeps; unrequested dependency steps run as prerequisites (steps own
   run-global state: tokens, WORK_MAIN).
 - Restart checkpoints: approval parked across a `restart facilitator`
-  (durable await); worker leg = as-built reconcile law — a mid-execution
-  stop yields exactly ONE honest `assignment.failed(retryable)`, then an
-  operator re-dispatch completes with exactly 1 manifest, revision 1,
-  revisionOf null. The child quota is `maxInFlight: 1`: seed only after
-  the fleet is idle (an overlapping assign is honestly answered
-  child-busy and dropped).
+  (durable await); worker leg = the plan 35 Phase C PROVISIONING law — the
+  killed worker is the kernel-launched elastic container (`docker kill
+  ofac-gw-team-beta`), and a mid-execution kill yields exactly ONE honest
+  `assignment.failed(retryable)`, then the kernel's worker-lost arm
+  relaunches AND re-dispatches (NO operator verb) to completion with
+  exactly 1 manifest, revision 1, revisionOf null, and a
+  `provisioning_operations` row `reason like 'worker-lost%'`. The child
+  quota is `maxInFlight: 1`: seed only after the fleet is idle
+  (`poll_elastic_idle` — session lease + zero in-flight over the
+  container's own diagnostics port).
+- The provisioning overlay (compose.provisioning.yaml) rides EVERY compose
+  invocation (seed-lib, verify.sh, verify-full, referencectl, Makefile):
+  the scale law is part of the acceptance env. The legs OWN the policy via
+  `seed_workload_scale_policy` (PATCH /api/admin/config/workload-scale,
+  If-Match:*) — min1 at leg start, and bootstrap.sh seeds {1,1,10} at
+  stack up so a bare stack self-boots the elastic container.
 - Trace law: the dispatcher extracts the carrier parent, runs
   `outbox.dispatch` under it, and restamps every link-channel row before
   delivery (`RestampEnvelopeAsync`, lease-guarded); the worker echoes the

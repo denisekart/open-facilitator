@@ -4,7 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 
 using Facilitator.Kernel.Work;
-using Facilitator.Tests.Infrastructure;
+
 
 namespace Facilitator.Tests.Routing;
 
@@ -26,7 +26,7 @@ namespace Facilitator.Tests.Routing;
 /// requeue attempts.
 /// </summary>
 [Collection("postgres:dispatch-link")]
-public sealed class DagGateTests(PostgresFixture fixture) : IAsyncLifetime
+public sealed class DagGateTests(DispatchDbFixture fixture) : IAsyncLifetime
 {
     /// <inheritdoc />
     public Task InitializeAsync() => Task.CompletedTask;

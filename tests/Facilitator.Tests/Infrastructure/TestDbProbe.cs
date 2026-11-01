@@ -710,6 +710,33 @@ public sealed class TestDbProbe : IAsyncDisposable
                 cmd.Parameters.AddWithValue((object?)openedAt ?? DBNull.Value);
             });
 
+    /// <summary>Re-lease an existing session row (a reconnect: new epoch,
+    /// fresh lease window) — the link_sessions PK is per-endpoint, so a
+    /// second SeedLinkSession for the same endpoint would collide.</summary>
+    public Task RefreshLinkLease(string endpointId, long epoch, DateTime leaseUntil) =>
+        NonQuery(
+            "UPDATE facilitator.link_sessions SET session_epoch = $2, lease_until = $3, last_heartbeat = now() "
+            + "WHERE logical_endpoint_id = $1",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(endpointId);
+                cmd.Parameters.AddWithValue(epoch);
+                cmd.Parameters.AddWithValue(leaseUntil);
+            });
+
+    /// <summary>Close an open attempt row (lane cleanup: a terminal attempt
+    /// is inert for every sweeper's candidate law).</summary>
+    public Task EndAttempt(Guid executionId) =>
+        NonQuery(
+            "UPDATE facilitator.execution_attempts SET status = 'lost', ended_at = now() WHERE execution_id = $1",
+            cmd => cmd.Parameters.AddWithValue(executionId));
+
+    /// <summary>Drop an endpoint's link-session row (lane cleanup).</summary>
+    public Task DeleteLinkSession(string endpointId) =>
+        NonQuery(
+            "DELETE FROM facilitator.link_sessions WHERE logical_endpoint_id = $1",
+            cmd => cmd.Parameters.AddWithValue(endpointId));
+
     /// <summary>Drop test fleets by endpoint prefix (per-test isolation: a
     /// leaked live session would join a later test's candidate set).</summary>
     public async Task PurgeFleets(string endpointPrefix)
@@ -1151,4 +1178,189 @@ public sealed class TestDbProbe : IAsyncDisposable
         await using var reader = await cmd.ExecuteReaderAsync();
         return await reader.ReadAsync() ? (reader.GetString(0), reader.IsDBNull(1) ? null : reader.GetString(1)) : null;
     }
+
+    /// <summary>The stored envelope payload for one event id (the session-loss
+    /// law asserts the synthesized event's data block on the wire).</summary>
+    public async Task<string?> InboxPayload(string eventId)
+    {
+        await using var connection = await _dataSource.OpenConnectionAsync();
+        await using var cmd = new NpgsqlCommand(
+            "SELECT payload::text FROM facilitator.inbox WHERE event_id = $1", connection);
+        cmd.Parameters.AddWithValue(eventId);
+        var v = await cmd.ExecuteScalarAsync();
+        return v as string;
+    }
+
+    /// <summary>The attempt row's terminal vocabulary state for an execution
+    /// (the session-loss law's effect on <c>execution_attempts</c>).</summary>
+    public async Task<string?> AttemptState(Guid executionId)
+    {
+        await using var connection = await _dataSource.OpenConnectionAsync();
+        await using var cmd = new NpgsqlCommand(
+            "SELECT status FROM facilitator.execution_attempts WHERE execution_id = $1", connection);
+        cmd.Parameters.AddWithValue(executionId);
+        var v = await cmd.ExecuteScalarAsync();
+        return v as string;
+    }
+
+    /// <summary>Move an assignment's generation line forward (the re-dispatch
+    /// effect the session-loss candidate law fences straggers against).</summary>
+    public Task BumpAssignmentGeneration(Guid assignmentId) =>
+        NonQuery(
+            "UPDATE facilitator.assignments SET current_execution_generation = current_execution_generation + 1 "
+            + "WHERE assignment_id = $1",
+            cmd => cmd.Parameters.AddWithValue(assignmentId));
+
+    /// <summary>Drop an admin_config row (manual-mode state: no policy).</summary>
+    public Task DeleteAdminConfig(string resource) =>
+        NonQuery(
+            "DELETE FROM facilitator.admin_config WHERE resource = $1",
+            cmd => cmd.Parameters.AddWithValue(resource));
+
+    // ---- Plan 35 C provisioning plane -----------------------------------------
+
+    /// <summary>Hand-mint a nudges ledger row at a generation (the stalled-arm
+    /// trigger: a row whose nudge_count sits at the cap).</summary>
+    public Task SeedNudgeRow(Guid assignmentId, int generation, int episode, int count) =>
+        NonQuery(
+            "INSERT INTO facilitator.nudges (assignment_id, generation, stall_episode, nudge_count, "
+            + "last_nudge_at, last_progress_at) VALUES ($1, $2, $3, $4, now(), now())",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(assignmentId);
+                cmd.Parameters.AddWithValue(generation);
+                cmd.Parameters.AddWithValue(episode);
+                cmd.Parameters.AddWithValue(count);
+            });
+
+    /// <summary>Hand-mint a pending routing_decisions row with a basis (the
+    /// no-capacity arm's trigger; the funnel's own still-un-routed marker).</summary>
+    public Task SeedRoutingDecision(string intentCommandId, Guid workId, string teamSlug, string basis, string capabilityId = "cap.seed") =>
+        NonQuery(
+            "INSERT INTO facilitator.routing_decisions (decision_id, work_id, intent_command_id, capability_id, "
+            + "team_slug, allowed_candidates, chosen_endpoint_id, status, basis, provider_ref, "
+            + "last_routing_attempt_at, attempt_count, created_at, updated_at) "
+            + "VALUES (gen_random_uuid(), $2, $1, $5, $3, '[]'::jsonb, NULL, 'pending', $4, NULL, now(), 1, now(), now())",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(intentCommandId);
+                cmd.Parameters.AddWithValue(workId);
+                cmd.Parameters.AddWithValue(teamSlug);
+                cmd.Parameters.AddWithValue(basis);
+                cmd.Parameters.AddWithValue(capabilityId);
+            });
+
+    /// <summary>Hand-mint the outbox row that carried an assign WITH the full
+    /// data block (capability + inputs) the worker-lost arm rebuilds a fresh
+    /// routing intent from; returns the outbox id.</summary>
+    public async Task<Guid> SeedAssignLedgerRowWithContext(Guid workId, Guid assignmentId, string endpoint, string capabilityId, string objective, int generation = 1)
+    {
+        var outboxId = Guid.NewGuid();
+        await NonQuery(
+            "INSERT INTO facilitator.outbox (outbox_id, recipient_endpoint_id, aggregate_type, aggregate_id, "
+            + "event_type, command_id, envelope, work_id, status, available_at, attempts, created_at, processed_at) "
+            + "VALUES ($1, 'link.' || $2, 'work', $3, 'org.facilitator.command.work.assign.v1', "
+            + "'work-assign:' || $4 || '-seed', "
+            + "jsonb_build_object('data', jsonb_build_object('assignmentId', $4, 'executionGeneration', $6, "
+            + "'capabilityId', $5, 'targetId', 'kernel', 'inputs', "
+            + "jsonb_build_object('objective', $7))), "
+            + "$3, 'delivered', now(), 1, now(), now())",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(outboxId);
+                cmd.Parameters.AddWithValue(endpoint);
+                cmd.Parameters.AddWithValue(workId);
+                cmd.Parameters.AddWithValue(assignmentId.ToString("N"));
+                cmd.Parameters.AddWithValue(capabilityId);
+                cmd.Parameters.AddWithValue(generation);
+                cmd.Parameters.AddWithValue(objective);
+            });
+        return outboxId;
+    }
+
+    /// <summary>Hand-mint a provisioning_operations row in a given state (the
+    /// cap tests seed ledger states the sweep cannot reach without a launcher).</summary>
+    public Task SeedProvisionOp(string operationId, string workloadId, string team, string operation, string state, string reason, int? generation = null) =>
+        NonQuery(
+            "INSERT INTO facilitator.provisioning_operations (operation_id, workload_id, team, operation, "
+            + "state, work_id, assignment_id, generation, reason, created_at, updated_at) "
+            + "VALUES ($1, $2, $3, $4, $5, NULL, NULL, $6, $7, now(), now())",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(operationId);
+                cmd.Parameters.AddWithValue(workloadId);
+                cmd.Parameters.AddWithValue(team);
+                cmd.Parameters.AddWithValue(operation);
+                cmd.Parameters.AddWithValue(state);
+                cmd.Parameters.AddWithValue((object?)generation ?? DBNull.Value);
+                cmd.Parameters.AddWithValue(reason);
+            });
+
+    /// <summary>One provisioning ledger row (typed window, no raw SQL in tests).</summary>
+    public sealed record ProvisionOpRow(
+        string OperationId, string Operation, string State, string Reason, string? WorkId, string? AssignmentId, int? Generation);
+
+    /// <summary>The provisioning ledger rows for one workload (by op identity).</summary>
+    public async Task<List<ProvisionOpRow>> ProvisionOpsFor(string workloadId)
+    {
+        await using var connection = await _dataSource.OpenConnectionAsync();
+        await using var cmd = new NpgsqlCommand(
+            "SELECT operation_id, operation, state, reason, work_id::text, assignment_id::text, generation "
+            + "FROM facilitator.provisioning_operations WHERE workload_id = $1 ORDER BY created_at", connection);
+        cmd.Parameters.AddWithValue(workloadId);
+        await using var reader = await cmd.ExecuteReaderAsync();
+        var rows = new List<ProvisionOpRow>();
+        while (await reader.ReadAsync())
+        {
+            rows.Add(new ProvisionOpRow(
+                reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3),
+                reader.IsDBNull(4) ? null : reader.GetString(4),
+                reader.IsDBNull(5) ? null : reader.GetString(5),
+                reader.IsDBNull(6) ? null : reader.GetInt32(6)));
+        }
+
+        return rows;
+    }
+
+    /// <summary>Outbox rows addressed to one recipient channel (the launcher's
+    /// inbox depth: one per emitted envelope, never more).</summary>
+    public Task<long> OutboxCountForRecipient(string recipientEndpointId) =>
+        ScalarLong("SELECT count(*) FROM facilitator.outbox WHERE recipient_endpoint_id = $1",
+            cmd => cmd.Parameters.AddWithValue(recipientEndpointId));
+
+    /// <summary>The status stored for a command's outbox row (null when absent).</summary>
+    public async Task<string?> OutboxStatusByCommand(string commandId)
+    {
+        var rows = await TextList("SELECT status FROM facilitator.outbox WHERE command_id = $1", commandId);
+        return rows.Count == 0 ? null : Assert.Single(rows);
+    }
+
+    /// <summary>Outbox rows database-wide of one event type (the offline-
+    /// launcher law: ops land with ZERO provision envelopes).</summary>
+    public Task<long> OutboxCountByEventType(string eventType) =>
+        ScalarLong("SELECT count(*) FROM facilitator.outbox WHERE event_type = $1",
+            cmd => cmd.Parameters.AddWithValue(eventType));
+
+    /// <summary>Settle a command's outbox row as delivered (the dispatcher's
+    /// own settle: status + processed stamp).</summary>
+    public Task MarkOutboxDeliveredByCommand(string commandId) =>
+        NonQuery(
+            "UPDATE facilitator.outbox SET status = 'delivered', processed_at = now() WHERE command_id = $1",
+            cmd => cmd.Parameters.AddWithValue(commandId));
+
+    /// <summary>Hand-mint a delivered launcher command row (the mirror's
+    /// "delivered" observation without running a dispatcher; no receipt row,
+    /// so the rejection join stays empty).</summary>
+    public Task SeedLauncherDeliveryRow(string commandId, string launcherEndpoint, string eventType) =>
+        NonQuery(
+            "INSERT INTO facilitator.outbox (outbox_id, recipient_endpoint_id, aggregate_type, aggregate_id, "
+            + "event_type, command_id, envelope, work_id, status, available_at, attempts, created_at, processed_at) "
+            + "VALUES (gen_random_uuid(), 'link.' || $2, 'work', NULL, $3, $1, '{}', NULL, 'delivered', "
+            + "now(), 1, now(), now())",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(commandId);
+                cmd.Parameters.AddWithValue(launcherEndpoint);
+                cmd.Parameters.AddWithValue(eventType);
+            });
 }

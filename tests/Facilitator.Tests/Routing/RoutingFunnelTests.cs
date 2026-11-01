@@ -2,7 +2,7 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 
-using Facilitator.Tests.Infrastructure;
+
 
 namespace Facilitator.Tests.Routing;
 
@@ -20,7 +20,7 @@ namespace Facilitator.Tests.Routing;
 /// may claim an intent outside this test's drains).
 /// </summary>
 [Collection("postgres:dispatch-link")]
-public sealed class RoutingFunnelTests(PostgresFixture fixture) : IAsyncLifetime
+public sealed class RoutingFunnelTests(DispatchDbFixture fixture) : IAsyncLifetime
 {
     /// <inheritdoc />
     public Task InitializeAsync() => Task.CompletedTask;

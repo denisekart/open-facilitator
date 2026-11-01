@@ -14,6 +14,8 @@ import commandWorkSteer from "../schemas/command.work.steer.v1.json" with { type
 import commandWorkCancel from "../schemas/command.work.cancel.v1.json" with { type: "json" };
 import commandWorkStatusRequest from "../schemas/command.work.status.request.v1.json" with { type: "json" };
 import commandWorkNudge from "../schemas/command.work.nudge.v1.json" with { type: "json" };
+import commandProvisionStart from "../schemas/command.provision.start.v1.json" with { type: "json" };
+import commandProvisionStop from "../schemas/command.provision.stop.v1.json" with { type: "json" };
 import commandContextFetch from "../schemas/command.context.fetch.v1.json" with { type: "json" };
 import commandApprovalConsume from "../schemas/command.approval.consume.v1.json" with { type: "json" };
 import commandApprovalRespond from "../schemas/command.approval.respond.v1.json" with { type: "json" };
@@ -75,6 +77,8 @@ const all: JsonSchema[] = [
   commandArtifactRequestUpload,
   commandArtifactConfirmUpload,
   commandMemoryRetain,
+  commandProvisionStart,
+  commandProvisionStop,
   commandMemoryRecall,
   commandCommunicationReply,
   commandCommunicationReact,

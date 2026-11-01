@@ -13,7 +13,7 @@ namespace Facilitator.Tests.Dispatch;
 /// lease looks like after the 30 s window.
 /// </summary>
 [Collection("postgres:dispatch-link")]
-public class LeaseRecoveryTests(PostgresFixture fixture)
+public class LeaseRecoveryTests(DispatchDbFixture fixture)
 {
     [Fact]
     public async Task ExpiredLease_ReclaimedAndDelivered()

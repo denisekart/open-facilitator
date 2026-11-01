@@ -766,6 +766,18 @@
       "expect": "invalid",
       "class": "command",
       "errorClass": "schema-violation"
+    },
+    {
+      "file": "valid/command.provision.start.json",
+      "expect": "valid",
+      "class": "command",
+      "type": "org.facilitator.command.provision.start.v1"
+    },
+    {
+      "file": "valid/command.provision.stop.json",
+      "expect": "valid",
+      "class": "command",
+      "type": "org.facilitator.command.provision.stop.v1"
     }
   ]
 }

@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openfacilitator.org/v1/command.provision.start.v1.json",
+  "title": "ProvisionStartCommandV1Data",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "commandId",
+    "operationId",
+    "workloadId",
+    "team",
+    "actorEvidenceRef",
+    "deadline",
+    "spec"
+  ],
+  "properties": {
+    "commandId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "operationId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "workloadId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "team": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "actorEvidenceRef": {
+      "$ref": "common.v1.json#/$defs/evidenceRef"
+    },
+    "deadline": {
+      "$ref": "common.v1.json#/$defs/rfc3339DateTime"
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["image"],
+      "properties": {
+        "image": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "entrypoint": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 1024 },
+          "maxItems": 16
+        },
+        "network": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "env": {
+          "type": "object",
+          "propertyNames": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,63}$" },
+          "additionalProperties": { "type": "string", "maxLength": 4096 },
+          "maxProperties": 64
+        },
+        "volumes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["source", "target"],
+            "properties": {
+              "source": { "type": "string", "minLength": 1, "maxLength": 1024 },
+              "target": { "type": "string", "minLength": 1, "maxLength": 1024 },
+              "readOnly": { "type": "boolean" }
+            }
+          },
+          "maxItems": 32
+        },
+        "labels": {
+          "type": "object",
+          "propertyNames": { "type": "string", "minLength": 1, "maxLength": 256 },
+          "additionalProperties": { "type": "string", "maxLength": 1024 },
+          "maxProperties": 32
+        },
+        "stopGraceSeconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 300
+        }
+      }
+    }
+  }
+}

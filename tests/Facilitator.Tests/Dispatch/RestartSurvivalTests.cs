@@ -16,7 +16,7 @@ namespace Facilitator.Tests.Dispatch;
 /// steer timeline row.
 /// </summary>
 [Collection("postgres:dispatch-link")]
-public class RestartSurvivalTests(PostgresFixture fixture)
+public class RestartSurvivalTests(DispatchDbFixture fixture)
 {
     [Fact]
     public async Task RestartAfterAcceptedEvents_NoLossNoDuplicate()

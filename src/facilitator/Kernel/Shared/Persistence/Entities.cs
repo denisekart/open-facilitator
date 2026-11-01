@@ -801,3 +801,55 @@ public sealed class AdminConfigVersionEntity
 
     public DateTime UpdatedAt { get; set; }
 }
+
+/// <summary>facilitator.provisioning_operations — Plan 35 C: the durable
+/// provisioning ledger. One row per appended launcher operation; the id is
+/// the deterministic trigger identity (<see cref="Kernel.Provisioning.ProvisioningOperationId"/>),
+/// so a replayed trigger lands the same row and the same outbox
+/// <c>command_id</c> (at-least-once enqueue is a no-op). State mirror:
+/// requested → running when the command delivered AND the workload's link
+/// session is live; requested → stopped when a stop delivered against a
+/// non-live workload or the receiver terminally REJECTED the command;
+/// requested → failed when the row dead-lettered (delivery budget spent —
+/// honest terminal, a fresh work-keyed op may re-fire); running → stopped
+/// when the session stays gone across two consecutive sweeps (worker-lost
+/// demotion — final for THAT op; the relaunch arrives as a fresh
+/// work-keyed op).</summary>
+public sealed class ProvisioningOpEntity
+{
+    /// <summary>PK = deterministic trigger id = the outbox command id.</summary>
+    public required string OperationId { get; set; }
+
+    /// <summary>The managed workload (= its link endpoint id).</summary>
+    public required string WorkloadId { get; set; }
+
+    /// <summary>The owning team slug (the spec's team, wire-required).</summary>
+    public required string Team { get; set; }
+
+    /// <summary>start | stop.</summary>
+    public required string Operation { get; set; }
+
+    /// <summary>requested | running | stopped | failed.</summary>
+    public required string State { get; set; }
+
+    /// <summary>The triggering work (worker-lost / stalled-scaleup /
+    /// no-capacity arms); null for workload-level ops (min-workers,
+    /// idle-shutdown).</summary>
+    public Guid? WorkId { get; set; }
+
+    /// <summary>Triggering assignment (assignment-keyed arms only).</summary>
+    public Guid? AssignmentId { get; set; }
+
+    /// <summary>Generation from the trigger: the FAILED-attempt generation
+    /// (worker-lost) or the stalled generation; 0 for the no-capacity tuple
+    /// literal; the ledger-row count for workload-level ids.</summary>
+    public int? Generation { get; set; }
+
+    /// <summary>worker-lost | stalled-scaleup | no-capacity | min-workers |
+    /// idle-shutdown.</summary>
+    public string? Reason { get; set; }
+
+    public DateTime CreatedAt { get; set; }
+
+    public DateTime UpdatedAt { get; set; }
+}

@@ -8,6 +8,7 @@ packages:
   - "src/adapters/communication/mattermost"
   - "src/adapters/communication/forgejo"
   - "src/adapters/communication/forgejo-connector"
+  - "src/adapters/provisioning-oci"
   - "examples/full/coding-worker"
 
 allowBuilds:

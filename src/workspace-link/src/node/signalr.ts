@@ -71,6 +71,15 @@ export class SignalrTransport implements LinkTransport {
       this.lastGoodbye = frame;
       this.disconnect.emit(frame);
     });
+    // The client's server timeout races the SERVER's keep-alive: the
+    // default 30s equals the default negotiated cadence, so an idle link
+    // dies exactly when the first keep-alive would land (the client's
+    // timeout handle is armed at start() and only re-armed by INCOMING
+    // frames — a post-hello raise would arrive too late for window one).
+    // Fifteen minutes is the honest pre-negotiation floor: it exceeds the
+    // largest cadence the hub advertises (Welcome heartbeatSeconds ≤ 600),
+    // and hello() narrows it to 3× the negotiated window below.
+    connection.serverTimeoutInMilliseconds = 900_000;
     return connection;
   }
 
@@ -92,7 +101,18 @@ export class SignalrTransport implements LinkTransport {
       // Server null-return convention: LinkHub.Hello returns WelcomeFrame?;
       // the JS client surfaces `null`, and the incompatible-version goodbye
       // arrives through the Disconnect push.
-      return await this.connection.invoke<WelcomeFrame | null>("Hello", frame);
+      const welcome = await this.connection.invoke<WelcomeFrame | null>("Hello", frame);
+      if (welcome !== null) {
+        // The negotiated cadence is the timeout authority. Both ends'
+        // defaults sit at 30s (server KeepAliveInterval = heartbeat,
+        // client serverTimeout = 30s): an IDLE link dies in that race —
+        // the client gives up at exactly the instant the server's first
+        // keep-alive would land, so a quiet endpoint (a launcher between
+        // commands) churns an epoch per heartbeat window. Three windows
+        // mirrors the server's own ClientTimeoutInterval (2× + slack).
+        this.connection.serverTimeoutInMilliseconds = welcome.heartbeatSeconds * 3_000;
+      }
+      return welcome;
     } catch (error) {
       throw mapHubError(error);
     }

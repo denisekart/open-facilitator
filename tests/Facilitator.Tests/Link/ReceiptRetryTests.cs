@@ -20,7 +20,7 @@ namespace Facilitator.Tests.Link;
 /// same rig as <see cref="ReceiptLossTests"/>.
 /// </summary>
 [Collection("postgres:dispatch-link")]
-public sealed class ReceiptRetryTests(PostgresFixture fixture)
+public sealed class ReceiptRetryTests(DispatchDbFixture fixture)
 {
     private static string RejectedBody(string reason) =>
         JsonSerializer.Serialize(new { status = "rejected", reason, processedAt = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ") });

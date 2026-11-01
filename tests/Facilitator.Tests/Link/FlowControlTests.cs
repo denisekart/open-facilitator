@@ -9,7 +9,7 @@ namespace Facilitator.Tests.Link;
 /// capacity — after which the next queued row is delivered.
 /// </summary>
 [Collection("postgres:dispatch-link")]
-public sealed class FlowControlTests(PostgresFixture fixture)
+public sealed class FlowControlTests(DispatchDbFixture fixture)
 {
     [Fact]
     public async Task WindowFullPausesAndReceiptResumesAndDeliversNext()

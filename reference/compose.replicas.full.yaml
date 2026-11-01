@@ -1,0 +1,45 @@
+# Full-profile Phase D: the provider plane rides the LB. Loaded with
+# FULL=1 --replicas 2 (compose refuses fragments for absent services, so
+# these legs live in a separate overlay). Adapters point at the LB via env;
+# both workspaces keep the base config dir mount with an LB-bound
+# gateway.yaml file mounted over it (see compose.replicas.yaml).
+services:
+  # The twin's `extends` resolves against compose.slim.yaml only, so the
+  # full-profile provider arm never reaches it by inheritance: load the
+  # SAME providers env file the primary reads (one source, no drift — a
+  # webhook whose adapter session rides B must not get typed `unsupported`).
+  facilitator-b:
+    env_file:
+      - config/facilitator.env
+      - config/facilitator-providers.env
+  mattermost-adapter:
+    environment:
+      # Pinned to replica A DIRECTLY (mirror of the launcher's direct-B
+      # pin): guarantees BOTH replicas own a session at boot regardless of
+      # LB tie placement — case (a)'s per-replica lease assertion. It is
+      # excluded from the kill leg's failover-subject pool (killing A drops
+      # it with A; it reconnects to A itself).
+      OFAC_KERNEL_URL: http://facilitator:8080
+  forgejo-adapter:
+    environment:
+      OFAC_KERNEL_URL: http://facilitator-lb
+  # Full volumes re-declaration (compose replaces sequence values): same
+  # list as compose.full.yaml with the config mount swapped to the LB variant.
+  demo-workspace:
+    volumes:
+      - workspace_state:/var/lib/ofac
+      - ../features/shared/ofac-supervisor.sh:/opt/ofac/ofac-supervisor.sh:ro
+      - ./container/units:/opt/ofac/units:ro
+      - ./config/workspace:/opt/ofac/config:ro
+      - ./config/workspace-lb/gateway.yaml:/opt/ofac/config/gateway.yaml:ro
+      - forgejo_provision:/provision:ro
+  coding-workspace:
+    environment:
+      OFAC_KERNEL_URL: http://facilitator-lb
+    volumes:
+      - coding_workspace_state:/var/lib/ofac
+      - ../features/shared/ofac-supervisor.sh:/opt/ofac/ofac-supervisor.sh:ro
+      - ./container/coding-units:/opt/ofac/units:ro
+      - ./config/coding-workspace:/opt/ofac/config:ro
+      - ./config/coding-workspace-lb/gateway.yaml:/opt/ofac/config/gateway.yaml:ro
+      - forgejo_provision:/provision:ro

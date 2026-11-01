@@ -123,6 +123,29 @@ public sealed class NudgeSweeperTests(PostgresFixture fixture)
     }
 
     [Fact]
+    public async Task PeerHoldsSweepLock_PassSkipsSilently()
+    {
+        // Plan 35 D: two replicas sweep the same fleet; the advisory lock
+        // makes a concurrent pass a silent skip, not a race or an error.
+        using var factory = await Host();
+        await fixture.Db.SeedAdminConfig(Policy, PolicyPayload);
+        var lane = await StaleLaneAsync(online: true);
+        try
+        {
+            factory.Clock!.Advance(TimeSpan.FromMinutes(20));
+            await using var peer = await fixture.Db.HoldAdvisoryLockAsync(NudgeSweeper.SweepLockKey);
+            Assert.Equal(0, await Sweeper(factory).SweepOnceAsync(CancellationToken.None));
+            Assert.Equal(1, await fixture.Db.OutboxCountBy(lane.WorkId)); // only the seeded assign
+            Assert.Empty(await fixture.Db.NudgeRowsForAssignment(lane.AssignmentId));
+        }
+        finally
+        {
+            await fixture.Db.AdminConfigPurge(Policy);
+            await fixture.Db.ExpireSessionLease(lane.Endpoint);
+        }
+    }
+
+    [Fact]
     public async Task AckedDeliveryAfterCutoff_KeepsLaneAlive()
     {
         using var factory = await Host();

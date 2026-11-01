@@ -5,42 +5,15 @@
 # env is the launch-approved surface: exactly this image, exactly this
 # network.
 services:
-  facilitator:
-    environment:
-      # The provisioning decision core arms on this row + these specs.
-      # NetworkMode is the compose project's default network (pre-created by
-      # the facilitator's own dependency chain before any container launches).
-      # The $-prefixed env VALUES are the launcher's expansion contract:
-      # secrets travel by NAME, resolved from the launcher's own env.
-      # The kill-9 continuity leg's timing law: a 5s heartbeat (the SDK
-      # adopts the welcome's advertised value) pins the session lease at 15s,
-      # so the session-loss sweeper's two passes (5s each) fail a dead
-      # gateway's execution ~25s after the kill — far inside the leg's 90s
-      # window. Without it the default 30s heartbeat leases 90s and the leg
-      # races the lease.
-      Link__HeartbeatSeconds: "5"
-      Provision__LauncherEndpoint: oci-launcher
-      Provision__SweepIntervalSeconds: "10"
-      Provision__Workloads__0__WorkloadId: gw.team-beta
-      Provision__Workloads__0__Team: team-beta
-      Provision__Workloads__0__Image: ${OCI_REGISTRY:?set in versions.env}/elastic-worker:${FRAMEWORK_TAG:?set in versions.env}
-      Provision__Workloads__0__Network: facilitator-demo_default
-      Provision__Workloads__0__Entrypoint__0: /bin/sh
-      Provision__Workloads__0__Entrypoint__1: /opt/ofac/ofac-supervisor.sh
-      Provision__Workloads__0__Env__UNITS_DIR: /opt/ofac/units
-      Provision__Workloads__0__Env__OFAC_LOG_DIR: /var/lib/ofac/logs
-      Provision__Workloads__0__Env__OFAC_KERNEL_URL: http://facilitator:8080
-      Provision__Workloads__0__Env__OFAC_WORKER_TEAM: team-beta
-      Provision__Workloads__0__Env__OFAC_WORKER_ENDPOINT: elastic-worker-child
-      Provision__Workloads__0__Env__OFAC_ENROLL_SECRET: $$DEMO_ENROLLMENT_TOKEN
-      Provision__Workloads__0__Env__OFAC_CHILD_SECRET: $$DEMO_CHILD_SECRET
-      # A dead unit must surface as an exited container (the launcher's
-      # relaunch law), not a supervisor restart loop.
-      Provision__Workloads__0__Env__OFAC_SUPERVISOR_MAX_RESTARTS: "3"
-      Provision__Workloads__0__Labels__io.facilitator.managed: kernel-provisioned
-    # No depends_on the launcher: an unstarted launcher just means provision
-    # commands queue undelivered (the honest link-plane law); a depends edge
-    # would cycle (the launcher already depends on the kernel).
+  # The kernel's provisioning arm (Provision__* + the 5s heartbeat timing
+  # law) lives in config/facilitator.env — the ONE facilitator env source
+  # shared verbatim by the primary and the Phase D replica twin, so a twin
+  # can never drift from its primary. Every live bring-up path loads this
+  # overlay, so it is the right home for the block.
+  facilitator: {}
+  # No depends_on the launcher: an unstarted launcher just means provision
+  # commands queue undelivered (the honest link-plane law); a depends edge
+  # would cycle (the launcher already depends on the kernel).
 
   # The launcher (§18): link endpoint `oci-launcher`, Docker Engine over the
   # host's unix socket. It launches ONLY allowlisted images onto allowlisted

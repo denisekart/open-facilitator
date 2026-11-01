@@ -5,7 +5,8 @@
 # everything here shells to `docker compose`, `curl`, and `jq`.
 #
 # Usage:
-#   ./referencectl up slim [--no-seed]   bring the stack up, then seed (unless --no-seed)
+#   ./referencectl up slim [--no-seed] [--replicas 2]   bring the stack up, then seed (unless --no-seed);
+#                                    --replicas 2 runs the kernel as two replicas behind a LB (:8089)
 #   ./referencectl down [-v|--volumes]   tear down (-v also removes volumes)
 #   ./referencectl status                compose ps + kernel + gateway diagnostics probes
 #   ./referencectl token [--user U --password P]   mint an operator token (client
@@ -13,6 +14,7 @@
 #   ./referencectl work [--objective TEXT]  create a Work and print its timeline
 #   ./referencectl verify [--json] [--only id,id]  run the acceptance steps against a
 #                                    booted stack (seeds its own works; exit 0 iff all pass)
+#   ./referencectl verify --replicas  run the two-replica matrix (case a-e, spec §7)
 set -euo pipefail
 
 ROOT=$(cd -- "$(dirname -- "$0")" && pwd)
@@ -32,6 +34,21 @@ have docker; have curl; have jq
 overlays=(-f compose.slim.yaml -f compose.provisioning.yaml)
 [ -n "${FULL:-}" ] && overlays+=(-f compose.full.yaml)
 compose() { (cd "$REF" && docker compose --env-file versions.env --env-file .env "${overlays[@]}" -p facilitator-demo "$@"); }
+
+# Phase D: REPLICAS=2 (or `up slim --replicas 2`) adds the two-replica
+# overlay so every compose verb (up/ps/logs/down/exec) sees facilitator-b
+# + the LB; the replica matrix then has a single-file compose definition.
+# The full-profile replica legs (adapters + coding workspace riding the LB)
+# ride along whenever the full overlay is loaded — compose refuses
+# fragments naming absent services, so they cannot live in one file.
+add_replicas_overlay() {
+  local o
+  for o in "${overlays[@]}"; do [ "$o" = compose.replicas.yaml ] && return; done
+  overlays+=(-f compose.replicas.yaml)
+  [ -n "${FULL:-}" ] && overlays+=(-f compose.replicas.full.yaml)
+  return 0
+}
+[ -n "${REPLICAS:-}" ] && add_replicas_overlay
 
 mint_token() {
   # $1: client_credentials | password; password needs $2/$3.
@@ -53,8 +70,13 @@ cmd_up() {
     slim) shift ;;
     *) echo "referencectl: only 'up slim' exists (FULL=1 adds the full overlay)" >&2; usage ;;
   esac
-  for arg in "$@"; do
-    if [ "$arg" = "--no-seed" ]; then seed=0; else echo "referencectl: unknown up flag '$arg'" >&2; usage; fi
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --no-seed) seed=0 ;;
+      --replicas) REPLICAS=${2:?--replicas needs a count}; export REPLICAS; add_replicas_overlay; shift ;;
+      *) echo "referencectl: unknown up flag '$1'" >&2; usage ;;
+    esac
+    shift
   done
   have jq
   [ -f "$REF/.env" ] || "$REF/bootstrap/generate-secrets.sh"
@@ -86,10 +108,32 @@ Next: ./referencectl status · ./referencectl work · ./referencectl down
 EOF
 }
 
+sweep_managed() {
+  # Kernel-provisioned children (the launcher's, labeled
+  # io.facilitator.managed) are born over the docker socket, so compose
+  # never owns them: a leftover elastic from an earlier bring-up shape sits
+  # "already running" and the next leg's launch no-ops onto the zombie —
+  # with the OLD deployment's env baked in (a single-kernel pin surviving a
+  # replicas bring-up). Sweep them on every down.
+  docker ps -aq --filter label=io.facilitator.managed \
+    | xargs -r docker rm -f >/dev/null 2>&1 || true
+}
+
 cmd_down() {
+  # Teardown owns EVERY shape, flags included: a two-replica or full-profile
+  # stack brought up by one invocation must come fully down from any other
+  # (compose ignores files whose services simply aren't running, so loading
+  # all overlays is always safe — NOT loading them orphans facilitator-b,
+  # the LB, and the adapter legs with a stale cached IP for the next up).
+  add_replicas_overlay
+  [ -z "${FULL:-}" ] && overlays+=(-f compose.full.yaml -f compose.replicas.full.yaml)
   case "${1:-}" in
-    "" ) compose down ;;
-    -v | --volumes) compose down -v ;;
+    "" )
+      compose down
+      sweep_managed ;;
+    -v | --volumes)
+      compose down -v
+      sweep_managed ;;
     *) echo "referencectl: down takes [-v|--volumes]" >&2; exit 2 ;;
   esac
 }
@@ -105,6 +149,17 @@ cmd_status() {
     "fetch('http://127.0.0.1:8099/status').then(r=>r.ok?r.json():Promise.reject(r.status)).then(s=>process.stdout.write(JSON.stringify(s)))" \
     | jq '{gatewayId, state, session, children, awaitingApproval}' \
     || { echo "gateway probe FAILED (demo-workspace 127.0.0.1:8099/status)" >&2; rc=1; }
+  # Phase D: when an LB answers at :8089 (the two-replica shape), show the
+  # fleet view — who answers, per-replica live leases (stamp count vs
+  # sockets held), queue depth.
+  if curl -fs --max-time 5 -o /dev/null http://localhost:8089/health; then
+    local fleet_token
+    fleet_token=$(mint_token client_credentials)
+    curl -fs --max-time 10 -sS http://localhost:8089/api/admin/replicas \
+      -H "Authorization: Bearer $fleet_token" \
+      | jq '{answeringReplicaId, outboxPending, replicas}' \
+      || { echo "replicas probe FAILED (LB :8089 /api/admin/replicas)" >&2; rc=1; }
+  fi
   return $rc
 }
 
@@ -148,6 +203,17 @@ cmd_work() {
 
 cmd_verify() {
   have jq
+  if [ "${1:-}" = "--replicas" ]; then
+    shift
+    add_replicas_overlay
+    curl -fs --max-time 10 -o /dev/null "http://localhost:8089/health" \
+      || { echo "referencectl: LB not reachable at :8089 — run 'referencectl up slim --replicas 2' first" >&2; exit 2; }
+    . "$REF/checks/verify.sh"
+    # shellcheck source=checks/verify-replicas.sh
+    . "$REF/checks/verify-replicas.sh"
+    run_verify_replicas "$@"
+    return $?
+  fi
   curl -fs --max-time 10 -o /dev/null "$KERNEL/health" \
     || { echo "referencectl: kernel not reachable at $KERNEL — run 'referencectl up slim --no-seed' first" >&2; exit 2; }
   # The acceptance runner: sources the step library and reports per step.

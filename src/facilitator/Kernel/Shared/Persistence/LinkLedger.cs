@@ -50,7 +50,7 @@ public sealed class LinkLedger(
               JOIN facilitator.link_sessions s ON s.logical_endpoint_id = substring(o.recipient_endpoint_id from 6)
              WHERE o.recipient_endpoint_id LIKE 'link.%'
                AND o.status NOT IN ('delivered', 'dead_letter')
-               AND NOT EXISTS (SELECT 1 FROM facilitator.link_deliveries d WHERE d.delivery_id = o.outbox_id)
+            ON CONFLICT (delivery_id) DO NOTHING
             """, ct);
         return rows;
     }
@@ -69,7 +69,7 @@ public sealed class LinkLedger(
              WHERE o.recipient_endpoint_id LIKE 'link.%'
                AND substring(o.recipient_endpoint_id from 6) = {endpointId}
                AND o.status NOT IN ('delivered', 'dead_letter')
-               AND NOT EXISTS (SELECT 1 FROM facilitator.link_deliveries d WHERE d.delivery_id = o.outbox_id)
+            ON CONFLICT (delivery_id) DO NOTHING
             """, ct);
     }
 

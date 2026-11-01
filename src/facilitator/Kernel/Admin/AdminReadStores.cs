@@ -59,6 +59,17 @@ public sealed record AdminAffectedAssignment(Guid AssignmentId, Guid WorkId, str
 /// <summary>GET /api/admin/links: gateway rows + affected assignments of offline teams.</summary>
 public sealed record AdminLinksView(IReadOnlyList<AdminLinkRow> Gateways, IReadOnlyList<AdminAffectedAssignment> AffectedAssignments);
 
+/// <summary>One kernel replica: live leases it stamps, of those the endpoints
+/// it actually holds sockets for, fleet queue depth (every replica answers
+/// the same number from the shared tables).</summary>
+public sealed record AdminReplicaRow(string ReplicaId, int LiveSessions, int SocketsHere);
+
+/// <summary>GET /api/admin/replicas: who answers, who leases, queue depth.</summary>
+public sealed record AdminReplicasView(
+    string AnsweringReplicaId,
+    IReadOnlyList<AdminReplicaRow> Replicas,
+    long OutboxPending);
+
 /// <summary>
 /// GET /api/admin/deliveries merged row: kernel-plane outbox rows, link-plane
 /// delivery rows, and dead-letter rows (the superset that replaced
@@ -437,6 +448,34 @@ public sealed class AdminReadStores(
                 o.OperationId, o.WorkloadId, o.Team, o.Operation, o.State,
                 o.WorkId, o.AssignmentId, o.Generation, o.Reason, o.CreatedAt, o.UpdatedAt))
             .ToListAsync(ct);
+    }
+
+    /// <summary>Per-replica fleet view (Plan 35 D): live link-session leases
+    /// grouped by the replica that stamps them, plus how many of those
+    /// endpoints THIS replica actually holds a socket for (the honest
+    /// answer-identity read: a stale ReplicaId on a lease means a dead
+    /// replica's gateway, not a live twin).</summary>
+    public async Task<AdminReplicasView> ReplicasAsync(CancellationToken ct)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(ct);
+        var now = timeProvider.GetUtcNow().UtcDateTime;
+        var sessions = await db.LinkSessions.AsNoTracking()
+            .Where(s => s.LeaseUntil > now)
+            .Select(s => new { s.ReplicaId, s.LogicalEndpointId })
+            .ToListAsync(ct);
+        var heldHere = connections.ForAllEndpoints();
+        var rows = sessions
+            .GroupBy(s => s.ReplicaId, StringComparer.Ordinal)
+            .Select(g => new AdminReplicaRow(
+                g.Key,
+                g.Count(),
+                g.Count(s => heldHere.Contains(s.LogicalEndpointId, StringComparer.Ordinal))))
+            .OrderBy(r => r.ReplicaId, StringComparer.Ordinal)
+            .ToList();
+        return new AdminReplicasView(
+            connections.ReplicaId,
+            rows,
+            await db.Outbox.CountAsync(o => o.Status == "pending", ct));
     }
 
     /// <summary>Inline metrics roll-up: SQL gauges + windowed per-hour table facts + process counter snapshot.</summary>

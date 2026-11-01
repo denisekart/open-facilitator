@@ -505,6 +505,19 @@ describe("parseConfig env overlay", () => {
       parseConfig(yaml, { env: { OFAC_ENROLL_SECRET: "s" }, hasStoredToken: () => false }),
     ).not.toThrow();
   });
+
+  it("OFAC_KERNEL_URL repoints facilitatorUrl (the deployment origin wins)", () => {
+    const config = parseConfig(BASE, {
+      env: { OFAC_KERNEL_URL: "http://facilitator-lb" },
+      hasStoredToken: () => false,
+    });
+    expect(config.facilitatorUrl).toBe("http://facilitator-lb");
+  });
+
+  it("a file facilitatorUrl stands when the env is unset", () => {
+    const config = parseConfig(BASE, { env: {}, hasStoredToken: () => false });
+    expect(config.facilitatorUrl).toBe("http://localhost:8088");
+  });
 });
 
 describe("parseConfig policy block", () => {

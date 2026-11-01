@@ -94,27 +94,22 @@ services:
       context: ..
       dockerfile: src/facilitator/Dockerfile
     image: ${OCI_REGISTRY:?set in versions.env}/facilitator:${FRAMEWORK_TAG:?set in versions.env}
-    environment:
-      ConnectionStrings__Facilitator: Host=postgres;Database=facilitator;Username=demo;Password=${DEMO_POSTGRES_PASSWORD:?set in .env}
-      Link__EnrollmentToken: ${DEMO_ENROLLMENT_TOKEN:?set in .env}
-      Storage__Provider: s3
-      Storage__S3__Endpoint: http://artifacts:8333
-      Storage__S3__Bucket: facilitator-artifacts
-      Storage__S3__Region: us-east-1
-      Storage__S3__AccessKey: ${DEMO_S3_ACCESS_KEY:?set in .env}
-      Storage__S3__SecretKey: ${DEMO_S3_SECRET_KEY:?set in .env}
-      # Otel:Endpoint is the kernel's on/off switch; the exporter transport
-      # reads the standard OTLP env vars (AddOtlpExporter takes no argument).
-      # The .NET exporter defaults to gRPC (dashboard :18889); pin HTTP so both
-      # point at the dashboard's HTTP/protobuf listener :18890.
-      Otel__Endpoint: http://aspire:18890
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://aspire:18890
-      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
-      OTEL_SERVICE_NAME: facilitator
+    # ONE env source shared verbatim with the replica twin (compose.replicas.
+    # yaml EXTENDS this service; the provisioning overlay's arm lives here
+    # too, since every live path loads that overlay — a twin can never drift
+    # from its primary). Interpolated against versions.env + .env like an
+    # inline block.
+    env_file:
+      - config/facilitator.env
     volumes:
       - ./config/facilitator.json:/app/config/facilitator.json:ro
     ports:
       - "127.0.0.1:8088:8080"
+    # Bounded restart: a cold-start DNS flake (WSL2 resolver exhaustion
+    # when the whole fleet boots at once) surfaces as an Npgsql connect
+    # failure and kills startup; docker treats user STOP/KILL as intentional
+    # (no restart), so the failover legs' kill semantics are untouched.
+    restart: on-failure:5
     # aspnet:10.0 has bash but no HTTP client; probe /health over /dev/tcp.
     healthcheck:
       test:

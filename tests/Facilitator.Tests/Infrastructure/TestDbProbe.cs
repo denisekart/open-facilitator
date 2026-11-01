@@ -477,6 +477,38 @@ public sealed class TestDbProbe : IAsyncDisposable
         return rows;
     }
 
+    /// <summary>Hold a transactional advisory lock on a dedicated connection
+    /// (simulates a peer replica's sweep pass while asserting a second
+    /// sweep skips); disposing releases it.</summary>
+    public async Task<IAsyncDisposable> HoldAdvisoryLockAsync(int key)
+    {
+        var connection = await _dataSource.OpenConnectionAsync();
+        try
+        {
+            var tx = await connection.BeginTransactionAsync();
+            await using (var cmd = new NpgsqlCommand($"SELECT pg_advisory_xact_lock({key})", connection, (NpgsqlTransaction)tx))
+            {
+                await cmd.ExecuteNonQueryAsync();
+            }
+
+            return new LockHolder(connection, tx);
+        }
+        catch
+        {
+            connection.Dispose();
+            throw;
+        }
+    }
+
+    private sealed class LockHolder(NpgsqlConnection connection, NpgsqlTransaction tx) : IAsyncDisposable
+    {
+        public async ValueTask DisposeAsync()
+        {
+            await tx.DisposeAsync();
+            await connection.DisposeAsync();
+        }
+    }
+
     /// <summary>One result-manifest ledger assertion row (typed window, no raw SQL in tests).</summary>
     public sealed record ManifestRow(
         string ManifestId, string WorkId, string AssignmentId, string ExecutionId, int Revision,
@@ -696,18 +728,20 @@ public sealed class TestDbProbe : IAsyncDisposable
             });
 
     /// <summary>Hand-mint a live link session row for an endpoint (optional
-    /// opened_at for deterministic oldest-online ordering).</summary>
-    public Task SeedLinkSession(string endpointId, long epoch, DateTime leaseUntil, DateTime? openedAt = null) =>
+    /// opened_at for deterministic oldest-online ordering; optional
+    /// replicaId to stamp a chosen lease owner).</summary>
+    public Task SeedLinkSession(string endpointId, long epoch, DateTime leaseUntil, DateTime? openedAt = null, string replicaId = "replica-seed") =>
         NonQuery(
             "INSERT INTO facilitator.link_sessions (logical_endpoint_id, connection_instance_id, replica_id, "
             + "session_epoch, lease_until, last_heartbeat, opened_at) "
-            + "VALUES ($1, 'inst-seed', 'replica-seed', $2, $3, now(), coalesce($4, now()))",
+            + "VALUES ($1, 'inst-seed', $5, $2, $3, now(), coalesce($4, now()))",
             cmd =>
             {
                 cmd.Parameters.AddWithValue(endpointId);
                 cmd.Parameters.AddWithValue(epoch);
                 cmd.Parameters.AddWithValue(leaseUntil);
                 cmd.Parameters.AddWithValue((object?)openedAt ?? DBNull.Value);
+                cmd.Parameters.AddWithValue(replicaId);
             });
 
     /// <summary>Re-lease an existing session row (a reconnect: new epoch,

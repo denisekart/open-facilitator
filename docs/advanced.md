@@ -86,7 +86,7 @@ The locked YAML surface (`loadConfigFile` rejects any other key, naming it):
 |`kind`|`Gateway`|
 |`gatewayId`|`^gw\.[a-z0-9]([a-z0-9-]*[a-z0-9])?$`, ≤128 chars — the Link endpoint id|
 |`team`|must equal the kernel's enrollment team slug (else capabilities POST 403s)|
-|`facilitatorUrl`|kernel base URL|
+|`facilitatorUrl`|kernel base URL; `OFAC_KERNEL_URL` env wins (the deployment origin — e.g. a kernel LB in the two-replica shape)|
 |`enrollmentSecret`|bootstrap secret; `OFAC_ENROLL_SECRET` env wins; optional once `<stateDir>/token` exists|
 |`linkToken`|static mount; `OFAC_LINK_TOKEN` env wins|
 |`trustMode`|see table above|

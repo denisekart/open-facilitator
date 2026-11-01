@@ -163,6 +163,7 @@
             "/api/admin/deliveries",
             "/api/admin/provisioning",
             "/api/admin/metrics",
+            "/api/admin/replicas",
             "/api/admin/config",
             "/api/admin/config/{resource}",
             "/api/admin/config/{resource}/history"

@@ -347,7 +347,11 @@ export function parseConfig(yamlText: string, options: ParseConfigOptions = {}):
     fail("gatewayId", "must match ^gw\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?$");
   }
   const team = requireString(root, "team");
-  const facilitatorUrl = requireString(root, "facilitatorUrl");
+  // Env overlay: the deployment (kernel) origin rides OFAC_KERNEL_URL when
+  // the operator injects it (the elastic worker's baked config names the
+  // single-replica service; the replica overlay repoints every leg at the
+  // LB via this env — a pin to one replica dies with it).
+  const facilitatorUrl = env["OFAC_KERNEL_URL"] ?? requireString(root, "facilitatorUrl");
   if (!/^https?:\/\/\S+$/.test(facilitatorUrl)) {
     fail("facilitatorUrl", "must be an http(s) URL");
   }

@@ -14,9 +14,21 @@ compute-gated off; see `Develop here`).
   `coding-workspace` (node-runtime image, supervisor entrypoint); the
   provisioning overlay (launcher + kernel `Provision__*` + the build-only
   `elastic-worker` image) rides EVERY compose invocation, slim included;
-  interpolation ONLY from `versions.env` + `.env` (two `--env-file` flags).
-- `../referencectl` — the operator loop: up/down/status/token/work; it owns
-  the compose invocation and the bootstrap call.
+  the facilitator's whole env (both overlays' arms) is `config/facilitator.env`
+  — ONE source the replica twin `extends` reads, so a twin cannot drift; the
+  full-profile provider arm is the second shared env_file
+  (`config/facilitator-providers.env` — `extends` resolves against
+  compose.slim.yaml only, so an inline provider block would leave the twin
+  provider-less); interpolation ONLY from `versions.env` + `.env` (two
+  `--env-file` flags).
+- `compose.replicas.yaml` (+ `.full.yaml`) — optional two-replica shape
+  (`up slim --replicas 2`): `facilitator-b` twin + nginx `facilitator-lb`
+  (:8089); every link leg rides the LB via the `config/*-lb` mount variants
+  or the `OFAC_KERNEL_URL` env overlay (a Gateway config honors it for
+  `facilitatorUrl`).
+- `../referencectl` — the operator loop: up/down/status/token/work/verify;
+  it owns the compose invocation and the bootstrap call. `status` shows the
+  fleet view when an LB answers at :8089.
 - `versions.env` — the single pin source: every reference image tag, the
   source-built `FRAMEWORK_TAG`, and release-time digests live here, nothing
   else. `.env.example` — every local secret, each naming its consumer.
@@ -29,9 +41,11 @@ compute-gated off; see `Develop here`).
   (team-coding posture: PR ops at allow); `config/workspace/` —
   Gateway/worker/policy/manifest configs; `bootstrap/seed-lib.sh` — the seed
   primitives (compose/psql/token/work) shared by `bootstrap.sh` (demo path)
-  and the acceptance run — a raw-SQL `work.assign` outbox insert stands in
-  for the routing slice; `checks/verify.sh` — the 11-step acceptance run,
-  sourced by `referencectl verify`.
+  and the acceptance run — `seed_work` POSTs `/api/works` and the kernel
+  routing funnel writes the `work.assign` effect; `checks/verify.sh` — the
+  11-step acceptance run, sourced by `referencectl verify`;
+  `checks/verify-replicas.sh` — the two-replica matrix
+  (`referencectl verify --replicas`), cases a–e of §7.
 - Provider init is a one-shot per forge (`mattermost-init`, `forgejo-init` =
   `forgejo-adapter init`): consumers gate on `service_completed_successfully`
   and read bot credentials from the shared provision volume, never env.

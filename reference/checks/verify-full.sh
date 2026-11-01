@@ -93,8 +93,14 @@ full_logs() {
   done
 }
 full_compose() {
+  # REPLICAS=1 (set by `up slim --replicas 2`) keeps the replica overlay in
+  # every internal compose verb too: an `up -d --no-deps` of a leg the
+  # overlay remounts onto the LB (coding-workspace) must recreate it WITH
+  # the LB mounts, or the leg silently falls back to a single-kernel pin.
+  local ro=()
+  [ -n "${REPLICAS:-}" ] && ro=(-f compose.replicas.yaml -f compose.replicas.full.yaml)
   (cd "$VERIFY_REF" && docker compose --env-file versions.env --env-file .env \
-    -f compose.slim.yaml -f compose.provisioning.yaml -f compose.full.yaml -p facilitator-demo "$@")
+    -f compose.slim.yaml -f compose.provisioning.yaml -f compose.full.yaml "${ro[@]}" -p facilitator-demo "$@")
 }
 
 # --- steps --------------------------------------------------------------------

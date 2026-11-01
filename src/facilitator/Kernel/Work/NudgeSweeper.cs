@@ -5,6 +5,7 @@ using Facilitator.Kernel.Integrations;
 using Facilitator.Kernel.Shared.Persistence;
 
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 using Ofac.Protocol.Validation;
 
@@ -75,12 +76,52 @@ public sealed class NudgeSweeper(
         }
     }
 
-    /// <summary>One sweep (public for fake-clock tests): evaluate every live
-    /// assignment against the policy, emit budgeted nudges, record episodes.
-    /// Returns the number of nudges emitted.</summary>
+    /// <summary>Advisory key serializing nudge sweeps across kernel replicas
+    /// (Plan 35 D audit): two replicas evaluating the same stale fleet race
+    /// the episode ledger; the deterministic nudge <c>commandId</c> + the
+    /// unique outbox key already make a collision all-or-nothing, but a
+    /// busy lock skips the pass instead of aborting it (the provisioning
+    /// 420004 / GC 420001-420003 precedent).</summary>
+    public const int SweepLockKey = 420005;
+
+    /// <summary>One sweep (public for fake-clock tests): serialize against
+    /// peer replicas, then evaluate every live assignment against the policy,
+    /// emit budgeted nudges, record episodes.
+    /// Returns the number of nudges emitted (a skipped pass — a peer replica
+    /// holds the sweep lock — returns 0).</summary>
     public async Task<int> SweepOnceAsync(CancellationToken ct)
     {
         await using var db = await contextFactory.CreateDbContextAsync(ct);
+        await db.Database.OpenConnectionAsync(ct);
+        try
+        {
+            await using var tx = await db.Database.BeginTransactionAsync(ct);
+            if (!await TrySweepLockAsync(db, ct))
+            {
+                return 0;
+            }
+
+            var emitted = await SweepLockedAsync(db, ct);
+            await tx.CommitAsync(ct);
+            return emitted;
+        }
+        finally
+        {
+            await db.Database.CloseConnectionAsync();
+        }
+    }
+
+    private static async Task<bool> TrySweepLockAsync(FacilitatorDbContext db, CancellationToken ct)
+    {
+        var connection = db.Database.GetDbConnection();
+        await using var command = connection.CreateCommand();
+        command.Transaction = db.Database.CurrentTransaction?.GetDbTransaction();
+        command.CommandText = $"SELECT pg_try_advisory_xact_lock({SweepLockKey})";
+        return (bool)(await command.ExecuteScalarAsync(ct) ?? false);
+    }
+
+    private async Task<int> SweepLockedAsync(FacilitatorDbContext db, CancellationToken ct)
+    {
         var now = timeProvider.GetUtcNow().UtcDateTime;
 
         var staleAfter = await PolicyMinutesAsync(db, ct);

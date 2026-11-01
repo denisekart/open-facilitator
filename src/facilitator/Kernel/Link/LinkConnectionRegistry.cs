@@ -1,6 +1,6 @@
 using System.Threading.Channels;
 
-namespace Facilitator.Kernel.Link;
+using Facilitator.Kernel.Shared;
 
 /// <summary>One live hub connection on THIS replica (§7.3: a replica owns only its own sockets).</summary>
 /// <param name="ConnectionId">SignalR connection id.</param>
@@ -16,8 +16,11 @@ public sealed record LinkConnection(string ConnectionId, string EndpointId, long
 /// Authoritative liveness stays in the DB lease — the sweeper closes entries
 /// whose <c>link_sessions.lease_until</c> passed.
 /// </summary>
-public sealed class LinkConnectionRegistry
+public sealed class LinkConnectionRegistry(IConfiguration configuration)
 {
+    /// <summary>This replica's lease identity (the same value session rows
+    /// carry; the admin replicas view answers "who am I").</summary>
+    public string ReplicaId { get; } = KernelOptions.ReplicaId(configuration);
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, LinkConnection> _byConnection = new(StringComparer.Ordinal);
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, Channel<long>> _wakes = new(StringComparer.Ordinal);
 

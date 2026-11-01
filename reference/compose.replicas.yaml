@@ -1,0 +1,107 @@
+# Plan 35 Phase D overlay (slim, optional FULL=1): two kernel replicas behind
+# an LB. `facilitator-b` EXTENDS the primary service (whose env_file already
+# carries the provisioning arm — one env source, no drift: a genuine twin),
+# differing ONLY in its fail-closed lease identity (Kernel:ReplicaId:
+# ReplicaIdentityCheck refuses startup when two live processes share one) and
+# its published port. `facilitator-lb` fronts BOTH on :8089; every link leg
+# (gateways, adapters, the launcher, child self-enrollment) rides the LB (the
+# config/*-lb + launcher-replicas variants) so a replica death fails over;
+# direct :8088 (A) / :8090 (B) stay published so the matrix can target one
+# replica exactly (deterministic dual-injection). Single-replica bring-up
+# never loads this file (`up slim --replicas 2` only).
+services:
+  facilitator:
+    environment:
+      Kernel__ReplicaId: facilitator-a
+      # Managed children ride the LB too (extends reads the BASE file, so
+      # the twin restates this).
+      Provision__Workloads__0__Env__OFAC_KERNEL_URL: http://facilitator-lb
+
+  # Genuine twin: extends inherits the FULL service — build, env_file
+  # (config/facilitator.env, provisioning arm included), volumes,
+  # healthcheck — differing only in identity + published port.
+  facilitator-b:
+    extends:
+      file: compose.slim.yaml
+      service: facilitator
+    environment:
+      Kernel__ReplicaId: facilitator-b
+      Provision__Workloads__0__Env__OFAC_KERNEL_URL: http://facilitator-lb
+    # !override: compose CONCATENATES ports sequences, so a plain list
+    # would inherit the primary's :8088 publish (port clash, and both
+    # replicas would answer the "A-direct" port).
+    ports: !override
+      - "127.0.0.1:8090:8080"
+
+  # The demo workspace rides the LB: its gateway leg + child self-enrollment
+  # reconnect onto the SURVIVOR when a replica dies (case (b)'s law). The
+  # config keeps the base dir mount with an LB-bound gateway.yaml mounted
+  # OVER it (docker nests mounts parent-first; a swapped whole-dir with
+  # relative symlinks would dangle inside the container), and child
+  # self-enrollment rides the OFAC_KERNEL_URL env. (Full volumes
+  # re-declaration: compose replaces sequence values, so the mount list is
+  # restated whole — slim shape; the full-profile restatement with the
+  # provision volume lives in compose.replicas.full.yaml, loaded AFTER this
+  # file.)
+  demo-workspace:
+    environment:
+      OFAC_KERNEL_URL: http://facilitator-lb
+    volumes:
+      - workspace_state:/var/lib/ofac
+      - ../features/shared/ofac-supervisor.sh:/opt/ofac/ofac-supervisor.sh:ro
+      - ./container/units:/opt/ofac/units:ro
+      - ./config/workspace:/opt/ofac/config:ro
+      - ./config/workspace-lb/gateway.yaml:/opt/ofac/config/gateway.yaml:ro
+    depends_on:
+      facilitator-lb:
+        condition: service_started
+
+  # The launcher's link leg is pinned to replica B directly (see
+  # config/launcher-lb/adapter.yaml — the deterministic lease split); its
+  # enrollment + the elastic children it launches ride the LB env below
+  # (restart: on-failure reconnects it after a replica death).
+  provisioning-launcher:
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - launcher_state:/var/lib/ofac
+      - ./config/launcher:/opt/ofac/config:ro
+      - ./config/launcher-lb/adapter.yaml:/opt/ofac/config/adapter.yaml:ro
+    depends_on:
+      facilitator-lb:
+        condition: service_started
+
+  # LB (§7.3): long-lived WS legs are sticky BY NATURE (one connection = one
+  # replica; skipNegotiation is the documented gateway law), so balancing is
+  # least_conn with passive eviction: a killed replica's refused connects
+  # take it out of rotation (max_fails), and the gateway's reconnect storm
+  # lands on the survivor. (Deviation from the plan's ip_hash: docker's
+  # userland proxy gives every host-published connection ONE source IP, so
+  # ip_hash degenerates to a single upstream and never exercises replica B.)
+  # 16m body limit >= the kernel's own 256 KiB RequestBodies cap.
+  facilitator-lb:
+    image: nginx:${NGINX_TAG:?set in versions.env}
+    volumes:
+      - ./config/nginx-replicas.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "127.0.0.1:8089:80"
+    depends_on:
+      facilitator:
+        condition: service_healthy
+      facilitator-b:
+        condition: service_healthy
+    healthcheck:
+      # PER-UPSTREAM probes over the resolver-driven probe locations: a
+      # proxied /health only answers 200 while ANY upstream lives, so one
+      # stale cached IP hides behind the other replica and every client
+      # silently loses half the fleet. Probing each replica by name makes a
+      # stale IP (replica recreated while the LB runs) an unhealthy LB —
+      # the fix is `docker restart` of the LB (re-resolves upstreams).
+      test:
+        - CMD
+        - sh
+        - -c
+        - wget -q --spider http://127.0.0.1/upstream-a && wget -q --spider http://127.0.0.1/upstream-b
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s

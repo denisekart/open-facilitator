@@ -3,7 +3,7 @@ name: facilitator-reference-env
 description: Slim/full Docker Compose reference environments, versions.env pinning, referencectl bootstrap/seed/verify, localhost hostname wiring, and local debugging of the Open Facilitator Framework.
 ---
 
-> **Status (as-built):** `./referencectl up slim` (repo root) boots + seeds the demo path: PostgreSQL + Keycloak + SeaweedFS + Aspire dashboard + the Facilitator container + `demo-workspace` (one container, two processes: standalone Gateway `gw.team-alpha` + the deterministic worker over an in-container unix child leg — the mode-(b) embedded story). `reference/bootstrap/seed-lib.sh` holds the seed primitives (compose/psql/token/project/work/dispatch), shared by `bootstrap.sh` (demo path) and the acceptance run; a SQL outbox insert stands in until the routing slice assigns works itself. `reference/checks/verify.sh` is the 11-step acceptance run (`referencectl verify`). Full-overlay provider seed data lands with the init one-shots (`mattermost-init`, `forgejo-init`), not the slim bootstrap.
+> **Status (as-built):** `./referencectl up slim` (repo root) boots + seeds the demo path: PostgreSQL + Keycloak + SeaweedFS + Aspire dashboard + the Facilitator container + `demo-workspace` (one container, two processes: standalone Gateway `gw.team-alpha` + the deterministic worker over an in-container unix child leg — the mode-(b) embedded story). `reference/bootstrap/seed-lib.sh` holds the seed primitives (compose/psql/token/project/work/dispatch), shared by `bootstrap.sh` (demo path) and the acceptance run; `seed_work` POSTs `/api/works`; the kernel routing funnel writes the `work.assign` effect. `reference/checks/verify.sh` is the 11-step acceptance run (`referencectl verify`). Full-overlay provider seed data lands with the init one-shots (`mattermost-init`, `forgejo-init`), not the slim bootstrap.
 
 # Reference Environment & Dev Loop
 
@@ -18,9 +18,10 @@ Normative source: `docs/specs/open_facilitator_framework_architecture.md` §21�
 
 **Slim** (laptop, few GiB): Facilitator (ASP.NET Core + embedded admin SPA), PostgreSQL 17 (default datastore even in slim; inbox/outbox/leases/memory FTS), Keycloak 26 (`start-dev --import-realm`), SeaweedFS `weed mini` (S3 artifacts), standalone Aspire dashboard (OTLP viewer, in-memory retention), Node/TS embedded Gateway + deterministic research worker, CLI/HTTP requester. No Kafka, no Temporal, no model download required.
 
- **Full overlay** adds: Mattermost Team Edition + the Plan 22 provider pair (`mattermost-init` one-shot provisions bot+PAT via REST onto the `mm_provision` volume — 11.11.1 has NO unauthenticated setup route, so bootstrap rides OPEN SIGNUP; `mattermost-adapter` runs from node-runtime, `/healthz` :8066), Forgejo (SQLite; VCS **and** issues — one service) + the Plan 23 pair (`forgejo-init` — `forgejo-adapter init` — signs up the first admin via `POST /user/sign_up` when none exists, seeds org/repo/labels/sample issues/webhook + bot PAT onto `forgejo_provision`; `forgejo-adapter` webhook normalizer `/healthz`+`/hooks/forgejo` :8067; the `forgejo-connector` runs as a supervisor unit inside `demo-workspace`, env-gated by `FORGEJO_URL`), a **second workspace container for the coding lane** (`coding-workspace`: same node-runtime, `CODING_CHILD_SECRET` child-wire fleet key, `OFAC_WORKER_TEAM=team-coding`), Kafka 4.x single-node KRaft (example ingest only), Ollama + `qwen2.5:1.5b` (optional semantic routing), shared team-gateway + workspace-launcher. The facilitator's provider sections ride `Providers__Mattermost__*` / `Providers__Forgejo__*` env in the overlay only — slim boots provider-less from the same mounted config; the coding lane is `Providers__Forgejo__AssignRules__N__*` (label→endpoint/capability/team) + `PrRequestCapability`. The PROVISIONING overlay (`compose.provisioning.yaml`, slim+full, plan 35 Phase C) adds the `provisioning-launcher` link endpoint (Docker socket, allowlisted image+network) + the kernel's `Provision__*` config; the `elastic-worker` (team-beta, `gw.team-beta`) is a build-only image the KERNEL launches — never a compose service. Live proof: `make provider-e2e` (20 steps: 6 mattermost + 7 forgejo + 4 coding `coding-*` + 1 two-repo DAG leg + 2 provisioning `provision-*` legs, `reference/checks/verify-full.sh`; the CI leg synthesizes a signed `status` delivery straight to the adapter — Forgejo 16.0.7 does not fire status webhooks, open feature request #9325).
 
-Layer compose: `docker compose -f compose.slim.yaml -f compose.provisioning.yaml [-f compose.full.yaml]`; ship one tested method, don't make newcomers invent network wiring.
+ **Full overlay** adds: Mattermost Team Edition + the Plan 22 provider pair (`mattermost-init` one-shot provisions bot+PAT via REST onto the `mm_provision` volume — 11.11.1 has NO unauthenticated setup route, so bootstrap rides OPEN SIGNUP; `mattermost-adapter` runs from node-runtime, `/healthz` :8066), Forgejo (SQLite; VCS **and** issues — one service) + the Plan 23 pair (`forgejo-init` — `forgejo-adapter init` — signs up the first admin via `POST /user/sign_up` when none exists, seeds org/repo/labels/sample issues/webhook + bot PAT onto `forgejo_provision`; `forgejo-adapter` webhook normalizer `/healthz`+`/hooks/forgejo` :8067; the `forgejo-connector` runs as a supervisor unit inside `demo-workspace`, env-gated by `FORGEJO_URL`), a **second workspace container for the coding lane** (`coding-workspace`: same node-runtime, `CODING_CHILD_SECRET` child-wire fleet key, `OFAC_WORKER_TEAM=team-coding`), Kafka 4.x single-node KRaft (example ingest only), Ollama + `qwen2.5:1.5b` (optional semantic routing), shared team-gateway + workspace-launcher. The facilitator's provider sections ride `config/facilitator-providers.env` (full-profile `env_file` only, both replicas — see the twin law below), so the slim stack stays provider-less from the same mounted config; the coding lane is `Providers__Forgejo__AssignRules__N__*` (label→endpoint/capability/team) + `PrRequestCapability`. The PROVISIONING overlay (`compose.provisioning.yaml`, slim+full, plan 35 Phase C) adds the `provisioning-launcher` link endpoint (Docker socket, allowlisted image+network) + the kernel's `Provision__*` config; the `elastic-worker` (team-beta, `gw.team-beta`) is a build-only image the KERNEL launches — never a compose service. Live proof: `make provider-e2e` (20 steps: 6 mattermost + 7 forgejo + 4 coding `coding-*` + 1 two-repo DAG leg + 2 provisioning `provision-*` legs, `reference/checks/verify-full.sh`; the CI leg synthesizes a signed `status` delivery straight to the adapter — Forgejo 16.0.7 does not fire status webhooks, open feature request #9325).
+
+Layer compose: `docker compose -f compose.slim.yaml -f compose.provisioning.yaml [-f compose.full.yaml]`; ship one tested method, don't make newcomers invent network wiring. The two-replica shape (`up slim --replicas 2`, full: `FULL=1`) appends `-f compose.replicas.yaml [-f compose.replicas.full.yaml]`: a `facilitator-b` twin (`extends` the primary — distinct `Kernel__ReplicaId`, :8090) behind nginx `facilitator-lb` :8089 (least_conn + passive eviction; ip_hash degenerates behind docker's userland proxy). EVERY link leg rides the LB: the `config/workspace-lb`/`coding-workspace-lb`/`launcher-lb` mount variants point gateways/launcher at `http://facilitator-lb`, adapter + child URLs via env (a Gateway's `facilitatorUrl` honors the `OFAC_KERNEL_URL` env overlay — how the elastic worker's BAKED config repoints at the LB). The twin's `extends` resolves against compose.slim.yaml ONLY, so the full-profile provider arm lives in `config/facilitator-providers.env` and BOTH replica blocks load it as `env_file` (an inline block in compose.full.yaml would leave B provider-less → typed `unsupported` receipts when an adapter session lands there). The LB healthcheck PROXIES `/health`: a stale cached upstream IP after a replica recreate must surface as an unhealthy LB (restart it), not silent 502s. Single-replica bring-up never loads these files.
 
 ## Hard requirements
 
@@ -48,7 +49,7 @@ Observe: `docker compose ... ps` (all healthy), kernel `http://localhost:8088/he
 
 Operator UI: `http://localhost:8088` serves the embedded admin SPA (Plan 21) — login `alice`/`alice`; the browser tier is `make admin-e2e`, so a psql-free walkthrough of the acceptance-run Work (search → inspector → timeline → trace chip, dead-letter replay, one config PATCH) is the manual acceptance leg.
 
-`referencectl` (built): `up slim [--no-seed]` (compose up --wait + bootstrap), `down [-v]`, `status` (compose ps + kernel `/health` + a `compose exec` probe of the Gateway's `127.0.0.1:8099/status` — diagnostics bind the demo-workspace container's loopback, never a published port), `token [--user U --password P]`, `work [--objective T]`, `verify [--json] [--only ids]` — the acceptance run (see below). Appendix ergonomics (`./dev up`, `./dev assign`, `./dev show deliveries`) share that unbuilt status.
+`referencectl` (built): `up slim [--no-seed] [--replicas 2]` (compose up --wait + bootstrap), `down [-v]`, `status` (compose ps + kernel `/health` + a `compose exec` probe of the Gateway's `127.0.0.1:8099/status` — diagnostics bind the demo-workspace container's loopback, never a published port; when an LB answers at :8089 the fleet view `/api/admin/replicas` prints too), `token [--user U --password P]`, `work [--objective T]`, `verify [--json] [--only ids]` — the acceptance run (see below), `verify --replicas` — the two-replica matrix. Appendix ergonomics (`./dev up`, `./dev assign`, `./dev show deliveries`) share that unbuilt status.
 
 ## Acceptance run (`reference/checks/verify.sh`)
 
@@ -86,6 +87,25 @@ script encodes (keep them when editing):
   of the outbox row — never a timing join.
 - Debug a leg: `verify --only <id>` (prereqs auto-run); the human plane
   dumps kernel+workspace log tails on failure.
+- Two-replica matrix (`reference/checks/verify-replicas.sh`,
+  `verify --replicas`, spec §7 cases a–e): LB answers from both replicas;
+  concurrent duplicate event POSTs settle to one inbox row (DB arbiter);
+  SIGKILL the session-owning replica → lease expiry (15s: heartbeat 5×3 —
+  the overlay's timing law) → the gateway reconnects through the LB onto
+  the survivor at a bumped epoch, acked deliveries never shrink; an
+  expired-lease outbox row stamped by a GHOST replica is stolen by a live
+  dispatcher and settled exactly once; parallel steers at one
+  expectedVersion (distinct commandIds) → one 200 + one 409 + fresh-version
+  retry wins (target: a parked research.publish work — steer on completed
+  work is a terminal-state refusal); the full slim suite nested through the
+  LB with both replicas running every loop. The kill leg RESTORES the
+  victim (`up -d --no-deps`): docker counts a user KILL as an intentional
+  stop (on-failure restarts crashes, not kills), and later cases need both
+  replicas. The restore loads the SAME overlays as the running stack (the
+  script auto-detects the full profile from a running
+  `facilitator-demo-mattermost-1`): a full stack restored without
+  `compose.full.yaml` recreates the primary stripped of its provider arm,
+  and the adapter's DM events then type `unsupported`.
 
 ## Debugging hooks
 

@@ -15,7 +15,7 @@ apiVersion: facilitator.framework/v1
 kind: Gateway
 gatewayId: gw.team-a          # ^gw\.[a-z0-9]([a-z0-9-]*[a-z0-9])?$
 team: team-alpha              # kernel roster slug (config Link:Teams); 403 team-unknown otherwise
-facilitatorUrl: http://localhost:8080
+facilitatorUrl: http://localhost:8080   # or OFAC_KERNEL_URL (env wins — the deployment origin repoints it, e.g. at a kernel LB)
 enrollmentSecret: enroll-dev  # or OFAC_ENROLL_SECRET (env wins); optional once <stateDir>/token exists
 role: gateway                 # sent at enrollment (default gateway; gw.* endpoints MUST be gateway)
 # workload:                     # mode-(b) enrollment: OIDC client-credentials instead of the secret

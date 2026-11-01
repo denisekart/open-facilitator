@@ -160,6 +160,39 @@ paths:
                     items: { $ref: "#/components/schemas/AdminDeliveryRow" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
+  /api/admin/provisioning:
+    get:
+      operationId: getProvisioning
+      tags: [read]
+      summary: Newest provisioning ops (the scale-law ledger).
+      responses:
+        "200":
+          description: Newest-first ops.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/AdminProvisioningRow" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/admin/replicas:
+    get:
+      operationId: getReplicas
+      tags: [read]
+      summary: Per-replica fleet view — which replica stamps each live lease, sockets held here, fleet queue depth.
+      responses:
+        "200":
+          description: The replicas view.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminReplicasView" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
   /api/admin/metrics:
     get:
       operationId: getMetrics
@@ -511,6 +544,40 @@ components:
       properties:
         hour: { type: string, format: date-time }
         count: { type: integer, format: int64 }
+    AdminProvisioningRow:
+      type: object
+      additionalProperties: false
+      required: [operationId, workloadId, team, operation, state, createdAt, updatedAt]
+      properties:
+        operationId: { type: string, description: Deterministic hash id (replay-safe). }
+        workloadId: { type: string }
+        team: { type: string }
+        operation: { type: string, enum: [start, stop] }
+        state: { type: string, enum: [requested, running, stopped, failed] }
+        workId: { type: [string, "null"], format: uuid }
+        assignmentId: { type: [string, "null"], format: uuid }
+        generation: { type: [integer, "null"] }
+        reason: { type: [string, "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    AdminReplicaRow:
+      type: object
+      additionalProperties: false
+      required: [replicaId, liveSessions, socketsHere]
+      properties:
+        replicaId: { type: string, description: Lease identity stamped on link_sessions rows. }
+        liveSessions: { type: integer, description: Live leases this replica stamps (fleet-wide view). }
+        socketsHere: { type: integer, description: Of those, endpoints THIS replica holds a socket for. }
+    AdminReplicasView:
+      type: object
+      additionalProperties: false
+      required: [answeringReplicaId, replicas, outboxPending]
+      properties:
+        answeringReplicaId: { type: string, description: Identity of the replica that answered. }
+        replicas:
+          type: array
+          items: { $ref: "#/components/schemas/AdminReplicaRow" }
+        outboxPending: { type: integer, format: int64, description: Fleet queue depth (shared tables, identical from every replica). }
     AdminMetrics:
       type: object
       additionalProperties: false

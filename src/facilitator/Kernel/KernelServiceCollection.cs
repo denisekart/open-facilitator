@@ -160,6 +160,11 @@ public static class KernelServiceCollection
         builder.Services.AddSingleton<IEvidenceStore, EvidenceStore>();
         builder.Services.AddScoped<IApprovalLedger, ApprovalLedger>();
         builder.Services.AddHostedService<TeamRosterSeeder>();
+
+        // Horizontal replicas (Plan 35 D): a configured Kernel:ReplicaId that
+        // a live peer already stamps on advancing leases is a fail-closed
+        // startup refusal, not a runtime surprise.
+        builder.Services.AddHostedService<ReplicaIdentityCheck>();
         builder.Services.AddSingleton<ILinkTokenValidator, StoreLinkTokenValidator>();
         builder.Services.AddSingleton<LinkService>();
         builder.Services.AddSingleton<LinkConnectionRegistry>();

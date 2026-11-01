@@ -145,9 +145,11 @@ export interface GatewayHandle {
 }
 
 export function startGateway(configPath: string): GatewayHandle {
-  const child = spawn("node", [GATEWAY_BIN, "run", "--config", configPath], {
-    env: { ...process.env, OFAC_GATEWAY_LOG: "debug" },
-  });
+  const env: Record<string, string | undefined> = { ...process.env, OFAC_GATEWAY_LOG: "debug" };
+  // The config file is the harness's truth: an OFAC_KERNEL_URL leaked from
+  // the dev/CI shell would silently override facilitatorUrl (env overlay).
+  delete env.OFAC_KERNEL_URL;
+  const child = spawn("node", [GATEWAY_BIN, "run", "--config", configPath], { env });
   let log = "";
   child.stdout?.on("data", (c: Buffer) => {
     log += c.toString();

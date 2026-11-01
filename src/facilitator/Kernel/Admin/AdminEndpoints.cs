@@ -71,6 +71,9 @@ public static class AdminEndpoints
         group.MapGet("/metrics", async (string? window, AdminReadStores stores, CancellationToken ct) =>
             Results.Ok(await stores.MetricsAsync(window, ct)));
 
+        group.MapGet("/replicas", async (AdminReadStores stores, CancellationToken ct) =>
+            Results.Ok(await stores.ReplicasAsync(ct)));
+
         MapConfig(group);
         MapMutations(group);
 

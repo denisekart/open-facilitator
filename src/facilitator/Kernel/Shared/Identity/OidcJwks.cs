@@ -70,19 +70,18 @@ public sealed class OidcJwks(IOptions<IdentityOptions> identity)
         }
 
         var keys = await KeysForIssuerAsync(jwt.Issuer, ct);
-        var parameters = new TokenValidationParameters
+        var result = await VerifyAsync(token, audience, keys, clockSkewSeconds);
+        if (!result.IsValid && result.Exception is SecurityTokenSignatureKeyNotFoundException)
         {
-            ValidateIssuer = true,
-            ValidIssuers = TrustedIssuers,
-            ValidateAudience = true,
-            ValidAudience = audience,
-            ValidateIssuerSigningKey = true,
-            ValidAlgorithms = IdentityAuthentication.ValidAlgorithms,
-            ClockSkew = TimeSpan.FromSeconds(clockSkewSeconds),
-            IssuerSigningKeys = keys,
-        };
-
-        var result = await _handler.ValidateTokenAsync(token, parameters);
+            // Unfamiliar kid: the IdP may have lazily created/rotated its
+            // signing key after our cached fetch (Keycloak creates the realm
+            // key on FIRST token issuance, so a cold stack hits this class
+            // for real). Force one refresh and retry — the same law the
+            // stock JwtBearerHandler applies to unknown keys.
+            RefreshIssuer(jwt.Issuer);
+            keys = await KeysForIssuerAsync(jwt.Issuer, ct);
+            result = await VerifyAsync(token, audience, keys, clockSkewSeconds);
+        }
         if (!result.IsValid)
         {
             var reason = result.Exception switch
@@ -98,21 +97,49 @@ public sealed class OidcJwks(IOptions<IdentityOptions> identity)
         return new OidcVerifyResult(ParsePayload(jwt.EncodedPayload), jwt, null);
     }
 
+    private Task<TokenValidationResult> VerifyAsync(
+        string token,
+        string audience,
+        IReadOnlyCollection<SecurityKey> keys,
+        int clockSkewSeconds) =>
+        _handler.ValidateTokenAsync(token, new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuers = TrustedIssuers,
+            ValidateAudience = true,
+            ValidAudience = audience,
+            ValidateIssuerSigningKey = true,
+            ValidAlgorithms = IdentityAuthentication.ValidAlgorithms,
+            ClockSkew = TimeSpan.FromSeconds(clockSkewSeconds),
+            IssuerSigningKeys = keys,
+        });
+
     /// <summary>Discovery-document signing keys for an issuer (cached per issuer, refreshed per manager policy).</summary>
     private async Task<IReadOnlyCollection<SecurityKey>> KeysForIssuerAsync(string issuer, CancellationToken ct)
     {
-        var manager = _managers.GetOrAdd(issuer, static (iss, ident) =>
-            new ConfigurationManager<OpenIdConnectConfiguration>(
-                iss.TrimEnd('/') + "/.well-known/openid-configuration",
-                new OpenIdConnectConfigurationRetriever(),
-                new HttpDocumentRetriever { RequireHttps = ident.Oidc.RequireHttps })
-            {
-                AutomaticRefreshInterval = TimeSpan.FromMinutes(5),
-                RefreshInterval = TimeSpan.FromSeconds(30),
-            }, identity.Value);
-        var config = await manager.GetConfigurationAsync(ct);
+        var config = await ManagerFor(issuer).GetConfigurationAsync(ct);
         return [.. config.SigningKeys];
     }
+
+    /// <summary>
+    /// Force a re-fetch of an issuer's discovery document: replace the cached
+    /// manager with a fresh one (a new manager fetches on first use, so the
+    /// next keys lookup sees a rotated key without waiting the 30s refresh).
+    /// </summary>
+    private void RefreshIssuer(string issuer) => _managers[issuer] = NewManager(issuer, identity.Value.Oidc.RequireHttps);
+
+    private ConfigurationManager<OpenIdConnectConfiguration> ManagerFor(string issuer) =>
+        _managers.GetOrAdd(issuer, static (iss, https) => NewManager(iss, https), identity.Value.Oidc.RequireHttps);
+
+    private static ConfigurationManager<OpenIdConnectConfiguration> NewManager(string issuer, bool requireHttps) =>
+        new(
+            issuer.TrimEnd('/') + "/.well-known/openid-configuration",
+            new OpenIdConnectConfigurationRetriever(),
+            new HttpDocumentRetriever { RequireHttps = requireHttps })
+        {
+            AutomaticRefreshInterval = TimeSpan.FromMinutes(5),
+            RefreshInterval = TimeSpan.FromSeconds(30),
+        };
 
     private static bool TryRead(string token, out JsonWebToken jwt)
     {

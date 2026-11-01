@@ -7,6 +7,7 @@ using Facilitator.Kernel.Shared.Persistence;
 using Facilitator.Kernel.Work;
 
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 using Ofac.Protocol.Validation;
 
@@ -139,12 +140,60 @@ public sealed class ProvisioningProcessor(
         }
     }
 
-    /// <summary>One sweep (public for fake-clock tests): mirror op states,
-    /// then evaluate the escalation arms in law order. Returns the number of
-    /// ops appended this pass.</summary>
+    /// <summary>One sweep (public for fake-clock tests): serialize against
+    /// peer replicas, mirror op states, then evaluate the escalation arms in
+    /// law order. Returns the number of ops appended this pass (a skipped
+    /// pass — a peer replica holds the sweep lock — returns 0).</summary>
     public async Task<int> SweepOnceAsync(CancellationToken ct)
     {
         await using var db = await contextFactory.CreateDbContextAsync(ct);
+
+        // N-replica serialization (Plan 35 D audit): two replicas'
+        // read-evaluate-flush windows interleave without it — both read the
+        // pre-commit ledger, both pass the inflight/maxWorkers gates, both
+        // append ops whose work-keyed ids DIFFER across arms (worker-lost vs
+        // no-capacity collide on nothing), double-starting a workload past
+        // maxWorkers. One advisory xact lock over the whole sweep (the
+        // retention-GC precedent; 420001 migrations, 420002 artifact GC,
+        // 420003 memory GC): a busy sweep means a peer is already evaluating
+        // the same fleet, so skipping is correct, not an error.
+        await db.Database.OpenConnectionAsync(ct);
+        try
+        {
+            await using var tx = await db.Database.BeginTransactionAsync(ct);
+            if (!await TryExecuteScalarBoolAsync(db, $"SELECT pg_try_advisory_xact_lock({SweepLockKey})", ct))
+            {
+                return 0;
+            }
+
+            var appends = await SweepLockedAsync(db, ct);
+            await tx.CommitAsync(ct);
+            return appends;
+        }
+        finally
+        {
+            await db.Database.CloseConnectionAsync();
+        }
+    }
+
+    /// <summary>Advisory xact-lock key serializing scale-law sweeps across
+    /// kernel replicas (see <see cref="SweepOnceAsync"/>).</summary>
+    internal const int SweepLockKey = 420004;
+
+    private static async Task<bool> TryExecuteScalarBoolAsync(FacilitatorDbContext db, string sql, CancellationToken ct)
+    {
+        var connection = db.Database.GetDbConnection();
+        await using var command = connection.CreateCommand();
+        command.Transaction = db.Database.CurrentTransaction?.GetDbTransaction();
+        command.CommandText = sql;
+        return (bool)(await command.ExecuteScalarAsync(ct) ?? false);
+    }
+
+    /// <summary>The sweep's read-evaluate-flush, running inside the sweep
+    /// lock's transaction on the caller's context (the final SaveChanges
+    /// commits with the lock).</summary>
+    private async Task<int> SweepLockedAsync(FacilitatorDbContext db, CancellationToken ct)
+    {
         var now = timeProvider.GetUtcNow().UtcDateTime;
 
         var policy = await PolicyAsync(db, ct);

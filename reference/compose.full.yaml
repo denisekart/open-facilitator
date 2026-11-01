@@ -114,42 +114,15 @@ services:
   # facilitator.json. The bot id is resolved lazily via the configured probe
   # URL (BotIdentityProbeUrl) with the provisioned PAT (provider-generated,
   # unpinnable); the unlinked-mention hint copy is provider data too.
+  # ONE env source shared with the replica twin (compose.replicas.full.yaml
+  # loads the SAME providers file): `extends` resolves against
+  # compose.slim.yaml only, so an inline env block here would leave the twin
+  # provider-less and a webhook whose adapter session rides replica B would
+  # get a typed `unsupported` receipt.
   facilitator:
-    environment:
-      Providers__Mattermost__Enabled: "true"
-      Providers__Mattermost__EndpointId: mm-adapter
-      Providers__Mattermost__Tenant: chat.localhost
-      Providers__Mattermost__SiteUrl: http://mattermost:8065
-      Providers__Mattermost__BotTokenFile: /provision/mm-bot-token
-      Providers__Mattermost__BotIdentityProbeUrl: http://mattermost:8065/api/v4/users/me
-      Providers__Mattermost__LinkHintText: "Your Mattermost account is not linked to a Facilitator identity — send me a DM starting with /link to link it."
-      Providers__Mattermost__AssignEndpointId: gw.team-alpha
-      Providers__Mattermost__AssignCapabilityId: research.analyze
-      # Plan 23: the forgejo arm needs no REST probe (bot id is a config
-      # value, decision 1), so no token file for the kernel. D3:
-      # AssignCapabilityId research.analyze, not the plan's literal
-      # analysis.summarize — the deterministic worker advertises
-      # research.analyze, so the interim assign EXECUTES and the completion
-      # comment closes the loop (22's precedent); analysis.summarize has no
-      # executor here.
-      Providers__Forgejo__Enabled: "true"
-      Providers__Forgejo__EndpointId: forgejo-adapter
-      Providers__Forgejo__Tenant: git.localhost
-      Providers__Forgejo__SiteUrl: http://forgejo:3000
-      Providers__Forgejo__BotUserId: facilitator-bot
-      Providers__Forgejo__AssignEndpointId: gw.team-alpha
-      Providers__Forgejo__AssignCapabilityId: research.analyze
-      # Label-routed interim assign: an issue labeled ofac:coding routes the
-      # coding capability to the coding team's gateway instead of the global
-      # research lane. PrRequestCapability marks the capability whose completed
-      # manifest may carry prRequest/commentRequests (connector dispatch).
-      Providers__Forgejo__AssignRules__0__Label: ofac:coding
-      Providers__Forgejo__AssignRules__0__CapabilityId: coding.implement
-      Providers__Forgejo__AssignRules__0__EndpointId: gw.coding
-      # The coding Work lives on team-coding: the manifest ledger team-scopes
-      # a work's artifacts, and the coding worker's fleet owns them.
-      Providers__Forgejo__AssignRules__0__Team: team-coding
-      Providers__Forgejo__PrRequestCapability: coding.implement
+    env_file:
+      - config/facilitator.env
+      - config/facilitator-providers.env
     volumes:
       - mm_provision:/provision:ro
     depends_on:

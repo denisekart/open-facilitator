@@ -18,7 +18,7 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v7
         with:
           context: .
           file: src/facilitator/Dockerfile
@@ -28,7 +28,7 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
       # Source-built Node runtime (gateway/linkd/worker in one image).
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v7
         with:
           context: .
           file: Dockerfile.node

@@ -4,7 +4,7 @@
 // `duplicate`, terminating the loop).
 import { KNOWN_COMMAND_TYPES } from "@ofac/protocol";
 import type { EnvelopeCommand, EnvelopeEvent, LinkDeliveryV1, ReceiptV1 } from "@ofac/protocol";
-import { nowIso, type SendReceipt } from "./delivery-pipeline.js";
+import { nowIso, epochField, type SendReceipt } from "./delivery-pipeline.js";
 import type { Ledger } from "./ledger.js";
 import type {
   CommandContext,
@@ -141,6 +141,9 @@ export class CommandDispatcher {
         };
         break;
     }
+    // Plan 35 fencing: the receipt echoes the delivered command's execution
+    // epoch (when it carried one) so the kernel fences a stale execution.
+    receipt = { ...receipt, ...epochField(delivery.envelope) };
     // Ledger flip BEFORE the receipt (S:302).
     ledger.markState(delivery.deliveryId, state);
     await sendReceipt(delivery.deliveryId, receipt, correlation);

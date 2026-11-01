@@ -171,6 +171,7 @@ function assignDelivery(overrides: {
   commandId: string;
   capabilityId?: string;
   deliveryId?: string;
+  executionGeneration?: number;
 }): LinkDeliveryV1 {
   return {
     deliveryId: overrides.deliveryId ?? `del-${overrides.commandId}`,
@@ -194,6 +195,7 @@ function assignDelivery(overrides: {
         inputs: { objective: "unit", sourceRefs: [] },
         expectedDeliverables: [{ kind: "analysis.report", mediaType: "text/markdown" }],
         deadline: "2036-10-23T18:00:00Z",
+        executionGeneration: overrides.executionGeneration ?? 1,
         assignmentId: `asg-${overrides.commandId}`,
       },
     },

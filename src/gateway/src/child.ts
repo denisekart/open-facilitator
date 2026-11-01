@@ -30,7 +30,7 @@ export const MANIFEST_SCHEMA_ID =
 
 export type ChildMessage =
   | { kind: "register"; childWorkspaceId: string; manifest: CapabilityManifestV1 }
-  | { kind: "start"; executionId: string; connectionGeneration: number; command: EnvelopeCommand } // work.assign envelope
+  | { kind: "start"; executionId: string; executionGeneration: number; command: EnvelopeCommand } // work.assign envelope (B4: assignment generation, not link epoch)
   | { kind: "steer"; executionId: string; command: EnvelopeCommand }
   | { kind: "status"; executionId: string }
   | { kind: "stop"; executionId: string; reason: string }; // work.cancel

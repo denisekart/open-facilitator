@@ -513,6 +513,7 @@ export function assignEnvelope(overrides: {
       targetId: "e2e",
       capabilityId: "research.analyze",
       expectedContextVersion: 1,
+      executionGeneration: 1,
       inputs: { objective: "e2e", sourceRefs: [] },
       expectedDeliverables: [{ kind: "analysis.report", mediaType: "text/markdown" }],
       deadline: "2036-10-23T18:00:00Z",

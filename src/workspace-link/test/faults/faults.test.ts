@@ -26,6 +26,7 @@ const ENVELOPE = {
     targetId: "gw-1",
     capabilityId: "research.analyze",
     expectedContextVersion: 1,
+    executionGeneration: 1,
     actorEvidenceRef: "identity-evidence:r",
     deadline: "2026-10-23T18:00:00Z",
     inputs: { objective: "x" },

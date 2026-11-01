@@ -31,7 +31,7 @@ export function createEchoHandler(options: EchoHandlerOptions): LinkHandler {
           data: {
             workId: data.workId,
             assignmentId: data.assignmentId,
-            executionGeneration: 1,
+            executionGeneration: data.executionGeneration ?? 1,
             progressNote: "linkd echo: assignment received.",
           },
         }),
@@ -44,7 +44,7 @@ export function createEchoHandler(options: EchoHandlerOptions): LinkHandler {
             workId: data.workId,
             assignmentId: data.assignmentId,
             executionId: `exec-${ctx.deliveryId}`,
-            executionGeneration: 1,
+            executionGeneration: data.executionGeneration ?? 1,
             resultManifest: { manifestId: `man-${ctx.deliveryId}`, outputs: [] },
           },
         }),

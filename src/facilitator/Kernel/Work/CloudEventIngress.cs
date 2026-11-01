@@ -112,9 +112,11 @@ public sealed class CloudEventIngress(
                 return Results.Accepted(null, new { status = arm.Status, inboxId });
             }
 
-            if (type == ResultIngress.CompletedType)
+            if (type == ResultIngress.CompletedType || type == ResultIngress.FailedType)
             {
-                var arm = await results.HandleCompletedAsync(root, null, ct);
+                var arm = type == ResultIngress.CompletedType
+                    ? await results.HandleCompletedAsync(root, null, ct)
+                    : await results.HandleFailedAsync(root, ct);
                 if (arm.Refused)
                 {
                     return await pipeline.SettleAsync(

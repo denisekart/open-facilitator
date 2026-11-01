@@ -14,6 +14,7 @@
     "targetId": "gateway-team-alpha",
     "actorEvidenceRef": "identity-evidence:ref-123",
     "deadline": "2026-10-23T18:00:00Z",
-    "stallEpisode": "stall-7"
+    "stallEpisode": "stall-7",
+    "executionGeneration": 1
   }
 }

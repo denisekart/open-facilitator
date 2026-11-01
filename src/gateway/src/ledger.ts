@@ -15,7 +15,7 @@ export interface GatewayPaths {
   execution: ExecutionLedger;
 }
 
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 
 const DDL_BINDINGS = `
 CREATE TABLE IF NOT EXISTS bindings (
@@ -26,7 +26,8 @@ CREATE TABLE IF NOT EXISTS bindings (
   assignment_id TEXT NOT NULL,
   execution_id  TEXT NOT NULL,                -- gateway-issued, assigned at accept time
   work_id       TEXT NOT NULL,                -- reconcile's assignment.failed needs it
-  connection_generation INTEGER NOT NULL,     -- leaseEpoch at write time
+  connection_generation INTEGER NOT NULL,     -- leaseEpoch at write time (S:329 freshness fence)
+  execution_generation  INTEGER NOT NULL DEFAULT 1, -- assign envelope's executionGeneration (event stamp)
   child_generation INTEGER NOT NULL DEFAULT 0, -- child-connection fence (v2); 0 = pre-child-era row
   state         TEXT NOT NULL CHECK (state IN ('running','completed','failed','lost')),
   error         TEXT,
@@ -176,6 +177,7 @@ export interface BindingRow {
   executionId: string;
   workId: string;
   connectionGeneration: number;
+  executionGeneration: number;
   childGeneration: number;
   state: BindingState;
   error: string | null;
@@ -192,6 +194,8 @@ export interface NewBinding {
   executionId: string;
   workId: string;
   connectionGeneration: number;
+  /** B(4) event stamp; a pre-B envelope sat at generation 1 (DEFAULT 1). */
+  executionGeneration?: number;
   childGeneration: number;
 }
 
@@ -212,6 +216,7 @@ interface DbRow {
   execution_id: string;
   work_id: string;
   connection_generation: number;
+  execution_generation: number;
   child_generation: number;
   state: BindingState;
   error: string | null;
@@ -229,6 +234,7 @@ function toBinding(row: DbRow): BindingRow {
     executionId: row.execution_id,
     workId: row.work_id,
     connectionGeneration: row.connection_generation,
+    executionGeneration: row.execution_generation,
     childGeneration: row.child_generation,
     state: row.state,
     error: row.error,
@@ -289,9 +295,24 @@ export class ExecutionLedger {
     } else if (version === 2) {
       // v2 (plan 06/10) files gain only the Plan 12 pending side table.
       this.db.exec(`BEGIN IMMEDIATE;${DDL_PENDING}PRAGMA user_version = ${SCHEMA_VERSION};COMMIT;`);
+    } else if (version === 3) {
+      // v3 (plan 12) files: the execution_generation ALTER below (idempotent).
     } else if (version !== SCHEMA_VERSION) {
       throw new Error(
         `bindings: unsupported schema version ${version} (this build writes ${SCHEMA_VERSION})`,
+      );
+    }
+    // Plan 35 B(4), idempotent for every pre-v4 file (v1/v2/v3-era): the
+    // event stamp splits from the S:329 freshness fence. DEFAULT 1: every
+    // pre-B envelope rode generation 1 (the kernel's pre-B constant).
+    const cols = this.db.pragma("table_info(bindings)", { simple: false }) as {
+      name: string;
+    }[];
+    if (!cols.some((c) => c.name === "execution_generation")) {
+      this.db.exec(
+        `BEGIN IMMEDIATE;` +
+          `ALTER TABLE bindings ADD COLUMN execution_generation INTEGER NOT NULL DEFAULT 1;` +
+          `PRAGMA user_version = ${SCHEMA_VERSION};COMMIT;`,
       );
     }
   }
@@ -374,13 +395,13 @@ export class ExecutionLedger {
       this.db
         .prepare(
           `INSERT INTO bindings (delivery_id, dedupe_key, gateway_id, child_id, assignment_id,
-                                 execution_id, work_id, connection_generation, child_generation,
-                                 state, error, started_at, updated_at)
+                                 execution_id, work_id, connection_generation, execution_generation,
+                                 child_generation, state, error, started_at, updated_at)
            VALUES (@deliveryId, @dedupeKey, @gatewayId, @childId, @assignmentId,
-                   @executionId, @workId, @connectionGeneration, @childGeneration,
-                   'running', NULL, @now, @now)`,
+                   @executionId, @workId, @connectionGeneration, @executionGeneration,
+                   @childGeneration, 'running', NULL, @now, @now)`,
         )
-        .run({ ...binding, now });
+        .run({ executionGeneration: 1, ...binding, now });
     } catch (error) {
       if (error instanceof Error && error.message.includes("UNIQUE constraint failed")) {
         throw new BindingConflictError(binding.dedupeKey);

@@ -41,6 +41,11 @@ public sealed class AdminMutationStore(
         audit.Append(db, new AuditRecord(actor, "admin.manifest.re-mark", $"/api/admin/manifests/{manifestId}/re-mark", "allow", null, null, null,
             System.Text.Json.JsonSerializer.Serialize(new { manifestId, resultState })));
         await db.SaveChangesAsync(ct);
+        // The wake law (Plan 35 B): a validated re-mark releases a
+        // `result_validated` gate — pull the work's gated routing intents
+        // forward so the funnel re-evaluates now, not at backoff.
+        await Facilitator.Kernel.Work.DependencyGate.WakeGatedRoutingIntentsAsync(
+            db, row.WorkId, DateTime.UtcNow, ct);
         return ReMarkOutcome.Stored;
     }
 }

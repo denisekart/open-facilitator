@@ -152,13 +152,13 @@ function seedV1(file: string): void {
 }
 
 describe("ExecutionLedger schema v2/v3", () => {
-  it("migrates a v1 file in place: version 3, child_state + pending_actions exist, old rows read with childGeneration 0", () => {
+  it("migrates a v1 file in place: version 4, child_state + pending_actions exist, old rows read with childGeneration 0", () => {
     const file = join(mkdtempSync(join(tmpdir(), "gw-ledger-")), "gateway.sqlite3");
     seedV1(file);
 
     const l = open(file);
     const db = new Database(file, { readonly: true });
-    expect(db.pragma("user_version", { simple: true })).toBe(3);
+    expect(db.pragma("user_version", { simple: true })).toBe(4);
     const tables = db
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
       .all() as { name: string }[];
@@ -166,10 +166,16 @@ describe("ExecutionLedger schema v2/v3", () => {
     expect(tables.map((t) => t.name)).toContain("pending_actions");
     db.close();
 
-    // the pre-v2 row survived the ALTER and reads as generation 0
+    // the pre-v2 row survived the ALTERs and reads as generation 0; the
+    // plan-35 ALTER gives every pre-v4 row the honest event stamp 1.
     const old = l.byExecution("exec-old");
     expect(old).not.toBeNull();
-    expect(old).toMatchObject({ childGeneration: 0, connectionGeneration: 1, state: "running" });
+    expect(old).toMatchObject({
+      childGeneration: 0,
+      connectionGeneration: 1,
+      executionGeneration: 1,
+      state: "running",
+    });
     // fresh inserts under v2 carry the child fence
     l.insert(binding({ executionId: "exec-new", dedupeKey: "cmd-new", deliveryId: "del-new" }));
     expect(l.byExecution("exec-new")?.childGeneration).toBe(3);
@@ -181,20 +187,20 @@ describe("ExecutionLedger schema v2/v3", () => {
     db.pragma("user_version = 7");
     db.close();
     expect(() => new ExecutionLedger(file)).toThrow(
-      "bindings: unsupported schema version 7 (this build writes 3)",
+      "bindings: unsupported schema version 7 (this build writes 4)",
     );
   });
 
   it("migrates a v2 file in place: pending_actions appears, bindings untouched", () => {
     const file = join(mkdtempSync(join(tmpdir(), "gw-ledger-")), "gateway.sqlite3");
     seedV1(file);
-    new ExecutionLedger(file).close(); // v1 → v3
+    new ExecutionLedger(file).close(); // v1 → v4
     const v2 = new Database(file);
     v2.exec("DROP TABLE pending_actions; PRAGMA user_version = 2;");
     v2.close();
     const l = open(file);
     const db = new Database(file, { readonly: true });
-    expect(db.pragma("user_version", { simple: true })).toBe(3);
+    expect(db.pragma("user_version", { simple: true })).toBe(4);
     const tables = db
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
       .all() as { name: string }[];

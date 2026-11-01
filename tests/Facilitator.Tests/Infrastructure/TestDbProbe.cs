@@ -772,6 +772,111 @@ public sealed class TestDbProbe : IAsyncDisposable
                 cmd.Parameters.AddWithValue(status);
             });
 
+    /// <summary>Hand-mint an assignment ledger row (optionally with a pinned
+    /// identity/generation — the DAG tests pin the deterministic UUID the
+    /// funnel will land); returns the assignment id. Probe seeding for the
+    /// nudge/fence lanes where the full funnel is not the subject.</summary>
+    public async Task<Guid> SeedAssignmentRow(
+        Guid workId, string status, int generation = 1, Guid? assignmentId = null, string? capabilityId = null)
+    {
+        var id = assignmentId ?? Guid.NewGuid();
+        await NonQuery(
+            "INSERT INTO facilitator.assignments (assignment_id, work_id, team_id, capability_id, status, "
+            + "current_execution_generation, created_at, updated_at) "
+            + "VALUES ($1, $2, NULL, $3, $4, $5, now(), now())",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(id);
+                cmd.Parameters.AddWithValue(workId);
+                cmd.Parameters.AddWithValue((object?)capabilityId ?? DBNull.Value);
+                cmd.Parameters.AddWithValue(status);
+                cmd.Parameters.AddWithValue(generation);
+            });
+        return id;
+    }
+
+    /// <summary>Hand-mint an execution-attempt row with a pinned start time
+    /// (the nudge staleness clock).</summary>
+    public Task SeedAttemptRow(
+        Guid executionId, Guid assignmentId, int generation, string status, DateTime startedAt) =>
+        NonQuery(
+            "INSERT INTO facilitator.execution_attempts (execution_id, assignment_id, generation, status, started_at, ended_at) "
+            + "VALUES ($1, $2, $3, $4, $5, NULL)",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(executionId);
+                cmd.Parameters.AddWithValue(assignmentId);
+                cmd.Parameters.AddWithValue(generation);
+                cmd.Parameters.AddWithValue(status);
+                cmd.Parameters.AddWithValue(startedAt);
+            });
+
+    /// <summary>Hand-mint the outbox row that carried an assign to an endpoint
+    /// — the ownership ledger the nudge sweeper reads (its owner join matches
+    /// the N-format assignmentId inside `data`). Stable command id
+    /// `work-assign:&lt;assignmentId&gt;-seed`; returns the outbox id.</summary>
+    public async Task<Guid> SeedAssignLedgerRow(Guid workId, Guid assignmentId, string endpoint, int generation = 1)
+    {
+        var outboxId = Guid.NewGuid();
+        await NonQuery(
+            "INSERT INTO facilitator.outbox (outbox_id, recipient_endpoint_id, aggregate_type, aggregate_id, "
+            + "event_type, command_id, envelope, work_id, status, available_at, attempts, created_at, processed_at) "
+            + "VALUES ($1, 'link.' || $2, 'work', $3, 'org.facilitator.command.work.assign.v1', "
+            + "'work-assign:' || $4 || '-seed', "
+            + "jsonb_build_object('data', jsonb_build_object('assignmentId', $5, 'executionGeneration', $6)), "
+            + "$3, 'delivered', now(), 1, now(), now())",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(outboxId);
+                cmd.Parameters.AddWithValue(endpoint);
+                cmd.Parameters.AddWithValue(workId);
+                cmd.Parameters.AddWithValue(assignmentId.ToString("N"));
+                cmd.Parameters.AddWithValue(assignmentId.ToString("N"));
+                cmd.Parameters.AddWithValue(generation);
+            });
+        return outboxId;
+    }
+
+    /// <summary>Hand-mint a work timeline row (the sweeper's progress signal).</summary>
+    public Task SeedTimelineRow(Guid workId, string kind, string detailJson = "{}") =>
+        NonQuery(
+            "INSERT INTO facilitator.work_events (event_id, work_id, work_version, kind, actor, detail, created_at) "
+            + "VALUES (gen_random_uuid(), $1, 1, $2, 'seed', $3::jsonb, now())",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(workId);
+                cmd.Parameters.AddWithValue(kind);
+                cmd.Parameters.AddWithValue(detailJson);
+            });
+
+    /// <summary>Hand-mint (or replace) an admin_config row for a test that
+    /// wants configuration state without the admin API roundtrip.</summary>
+    public Task SeedAdminConfig(string resource, string payloadJson) =>
+        NonQuery(
+            "INSERT INTO facilitator.admin_config (resource, row_version, payload, author, reason, updated_at) "
+            + "VALUES ($1, 1, $2::jsonb, 'seed', 'test seed', now()) "
+            + "ON CONFLICT (resource) DO UPDATE SET payload = excluded.payload, "
+            + "row_version = facilitator.admin_config.row_version + 1, updated_at = now()",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(resource);
+                cmd.Parameters.AddWithValue(payloadJson);
+            });
+
+    /// <summary>Acked link delivery for an outbox row — the sweeper counts it
+    /// as work activity (the freshness signal on a live lane).</summary>
+    public Task SeedAckedDelivery(Guid outboxId, string endpointId, DateTime ackedAt) =>
+        NonQuery(
+            "INSERT INTO facilitator.link_deliveries (delivery_id, endpoint_id, session_epoch, state, "
+            + "delivered_at, acked_at, attempts) "
+            + "VALUES ($1, $2, 1, 'acked', $3, $3, 1)",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(outboxId);
+                cmd.Parameters.AddWithValue(endpointId);
+                cmd.Parameters.AddWithValue(ackedAt);
+            });
+
     /// <summary>Hand-mint an approvals ledger row against a work (admin detail seeding).</summary>
     public Task SeedApproval(Guid approvalId, Guid workId, string eligibleActorsJson = "[]") =>
         NonQuery(
@@ -940,6 +1045,34 @@ public sealed class TestDbProbe : IAsyncDisposable
                 cmd.Parameters.AddWithValue(subject);
             });
 
+    /// <summary>Expire one endpoint's live session lease (per-lane nudge
+    /// isolation: the sweeper skips offline owners, so a finished test's
+    /// lane stops joining later sweeps without touching foreign leases).</summary>
+    public Task ExpireSessionLease(string endpointId) =>
+        NonQuery(
+            "UPDATE facilitator.link_sessions SET lease_until = now() - interval '1 second' "
+            + "WHERE logical_endpoint_id = $1 AND lease_until > now()",
+            cmd => cmd.Parameters.AddWithValue(endpointId));
+
+    /// <summary>The nudge ledger rows for an assignment (episode, count,
+    /// generation), ordered by episode — the §5.3 bounded-nudge window.</summary>
+    public async Task<List<(int Episode, int NudgeCount, int Generation)>> NudgeRowsForAssignment(Guid assignmentId)
+    {
+        await using var connection = await _dataSource.OpenConnectionAsync();
+        await using var cmd = new NpgsqlCommand(
+            "SELECT stall_episode, nudge_count, generation FROM facilitator.nudges "
+            + "WHERE assignment_id = $1 ORDER BY stall_episode", connection);
+        cmd.Parameters.AddWithValue(assignmentId);
+        var rows = new List<(int, int, int)>();
+        await using var reader = await cmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            rows.Add((reader.GetInt32(0), reader.GetInt32(1), reader.GetInt32(2)));
+        }
+
+        return rows;
+    }
+
     /// <inheritdoc />
     public async ValueTask DisposeAsync() => await _dataSource.DisposeAsync();
 
@@ -987,5 +1120,35 @@ public sealed class TestDbProbe : IAsyncDisposable
         }
 
         return values;
+    }
+
+    /// <summary>Hand-mint a result-manifest ledger row pinned to a specific
+    /// assignment (the DAG gate's <c>result_validated</c> edge reads the row
+    /// by <c>assignment_id</c>, which <c>SeedResultManifest</c> cannot target),
+    /// in the given <c>result_state</c>.</summary>
+    public Task SeedAssignmentManifest(string manifestId, Guid workId, Guid assignmentId, string resultState) =>
+        NonQuery(
+            "INSERT INTO facilitator.result_manifests (manifest_id, work_id, assignment_id, execution_id, "
+            + "revision, digest, artifact_id, output_artifact_ids, result_state, state, recorded_at) "
+            + "VALUES ($1, $2, $3, 'exec-dag', 1, 'sha256:' || repeat('b', 64), gen_random_uuid(), "
+            + "'{}'::text[], $4, 'recorded', now())",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(manifestId);
+                cmd.Parameters.AddWithValue(workId);
+                cmd.Parameters.AddWithValue(assignmentId);
+                cmd.Parameters.AddWithValue(resultState);
+            });
+
+    /// <summary>The inbox settle pair (state, error) for one envelope id,
+    /// when a row exists — the fence law's refused-audit window.</summary>
+    public async Task<(string State, string? Error)?> InboxStateError(string eventId)
+    {
+        await using var connection = await _dataSource.OpenConnectionAsync();
+        await using var cmd = new NpgsqlCommand(
+            "SELECT state, error FROM facilitator.inbox WHERE event_id = $1", connection);
+        cmd.Parameters.AddWithValue(eventId);
+        await using var reader = await cmd.ExecuteReaderAsync();
+        return await reader.ReadAsync() ? (reader.GetString(0), reader.IsDBNull(1) ? null : reader.GetString(1)) : null;
     }
 }

@@ -239,7 +239,7 @@ export function runAdapterLifecycleContract(opts: AdapterLifecycleContractOption
       const reply = await h.link.send({
         kind: "start",
         executionId,
-        connectionGeneration: 7,
+        executionGeneration: 7,
         command: assignEnvelope(`kit-cmd-${caseCounter}`, workId, assignmentId) as never,
       });
       expect(reply).toEqual({ kind: "accepted", executionId });
@@ -281,7 +281,7 @@ export function runAdapterLifecycleContract(opts: AdapterLifecycleContractOption
       const first = await h.link.send({
         kind: "start",
         executionId: `kit-exec-${caseCounter}a`,
-        connectionGeneration: 1,
+        executionGeneration: 1,
         command: envelope as never,
       });
       expect(first.kind).toBe("accepted");
@@ -290,7 +290,7 @@ export function runAdapterLifecycleContract(opts: AdapterLifecycleContractOption
       const duplicate = await h.link.send({
         kind: "start",
         executionId: `kit-exec-${caseCounter}b`,
-        connectionGeneration: 1,
+        executionGeneration: 1,
         command: envelope as never,
       });
       expect(duplicate).toEqual({ kind: "accepted", executionId: `kit-exec-${caseCounter}b` });
@@ -309,7 +309,7 @@ export function runAdapterLifecycleContract(opts: AdapterLifecycleContractOption
       const reply = await h.link.send({
         kind: "start",
         executionId,
-        connectionGeneration: 2,
+        executionGeneration: 2,
         command: assignEnvelope(`kit-steercmd-${caseCounter}`, workId, assignmentId) as never,
       });
       expect(reply.kind).toBe("accepted");
@@ -344,7 +344,7 @@ export function runAdapterLifecycleContract(opts: AdapterLifecycleContractOption
       const reply = await h.link.send({
         kind: "start",
         executionId,
-        connectionGeneration: 3,
+        executionGeneration: 3,
         command: assignEnvelope(`kit-stopcmd-${caseCounter}`, workId, assignmentId) as never,
       });
       expect(reply.kind).toBe("accepted");
@@ -370,7 +370,7 @@ export function runAdapterLifecycleContract(opts: AdapterLifecycleContractOption
       await h.link.send({
         kind: "start",
         executionId,
-        connectionGeneration: 1,
+        executionGeneration: 1,
         command: assignEnvelope(`kit-statuscmd-${caseCounter}`, workId, assignmentId) as never,
       });
       const running = await h.link.send({ kind: "status", executionId });
@@ -393,7 +393,7 @@ export function runAdapterLifecycleContract(opts: AdapterLifecycleContractOption
       const reply = await h.link.send({
         kind: "start",
         executionId,
-        connectionGeneration: 4,
+        executionGeneration: 4,
         command: assignEnvelope(`kit-restartcmd-${caseCounter}`, workId, assignmentId) as never,
       });
       expect(reply.kind).toBe("accepted");

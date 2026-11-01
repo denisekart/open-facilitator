@@ -645,6 +645,9 @@ namespace Ofac.Protocol
         [JsonPropertyName("deadline")]
         public string deadline { get; set; }
 
+        [JsonPropertyName("executionGeneration")]
+        public long executionGeneration { get; set; }
+
         [JsonPropertyName("expectedContextVersion")]
         public long expectedContextVersion { get; set; }
 
@@ -719,6 +722,9 @@ namespace Ofac.Protocol
         [JsonPropertyName("deadline")]
         public string deadline { get; set; }
 
+        [JsonPropertyName("executionGeneration")]
+        public long executionGeneration { get; set; }
+
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("stallEpisode")]
         [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
@@ -777,6 +783,9 @@ namespace Ofac.Protocol
         [JsonPropertyName("directive")]
         [JsonConverter(typeof(AmbitiousMinMaxLengthCheckConverter))]
         public string directive { get; set; }
+
+        [JsonPropertyName("executionGeneration")]
+        public long executionGeneration { get; set; }
 
         [JsonPropertyName("expectedContextVersion")]
         public long expectedContextVersion { get; set; }
@@ -1535,6 +1544,11 @@ namespace Ofac.Protocol
         [JsonPropertyName("commandIdBase")]
         public string commandIdBase { get; set; }
 
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("dependsOnJson")]
+        [JsonConverter(typeof(MinMaxLengthCheckConverter4))]
+        public string? dependsOnJson { get; set; }
+
         /// <summary>
         /// Effect-identity override: the assign effect row is '&lt;commandIdBase&gt;:&lt;effectKey&gt;' instead
         /// of '&lt;commandIdBase&gt;:&lt;workId&gt;'. A re-dispatch intent uses the steer command id, preserving
@@ -1546,12 +1560,16 @@ namespace Ofac.Protocol
         [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
         public string? effectKey { get; set; }
 
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("executionGeneration")]
+        public long? executionGeneration { get; set; }
+
         /// <summary>
         /// Rule-configured extra inputs (JSON object) merged into the assign's inputs.extras.
         /// </summary>
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("extraInputsJson")]
-        [JsonConverter(typeof(MinMaxLengthCheckConverter4))]
+        [JsonConverter(typeof(MinMaxLengthCheckConverter5))]
         public string? extraInputsJson { get; set; }
 
         [JsonPropertyName("intentId")]
@@ -1578,7 +1596,7 @@ namespace Ofac.Protocol
         /// </summary>
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("referenceJson")]
-        [JsonConverter(typeof(MinMaxLengthCheckConverter4))]
+        [JsonConverter(typeof(MinMaxLengthCheckConverter5))]
         public string? referenceJson { get; set; }
 
         /// <summary>
@@ -1673,6 +1691,10 @@ namespace Ofac.Protocol
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("detail")]
         public Dictionary<string, object>? detail { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("executionGeneration")]
+        public long? executionGeneration { get; set; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("processedAt")]
@@ -3202,6 +3224,33 @@ namespace Ofac.Protocol
         public override string Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             var value = reader.GetString();
+            if (value.Length >= 2 && value.Length <= 8192)
+            {
+                return value;
+            }
+            throw new Exception("Cannot unmarshal type string");
+        }
+
+        public override void Write(Utf8JsonWriter writer, string value, JsonSerializerOptions options)
+        {
+            if (value.Length >= 2 && value.Length <= 8192)
+            {
+                JsonSerializer.Serialize(writer, value, options);
+                return;
+            }
+            throw new Exception("Cannot marshal type string");
+        }
+
+        public static readonly MinMaxLengthCheckConverter4 Singleton = new MinMaxLengthCheckConverter4();
+    }
+
+    internal class MinMaxLengthCheckConverter5 : JsonConverter<string>
+    {
+        public override bool CanConvert(Type t) => t == typeof(string);
+
+        public override string Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            var value = reader.GetString();
             if (value.Length <= 8192)
             {
                 return value;
@@ -3219,7 +3268,7 @@ namespace Ofac.Protocol
             throw new Exception("Cannot marshal type string");
         }
 
-        public static readonly MinMaxLengthCheckConverter4 Singleton = new MinMaxLengthCheckConverter4();
+        public static readonly MinMaxLengthCheckConverter5 Singleton = new MinMaxLengthCheckConverter5();
     }
 
     internal class WorkspaceHeartbeatEventV1DataStatusConverter : JsonConverter<WorkspaceHeartbeatEventV1DataStatus>

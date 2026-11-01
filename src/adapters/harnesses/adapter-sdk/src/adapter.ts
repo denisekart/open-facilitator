@@ -199,7 +199,7 @@ class Adapter implements AdapterHandle {
     const message = frame.message;
     switch (message.kind) {
       case "start": {
-        const { executionId, connectionGeneration, command } = message;
+        const { executionId, executionGeneration, command } = message;
         const commandId = commandIdOf(command) || executionId;
         const existing =
           this.registry.find(executionId) ?? this.registry.findByCommandId(commandId);
@@ -213,7 +213,7 @@ class Adapter implements AdapterHandle {
           entry,
           controller,
           steered: undefined,
-          ctx: this.makeContext(entry, command, controller, connectionGeneration),
+          ctx: this.makeContext(entry, command, controller, executionGeneration),
         };
         this.runs.set(executionId, record);
         void this.execute(record);

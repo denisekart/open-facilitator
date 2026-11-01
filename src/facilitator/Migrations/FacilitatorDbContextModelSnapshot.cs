@@ -303,6 +303,10 @@ namespace Facilitator.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("current_execution_generation");
 
+                    b.Property<string>("DependsOn")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("depends_on");
+
                     b.Property<long?>("ExpectedContextVersion")
                         .HasColumnType("bigint")
                         .HasColumnName("expected_context_version");
@@ -1097,6 +1101,37 @@ namespace Facilitator.Migrations
                     b.ToTable("memory_usage", "facilitator");
                 });
 
+            modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.NudgeLedgerEntity", b =>
+                {
+                    b.Property<Guid>("AssignmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("assignment_id");
+
+                    b.Property<int>("Generation")
+                        .HasColumnType("integer")
+                        .HasColumnName("generation");
+
+                    b.Property<int>("StallEpisode")
+                        .HasColumnType("integer")
+                        .HasColumnName("stall_episode");
+
+                    b.Property<DateTime>("LastNudgeAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_nudge_at");
+
+                    b.Property<DateTime>("LastProgressAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_progress_at");
+
+                    b.Property<int>("NudgeCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("nudge_count");
+
+                    b.HasKey("AssignmentId", "Generation", "StallEpisode");
+
+                    b.ToTable("nudges", "facilitator");
+                });
+
             modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.OutboxEntity", b =>
                 {
                     b.Property<Guid>("OutboxId")
@@ -1729,6 +1764,18 @@ namespace Facilitator.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("memory_shares_entry_id_fkey");
+                });
+
+            modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.NudgeLedgerEntity", b =>
+                {
+                    b.HasOne("Facilitator.Kernel.Shared.Persistence.AssignmentEntity", "Assignment")
+                        .WithMany()
+                        .HasForeignKey("AssignmentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("nudges_assignment_id_fkey");
+
+                    b.Navigation("Assignment");
                 });
 
             modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.ProjectEntity", b =>

@@ -253,6 +253,7 @@ export interface WorkAssignCommandV1Data {
   capabilityId: string;
   commandId: string;
   deadline: string;
+  executionGeneration: number;
   expectedContextVersion: number;
   expectedDeliverables: [Deliverable, ...Deliverable[]];
   inputs: { [key: string]: unknown };
@@ -280,6 +281,7 @@ export interface WorkNudgeCommandV1Data {
   assignmentId: string;
   commandId: string;
   deadline: string;
+  executionGeneration: number;
   stallEpisode?: string;
   targetId: string;
   workId: string;
@@ -300,6 +302,7 @@ export interface WorkSteerCommandV1Data {
   commandId: string;
   deadline: string;
   directive: string;
+  executionGeneration: number;
   expectedContextVersion: number;
   targetId: string;
   workId: string;
@@ -636,6 +639,7 @@ export interface EventRoutingRequestedV1 {
    * (effectKey defaults to the workId), keeping routing replay-idempotent.
    */
   commandIdBase: string;
+  dependsOnJson?: string;
   /**
    * Effect-identity override: the assign effect row is '<commandIdBase>:<effectKey>' instead
    * of '<commandIdBase>:<workId>'. A re-dispatch intent uses the steer command id, preserving
@@ -643,6 +647,7 @@ export interface EventRoutingRequestedV1 {
    * cutover.
    */
   effectKey?: string;
+  executionGeneration?: number;
   /**
    * Rule-configured extra inputs (JSON object) merged into the assign's inputs.extras.
    */
@@ -703,6 +708,7 @@ export type WorkspaceHeartbeatEventV1DataStatus = "idle" | "busy" | "draining" |
 export interface ReceiptV1 {
   deliveryId: string;
   detail?: { [key: string]: unknown };
+  executionGeneration?: number;
   processedAt?: string;
   reason?: string;
   status: ReceiptV1Status;

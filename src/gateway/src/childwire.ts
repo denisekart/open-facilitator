@@ -19,7 +19,7 @@ export const MAX_CHILD_FRAME_BYTES = 262_144;
 /** Commands the Gateway pushes to a child: 05's vocabulary minus `register`
  * (registration rides the `hello` frame; the child sees the same messages). */
 export type ChildWireCommand =
-  | { kind: "start"; executionId: string; connectionGeneration: number; command: EnvelopeCommand }
+  | { kind: "start"; executionId: string; executionGeneration: number; command: EnvelopeCommand }
   | { kind: "steer"; executionId: string; command: EnvelopeCommand }
   | { kind: "status"; executionId: string }
   | { kind: "stop"; executionId: string; reason: string };

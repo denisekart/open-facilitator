@@ -268,6 +268,10 @@ public sealed class LinkLedger(
         if (!requeue)
         {
             await OutboxRepository.MarkDeliveredOnAsync(db, deliveryId, now, ct);
+            // §7.4 execution-attempt law: an accepted assign receipt IS the
+            // proof of execution start — open the attempt row (execution id =
+            // delivery id) and walk the assignment to running, in this tx.
+            await Facilitator.Kernel.Work.ExecutionLedger.OpenAttemptOnAckAsync(db, deliveryId, now, ct);
         }
 
         await tx.CommitAsync(ct);

@@ -86,7 +86,7 @@ compose-full:
 	@echo "Provider adapter :8066 (GET /healthz), kernel provider section ON. Live proof: make provider-e2e"
 
 # Provider-ingest live proof (Plan 22 + 23 + 24): the full stack must be up
-# first (`make compose-full`); 17 steps, verify-shaped report.
+# first (`make compose-full`); 18 steps, verify-shaped report.
 # Step selection: make provider-e2e ARGS="--only provider-boot".
 provider-e2e:
 	@echo "Provider E2E tier: needs the FULL stack (make compose-full) — mattermost :8065, adapter :8066, kernel :8088."

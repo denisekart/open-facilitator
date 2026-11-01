@@ -148,6 +148,7 @@ function assignDelivery(commandId: string): LinkDeliveryV1 {
         targetId: "unit",
         capabilityId: "research.analyze",
         expectedContextVersion: 1,
+        executionGeneration: 1,
         inputs: { objective: "unit", sourceRefs: [] },
         expectedDeliverables: [{ kind: "analysis.report", mediaType: "text/markdown" }],
         deadline: "2036-10-23T18:00:00Z",
@@ -183,7 +184,7 @@ function interaction(
         deadline: "2036-10-23T18:00:00Z",
         assignmentId,
         ...(kind === "steer"
-          ? { directive: "pivot", expectedContextVersion: 1 }
+          ? { directive: "pivot", expectedContextVersion: 1, executionGeneration: 1 }
           : { reason: "no longer needed" }),
       },
     },

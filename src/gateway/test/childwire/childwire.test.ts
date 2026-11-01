@@ -123,7 +123,7 @@ describe("createFrameParser", () => {
         message: {
           kind: "start",
           executionId: "exec-1",
-          connectionGeneration: 4,
+          executionGeneration: 4,
           command: envelope,
         },
       },

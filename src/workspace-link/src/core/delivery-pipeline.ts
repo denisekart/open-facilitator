@@ -21,6 +21,20 @@ export function nowIso(): string {
   return new Date().toISOString();
 }
 
+/**
+ * Plan 35 fencing: a receipt for a command whose data carries an execution
+ * epoch echoes it, so the kernel can fence a stale execution's own delivery
+ * answer. A non-number (malformed/absent) simply omits the field — the
+ * receipt schema keeps it optional.
+ */
+export function epochField(envelope: unknown): { executionGeneration?: number } {
+  const data = (envelope as { data?: Record<string, unknown> } | undefined)?.data;
+  const generation = data?.["executionGeneration"];
+  return typeof generation === "number" && Number.isInteger(generation) && generation >= 1
+    ? { executionGeneration: generation }
+    : {};
+}
+
 export class DeliveryPipeline {
   constructor(
     private readonly deps: {
@@ -56,6 +70,7 @@ export class DeliveryPipeline {
         await sendReceipt(delivery.deliveryId, {
           status: "unsupported",
           reason: `envelope ${shape.errorClass}: ${shape.message}`,
+          ...epochField(delivery.envelope),
         });
         return;
       }
@@ -63,6 +78,7 @@ export class DeliveryPipeline {
       await sendReceipt(delivery.deliveryId, {
         status: "rejected",
         reason: `envelope ${shape.errorClass}: ${shape.message}`,
+        ...epochField(delivery.envelope),
       });
       return;
     }
@@ -71,6 +87,7 @@ export class DeliveryPipeline {
       await sendReceipt(delivery.deliveryId, {
         status: "rejected",
         reason: `envelope exceeds ${MAX_ENVELOPE_BYTES} wire bytes`,
+        ...epochField(delivery.envelope),
       });
       return;
     }
@@ -80,7 +97,11 @@ export class DeliveryPipeline {
     if (ledger.insertIfNew(delivery.deliveryId, env, dedupe) === "duplicate") {
       counters.duplicate += 1;
       logger.debug("duplicate delivery → duplicate receipt", correlation);
-      await sendReceipt(delivery.deliveryId, { status: "duplicate", processedAt: nowIso() });
+      await sendReceipt(delivery.deliveryId, {
+        status: "duplicate",
+        processedAt: nowIso(),
+        ...epochField(env),
+      });
       return;
     }
     // 3) Fresh: business events are facts, auto-acked after logging;
@@ -93,7 +114,11 @@ export class DeliveryPipeline {
       ledger.markState(delivery.deliveryId, "processed");
       counters.processed += 1;
       logger.info("event delivery auto-acked", { ...correlation, type: env.type });
-      await sendReceipt(delivery.deliveryId, { status: "accepted", processedAt: nowIso() });
+      await sendReceipt(delivery.deliveryId, {
+        status: "accepted",
+        processedAt: nowIso(),
+        ...epochField(env),
+      });
       return;
     }
     if (queue.saturated()) {

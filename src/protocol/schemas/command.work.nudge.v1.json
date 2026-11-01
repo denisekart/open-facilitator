@@ -10,7 +10,8 @@
     "targetId",
     "actorEvidenceRef",
     "deadline",
-    "assignmentId"
+    "assignmentId",
+    "executionGeneration"
   ],
   "properties": {
     "commandId": {
@@ -33,6 +34,10 @@
     },
     "stallEpisode": {
       "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "executionGeneration": {
+      "type": "integer",
+      "minimum": 1
     }
   }
 }

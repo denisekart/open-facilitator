@@ -16,6 +16,7 @@
     "targetId": "demo/widgets",
     "objective": "Add a changelog entry.",
     "referenceJson": "{\"provider\":\"forgejo\",\"issue\":8}",
-    "actorEvidenceRef": "kernel:provider-ingest:work-123"
+    "actorEvidenceRef": "kernel:provider-ingest:work-123",
+    "executionGeneration": 1
   }
 }

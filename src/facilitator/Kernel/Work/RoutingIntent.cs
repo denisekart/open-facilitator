@@ -37,7 +37,9 @@ public sealed record RoutingIntent(
     string Objective,
     string? SourceRefsJson,
     string? ExtraInputsJson,
-    string ActorEvidenceRef)
+    string ActorEvidenceRef,
+    int ExecutionGeneration = 1,
+    string? DependsOnJson = null)
 {
     /// <summary>Envelope type of the intent event.</summary>
     public const string Type = "org.facilitator.event.routing.requested.v1";
@@ -55,6 +57,50 @@ public sealed record RoutingIntent(
     /// <summary>Command id of the intent row itself (double idempotency with
     /// the effect row's unique command id).</summary>
     public string IntentCommandId => $"routing:{EffectCommandId}";
+
+    /// <summary>The Name-based (SHA-1, RFC 9562) assignment identity: derived
+    /// from the effect command id alone, so a create carrying sibling
+    /// dependencies can reference a sibling's identity BEFORE the funnel
+    /// runs, and the funnel lands exactly the identity the store wrote into
+    /// <c>depends_on</c> — the DAG join needs the assignment id deterministic,
+    /// not crash-replay-stable.</summary>
+    public Guid DeterministicAssignmentId => AssignmentIdFor(EffectCommandId);
+
+    /// <summary>The single derivation of the DAG-visible assignment identity:
+    /// UUIDv5 (SHA-1, RFC 9562) over the namespaced name — computed here
+    /// because the in-box BCL predates <c>Guid.CreateVersion5</c>.</summary>
+    public static Guid AssignmentIdFor(string effectCommandId)
+    {
+        static byte[] Wire(Guid g)
+        {
+            var b = g.ToByteArray();
+            return [b[3], b[2], b[1], b[0], b[5], b[4], b[7], b[6], b[8], b[9], b[10], b[11], b[12], b[13], b[14], b[15]];
+        }
+
+        var name = System.Text.Encoding.UTF8.GetBytes($"facilitator:assignment:{effectCommandId}");
+        var hash = System.Security.Cryptography.SHA1.HashData([.. Wire(new Guid("f7ac5ca4-1d47-4ee3-b037-3f19a1d4b904")), .. name]);
+        hash[6] = (byte)((hash[6] & 0x0F) | 0x50); // version 5
+        hash[8] = (byte)((hash[8] & 0x3F) | 0x80); // RFC 4122 variant
+        var fromWire = new byte[16];
+        fromWire[0] = hash[3];
+        fromWire[1] = hash[2];
+        fromWire[2] = hash[1];
+        fromWire[3] = hash[0];
+        fromWire[4] = hash[5];
+        fromWire[5] = hash[4];
+        fromWire[6] = hash[7];
+        fromWire[7] = hash[6];
+        System.Array.Copy(hash, 8, fromWire, 8, 8);
+        return new Guid(fromWire);
+    }
+
+    /// <summary>The canonical effect key for a create-batch assignment at
+    /// <paramref name="index"/> (index 0 carries the bare work id — the
+    /// pre-DAG ledger identity, byte-for-byte). The single source for both
+    /// the store's intents and the ingress's dependency resolution: the
+    /// DAG join depends on it.</summary>
+    public static string CreateEffectKey(Guid workId, int index) =>
+        index == 0 ? workId.ToString("N") : $"{workId:N}-{index}";
 }
 
 /// <summary>A caller-supplied assignment intent on <c>POST /api/works</c>:
@@ -74,7 +120,11 @@ public sealed record RoutingIntentSeed(
     string? TargetId = null,
     string? PreferenceEndpointId = null,
     string? ActorEvidenceRef = null,
-    System.Text.Json.JsonElement? Inputs = null);
+    System.Text.Json.JsonElement? Inputs = null,
+    // Raw `dependsOn` array ({index|assignmentId, condition}); the store
+    // validates + resolves sibling indexes to deterministic assignment
+    // identities before the first funnel run (Plan 35 B).
+    System.Text.Json.JsonElement? DependsOn = null);
 
 /// <summary>CloudEvent envelope for a <see cref="RoutingIntent"/> (kernel source;
 /// validated like every kernel emission before insert).</summary>
@@ -126,6 +176,16 @@ public static class RoutingIntentEnvelope
         if (intent.ExtraInputsJson is { Length: > 0 } extras)
         {
             data["extraInputsJson"] = extras;
+        }
+
+        if (intent.ExecutionGeneration > 1)
+        {
+            data["executionGeneration"] = intent.ExecutionGeneration;
+        }
+
+        if (intent.DependsOnJson is { Length: > 0 } deps)
+        {
+            data["dependsOnJson"] = deps;
         }
 
         return data;

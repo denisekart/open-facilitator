@@ -13,7 +13,7 @@ Normative source: `docs/specs/open_facilitator_framework_architecture.md` §2–
 
 Kernel code lives in `src/facilitator` (single deployable), grouped by feature: `Kernel/Work` (lifecycle + its coordination store), `Kernel/Link` (workspace-link server), `Kernel/Shared` (Auth, Identity, Dispatch, Persistence, CLI, metrics — not a feature). Namespace root `Facilitator.Kernel.*` follows folders. Composition: `KernelServiceCollection` exposes one extension method per folder (`AddSharedKernel`/`AddIdentityFeature`/`AddWorkFeature`/`AddLinkFeature`); new services register in their folder's method. Raw SQL lives only inside `Kernel/Shared/Persistence` classes and only for advisory locks, `pg_notify`/`LISTEN`, `FOR UPDATE SKIP LOCKED` claims, and version-fenced UPDATEs; no endpoint lambda injects a DbContext.
 
-- **Schema** (Postgres `facilitator` schema, EF Core migrations `InitialCreate` + `AddLinkServer` + `AddIdentityFoundation` + `AddWorkloadIdentity` + `AddApprovalLifecycle` + `AddArtifactStore` + `AddArtifactGcTimelineKind` + `AddResultManifests` + `AddMemoryBroker` + `AddAdminConfig` + `provider_identities`, auto-applied on startup behind `pg_advisory_lock(420001)`): `teams`, `projects`, `works`, `work_events`, `inbox`, `outbox`, `dead_letters`, `provider_events` are written by Plan 02; `link_enrollments` and `link_deliveries` by Plan 03 (see below); `audit` and `identity_roles` by Plan 09 (identity, below); `evidence` + `link_enrollments.role/-accepts-delegated/-workload-*` by Plan 10 (workload identity, below); `approvals` is the lifecycle authority by Plan 11 (approvals, below); `artifacts` by Plan 13/14 (Artifacts, below); `result_manifests` by Plan 15 (Result manifests, below); `memory_scopes`/`memory_entries`/`memory_shares`/`memory_usage` by Plan 16 (Memory broker, below); `admin_config`/`admin_config_history` by Plan 20 (Admin plane, below); `provider_identities`/`provider_link_challenges` by Plan 22 (provider ingest, below). `assignments`, `execution_attempts` exist schema-only for Plans 07/13; `communication_bindings` is the thread-binding authority by Plan 22; `link_sessions` is Plan 02's table now driven by Plan 03.
+- **Schema** (Postgres `facilitator` schema, EF Core migrations `InitialCreate` + `AddLinkServer` + `AddIdentityFoundation` + `AddWorkloadIdentity` + `AddApprovalLifecycle` + `AddArtifactStore` + `AddArtifactGcTimelineKind` + `AddResultManifests` + `AddMemoryBroker` + `AddAdminConfig` + `provider_identities` + `AddRoutingDecisions` + `AddDagNudges`, auto-applied on startup behind `pg_advisory_lock(420001)`): `teams`, `projects`, `works`, `work_events`, `inbox`, `outbox`, `dead_letters`, `provider_events` are written by Plan 02; `link_enrollments` and `link_deliveries` by Plan 03 (see below); `audit` and `identity_roles` by Plan 09 (identity, below); `evidence` + `link_enrollments.role/-accepts-delegated/-workload-*` by Plan 10 (workload identity, below); `approvals` is the lifecycle authority by Plan 11 (approvals, below); `artifacts` by Plan 13/14 (Artifacts, below); `result_manifests` by Plan 15 (Result manifests, below); `memory_scopes`/`memory_entries`/`memory_shares`/`memory_usage` by Plan 16 (Memory broker, below); `admin_config`/`admin_config_history` by Plan 20 (Admin plane, below); `provider_identities`/`provider_link_challenges` by Plan 22 (provider ingest, below). `assignments`, `execution_attempts` exist schema-only for Plans 07/13; `communication_bindings` is the thread-binding authority by Plan 22; `link_sessions` is Plan 02's table now driven by Plan 03.
 - **HTTP surface** (all under `/api`, bearer token, RFC 9457 ProblemErrors with type URIs `https://errors.openfacilitator.org/v1/<code>`; `/api/link/v1/*` is the exception — link-token auth, see Plan 03 below): `POST /api/works` (201), `GET /api/works`, `GET /api/works/{id}`, `POST /api/works/{id}/steer`, `POST /api/works/{id}/transitions`, `GET /api/works/{id}/timeline`, `POST /api/ingress/events` (raw CloudEvents 1.0 envelope, ≤262144 bytes); the operator surface is `/api/admin/*` (Admin plane, below). Error codes: `invalid-state-transition` 422, `version-conflict` 409 (carries `currentVersion`), `unknown-command` 422, `schema-violation` 400, `envelope-violation` 400, `payload-too-large` 413, `unauthorized` 401, `work-not-found` 404; duplicate ⇒ 200 `{"status":"duplicate"}` (not an error). Endpoint detail: `docs/protocol.md` (Kernel ingress).
 - **Dedupe**: `inbox UNIQUE (event_source, event_id)`, `inbox.command_id` unique for business commands, `provider_events UNIQUE (provider, provider_delivery_id)`. Duplicate ⇒ 200 duplicate, zero reprocessing.
 - **Per-Work serialization**: `pg_advisory_xact_lock(hashtextextended(work_id::text, 0))` inside each processing transaction + optimistic `workVersion` fencing (spec §7.4). Illegal transitions fail closed 422 naming the edge; the §4.1 guard tables (`Kernel/Work/WorkState.cs`) are the single authority — no shortcuts.
@@ -118,3 +118,34 @@ The funnel (`Kernel/Routing/RoutingSink.cs`, dispatcher channel `routing`) is th
 - Provider rules are HINTS: `AssignRules` match contributes capability/inputs/commandIdBase, `EndpointId` (rule or global `AssignEndpointId`) rides as an optional preference, audited `preference-satisfied`/`preference-ignored` (outside allowed set ⇒ deterministic first stands). `POST /api/works` accepts the same intent fields (`capabilityId`, `targetId`, `preferenceEndpointId`, `actorEvidenceRef`) — seed/bootstrap post creates, no raw-SQL assigns.
 - Decision seam: `Shared/IDecisionProvider.cs` (`EvaluateAsync(kind, facts, allowedCandidates)`); only `DeterministicDecisionProvider` ships. `routing-defaults` config `{provider: "deterministic"|"model"|"", preferTeam?}` — `"model"` is stored-accepted, falls back deterministic audited `model-fallback` (plan 26's seam).
 - Re-dispatch (`EfCoordinationStore.AppendSteerDeliveryAsync`, no live attempt) appends a fresh intent reusing the ORIGINAL envelope's capability/target/inputs (`steers[]` accumulates directives); preference = the original recipient endpoint.
+
+## DAG coordination, generation fencing, bounded nudge — IMPLEMENTED (Plan 35 B)
+
+- **DAG gate** (`Kernel/Work/DependencyGate.cs`): `POST /api/works` accepts
+  `assignments[].dependsOn = [{index, condition: completed|result_validated|approved}]`
+  (sibling index → that sibling's deterministic assignment id). A create-time cycle /
+  unknown index / unknown condition ⇒ 422 `dependency-violation`, nothing created
+  (`DagLaw.ValidateBatch`). The funnel consults `UnmetAsync` per intent: an unmet edge
+  audits `routing_decisions` row `pending`/`deps-unmet` and requeues — a gated intent
+  NEVER dead-letters and its sibling assignment row is NOT created early. The WAKE LAW
+  (`WakeGatedRoutingIntentsAsync`, run inside every terminal finalize) resets the still
+  gated intents to `pending`/`wake` so the funnel re-evaluates immediately.
+- **Generation fencing (§7.4)**: `assignments.current_execution_generation` is the
+  fence key; the assign envelope carries it as `data.executionGeneration` (REQUIRED on
+  the wire — gateways stamp it onto START frames, receipts, and every event an execution
+  publishes; a Gateway's own `assignment.failed`/lost stamps ride the envelope/row
+  generation, never the link epoch). `ExecutionLedger.FinalizeAsync` accepts a
+  completed/failed event ONLY at the assignment's current generation: mismatch ⇒ 422
+  `stale-generation`, inbox row settles `failed` (no manifest recorded). A
+  terminal-attempt re-dispatch rides `current+1`. Attempt rows settle
+  `stopped|failed` (the attempt vocabulary has no `completed`).
+- **Bounded nudge** (`Kernel/Work/NudgeSweeper.cs`, periodic + `SweepOnceAsync` for
+  tests): policy = admin_config `nudge-policy` `{"staleAfterMinutes":N}` — ABSENT ⇒
+  fully inert. A live assignment (running, open attempt) silent past the window with a
+  LIVE session lease on its owning endpoint gets `command.work.nudge.v1`
+  (`work-nudge:<assignmentN>:<gen>:<episode>:<count>`, cap 3/episode, fresh progress
+  starts a new episode); offline endpoint ⇒ silence. Ownership resolves from the latest
+  assign-family outbox row (parse envelopes; jsonb `LIKE` does not translate). Ledger:
+  `facilitator.nudges` (assignment, generation, episode, count); admin DTOs surface
+  `nudgeCount` + `stalled` (cap spent) per assignment alongside `dependsOn` and
+  `currentExecutionGeneration`.

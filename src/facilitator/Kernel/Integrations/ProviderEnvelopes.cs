@@ -29,7 +29,7 @@ public static class ProviderEnvelopes
     /// in, one deliverable expected. Capability + targetId arrive resolved (a
     /// routing intent's pair); the actor evidence defaults to the kernel
     /// mention pointer, overridable by the routing intent's own attribution.</summary>
-    public static JsonObject Assign(Guid workId, string assignmentId, string objective, string capabilityId, string targetId, DateTime now, JsonObject? extraInputs = null, string? commandId = null, string? actorEvidenceRef = null)
+    public static JsonObject Assign(Guid workId, string assignmentId, string objective, string capabilityId, string targetId, DateTime now, JsonObject? extraInputs = null, string? commandId = null, string? actorEvidenceRef = null, int executionGeneration = 1)
     {
         var objectiveRef = objective.Length <= 512 ? objective : objective[..512];
         var inputs = new JsonObject
@@ -71,6 +71,7 @@ public static class ProviderEnvelopes
                 ["actorEvidenceRef"] = actorEvidenceRef ?? $"kernel:provider-ingest:{workId}",
                 ["deadline"] = (now + AssignDeadline).ToString("yyyy-MM-ddTHH:mm:ssZ"),
                 ["assignmentId"] = assignmentId,
+                ["executionGeneration"] = executionGeneration,
             },
         };
     }
@@ -80,7 +81,7 @@ public static class ProviderEnvelopes
     /// gateway, where <c>onInteraction</c> delivers it to the bound child or
     /// honestly rejects (<c>no-binding</c> / <c>child-disconnected</c>) — a
     /// rejected steer is a normal result; the timeline row already exists.</summary>
-    public static JsonObject Steer(Guid workId, string assignmentId, string targetId, string directive, long expectedContextVersion, DateTime now, string commandId) =>
+    public static JsonObject Steer(Guid workId, string assignmentId, string targetId, string directive, long expectedContextVersion, DateTime now, string commandId, int executionGeneration = 1) =>
         new()
         {
             ["specversion"] = "1.0",
@@ -101,6 +102,7 @@ public static class ProviderEnvelopes
                 ["assignmentId"] = assignmentId,
                 ["directive"] = directive.Length <= 16384 ? directive : directive[..16384],
                 ["expectedContextVersion"] = expectedContextVersion,
+                ["executionGeneration"] = executionGeneration,
             },
         };
 
@@ -137,6 +139,35 @@ public static class ProviderEnvelopes
                 ["actorEvidenceRef"] = $"kernel:{provider}-dispatch:{workId}",
                 ["deadline"] = (now + AssignDeadline).ToString("yyyy-MM-ddTHH:mm:ssZ"),
                 ["assignmentId"] = Guid.NewGuid().ToString("N"),
+                ["executionGeneration"] = 1,
+            },
+        };
+
+    /// <summary>Plan 35 B(5): the bounded nudge (§6.4) — an informational
+    /// command to the owning gateway; it never re-runs tools and never
+    /// escalates authority. Command id <c>nudge:&lt;assignmentId&gt;:&lt;generation&gt;:&lt;episode&gt;</c>
+    /// makes one nudge per stall episode single-shot on the outbox ledger.</summary>
+    public static JsonObject Nudge(Guid workId, string assignmentId, string targetId, int stallEpisode, int executionGeneration, DateTime now, string commandId) =>
+        new()
+        {
+            ["specversion"] = "1.0",
+            ["id"] = Guid.NewGuid().ToString("N"),
+            ["source"] = EnvelopeFactory.KernelSource,
+            ["type"] = "org.facilitator.command.work.nudge.v1",
+            ["subject"] = $"work/{workId}/assignment/{assignmentId}",
+            ["time"] = now.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
+            ["datacontenttype"] = "application/json",
+            ["dataschema"] = "https://schemas.openfacilitator.org/v1/command.work.nudge.v1.json",
+            ["data"] = new JsonObject
+            {
+                ["commandId"] = commandId,
+                ["workId"] = workId.ToString(),
+                ["targetId"] = targetId,
+                ["actorEvidenceRef"] = $"kernel:nudge:{commandId}",
+                ["deadline"] = (now + AssignDeadline).ToString("yyyy-MM-ddTHH:mm:ssZ"),
+                ["assignmentId"] = assignmentId,
+                ["stallEpisode"] = stallEpisode.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["executionGeneration"] = executionGeneration,
             },
         };
 }

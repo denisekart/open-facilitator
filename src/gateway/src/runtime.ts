@@ -8,13 +8,17 @@
 // assign must never die in that window) → start() → first welcome ⇒
 // RECONCILE (§6.3) → ready line → heartbeats.
 //
-// Stamp law: a binding row's connectionGeneration is the leaseEpoch of the
-// session that accepted the command, its childGeneration the link's fence
-// at insert time (embedded: 0 — no transport, no re-register). A delivery
-// frame can be dispatched before start()'s welcome continuation lands, so
-// onAssign AWAITS the first welcome rather than reading a possibly-null
-// session — an unstamped (epoch 0) row would make the reconcile
-// generation-freshness law lie.
+// Stamp law (Plan 35 B(4)): a binding row pins TWO generations —
+// connectionGeneration is the leaseEpoch of the session that accepted the
+// command (the S:329 freshness fence: a frame recorded under a dead
+// connection is not forwarded), executionGeneration is the assign
+// envelope's assignment generation, the value every event this execution
+// publishes carries so the kernel's §7.4 fence matches the assignment row.
+// The childGeneration is the child link's fence at insert time (embedded:
+// 0 — no transport, no re-register). A delivery frame can be dispatched
+// before start()'s welcome continuation lands, so onAssign AWAITS the first
+// welcome rather than reading a possibly-null session — an unstamped
+// (epoch 0) row would make the reconcile generation-freshness law lie.
 //
 // Routing law (S:318): work.assign = capability lookup over the fleet —
 // nobody advertises ⇒ unsupported (no row, mirror of the policy-deny
@@ -125,6 +129,7 @@ export interface GatewayStatus {
     executionId: string;
     state: string;
     connectionGeneration: number;
+    executionGeneration: number;
     childId: string;
     childGeneration: number;
   }[];
@@ -414,6 +419,7 @@ export class GatewayRuntime {
         executionId: row.executionId,
         state: row.state as string,
         connectionGeneration: row.connectionGeneration,
+        executionGeneration: row.executionGeneration,
         childId: row.childId,
         childGeneration: row.childGeneration,
       })),
@@ -727,6 +733,9 @@ export class GatewayRuntime {
         executionId,
         workId: data.workId,
         connectionGeneration: epoch,
+        // B(4): the event stamp rides the ASSIGNMENT generation carried by
+        // the envelope (the kernel's fence key), never the link epoch.
+        executionGeneration: data.executionGeneration ?? 1,
         childGeneration: member.generation,
       });
     } catch (error) {
@@ -742,7 +751,7 @@ export class GatewayRuntime {
       reply = await member.executor.send({
         kind: "start",
         executionId,
-        connectionGeneration: epoch,
+        executionGeneration: data.executionGeneration ?? 1,
         command: cmd,
       });
     } catch (error) {
@@ -992,7 +1001,7 @@ export class GatewayRuntime {
       await this.publishAssignmentFailed(
         data.workId,
         data.assignmentId,
-        epoch,
+        data.executionGeneration ?? 1,
         `approval-publish-failed: ${reason}`,
       );
       return { kind: "rejected", reason: `approval-publish-failed: ${approvalId}` };
@@ -1042,7 +1051,7 @@ export class GatewayRuntime {
     await this.publishAssignmentFailed(
       pending.workId,
       pending.assignmentId,
-      pending.epoch,
+      GatewayRuntime.pendingGeneration(pending),
       `approval-${decision === "" ? "denied" : decision}`,
     );
   }
@@ -1068,7 +1077,7 @@ export class GatewayRuntime {
       await this.publishAssignmentFailed(
         pending.workId,
         pending.assignmentId,
-        pending.epoch,
+        GatewayRuntime.pendingGeneration(pending),
         `approval-${reason}`,
       );
     };
@@ -1133,7 +1142,7 @@ export class GatewayRuntime {
       await this.publishAssignmentFailed(
         pending.workId,
         pending.assignmentId,
-        pending.epoch,
+        GatewayRuntime.pendingGeneration(pending),
         rejectedProblem,
       );
       return;
@@ -1151,6 +1160,7 @@ export class GatewayRuntime {
         executionId,
         workId: data.workId ?? "",
         connectionGeneration: epoch,
+        executionGeneration: data.executionGeneration ?? 1,
         childGeneration: member.generation,
       });
     } catch (error) {
@@ -1169,7 +1179,7 @@ export class GatewayRuntime {
       reply = await member.executor.send({
         kind: "start",
         executionId,
-        connectionGeneration: epoch,
+        executionGeneration: data.executionGeneration ?? 1,
         command: cmd,
       });
     } catch (error) {
@@ -1242,7 +1252,7 @@ export class GatewayRuntime {
         await this.publishAssignmentFailed(
           pending.workId,
           pending.assignmentId,
-          pending.epoch,
+          GatewayRuntime.pendingGeneration(pending),
           "approval-expired",
         );
         continue;
@@ -1258,7 +1268,7 @@ export class GatewayRuntime {
           await this.publishAssignmentFailed(
             pending.workId,
             pending.assignmentId,
-            pending.epoch,
+            GatewayRuntime.pendingGeneration(pending),
             "approval-execution-lost",
           );
         }
@@ -1275,7 +1285,7 @@ export class GatewayRuntime {
         await this.publishAssignmentFailed(
           pending.workId,
           pending.assignmentId,
-          pending.epoch,
+          GatewayRuntime.pendingGeneration(pending),
           "approval-denied",
         );
       } else if (kernel === "expired") {
@@ -1283,7 +1293,7 @@ export class GatewayRuntime {
         await this.publishAssignmentFailed(
           pending.workId,
           pending.assignmentId,
-          pending.epoch,
+          GatewayRuntime.pendingGeneration(pending),
           "approval-expired",
         );
       } else if (kernel === "revoked") {
@@ -1295,7 +1305,7 @@ export class GatewayRuntime {
         await this.publishAssignmentFailed(
           pending.workId,
           pending.assignmentId,
-          pending.epoch,
+          GatewayRuntime.pendingGeneration(pending),
           "approval-execution-lost",
         );
       }
@@ -1364,11 +1374,24 @@ export class GatewayRuntime {
     }
   }
 
-  /** ONE honest non-retryable assignment.failed for a settled-without-execution action. */
+  /** The assignment generation a parked assign envelope carried (B(4) event
+   * stamp for every failure the Gateway reports before/without a binding row). */
+  private static pendingGeneration(pending: PendingRow): number {
+    try {
+      const data = JSON.parse(pending.envelope) as { data?: { executionGeneration?: number } };
+      return data.data?.executionGeneration ?? 1;
+    } catch {
+      return 1;
+    }
+  }
+
+  /** ONE honest non-retryable assignment.failed for a settled-without-execution
+   * action. B(4): the stamp is the ASSIGNMENT generation the assign envelope
+   * carried (the kernel fence key), not the link epoch. */
   private async publishAssignmentFailed(
     workId: string | null,
     assignmentId: string,
-    epoch: number,
+    executionGeneration: number,
     reason: string,
   ): Promise<void> {
     if (workId === null) return;
@@ -1380,7 +1403,7 @@ export class GatewayRuntime {
           data: {
             workId,
             assignmentId,
-            executionGeneration: Math.max(1, epoch),
+            executionGeneration: Math.max(1, executionGeneration),
             reason,
             retryable: false,
           },

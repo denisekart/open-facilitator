@@ -74,6 +74,22 @@ public sealed class RoutingSink(
                 .Select(t => t.Slug).FirstOrDefaultAsync(ct)
             : null;
 
+        // The DAG gate (Plan 35 B): an assign whose siblings haven't released
+        // it requeues with the dispatcher's backoff (never dead-letters) —
+        // a sibling's terminal/validated/approved event pulls it forward
+        // under the wake law. Audit-first so the pending basis is truthful.
+        var unmet = await DependencyGate.UnmetAsync(db, intent.DependsOnJson, ct);
+        if (unmet.Count > 0)
+        {
+            var gatedAudit = await db.RoutingDecisions.FirstOrDefaultAsync(
+                d => d.IntentCommandId == intent.IntentCommandId, ct);
+            UpsertAudit(db, gatedAudit, intent, work.WorkId, allowedJson: "[]", chosen: null,
+                "pending", "deps-unmet", providerRef: null, now);
+            await db.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
+            throw new RoutePendingException("deps-unmet");
+        }
+
         var (candidates, advertisedSlot) = await ComputeCandidatesAsync(db, intent, workTeamSlug, ct);
 
         var allowedJson = JsonSerializer.Serialize(candidates.Select(c => c.EndpointId).ToArray());
@@ -285,7 +301,10 @@ public sealed class RoutingSink(
     private void EmitEffect(
         FacilitatorDbContext db, RoutingIntent intent, Guid? workTeamId, string chosen, DateTime now)
     {
-        var assignmentId = Guid.NewGuid().ToString("N");
+        // The DAG-visible identity: derived from the effect command id, so a
+        // create that wrote sibling dependencies into `depends_on` before any
+        // funnel ran joins onto exactly this assignment (Plan 35 B(1)).
+        var assignmentId = intent.DeterministicAssignmentId.ToString("N");
         db.Assignments.Add(new AssignmentEntity
         {
             AssignmentId = Guid.Parse(assignmentId),
@@ -293,7 +312,8 @@ public sealed class RoutingSink(
             TeamId = workTeamId,
             CapabilityId = intent.CapabilityId,
             Status = "routed",
-            CurrentExecutionGeneration = 1,
+            DependsOn = intent.DependsOnJson,
+            CurrentExecutionGeneration = intent.ExecutionGeneration,
             ExpectedContextVersion = 1,
             CreatedAt = now,
             UpdatedAt = now,
@@ -308,7 +328,8 @@ public sealed class RoutingSink(
 
         var envelope = ProviderEnvelopes.Assign(
             intent.WorkId, assignmentId, intent.Objective, intent.CapabilityId, intent.TargetId,
-            now, extraInputs, intent.EffectCommandId, intent.ActorEvidenceRef);
+            now, extraInputs, intent.EffectCommandId, intent.ActorEvidenceRef,
+            intent.ExecutionGeneration);
         // Durable-queue trace law, creation side: the carrier rides the row
         // BEFORE insert (validated first: the schema is carrier-free, the
         // dispatcher restamps link rows the same post-validation way), so
@@ -437,6 +458,8 @@ public sealed class RoutingSink(
             data.GetProperty("objective").GetString()!,
             data.TryGetProperty("referenceJson", out var reference) ? reference.GetString() : null,
             data.TryGetProperty("extraInputsJson", out var extras) ? extras.GetString() : null,
-            data.GetProperty("actorEvidenceRef").GetString()!);
+            data.GetProperty("actorEvidenceRef").GetString()!,
+            data.TryGetProperty("executionGeneration", out var gen) ? gen.GetInt32() : 1,
+            data.TryGetProperty("dependsOnJson", out var deps) ? deps.GetString() : null);
     }
 }

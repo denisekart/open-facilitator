@@ -76,6 +76,8 @@ public class FacilitatorDbContext(DbContextOptions<FacilitatorDbContext> options
 
     public DbSet<RoutingDecisionEntity> RoutingDecisions => Set<RoutingDecisionEntity>();
 
+    public DbSet<NudgeLedgerEntity> Nudges => Set<NudgeLedgerEntity>();
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder model)
     {

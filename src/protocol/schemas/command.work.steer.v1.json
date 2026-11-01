@@ -12,7 +12,8 @@
     "deadline",
     "assignmentId",
     "directive",
-    "expectedContextVersion"
+    "expectedContextVersion",
+    "executionGeneration"
   ],
   "properties": {
     "commandId": {
@@ -40,6 +41,10 @@
     },
     "expectedContextVersion": {
       "$ref": "common.v1.json#/$defs/contextVersion"
+    },
+    "executionGeneration": {
+      "type": "integer",
+      "minimum": 1
     }
   }
 }

@@ -112,14 +112,20 @@ public sealed record AdminWorkDetail(
     IReadOnlyList<AdminApprovalRow> Approvals,
     IReadOnlyList<AdminManifestRow> Manifests);
 
-/// <summary>Assignment row with its execution attempts.</summary>
+/// <summary>Assignment row with its execution attempts. <c>DependsOnJson</c>
+/// is the raw DAG gate (additive pass-through, the AllowedCandidates precedent);
+/// <c>NudgeCount</c>/<c>Stalled</c> derive from the nudge ledger at the
+/// assignment's current generation (§5.3: stalled = the cap is spent).</summary>
 public sealed record AdminAssignmentRow(
     Guid AssignmentId,
     string Status,
     int CurrentExecutionGeneration,
     DateTime CreatedAt,
     DateTime UpdatedAt,
-    IReadOnlyList<AdminAttemptRow> Attempts);
+    IReadOnlyList<AdminAttemptRow> Attempts,
+    string? DependsOnJson,
+    int NudgeCount,
+    bool Stalled);
 
 /// <summary>Execution-attempt row (the workspace-execution proxy).</summary>
 public sealed record AdminAttemptRow(Guid ExecutionId, int Generation, string Status, DateTime StartedAt, DateTime? EndedAt);
@@ -268,7 +274,23 @@ public sealed class AdminReadStores(
                 db.ExecutionAttempts.Where(e => e.AssignmentId == a.AssignmentId)
                     .OrderBy(e => e.Generation)
                     .Select(e => new AdminAttemptRow(e.ExecutionId, e.Generation, e.Status, e.StartedAt, e.EndedAt))
-                    .ToList()))
+                    .ToList(),
+                a.DependsOn,
+                // Doctrine (§5.3): the budget is per stall episode, so both
+                // fields read the LATEST episode's ledger row — progress that
+                // opens a fresh episode clears the stalled flag.
+                (int?)db.Nudges.Where(n => n.AssignmentId == a.AssignmentId
+                        && n.Generation == a.CurrentExecutionGeneration
+                        && n.StallEpisode == db.Nudges
+                            .Where(x => x.AssignmentId == a.AssignmentId && x.Generation == a.CurrentExecutionGeneration)
+                            .Max(x => x.StallEpisode))
+                    .Select(n => (int?)n.NudgeCount).FirstOrDefault() ?? 0,
+                db.Nudges.Any(n => n.AssignmentId == a.AssignmentId
+                    && n.Generation == a.CurrentExecutionGeneration
+                    && n.NudgeCount >= Work.NudgeSweeper.NudgeCap
+                    && n.StallEpisode == db.Nudges
+                        .Where(x => x.AssignmentId == a.AssignmentId && x.Generation == a.CurrentExecutionGeneration)
+                        .Max(x => x.StallEpisode))))
             .ToListAsync(ct);
         var approvals = await db.Approvals.AsNoTracking()
             .Where(a => a.WorkId == workId)

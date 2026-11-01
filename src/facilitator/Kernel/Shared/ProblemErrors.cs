@@ -64,6 +64,18 @@ public static class ProblemErrors
         Create("artifact-digest-mismatch", "Artifact digest mismatch", StatusCodes.Status422UnprocessableEntity,
             $"bytes uploaded for artifact '{artifactId}' do not hash to the declared digest");
 
+    /// <summary>422 a terminal execution event whose stamped execution generation is not
+    /// the assignment's current one — a late completion from a fenced-over generation.
+    /// §7.4 fencing: the stale event is refused, never finalized.</summary>
+    public static ProblemDetails StaleGeneration(int eventGeneration, int currentGeneration) =>
+        Create("stale-generation", "Stale execution generation", StatusCodes.Status422UnprocessableEntity,
+            $"terminal event stamped generation {eventGeneration} does not match the assignment's "
+            + $"current generation {currentGeneration}; the event is fenced");
+
+    /// <summary>422 a work-request assignment dependsOn edge the kernel cannot admit
+    /// (unknown sibling reference, unknown condition, or a dependency cycle).</summary>
+    public static ProblemDetails DagViolation(string detail) =>
+        Create("dependency-violation", "Dependency violation", StatusCodes.Status422UnprocessableEntity, detail);
     /// <summary>422 uploaded body differs from the declared size; row rejected.</summary>
     public static ProblemDetails ArtifactSizeMismatch(string artifactId) =>
         Create("artifact-size-mismatch", "Artifact size mismatch", StatusCodes.Status422UnprocessableEntity,

@@ -48,7 +48,7 @@ FULL_ORDER=(provider-boot provider-link-challenge provider-mention
   provider-completion-reply provider-echo-suppression provider-reaction-no-consent
   forgejo-boot forgejo-seed forgejo-issue-work forgejo-comment-input
   forgejo-connector-pr forgejo-review-steer forgejo-ci-note
-  coding-issue-work coding-pr coding-review-steer coding-redispatch)
+  coding-issue-work coding-pr coding-review-steer coding-redispatch two-repo-dependency)
 full_deps_of() {
   case "$1" in
     provider-link-challenge) echo provider-boot ;;
@@ -63,6 +63,7 @@ full_deps_of() {
     coding-pr) echo coding-issue-work ;;
     coding-review-steer) echo coding-pr ;;
     coding-redispatch) echo coding-review-steer ;;
+    two-repo-dependency) ;;
     *) ;;
   esac
 }
@@ -403,7 +404,7 @@ step_forgejo_connector_pr() {
       dataschema: "https://schemas.openfacilitator.org/v1/command.work.assign.v1.json",
       data: { commandId: $commandId, actorEvidenceRef: "seed: verify-pr",
         workId: $workId, targetId: "demo", capabilityId: "vcs.change_request.create",
-        expectedContextVersion: 1,
+        expectedContextVersion: 1, executionGeneration: 1,
         inputs: { objective: "verify connector leg", sourceRefs: [],
           repo: "demo/widgets", head: "bot/topic", base: "main",
           title: "verify: connector leg", body: "opened by the forgejo verify leg" },
@@ -663,14 +664,16 @@ step_coding_redispatch() {
   local directive2="add the timeout clause to the changelog note"
   forgejo_api POST "/api/v1/repos/demo/widgets/pulls/$FJ_CODING_PR/reviews" \
     "$(jq -cn --arg b "$directive2" '{body:$b, event:"APPROVED"}')" >/dev/null \
-    || { step_fail "second review POST refused"; full_compose start coding-workspace >/dev/null; return 1; }
+    || { step_fail "second review POST refused"; full_compose up -d --no-deps coding-workspace >/dev/null; return 1; }
   fj_queued() {
     full_psql "SELECT 1 FROM facilitator.outbox WHERE work_id = '$FJ_CODING_WORK'
         AND command_id LIKE 'routing:work-redispatch:%' AND envelope::text LIKE '%timeout clause%' LIMIT 1" | grep -q 1
   }
   poll_until 45 fj_queued \
-    || { step_fail "no queued re-dispatch while coding-workspace is down"; full_logs facilitator; full_compose start coding-workspace >/dev/null; return 1; }
-  full_compose start coding-workspace \
+    || { step_fail "no queued re-dispatch while coding-workspace is down"; full_logs facilitator; full_compose up -d --no-deps coding-workspace >/dev/null; return 1; }
+  # compose `start` has no --no-deps and blocks on the one-shot init legs;
+  # `up -d --no-deps` starts the stopped container in place.
+  full_compose up -d --no-deps coding-workspace \
     || { step_fail "could not restart coding-workspace"; return 1; }
   poll_until 180 fj_issue_comment_with "steer incorporated: $directive2" \
     || { step_fail "post-restart steer comment never landed"; full_logs coding-workspace facilitator; return 1; }
@@ -679,6 +682,138 @@ step_coding_redispatch() {
   [ "${steers:-0}" -ge 2 ] \
     || { step_fail "expected >= 2 steer timeline rows, got ${steers:-?}"; return 1; }
   step_pass "review while offline queued the re-dispatch; restart re-hydrated and the second steer comment landed ($steers steers on $FJ_CODING_WORK)"
+}
+
+step_two_repo_dependency() {
+  # §23.2 live proof: one Work, TWO assignment intents with a dependsOn edge.
+  # The funnel gates sibling 2 (audit basis deps-unmet) until sibling 1's
+  # completion wakes it; a steer while execution 2 is LIVE rides the live
+  # generation; a steer after completion re-dispatches at generation 2; a
+  # straggler terminal event stamped generation 1 fences 422 stale-generation.
+  VERIFY_TOKEN_CLI=${VERIFY_TOKEN_CLI:-$(seed_mint_cli_token)}
+  local project tag objective body work code
+  project=$(seed_project two-repo) || { step_fail "two-repo project missing"; return 1; }
+  tag=$(date +%s)$RANDOM
+  objective="verify two-repo $tag: contract change across two lanes"
+  body=$(jq -cn --arg objective "$objective" --arg projectId "$project" --arg tag "$tag" \
+    '{objective: $objective, projectId: $projectId, actorEvidenceRef: ("identity-evidence:two-repo-" + $tag),
+      assignments: [
+        {capabilityId: "research.analyze", objective: ($objective + " [api]"), targetId: "demo-api"},
+        {capabilityId: "research.analyze", objective: ($objective + " [ui]"), targetId: "demo-ui",
+         dependsOn: [{index: 0, condition: "completed"}]}
+      ]}')
+  code=$(curl -s --max-time 15 -o /tmp/tr-create.json -w '%{http_code}' -X POST "$VERIFY_KERNEL/api/works" \
+    -H "Authorization: Bearer $VERIFY_TOKEN_CLI" -H 'content-type: application/json' -d "$body")
+  [ "$code" = 201 ] || { step_fail "two-assignment create refused (HTTP $code): $(cat /tmp/tr-create.json)"; return 1; }
+  work=$(jq -re '.workId' /tmp/tr-create.json)
+  local wln=${work//-/}
+  # Both intents exist; sibling 0's effect lands, sibling 1 stays gated.
+  fj_tr_gated() {
+    full_psql "SELECT 1 FROM facilitator.routing_decisions WHERE work_id = '$work'
+        AND status = 'pending' AND basis = 'deps-unmet' LIMIT 1" | grep -q 1
+  }
+  poll_until 30 fj_tr_gated >/dev/null \
+    || { step_fail "sibling 2 never gated deps-unmet for $work"; full_logs facilitator; return 1; }
+  fj_tr_sibling0() {
+    full_psql "SELECT 1 FROM facilitator.outbox WHERE work_id = '$work'
+        AND command_id = 'work-assign:$wln' AND recipient_endpoint_id = 'link.gw.team-alpha' LIMIT 1" | grep -q 1
+  }
+  poll_until 30 fj_tr_sibling0 >/dev/null \
+    || { step_fail "sibling 0 assign effect missing for $work"; full_logs facilitator demo-workspace; return 1; }
+  # The gate holds: exactly ONE assignment row while sibling 0 runs.
+  local rows
+  rows=$(full_psql "SELECT count(*) FROM facilitator.assignments WHERE work_id = '$work'" | head -n1)
+  [ "${rows:-9}" = "1" ] \
+    || { step_fail "gated sibling created its assignment row early ($rows rows)"; return 1; }
+  # Sibling 0 executes + records its manifest: the real worker completes it.
+  fj_tr_manifest1() {
+    full_psql "SELECT 1 FROM facilitator.result_manifests WHERE work_id = '$work' LIMIT 1" | grep -q 1
+  }
+  poll_until 120 fj_tr_manifest1 >/dev/null \
+    || { step_fail "sibling 0 manifest never recorded for $work"; full_logs demo-workspace facilitator; return 1; }
+  # The wake law: completion releases the gate — sibling 1 dispatches.
+  fj_tr_sibling1() {
+    full_psql "SELECT 1 FROM facilitator.outbox WHERE work_id = '$work'
+        AND command_id = 'work-assign:$wln-1' AND recipient_endpoint_id = 'link.gw.team-alpha' LIMIT 1" | grep -q 1
+  }
+  poll_until 45 fj_tr_sibling1 >/dev/null \
+    || { step_fail "wake never released the gated sibling for $work"; full_logs facilitator; return 1; }
+  fj_tr_manifest2() {
+    [ "$(full_psql "SELECT count(*) FROM facilitator.result_manifests WHERE work_id = '$work'" | head -n1)" -ge 2 ]
+  }
+  poll_until 120 fj_tr_manifest2 >/dev/null \
+    || { step_fail "execution 2 manifest never recorded for $work"; full_logs demo-workspace facilitator; return 1; }
+  # Both executions have ended (the manifest record and the terminal walk
+  # are one atomic ingest), so the steer lands the re-dispatch branch — the
+  # §23.1 shape the review leg proved, now on the two-lane Work.
+  local version2
+  version2=$(full_psql "SELECT version FROM facilitator.works WHERE work_id = '$work'" | head -n1)
+  code=$(curl -s --max-time 15 -o /tmp/tr-steer.json -w '%{http_code}' -X POST "$VERIFY_KERNEL/api/works/$work/steer" \
+    -H "Authorization: Bearer $VERIFY_TOKEN_CLI" -H 'content-type: application/json' \
+    -d "$(jq -cn --arg v "$version2" --arg c "tr-steer-$RANDOM" '{directive:"rename the summary section", commandId:$c, expectedVersion:($v|tonumber)}')")
+  [ "$code" = 200 ] || { step_fail "steer refused (HTTP $code): $(cat /tmp/tr-steer.json)"; return 1; }
+  fj_tr_steer_row() {
+    full_psql "SELECT 1 FROM facilitator.work_events WHERE work_id = '$work' AND kind = 'steer' LIMIT 1" | grep -q 1
+  }
+  poll_until 15 fj_tr_steer_row >/dev/null \
+    || { step_fail "no steer timeline row for $work"; full_logs facilitator; return 1; }
+  # Re-dispatch lands generation 2 for the assignment line (the steer had no
+  # live attempt: both executions had ended — the 24 re-dispatch branch).
+  fj_tr_gen2() {
+    full_psql "SELECT 1 FROM facilitator.outbox WHERE work_id = '$work'
+        AND command_id LIKE 'routing:work-redispatch:%'
+        AND envelope::text LIKE '%rename the summary section%' LIMIT 1" | grep -q 1
+  }
+  poll_until 45 fj_tr_gen2 >/dev/null \
+    || { step_fail "no re-dispatch intent carrying the directive for $work"; full_logs facilitator; return 1; }
+  fj_tr_gen2_effect() {
+    full_psql "SELECT 1 FROM facilitator.outbox WHERE work_id = '$work'
+        AND command_id LIKE 'work-redispatch:%'
+        AND envelope->'data'->>'executionGeneration' = '2' LIMIT 1" | grep -q 1
+  }
+  poll_until 60 fj_tr_gen2_effect >/dev/null \
+    || { step_fail "generation-2 re-dispatch effect missing for $work"; full_logs facilitator demo-workspace; return 1; }
+  # The straggler: a terminal event stamped generation 1 against the
+  # re-dispatched assignment — whose row sits at generation 2, so the
+  # §7.4 fence bites. (Sibling 0 sits completed AT gen 1: a re-delivery of
+  # its own event is legal, not a straggler.)
+  local rdassign straggler
+  rdassign=$(full_psql "SELECT envelope->'data'->>'assignmentId' FROM facilitator.outbox
+      WHERE work_id = '$work' AND command_id LIKE 'work-redispatch:%' LIMIT 1" | head -n1)
+  straggler=$(jq -cn --arg work "$work" --arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg tag "$tag" --arg a "$rdassign" '{
+      specversion: "1.0", id: ("tr-straggler-" + $tag), source: "urn:workspace:two-repo-verify",
+      type: "org.facilitator.event.assignment.completed.v1",
+      subject: ("work/" + $work + "/assignment/" + $a), time: $now,
+      datacontenttype: "application/json",
+      dataschema: "https://schemas.openfacilitator.org/v1/event.assignment.completed.v1.json",
+      data: {workId: $work, assignmentId: $a, executionId: ("tr-exec-" + $tag),
+             executionGeneration: 1, resultManifest: {manifestId: ("tr-manifest-" + $tag), outputs: []}}}')
+  local fence_body
+  fence_body=$(mktemp)
+  code=$(curl -s --max-time 15 -o "$fence_body" -w '%{http_code}' -X POST "$VERIFY_KERNEL/api/ingress/events" \
+    -H "Authorization: Bearer $VERIFY_TOKEN_CLI" -H 'content-type: application/json' -d "$straggler")
+  [ "$code" = 422 ] && grep -q 'stale-generation' "$fence_body" \
+    || { step_fail "straggler gen-1 event answered HTTP $code (want 422 stale-generation): $(cat "$fence_body")"; rm -f "$fence_body"; return 1; }
+  rm -f "$fence_body"
+  # The fenced event had NO effect: it settled refused (inbox 'failed') and
+  # its manifest never entered the ledger.
+  full_psql "SELECT 1 FROM facilitator.inbox WHERE event_id = 'tr-straggler-$tag' AND state = 'failed' LIMIT 1" | grep -q 1 \
+    || { step_fail "fenced straggler settled processed instead of refused"; return 1; }
+  full_psql "SELECT 1 FROM facilitator.result_manifests WHERE manifest_id = 'tr-manifest-$tag' LIMIT 1" | grep -q . \
+    && { step_fail "fenced straggler recorded its manifest anyway"; return 1; }
+    true
+  # The create-time DAG law: a mutually-dependent batch is a 422 with nothing created.
+  code=$(curl -s --max-time 15 -o /tmp/tr-cycle.json -w '%{http_code}' -X POST "$VERIFY_KERNEL/api/works" \
+    -H "Authorization: Bearer $VERIFY_TOKEN_CLI" -H 'content-type: application/json' \
+    -d "$(jq -cn --arg projectId "$project" '{objective:"two-repo cycle reject", projectId: $projectId,
+        actorEvidenceRef: "identity-evidence:two-repo-cycle",
+        assignments: [
+          {capabilityId: "research.analyze", dependsOn: [{index: 1, condition: "completed"}]},
+          {capabilityId: "research.analyze", dependsOn: [{index: 0, condition: "completed"}]}
+        ]}')")
+  [ "$code" = 422 ] && grep -q 'dependency-violation' /tmp/tr-cycle.json \
+    || { step_fail "cycle batch answered HTTP $code without dependency-violation: $(cat /tmp/tr-cycle.json)"; return 1; }
+  step_pass "two-repo Work: gated dispatch -> wake -> 2 executions, steer -> gen-2 re-dispatch, straggler fenced 422, cycle rejected"
 }
 
 # --- runner (same record/report shape as the slim verify) ---------------------
@@ -712,6 +847,7 @@ full_run_step() { # <id>
     coding-pr) step_coding_pr ;;
     coding-review-steer) step_coding_review_steer ;;
     coding-redispatch) step_coding_redispatch ;;
+    two-repo-dependency) step_two_repo_dependency ;;
     *) verify_step_skip "$id" "unknown step" ;;
   esac
 }

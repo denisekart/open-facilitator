@@ -39,6 +39,7 @@ function assignEnvelope(commandId: string, id = `env-${commandId}`): EnvelopeCom
       targetId: "gw-1",
       capabilityId: "research.analyze",
       expectedContextVersion: 1,
+      executionGeneration: 1,
       actorEvidenceRef: "identity-evidence:ref-123",
       deadline: "2026-10-23T18:00:00Z",
       inputs: { objective: "compare", sourceRefs: ["artifact://s/1"] },
@@ -182,6 +183,62 @@ describe("delivery pipeline", () => {
     transport.pushDeliver(delivery("del-r", assignEnvelope("cmd-r")));
     await flush(8);
     expect(transport.receipts[0]).toMatchObject({ status: "rejected", reason: "budget exceeded" });
+    expect(validateReceipt(transport.receipts[0])).toEqual({ ok: true });
+    await client.stop();
+  });
+
+  it("receipt echoes the command's executionGeneration when it carried one (Plan 35 fence)", async () => {
+    const transport = new MockTransport();
+    const client = clientWith(transport, {
+      async onCommand() {
+        return { kind: "accepted" };
+      },
+    });
+    await client.start();
+    const env = assignEnvelope("cmd-gen");
+    (env.data as Record<string, unknown>)["executionGeneration"] = 3;
+    transport.pushDeliver(delivery("del-gen", env));
+    await flush(8);
+    expect(transport.receipts[0]).toMatchObject({ status: "accepted", executionGeneration: 3 });
+    expect(validateReceipt(transport.receipts[0])).toEqual({ ok: true });
+    await client.stop();
+  });
+
+  it("receipt omits executionGeneration when the command data lacks it", async () => {
+    const transport = new MockTransport();
+    const client = clientWith(transport, {
+      async onCommand() {
+        return { kind: "accepted" };
+      },
+    });
+    await client.start();
+    // A cancel carries no epoch on the wire: its receipt must not invent one.
+    transport.pushDeliver({
+      deliveryId: "del-nogen",
+      deliveredAt: "2026-10-22T18:00:01Z",
+      envelope: {
+        specversion: "1.0",
+        id: "env-nogen",
+        source: "urn:facilitator:instance:main",
+        type: "org.facilitator.command.work.cancel.v1",
+        subject: "work/work-123/assignment/cmd-nogen",
+        time: "2026-10-22T18:00:00Z",
+        datacontenttype: "application/json",
+        dataschema: "https://schemas.openfacilitator.org/v1/command.work.cancel.v1.json",
+        data: {
+          commandId: "cmd-nogen",
+          workId: "work-123",
+          assignmentId: "cmd-nogen",
+          targetId: "gw-1",
+          actorEvidenceRef: "identity-evidence:ref-123",
+          deadline: "2026-10-23T18:00:00Z",
+          reason: "user cancelled",
+        },
+      },
+    });
+    await flush(8);
+    expect(transport.receipts[0].status).toBe("accepted");
+    expect("executionGeneration" in transport.receipts[0]).toBe(false);
     expect(validateReceipt(transport.receipts[0])).toEqual({ ok: true });
     await client.stop();
   });

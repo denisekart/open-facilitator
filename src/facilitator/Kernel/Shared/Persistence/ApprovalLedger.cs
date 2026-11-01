@@ -347,6 +347,14 @@ public sealed class ApprovalLedger(
         // Gateway didn't record (REST/CloudEvent-plane recorders).
         await AppendDecidedAsync(db, row, decision, decidedBy: actorActor,
             evidenceRef: decision == "approved" ? (minted ? $"kernel:{evidenceId}" : evidenceRef ?? string.Empty) : string.Empty, ct);
+        // The wake law (Plan 35 B): an approval decision releases an
+        // `approved`-condition gate — pull the work's gated routing intents
+        // forward inside this tx so the funnel re-evaluates now.
+        if (decision == "approved" && row.WorkId is { } gatedWorkId)
+        {
+            await Facilitator.Kernel.Work.DependencyGate.WakeGatedRoutingIntentsAsync(db, gatedWorkId, now, ct);
+        }
+
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
         var after = await FindViewAsync(db, approvalId, ct);

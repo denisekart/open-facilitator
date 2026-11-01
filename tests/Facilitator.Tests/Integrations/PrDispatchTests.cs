@@ -326,7 +326,9 @@ public sealed class PrDispatchTests(PostgresFixture fixture) : IAsyncLifetime, I
     private static StringContent Content(string envelope) => new(envelope, Encoding.UTF8, "application/json");
 
     /// <summary>The completed-with-ref fixture rewritten: the assignmentId
-    /// rides the ASSIGN envelope's wire value verbatim (id-token free form).</summary>
+    /// rides the ASSIGN envelope's wire value verbatim (id-token free form),
+    /// and the generation stamp rides the assignment's current generation —
+    /// the §7.4 fence refuses a terminal event from any other generation.</summary>
     private static string Completed(Guid workId, string wireAssignmentId, string manifestId, Guid manifestArtifactId, string resultDigest)
     {
         var envelope = JsonNode.Parse(PostgresFixture.ReadFixture("valid/event.assignment.completed.with-manifest-ref.json"))!.AsObject();
@@ -335,6 +337,7 @@ public sealed class PrDispatchTests(PostgresFixture fixture) : IAsyncLifetime, I
         var data = envelope["data"]!.AsObject();
         data["workId"] = workId.ToString();
         data["assignmentId"] = wireAssignmentId;
+        data["executionGeneration"] = 1;
         data["executionId"] = "exec-" + manifestId;
         data["resultManifest"]!.AsObject()["manifestId"] = manifestId;
         data["resultManifestRef"] = $"artifact://{workId}/{wireAssignmentId}/{manifestArtifactId}";

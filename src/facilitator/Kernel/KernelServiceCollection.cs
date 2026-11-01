@@ -177,6 +177,14 @@ public static class KernelServiceCollection
         builder.Services.AddSingleton<IDecisionProvider, DeterministicDecisionProvider>();
         builder.Services.AddSingleton<ISink, Routing.RoutingSink>();
 
+        // The bounded nudge (§5.3): a per-replica sweep loop; the policy row
+        // (admin_config 'nudge-policy') decides whether it does anything.
+        builder.Services.AddSingleton(
+            builder.Configuration.GetSection(Work.NudgeSweeper.NudgeOptions.SectionName).Get<Work.NudgeSweeper.NudgeOptions>()
+            ?? new Work.NudgeSweeper.NudgeOptions());
+        builder.Services.AddSingleton<Work.NudgeSweeper>();
+        builder.Services.AddHostedService(sp => sp.GetRequiredService<Work.NudgeSweeper>());
+
         var heartbeat = TimeSpan.FromSeconds(linkOptions.HeartbeatSeconds);
         builder.Services.AddSignalR(options =>
         {

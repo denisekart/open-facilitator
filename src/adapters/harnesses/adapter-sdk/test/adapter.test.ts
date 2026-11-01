@@ -219,14 +219,14 @@ describe("adapter lifecycle over the real listener", () => {
     const first = await rig.link.send({
       kind: "start",
       executionId: "e-dup",
-      connectionGeneration: 9,
+      executionGeneration: 9,
       command: assign("cmd-dup"),
     });
     expect(first).toEqual({ kind: "accepted", executionId: "e-dup" });
     const dupe = await rig.link.send({
       kind: "start",
       executionId: "e-dup2",
-      connectionGeneration: 9,
+      executionGeneration: 9,
       command: assign("cmd-dup"),
     });
     expect(dupe).toEqual({ kind: "accepted", executionId: "e-dup2" });
@@ -248,7 +248,7 @@ describe("adapter lifecycle over the real listener", () => {
     await rig.link.send({
       kind: "start",
       executionId: "e-prog",
-      connectionGeneration: 4,
+      executionGeneration: 4,
       command: assign("cmd-prog"),
     });
     await vi.waitFor(() => expect(rig.events.length).toBe(1));
@@ -280,7 +280,7 @@ describe("adapter lifecycle over the real listener", () => {
     await rig.link.send({
       kind: "start",
       executionId: "e-steer",
-      connectionGeneration: 1,
+      executionGeneration: 1,
       command: assign("c1"),
     });
     const steer = {
@@ -315,7 +315,7 @@ describe("adapter lifecycle over the real listener", () => {
     await rig.link.send({
       kind: "start",
       executionId: "e-uns",
-      connectionGeneration: 1,
+      executionGeneration: 1,
       command: assign("c1"),
     });
     const reply = await rig.link.send({
@@ -344,7 +344,7 @@ describe("adapter lifecycle over the real listener", () => {
     await rig.link.send({
       kind: "start",
       executionId: "e-stop",
-      connectionGeneration: 1,
+      executionGeneration: 1,
       command: assign("c1"),
     });
     const stop = await rig.link.send({
@@ -373,7 +373,7 @@ describe("adapter lifecycle over the real listener", () => {
     await rig.link.send({
       kind: "start",
       executionId: "e-fail",
-      connectionGeneration: 2,
+      executionGeneration: 2,
       command: assign("c1"),
     });
     await vi.waitFor(() => expect(rig.events.length).toBe(1));
@@ -403,7 +403,7 @@ describe("adapter lifecycle over the real listener", () => {
     await rig.link.send({
       kind: "start",
       executionId: "e-throw",
-      connectionGeneration: 1,
+      executionGeneration: 1,
       command: assign("c1"),
     });
     const reply = await rig.link.send({
@@ -432,7 +432,7 @@ describe("adapter lifecycle over the real listener", () => {
     await rig.link.send({
       kind: "start",
       executionId: "e-r",
-      connectionGeneration: 1,
+      executionGeneration: 1,
       command: assign("cr"),
     });
     expect(rig.handle.status().activeExecutions).toEqual(["e-r"]);

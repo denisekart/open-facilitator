@@ -141,12 +141,17 @@ public sealed class LinkIngress(
                 return new LinkAdmission(null, "accepted", inboxId);
             }
 
-            if (screen.Type == Facilitator.Kernel.Work.ResultIngress.CompletedType)
+            if (screen.Type == Facilitator.Kernel.Work.ResultIngress.CompletedType
+                || screen.Type == Facilitator.Kernel.Work.ResultIngress.FailedType)
             {
                 // Plan 15: a completed event carrying a manifest ref records
                 // the manifest; a refusal settles the inbox with the refused
-                // status, mirroring the artifact.available arm.
-                var arm = await results.HandleCompletedAsync(root, screen.Principal, ct);
+                // status, mirroring the artifact.available arm. Plan 35 B:
+                // both terminal event classes run the fence + finalize arm
+                // (failed has no manifest).
+                var arm = screen.Type == Facilitator.Kernel.Work.ResultIngress.CompletedType
+                    ? await results.HandleCompletedAsync(root, screen.Principal, ct)
+                    : await results.HandleFailedAsync(root, ct);
                 if (arm.Refused)
                 {
                     await inbox.MarkProcessedAsync(inboxId, arm.Status, ct);

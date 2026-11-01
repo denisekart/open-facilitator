@@ -18,6 +18,7 @@ public sealed class AssignmentEntityConfiguration : IEntityTypeConfiguration<Ass
         e.Property(x => x.WorkId).HasColumnName("work_id").IsRequired();
         e.Property(x => x.TeamId).HasColumnName("team_id");
         e.Property(x => x.CapabilityId).HasColumnName("capability_id");
+        e.Property(x => x.DependsOn).HasColumnName("depends_on").HasColumnType("jsonb");
         e.Property(x => x.Status).HasColumnName("status").IsRequired();
         e.Property(x => x.CurrentExecutionGeneration).HasColumnName("current_execution_generation").IsRequired();
         e.Property(x => x.ExpectedContextVersion).HasColumnName("expected_context_version");

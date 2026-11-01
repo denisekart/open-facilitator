@@ -25,6 +25,7 @@
     ],
     "actorEvidenceRef": "identity-evidence:ref-123",
     "deadline": "2026-10-23T18:00:00Z",
-    "assignmentId": "analysis-1"
+    "assignmentId": "analysis-1",
+    "executionGeneration": 1
   }
 }

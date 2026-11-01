@@ -69,6 +69,9 @@ public sealed class AssignmentEntity
 
     public required string Status { get; set; }
 
+    /// <summary>jsonb — sibling assignment UUIDs gating this intent (Phase B DAG).</summary>
+    public string? DependsOn { get; set; }
+
     public int CurrentExecutionGeneration { get; set; }
 
     public long? ExpectedContextVersion { get; set; }
@@ -94,6 +97,24 @@ public sealed class ExecutionAttemptEntity
     public DateTime StartedAt { get; set; }
 
     public DateTime? EndedAt { get; set; }
+
+    public AssignmentEntity? Assignment { get; set; }
+}
+
+/// <summary>facilitator.nudges — bounded-nudge ledger, one row per stall episode (Phase B).</summary>
+public sealed class NudgeLedgerEntity
+{
+    public Guid AssignmentId { get; set; }
+
+    public int Generation { get; set; }
+
+    public int StallEpisode { get; set; }
+
+    public int NudgeCount { get; set; }
+
+    public DateTime LastNudgeAt { get; set; }
+
+    public DateTime LastProgressAt { get; set; }
 
     public AssignmentEntity? Assignment { get; set; }
 }

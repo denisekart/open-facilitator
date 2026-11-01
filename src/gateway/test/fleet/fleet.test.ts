@@ -123,6 +123,7 @@ function assign(commandId: string, capabilityId: string, deliveryId?: string): L
         targetId: "unit",
         capabilityId,
         expectedContextVersion: 1,
+        executionGeneration: 1,
         inputs: { objective: "unit", sourceRefs: [] },
         expectedDeliverables: [{ kind: "analysis.report", mediaType: "text/markdown" }],
         deadline: "2036-10-23T18:00:00Z",

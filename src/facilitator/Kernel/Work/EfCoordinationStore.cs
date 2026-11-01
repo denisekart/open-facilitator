@@ -64,6 +64,11 @@ public sealed class EfCoordinationStore(
         // (work, index) so a replayed create collides on the ledger.
         if (assignments is { Count: > 0 })
         {
+            // The create-time DAG law (Plan 35 B): validate the batch and
+            // resolve sibling index references to the deterministic sibling
+            // identities BEFORE the first funnel run, so depends_on joins
+            // exactly. A violation aborts the create (422 at the ingress).
+            var depsPerSeed = DagLaw.ResolveCreateBatch(workId, assignments);
             var teamSlug = projectId is { } pid
                 ? await db.Projects.AsNoTracking()
                     .Where(p => p.ProjectId == pid)
@@ -79,12 +84,13 @@ public sealed class EfCoordinationStore(
                     seed.PreferenceEndpointId,
                     TargetId: seed.TargetId is { Length: > 0 } target ? target : "kernel",
                     CommandIdBase: "work-assign",
-                    EffectKey: i == 0 ? workId.ToString("N") : $"{workId:N}-{i}",
+                    EffectKey: RoutingIntent.CreateEffectKey(workId, i),
                     Objective: seed.Objective is { Length: > 0 } obj ? obj : objective,
                     SourceRefsJson: null,
                     ExtraInputsJson: seed.Inputs is { ValueKind: JsonValueKind.Object } inputs ? inputs.GetRawText() : null,
                     ActorEvidenceRef: seed.ActorEvidenceRef is { Length: > 0 } evidence
-                        ? evidence : $"kernel:rest-ingress:{workId}");
+                        ? evidence : $"kernel:rest-ingress:{workId}",
+                    DependsOnJson: depsPerSeed[i]);
                 db.Outbox.Add(RoutingIntentEnvelope.OutboxRow(intent, now, envelopeValidator));
             }
         }
@@ -113,6 +119,12 @@ public sealed class EfCoordinationStore(
         }
 
         var now = timeProvider.GetUtcNow().UtcDateTime;
+        // §7.4: an explicit re-dispatch is the next execution generation of
+        // the work's assignment line (max prior attempt + 1; 1 for a bare work).
+        var priorGeneration = await db.ExecutionAttempts.AsNoTracking()
+            .Where(a => a.Assignment!.WorkId == workId)
+            .Select(a => (int?)a.Generation)
+            .MaxAsync(ct) ?? 0;
         var intent = new RoutingIntent(
             workId,
             seed.CapabilityId,
@@ -125,7 +137,8 @@ public sealed class EfCoordinationStore(
             SourceRefsJson: null,
             ExtraInputsJson: seed.Inputs is { ValueKind: JsonValueKind.Object } inputs ? inputs.GetRawText() : null,
             ActorEvidenceRef: seed.ActorEvidenceRef is { Length: > 0 } evidence
-                ? evidence : $"kernel:rest-ingress:{workId}");
+                ? evidence : $"kernel:rest-ingress:{workId}",
+            ExecutionGeneration: priorGeneration + 1);
         db.Outbox.Add(RoutingIntentEnvelope.OutboxRow(intent, now, envelopeValidator));
         AppendWorkProgress(db, workId, "re-dispatch requested", causationId: null, createdAt: now);
         await db.SaveChangesAsync(ct);
@@ -330,6 +343,9 @@ public sealed class EfCoordinationStore(
             .FirstOrDefaultAsync(ct);
         if (latest is not null && !AttemptTerminal.Contains(latest.Status))
         {
+            // §7.4: a live steer does NOT bump the generation — it rides the
+            // live attempt's generation, so the worker's echoed terminal
+            // events still fence-match the assignment.
             var steer = Facilitator.Kernel.Integrations.ProviderEnvelopes.Steer(
                 workId,
                 data.GetProperty("assignmentId").GetString() ?? latest.AssignmentId.ToString("N"),
@@ -337,7 +353,8 @@ public sealed class EfCoordinationStore(
                 directive,
                 contextVersion,
                 now,
-                $"work-steer:{commandId}");
+                $"work-steer:{commandId}",
+                executionGeneration: latest.Generation);
             AppendDeliveryRow(db, steer, original.RecipientEndpointId, $"work-steer:{commandId}", workId, now);
             return;
         }
@@ -379,7 +396,11 @@ public sealed class EfCoordinationStore(
             SourceRefsJson: originalInputs["sourceRefs"]?.ToJsonString() is { Length: > 0 } refs && refs != "[]" ? refs : null,
             ExtraInputsJson: extraInputs.Count > 0 ? extraInputs.ToJsonString() : null,
             ActorEvidenceRef: originalData["actorEvidenceRef"]?.GetValue<string>()
-                ?? $"kernel:steer:{commandId}");
+                ?? $"kernel:steer:{commandId}",
+            // §7.4 generation fencing: a re-dispatch is the next execution
+            // generation of the assignment's work line (prior attempt's + 1);
+            // terminal events from the fenced-over run stop matching it.
+            ExecutionGeneration: latest?.Generation + 1 ?? 1);
         db.Outbox.Add(RoutingIntentEnvelope.OutboxRow(redispatchIntent, now, envelopeValidator));
     }
 

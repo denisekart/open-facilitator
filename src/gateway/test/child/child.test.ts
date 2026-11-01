@@ -25,6 +25,7 @@ function assignCommand(overrides: Partial<EnvelopeCommand> = {}): EnvelopeComman
       targetId: "t",
       capabilityId: "research.analyze",
       expectedContextVersion: 1,
+      executionGeneration: 1,
       inputs: { objective: "x", sourceRefs: [] },
       expectedDeliverables: [{ kind: "analysis.report", mediaType: "text/markdown" }],
       deadline: "2036-10-23T18:00:00Z",
@@ -51,7 +52,7 @@ describe("ChildMessage vocabulary", () => {
       {
         kind: "start",
         executionId: "exec-1",
-        connectionGeneration: 3,
+        executionGeneration: 3,
         command: assignCommand(),
       },
       { kind: "steer", executionId: "exec-1", command: assignCommand() },
@@ -80,7 +81,7 @@ describe("EmbeddedChild echo mode", () => {
     const reply = await c.send({
       kind: "start",
       executionId: "exec-1",
-      connectionGeneration: 1,
+      executionGeneration: 1,
       command: assignCommand(),
     });
     expect(reply).toEqual({ kind: "accepted", executionId: "exec-1" });
@@ -107,19 +108,34 @@ describe("EmbeddedChild echo mode", () => {
     });
   });
 
+  it("echo stamps the command's executionGeneration onto both events (Plan 35 fence)", async () => {
+    const c = child("echo");
+    const command = assignCommand();
+    (command.data as Record<string, unknown>)["executionGeneration"] = 4;
+    const reply = await c.send({
+      kind: "start",
+      executionId: "exec-4",
+      executionGeneration: 1,
+      command,
+    });
+    expect(reply).toEqual({ kind: "accepted", executionId: "exec-4" });
+    const events = c.drainEvents();
+    expect(events.map((e) => e.data?.["executionGeneration"])).toEqual([4, 4]);
+  });
+
   it("a second start for a running execution answers accepted (echo re-publishes)", async () => {
     const c = child("echo");
     await c.send({
       kind: "start",
       executionId: "exec-1",
-      connectionGeneration: 1,
+      executionGeneration: 1,
       command: assignCommand(),
     });
     expect(c.drainEvents()).toHaveLength(2);
     const again = await c.send({
       kind: "start",
       executionId: "exec-1",
-      connectionGeneration: 1,
+      executionGeneration: 1,
       command: assignCommand(),
     });
     expect(again.kind).toBe("accepted");
@@ -136,7 +152,7 @@ describe("EmbeddedChild echo mode", () => {
     await c.send({
       kind: "start",
       executionId: "exec-1",
-      connectionGeneration: 1,
+      executionGeneration: 1,
       command: assignCommand(),
     });
     expect(sent).toEqual([
@@ -153,7 +169,7 @@ describe("EmbeddedChild stub mode + reconcile answers", () => {
     const reply = await c.send({
       kind: "start",
       executionId: "exec-1",
-      connectionGeneration: 1,
+      executionGeneration: 1,
       command: assignCommand(),
     });
     expect(reply.kind).toBe("accepted");
@@ -176,7 +192,7 @@ describe("EmbeddedChild stub mode + reconcile answers", () => {
     await c.send({
       kind: "start",
       executionId: "exec-1",
-      connectionGeneration: 1,
+      executionGeneration: 1,
       command: assignCommand(),
     });
     expect(await c.send({ kind: "stop", executionId: "exec-1", reason: "work.cancel" })).toEqual({
@@ -200,7 +216,7 @@ describe("EmbeddedChild stub mode + reconcile answers", () => {
       await c.send({
         kind: "start",
         executionId: "e",
-        connectionGeneration: 1,
+        executionGeneration: 1,
         command: assignCommand(),
       }),
     ).toMatchObject({ kind: "rejected", reason: "child closed" });

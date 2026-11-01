@@ -259,7 +259,7 @@ steers the Work: while an execution is live the steer rides the open link;
 after the run completed, the kernel re-dispatches the original assign with
 the directive in its inputs, the restarted worker re-hydrates from the branch
 and posts a "steer incorporated" comment. Live proof: `make provider-e2e`
-runs the 17 provider steps against the FULL overlay. Kafka and Ollama boot as
+runs the 18 provider steps against the FULL overlay. Kafka and Ollama boot as
 example ingest / optional routing only.
 
 ## 11. Tear down

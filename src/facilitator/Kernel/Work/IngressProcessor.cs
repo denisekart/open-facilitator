@@ -67,7 +67,8 @@ public sealed class IngressProcessor(
                     TargetId: Str(item, "targetId"),
                     PreferenceEndpointId: Str(item, "preferenceEndpointId"),
                     ActorEvidenceRef: Str(item, "actorEvidenceRef"),
-                    Inputs: item.TryGetProperty("inputs", out var inp) && inp.ValueKind == JsonValueKind.Object ? inp.Clone() : null));
+                    Inputs: item.TryGetProperty("inputs", out var inp) && inp.ValueKind == JsonValueKind.Object ? inp.Clone() : null,
+                    DependsOn: item.TryGetProperty("dependsOn", out var dep) && dep.ValueKind == JsonValueKind.Array ? dep.Clone() : null));
             }
         }
         else if (body.TryGetProperty("capabilityId", out var topCap) && topCap.ValueKind == JsonValueKind.String && topCap.GetString() is { Length: > 0 } topCapability)
@@ -91,8 +92,19 @@ public sealed class IngressProcessor(
             return Results.Ok(new { status = "duplicate", inboxId });
         }
 
-        var work = await pipeline.WithSpanAsync("ingress.process", async () =>
-            await store.CreateWorkAsync(objective, projectId, actor, ct, seeds));
+        WorkView work;
+        try
+        {
+            work = await pipeline.WithSpanAsync("ingress.process", async () =>
+                await store.CreateWorkAsync(objective, projectId, actor, ct, seeds));
+        }
+        catch (DagViolationException dag)
+        {
+            // Create-time DAG law (Plan 35 B): the whole request is rejected
+            // — the store's tx rolled back, nothing was created.
+            await inbox.MarkProcessedAsync(inboxId, "failed", ct);
+            return IngressPipeline.Problem(ProblemErrors.DagViolation(dag.Message));
+        }
         await inbox.MarkProcessedAsync(inboxId, null, ct);
         metrics.InboxProcessed();
         return Results.Created($"/api/works/{work.WorkId}", WorkDtoMapper.ToDto(work));

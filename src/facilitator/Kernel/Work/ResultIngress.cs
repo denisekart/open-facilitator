@@ -43,6 +43,9 @@ public sealed class ResultIngress(
     /// <summary>The completed event type this arm handles on both planes.</summary>
     public const string CompletedType = "org.facilitator.event.assignment.completed.v1";
 
+    /// <summary>The failed event type the finalize arm handles on both planes.</summary>
+    public const string FailedType = "org.facilitator.event.assignment.failed.v1";
+
     /// <summary>Capability of the manifest-dispatched PR creation op (the
     /// connector's op id; the gateway's policy routes it to the team's
     /// connector unit).</summary>
@@ -56,11 +59,23 @@ public sealed class ResultIngress(
         JsonElement root, EffectivePrincipal? principal, CancellationToken ct)
     {
         var data = root.GetProperty("data");
+
+        // §7.4 fence, BEFORE any ledger effect: a terminal event stamped at a
+        // generation the assignment has moved past is refused (422) — the
+        // manifest stays unrecorded, the inbox settles refused, and a
+        // redelivery of the same stale event fences identically.
+        var fence = await FenceAsync(data, ct);
+        if (fence is not null)
+        {
+            return new ResultArm(fence, "stale-generation");
+        }
+
         var wireRef = GetString(data, "resultManifestRef");
         if (wireRef is null)
         {
-            // Legacy inline-only completion: today's behavior, no ledger effect.
-            return new ResultArm(null, "accepted");
+            // Manifest-less completion (legacy inline path): the execution
+            // still finalizes — fenced, walked to terminal, siblings woken.
+            return await FinalizeAsync(data, "completed", ct);
         }
 
         var digest = GetString(data, "resultDigest") ?? string.Empty;
@@ -79,18 +94,94 @@ public sealed class ResultIngress(
                     data, manifestArtifactId, digest, workId, assignmentId, assignmentRaw!, ct);
             }
 
-            return outcome switch
+            var outcomeProblem = outcome switch
             {
-                ResultManifestOutcome.Recorded or ResultManifestOutcome.Duplicate => new ResultArm(null, "accepted"),
-                ResultManifestOutcome.ArtifactMissing => new(ProblemErrors.ManifestNotFound(wireRef), "manifest-not-found"),
-                ResultManifestOutcome.DigestMismatch => new(ProblemErrors.ManifestDigestMismatch(wireRef), "manifest-digest-mismatch"),
-                _ => new(ProblemErrors.ManifestOutputUnresolvable(wireRef), "manifest-output-unresolvable"),
+                ResultManifestOutcome.Recorded or ResultManifestOutcome.Duplicate => (ProblemDetails?)null,
+                ResultManifestOutcome.ArtifactMissing => ProblemErrors.ManifestNotFound(wireRef),
+                ResultManifestOutcome.DigestMismatch => ProblemErrors.ManifestDigestMismatch(wireRef),
+                _ => ProblemErrors.ManifestOutputUnresolvable(wireRef),
             };
+            if (outcomeProblem is not null)
+            {
+                return new ResultArm(outcomeProblem, outcome switch
+                {
+                    ResultManifestOutcome.ArtifactMissing => "manifest-not-found",
+                    ResultManifestOutcome.DigestMismatch => "manifest-digest-mismatch",
+                    _ => "manifest-output-unresolvable",
+                });
+            }
+
+            // Recorded (or a replay of a recorded manifest): finalize the
+            // execution — walk the assignment to terminal, settle the attempt
+            // at this generation, wake the work's gated siblings. A
+            // connector-synthetic assignment id (no row) is a no-op here.
+            return await FinalizeAsync(data, "completed", ct);
         }
 
         // Unknown work, foreign assignment identity space, or a non-GUID ref
         // segment: the same 404 the ledger answers for a foreign artifact.
         return new ResultArm(ProblemErrors.ManifestNotFound(wireRef), "manifest-not-found");
+    }
+
+    /// <summary>The failed-event arm: fence + finalize, no manifest. The
+    /// gated siblings wake (a failed dep never releases a
+    /// <c>completed</c>-condition gate, but the funnel re-evaluates and the
+    /// audit row records the truth either way).</summary>
+    public async Task<ResultArm> HandleFailedAsync(JsonElement root, CancellationToken ct)
+    {
+        var data = root.GetProperty("data");
+        var fence = await FenceAsync(data, ct);
+        if (fence is not null)
+        {
+            return new ResultArm(fence, "stale-generation");
+        }
+
+        return await FinalizeAsync(data, "failed", ct);
+    }
+
+    /// <summary>The fence read: null when the event may proceed (generation
+    /// current, no assignment row, or an unparseable identity space the
+    /// legacy arms already answer for); the 422 when it is stale.</summary>
+    private async Task<ProblemDetails?> FenceAsync(JsonElement data, CancellationToken ct)
+    {
+        if (!Guid.TryParse(GetString(data, "assignmentId"), out var assignmentId))
+        {
+            return null;
+        }
+
+        var generation = data.TryGetProperty("executionGeneration", out var g)
+            && g.ValueKind == JsonValueKind.Number ? g.GetInt32() : 1;
+        await using var db = await contextFactory.CreateDbContextAsync(ct);
+        var current = await db.Assignments.AsNoTracking()
+            .Where(a => a.AssignmentId == assignmentId)
+            .Select(a => (int?)a.CurrentExecutionGeneration)
+            .FirstOrDefaultAsync(ct);
+        return current is { } gen && gen != generation
+            ? ProblemErrors.StaleGeneration(generation, gen)
+            : null;
+    }
+
+    /// <summary>Finalize on a fresh context (the manifest ledger ran its own
+    /// transaction; the finalize is its own atomic walk + wake).</summary>
+    private async Task<ResultArm> FinalizeAsync(JsonElement data, string outcome, CancellationToken ct)
+    {
+        var workOk = Guid.TryParse(GetString(data, "workId"), out var workId);
+        var assignOk = Guid.TryParse(GetString(data, "assignmentId"), out var assignmentId);
+        var generation = data.TryGetProperty("executionGeneration", out var g)
+            && g.ValueKind == JsonValueKind.Number ? g.GetInt32() : 1;
+        if (!workOk || !assignOk)
+        {
+            return new ResultArm(null, "accepted");
+        }
+
+        await using var db = await contextFactory.CreateDbContextAsync(ct);
+        var result = await ExecutionLedger.FinalizeAsync(
+            db, workId, assignmentId, generation, outcome, timeProvider.GetUtcNow().UtcDateTime, ct);
+        return result.Outcome switch
+        {
+            FinalizeOutcome.Fenced => new ResultArm(result.Problem, "stale-generation"),
+            _ => new ResultArm(null, "accepted"),
+        };
     }
 
     /// <summary>Plan 24(1d): the manifest reader. A RECORDED manifest for an

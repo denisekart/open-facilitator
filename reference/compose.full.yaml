@@ -1,4 +1,4 @@
-# Full overlay (spec §22.3): the provider services on top of the slim stack.
+# Full overlay: the provider services on top of the slim stack.
 # Bring up: make compose-full. Gateway/launcher/worker services land with the
 # node-runtime compose services.
 services:

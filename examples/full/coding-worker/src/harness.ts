@@ -6,7 +6,7 @@
 // writer wins honestly) → complete over the kernel artifact path (Plan 15:
 // diff + canonical manifest UPLOADED, completed carries ref + digest).
 //
-// The PR is the gateway's job (§9.2 — the worker holds no PR API call): the
+// The PR is the gateway's job (the worker holds no PR API call): the
 // manifest's structuredResult carries `prRequest` on a first run and
 // `commentRequests[]` per steer, which the kernel's completed-manifest
 // reader dispatches as connector ops. Cancel law: an abort mid-run unwinds
@@ -231,7 +231,7 @@ export function createCodingHooks(options: CodingRunOptions): CodingHooks {
 
     // The manifest's structuredResult: the kernel's completed-manifest
     // reader turns prRequest / commentRequests into connector ops; the
-    // worker itself calls no PR API (§9.2 — the token is team-side only).
+    // worker itself calls no PR API (the token is team-side only).
     const structured: CodingStructuredResult = {
       branch,
       objective,

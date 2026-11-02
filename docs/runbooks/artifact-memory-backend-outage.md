@@ -15,7 +15,7 @@ blob in the S3-compatible store (SeaweedFS `:8333`, bucket
 gateway/worker PUTs the blob, finalize moves the row to `stored` after
 verification; a store that is down surfaces as a failed request or a row
 stuck in `requested` — never as a `stored` row with a missing blob
-(artifact reads 404-absent honestly, spec §27: degrade, don't fake).
+(artifact reads 404-absent honestly — degrade, don't fake).
 Memory recall goes through the kernel's brokered scopes
 (`memory_scopes`/`memory_usages` ledger); a backend failure returns a
 degraded response, and assignment context assembly proceeds without the

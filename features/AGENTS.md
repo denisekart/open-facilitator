@@ -21,7 +21,7 @@ into any team-owned container, published as OCI images
   every Feature's `entrypoint`; units `units/{10-gateway,20-linkd,30-harness-adapter,40-forgejo-connector}.sh`
   carry baked option defaults, numeric-prefix order, per-runtime
   restart-vs-terminal law, and forward TERM to the runtime child. No
-  lifecycle hooks (spec §8.2: never rely on them).
+  lifecycle hooks (never rely on them).
 
 ## Invariants
 - Options are startup-time defaults baked into the unit; the runtime
@@ -29,10 +29,10 @@ into any team-owned container, published as OCI images
   truth. Secrets are never options.
 - Features never own state; configs point `stateDir`/`workDir` at the
   workspace mount.
-- Feature version != protocol major (spec §8.5); tags come from
+- Feature version != protocol major; tags come from
   `release.yml`'s features job.
 
 ## Truth anchors
 - `../.omp/skills/facilitator-workspace-packaging/SKILL.md` — provisioning rules.
-- `../docs/specs/open_facilitator_framework_architecture.md` §8 — requirements.
+- `../docs/specs/open_facilitator_framework_architecture.md` — requirements.
 - `../examples/slim/deterministic-research-worker/.devcontainer` — composed example.

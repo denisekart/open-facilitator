@@ -5,7 +5,7 @@ namespace Ofac.Protocol.Validation;
 /// types the v1 contract accepts. Mirrors KNOWN_COMMAND_TYPES in
 /// <c>src/protocol/src/validate.ts</c> and the schema-derived set in
 /// <c>protocol/tools/Validate.Fixtures</c>; a command type outside this set is
-/// rejected <c>unknown-command</c> (spec §5.5).
+/// rejected <c>unknown-command</c> (fail closed).
 /// </summary>
 public static class KnownCommands
 {

@@ -98,7 +98,7 @@ export function validateEnvelope(env: unknown): ValidationResult {
     return fail(classify(envelopeValidator, "envelope-violation"), firstMessage(envelopeValidator));
   }
   if (isCommand && !KNOWN_COMMAND_TYPES.includes(type)) {
-    // Fail closed (spec §5.5): unknown commands get a typed `unsupported`.
+    // Fail closed: unknown commands get a typed `unsupported`.
     return fail("unknown-command", `command type '${type}' is not in the contract`);
   }
   if (typeof dataschema !== "string") {
@@ -116,7 +116,7 @@ export function validateEnvelope(env: unknown): ValidationResult {
   return { ok: true };
 }
 
-/** Validate a plain-JSON receipt (not a CloudEvent; spec §5.2). */
+/** Validate a plain-JSON receipt (not a CloudEvent). */
 export function validateReceipt(v: unknown): ValidationResult {
   if (!receiptValidator(v)) {
     return fail("schema-violation", firstMessage(receiptValidator));
@@ -124,7 +124,7 @@ export function validateReceipt(v: unknown): ValidationResult {
   return { ok: true };
 }
 
-/** Validate a plain-JSON link control frame (hello/welcome/…; spec §5.3). */
+/** Validate a plain-JSON link control frame (hello/welcome/…). */
 export function validateControlFrame(v: unknown): ValidationResult {
   if (!controlValidator(v)) {
     return fail("schema-violation", firstMessage(controlValidator));
@@ -157,7 +157,7 @@ export function enforceSizeLimit(bytes: number, max: number): boolean {
 }
 
 /**
- * Handshake negotiation (spec §5.3): pick the highest version both sides speak,
+ * Handshake negotiation: pick the highest version both sides speak,
  * or null when there is no common version (`no-common-version`).
  */
 export function negotiateProtocolVersion(

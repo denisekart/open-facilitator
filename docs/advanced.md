@@ -99,12 +99,12 @@ The locked YAML surface (`loadConfigFile` rejects any other key, naming it):
 |`childTransport.handshakeTimeoutSeconds` `childTransport.leaseMissedBeats`|hello deadline; lease (default 5 / 2)|
 |`diagnostics.port`|localhost `/status` endpoint; `0` disables|
 |`heartbeatSeconds`|1..3600, default 30|
-|`policy.inline` \| `policy.path`|team policy file (spec §12): exactly one; `path` resolves against the config file's dir; fail-closed loader. `policy.confirmTimeoutSeconds` (default 900) caps how long a `confirm` approval stays pending. Laws + audit line: `docs/security.md`|
+|`policy.inline` \| `policy.path`|team policy file: exactly one; `path` resolves against the config file's dir; fail-closed loader. `policy.confirmTimeoutSeconds` (default 900) caps how long a `confirm` approval stays pending. Laws + audit line: `docs/security.md`|
 
 ## HarnessAdapter contract
 
 A HarnessAdapter is the thin translation layer between the Gateway's child
-transport and one harness execution engine (spec §8.3). Shipped as
+transport and one harness execution engine. Shipped as
 `@ofac/adapter` (`src/adapters/harnesses/adapter-sdk/`); the worked example
 is `@ofac/harness-deterministic`.
 
@@ -149,7 +149,7 @@ redefined:
 |`heartbeat`|adapter → Gateway|`childWorkspaceId` (lease keepalive)|
 |`goaway`|Gateway → adapter|drain `reason`|
 
-### Authority law (S:422)
+### Authority law
 
 The adapter is thin translation; the **harness** is authoritative over
 execution state; the Gateway mediates. `assignment.completed.v1` is the
@@ -238,7 +238,7 @@ Authoring law, as both adapters prove it:
   no-op. Identities the provider object doesn't carry (a Mattermost Reaction
   has no `id` on 11.11) get a **synthesized stable composite** — never a
   transport nonce.
-- **Outbound is idempotent per §13.3**: record the provider object id keyed
+- **Outbound is idempotent**: record the provider object id keyed
   by the command's `idempotencyKey` in a durable ledger BEFORE answering the
   receipt; replays answer `accepted` without touching the provider.
 - **Echo suppression is the kernel's judgment, the adapter's honesty**: the
@@ -248,7 +248,7 @@ Authoring law, as both adapters prove it:
   change the head-branch resolver must see (a connector-minted PR would else
   strand unbound) and nothing answers it, so it runs the arm instead.
 
-### Operation semantics (spec §13.5, as-built — Mattermost)
+### Operation semantics (as-built — Mattermost)
 
 The Forgejo adapter advertises only `communication.reply.v1` (issue/PR
 comment as the bot, ledger-keyed the same way).
@@ -310,7 +310,7 @@ with the readable predicate.
 ### Team-side profile
 
 Teams opt in through a `.facilitator/memory.yaml` profile (owner-verified
-configuration, not a privilege grant — spec §14.10/§14.11): `provider`,
+configuration, not a privilege grant): `provider`,
 `retrieval.{enabled,maxItems,maxTokens,purposes}`, `retention.*`,
 `sharing.*`, `reflect.enabled`. The kernel reads none of it; it is the
 Gateway/harness-side statement of how the team uses the broker.

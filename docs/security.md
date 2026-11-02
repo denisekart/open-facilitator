@@ -5,7 +5,7 @@ artifact-store and result-manifest laws below.
 The human plane federates to any OIDC IdP; roles are operator-defined claim
 rules; every gate decision audits.
 
-## Trust vs data-plane split (spec §3.3, D-10)
+## Trust vs data-plane split (D-10)
 
 The Facilitator is a coordination kernel, not a privilege holder. It authorizes *admission* (accept a command, transition a Work) and never performs privileged external writes itself:
 
@@ -30,7 +30,7 @@ The kernel is **vendor-neutral**: it consumes OIDC discovery, bearer tokens,
 and RFC 6901 JSON pointers only. Vendors (Keycloak in dev/test) appear only
 in fixtures (`reference/keycloak/`) and docs.
 
-## Human plane: OIDC + claim pointers (spec §11)
+## Human plane: OIDC + claim pointers
 
 Identity is the verified pair `(iss, sub)` — the canonical audit/timeline
 actor is `oidc:<iss>|<sub>`. Display names never enter the actor. Which
@@ -109,7 +109,7 @@ block (`IdentityStartupCheck`, fail closed in every environment).
 
 ## Ingress hard limits
 
-- Request bodies at `/api/ingress/events` are capped at **262144 bytes**; oversize ⇒ `413` (`payload-too-large`). This matches `limits.maxEnvelopeBytes` in `protocol/conformance-fixtures/index.json` and is the baseline DoS floor — large payloads travel by artifact reference (appendix §8), never inline.
+- Request bodies at `/api/ingress/events` are capped at **262144 bytes**; oversize ⇒ `413` (`payload-too-large`). This matches `limits.maxEnvelopeBytes` in `protocol/conformance-fixtures/index.json` and is the baseline DoS floor — large payloads travel by artifact reference, never inline.
 - Envelopes fail closed: schema/envelope violations ⇒ `400`, command types outside the 7-type known-command table ⇒ `422 unknown-command`, and the rejected envelope is still persisted to the `inbox` as an audit record (state `failed`).
 - Duplicate admission (same `(event_source, event_id)`, `command_id`, or `(provider, provider_delivery_id)`) returns `200 {"status":"duplicate"}` and reprocesses nothing — replay is cheap and side-effect-free by construction.
 
@@ -147,13 +147,13 @@ audit row, never silent acceptance. Provider-specific rules:
   into a new Work.
 - **A reaction is never consent.** `reaction.v1` audits
   (`provider.reaction` timeline row) and gets the configured ack; it is not
-  an approval, transition, or steer signal anywhere in the kernel (§13.3).
+  an approval, transition, or steer signal anywhere in the kernel.
 - **Link identity is redeemed on the human plane.** A `/link` DM mints a
   one-shot code; redemption is an authenticated REST call
   (`POST /api/link-identities/redeem`) so the linked identity is the
   verified OIDC `(iss, sub)` — chat display names never bind accounts.
 
-## Workload plane: enrollment + delegation evidence (appendix §3.2)
+## Workload plane: enrollment + delegation evidence
 
 **Enrollment** (`POST /api/link/v1/enroll`) minting a per-endpoint
 `linkToken` comes in two modes, told apart by the shape of the presented
@@ -191,13 +191,13 @@ path ⇒ `503 auth-unavailable` (fail closed). The effective principal (always
 workload + optional validated human) is what the Gateway team policy engine
 authorizes against.
 
-## Approval lifecycle (spec §12.1–12.2, appendix §7)
+## Approval lifecycle
 
 `facilitator.approvals` is the lifecycle authority:
 `pending → approved|denied|expired|revoked → consumed`.
 
 - **Digest law**: when `approval.required` carries an `action`, the kernel
-  recomputes the appendix §7.2 digest (RFC 8785 over
+  recomputes the record digest (RFC 8785 over
   `{approvalId, action, eligibleActors, expiresAt, createdAt}`) and compares
   to the declared `actionDigest` — a mismatch denies `422
   approval-digest-mismatch` and the row is never recorded; the kernel never
@@ -206,7 +206,7 @@ authorizes against.
 - **Single use**: a respond decides via one conditional
   `UPDATE ... WHERE state='pending'` — exactly one concurrent decider wins,
   every replay denies `409 approval-already-consumed` even for byte-identical
-  command JSON (§12.2). Consume (`approved→consumed`) is the
+  command JSON. Consume (`approved→consumed`) is the
   same conditional-update shape.
 - **Lazy expiry**: no timer. Every read/respond first applies
   `UPDATE ... SET state='expired' WHERE state='pending' AND expires_at<=now`
@@ -217,7 +217,7 @@ authorizes against.
   — the token's `/groups` claim), then `user:<displayName>`, then
   `oidc:<iss>|<sub>` (canonical actor, verbatim). Deny ⇒ `403
   approval-actor-ineligible` + audit `deny reason=actor-ineligible`.
-- **Non-repudiation (§12.1 step 4)**: a respond needs a verified human —
+- **Non-repudiation**: a respond needs a verified human —
   the REST pair takes the OIDC bearer principal; the wire/Link surfaces
   require `actorEvidenceRef` verifying as `oidc:`/`kernel:`. A workload-only
   respond denies `403 approval-actor-unknown`.
@@ -225,7 +225,7 @@ authorizes against.
   `consumed` (receipt semantics: it proves the decision happened, it is not
   re-spent), rides the response as `evidenceRef`, and lands in the audit
   row + an `approval.decided` timeline note.
-- **Revocation-before-apply (appendix §7.3)**: `approval.revoked` flips
+- **Revocation-before-apply**: `approval.revoked` flips
   `pending→revoked` (terminal states no-op, 202 + audit); every consumer
   (respond, consume) checks the row state first, so a revoked approval denies
   `409 approval-revoked` even when the command JSON is identical to what
@@ -237,7 +237,7 @@ approvalId/digest/decision/actor, `policy_version` `approval-v1`; gate
 evaluations on the REST pair ride `authorization.evaluated:approvals.read`/
 `:approvals.respond`) — never a raw token.
 
-## Team policy engine + the confirm round-trip (spec §12)
+## Team policy engine + the confirm round-trip
 
 The Gateway evaluates every inbound command against the team's policy
 file (`policy.inline` / `policy.path` in `gateway.yaml`; the path resolves
@@ -278,23 +278,23 @@ only), `user:<principal-or-preferred_username>`, `workload:<id>`.
 `role:<r>` terms match nothing today — no realm mapper mints roles into
 evidence — so a `role:` row denies until one lands (documented limitation).
 
-**The §12 loop** across kernel + Gateway, wire-visible in both directions:
+**The approval loop** across kernel + Gateway, wire-visible in both directions:
 
 1. `command.work.assign` arrives over the Link; a `confirm` verdict parks a
    `awaiting-approval` row in the Gateway ledger, publishes
    `event.approval.required.v1` (with the `action` payload —
    `{capabilityId, resource, assignmentId, workId}`) to
    `/api/link/v1/events`, and ACKS the delivery `accepted`. The kernel
-   recomputes the §7.2 digest (cross-language goldens:
+   recomputes the record digest (cross-language goldens:
    `canonical/approval-record-1|-2`) and stores
    `requested_by_endpoint_id` from the Link caller.
-2. A human answers the REST pair (§ above). Every terminal flip
+2. A human answers the REST pair (above). Every terminal flip
    (approved/denied/expired/revoked) enqueues
    `event.approval.decided.v1` on the `link.<endpointId>` outbox channel in
    the SAME transaction (outbox law; per-decision `commandId` dedupe), and
    the pump pushes it into the Gateway's session.
 3. The Gateway re-evaluates the parked envelope against CURRENT state
-   (appendix §7.3: a policy flip or a vanished capability denies even after
+   (a policy flip or a vanished capability denies even after
    a human approved; `createdAt` must match the parked digest record), then
    sends `command.approval.consume.v1` (`actorEvidenceRef:
    workload:<gatewayId>`) synchronously over the Link plane. The kernel
@@ -306,7 +306,7 @@ evidence — so a `role:` row denies until one lands (documented limitation).
    settles once.
 
 **Gateway audit line** (`src/gateway/src/audit.ts`): every policy decision
-emits exactly one `authorization.evaluated` info line carrying the §12.2
+emits exactly one `authorization.evaluated` info line carrying the full
 set — `decision`, `reason`, `workId`/`assignmentId`/`capabilityId`,
 `resource`, the three principals (`callerWorkload`, `gatewayWorkload`,
 `humanSubject` only when claims verified), `policyId`, `actionDigest` +
@@ -395,7 +395,7 @@ set — `decision`, `reason`, `workId`/`assignmentId`/`capabilityId`,
   the breach is 422 `memory-quota-exceeded` + deny audit, never a queue
   backpressured onto readers. Duplicate content (same scope, same sha256)
   dedupes to the stored identity instead of consuming budget growth.
-- **Memory is never authorization (spec §3.3).** Recall and the usage law
+- **Memory is never authorization.** Recall and the usage law
   inform decisions; no gate, transition, or ledger mutation reads memory
   as an authority source.
 - **Injected content is data.** Recalled entries ride back as reference

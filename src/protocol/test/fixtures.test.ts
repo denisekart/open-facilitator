@@ -151,7 +151,7 @@ describe("approval-record digest golden — Gateway-shaped action", () => {
   });
 });
 
-describe("approval-record digest golden (appendix §7.2)", () => {
+describe("approval-record digest golden", () => {
   const record = JSON.parse(
     readFileSync(new URL("canonical/approval-record-1.json", fixturesRoot), "utf8"),
   ) as {
@@ -189,7 +189,7 @@ describe("approval-record digest golden (appendix §7.2)", () => {
   });
 });
 
-describe("result-manifest digest golden (spec §15.3)", () => {
+describe("result-manifest digest golden", () => {
   const raw = readFileSync(new URL("canonical/result-manifest-1.json", fixturesRoot), "utf8");
   const golden = readFileSync(
     new URL("canonical/result-manifest-1.sha256", fixturesRoot),

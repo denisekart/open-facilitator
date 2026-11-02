@@ -10,7 +10,7 @@ that runs the Gateway with restart-with-backoff.
 - Node **>= 22** on PATH (hard-fails otherwise). A Node-shipping base image
   (`mcr.microsoft.com/devcontainers/typescript-node`) or the official
   `ghcr.io/devcontainers/features/node` Feature satisfies this; the Feature
-  deliberately does not download a Node runtime itself (spec §8 packaging).
+  deliberately does not download a Node runtime itself.
 
 ## Options (startup-time defaults only)
 

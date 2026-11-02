@@ -1,7 +1,7 @@
 # Keycloak realm fixture
 
 `realm.json` is **fixture infrastructure**, not product: the kernel itself is
-vendor-neutral (OIDC + JWKS + RFC 6901 claim pointers only, spec §11). This
+vendor-neutral (OIDC + JWKS + RFC 6901 claim pointers only). This
 realm is the shared dev/test IdP that mints the bearer tokens every tier
 authenticates with — the .NET suite (`KeycloakFixture`), the TS e2e harnesses
 (`KEYCLOAK_URL`), CI service steps, and local manual runs.

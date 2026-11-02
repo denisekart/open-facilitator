@@ -62,7 +62,7 @@ section 3's scope question before creating anything else.
    "Workflows permissions: Read and write allowed" (the default); do not set
    the org/repo limit to Read-only.
 5. Feature OCI path contract (consumers depend on this —
-   `docs/getting-started.md` §10 and `examples/slim/deterministic-research-worker/README.md`
+   `docs/getting-started.md` (registry coordinates table) and `examples/slim/deterministic-research-worker/README.md`
    advertise the coordinates): `@devcontainers/cli features publish` pushes
    each directory of `features/src` to
    `<registry>/<namespace>/<id>` where `<id>` is the `id` field of that
@@ -158,7 +158,8 @@ from, and the scope must match the owner account/org name.
   organization named `ofac` (GitHub → New organization → `ofac`; link or
   mirror the publishable packages there). Coordinates become
   `https://npm.pkg.github.com/ofac`. This diverges from the
-  `…/denisekart` URL the workflow comment and `docs/getting-started.md` §9
+  `…/denisekart` URL the workflow comment and the registry-coordinates table of
+  `docs/getting-started.md`
   currently state — align all three at flip time.
 - **(b) Rename scope** to `@denisekart/*` (or `@denisekart-open-facilitator/*`)
   and rewrite `publishConfig`, the repo `.npmrc`, and every cross-package
@@ -409,6 +410,6 @@ setup:
 | 5 | digest-pin needs `contents: write` (and a PAT only under branch protection) — no job declares it yet | sbom/digest-pin job owner | 5, 6 |
 
 Cross-references: `.github/workflows/README.md` (job-by-job scope),
-`docs/getting-started.md` §9 (registry coordinates table),
+`docs/getting-started.md` (registry coordinates table),
 `features/AGENTS.md` (install contract), `reference/AGENTS.md` (versions.env
 law).

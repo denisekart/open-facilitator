@@ -1,4 +1,4 @@
-# OCI provisioning launcher (spec §18): link-plane endpoint
+# OCI provisioning launcher: link-plane endpoint
 # receiving org.facilitator.command.provision.start|stop.v1 and executing
 # them against the Docker Engine socket. Mode-(a) enrollment (shared secret,
 # like every adapter); the allowlists are the approved-image/network gate

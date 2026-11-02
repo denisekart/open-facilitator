@@ -15,7 +15,7 @@
   "properties": {
     "action": {
       "type": "object",
-      "description": "The exact action payload covered by actionDigest; the kernel digests its canonical form (appendix \u00a77.2)."
+      "description": "The exact action payload covered by actionDigest; the kernel digests its canonical form."
     },
     "workId": {
       "$ref": "common.v1.json#/$defs/idToken",

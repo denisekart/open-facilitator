@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://schemas.openfacilitator.org/v1/policy-file.v1.json",
   "title": "PolicyFileV1",
-  "description": "Team authorization policy file (spec \u00a712). Gateway-local artifact: published here for third-party Gateway builders; it never rides a wire envelope. First-match-wins over `policies`; an implicit final deny closes the list.",
+  "description": "Team authorization policy file. Gateway-local artifact: published here for third-party Gateway builders; it never rides a wire envelope. First-match-wins over `policies`; an implicit final deny closes the list.",
   "type": "object",
   "additionalProperties": false,
   "required": ["owner", "policies"],

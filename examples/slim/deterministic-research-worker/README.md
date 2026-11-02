@@ -13,7 +13,7 @@ PostgreSQL 17 + .NET 10 + Node 22 (as `docs/getting-started.md`).
 ## 1. Kernel
 
 ```bash
-# repo root — dev Postgres + dev IdP per getting-started §3
+# repo root — dev Postgres + dev IdP per getting-started section 3
 docker run -d --name ofac-pg -e POSTGRES_USER=demo -e POSTGRES_PASSWORD=demo \
   -e POSTGRES_DB=facilitator -p 5432:5432 postgres:17-alpine
 ConnectionStrings__Facilitator="Host=localhost;Database=facilitator;Username=demo;Password=demo" \
@@ -108,7 +108,7 @@ With `stepMs: 800` the run completes ~1.6s after the assign.
 
 `gateway.yaml` carries `policy: { path: ./policy.yaml }`: `research.analyze`
 stays `allow`, `research.publish` is `confirm` for team-alpha actors. Re-seed
-§4's curl with `"capabilityId": "research.publish"`, a fresh
+section 4's curl with `"capabilityId": "research.publish"`, a fresh
 `commandId`/`subject`, a **GUID** `workId` (`uuidgen` — the approvals row
 scopes by work id, so the respond route needs one),
 `"actorEvidenceRef": "oidc:<EVIDENCE_JWT>"` (an `ofac-evidence`
@@ -193,7 +193,7 @@ supervisor entrypoint boots a standalone Gateway + deterministic worker (the
 beside it — the coexistence proof.
 
 ```bash
-# repo root — host kernel per §1 (dev mode: OIDC IdP + enroll-dev)
+# repo root — host kernel per section 1 (dev mode: OIDC IdP + enroll-dev)
 ConnectionStrings__Facilitator="Host=localhost;Database=facilitator;Username=demo;Password=demo" \
   dotnet run --project src/facilitator &
 
@@ -219,7 +219,7 @@ grep 'worker ready'   .ofac-logs/30-harness-adapter.sh.log
 grep 'linkd ready'    .ofac-logs/20-linkd.sh.log     # endpointId=ws.demo
 ```
 
-Seed an assignment with §4's curl (it targets the host kernel on :8088),
+Seed an assignment with section 4's curl (it targets the host kernel on :8088),
 then:
 
 ```bash
@@ -228,7 +228,7 @@ devcontainer exec --workspace-folder examples/slim/deterministic-research-worker
 # → the gw.demo/deterministic child, online
 ```
 
-The completion row lands in `facilitator.inbox` exactly as §6 verifies.
+The completion row lands in `facilitator.inbox` exactly as section 6 verifies.
 Cleanup: `devcontainer rm --workspace-folder examples/slim/deterministic-research-worker`
 (state lives in the workspace mount: `.ofac-gateway/`, `.ofac-worker/`,
 `.ofac-logs/`, `.ofac-linkd.sqlite3` — all gitignored).

@@ -4,7 +4,7 @@
 // runtime package into a self-contained tree and tars it to
 // features/src/<name>/pkg/runtime.tar.gz with a sha256 sibling. The Feature
 // install.sh layers consume the tarball: no npm registry, no network, no
-// toolchain at container-install time (spec §8.2).
+// toolchain at container-install time.
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";

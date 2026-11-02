@@ -1,6 +1,6 @@
 # Example: coding worker (full profile)
 
-The spec §23.1 demo worker: an issue label becomes a merged-ready change.
+The full-profile demo worker: an issue label becomes a merged-ready change.
 `coding.implement` clones the assign's repo over git-http (bot PAT from
 `FORGEJO_TOKEN_FILE`, read per run so rotation is the next run's truth),
 appends a `CODE_CHANGELOG.md` entry + a deterministic test on branch
@@ -8,7 +8,7 @@ appends a `CODE_CHANGELOG.md` entry + a deterministic test on branch
 completes with a Result Manifest whose `structuredResult` the kernel reads:
 `prRequest` (first run) and one `commentRequests` entry per incorporated
 steer become connector ops — the worker itself calls no PR API; the team
-token never leaves the team side (§9.2).
+token never leaves the team side.
 
 A steer after completion re-dispatches the original assign with the
 directive in `inputs.steers`: the worker re-hydrates by adopting the

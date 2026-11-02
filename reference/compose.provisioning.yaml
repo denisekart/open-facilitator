@@ -15,7 +15,7 @@ services:
   # commands queue undelivered (the honest link-plane law); a depends edge
   # would cycle (the launcher already depends on the kernel).
 
-  # The launcher (§18): link endpoint `oci-launcher`, Docker Engine over the
+  # The launcher: link endpoint `oci-launcher`, Docker Engine over the
   # host's unix socket. It launches ONLY allowlisted images onto allowlisted
   # networks; the env VALUES its workloads carry are expanded from THIS
   # container's env (name-indirection law), hence the two demo literals ride

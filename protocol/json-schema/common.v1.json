@@ -60,7 +60,7 @@
           "$ref": "common.v1.json#/$defs/rfc3339DateTime"
         },
         "kind": {
-          "description": "Optional producer-owned taxonomy label (e.g. analysis.report). artifactRef carries it additively; the kernel treats unknown values as opaque (spec 15.6 extensibility).",
+          "description": "Optional producer-owned taxonomy label (e.g. analysis.report). artifactRef carries it additively; the kernel treats unknown values as opaque (open extensibility).",
           "type": "string",
           "minLength": 1,
           "maxLength": 64

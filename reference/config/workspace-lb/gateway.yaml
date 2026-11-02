@@ -1,4 +1,4 @@
-# Standalone Gateway for the compose demo-workspace container (§9.1 mode
+# Standalone Gateway for the compose demo-workspace container (mode
 # (b)): empty fleet, late child hello over the unix socket under stateDir.
 # Identity: realm workload enrollment (mode (b)) — the kernel binds
 # (azp=ofac-gateway-alpha, endpointId=gw.team-alpha) to team-alpha/gateway

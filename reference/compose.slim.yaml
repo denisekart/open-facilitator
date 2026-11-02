@@ -1,4 +1,4 @@
-# Slim reference environment (spec §22.2): identity + persistence + artifacts +
+# Slim reference environment: identity + persistence + artifacts +
 # observability + the Facilitator. Interpolates ONLY from the two env files the
 # make targets pass: versions.env (image pins) and .env (local secrets).
 # Bring up: make compose-slim (from the repo root).
@@ -127,7 +127,7 @@ services:
       artifacts:
         condition: service_healthy
 
-  # Team-owned workspace (spec §22.2): one container, two processes — a
+  # Team-owned workspace: one container, two processes — a
   # standalone Gateway (empty fleet) + the deterministic worker over a unix
   # child leg, under the Feature supervisor's unit law. Enrolls kernel-side
   # as gw.team-alpha (realm workload), self-enrolls the worker's child

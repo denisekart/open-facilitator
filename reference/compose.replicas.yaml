@@ -70,7 +70,7 @@ services:
       facilitator-lb:
         condition: service_started
 
-  # LB (§7.3): long-lived WS legs are sticky BY NATURE (one connection = one
+  # LB: long-lived WS legs are sticky BY NATURE (one connection = one
   # replica; skipNegotiation is the documented gateway law), so balancing is
   # least_conn with passive eviction: a killed replica's refused connects
   # take it out of rotation (max_fails), and the gateway's reconnect storm

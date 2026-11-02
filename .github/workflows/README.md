@@ -17,4 +17,4 @@
 |`release.yml` / `publish-npm`|inert seam (`vars.ENABLE_NPM_PUBLISH` unset)|`https://npm.pkg.github.com/denisekart`|Plan 01 flip (`private: false` + publish)|
 |`release.yml` / `containers`|Facilitator image → GHCR on `v*` tags (amd64+arm64)|`ghcr.io/denisekart/open-facilitator/facilitator`|gateway/workspace-link entries: Plans 04/05|
 |`release.yml` / `features`|Dev Container Features → GHCR OCI on `v*` tags (`:1.0.0` + `:1` major tags)|`ghcr.io/denisekart/open-facilitator/features/<name>`|Plan 08|
-|`release.yml` / sbom + digest-pin|commented plan only|—|Plan 18 (spec §22.6)|
+|`release.yml` / sbom + digest-pin|commented plan only|—|Plan 18|

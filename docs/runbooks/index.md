@@ -1,12 +1,12 @@
 # Operational runbooks
 
-Eight operational scenes per spec §27, expanded into operator-runnable form
+Eight operational scenes, expanded into operator-runnable form
 against the reference environment: each scene carries a symptom, exact
 diagnosis queries (psql, curl, admin surfaces), the action, and a dated
 drill section where one has been executed.
 
 **The reference environment is a conformance environment, not proof of
-production hardening** (spec §26.2). Every drill below was executed against
+production hardening**. Every drill below was executed against
 the live two-replica `facilitator-demo-*` compose stack and shows what the
 *reference* deployment does — backup/restore, workload token rotation,
 upgrade/rollback, and alert ownership remain deployment-site obligations

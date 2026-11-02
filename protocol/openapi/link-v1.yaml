@@ -3,7 +3,7 @@ info:
   title: Open Facilitator — Workspace Link HTTP surface (v1)
   version: 1.0.2
   description: |
-    Provider-neutral HTTP fallback for the Workspace Link contract (spec §5.3).
+    Provider-neutral HTTP fallback for the Workspace Link contract.
     SignalR is the default reference transport; these endpoints carry identical
     application semantics and MUST pass the same conformance suite
     (protocol/conformance-fixtures/).
@@ -12,10 +12,10 @@ info:
     262144 bytes (256 KiB; the fixture index `limits.maxEnvelopeBytes` is the
     single source of truth). Artifacts never travel inline — they move through
     scoped artifact storage and are referenced by digest
-    (appendix §8.1, components ArtifactRefV1).
+    (components ArtifactRefV1).
 
     Authentication: bearer workload token (short-lived OIDC/mTLS-anchored
-    principal per spec §5.3); the authenticated principal — not a JSON field —
+    principal); the authenticated principal — not a JSON field —
     determines allowed team/Gateway/workspace identity.
 
     Served by the kernel Link server; the admin surface mirror lives in
@@ -70,10 +70,10 @@ paths:
       operationId: postEvent
       summary: Submit a CloudEvents envelope (equivalent to the SignalR Envelope method)
       description: |
-        Receiver persists the inbox row before returning `accepted`
-        (appendix §5.3). Duplicate `(source, id)` or `commandId` replays return
+        Receiver persists the inbox row before returning `accepted`.
+        Duplicate `(source, id)` or `commandId` replays return
         a `duplicate` receipt without re-applying the command. Unknown command
-        types fail closed with an `unsupported` receipt (spec §5.5).
+        types fail closed with an `unsupported` receipt.
       requestBody:
         required: true
         content:
@@ -152,7 +152,7 @@ paths:
       summary: The endpoint's advertised CapabilityManifest
       responses:
         "200":
-          description: Capability manifest (spec §15.6)
+          description: Capability manifest
           content:
             application/json:
               schema:

@@ -40,7 +40,7 @@ admin-e2e: build
 	dotnet test tests/Facilitator.E2E/Facilitator.E2E.csproj -c Release --no-build
 link-e2e:
 	@echo "E2E tier: needs Postgres at FACILITATOR_PG (default: facilitator-dev on 5433)"
-	@echo "and the dev IdP at KEYCLOAK_URL (default: http://localhost:8480, see docs/getting-started.md §2);"
+	@echo "and the dev IdP at KEYCLOAK_URL (default: http://localhost:8480, see docs/getting-started.md section 2);"
 	@echo "no psql binary on PATH? PG_ADMIN_CMD='docker exec facilitator-dev psql' PG_ADMIN_URL=postgresql://postgres:postgres@localhost:5432/postgres"
 	FACILITATOR_URL=$${FACILITATOR_URL:-http://gate-only} \
 	FACILITATOR_PG=$${FACILITATOR_PG:-postgresql://postgres:postgres@127.0.0.1:5433/postgres} \
@@ -65,7 +65,7 @@ worker-e2e:
 
 example-slim-up:
 	@echo "Slim example devcontainer: needs Docker, @devcontainers/cli (npx @devcontainers/cli),"
-	@echo "a host Facilitator on :8088 (see examples/slim/.../README.md §1) and"
+	@echo "a host Facilitator on :8088 (see examples/slim/.../README.md section 1) and"
 	@echo "'node features/build.mjs' (Feature runtime tarballs) beforehand."
 	npx --yes @devcontainers/cli@^0.79 up --workspace-folder examples/slim/deterministic-research-worker
 

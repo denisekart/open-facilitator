@@ -2,7 +2,7 @@
 
 **Portable, pluggable, multi-workspace orchestration of autonomous, assisted, and deterministic workloads across independently operated execution environments.**
 
-> **Status: slim reference environment runs end-to-end.** Plans 00–16 are real: buildable monorepo, frozen v1 wire contract (`protocol/`), the transactional kernel (`src/facilitator`), the Link hub, Gateway + deterministic worker, identity/policy/approvals, artifacts + memory. `./referencectl up slim` boots the whole slim stack (kernel, Postgres, Keycloak, SeaweedFS, Aspire dashboard, a linked demo workspace) and `./referencectl verify` proves every spec §21.1 hop unattended. Everything else named in the specs (admin SPA, full providers, multi-work provisioning) remains a target, not a reality.
+> **Status: slim reference environment runs end-to-end.** Plans 00–16 are real: buildable monorepo, frozen v1 wire contract (`protocol/`), the transactional kernel (`src/facilitator`), the Link hub, Gateway + deterministic worker, identity/policy/approvals, artifacts + memory. `./referencectl up slim` boots the whole slim stack (kernel, Postgres, Keycloak, SeaweedFS, Aspire dashboard, a linked demo workspace) and `./referencectl verify` proves every acceptance hop unattended. Everything else named in the target design (admin SPA, full providers, multi-work provisioning) remains a target, not a reality.
 
 ## The idea in one paragraph
 
@@ -46,7 +46,7 @@ Key properties, normatively defined in the specs:
 
 ## Repository layout
 
-Repo root **is** the spec §22.1 `framework/` tree (Plan 00). Every directory carries a README stating what lands there and in which plan:
+Repo root **is** the `framework/` tree (Plan 00). Every directory carries a README stating what lands there and in which plan:
 
 ```text
 ├── src/
@@ -63,7 +63,7 @@ Repo root **is** the spec §22.1 `framework/` tree (Plan 00). Every directory ca
 └── Makefile               # restore/build/test/lint/format + compose placeholders
 ```
 
-Delivery is vertical slices with runnable exit tests (spec §26): transactional kernel → workspace link → gateway/adapters → identity/policy → artifacts/memory → slim reference → full providers → multi-work provisioning → horizontal replicas → hardening. Track via `.omp/plans/IMPLEMENTATION_ROADMAP_PLAN.md`.
+Delivery is vertical slices with runnable exit tests: transactional kernel → workspace link → gateway/adapters → identity/policy → artifacts/memory → slim reference → full providers → multi-work provisioning → horizontal replicas → hardening. Track via `.omp/plans/IMPLEMENTATION_ROADMAP_PLAN.md`.
 
 ## Technology stack
 
@@ -85,16 +85,16 @@ Delivery is vertical slices with runnable exit tests (spec §26): transactional 
 5. **Running tests:** .NET — `dotnet test OpenFacilitator.slnx [-c Release] [--filter FullyQualifiedName~HealthEndpointTests]` (Docker required: the Plan 02 integration suite boots Postgres 17 via Testcontainers); TypeScript — per package `pnpm --filter @ofac/gateway test`, workspace-wide `pnpm -r test`, single file `pnpm --filter @ofac/workspace-link exec vitest run test/package.test.ts`.
 6. **CI is the merge gate** — see [`.github/workflows/README.md`](.github/workflows/README.md). The slim reference-env jobs are compute-gated off on free-tier CI, so the acceptance run is a **local** gate: `./referencectl up slim --no-seed && ./referencectl verify` must exit 0 before any task is called done. Release = push a `v*` tag → images to GHCR.
 
-This repo is also an omp agent workspace: project skills in `.omp/skills/` encode the spec rules agents must not violate (every implementation slice updates the matching skill in the same change), MCP servers are declared in `.omp/mcp.json`, plans land in `.omp/plans/`, and demo secrets are never committed (`.env`, `secrets/` are gitignored).
+This repo is also an omp agent workspace: project skills in `.omp/skills/` encode the architectural rules agents must not violate (every implementation slice updates the matching skill in the same change), MCP servers are declared in `.omp/mcp.json`, plans land in `.omp/plans/`, and demo secrets are never committed (`.env`, `secrets/` are gitignored).
 
 The demo entry point is live:
 
 ```bash
 ./referencectl up slim      # build + wait healthy + seed the demo path
-./referencectl verify       # acceptance run: every spec 21.1 hop, 11 steps
+./referencectl verify       # acceptance run: every hop, 11 steps
 ./referencectl down -v
 ```
 
 ## License
 
-To be chosen by the maintainers; the spec targets open-source distribution of all framework modules.
+To be chosen by the maintainers; the target design favors open-source distribution of all framework modules.

@@ -1,4 +1,4 @@
-// Spec §26.1 item 1 (.NET side); also the kernel inbox's fixture source.
+// The .NET conformance harness; also the kernel inbox's fixture source.
 // Validates every fixture listed in <fixturesDir>/index.json against the
 // normative schemas in protocol/json-schema + protocol/cloudevents-schemas.
 // Semantics mirror src/protocol/test/fixtures.test.ts (vitest side); the
@@ -120,7 +120,7 @@ foreach (var c in cases)
     }
 }
 
-// ---- approval-record golden (appendix §7.2 record digest via the kernel helper) ----
+// ---- approval-record golden (record digest via the kernel helper) ----
 {
     var recordGolden = File.ReadAllText(Path.Combine(fixturesDir, "canonical", "approval-record-1.sha256")).Trim();
     using var recordDoc = JsonDocument.Parse(File.ReadAllText(Path.Combine(fixturesDir, "canonical", "approval-record-1.json")));
@@ -131,7 +131,7 @@ foreach (var c in cases)
     var digest = ApprovalDigest.Compute(record.GetProperty("approvalId").GetString()!, record.GetProperty("action"), actors, expiresAt, createdAt);
 
     // Property twin: action keys reversed + strings NFD-encoded — the digest
-    // must not depend on source key order or unicode spelling (appendix §7.1).
+    // must not depend on source key order or unicode spelling.
     static JsonNode Flip(JsonElement element) => element.ValueKind switch
     {
         JsonValueKind.Object => new JsonObject(element.EnumerateObject()
@@ -204,7 +204,7 @@ string? RunCase(string path, string messageClass, string? schemaFile = null)
             return "schema-violation";
         }
 
-        // Version negotiation is observable on hello frames (spec §5.3).
+        // Version negotiation is observable on hello frames.
         if (root.GetProperty("kind").GetString() == "hello")
         {
             var offered = root.GetProperty("protocolVersions").EnumerateArray()

@@ -3,7 +3,7 @@
 Status: the slim reference environment runs the whole demo path — kernel,
 Postgres, Keycloak, S3 artifacts, OTLP telemetry, a linked team workspace
 with a deterministic worker — and `./referencectl verify` proves every
-spec §21.1 hop unattended. The walkthrough below is a real session against
+acceptance hop unattended. The walkthrough below is a real session against
 a fresh stack.
 
 ## 1. Environment
@@ -140,7 +140,7 @@ inspector. Trace the acceptance-run Work without psql:
    (`/api/admin/work/{id}/timeline`).
 3. A `CorrelationId` chip copies the trace handle; the dashboards' trace
    link opens the Aspire resource with that id (the kernel stores no
-   telemetry time-series — §17.4).
+   telemetry time-series).
 4. **Links** view: gateways online/offline (a stale session collapses to
    offline — the DB lease is the sole authority) + trust tier.
    **Deliveries**: filter poisoned rows and replay a dead-letter once —
@@ -156,7 +156,7 @@ The browser tier runs in CI as the `admin-e2e` job
 ## 7. Acceptance run: `referencectl verify`
 
 The 11-step acceptance script (`reference/checks/verify.sh`) proves every
-spec §21.1 hop through public read models, the Postgres planes, S3, and the
+acceptance hop through public read models, the Postgres planes, S3, and the
 dashboard — no product hooks, no dev-only routes. Run it against a
 booted-but-unseeded stack (`up slim --no-seed`): it seeds its own works.
 Exit 0 iff every step passes; `--json` is the machine report, `--only <ids>`
@@ -205,13 +205,13 @@ This run is part of every task's acceptance criteria — see
 |---|---|---|
 | OCI images (facilitator) | GHCR | `ghcr.io/denisekart/open-facilitator/<name>` |
 | npm packages `@ofac/*` | GitHub Packages npm | `https://npm.pkg.github.com/denisekart` (see repo `.npmrc`; not yet published — packages remain `private`) |
-| Dev Container Features (OCI per spec §8.5; `gateway`, `workspace-link`, `harness-adapter`) | GHCR | `ghcr.io/denisekart/open-facilitator/features/<name>:1` |
+| Dev Container Features (OCI-published; `gateway`, `workspace-link`, `harness-adapter`) | GHCR | `ghcr.io/denisekart/open-facilitator/features/<name>:1` |
 | NuGet | — (public deps from nuget.org; first internal package → `https://nuget.pkg.github.com/denisekart/index.json`) | — |
 
 ## 10. Connect an existing workspace: add one Feature
 
 An existing team container becomes a linked, headless workspace by adding
-ONE Feature to its `devcontainer.json` (spec §28's onboarding law) — no base
+ONE Feature to its `devcontainer.json` (the one-Feature onboarding law) — no base
 image change, no build-time secrets:
 
 ```jsonc
@@ -242,9 +242,9 @@ the sibling `workspace-link` / `harness-adapter` READMEs). A fully composed
 three-Feature example with an end-to-end walkthrough:
 [`examples/slim/deterministic-research-worker`](../examples/slim/deterministic-research-worker/README.md).
 
-### The full-profile walkthrough (spec §23.1)
+### The full-profile walkthrough
 
-The `up full` providers (the chat/VCS legs of spec §28) are live:
+The `up full` providers (the chat/VCS legs) are live:
 Mattermost + the ingest pair, and Forgejo + the VCS pair (`forgejo-init`
 seeds org/repo/labels/webhook + the bot PAT; the adapter normalizes
 HMAC-verified hook deliveries; the connector child executes policy-held PR

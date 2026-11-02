@@ -1,6 +1,6 @@
 # Reference environment
 
-Slim/full Docker Compose deployment inputs (spec §22). `./referencectl up slim`
+Slim/full Docker Compose deployment inputs. `./referencectl up slim`
 from the repo root boots and seeds the demo path: PostgreSQL, Keycloak (realm
 `facilitator`), SeaweedFS (S3 artifact store), the Aspire dashboard (OTLP),
 the Facilitator kernel container, and `demo-workspace` — a team-owned
@@ -71,6 +71,6 @@ reaction-never-consent).
 ## Security profile
 
 `start-dev` Keycloak, non-TLS loopback ports and plaintext local secrets are
-**reference-only** (spec §22.2): real deployments use Keycloak production
+**reference-only**: real deployments use Keycloak production
 mode, HTTPS, secret injection, hardened S3 credentials, restricted OTLP
 endpoints, and tenant isolation.

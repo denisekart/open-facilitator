@@ -2,7 +2,7 @@
 
 ## Repository layout
 
-Repo root **is** the spec §22.1 `framework/` tree — no `framework/` subdirectory, `docs/specs/` is the spec node (see repository layout in the root README).
+Repo root **is** the `framework/` tree — no `framework/` subdirectory, `docs/specs/` holds the target design (see repository layout in the root README).
 
 ## Make targets
 
@@ -32,7 +32,7 @@ The wire contract is schema-first: edit the JSON Schema under `protocol/`, add v
 ./referencectl verify --json   # 11 steps, exit 0
 ```
 
-## Version pinning policy (spec §22.4)
+## Version pinning policy
 
 - All reference image tags live in `reference/versions.env`; the compose files
   interpolate it verbatim via `--env-file` — never hardcode a tag elsewhere.

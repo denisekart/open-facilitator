@@ -1,6 +1,6 @@
 #!/bin/sh
 # ofac-supervisor — headless entrypoint for Feature-installed OFAC runtimes
-# (spec §8.2: never rely on devcontainer lifecycle hooks; the entrypoint works
+# (never rely on devcontainer lifecycle hooks; the entrypoint works
 # in IDE and headless contexts alike). Installed identically by every Feature;
 # the last Feature to install simply rewrites the same bytes.
 #

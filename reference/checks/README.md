@@ -4,7 +4,7 @@
 `referencectl verify` (run it from the repo root:
 `./referencectl verify --json`, `--only <ids>` reruns a leg and its
 prerequisites). 11 ordered steps over a booted-but-unseeded stack
-(`up slim --no-seed`): every spec §21.1 hop is proven through public read
+(`up slim --no-seed`): every hop is proven through public read
 models, the Postgres planes, S3, and the Aspire dashboard — no product-code
 hooks, no dev-only routes. Exit 0 iff every step passes.
 

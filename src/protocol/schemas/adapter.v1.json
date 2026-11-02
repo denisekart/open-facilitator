@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://schemas.openfacilitator.org/v1/adapter.v1.json",
   "title": "AdapterFrameV1",
-  "description": "One HarnessAdapter lifecycle frame (either direction of the Gateway<->adapter NDJSON wire, one JSON object per line). A verbatim profile of the shipped 06 child transport (src/gateway/src/childwire.ts + child.ts): the six-method HarnessAdapter contract (spec 8.3) maps start->command(start), steer->command(steer), status->command(status), interrupt->command(stop), observe->the push-based event relay; respond has no v1 frame (adapters advertise no input support). Frames are NOT CloudEvents: the version property is `v: 1`, the discriminator is `type`. The 262144-byte frame limit is a transport-level code constant (MAX_CHILD_FRAME_BYTES), not a schema keyword.",
+  "description": "One HarnessAdapter lifecycle frame (either direction of the Gateway<->adapter NDJSON wire, one JSON object per line). A verbatim profile of the shipped child transport (src/gateway/src/childwire.ts + child.ts): the six-method HarnessAdapter contract maps start->command(start), steer->command(steer), status->command(status), interrupt->command(stop), observe->the push-based event relay; respond has no v1 frame (adapters advertise no input support). Frames are NOT CloudEvents: the version property is `v: 1`, the discriminator is `type`. The 262144-byte frame limit is a transport-level code constant (MAX_CHILD_FRAME_BYTES), not a schema keyword.",
   "type": "object",
   "required": ["v", "type"],
   "properties": {

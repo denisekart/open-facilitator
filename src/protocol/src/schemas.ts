@@ -3,7 +3,7 @@
 // .json files, loaded via import attributes; codegen mirrors them into
 // schemas/ — never edit the copies here.
 // Validators resolve a CloudEvents `dataschema` value against this registry by
-// $id — never by HTTP fetch (spec §5.2: `dataschema` identifies an advertised
+// $id — never by HTTP fetch (`dataschema` identifies an advertised
 // immutable schema).
 import commonV1 from "../schemas/common.v1.json" with { type: "json" };
 import envelope from "../schemas/envelope.json" with { type: "json" };

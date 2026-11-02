@@ -1,4 +1,4 @@
-// The shared approval action digest (appendix §7.1–7.2, law D2):
+// The shared approval action digest (law D2):
 // SHA-256 over the RFC 8785 canonical form of the approval record
 // {approvalId, action, eligibleActors, expiresAt, createdAt}, rendered
 // "sha256:<64 hex>". Byte-for-byte the mirror of the kernel's
@@ -10,7 +10,7 @@ import { createHash } from "node:crypto";
 
 import canonicalize from "canonicalize";
 
-/** The §7.2 record fields the digest covers (nonce is ledger-only, §7.3). */
+/** The record fields the digest covers (nonce is ledger-only). */
 export interface ApprovalDigestRecord {
   approvalId: string;
   /** The exact action payload, digested verbatim (key order irrelevant). */
@@ -36,7 +36,7 @@ export function computeActionDigest(record: ApprovalDigestRecord): string {
 }
 
 /**
- * The Result Manifest digest (spec §15.3): SHA-256 over the
+ * The Result Manifest digest: SHA-256 over the
  * RFC 8785 canonical form of the manifest document, NFC-normalized — the
  * same law as `computeActionDigest` over a different document. Producers
  * serialize the manifest WITH `canonicalizeManifest` so the stored bytes
@@ -62,7 +62,7 @@ function digestCanonical(canonicalInput: unknown): string {
   );
 }
 
-// RFC 8785 leaves spelling alone; appendix §7.1 additionally mandates NFC,
+// RFC 8785 leaves spelling alone; additionally mandates NFC,
 // so the digest of an NFD-encoded payload equals the NFC one — mirrored by
 // the .NET helper's Normalize(FormC).
 function nfc(value: unknown): unknown {

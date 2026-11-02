@@ -51,12 +51,12 @@ export interface Envelope {
 }
 
 /**
- * One durable delivery: the envelope plus the delivery metadata a receipt references (spec
- * §5.2 — the receipt refers to the durable deliveryId, not the socket). Identical shape on
- * the SignalR Deliver client method and the HTTP GET /deliveries items. The envelope $ref
- * resolves by $id (same style as envelope-command.json); idToken/rfc3339DateTime
- * constraints are inlined verbatim from common.v1.json#$defs because this file lives beside
- * envelope.json in cloudevents-schemas/ and the OpenAPI validator resolves refs physically.
+ * One durable delivery: the envelope plus the delivery metadata a receipt references (the
+ * receipt refers to the durable deliveryId, not the socket). Identical shape on the SignalR
+ * Deliver client method and the HTTP GET /deliveries items. The envelope $ref resolves by
+ * $id (same style as envelope-command.json); idToken/rfc3339DateTime constraints are
+ * inlined verbatim from common.v1.json#$defs because this file lives beside envelope.json
+ * in cloudevents-schemas/ and the OpenAPI validator resolves refs physically.
  */
 export interface LinkDeliveryV1 {
   deliveredAt: string;
@@ -417,8 +417,7 @@ export type ApprovalDecidedEventV1DataDecision = "approved" | "denied" | "expire
 
 export interface ApprovalRequiredEventV1Data {
   /**
-   * The exact action payload covered by actionDigest; the kernel digests its canonical form
-   * (appendix §7.2).
+   * The exact action payload covered by actionDigest; the kernel digests its canonical form.
    */
   action?: { [key: string]: unknown };
   actionDigest: string;
@@ -489,7 +488,7 @@ export interface ArtifactRef {
   digest: string;
   /**
    * Optional producer-owned taxonomy label (e.g. analysis.report). artifactRef carries it
-   * additively; the kernel treats unknown values as opaque (spec 15.6 extensibility).
+   * additively; the kernel treats unknown values as opaque (open extensibility).
    */
   kind?: string;
   mediaType: string;

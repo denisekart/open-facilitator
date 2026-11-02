@@ -1,6 +1,6 @@
-# §26.1 Conformance Coverage Matrix
+# Conformance Coverage Matrix
 
-Spec §26.1's fifteen required proof areas × what exists in this repo ×
+The fifteen required proof areas × what exists in this repo ×
 what a config-driven run of `protocol/tools/Conformance.Runner` against
 ANY conformant kernel could not reproduce. Proof paths are repo-relative.
 Status vocabulary: `covered` (a runnable proof exists), `gap:runner`

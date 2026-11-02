@@ -62,7 +62,7 @@ public sealed class RoutingSink(
 
         var work = await db.Works.AsNoTracking()
             .Where(w => w.WorkId == intent.WorkId)
-            .Select(w => new { w.WorkId, w.ProjectId, TeamId = w.Project!.TeamId })
+            .Select(w => new { w.WorkId, w.ProjectId, TeamId = w.Project != null ? (Guid?)w.Project.TeamId : null })
             .FirstOrDefaultAsync(ct)
             ?? throw new InvalidOperationException($"routing intent for unknown work {intent.WorkId}");
 

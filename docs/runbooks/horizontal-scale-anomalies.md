@@ -58,7 +58,16 @@ exact attempt/backoff sequence) before blaming the kernel — the kernel
 side is just "lease lapsed, next re-open wins". Never run two replicas
 with independent stores; `outboxPending` skew between answers of
 `/api/admin/replicas` on different replicas means the DB itself is
-degrading.
+degrading. Boot-floor re-arm: the provisioning elastic arm is driven by
+ledger rows in `facilitator.provisioning_operations`, and a `stopped` row
+permanently disarms that arm — only a NEW work-keyed trigger re-launches.
+A drained-then-restarted environment therefore never re-boots its
+min-workers floor until the ledger is cleared:
+`DELETE FROM facilitator.provisioning_operations` plus the matching
+hash-commanded `facilitator.outbox` rows (orphan hash rows otherwise make
+every sweep die on the outbox command-id unique key). Verified live: with
+6 stale rows wiped, the min-arm re-armed, provisioned the elastic, and all
+elastic legs went green across two consecutive full runs.
 
 ## Drill 4 executed 2026-11-01 (replica SIGKILL — two-replica matrix; UTC wall-clock 04:44–04:48 and 05:01–05:05, two full runs)
 
@@ -72,12 +81,13 @@ zero parked rows):** the *same* result — 4/6 pass, fleet view a=2/b=3,
 **replica-kill FAIL at an identical 61.2 s**, nested
 `worker-restart-resume` FAIL (138 s). Reproduced 2/2 with identical
 timing signature → recorded as a **defect found**, not a slow-poll
-flake — with one caveat recorded after the fact: a sibling acceptance
-run drove `verify --full` tiers against this same stack during the
-window (its replica tier also SIGKILLs a victim and runs the nested
-suite), so the leg-budget *attribution* is owed a clean-volume
-reproduction. The two structural observations stand regardless of who
-runs the leg: the eviction-plus-backoff ladder arithmetic
+flake — with one caveat recorded after the fact, since RESOLVED (2026-11-02):
+a sibling acceptance run drove `verify --full` tiers against this same
+stack during the window. The clean-volume rerun settled attribution: the
+full-tier replica matrix passed 6/6 twice (leg completed in ~13 s), so the
+61.2 s FAIL was concurrent-agent interference — two agents SIGKILLing
+victims on one stack — not a leg defect. The two structural observations
+stand regardless of who runs the leg: the eviction-plus-backoff ladder arithmetic
 (`max_fails=1 fail_timeout=30s` + SignalR 0/2/5/10/30 s + gateway
 backoff ≈ 76 s) exceeds the leg's 60 s budget, and epoch is per session
 row — a re-created row lawfully starts at epoch 1, so the leg's

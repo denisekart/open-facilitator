@@ -16,6 +16,10 @@ dist/
 node_modules/
 coverage/
 TestResults/
+# pnpm falls back to a project-local store when the global one is
+# unreachable (sandboxed installs); 12k content-addressable files must
+# never surface in git status.
+.pnpm-store/
 .vitest/
 
 # Local environment & generated secrets (spec §22: never commit)

@@ -100,6 +100,45 @@ public sealed class RoutingFunnelTests(DispatchDbFixture fixture) : IAsyncLifeti
     }
 
     [Fact]
+    public async Task ProjectlessWorkRoutesTeamAgnostically()
+    {
+        // A work created without a project has no owning team; the funnel
+        // must route team-agnostically, not fault on the missing join
+        // (a NULL team materialized into a value Guid dead-lettered the
+        // intent after five passes).
+        using var factory = new KernelTestFactory(fixture, noDispatcher: true);
+        using var kernel = factory.CreateAuthedClient();
+        var (team, _) = await FreshTeamAsync();
+        var endpoint = $"rt.noproject{Leaf()}";
+        await AdvertiseAsync(kernel, endpoint, team, Manifest(Analyse("research.analyze")));
+
+        var body = JsonSerializer.Serialize(new Dictionary<string, object?>
+        {
+            ["objective"] = "no project",
+            ["commandId"] = Guid.NewGuid().ToString("N"),
+            ["assignments"] = new[]
+            {
+                new Dictionary<string, object?>
+                {
+                    ["capabilityId"] = "research.analyze",
+                    ["objective"] = "route me",
+                    ["targetId"] = "kernel",
+                    ["actorEvidenceRef"] = "identity-evidence:routing-suite",
+                },
+            },
+        });
+        var workId = (await KernelOps.PostJsonAsync(kernel, "/api/works", body, HttpStatusCode.Created))
+            .GetProperty("workId").GetGuid();
+
+        var effect = await RoutingHarness.DrainUntilAsync(
+            factory, () => fixture.Db.OutboxEnvelopeByCommand($"work-assign:{workId:N}"), "assign effect");
+        Assert.Contains("org.facilitator.command.work.assign.v1", effect);
+        var audit = await fixture.Db.RoutingDecision($"routing:work-assign:{workId:N}");
+        Assert.Equal("routed", audit!.Status);
+        Assert.Equal(endpoint, audit.ChosenEndpointId);
+    }
+
+    [Fact]
     public async Task NobodyAdvertisedPendsWithNoCandidateAndNeverDeadLetters()
     {
         using var factory = new KernelTestFactory(fixture, noDispatcher: true);

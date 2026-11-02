@@ -24,12 +24,12 @@ acceptance run — a LOCAL gate (hosted ref-env CI is compute-gated off).
   configs for the demo and coding workspaces; `bootstrap/seed-lib.sh` — seed
   primitives shared by `bootstrap.sh` and the acceptance run.
 - `checks/verify.sh` — slim acceptance run; `checks/verify-replicas.sh` — two-replica
-  matrix (spec §7); `checks/verify-full.sh` — provider + provisioning live proof
+  matrix; `checks/verify-full.sh` — provider + provisioning live proof
   (`make provider-e2e`); `referencectl verify --full` merges all three into one report.
 - Provider init is a one-shot per forge (`mattermost-init`, `forgejo-init`):
   gate on `service_completed_successfully`, bot credentials via the provision
   volume, never env. Target design:
-  `../docs/specs/open_facilitator_framework_architecture.md` §21–22.
+  `../docs/specs/open_facilitator_framework_architecture.md`.
 
 ## Develop here
 - Pins change only in `versions.env`; empty `*_DIGEST` are release-filled; a

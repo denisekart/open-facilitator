@@ -131,7 +131,7 @@ step_provider_boot() {
 step_provider_link_challenge() {
   local admin_id dm_chan dm_post challenge_code
   admin_id=$(mm_api GET /api/v4/users/me | jq -re .id)
-  # 1. DM the bot "/link" (the §11 entry point for an unlinked account).
+  # 1. DM the bot "/link" (the entry point for an unlinked account).
   dm_chan=$(mm_api POST /api/v4/channels/direct "[\"$mm_bot_id\", \"$admin_id\"]" | jq -re .id) \
     || { step_fail "could not open the bot DM channel"; full_logs mattermost-adapter; return 1; }
   dm_post=$(mm_api POST /api/v4/posts \
@@ -246,7 +246,7 @@ step_provider_completion_reply() {
   }
   poll_until 120 full_manifest_recorded \
     || { step_fail "no manifest.recorded for $FULL_WORK (assign interim)"; full_logs facilitator demo-workspace mattermost-adapter; return 1; }
-  # Completion is an explicit human transition (§4.1: no implicit jumps, the
+  # Completion is an explicit human transition (no implicit jumps — the
   # guard table allows only open→planning→active→review→completed). Walking
   # the chain as alice fires the provider completion hook on the LAST edge.
   local to state version
@@ -285,7 +285,7 @@ full_echo_row() {
 }
 
 step_provider_reaction_no_consent() {
-  # §13.3: a human thumbsup on the mention post audits + configured ack, and
+  # A human thumbsup on the mention post audits + configured ack, and
   # NEVER a consent/transition signal.
   local admin_id
   admin_id=$(mm_api GET /api/v4/users/me | jq -re .id)
@@ -520,7 +520,7 @@ step_forgejo_ci_note() {
     || { step_fail "no provider.input note with the failure verdict 45s after the status"; full_logs forgejo-adapter facilitator; return 1; }
   step_pass "commit-status failure annotated $FJ_WORK (status on PR head + signed ci delivery)"
 }
-# --- Coding-worker legs (spec §23.1) ------------------------------------------
+# --- Coding-worker legs ------------------------------------------------------
 # A fresh ofac:coding-labeled issue arms a coding Work (rule-matched assign to
 # gw.coding, team-coding), the coding worker clones/changes/pushes, the kernel
 # manifest reader opens the PR through the coding connector, a PR review
@@ -642,7 +642,7 @@ step_coding_review_steer() {
   }
   poll_until 45 fj_coding_steered \
     || { step_fail "no steer timeline row 45s after the PR review"; full_logs forgejo-adapter facilitator; return 1; }
-  # No live execution (the first run completed): §23.1 re-dispatch branch —
+  # No live execution (the first run completed): the re-dispatch branch —
   # a cloned assign envelope keyed work-redispatch:<steerId> carrying the
   # directive in inputs.steers, addressed to the ORIGINAL recipient.
   fj_coding_redispatched() {
@@ -663,7 +663,7 @@ step_coding_review_steer() {
 }
 
 step_coding_redispatch() {
-  # §23.1's restart leg: the owning workspace is DOWN when the second review
+  # The restart leg: the owning workspace is DOWN when the second review
   # lands. The steer still records + queues the re-dispatch kernel-side (the
   # routing INTENT row commits with the steer; the funnel holds it pending
   # `no-capacity` while the endpoint is offline, so the effect row only
@@ -695,7 +695,7 @@ step_coding_redispatch() {
 }
 
 step_two_repo_dependency() {
-  # §23.2 live proof: one Work, TWO assignment intents with a dependsOn edge.
+  # Live proof: one Work, TWO assignment intents with a dependsOn edge.
   # The funnel gates sibling 2 (audit basis deps-unmet) until sibling 1's
   # completion wakes it; a steer while execution 2 is LIVE rides the live
   # generation; a steer after completion re-dispatches at generation 2; a
@@ -755,7 +755,7 @@ step_two_repo_dependency() {
     || { step_fail "execution 2 manifest never recorded for $work"; full_logs demo-workspace facilitator; return 1; }
   # Both executions have ended (the manifest record and the terminal walk
   # are one atomic ingest), so the steer lands the re-dispatch branch — the
-  # §23.1 shape the review leg proved, now on the two-lane Work.
+  # re-dispatch shape the review leg proved, now on the two-lane Work.
   local version2
   version2=$(full_psql "SELECT version FROM facilitator.works WHERE work_id = '$work'" | head -n1)
   code=$(curl -s --max-time 15 -o /tmp/tr-steer.json -w '%{http_code}' -X POST "$VERIFY_KERNEL/api/works/$work/steer" \
@@ -768,7 +768,7 @@ step_two_repo_dependency() {
   poll_until 15 fj_tr_steer_row >/dev/null \
     || { step_fail "no steer timeline row for $work"; full_logs facilitator; return 1; }
   # Re-dispatch lands generation 2 for the assignment line (the steer had no
-  # live attempt: both executions had ended — the §23.1 re-dispatch branch).
+  # live attempt: both executions had ended — the re-dispatch branch).
   fj_tr_gen2() {
     full_psql "SELECT 1 FROM facilitator.outbox WHERE work_id = '$work'
         AND command_id LIKE 'routing:work-redispatch:%'
@@ -785,7 +785,7 @@ step_two_repo_dependency() {
     || { step_fail "generation-2 re-dispatch effect missing for $work"; full_logs facilitator demo-workspace; return 1; }
   # The straggler: a terminal event stamped generation 1 against the
   # re-dispatched assignment — whose row sits at generation 2, so the
-  # §7.4 fence bites. (Sibling 0 sits completed AT gen 1: a re-delivery of
+  # generation fence bites. (Sibling 0 sits completed AT gen 1: a re-delivery of
   # its own event is legal, not a straggler.)
   local rdassign straggler
   rdassign=$(full_psql "SELECT envelope->'data'->>'assignmentId' FROM facilitator.outbox

@@ -1,4 +1,4 @@
-# verify-replicas.sh — the two-replica matrix (spec §7),
+# verify-replicas.sh — the two-replica matrix (balancing + failover law),
 # run by `referencectl verify --replicas` after `up slim --replicas 2`.
 # Reuses verify.sh's step-record machinery (step_pass/step_fail read
 # $VERIFY_RESULTS); the caller owns VERIFY_RESULTS + the report.
@@ -43,7 +43,7 @@ r_post_code() { # <base> <token> <path> <json> -> HTTP status code only
     -H "Authorization: Bearer $2" -H 'content-type: application/json' -d "$4"
 }
 
-# Precondition + §7.3 balancing proof: the LB answers AND both replicas
+# Precondition + balancing proof: the LB answers AND both replicas
 # answer its requests (least_conn round-robins identical requests), and
 # /api/admin/replicas attributes a lease to each replica by name.
 step_replica_lb_distribution() {

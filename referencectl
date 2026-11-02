@@ -14,7 +14,7 @@
 #   ./referencectl work [--objective TEXT]  create a Work and print its timeline
 #   ./referencectl verify [--json] [--only ids]  run the acceptance steps against a
 #                                    booted stack (seeds its own works; exit 0 iff all pass)
-#   ./referencectl verify --replicas  run the two-replica matrix (case a-e, spec §7)
+#   ./referencectl verify --replicas  run the two-replica matrix (cases a-e)
 #   ./referencectl verify --full [--json]  run EVERY tier — slim 11 + full-profile 20 +
 #                                    replica matrix — against the full two-replica stack
 #                                    (kernel :8088 + LB :8089 + provider ports); one

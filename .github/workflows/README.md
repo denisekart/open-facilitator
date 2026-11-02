@@ -18,5 +18,5 @@
 | `release.yml` / `containers` | Facilitator + node-runtime images → GHCR on `v*` tags (amd64+arm64) | `ghcr.io/denisekart/open-facilitator/{facilitator,node-runtime}` |
 | `release.yml` / `features` | Dev Container Features → GHCR OCI on `v*` tags (`:1.0.0` + `:1` major tags) | `ghcr.io/denisekart/open-facilitator/features/<name>` |
 | `release.yml` / `publish-npm` | inert seam (`vars.ENABLE_NPM_PUBLISH` unset) | `https://npm.pkg.github.com/denisekart` |
-| `release.yml` / `sbom` | cyclonedx-dotnet SBOM for the solution + cyclonedx-npm SBOM for the pnpm workspace, attached to the GitHub release | — |
+| `release.yml` / `sbom` | `dotnet-CycloneDX` SBOM for the solution + pnpm's native lockfile SBOM for the workspace, attached to the GitHub release | — |
 | `release.yml` / `digest-pin` | Resolves pushed + third-party image digests and commits changed `*_DIGEST` keys back to `reference/versions.env` (also runs on `workflow_dispatch` for a re-pin) | — |

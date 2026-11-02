@@ -94,8 +94,8 @@ jobs:
       - run: echo "inert seam — see comment in job definition"
 
   # SBOM for every shipped artifact, attached to the GitHub release:
-  # cyclonedx-dotnet for the .NET solution, @cyclonedx/cyclonedx-npm for the
-  # pnpm workspace. Both analyze the restored dependency graph, no execution.
+  # dotnet-CycloneDX over the .NET solution + pnpm's native SBOM generator
+  # over the workspace lockfile. Both analyze the dependency graph, no execution.
   sbom:
     needs: containers
     runs-on: ubuntu-latest
@@ -116,10 +116,16 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: dotnet tool install --global CycloneDX
       - run: echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+      # the tool's verb is `dotnet-CycloneDX` (no `dotnet sbom` verb exists);
+      # it restores the graph itself, so no separate restore/build step.
       - name: .NET solution SBOM
-        run: dotnet sbom --output sbom-dotnet --filename sbom.cdx.json
+        run: dotnet-CycloneDX OpenFacilitator.slnx --output sbom-dotnet --filename sbom.cdx.json
+      # pnpm 12's own generator: the CycloneDX npm tool shells out to `npm ls`,
+      # which cannot walk a pnpm workspace. --lockfile-only reads the lockfile
+      # directly (no install, no store), emitting one CycloneDX doc for the
+      # whole workspace.
       - name: pnpm workspace SBOM
-        run: npx --yes @cyclonedx/cyclonedx-npm -- --output-file sbom-npm.cdx.json
+        run: pnpm sbom --sbom-format cyclonedx --lockfile-only --out sbom-npm.cdx.json
       - name: attach to release
         uses: softprops/action-gh-release@v2
         with:

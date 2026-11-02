@@ -123,6 +123,10 @@ function steerEnvelope(
       deadline: "2036-10-23T18:00:00Z",
       directive,
       expectedContextVersion: 1,
+      // Required by the frozen command.work.steer.v1 schema (generation
+      // fencing): a steer envelope without the stamp fails closed in the
+      // link delivery pipeline's envelope validation.
+      executionGeneration: 1,
     },
   };
 }

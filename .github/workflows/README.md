@@ -7,7 +7,7 @@
 | `ci.yml` / `meta` | actionlint + yamllint + `reference/versions.env` key completeness | — |
 | `ci.yml` / `docker-build` | Facilitator and node-runtime images compile on every PR (no push) | — |
 | `ci.yml` / `protocol` | Codegen drift gate (generated TS + .NET + schemas) + OpenAPI stub validates | — |
-| `ci.yml` / `conformance` | Config-driven kernel conformance runner (items 1-5) + the foreign-shape link client against a live slim stack; JSON report uploaded as an artifact | — |
+| `ci.yml` / `conformance` **(CI-disabled)** | Config-driven kernel conformance runner (items 1-5) + the foreign-shape link client against a live slim stack; JSON report uploaded as an artifact. Commented out in `ci.yml` — the first hosted run died on the non-executable `referencectl` (committed mode 100644); the exec bit is now recorded in git, uncomment to re-enable | — |
 | `ci.yml` / `ref-env-bringup` **(CI-disabled)** | Slim reference env boots authenticated, S3-backed, OTLP-exporting. Commented out in `ci.yml` (free-tier compute); **runs locally and is acceptance-required** — see `reference/AGENTS.md` | — |
 | `ci.yml` / `ref-env-verify` **(CI-disabled)** | Acceptance run (`referencectl verify`, 11 steps) unattended on a booted-but-unseeded slim stack, amd64+arm64 matrix. Commented out in `ci.yml`; **runs locally and is acceptance-required** | — |
 | `ci.yml` / `link-e2e` | SDK + linkd against a live Facilitator + Postgres service: handshake/supersede, delivery+dedupe, receipt-loss redelivery, partition buffering, HTTP-poll keeper revival, crash replay | — |

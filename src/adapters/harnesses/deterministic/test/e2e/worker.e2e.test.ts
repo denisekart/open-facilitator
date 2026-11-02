@@ -140,6 +140,11 @@ function steerEnvelopeFor(
       deadline: "2036-10-23T18:00:00Z",
       directive,
       expectedContextVersion: 1,
+      // Required by the frozen command.work.steer.v1 schema (generation
+      // fencing): the link delivery pipeline fail-closed-validates every
+      // seeded envelope, and a schema-violating steer is rejected before
+      // the gateway ever forwards it to the running child.
+      executionGeneration: 1,
     },
   };
 }
@@ -156,7 +161,7 @@ describe.skipIf(!E2E)("deterministic worker e2e", () => {
     });
     const workDir = mkdtempSync(join(tmpdir(), "worker-e2e-work-"));
     const dump = (label: string): string =>
-      `${label}\nGATEWAY LOG:\n${gateway.log()}\nWORKER LOG:\n${worker.log()}\n`;
+      `${label}\nGATEWAY LOG:\n${gateway.log()}\nWORKER LOG:\n${worker?.log() ?? "(worker not spawned yet)"}\n`;
     const withDump = <T>(p: Promise<T>, label: string): Promise<T> => {
       let timer: NodeJS.Timeout;
       const guard = new Promise<never>((_, reject) => {
@@ -215,18 +220,24 @@ describe.skipIf(!E2E)("deterministic worker e2e", () => {
     const asgA = randomUUID();
     const asgB = randomUUID();
     const gateway = startGateway(gw.configPath);
-    let worker = startWorker({
-      childWorkspaceId: `${gw.gatewayId}/deterministic`,
-      socket: gw.socketPath ?? "",
-      workDir,
-      stepMs: 4000, // a wide steer/kill window per step
-      kernelUrl: harness.baseUrl,
-      token: childToken,
-    });
+    // Declared here, spawned only after the gateway's ready line (below).
+    let worker: WorkerHandle | undefined;
     try {
       // ── 1. boot + register + capability union (ownerTeam rewritten) ──
       const ready = await withDump(gateway.ready(), "awaiting gateway ready line");
       expect(ready.children).toBe(0); // listener boots empty: fleet modes POST nothing
+      // Spawn AFTER the ready line, never alongside it: a worker launched
+      // at boot can attach before the gateway prints its snapshot, so the
+      // empty-listener assertion above would race the child registration
+      // (children=1 on a warm runner). Ordering makes it deterministic.
+      worker = startWorker({
+        childWorkspaceId: `${gw.gatewayId}/deterministic`,
+        socket: gw.socketPath ?? "",
+        workDir,
+        stepMs: 4000, // a wide steer/kill window per step
+        kernelUrl: harness.baseUrl,
+        token: childToken,
+      });
       await withDump(worker.ready(), "awaiting worker ready line");
       const caps = await waitFor("capability union POST", async () => {
         const r = await linkGet(
@@ -503,7 +514,7 @@ describe.skipIf(!E2E)("deterministic worker e2e", () => {
       expect(failedData["retryable"]).toBe(true);
       expect(failedData["reason"]).toBe("child-lost-execution");
     } finally {
-      worker.child.kill("SIGKILL");
+      worker?.child.kill("SIGKILL");
       await gateway.kill();
     }
   }, 110_000);

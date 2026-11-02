@@ -131,7 +131,7 @@ describe("canonicalization golden (RFC 8785)", () => {
   });
 });
 
-describe("approval-record digest golden — Gateway-shaped action (Plan 12)", () => {
+describe("approval-record digest golden — Gateway-shaped action", () => {
   const record = JSON.parse(
     readFileSync(new URL("canonical/approval-record-2.json", fixturesRoot), "utf8"),
   ) as {
@@ -189,7 +189,7 @@ describe("approval-record digest golden (appendix §7.2)", () => {
   });
 });
 
-describe("result-manifest digest golden (Plan 15, spec §15.3)", () => {
+describe("result-manifest digest golden (spec §15.3)", () => {
   const raw = readFileSync(new URL("canonical/result-manifest-1.json", fixturesRoot), "utf8");
   const golden = readFileSync(
     new URL("canonical/result-manifest-1.sha256", fixturesRoot),

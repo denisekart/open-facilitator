@@ -1,5 +1,5 @@
-// @ofac/provisioning-oci — the local OCI provisioning launcher (Plan 35
-// Phase C): a link-plane endpoint (enroll → capabilities → SignalR) that
+// @ofac/provisioning-oci — the local OCI provisioning launcher:
+// a link-plane endpoint (enroll → capabilities → SignalR) that
 // executes `command.provision.start.v1` / `.stop.v1` against the local Docker
 // Engine socket, so a killed/idle worker container auto-relaunches and rebinds
 // the same assignment at a new generation. Stateless apart from the SQLite

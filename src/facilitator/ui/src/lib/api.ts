@@ -49,7 +49,7 @@ export async function toApiError(response: Response): Promise<ApiError> {
 
 export type Fetcher = (path: string, init?: RequestInit) => Promise<Response>;
 
-/** Bearer-token fetch with ONE silent-renew retry on 401 (plan 21 decision 2). */
+/** Bearer-token fetch with ONE silent-renew retry on 401. */
 export function makeApiFetch(
   getToken: () => Promise<string | null>,
   renew: () => Promise<string | null>,

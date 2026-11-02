@@ -276,7 +276,7 @@ public sealed class TestDbProbe : IAsyncDisposable
         await ScalarBool("SELECT count(*) FROM facilitator.teams WHERE slug = $1",
             cmd => cmd.Parameters.AddWithValue(slug));
 
-    /// <summary>Hand-mint a facilitator.evidence row (Plan 11 owns minting; tests seed validation paths).</summary>
+    /// <summary>Hand-mint a facilitator.evidence row (the approvals ledger owns minting; tests seed validation paths).</summary>
     public Task SeedEvidence(string evidenceId, string subject, DateTime? expiresAt, DateTime? consumedAt) =>
         NonQuery(
             "INSERT INTO facilitator.evidence (evidence_id, subject, claims, issued_at, expires_at, consumed_at) "
@@ -338,7 +338,7 @@ public sealed class TestDbProbe : IAsyncDisposable
     }
 
     /// <summary>Decided-push outbox rows enqueued for one approval's terminal transitions
-    /// (Plan 12): recipient channel + envelope jsonb text, oldest first.</summary>
+    /// (one link-addressed row per flip): recipient channel + envelope jsonb text, oldest first.</summary>
     public async Task<List<(string Recipient, string Envelope)>> DecidedPushRows(Guid approvalId)
     {
         await using var connection = await _dataSource.OpenConnectionAsync();
@@ -1009,7 +1009,7 @@ public sealed class TestDbProbe : IAsyncDisposable
     /// <summary>One audit assertion row (typed window, no raw SQL in tests).</summary>
     public sealed record AuditRow(string? Actor, string Action, string Decision, string Reason, string Detail, string PolicyVersion, string EvidenceRef, string Resource);
 
-    // ---- Plan 22 provider plane -------------------------------------------------
+    // ---- Provider plane --------------------------------------------------
 
     /// <summary>provider_events rows for one delivery id (typed window).</summary>
     public Task<long> ProviderEventCount(string provider, string deliveryId) =>
@@ -1251,7 +1251,7 @@ public sealed class TestDbProbe : IAsyncDisposable
             "DELETE FROM facilitator.admin_config WHERE resource = $1",
             cmd => cmd.Parameters.AddWithValue(resource));
 
-    // ---- Plan 35 C provisioning plane -----------------------------------------
+    // ---- Provisioning plane ----------------------------------------------
 
     /// <summary>Hand-mint a nudges ledger row at a generation (the stalled-arm
     /// trigger: a row whose nudge_count sits at the cap).</summary>

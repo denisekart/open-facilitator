@@ -19,8 +19,8 @@
     <ProjectReference Include="../../src/facilitator/Facilitator.csproj" />
   </ItemGroup>
 
-  <!-- One identity + database fixture set for both .NET tiers: the Plan-20
-       infrastructure files are LINKED, not copied (plan 21 decision 7). -->
+  <!-- One identity + database fixture set for both .NET tiers: the
+       infrastructure files are LINKED, not copied. -->
   <ItemGroup>
     <Compile Include="../Facilitator.Tests/Infrastructure/PostgresFixture.cs" />
     <Compile Include="../Facilitator.Tests/Infrastructure/KeycloakFixture.cs" />

@@ -4,7 +4,7 @@ using Facilitator.Kernel.Shared.Storage;
 
 namespace Facilitator.Kernel.Work;
 
-/// <summary>The work-scoped result-manifest surface (Plan 15): pull-reads over the recorded chain.</summary>
+/// <summary>The work-scoped result-manifest surface: pull-reads over the recorded chain.</summary>
 public static class ResultManifestEndpoints
 {
     /// <summary>Map the work-scoped manifests group.</summary>

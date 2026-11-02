@@ -64,7 +64,7 @@ public sealed class EfCoordinationStore(
         // (work, index) so a replayed create collides on the ledger.
         if (assignments is { Count: > 0 })
         {
-            // The create-time DAG law (Plan 35 B): validate the batch and
+            // The create-time DAG law: validate the batch and
             // resolve sibling index references to the deterministic sibling
             // identities BEFORE the first funnel run, so depends_on joins
             // exactly. A violation aborts the create (422 at the ingress).
@@ -299,7 +299,7 @@ public sealed class EfCoordinationStore(
 
     private static readonly string[] AttemptTerminal = ["stopped", "failed", "lost"];
 
-    /// <summary>Plan 24(1b/1c): a steer reaches the owning gateway. The
+    /// <summary>A steer reaches the owning gateway. The
     /// outbox row that CARRIED the assign is the assignment→endpoint ledger
     /// (<c>assignments</c>/<c>link_deliveries</c> pin no endpoint — the
     /// outbox recipient survives as <c>link.&lt;endpoint&gt;</c>), so this
@@ -485,7 +485,7 @@ public sealed class EfCoordinationStore(
         return row;
     }
 
-    /// <summary>Plan 22 completion hook: a terminal transition of a bound Work
+    /// <summary>Completion hook: a terminal transition of a bound Work
     /// appends one <c>command.communication.reply.v1</c> to the bound
     /// conversation, inside the SAME transaction (the §13.2 reply law; the
     /// deterministic <c>communication-reply:&lt;transitionEventId&gt;</c>

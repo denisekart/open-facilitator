@@ -123,7 +123,7 @@ public sealed record RoutingIntentSeed(
     System.Text.Json.JsonElement? Inputs = null,
     // Raw `dependsOn` array ({index|assignmentId, condition}); the store
     // validates + resolves sibling indexes to deterministic assignment
-    // identities before the first funnel run (Plan 35 B).
+    // identities before the first funnel run.
     System.Text.Json.JsonElement? DependsOn = null);
 
 /// <summary>CloudEvent envelope for a <see cref="RoutingIntent"/> (kernel source;

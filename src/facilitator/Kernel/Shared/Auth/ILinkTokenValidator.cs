@@ -5,7 +5,7 @@ namespace Facilitator.Kernel.Shared.Auth;
 /// <param name="TeamId">Owning team.</param>
 /// <param name="TeamSlug">Team slug (audit/manifest checks read it; no second query).</param>
 /// <param name="TrustMode">Declared trust mode (immutable for the session, appendix §4).</param>
-/// <param name="Role">gateway | child, bound at enrollment (Plan 10).</param>
+/// <param name="Role">gateway | child, bound at enrollment.</param>
 public sealed record LinkPrincipal(string EndpointId, Guid TeamId, string TeamSlug, string TrustMode, string Role);
 
 /// <summary>

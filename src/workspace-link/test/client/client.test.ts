@@ -1,5 +1,5 @@
-// Client core unit tier: the mock transport is the only wire. Proofs mirror
-// the plan's verification list — hello validity, terminal protocol mismatch,
+// Client core unit tier: the mock transport is the only wire. Proofs cover
+// hello validity, terminal protocol mismatch,
 // the pipeline law, duplicate answering, fail-closed unsupported, advisory
 // flow control, heartbeat cadence.
 import { describe, expect, it, vi } from "vitest";
@@ -187,7 +187,7 @@ describe("delivery pipeline", () => {
     await client.stop();
   });
 
-  it("receipt echoes the command's executionGeneration when it carried one (Plan 35 fence)", async () => {
+  it("receipt echoes the command's executionGeneration when it carried one (generation fence)", async () => {
     const transport = new MockTransport();
     const client = clientWith(transport, {
       async onCommand() {

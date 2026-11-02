@@ -1,4 +1,4 @@
-// The link command dispatcher, forgejo side (Plan 23 decision 4): the ONLY
+// The link command dispatcher, forgejo side (decision 4): the ONLY
 // outbound effect is a bot-identity comment on an issue/PR.
 // `command.communication.reply.v1` with target.conversationKind
 // "comment"|"thread" ⇒ POST /repos/{repo}/issues/{number}/comments under the

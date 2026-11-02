@@ -2,7 +2,7 @@ import { ApiError, getJson, type Fetcher } from "./api.js";
 import type { AdminMetrics, AdminSummary } from "./types.js";
 
 /**
- * Shared health data (plan 21 decision 6): one store drives every view —
+ * Shared health data: one store drives every view —
  * summary every 15 s, metrics every 60 s, no websockets.
  */
 class HealthStore {

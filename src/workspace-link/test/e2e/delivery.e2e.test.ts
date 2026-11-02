@@ -50,7 +50,7 @@ describe.skipIf(!E2E)("link delivery pipeline", () => {
     expect(a.client.counters.duplicate).toBe(0);
 
     // Server-side: the link ledger row is acked with an `accepted` receipt,
-    // and the kernel-side ack ledger (Plan 02 affordance) saw the delivery.
+    // and the kernel-side ack ledger saw the delivery.
     const row = await waitFor("d1 acked server-side", async () => {
       const r = await linkRow(h.dbUrl, outboxId);
       return r?.state === "acked" ? r : null;

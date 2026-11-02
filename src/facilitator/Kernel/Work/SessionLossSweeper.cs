@@ -11,7 +11,7 @@ using Ofac.Protocol.Validation;
 namespace Facilitator.Kernel.Work;
 
 /// <summary>
-/// The session-loss law (Plan 35 C, the kill-9 continuity gap): when the
+/// The session-loss law (the kill-9 continuity gap): when the
 /// gateway that OWNS a live execution dies without a goodbye — kill-9, host
 /// loss — its link-session lease expires and nobody posts the honest terminal
 /// event any more (the worker's state died with the container, and the

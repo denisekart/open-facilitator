@@ -7,7 +7,7 @@ using Facilitator.Tests.Artifacts;
 namespace Facilitator.Tests.Memory;
 
 /// <summary>
-/// The Plan 16 Step 4 vertical: a human retains over REST (lands <c>active</c>,
+/// The memory vertical: a human retains over REST (lands <c>active</c>,
 /// D4), the row + hash + audit ride the broker's tx, recall answers the D8 shape
 /// and writes the §6.2 usage rows, content dedupe returns the stored identity,
 /// and a foreign team sees nothing (no count, no existence hint).

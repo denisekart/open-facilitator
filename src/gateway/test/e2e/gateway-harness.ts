@@ -1,7 +1,7 @@
 // Gateway E2E harness: imports workspace-link's harness (server boot,
 // seeding, psql) and adds the Gateway-process primitives. Cross-package
 // imports of the harness TS source resolve fine under vitest + tsc here,
-// so no fork (Plan 05 step 0 sanctioned fallback stays unused).
+// so no fork (the sanctioned fallback stays unused).
 import { type ChildProcess, spawn } from "node:child_process";
 import { createServer } from "node:net";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
@@ -28,7 +28,7 @@ export {
   type ServerConfig,
 } from "../../../workspace-link/test/e2e/harness.js";
 
-// The harness's local interface isn't exported (Plan 04 file, don't fork):
+// The harness's local interface isn't exported (shared file, don't fork):
 // derive it from the factory's return type.
 import { useFacilitator as _useFacilitator } from "../../../workspace-link/test/e2e/harness.js";
 export type Harness = ReturnType<typeof _useFacilitator>;
@@ -70,7 +70,7 @@ export async function gatewayConfig(options: {
   mode?: "echo" | "stub";
   childName?: string;
   heartbeatSeconds?: number;
-  /** Plan 12: policy-file YAML, written beside gateway.yaml + referenced by path. */
+  /** Policy-file YAML, written beside gateway.yaml + referenced by path. */
   policy?: string;
   /** Fleet children (shared/standalone): name + token; socket auto-configured. */
   fleet?: { name: string; token?: string; maxInFlight?: number }[];
@@ -251,7 +251,7 @@ export function startChild(options: {
   token?: string;
   mode?: "complete" | "silent";
   capability?: string;
-  /** Plan 12: several advertised ids for one child (overrides `capability`). */
+  /** Several advertised ids for one child (overrides `capability`). */
   capabilities?: string[];
 }): ChildProcess {
   const runner = join(new URL(".", import.meta.url).pathname, "child-runner.mjs");

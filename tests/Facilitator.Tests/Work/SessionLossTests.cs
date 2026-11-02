@@ -9,7 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Facilitator.Tests.Work;
 
 /// <summary>
-/// Plan 35 C session-loss law on a fake clock: an open working attempt whose
+/// The session-loss law on a fake clock: an open working attempt whose
 /// owning endpoint holds no live link lease is marked on the first offline
 /// sweep and failed by a kernel-authored, schema-valid
 /// <c>event.assignment.failed.v1</c> (<c>reason=session-lease-expired</c>,

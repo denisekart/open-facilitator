@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore.Storage;
 namespace Facilitator.Kernel.Shared.Storage;
 
 /// <summary>
-/// The retention-GC pass (spec appendix 8.2, plan 14 D7/D8): a serialized
+/// The retention-GC pass (spec appendix 8.2, D7/D8): a serialized
 /// background loop (one <c>pg_try_advisory_xact_lock</c> per pass — no
 /// distributed scheduling) collecting rows whose retention lapsed and whose
 /// Work (if any) is terminal, plus expired pending slots. Per row, in one
@@ -241,7 +241,7 @@ public sealed class RetentionGcService(
             }
         }
 
-        // Plan 15: a recorded (non-superseded) result manifest pins the blob
+        // A recorded (non-superseded) result manifest pins the blob
         // it was stored under AND every output artifact its document declared,
         // regardless of the Work's state — the manifest is the durable claim.
         var idText = artifactId.ToString();

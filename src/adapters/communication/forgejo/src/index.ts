@@ -1,4 +1,4 @@
-// @ofac/forgejo-adapter — the inbound forge provider module (Plan 23 step 3):
+// @ofac/forgejo-adapter — the inbound forge provider module:
 // a link-plane endpoint (enroll → capabilities → SignalR) fronted by an HMAC
 // webhook receiver. Inbound forge webhooks normalize to the central forge
 // domain events (data.provider = "forgejo"); outbound

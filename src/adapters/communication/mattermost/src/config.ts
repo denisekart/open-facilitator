@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-// Env-only adapter config (Plan 22 step 3): every key names its consumer;
+// Env-only adapter config: every key names its consumer;
 // missing required keys fail closed with a named error, never a silent
 // default. `deriveTenant` fixes the conversationReference.tenantOrOrganizationId
 // as the Mattermost site host — the WS event stream carries no team id, and

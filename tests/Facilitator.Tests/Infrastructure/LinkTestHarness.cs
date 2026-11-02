@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.SignalR.Client;
 namespace Facilitator.Tests.Infrastructure;
 
 /// <summary>
-/// Shared plumbing for the Plan 03 link suites: enroll/hello/receipt payload
+/// Shared plumbing for the link suites: enroll/hello/receipt payload
 /// builders over the frozen fixtures, a SignalR fake link client (WebSockets,
 /// bearer header — no secrets in query strings, spec S:624) over a
 /// Kestrel-bound factory, and a controllable <see cref="TimeProvider"/> so

@@ -15,7 +15,7 @@ public static partial class LinkEndpoints
 {
     // Mode (a): guarded by the enrollment secret (Link:EnrollmentToken). Mode (b):
     // a JWKS-verified OIDC client-credentials JWT bound to a Link:WorkloadIdentities
-    // pre-registration (Plan 10). Both mint the same rotating opaque link token.
+    // pre-registration. Both mint the same rotating opaque link token.
     private static void MapEnroll(RouteGroupBuilder group) =>
         group.MapPost("/enroll", async (HttpRequest request, LinkEnrollmentStore store, LinkEnrollmentSecret secret, OidcJwks jwks, LinkOptions options, CancellationToken ct) =>
         {

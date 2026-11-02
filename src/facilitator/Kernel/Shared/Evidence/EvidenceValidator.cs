@@ -39,7 +39,7 @@ public sealed record EvidenceOutcome(string Scheme, EvidenceState State, string?
 }
 
 /// <summary>
-/// Scheme-split evidence validator (Plan 10, appendix §3.2): <c>oidc:&lt;jwt&gt;</c>
+/// Scheme-split evidence validator (appendix §3.2): <c>oidc:&lt;jwt&gt;</c>
 /// verifies signature/iss/aud/exp/nbf + the required <c>delegation: true</c>
 /// claim against the realm JWKS; <c>kernel:&lt;id&gt;</c> resolves through
 /// <see cref="IEvidenceStore"/> (unknown/expired/consumed ⇒ Invalid). Every
@@ -92,7 +92,7 @@ public sealed class EvidenceValidator(OidcJwks jwks, IEvidenceStore evidence, Li
         }
 
         // §3.3 authoritative claim set: sub + groups + scope (scope rides to
-        // Plan 12's policy engine; groups first).
+        // the policy engine; groups first).
         var groups = OidcClaims.ArrayOrSpaced(payload, "groups");
         return new EvidenceOutcome("oidc", EvidenceState.Valid, $"oidc:{verified.Token!.Issuer}|{subject}", groups, null);
     }

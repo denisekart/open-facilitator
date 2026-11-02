@@ -1,4 +1,4 @@
-// @ofac/forgejo-connector (Plan 23): the team-side privileged forge arm.
+// @ofac/forgejo-connector: the team-side privileged forge arm.
 // A Gateway fleet child that executes forge OPS (open PRs, comment, push
 // branches, fire commit statuses) under the Gateway's policy/approval
 // umbrella; the forge token never leaves this process. The inbound/event

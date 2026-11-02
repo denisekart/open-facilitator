@@ -9,10 +9,10 @@ using Microsoft.EntityFrameworkCore;
 //    concurrent causal decisions cannot overwrite one another.
 //  * `NOTIFY facilitator_outbox` is a HINT only (§7.3): correctness comes from
 //    the polling claim query, never from the wake.
-//  * Tables beyond Plan 02's write set (link_sessions → Plan 03, approvals →
-//    Plan 08, communication_bindings → Plan 13, teams/projects/assignments
-//    partially) land in the SAME InitialCreate baseline so no later plan needs
-//    a disruptive re-baseline.
+//  * Tables beyond the original ingress/dispatch write set (link_sessions,
+//    approvals, communication_bindings, teams/projects/assignments
+//    partially) land in the SAME InitialCreate baseline so no later feature
+//    needs a disruptive re-baseline.
 namespace Facilitator.Kernel.Shared.Persistence;
 
 /// <summary>The single transactional foundation (spec §19), schema <c>facilitator</c>.</summary>

@@ -8,7 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Facilitator.Tests.Provisioning;
 
 /// <summary>
-/// Plan 35 C scale law on a fake clock: no policy row means the sweep is
+/// The provisioning scale law on a fake clock: no policy row means the sweep is
 /// exactly nothing; a pending no-capacity decision earns ONE deterministic
 /// start op + one valid envelope to the launcher channel, and a replayed
 /// sweep is a no-op end to end; a nudge-capped offline assignment escalates

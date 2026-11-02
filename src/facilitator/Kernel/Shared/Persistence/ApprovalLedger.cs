@@ -80,7 +80,7 @@ public enum ApprovalDecisionOutcome
 public sealed record ApprovalDecision(ApprovalDecisionOutcome Outcome, ApprovalView? Row = null, string? EvidenceRef = null);
 
 /// <summary>
-/// The approvals ledger (Plan 11, spec §12.1–12.2 + appendix §7): the only
+/// The approvals ledger (spec §12.1–12.2 + appendix §7): the only
 /// writer of <c>facilitator.approvals</c>. State transitions are conditional
 /// UPDATEs — the database is the single-use arbiter (law D3, no advisory
 /// locks); expiry materializes lazily on read/respond (no janitor); every
@@ -94,7 +94,7 @@ public sealed record ApprovalDecision(ApprovalDecisionOutcome Outcome, ApprovalV
 public interface IApprovalLedger
 {
     /// <summary>Record an <c>approval.required</c> envelope (recompute + compare the digest when <c>data.action</c> is present).
-    /// <paramref name="requestedByEndpointId"/> is the Link endpoint that recorded it (Plan 12: decided-push
+    /// <paramref name="requestedByEndpointId"/> is the Link endpoint that recorded it (decided-push
     /// addressing + consume authorization); null on non-Link recorders.</summary>
     Task<ApprovalRecordResult> RecordFromEventAsync(
         JsonElement envelopeRoot, string source, string? requestedByEndpointId, CancellationToken ct);
@@ -134,7 +134,7 @@ public sealed class ApprovalLedger(
     TimeProvider timeProvider,
     EnvelopeValidator envelopeValidator) : IApprovalLedger
 {
-    /// <summary>Envelope type of the Plan 12 decided-push event.</summary>
+    /// <summary>Envelope type of the decided-push event.</summary>
     public const string DecidedType = "org.facilitator.event.approval.decided.v1";
 
     private const string DecidedSchemaId = "https://schemas.openfacilitator.org/v1/event.approval.decided.v1.json";
@@ -342,12 +342,12 @@ public sealed class ApprovalLedger(
             }
         }
 
-        // Plan 12 decided-push: the terminal-ish transition and its link-addressed
+        // Decided-push: the terminal-ish transition and its link-addressed
         // push row commit in one transaction (outbox law). No-op for approvals the
         // Gateway didn't record (REST/CloudEvent-plane recorders).
         await AppendDecidedAsync(db, row, decision, decidedBy: actorActor,
             evidenceRef: decision == "approved" ? (minted ? $"kernel:{evidenceId}" : evidenceRef ?? string.Empty) : string.Empty, ct);
-        // The wake law (Plan 35 B): an approval decision releases an
+        // The wake law: an approval decision releases an
         // `approved`-condition gate — pull the work's gated routing intents
         // forward inside this tx so the funnel re-evaluates now.
         if (decision == "approved" && row.WorkId is { } gatedWorkId)
@@ -454,7 +454,7 @@ public sealed class ApprovalLedger(
             })));
         if (!noOp)
         {
-            // Plan 12 decided-push (revoked): same-tx, link-addressed.
+            // Decided-push (revoked): same-tx, link-addressed.
             await AppendDecidedAsync(db, entity, "revoked", decidedBy: revokedBy, evidenceRef: string.Empty, ct);
         }
 
@@ -524,11 +524,11 @@ public sealed class ApprovalLedger(
             .Where(a => a.ApprovalId == approvalId && a.State == "pending")
             .ExecuteUpdateAsync(s => s.SetProperty(a => a.State, "expired"), ct);
         audit.Append(db, ExpiredAudit(approvalId));
-        // Plan 12 decided-push (lazy expiry, decidedBy ""): same-tx as the flip.
+        // Decided-push (lazy expiry, decidedBy ""): same-tx as the flip.
         await AppendDecidedAsync(db, entity, "expired", decidedBy: string.Empty, evidenceRef: string.Empty, ct);
     }
 
-    // Plan 12: decided-push (spec §12.1 step 5's other half). One link-addressed
+    // Decided-push (spec §12.1 step 5's other half). One link-addressed
     // outbox row per terminal transition, staged on the caller's context so the
     // flip and its push commit atomically (outbox law). Deterministic
     // command_id ("approval-decided:<id>:<decision>") makes a re-decision of the
@@ -580,7 +580,7 @@ public sealed class ApprovalLedger(
         if (!verdict.Ok)
         {
             // Kernel-emitted envelopes must be contract-valid; fail closed at
-            // insert rather than poison the outbox (locked decision, Plan 02).
+            // insert rather than poison the outbox (locked decision).
             throw new InvalidOperationException($"kernel envelope rejected by the validator: {verdict.ErrorClass}: {verdict.Message}");
         }
 

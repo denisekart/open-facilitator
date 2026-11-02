@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Facilitator.Kernel.Shared.Persistence.Configurations;
 
-/// <summary>facilitator.memory_usage (Plan 16).</summary>
+/// <summary>facilitator.memory_usage.</summary>
 public sealed class MemoryUsageEntityConfiguration : IEntityTypeConfiguration<MemoryUsageEntity>
 {
     /// <inheritdoc />

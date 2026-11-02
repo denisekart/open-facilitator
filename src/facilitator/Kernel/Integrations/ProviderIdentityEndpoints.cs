@@ -13,7 +13,7 @@ namespace Facilitator.Kernel.Integrations;
 public sealed record RedeemRequest(string Code);
 
 /// <summary>
-/// The human-plane linking endpoints (Plan 22, deviation D2): redemption is a
+/// The human-plane linking endpoints (deviation D2): redemption is a
 /// normal OIDC-authenticated call — the link workload has no authority to
 /// mint human identity mappings. Mounted only when the provider feature is
 /// enabled; disabled ⇒ no routes at all.

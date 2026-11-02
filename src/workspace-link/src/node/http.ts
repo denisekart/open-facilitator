@@ -1,10 +1,10 @@
 // HTTP long-poll transport + hidden SignalR "session keeper".
 //
-// As-built constraint (Plan 03, LinkEndpoints.cs): GET /deliveries REQUIRES a
+// As-built constraint (kernel LinkEndpoints.cs): GET /deliveries REQUIRES a
 // live link_sessions row — minted ONLY by a hub hello — and every successful
 // GET refreshes the lease (no HTTP heartbeat endpoint). A pure-HTTP mode would
-// need a server session-mint endpoint (future additive OpenAPI change, not in
-// this plan), so this transport keeps a hidden SignalR connection that does
+// need a server session-mint endpoint (future additive OpenAPI change), so
+// this transport keeps a hidden SignalR connection that does
 // hello + heartbeats; deliveries flow through the frozen HTTP surface.
 // Because the keeper socket is a tracked hub connection, the pump MAY push
 // Deliver to it instead of leaving rows for the poll (§7.3: any live socket

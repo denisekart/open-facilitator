@@ -3,11 +3,11 @@
 //     the next hello re-INSERTs at epoch 1 (harness header law); the SDK
 //     ledger in link.sqlite3 survived, so a server-forced REDELIVERY of the
 //     original delivery answers `duplicate` and no new binding appears.
-//     Plan 04's law (delivery.e2e): the frozen kernel dedupes commands by
+//     The kernel's law (delivery.e2e): the frozen kernel dedupes commands by
 //     command_id (outbox_command_id_key UNIQUE), so a re-seed cannot mint a
 //     second delivery — forcing the row back to `pending` via psql drives
 //     the exact redelivery path (the pump's 1 s safety-net poll re-pushes).
-// (b) As-built rotation law (conforms to reality; the plan premise "the
+// (b) As-built rotation law (conforms to reality; the premise "the
 //     gateway's next send 401s" does NOT hold over SignalR):
 //     · Hub auth runs at WebSocket-upgrade time only (LinkBearerHandler);
 //       Context.User claims are FROZEN for the socket's lifetime and the
@@ -18,7 +18,7 @@
 //       generic "WebSocket failed to connect" (no statusCode, no "401" in
 //       the text — proven against the dist/cjs transport), so
 //       TransportError.unauthorized never fires and the SDK cannot detect
-//       rotation mid-reconnect. Recorded gap for the SDK/Plan 06.
+//       rotation mid-reconnect. Recorded SDK gap.
 //     · Recovery law: a restart re-enrolls at startup (workload block
 //       configured — mode (b)) and writes the token file BEFORE any
 //       connect, then flows.

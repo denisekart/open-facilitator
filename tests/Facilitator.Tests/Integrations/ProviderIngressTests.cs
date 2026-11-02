@@ -9,7 +9,7 @@ using System.Text.RegularExpressions;
 namespace Facilitator.Tests.Integrations;
 
 /// <summary>
-/// Plan 22 provider-ingest plane over the link HTTP path: fail-closed
+/// Provider-ingest plane over the link HTTP path: fail-closed
 /// <c>unsupported</c> when disabled (failed audit row); linked-mention Work
 /// creation + binding (same post twice ⇒ one Work, duplicate returns the saved
 /// judgment); unlinked mention ⇒ reply-only, no Work; <c>/link</c> ⇒ challenge

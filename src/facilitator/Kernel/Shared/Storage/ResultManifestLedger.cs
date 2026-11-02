@@ -55,7 +55,7 @@ public sealed record ResultManifestView(
     string State,
     DateTime RecordedAt);
 
-/// <summary>The result-manifest ledger (Plan 15): one short transaction per recorded manifest.</summary>
+/// <summary>The result-manifest ledger: one short transaction per recorded manifest.</summary>
 public interface IResultManifestLedger
 {
     /// <summary>
@@ -80,7 +80,7 @@ public interface IResultManifestLedger
         Guid workId, IReadOnlyList<string> groups, IReadOnlySet<string> roles, CancellationToken ct);
 
     /// <summary>The stored, verified manifest document bytes re-parsed — the
-    /// Plan 24 completed-manifest reader's view of the just-recorded chain
+    /// completed-manifest reader's view of the just-recorded chain
     /// head (stored bytes are the law; the wire restatement never is). Null
     /// when the artifact is absent, unverified, or unreadable.</summary>
     Task<JsonDocument?> ReadStoredAsync(Guid manifestArtifactId, CancellationToken ct);

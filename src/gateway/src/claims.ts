@@ -1,4 +1,4 @@
-// Actor-claim extraction (Plan 12, spec §11/§12). The Gateway trusts exactly
+// Actor-claim extraction (spec §11/§12). The Gateway trusts exactly
 // two identity sources on an inbound command: its own workload identity, and
 // an `oidc:` actorEvidenceRef whose JWT verifies against the issuer JWKS
 // (signature, iss, aud, exp, delegation===true). Everything else — bare

@@ -7,9 +7,9 @@ using Facilitator.Kernel.Shared.Persistence;
 namespace Facilitator.Kernel.Work;
 
 /// <summary>
-/// The human approval surface (Plan 11): <c>GET /api/works/{id}/approvals</c> +
+/// The human approval surface: <c>GET /api/works/{id}/approvals</c> +
 /// <c>POST /api/works/{id}/approvals/{approvalId}/respond</c>. The authed
-/// principal IS the human (Plan 09 gate middleware + role gate ahead of
+/// principal IS the human (gate middleware + role gate ahead of
 /// these handlers), so respond acts with the token's canonical actor, groups,
 /// and display name — eligibility is enforced inside the ledger (law D4) and
 /// a consumed approve mints the <c>kernel:</c> evidence receipt (law D5) that

@@ -45,7 +45,7 @@ const MANIFEST: CapabilityManifestV1 = {
 
 const CHILD_ID = "gw.kit/deterministic";
 
-// Plan 15: the harness completes over the kernel artifact path, so every
+// The harness completes over the kernel artifact path, so every
 // adapter booted here needs a kernel surface — the stub stands in.
 const stubKernel: StubKernel = await startStubKernel();
 

@@ -22,7 +22,7 @@ export function nowIso(): string {
 }
 
 /**
- * Plan 35 fencing: a receipt for a command whose data carries an execution
+ * Fencing: a receipt for a command whose data carries an execution
  * epoch echoes it, so the kernel can fence a stale execution's own delivery
  * answer. A non-number (malformed/absent) simply omits the field — the
  * receipt schema keeps it optional.
@@ -106,7 +106,7 @@ export class DeliveryPipeline {
     }
     // 3) Fresh: business events are facts, auto-acked after logging;
     //    commands queue for the handler inside the flow window (bounded by
-    //    maxQueue). Plan 12 law: the kernel's approval.decided PUSH is an
+    //    maxQueue). The kernel's approval.decided PUSH is an
     //    event class yet routes as work — a silently auto-acked decision is
     //    a lost approval round-trip.
     const isCommand = env.type.startsWith("org.facilitator.command.");

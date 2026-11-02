@@ -1,4 +1,4 @@
-// E2E tier (Plan 05 step 6): each file spawns its OWN Facilitator process +
+// E2E tier: each file spawns its OWN Facilitator process +
 // database (workspace-link harness law), so files run sequentially with
 // generous timeouts — server boot is ~5 s and the reconcile test SIGKILLs a
 // gateway child process.

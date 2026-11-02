@@ -4,7 +4,7 @@
 //   --mode complete  reply accepted + publish assignment.completed (echo law)
 //   --mode silent    reply accepted, publish nothing (stub law: stays running)
 // SIGTERM/exit → the process dies; the Gateway's lease + reconcile law does
-// the rest. No reconnect: Plan 07's adapter owns restart policy.
+// the rest. No reconnect: the adapter owns restart policy.
 import { connectChild } from "@ofac/gateway";
 import { buildEvent } from "@ofac/workspace-link";
 
@@ -17,7 +17,7 @@ const childWorkspaceId = flag("--child");
 const socket = flag("--socket");
 const token = flag("--token") ?? "tok";
 const mode = flag("--mode") ?? "silent";
-// Plan 12: repeatable --capability so one child can advertise several ids.
+// Repeatable --capability so one child can advertise several ids.
 const capabilities = args.filter((_a, i) => args[i - 1] === "--capability");
 
 const manifest = {

@@ -58,9 +58,8 @@ public sealed class DeliveryLedger
 }
 
 /// <summary>
-/// Stub sink for channel <c>kernel</c> (Plan 02 target <c>kernel.log</c>):
-/// appends to <see cref="DeliveryLedger"/> and logs. Replaced by real
-/// transports (link server, providers) in later plans.
+/// Terminal sink for channel <c>kernel</c> (target <c>kernel.log</c>):
+/// appends to <see cref="DeliveryLedger"/> and logs.
 /// </summary>
 public sealed class KernelLogSink(DeliveryLedger ledger, ILogger<KernelLogSink> logger, TimeProvider timeProvider) : ISink
 {

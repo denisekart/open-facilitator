@@ -1,4 +1,4 @@
-// Typed error surface for the Link client (Plan 04 locked decision). Server
+// Typed error surface for the Link client (locked decision). Server
 // originated failures always carry the ProblemDetails `type` URI so callers
 // can branch on the frozen error taxonomy (docs/protocol.md "Error URIs").
 import type { ErrorClass } from "@ofac/protocol";

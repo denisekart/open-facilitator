@@ -1,8 +1,8 @@
 // Gateway config: `.facilitator/gateway.yaml` (spec §8.4 layout) parsed +
 // validated field-by-field. The spec is silent on the key set, so THIS file
-// is the lock. Config v2 (Plan 06): the deployment `mode`
+// is the lock. Config v2: the deployment `mode`
 // (embedded | shared | standalone, spec §9.1), the `children:` fleet block
-// and the `childTransport:` block; the 05 embedded path (`child:`) stays
+// and the `childTransport:` block; the embedded path (`child:`) stays
 // exactly as shipped — a v1 file (no `mode`) loads as `mode: "embedded"`.
 // Unknown top-level keys are config errors — fail loud on typos rather than
 // silently ignoring an identity or credential.
@@ -60,7 +60,7 @@ export interface GatewayConfig {
   gatewayId: string;
   /** ownerTeam; the kernel answers 403 team-mismatch on a wrong slug. */
   team: string;
-  /** Workload role sent at enrollment (plan 10); a `gw.` endpoint must be gateway (kernel 403 role-mismatch). */
+  /** Workload role sent at enrollment; a `gw.` endpoint must be gateway (kernel 403 role-mismatch). */
   role?: "gateway" | "child" | undefined;
   /** Present ⇒ mode-(b) enrollment: mint an OIDC client-credentials JWT instead of using the enrollment secret. */
   workload?:
@@ -99,7 +99,7 @@ export interface GatewayConfig {
     /** 0 ⇒ diagnostics disabled; >0 binds 127.0.0.1:port (fail-fast on clash). */
     port: number;
   };
-  /** Team policy source (Plan 12); absent ⇒ DefaultPolicy fallback + boot warning. */
+  /** Team policy source; absent ⇒ DefaultPolicy fallback + boot warning. */
   policy?:
     | {
         /** YAML text of the policy document. */
@@ -361,7 +361,7 @@ export function parseConfig(yamlText: string, options: ParseConfigOptions = {}):
     fail("trustMode", `must be one of ${TRUST_MODES.join(", ")}`);
   }
 
-  // Workload role (plan 10): gateway|child; absent ⇒ the callsite defaults
+  // Workload role: gateway|child; absent ⇒ the callsite defaults
   // to gateway (the gw. prefix law makes child meaningless here anyway).
   let role: "gateway" | "child" | undefined;
   if (root["role"] !== undefined) {
@@ -401,7 +401,7 @@ export function parseConfig(yamlText: string, options: ParseConfigOptions = {}):
     };
   }
 
-  // Team policy block (Plan 12): exactly one of inline/path; the key present
+  // Team policy block: exactly one of inline/path; the key present
   // with neither source is a typo, not a fallback.
   let policy: GatewayConfig["policy"];
   if (root["policy"] !== undefined) {

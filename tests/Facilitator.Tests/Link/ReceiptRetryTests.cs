@@ -9,7 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Facilitator.Tests.Link;
 
 /// <summary>
-/// Retryable-rejection law (plan 35 prereq): a <c>rejected</c> receipt naming a
+/// Retryable-rejection law: a <c>rejected</c> receipt naming a
 /// transient endpoint condition (<c>child-busy</c> — the gateway's own
 /// "honest, retryable upstream" answer when a child's quota is full) does NOT
 /// terminally settle the delivery. The ledger keeps the receipt, holds the row

@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Facilitator.Kernel.Shared.Persistence.Configurations;
 
-/// <summary>facilitator.communication_bindings (Plan 22 behaviour): one binding row per
+/// <summary>facilitator.communication_bindings: one binding row per
 /// bound conversation (thread/DM). The unique (provider, channel, root) index is the
 /// reply-routing lookup; the unique idempotency_key index is the "same post twice ⇒
 /// one Work" law.</summary>

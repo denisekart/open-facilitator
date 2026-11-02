@@ -51,7 +51,7 @@ public sealed class KernelMetrics
     public KernelMetrics()
     {
         var meter = new Meter(MeterName);
-        // Admin metrics snapshot (Plan 20, §17): an in-process listener
+        // Admin metrics snapshot (spec §17): an in-process listener
         // accumulates every long counter of this meter, so the roll-up needs
         // no scrape backend (§17: no time-series query).
         _counterListener = new System.Diagnostics.Metrics.MeterListener
@@ -195,13 +195,13 @@ public sealed class KernelMetrics
     /// <summary>Record recall latency in milliseconds.</summary>
     public void MemoryRecallLatency(double ms) => _memoryRecallLatency.Record(ms);
 
-    /// <summary>Record one provisioning op appended by the sweep (Plan 35 C).</summary>
+    /// <summary>Record one provisioning op appended by the sweep.</summary>
     /// <param name="operation">start | stop.</param>
     /// <param name="reason">worker-lost | stalled-scaleup | no-capacity | min-workers | idle-shutdown.</param>
     public void ProvisioningOp(string operation, string reason) => _provisioningOps.Add(1,
         new KeyValuePair<string, object?>("operation", operation), new KeyValuePair<string, object?>("reason", reason));
 
-    /// <summary>Record one execution failed by the session-loss law (Plan 35 C).</summary>
+    /// <summary>Record one execution failed by the session-loss law.</summary>
     public void SessionLoss(string reason) => _sessionLoss.Add(1,
         new KeyValuePair<string, object?>("reason", reason));
 
@@ -217,7 +217,7 @@ public sealed class KernelMetrics
     }
 
     /// <summary>
-    /// Process-lifetime counter totals (the admin metrics snapshot, Plan 20),
+    /// Process-lifetime counter totals (the admin metrics snapshot),
     /// served from the in-process listener installed in the constructor.
     /// </summary>
     public IReadOnlyDictionary<string, long> CounterTotals() =>

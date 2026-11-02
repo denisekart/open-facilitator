@@ -50,7 +50,7 @@ public sealed record AdminConfigMutationResult(AdminConfigOutcome Outcome, Admin
 public sealed record AdminConfigHistoryEntry(long Version, JsonElement Payload, string Author, string Reason, DateTime UpdatedAt);
 
 /// <summary>
-/// The <c>facilitator.admin_config</c> store (Plan 20, spec §17.4): plain
+/// The <c>facilitator.admin_config</c> store (spec §17.4): plain
 /// field-shape validation against a closed registry, version-fenced PATCH
 /// (the roles conditional-write template), same-tx history row + audit +
 /// newest-20 retention. Stored intent only — no kernel behavior reads these
@@ -230,9 +230,9 @@ public sealed class AdminConfigStore(
             UnknownFields(payload, "provider", "preferTeam"),
             EnumField(payload, "provider", ["deterministic", "model", ""]),
             OptionalStringField(payload, "preferTeam", 1, 128)),
-        // ^ "model" is stored-accepted for Plan 26's seam: no registered
-        // implementation falls back deterministic with a model-fallback audit
-        // flag (RoutingSink), so no config-schema change lands later.
+        // ^ "model" is stored-accepted as the seam for future model routing: no
+        // registered implementation falls back deterministic with a model-fallback
+        // audit flag (RoutingSink), so no config-schema change lands later.
     };
 
     private static string? FirstError(params string?[] errors) => errors.FirstOrDefault(static e => e is not null);

@@ -1,4 +1,4 @@
-// Plan 12 Step 5: the confirm round-trip at the runtime unit tier. A
+// The confirm round-trip at the runtime unit tier. A
 // `confirm` verdict parks a pending row + publishes approval.required and
 // answers accepted; the decided-push then consumes (approved) or settles
 // (denied/expired/revoked) — never a silent drop. Cancel on a pending action

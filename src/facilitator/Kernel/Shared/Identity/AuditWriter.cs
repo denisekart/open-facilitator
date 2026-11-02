@@ -44,7 +44,7 @@ public sealed class AuditWriter(IDbContextFactory<FacilitatorDbContext> contextF
 
     /// <summary>
     /// Stage one decision row on a caller-owned context so the audit row
-    /// commits atomically with the state change it records (Plan 11 ledger).
+    /// commits atomically with the state change it records.
     /// </summary>
     public void Append(FacilitatorDbContext db, AuditRecord record) => db.Audit.Add(Build(record));
 

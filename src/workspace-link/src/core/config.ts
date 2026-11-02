@@ -12,7 +12,7 @@ export interface LinkdConfig {
   team: string;
   manifestPath: string;
   trustMode: TrustMode;
-  /** Workload role for enrollment (plan 10); linkd is a standalone child workspace by default. */
+  /** Workload role for enrollment; linkd is a standalone child workspace by default. */
   role: "gateway" | "child";
   transport: "signalr" | "http-poll";
   statePath: string;

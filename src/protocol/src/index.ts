@@ -1,6 +1,6 @@
 // @ofac/protocol — the frozen v1 wire contract as a consumable package.
-// Plan 04 (Workspace Link SDK) consumes generated types from this root entry
-// without remapping; Plan 03 (Link server) uses KNOWN_COMMAND_TYPES as its
+// The Workspace Link SDK consumes generated types from this root entry
+// without remapping; the Link server uses KNOWN_COMMAND_TYPES as its
 // fail-closed command table.
 export * from "./generated/index.js";
 export * from "./digest.js";

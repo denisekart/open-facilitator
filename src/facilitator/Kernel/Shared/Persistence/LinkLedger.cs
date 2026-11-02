@@ -221,7 +221,7 @@ public sealed class LinkLedger(
     /// backoff (which also charges the window, i.e. it applies flow control),
     /// and only after <see cref="MaxReceiptAttempts"/> offers does it settle.
     /// Terminally acking a busy rejection would silently lose the command
-    /// (plan 35 prereq: a steer comment rejected child-busy never landed).
+    /// (a steer comment rejected child-busy once never landed at all).
     /// </summary>
     public async Task<bool> AckAsync(Guid deliveryId, string endpointId, string receiptJson, CancellationToken ct)
     {

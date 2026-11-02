@@ -98,7 +98,7 @@ namespace Facilitator.Migrations
                         onDelete: ReferentialAction.Cascade);
                 });
 
-            // The FTS surface stays out of the EF model on purpose (Plan 16):
+            // The FTS surface stays out of the EF model on purpose:
             // the broker never reads or writes `search`; Postgres recomputes
             // the stored generated column when tombstoning empties `content`.
             migrationBuilder.Sql(

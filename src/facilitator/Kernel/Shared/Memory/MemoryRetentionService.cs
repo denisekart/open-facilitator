@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore.Storage;
 namespace Facilitator.Kernel.Shared.Memory;
 
 /// <summary>
-/// The memory retention pass (Plan 16, spec §14.6): the second hosted loop
+/// The memory retention pass (spec §14.6): the second hosted loop
 /// (advisory lock <c>420003</c> — 420001 is migrations, 420002 artifact GC),
 /// independent of the artifact loop by design. Candidates whose
 /// <c>expires_at</c> lapsed are tombstoned under the D5 law — content drop

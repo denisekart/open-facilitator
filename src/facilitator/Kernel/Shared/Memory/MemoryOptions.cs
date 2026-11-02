@@ -1,7 +1,7 @@
 namespace Facilitator.Kernel.Shared.Memory;
 
 /// <summary>
-/// Memory-broker configuration (<c>Memory</c> section, Plan 16). The only
+/// Memory-broker configuration (<c>Memory</c> section). The only
 /// shipped provider profile is <c>postgres-fts</c> (spec §14.7): the shared
 /// kernel Postgres is the store and the index — no new container. An unknown
 /// provider value fails startup (no silent fallback, the artifact-options

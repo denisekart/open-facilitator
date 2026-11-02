@@ -8,8 +8,8 @@ using Xunit;
 namespace Facilitator.Tests.Link;
 
 /// <summary>
-/// Plan 10 mode-(b) enrollment + oidc: evidence against the shared Keycloak
-/// realm (plan §6): CC enrollment round-trip with rotation, the pre-registration
+/// Mode-(b) enrollment + oidc: evidence against the shared Keycloak
+/// realm (spec §6): CC enrollment round-trip with rotation, the pre-registration
 /// law (workload-not-registered, role-mismatch), and the evidence five-step
 /// outcomes (delegation-validated extends the principal; tampered/expired/
 /// wrong-audience/missing-delegation deny 422 + audit). Mode-(a) negatives

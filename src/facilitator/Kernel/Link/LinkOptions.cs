@@ -2,7 +2,7 @@ namespace Facilitator.Kernel.Link;
 
 /// <summary>
 /// Link server settings (config group <c>Link</c>), validated once at
-/// composition. Defaults per the Plan 03 locked decisions; tests override via
+/// composition. Locked defaults; tests override via
 /// <c>UseSetting</c>.
 /// </summary>
 public sealed class LinkOptions

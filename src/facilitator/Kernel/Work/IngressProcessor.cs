@@ -100,7 +100,7 @@ public sealed class IngressProcessor(
         }
         catch (DagViolationException dag)
         {
-            // Create-time DAG law (Plan 35 B): the whole request is rejected
+            // Create-time DAG law: the whole request is rejected
             // — the store's tx rolled back, nothing was created.
             await inbox.MarkProcessedAsync(inboxId, "failed", ct);
             return IngressPipeline.Problem(ProblemErrors.DagViolation(dag.Message));

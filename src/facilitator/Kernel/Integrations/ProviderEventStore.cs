@@ -56,7 +56,7 @@ public sealed record ConversationTarget(
     string? ActorProviderAccountId);
 
 /// <summary>
-/// The Plan 22 provider-ingest plane (locked decision 1): one transaction per
+/// The provider-ingest plane (locked decision 1): one transaction per
 /// normalized provider event — insert-or-duplicate <c>provider_events</c>
 /// (canonical-data sha), add the inbox row (wire-bytes sha + provider fields),
 /// then the business-effect arms appending outbox rows, all before commit.
@@ -1017,7 +1017,7 @@ public sealed class ProviderEventStore(
         if (!verdict.Ok)
         {
             // Kernel-emitted envelopes must be contract-valid; fail closed at
-            // insert rather than poison the outbox (Plan 02 law).
+            // insert rather than poison the outbox.
             throw new InvalidOperationException($"kernel envelope rejected by the validator: {verdict.ErrorClass}: {verdict.Message}");
         }
 

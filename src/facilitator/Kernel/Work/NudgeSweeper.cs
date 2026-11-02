@@ -77,7 +77,7 @@ public sealed class NudgeSweeper(
     }
 
     /// <summary>Advisory key serializing nudge sweeps across kernel replicas
-    /// (Plan 35 D audit): two replicas evaluating the same stale fleet race
+    /// (N-replica audit): two replicas evaluating the same stale fleet race
     /// the episode ledger; the deterministic nudge <c>commandId</c> + the
     /// unique outbox key already make a collision all-or-nothing, but a
     /// busy lock skips the pass instead of aborting it (the provisioning

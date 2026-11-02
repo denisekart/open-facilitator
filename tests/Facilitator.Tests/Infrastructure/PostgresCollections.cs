@@ -12,7 +12,7 @@ namespace Facilitator.Tests.Infrastructure;
 public sealed class WorkCollection : ICollectionFixture<PostgresFixture>, ICollectionFixture<KeycloakFixture>;
 
 /// <summary>
-/// Artifact suites against the s3 provider (Plan 14 matrix): same Postgres +
+/// Artifact suites against the s3 provider (the s3 matrix): same Postgres +
 /// Keycloak containers, plus the shared SeaweedFS S3 container. Serial among
 /// themselves; runs parallel to the fs leg (distinct rows, distinct buckets).
 /// </summary>

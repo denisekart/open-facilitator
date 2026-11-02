@@ -1,4 +1,4 @@
-// Mattermost WebSocket v4 event listener (Plan 22 D1 — the inbound form).
+// Mattermost WebSocket v4 event listener (D1 — the inbound form).
 // Mattermost 11.11 webhooks carry no signing secret, so trust comes from the
 // bot credential instead: the adapter connects AS the bot and receives the
 // same events its memberships entitle it to (channels it belongs to, its DMs).

@@ -1,11 +1,11 @@
 // The child-transport wire: one NDJSON frame per line over a Unix socket or
-// a 127.0.0.1 TCP fallback — identical protocol on both (Plan 06 lock). This
+// a 127.0.0.1 TCP fallback — identical protocol on both. This
 // module is pure: no sockets, no timers. `encodeFrame`/`createFrameParser`
 // are the single codec; the listener (`listen.ts`) and the child-side client
 // (`connect.ts`) both feed socket bytes through it.
 //
 // Frame law: one JSON object per line, single trailing `\n`; every frame
-// carries `{ v: 1, type: <literal> }`. Payloads reuse the frozen 05
+// carries `{ v: 1, type: <literal> }`. Payloads reuse the frozen
 // vocabulary verbatim (`ChildMessage`/`ChildReply` — import, never redefine).
 // Oversized lines are rejected once (`oversize`) and the connection dies;
 // a malformed line is dropped alone (`parse-error`) — it kills nothing but
@@ -54,7 +54,7 @@ export interface ReplyFrame {
 }
 
 /** The child→Gateway event relay: the Gateway forwards `envelope` bytes
- * unmodified (05 law); Plan 07's `event.publish` profiles this frame. */
+ * unmodified; the `event.publish` frame profiles this shape. */
 export interface EventFrame {
   v: 1;
   type: "event";

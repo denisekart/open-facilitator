@@ -21,7 +21,7 @@ public sealed record MemoryArm(ProblemDetails? Problem, string Status, object? D
 }
 
 /// <summary>
-/// The memory arms of the link + CloudEvent planes (Plan 16): the two
+/// The memory arms of the link + CloudEvent planes: the two
 /// commands delegate to the broker with a context built ONLY from the screened
 /// principal (D4: a workload retain lands <c>candidate</c>; curation never
 /// rides this plane) and answer in-band on the ack <c>data</c> (the
@@ -69,7 +69,7 @@ public sealed class MemoryIngress(
         };
     }
 
-    /// <summary>Command arm: recall. Read-only, so a duplicate commandId honestly re-runs the query (the plan's pre-made call — no stored-result caching).</summary>
+    /// <summary>Command arm: recall. Read-only, so a duplicate commandId honestly re-runs the query (no stored-result caching).</summary>
     public async Task<MemoryArm> HandleRecallAsync(
         JsonElement root, EffectivePrincipal? principal, CancellationToken ct)
     {

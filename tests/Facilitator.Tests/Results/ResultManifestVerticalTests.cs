@@ -8,7 +8,7 @@ using Facilitator.Tests.Artifacts;
 namespace Facilitator.Tests.Results;
 
 /// <summary>
-/// The Plan 15 Step 2 vertical on the filesystem leg: a worker uploads a
+/// The result-manifest vertical on the filesystem leg: a worker uploads a
 /// canonical manifest document (link request_upload ⇒ ack ticket ⇒ PUT), posts
 /// a completed event carrying <c>resultManifestRef</c> + <c>resultDigest</c>,
 /// and the kernel records the manifest into the ledger — digest recomputed from

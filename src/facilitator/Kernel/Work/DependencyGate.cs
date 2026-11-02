@@ -16,7 +16,7 @@ namespace Facilitator.Kernel.Work;
 public sealed record DependencyEdge(Guid AssignmentId, string Condition);
 
 /// <summary>
-/// The dependsOn DAG gate (Plan 35 B(2)). The funnel suppresses an assign
+/// The dependsOn DAG gate. The funnel suppresses an assign
 /// while its deps are unmet (<see cref="UnmetAsync"/> ⇒ the routing intent
 /// requeues with the dispatcher's backoff — never dead-letters); satisfaction
 /// arrives as a wake-law UPDATE on the sibling's completion / manifest

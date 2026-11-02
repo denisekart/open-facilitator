@@ -25,7 +25,7 @@ export type { ProblemDetails };
 export const MAX_ENVELOPE_BYTES = 262144;
 
 /**
- * The kernel's approval-decision push (Plan 12 §12.1 step 5). An event
+ * The kernel's approval-decision push (spec §12.1 step 5). An event
  * CLASS, yet it routes as work: the dispatcher hands it to the handler's
  * `onDecided` arm instead of the fact-event auto-ack.
  */
@@ -107,8 +107,8 @@ export interface LinkTokenProvider {
   refresh?(): Promise<void>;
 }
 
-// ── Handler contract (HarnessAdapter envelope-handling subset; Plan 05
-// composes the full lifecycle on top of this) ───────────────────────────────
+// ── Handler contract (HarnessAdapter envelope-handling subset; embedders
+// compose the full lifecycle on top of this) ───────────────────────────────
 
 export type CommandOutcome =
   | { kind: "accepted" }
@@ -127,8 +127,8 @@ export interface CommandContext {
 export interface LinkHandler {
   onCommand(cmd: EnvelopeCommand, ctx: CommandContext): Promise<CommandOutcome>;
   /**
-   * Kernel-pushed business event delivered on the Link (Plan 12:
-   * approval.decided). Acked (receipt accepted) whatever the handler does;
+   * Kernel-pushed business event delivered on the Link (approval.decided).
+   * Acked (receipt accepted) whatever the handler does;
    * absent handler ⇒ silent ack.
    */
   onDecided?(env: EnvelopeEvent, ctx: CommandContext): Promise<void>;
@@ -136,9 +136,8 @@ export interface LinkHandler {
 
 /**
  * The capability manifest as the frozen schema requires it: the generated
- * `CapabilityManifestV1` already carries `ownerTeam` (verified against
- * src/protocol/src/generated/types.ts:89 at Plan 04 Step 0), so the
- * intersection from the plan collapses to an alias — kept for a stable name.
+ * `CapabilityManifestV1` already carries `ownerTeam`, so the schema's
+ * intersection collapses to an alias — kept for a stable name.
  */
 export type WorkspaceCapabilityManifest = CapabilityManifestV1;
 

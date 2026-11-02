@@ -13,7 +13,7 @@ public static class EnvelopeFactory
     /// <summary>CloudEvents source the kernel identifies itself with.</summary>
     public const string KernelSource = "urn:facilitator:kernel";
 
-    /// <summary>Envelope type of the only event type Plan 02 emits.</summary>
+    /// <summary>Envelope type of the kernel's own progress event.</summary>
     public const string WorkProgressType = "org.facilitator.event.work.progress.v1";
 
     /// <summary>Dataschema $id of the work.progress payload schema.</summary>

@@ -8,7 +8,7 @@ using Facilitator.Kernel.Shared;
 namespace Facilitator.Tests.Approvals;
 
 /// <summary>
-/// Plan 11 law D2: the kernel digest of the appendix §7.2 approval record must
+/// Law D2: the kernel digest of the appendix §7.2 approval record must
 /// equal the committed cross-language golden regardless of source key order or
 /// unicode spelling (the TS mirror runs the same golden in the protocol suite,
 /// and the .NET fixture harness compiles the same helper).
@@ -39,7 +39,7 @@ public sealed class ApprovalDigestTests
     }
 
     /// <summary>
-    /// Plan 12: the SECOND golden carries the exact action shape the Gateway
+    /// The SECOND golden carries the exact action shape the Gateway
     /// records (capabilityId/resource/assignmentId/workId) — the kernel must
     /// recompute the Gateway's declared digest byte-for-byte.
     /// </summary>

@@ -1,4 +1,4 @@
-// Team policy file loader (Plan 12, spec §12). The schema lives in the
+// Team policy file loader (spec §12). The schema lives in the
 // contract tree (protocol/json-schema/policy-file.v1.json) for third-party
 // Gateway builders, but it is a Gateway-local artifact: it never rides a wire
 // envelope. Structural validation reuses @ofac/protocol's registered-schema

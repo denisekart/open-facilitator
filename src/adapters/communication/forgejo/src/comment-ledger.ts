@@ -1,6 +1,6 @@
 // The adapter's durable state on better-sqlite3, alongside (not inside) the
 // SDK's SqliteLedger which owns the delivery ledger in the SAME file:
-//   comments — the Plan 23 §4 idempotency law: a command's idempotencyKey
+//   comments — the idempotency law: a command's idempotencyKey
 //              maps to the provider comment it created; replay answers with
 //              the stored id without touching Forgejo.
 import { chmodSync, existsSync } from "node:fs";

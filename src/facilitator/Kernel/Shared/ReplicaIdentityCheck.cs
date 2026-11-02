@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Facilitator.Kernel.Shared;
 
 /// <summary>
-/// Fail-closed startup gate for horizontal replicas (Plan 35 D): a configured
+/// Fail-closed startup gate for horizontal replicas: a configured
 /// <c>Kernel:ReplicaId</c> is the lease identity stamped on link sessions and
 /// outbox claims, so two live processes sharing one id interleave leases
 /// under an indistinguishable owner. At startup, every session row already

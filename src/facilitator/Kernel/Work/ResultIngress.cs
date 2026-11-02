@@ -25,7 +25,7 @@ public sealed record ResultArm(ProblemDetails? Problem, string Status)
 }
 
 /// <summary>
-/// The result-manifest arm of <c>event.assignment.completed.v1</c> (Plan 15),
+/// The result-manifest arm of <c>event.assignment.completed.v1</c>,
 /// shared by both ingress surfaces. A manifest-less completed event stays the
 /// plain accepted event it always was (the legacy inline path); once
 /// <c>data.resultManifestRef</c> rides along, the referenced artifact's stored
@@ -184,12 +184,12 @@ public sealed class ResultIngress(
         };
     }
 
-    /// <summary>Plan 24(1d): the manifest reader. A RECORDED manifest for an
+    /// <summary>The manifest reader. A RECORDED manifest for an
     /// assignment whose CAPABILITY one provider configured
     /// (<c>Providers:&lt;p&gt;:PrRequestCapability</c>) may carry connector
     /// work: <c>structuredResult.prRequest</c> ⇒ one
     /// <c>vcs.change_request.create</c> assign + the <c>branch:&lt;head&gt;</c>
-    /// pending-PR marker binding (24(1e)'s resolver key);
+    /// pending-PR marker binding (the head-branch resolver's key);
     /// <c>structuredResult.commentRequests[]</c> ⇒ one
     /// <c>vcs.change_request.comment</c> assign each (the steer-incorporated
     /// legs). The capability rides the ASSIGN envelope: no runtime table

@@ -1,4 +1,4 @@
-// E2E child-kill (Plan 06 step 6): SIGKILL a socket child mid-flight. The
+// E2E child-kill: SIGKILL a socket child mid-flight. The
 // Gateway marks it offline at once (socket close), the kernel keeps getting
 // service from the SURVIVING child, and when the dead child's name
 // reconnects, the re-register probe gets an honest `unknown` from the fresh

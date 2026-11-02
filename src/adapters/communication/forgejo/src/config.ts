@@ -1,4 +1,4 @@
-// Env-only adapter config (Plan 23 step 3, the Plan 22 config law): every key
+// Env-only adapter config (the provider config law): every key
 // names its consumer; missing required keys fail closed with a named error,
 // never a silent default. The provider tenant is the forge host: forgejo
 // webhooks carry no instance-wide tenant id, and the site origin IS the

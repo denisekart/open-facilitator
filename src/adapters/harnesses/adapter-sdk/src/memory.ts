@@ -1,4 +1,4 @@
-// The memory capability of `@ofac/adapter` (Plan 16): retain/recall against
+// The memory capability of `@ofac/adapter`: retain/recall against
 // the kernel broker over the link plane — the same in-band-ack law as the
 // artifact client (spec §14.3, appendix §6). The child link token is the
 // credential; `actorEvidenceRef` is schema-required, so the client always
@@ -125,7 +125,7 @@ export interface MemoryClient {
   attest(usage: UsageAttestation): Promise<void>;
   /** Build (not send) the frozen candidate envelope — the caller publishes it on its own transport. */
   buildMemoryCandidateEvent(input: MemoryCandidateInput): EnvelopeEvent;
-  /** Plan 16 ships no reflection provider: honest `unsupported`, never a silent no-op. */
+  /** No reflection provider ships: honest `unsupported`, never a silent no-op. */
   reflect(): { unsupported: true };
 }
 

@@ -1,6 +1,6 @@
 // Pure inbound normalization (no I/O): a Mattermost WS `posted` /
 // `reaction_added` payload in, one normalized provider event out — or null
-// when the post must be IGNORED (Plan 22 D1 classification law):
+// when the post must be IGNORED (D1 classification law):
 //
 //   bot-authored            → message.v1 (echo; the kernel suppresses arm
 //                             effects by botUserId but keeps the delivery

@@ -9,7 +9,7 @@ using Facilitator.Kernel.Work;
 namespace Facilitator.Tests.Routing;
 
 /// <summary>
-/// The dependsOn DAG gate (Plan 35 B): a create-batch sibling whose edges are
+/// The dependsOn DAG gate: a create-batch sibling whose edges are
 /// unmet keeps its routing intent pending with the dispatcher's backoff and
 /// the audit basis <c>deps-unmet</c> — never an assign effect, never a
 /// dead-letter. Satisfaction is a wake law: a sibling's terminal event (the

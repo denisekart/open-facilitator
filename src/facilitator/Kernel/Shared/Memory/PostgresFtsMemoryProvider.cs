@@ -34,7 +34,7 @@ public sealed record AuthorizedMemoryDeletion(Guid EntryId, DateTime Now);
 /// <summary>
 /// The provider seam (spec §14.3): the broker authorizes, the provider stores /
 /// searches / deletes inside the broker's transaction. <c>postgres-fts</c> is
-/// the only implementation (Plan 16 D10); a Hindsight adapter lands behind
+/// the only implementation (D10); a Hindsight adapter lands behind
 /// this same port — never as an empty class.
 /// </summary>
 public interface IMemoryProvider

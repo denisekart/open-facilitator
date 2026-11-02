@@ -1,4 +1,4 @@
-// E2E 1 (Plan 05 step 6): the full happy path against a live kernel —
+// E2E 1: the full happy path against a live kernel —
 // enroll, capabilities POST, SignalR delivery of a seeded work.assign,
 // echo-child completion, and the child's event settling `processed` in the
 // kernel inbox.
@@ -60,9 +60,9 @@ describe.skipIf(!E2E)("gateway assign e2e", () => {
           assignmentId: `asg-${commandId}`,
         }),
       );
-      // As-built law (Plan 20): the kernel-side truth for link dispatch is
+      // As-built law: the kernel-side truth for link dispatch is
       // the link_deliveries row (also visible on GET /api/admin/deliveries);
-      // the old in-memory dev ledger dump is gone. Plan 04's own e2e polls
+      // the old in-memory dev ledger dump is gone, so this e2e polls
       // the row via psql.
       const row = await waitFor("link row acked", async () => {
         const r = await linkRow(harness.dbUrl, outboxId);

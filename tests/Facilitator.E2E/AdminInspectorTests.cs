@@ -15,7 +15,7 @@ using static Microsoft.Playwright.Assertions;
 namespace Facilitator.E2E;
 
 /// <summary>
-/// Plan 21 browser tier: the embedded SPA against a real Kestrel kernel +
+/// Browser tier: the embedded SPA against a real Kestrel kernel +
 /// hosted Keycloak login, driven end-to-end (spec §17.6 walkthrough, UI
 /// edition): login gate, search→inspector→approval, links, dead-letter
 /// replay with the replay-once toast, config PATCH with the 412 conflict

@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Facilitator.Kernel.Shared.Persistence.Configurations;
 
-/// <summary>facilitator.memory_scopes (Plan 16).</summary>
+/// <summary>facilitator.memory_scopes.</summary>
 public sealed class MemoryScopeEntityConfiguration : IEntityTypeConfiguration<MemoryScopeEntity>
 {
     /// <inheritdoc />

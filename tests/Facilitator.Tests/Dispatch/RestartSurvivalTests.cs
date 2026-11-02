@@ -71,7 +71,7 @@ public class RestartSurvivalTests(DispatchDbFixture fixture)
         Assert.Equal(6, await fixture.Db.OutboxCountBy(workId, "delivered", attempts: 1));
         KernelOps.AssertEnvelopesValid(await fixture.Db.OutboxEnvelopes(workId));
 
-        // Durable deliveries view (Plan 20: /api/admin/deliveries replaced
+        // Durable deliveries view (/api/admin/deliveries replaced
         // the in-memory dev ledger): the table holds exactly one row per
         // outbox id, so a redrain can never duplicate a delivery — the
         // DB-side assert above (six delivered, attempts == 1) stays the

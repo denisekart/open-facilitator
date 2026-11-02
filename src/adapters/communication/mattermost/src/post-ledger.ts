@@ -1,6 +1,6 @@
 // The adapter's durable state on better-sqlite3, alongside (not inside) the
 // SDK's SqliteLedger which owns the delivery ledger in the SAME file:
-//   posts       — the Plan 22 idempotency law: a command's idempotencyKey
+//   posts       — the idempotency law: a command's idempotencyKey
 //                 maps to the provider object it created; replay answers with
 //                 the stored id without touching Mattermost.
 //   channels    — channel-type cache (MM WS events carry no channel type).

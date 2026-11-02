@@ -44,7 +44,7 @@ export class CommandDispatcher {
           ? (env.data["assignmentId"] as string)
           : undefined,
     };
-    // Plan 12 pre-branch: a kernel-pushed business event (approval.decided)
+    // Pre-branch: a kernel-pushed business event (approval.decided)
     // rides the same delivery machinery as a command — classify it BEFORE
     // the command gate, ack it, and let the handler react.
     const outcome: CommandOutcome = !KNOWN_COMMAND_TYPES.includes(env.type)
@@ -141,7 +141,7 @@ export class CommandDispatcher {
         };
         break;
     }
-    // Plan 35 fencing: the receipt echoes the delivered command's execution
+    // Fencing: the receipt echoes the delivered command's execution
     // epoch (when it carried one) so the kernel fences a stale execution.
     receipt = { ...receipt, ...epochField(delivery.envelope) };
     // Ledger flip BEFORE the receipt (S:302).

@@ -1,4 +1,4 @@
-// Plan 12 Step 3/4: team policy engine + loader + audit line. The matrix
+// Team policy engine + loader + audit line. The matrix
 // covers capability × resource × actorAnyOf × ordering × deny-by-default,
 // malformed-file boot failure, revision-hash stability, group-term
 // normalization, and the `role:`-denies law.

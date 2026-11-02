@@ -1,4 +1,4 @@
-// E2E tier (Plan 07 step 5): the REAL worker binary against a standalone
+// E2E tier: the REAL worker binary against a standalone
 // Gateway + a dedicated Facilitator (workspace-link harness law); files run
 // sequentially, boot is slow, and the crash law SIGKILLs the worker.
 import { defineConfig } from "vitest/config";

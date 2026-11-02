@@ -6,8 +6,8 @@ using Facilitator.Tests.Infrastructure;
 namespace Facilitator.Tests.Memory;
 
 /// <summary>
-/// The frozen memory event arms on the ungated CE plane (/api/ingress/events,
-/// Plan 16 step 3): a candidate names a live Work, so ownership follows the
+/// The frozen memory event arms on the ungated CE plane (/api/ingress/events):
+/// a candidate names a live Work, so ownership follows the
 /// Work's Project→Team lineage and the entry lands promotable + timeline-noted;
 /// a used attestation carries no verifiable team, so the read law denies while
 /// the plane still answers accepted (§14.6: routing never blocks on memory).

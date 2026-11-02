@@ -1,4 +1,4 @@
-// E2E worker tier (Plan 07 step 5, Plan 15 cutover): the REAL
+// E2E worker tier: the REAL
 // ofac-deterministic-worker binary against a standalone Gateway + a
 // dedicated Facilitator. Proven end-to-end, observable in the kernel:
 // 1. boot → register → the union capability POST (ownerTeam rewritten);
@@ -164,10 +164,10 @@ describe.skipIf(!E2E)("deterministic worker e2e", () => {
       });
       return Promise.race([p, guard]).finally(() => clearTimeout(timer!));
     };
-    // Plan 15: the worker's kernel credential is a CHILD enrollment — mode
+    // The worker's kernel credential is a CHILD enrollment — mode
     // (a) with the dev enrollment secret. The empty-fleet standalone Gateway
     // admits any hello token, so the SAME link token rides both the child
-    // wire and the kernel link-plane HTTP (the plan's verbatim-token law).
+    // wire and the kernel link-plane HTTP (the verbatim-token law).
     const childToken = await (async () => {
       const r = await linkPost(harness.baseUrl, "/api/link/v1/enroll", "enroll-dev", {
         token: "enroll-dev",

@@ -44,9 +44,7 @@ public static partial class LinkEndpoints
     }
 
     // Dev-only test affordance: seed a link-addressed outbox row so link
-    // delivery flows are provable end-to-end without a full assignment
-    // slice. (Plan 20 cut over the dead-letter view to
-    // GET /api/admin/deliveries?state=dead_letter.)
+    // delivery flows are provable end-to-end without a full assignment slice.
     private static void MapDevAffordances(IEndpointRouteBuilder app, IHostEnvironment environment)
     {
         if (environment.IsDevelopment())

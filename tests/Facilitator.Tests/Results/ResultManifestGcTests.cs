@@ -5,7 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Facilitator.Tests.Results;
 
 /// <summary>
-/// Plan 15's GC strengthening: a RECORDED result manifest pins the blob it was
+/// GC strengthening for result manifests: a RECORDED result manifest pins the blob it was
 /// stored under (and, via the flattened outputs column, every output artifact
 /// its document declared) regardless of the Work's state — a lapsed <c>Nd</c>
 /// retention policy on an unreferenced-by-Work artifact still cannot collect a

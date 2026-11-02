@@ -12,7 +12,7 @@ export interface EnrollOptions {
   endpointId: string;
   instanceId: string;
   trustMode: EnrollRequestV1["trustMode"];
-  /** Workload role claim (plan 10); the kernel rejects contradictions with a mode-(b) binding or the gw. prefix law. */
+  /** Workload role claim; the kernel rejects contradictions with a mode-(b) binding or the gw. prefix law. */
   role?: "gateway" | "child";
   /** Team roster slug to bind (required for mode (a); a mode-(b) binding's team wins). */
   team?: string;

@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Facilitator.Kernel.Shared.Persistence.Configurations;
 
-/// <summary>facilitator.result_manifests — immutable result-manifest ledger (Plan 15).</summary>
+/// <summary>facilitator.result_manifests — immutable result-manifest ledger.</summary>
 public sealed class ResultManifestEntityConfiguration : IEntityTypeConfiguration<ResultManifestEntity>
 {
     /// <inheritdoc />

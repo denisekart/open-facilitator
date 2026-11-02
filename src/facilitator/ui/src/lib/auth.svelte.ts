@@ -30,7 +30,7 @@ export function decodeTokenClaims(jwt: string | undefined | null): TokenClaims {
 }
 
 /**
- * OIDC session (plan 21 decision 2): authorization-code + PKCE against the
+ * OIDC session: authorization-code + PKCE against the
  * public client, access token in memory (oidc-client-ts keeps the user object
  * in sessionStorage), silent renew via prompt=none iframe.
  */

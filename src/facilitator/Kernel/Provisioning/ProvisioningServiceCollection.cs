@@ -5,7 +5,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 /// <summary>
-/// Plan 35 C composition: the provisioning decision core. Options bind from
+/// Composition for the provisioning decision core. Options bind from
 /// the <c>Provision</c> section (LauncherEndpoint + the Workloads spec
 /// array); the processor is a singleton hosted service next to the
 /// NudgeSweeper — same cadence law, tests drive <c>SweepOnceAsync</c>.

@@ -22,7 +22,7 @@ public sealed record DeadLetterRow(Guid DeadLetterId, Guid OutboxId, string Reas
 /// claim, claim-expired reclaim, mark-delivered, requeue-with-backoff,
 /// dead-letter, and the dev test-affordance insert (+wake). Raw SQL only where
 /// the stance allows it (claim, lease reclaim, backoff arithmetic); EF for the
-/// plain inserts. The admin replay (Plan 20) re-enqueues a dead-lettered
+/// plain inserts. The admin replay re-enqueues a dead-lettered
 /// envelope VERBATIM under a deterministic <c>replay:&lt;deadLetterId&gt;</c>
 /// command id, so double-replay collides on <c>outbox_command_id_key</c> and
 /// the ledger arbitrates idempotency — never the UI.
@@ -210,7 +210,7 @@ public sealed class OutboxRepository(
         return rows;
     }
 
-    /// <summary>Outcome of an admin dead-letter replay (Plan 20).</summary>
+    /// <summary>Outcome of an admin dead-letter replay.</summary>
     public enum ReplayOutcome
     {
         /// <summary>A fresh pending row landed (wake sent).</summary>

@@ -7,7 +7,7 @@ namespace Facilitator.Kernel.Link;
 /// Routing liveness probe for channel <c>link</c>: the dispatcher's contract
 /// is only "is there anywhere this can go". A live session means the pump owns
 /// the row via the DB ledger (materialize + claim + push, with redelivery);
-/// no session anywhere ⇒ false ⇒ Plan 02's no-route requeue-with-backoff
+/// no session anywhere ⇒ false ⇒ the no-route requeue-with-backoff
 /// applies unchanged. Ordering/redelivery/attempts for link rows live in
 /// <c>link_deliveries</c>, not the dispatcher.
 /// </summary>

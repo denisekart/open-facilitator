@@ -81,7 +81,7 @@ public sealed class ProviderOptions
     /// capability/endpoint instead of the global
     /// <see cref="AssignEndpointId"/>/<see cref="AssignCapabilityId"/> pair.
     /// A rule with a blank endpoint falls back to the global endpoint.
-    /// Interim routing until Plan 25 capability routing lands.</summary>
+    /// Interim routing until capability routing lands.</summary>
     public List<AssignRule> AssignRules { get; init; } = [];
 
     /// <summary>The completed-manifest arm of <c>ResultIngress</c> reads

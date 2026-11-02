@@ -55,10 +55,10 @@ export interface RunContext {
    */
   sessionRef?: string | undefined;
   /**
-   * Kernel byte-path surface (Plan 15): the configured origin plus the child
+   * Kernel byte-path surface: the configured origin plus the child
    * link token, which IS the workload credential (link-plane HTTP:
    * request_upload + PUT). Harnesses hand this to `createArtifactClient`.
-   * Required since the Plan 15 kill rule — every adapter carries a kernel.
+   * Required by the kill rule — every adapter carries a kernel.
    */
   readonly kernel: { readonly baseUrl: string; readonly token: string };
 }
@@ -100,12 +100,12 @@ export interface CreateAdapterOptions {
   restartBackoffMs?: readonly number[];
   logger?: LinkLogger;
   /**
-   * Kernel origin for the artifact byte path (Plan 15). `RunContext.kernel`
+   * Kernel origin for the artifact byte path. `RunContext.kernel`
    * surfaces it + the bearer for link-plane HTTP; `token` defaults to the
    * child token — pass the worker's separately enrolled KERNEL link token
    * when the Gateway-facing token is not one (e2e/example enroll role
    * `child`: the Gateway fleet secret does not validate kernel-side).
-   * Required since the Plan 15 kill rule: the file:// inline-manifest path
+   * Required by the kill rule: the file:// inline-manifest path
    * is retired, every adapter uploads through a kernel.
    */
   kernel: { readonly baseUrl: string; readonly token?: string };

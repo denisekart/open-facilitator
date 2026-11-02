@@ -33,7 +33,7 @@ public class DeadLetterTests(DispatchDbFixture fixture)
         // Cross-test isolation: a prior suite's link_sessions row stays live
         // until its DB lease expires (90 s default), and the global claim
         // would hand those link.* rows to the LinkSink (delivered > 0).
-        // Expire every lease first: link rows then answer no-route (Plan 02
+        // Expire every lease first: link rows then answer no-route (the
         // requeue, never a delivery) and only the poisoned kernel.log rows
         // burn attempts here.
         await fixture.Db.ExpireLinkLeases();

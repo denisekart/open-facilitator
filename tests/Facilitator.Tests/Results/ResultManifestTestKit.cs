@@ -41,7 +41,7 @@ internal static class ResultManifestTestKit
         {
             ["manifestId"] = manifestId,
             ["outputs"] = outputs ?? [],
-            ["notes"] = "plan 15 vertical",
+            ["notes"] = "result manifest vertical",
             ["createdAt"] = "2026-10-27T00:00:00Z",
         };
         if (structuredResult is not null)

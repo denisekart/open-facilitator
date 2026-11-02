@@ -1,6 +1,6 @@
-// Built-in handlers (Plan 04 locked decision): enough to run §26.1's
-// client-side items end-to-end without a harness. Plan 06's deterministic
-// worker replaces them; Plan 05 composes createEchoHandler/createStubHandler.
+// Built-in handlers (locked decision): enough to run §26.1's
+// client-side items end-to-end without a harness. The deterministic
+// worker replaces them; embedders compose createEchoHandler/createStubHandler.
 import type { EnvelopeCommand, WorkAssignCommandV1Data } from "@ofac/protocol";
 import { buildEvent } from "./envelope.js";
 import type { LinkHandler } from "./types.js";

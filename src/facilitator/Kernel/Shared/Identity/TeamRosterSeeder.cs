@@ -7,11 +7,10 @@ namespace Facilitator.Kernel.Shared.Identity;
 using LinkOptions = Facilitator.Kernel.Link.LinkOptions;
 
 /// <summary>
-/// Team roster seeder (Plan 10): <c>Link:Teams</c> slugs are inserted into
+/// Team roster seeder: <c>Link:Teams</c> slugs are inserted into
 /// <c>facilitator.teams</c> at startup when absent (the RoleStore
-/// "seed-when-row-absent" pattern — config bootstraps, DB is truth). Replaces
-/// the Plan 03 on-demand <c>default</c>-team seeding: enrolling with a team
-/// the roster lacks is a 403, never a silent new team. Idempotent under
+/// "seed-when-row-absent" pattern — config bootstraps, DB is truth). Enrolling
+/// with a team the roster lacks is a 403, never a silent new team. Idempotent under
 /// concurrent replicas via ON CONFLICT DO NOTHING on the unique slug index.
 /// </summary>
 public sealed class TeamRosterSeeder(

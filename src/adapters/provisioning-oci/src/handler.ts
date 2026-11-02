@@ -1,4 +1,4 @@
-// The provision command dispatcher (Plan 35 Phase C): the launcher executes
+// The provision command dispatcher: the launcher executes
 // `command.provision.start.v1` as docker create+start (pull first, bounded by
 // the envelope deadline) and `command.provision.stop.v1` as docker stop+rm of
 // EVERY container carrying the workload label. The reconcile-by-label law:

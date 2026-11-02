@@ -1,4 +1,4 @@
-// The memory capability against the in-process stub kernel (Plan 16):
+// The memory capability against the in-process stub kernel:
 // the retain command envelope is schema-valid with the required evidence
 // pointer, the receipt rides the ack `data`, recall parses the D8 response,
 // attest publishes the frozen `memory.used` data, the candidate builder

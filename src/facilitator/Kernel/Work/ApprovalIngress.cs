@@ -21,7 +21,7 @@ public sealed record ApprovalArm(ProblemDetails? Problem, string Status, string?
 }
 
 /// <summary>
-/// The approval-family arms shared by both ingress surfaces (Plan 11):
+/// The approval-family arms shared by both ingress surfaces:
 /// <c>approval.required</c> → record (recompute + compare the digest, law D2),
 /// <c>approval.revoked</c> → mark revoked (terminal rows are a no-op),
 /// <c>approval.respond</c> → decide through the ledger's conditional update
@@ -40,7 +40,7 @@ public sealed class ApprovalIngress(
 {
     /// <summary>Event-class arm: record a required / mark a revoked approval.
     /// <paramref name="requestedByEndpointId"/> is the Link endpoint that sent a required event
-    /// (Plan 12: decided-push addressing + consume authorization); null on the CloudEvent plane.</summary>
+    /// (decided-push addressing + consume authorization); null on the CloudEvent plane.</summary>
     public async Task<ApprovalArm> HandleEventAsync(
         JsonElement root, string type, string? requestedByEndpointId, CancellationToken ct)
     {
@@ -71,10 +71,10 @@ public sealed class ApprovalIngress(
     }
 
     /// <summary>
-    /// Command arm (Plan 12): a Link-plane workload (the Gateway that recorded the
+    /// Command arm: a Link-plane workload (the Gateway that recorded the
     /// approval) consumes an approved row before applying it (spec §12.1 step 5).
     /// Authorization is the ledger's caller-endpoint gate (row ownership), not a
-    /// human identity — a foreign or non-gateway caller sees 404/403 per the plan.
+    /// human identity — a foreign or non-gateway caller sees 404/403.
     /// </summary>
     public async Task<ApprovalArm> HandleConsumeAsync(
         JsonElement root, string callerEndpointId, bool callerIsGateway, CancellationToken ct)

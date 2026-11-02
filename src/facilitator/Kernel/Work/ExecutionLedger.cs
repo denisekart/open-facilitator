@@ -31,7 +31,7 @@ public enum FinalizeOutcome
 public sealed record FinalizeResult(FinalizeOutcome Outcome, ProblemDetails? Problem = null);
 
 /// <summary>
-/// The execution-attempt ledger law (Plan 35 B(3)/B(4)): an accepted
+/// The execution-attempt ledger law: an accepted
 /// <c>work.assign</c> receipt opens the attempt row (execution id = the
 /// delivery id — the link ledger's own identity for the execution) and walks
 /// the assignment <c>routed→accepted→running</c> through legal edges; a

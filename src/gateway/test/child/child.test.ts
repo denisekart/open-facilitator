@@ -46,7 +46,7 @@ function child(mode: "echo" | "stub" = "echo"): EmbeddedChild {
 const CHILD_ID = "gw.t/echo";
 
 describe("ChildMessage vocabulary", () => {
-  it("every message round-trips JSON (socket-compatible for Plan 06/07)", () => {
+  it("every message round-trips JSON (socket-compatible)", () => {
     const messages: ChildMessage[] = [
       { kind: "register", childWorkspaceId: CHILD_ID, manifest: builtinChildManifest("echo") },
       {
@@ -108,7 +108,7 @@ describe("EmbeddedChild echo mode", () => {
     });
   });
 
-  it("echo stamps the command's executionGeneration onto both events (Plan 35 fence)", async () => {
+  it("echo stamps the command's executionGeneration onto both events (generation fence)", async () => {
     const c = child("echo");
     const command = assignCommand();
     (command.data as Record<string, unknown>)["executionGeneration"] = 4;

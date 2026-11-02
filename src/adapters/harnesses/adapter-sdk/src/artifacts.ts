@@ -1,9 +1,9 @@
-// The artifact capability of `@ofac/adapter` (Plan 15): upload bytes to the
+// The artifact capability of `@ofac/adapter`: upload bytes to the
 // kernel over the link plane and build/complete a Result Manifest — so a
 // third-party harness gets spec §15.3's completion truth without touching
 // wire details (envelopes, tickets, canonicalization, the digest law).
 //
-// Credential law (as-built Plan 13/14): the CHILD LINK TOKEN IS the workload
+// Credential law (as-built): the CHILD LINK TOKEN IS the workload
 // credential. `POST {base}/api/link/v1/events` with a request_upload command
 // answers 202 with the upload ticket IN-BAND on `data`; the wire schema makes
 // `actorEvidenceRef` REQUIRED, so the client always rides a non-authoritative
@@ -174,7 +174,7 @@ async function safeBody(response: Response): Promise<string> {
 }
 
 /** One `outputs[]` entry: an `artifactRef` (common.v1.json) — the 7 frozen
- *  fields plus the Plan 15 optional `kind`/`classification` taxonomy labels. */
+ *  fields plus the optional `kind`/`classification` taxonomy labels. */
 export interface ResultManifestOutput {
   readonly artifactId: string;
   readonly mediaType: string;
@@ -272,7 +272,7 @@ export type CompletedEventContext = {
 };
 
 /**
- * The completed-event payload law (spec §15.3 + Plan 15 amendment): four
+ * The completed-event payload law (spec §15.3): four
  * frozen fields + the deprecated inline `{manifestId, outputs: []}` +
  * `resultManifestRef` (the uploaded manifest doc's logical URI) +
  * `resultDigest`. `ref` and `digest` ride together (schema if/then).

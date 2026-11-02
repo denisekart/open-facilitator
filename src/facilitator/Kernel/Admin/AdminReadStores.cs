@@ -147,7 +147,7 @@ public sealed record AdminApprovalRow(Guid ApprovalId, string State, string Acti
 /// <summary>Manifest row (artifact refs) on the work-detail surface.</summary>
 public sealed record AdminManifestRow(string ManifestId, int Revision, string? RevisionOf, string ResultState, string State, Guid ArtifactId, IReadOnlyList<string> OutputArtifactIds, DateTime RecordedAt);
 
-/// <summary>One provisioning_operations ledger row (Plan 35 C, GET
+/// <summary>One provisioning_operations ledger row (GET
 /// /api/admin/provisioning): the launcher ops the scale-law sweep appended.</summary>
 public sealed record AdminProvisioningRow(
     string OperationId,
@@ -163,7 +163,7 @@ public sealed record AdminProvisioningRow(
     DateTime UpdatedAt);
 
 /// <summary>
-/// The admin read models (Plan 20, spec §17.2): bounded <c>GroupBy</c> counts
+/// The admin read models (spec §17.2): bounded <c>GroupBy</c> counts
 /// and <c>Take</c>-limited projections over the existing ledgers — one
 /// round-trip per section, the <c>EfCoordinationStore.TimelineAsync</c>
 /// pattern. Stale gateways collapse into offline (the sweeper deletes expired
@@ -436,7 +436,7 @@ public sealed class AdminReadStores(
         return items.OrderByDescending(i => i.UpdatedAt).Take(take).ToList();
     }
 
-    /// <summary>Newest provisioning ops (Plan 35 C): the scale-law ledger,
+    /// <summary>Newest provisioning ops: the scale-law ledger,
     /// newest-100, camelCase via the ASP.NET defaults.</summary>
     public async Task<IReadOnlyList<AdminProvisioningRow>> ProvisioningAsync(CancellationToken ct)
     {
@@ -450,7 +450,7 @@ public sealed class AdminReadStores(
             .ToListAsync(ct);
     }
 
-    /// <summary>Per-replica fleet view (Plan 35 D): live link-session leases
+    /// <summary>Per-replica fleet view: live link-session leases
     /// grouped by the replica that stamps them, plus how many of those
     /// endpoints THIS replica actually holds a socket for (the honest
     /// answer-identity read: a stale ReplicaId on a lease means a dead

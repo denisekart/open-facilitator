@@ -20,7 +20,7 @@ public readonly record struct OidcVerifyResult(JsonElement? Payload, JsonWebToke
 }
 
 /// <summary>
-/// Shared workload/OIDC JWT verifier (Plan 10): signature via realm JWKS
+/// Shared workload/OIDC JWT verifier: signature via realm JWKS
 /// (one cached <see cref="ConfigurationManager{OpenIdConnectConfiguration}"/>
 /// per issuer, refreshed per its own bounded lifetime policy), algorithms
 /// pinned to <see cref="IdentityAuthentication.ValidAlgorithms"/>, issuer ∈

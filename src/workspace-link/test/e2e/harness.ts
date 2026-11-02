@@ -1,4 +1,4 @@
-// Shared E2E harness (Plan 04 step 6). Each e2e file gets its OWN Facilitator
+// Shared E2E harness. Each e2e file gets its OWN Facilitator
 // process + its OWN Postgres database: tests are fully isolated, and the
 // in-flight lease can be shortened (Link__InFlightLeaseSeconds=2) without
 // racing other files. Skips cleanly when FACILITATOR_PG is unset.
@@ -82,7 +82,7 @@ export async function workloadToken(): Promise<string> {
 }
 
 /**
- * Plan 12: a HUMAN bearer — password grant on the public `facilitator-api`
+ * A HUMAN bearer — password grant on the public `facilitator-api`
  * client (alice = framework-admin + team-alpha group, bob = team-beta only).
  * Proves the respond path acts with a real user principal (groups included).
  */
@@ -103,7 +103,7 @@ export async function userToken(username: string, password: string): Promise<str
 }
 
 /**
- * Plan 12: a delegated-action evidence token — password grant on
+ * A delegated-action evidence token — password grant on
  * `ofac-evidence`, whose mappers stamp `delegation: true` + groups + the
  * facilitator-api audience. The Gateway verifies an `oidc:<jwt>`
  * actorEvidenceRef against exactly this shape (§11).
@@ -347,7 +347,7 @@ export async function seedDelivery(
   return (response.body as { outboxId: string }).outboxId;
 }
 
-/** Durable delivery rows (Plan 20: /api/admin/deliveries replaced the
+/** Durable delivery rows (/api/admin/deliveries replaced the
  * in-memory dev ledger AND /api/dead-letters; link acks land there too,
  * LinkHub.AckAsync). deliveryId = the durable row id. */
 export async function kernelDeliveries(baseUrl: string): Promise<{ deliveryId: string }[]> {
@@ -562,7 +562,7 @@ export interface SdkClient {
 
 /**
  * Enroll (or reuse a token) → POST capabilities → build a started SDK client
- * over SignalR by default. The manifest's ownerTeam is `default`: Plan 03's
+ * over SignalR by default. The manifest's ownerTeam is `default`: the
  * enrollment store binds every enrollment to the seeded `default` team, and
  * POST /capabilities rejects a manifest whose ownerTeam differs.
  */

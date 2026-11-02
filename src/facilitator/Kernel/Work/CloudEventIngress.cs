@@ -129,7 +129,7 @@ public sealed class CloudEventIngress(
 
             if (type == MemoryIngress.CandidateType || type == MemoryIngress.UsedType)
             {
-                // Plan 16: the frozen memory events on the CE plane run the
+                // The frozen memory events on the CE plane run the
                 // same arms; no AdmissionGate exists here, so the command's
                 // actorEvidenceRef law does not apply to events (they never
                 // carried one) — the workload context is absent, the broker
@@ -204,7 +204,7 @@ public sealed class CloudEventIngress(
                 () => Results.Accepted(null, new { status = arm.Status, inboxId, data = arm.Data }));
         }
 
-        // Known command with no Plan 02 business effect: processed + a
+        // Known command with no business effect: processed + a
         // typed timeline note (not silent), when the work is known.
         if (workId is not null)
         {

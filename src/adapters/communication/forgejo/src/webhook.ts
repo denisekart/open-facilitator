@@ -1,4 +1,4 @@
-// The webhook edge (Plan 23 decision 6): verify the HMAC over the RAW bytes
+// The webhook edge (decision 6): verify the HMAC over the RAW bytes
 // BEFORE any parsing — `X-Forgejo-Signature` / `X-Gitea-Signature` carry the
 // bare hex HMAC-SHA256 (step 0: the Gitea-family form, NO `sha256=` prefix),
 // and the GitHub-compatible `X-Hub-Signature-256: sha256=<hex>` copy is also

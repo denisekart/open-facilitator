@@ -68,7 +68,7 @@ public sealed class LinkIngress(
 
         if (ProviderEventClass.IsProviderClass(screen.Type))
         {
-            // Plan 22 provider plane: the store owns ONE transaction for
+            // Provider plane: the store owns ONE transaction for
             // provider_events + inbox + arm effects, so it takes the envelope
             // before the shared dedupe insert (its own (provider, delivery-id)
             // dedupe spine answers duplicate with the saved judgment). The gate
@@ -95,7 +95,7 @@ public sealed class LinkIngress(
                 ticketData = live is null ? null : Facilitator.Kernel.Work.ArtifactEndpoints.Ticket(live);
             }
 
-            // Plan 16 law: a duplicate retain re-runs the idempotent broker
+            // Duplicate memory commands: a duplicate retain re-runs the idempotent broker
             // path (content-hash dedupe returns the stored identity +
             // duplicate:true); a duplicate recall re-runs (a recall is a read
             // whose usage rows are per-delivery by design).
@@ -144,10 +144,10 @@ public sealed class LinkIngress(
             if (screen.Type == Facilitator.Kernel.Work.ResultIngress.CompletedType
                 || screen.Type == Facilitator.Kernel.Work.ResultIngress.FailedType)
             {
-                // Plan 15: a completed event carrying a manifest ref records
+                // A completed event carrying a manifest ref records
                 // the manifest; a refusal settles the inbox with the refused
-                // status, mirroring the artifact.available arm. Plan 35 B:
-                // both terminal event classes run the fence + finalize arm
+                // status, mirroring the artifact.available arm. Both terminal
+                // event classes run the fence + finalize arm
                 // (failed has no manifest).
                 var arm = screen.Type == Facilitator.Kernel.Work.ResultIngress.CompletedType
                     ? await results.HandleCompletedAsync(root, screen.Principal, ct)
@@ -166,7 +166,7 @@ public sealed class LinkIngress(
             if (screen.Type == Facilitator.Kernel.Work.MemoryIngress.CandidateType
                 || screen.Type == Facilitator.Kernel.Work.MemoryIngress.UsedType)
             {
-                // Plan 16: the frozen memory events record their ledger effect;
+                // The frozen memory events record their ledger effect;
                 // a refusal settles the inbox with the refused status, mirroring
                 // the manifest arm. Memory outages never refuse (accepted path).
                 // Events carry no evidence, so the authority is the enrolled
@@ -212,7 +212,7 @@ public sealed class LinkIngress(
 
         if (screen.Type == "org.facilitator.command.approval.consume.v1")
         {
-            // Plan 12: the Gateway that recorded the approval consumes it
+            // The Gateway that recorded the approval consumes it
             // before applying; the ledger gates on row ownership (a foreign
             // endpoint sees 404), non-gateway roles deny 403.
             var arm = await approvals.HandleConsumeAsync(
@@ -265,7 +265,7 @@ public sealed class LinkIngress(
         if (screen.Type == Facilitator.Kernel.Work.MemoryIngress.RetainType
             || screen.Type == Facilitator.Kernel.Work.MemoryIngress.RecallType)
         {
-            // Plan 16 D1: the retain receipt / recall response ride the ack
+            // The retain receipt / recall response ride the ack
             // in-band (the request_upload ticket precedent).
             var arm = screen.Type == Facilitator.Kernel.Work.MemoryIngress.RetainType
                 ? await memory.HandleRetainAsync(root, screen.Principal, ct)

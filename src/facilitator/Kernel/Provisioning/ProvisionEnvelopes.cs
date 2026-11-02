@@ -3,7 +3,7 @@ using System.Text.Json.Nodes;
 namespace Facilitator.Kernel.Provisioning;
 
 /// <summary>
-/// Kernel→launcher command envelopes (Plan 35 C): the full CloudEvents
+/// Kernel→launcher command envelopes: the full CloudEvents
 /// envelope for <c>org.facilitator.command.provision.start.v1</c> /
 /// <c>.stop.v1</c> (dataschema per the wire, subject <c>workload/&lt;id&gt;</c>,
 /// source <c>urn:facilitator:instance:&lt;Kernel:ReplicaId&gt;</c> — this

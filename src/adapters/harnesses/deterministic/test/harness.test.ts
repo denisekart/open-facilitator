@@ -1,5 +1,5 @@
 // The deterministic script driven in-process: a fake RunContext (no
-// sockets), the SDK's stub kernel (Plan 15: the completion path uploads
+// sockets), the SDK's stub kernel (the completion path uploads
 // report + manifest and completes with ref+digest), createMemoryLogger,
 // stepMs=1 — asserting the locked report structure, steer recording ORDER,
 // the cancel law (no terminal publish), schema-valid completed payloads,

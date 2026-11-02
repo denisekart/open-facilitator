@@ -1,4 +1,4 @@
-// E2E connector tier (Plan 23 step 4): the REAL forgejo-connector binary as
+// E2E connector tier: the REAL forgejo-connector binary as
 // a fleet child of a live Gateway + Facilitator, against a fake forge
 // (in-process HTTP). Proves the decision-5 loop end-to-end: a confirm-scoped
 // `vcs.change_request.create` assign rides the kernel to the Gateway, the human
@@ -83,7 +83,7 @@ function connectorReady(child: ChildProcess): Promise<string> {
   });
 }
 
-describe.skipIf(!E2E)("forgejo connector approval e2e (Plan 23)", () => {
+describe.skipIf(!E2E)("forgejo connector approval e2e", () => {
   const harness: Harness = useFacilitator();
   let forge: FakeForge;
   let gw: GatewayHandleConfig;

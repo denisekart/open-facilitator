@@ -1,10 +1,10 @@
-// The shared approval action digest (appendix §7.1–7.2, Plan 11 law D2):
+// The shared approval action digest (appendix §7.1–7.2, law D2):
 // SHA-256 over the RFC 8785 canonical form of the approval record
 // {approvalId, action, eligibleActors, expiresAt, createdAt}, rendered
 // "sha256:<64 hex>". Byte-for-byte the mirror of the kernel's
 // Kernel/Shared/ApprovalDigest.cs; both harnesses cross-check against
 // protocol/conformance-fixtures/canonical/approval-record-1.sha256.
-// Producers (Plan 12's Gateway) compute the declared `actionDigest` with
+// Producers (the Gateway) compute the declared `actionDigest` with
 // this helper; the kernel recomputes and compares.
 import { createHash } from "node:crypto";
 
@@ -36,7 +36,7 @@ export function computeActionDigest(record: ApprovalDigestRecord): string {
 }
 
 /**
- * The Result Manifest digest (Plan 15, spec §15.3): SHA-256 over the
+ * The Result Manifest digest (spec §15.3): SHA-256 over the
  * RFC 8785 canonical form of the manifest document, NFC-normalized — the
  * same law as `computeActionDigest` over a different document. Producers
  * serialize the manifest WITH `canonicalizeManifest` so the stored bytes

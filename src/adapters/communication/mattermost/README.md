@@ -1,6 +1,6 @@
 # Mattermost communication adapter (`@ofac/mattermost-adapter`)
 
-Plan 22's first communication adapter: a thin bridge between a Mattermost
+The first communication adapter: a thin bridge between a Mattermost
 server (Team Edition 11.11) and the Facilitator kernel. It is **just another
 integration on the link plane** — it enrolls as a link endpoint
 (`role: child`, secret mode), advertises the `command.communication.*`
@@ -17,7 +17,7 @@ kernel ──(link delivery: command.communication.{reply,react,update,acknowled
 
 Mattermost 11.11 webhooks carry **no signing secret** (custom webhooks sign,
 but outgoing webhooks — the event-carrying form — only ship a plaintext
-token; and the payload lacks `root_id`). So the adapter takes the plan's
+token; and the payload lacks `root_id`). So the adapter takes the
 contingency as the primary form: it connects to
 `GET <MATTERMOST_URL>/api/v4/websocket` **as the bot** and consumes the
 event stream its memberships entitle it to. Live 11.11 handshake law: the
@@ -91,7 +91,7 @@ Exit codes: 0 clean · 1 runtime · 2 config error. The bot needs channel
 membership for whatever conversations it should see; DMs with the bot always
 arrive.
 
-## Layout (Plan 31 SDK-extraction seams)
+## Layout (SDK-extraction seams)
 
 `config.ts` env law · `normalize.ts` pure classification (no I/O) ·
 `mm-client.ts` provider REST (`MattermostApi` interface = test seam) ·

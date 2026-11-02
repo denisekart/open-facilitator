@@ -8,7 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Facilitator.Tests.Work;
 
 /// <summary>
-/// Plan 35 B §5.3 bounded-nudge law on a fake clock: no policy row means no
+/// The §5.3 bounded-nudge law on a fake clock: no policy row means no
 /// nudging; a stale + online lane earns exactly one command.work.nudge.v1 per
 /// pass until the per-episode cap of three spends the budget; fresh activity
 /// (an acked delivery) keeps the lane alive; an endpoint without a live
@@ -125,7 +125,7 @@ public sealed class NudgeSweeperTests(PostgresFixture fixture)
     [Fact]
     public async Task PeerHoldsSweepLock_PassSkipsSilently()
     {
-        // Plan 35 D: two replicas sweep the same fleet; the advisory lock
+        // N-replica law: two replicas sweep the same fleet; the advisory lock
         // makes a concurrent pass a silent skip, not a race or an error.
         using var factory = await Host();
         await fixture.Db.SeedAdminConfig(Policy, PolicyPayload);

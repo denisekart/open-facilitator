@@ -1,6 +1,6 @@
 // The durable local delivery ledger seam. SQLite implementation in `"./node"`;
-// an in-memory implementation ships in core so consumers (and Plan 05's
-// in-process harness) can run the client without a file. Law (S:301): the
+// an in-memory implementation ships in core so consumers (and in-process
+// harnesses) can run the client without a file. Law (S:301): the
 // inbox row is persisted BEFORE the `accepted` receipt leaves the client.
 export type LedgerState = "received" | "processed" | "failed" | "unsupported";
 

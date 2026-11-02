@@ -4,11 +4,11 @@
 // modes POST on child churn, never at boot) → ledgers → transport → gateway
 // handler → child listener (shared|standalone; bound BEFORE the link session
 // opens so a command the kernel pushes on session-open meets its child, not
-// a boot-window `child-disconnected`: the plan 24 restart leg's re-hydrated
+// a boot-window `child-disconnected`: a restart leg's re-hydrated
 // assign must never die in that window) → start() → first welcome ⇒
 // RECONCILE (§6.3) → ready line → heartbeats.
 //
-// Stamp law (Plan 35 B(4)): a binding row pins TWO generations —
+// Stamp law: a binding row pins TWO generations —
 // connectionGeneration is the leaseEpoch of the session that accepted the
 // command (the S:329 freshness fence: a frame recorded under a dead
 // connection is not forwarded), executionGeneration is the assign
@@ -122,7 +122,7 @@ export interface GatewayStatus {
   reconciled: boolean;
   session?: { leaseEpoch: number; sessionId: string; state: string } | undefined;
   executions: { running: number; completed: number; failed: number; lost: number };
-  /** Plan 12: confirm-held assignments awaiting a decision (incl. consumed-executing). */
+  /** Confirm-held assignments awaiting a decision (incl. consumed-executing). */
   awaitingApproval: number;
   bindings: {
     assignmentId: string;
@@ -217,7 +217,7 @@ export class GatewayRuntime {
   private heartbeatTimer: ReturnType<typeof setInterval> | undefined;
   private unionTimer: ReturnType<typeof setTimeout> | undefined;
   private tokenProvider: LinkTokenProvider | null = null;
-  /** Plan 12 reconcile polling: the OIDC CC provider (undefined ⇒ no REST plane). */
+  /** Reconcile polling: the OIDC CC provider (undefined ⇒ no REST plane). */
   private workloadToken: LinkTokenProvider | null = null;
   /** Digest of the manifest bytes the kernel last accepted (hello carries it). */
   private currentDigest: string;
@@ -252,7 +252,7 @@ export class GatewayRuntime {
       this.embedded = null;
       this.childWorkspaceId = "";
     }
-    // Plan 12: a configured policy file boots or aborts (malformed ⇒ throw);
+    // A configured policy file boots or aborts (malformed ⇒ throw);
     // no file ⇒ today's DefaultPolicy plus one loud warning at start().
     this.loadedPolicy =
       deps.policy === undefined && config.policy !== undefined
@@ -597,7 +597,7 @@ export class GatewayRuntime {
       config.workload === undefined
         ? undefined
         : oidcClientCredentialsTokenProvider(config.workload, deps.fetchImpl ?? fetch);
-    // Plan 12: reconcile polls the kernel REST plane with the SAME workload
+    // Reconcile polls the kernel REST plane with the SAME workload
     // credential (audience facilitator-api via the realm's audience mapper).
     this.workloadToken = workload ?? null;
     const refresh = async (): Promise<void> => {
@@ -691,7 +691,7 @@ export class GatewayRuntime {
       // but a child mid-boot (kernel pushes on session-open, a socket child
       // dials ~100 ms later) gets one bounded hold first, so a re-hydrated
       // assign landing in that window is EXECUTED, not killed by a receipt
-      // the kernel would lawfully ack as terminal (plan 24 restart law).
+      // the kernel would lawfully ack as terminal (restart law).
       if (
         !(await this.fleet.waitUntilOnline(
           route.childId,
@@ -789,7 +789,7 @@ export class GatewayRuntime {
     const data = cmd.data as unknown as WorkCancelCommandV1Data;
     const row = this.paths.execution.byAssignment(data.assignmentId);
     if (row === null || row.state !== "running") {
-      // Plan 12: a confirm-held assignment has no binding row yet — cancel
+      // A confirm-held assignment has no binding row yet — cancel
       // revokes the approval, steer has nothing mid-flight to steer.
       const pending = this.paths.execution.pendingByAssignment(data.assignmentId);
       if (pending !== null && pending.state === "awaiting-approval") {
@@ -846,7 +846,7 @@ export class GatewayRuntime {
     return childOutcome(reply);
   }
 
-  // ── policy decision plumbing (Plan 12) ───────────────────────────────────
+  // ── policy decision plumbing ───────────────────────────────────
 
   /**
    * The whole resource-derivation law (§12): the connector-supplied
@@ -922,7 +922,7 @@ export class GatewayRuntime {
     });
   }
 
-  // ── approval lifecycle (Plan 12) ─────────────────────────────────────────
+  // ── approval lifecycle ─────────────────────────────────────────
 
   /**
    * Confirm hold (spec §12.1): mint the approval, park a pending row BEFORE
@@ -1486,7 +1486,7 @@ export class GatewayRuntime {
     }
     const decision = this.decideEvent(env, source.childId);
     if (decision.verdict !== "allow") {
-      // Plan 12: the silent drop gains its audit line.
+      // The silent drop gains its audit line.
       this.audit(decision, `event-${decision.verdict}`);
       return;
     }

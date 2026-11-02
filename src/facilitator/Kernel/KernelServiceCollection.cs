@@ -161,7 +161,7 @@ public static class KernelServiceCollection
         builder.Services.AddScoped<IApprovalLedger, ApprovalLedger>();
         builder.Services.AddHostedService<TeamRosterSeeder>();
 
-        // Horizontal replicas (Plan 35 D): a configured Kernel:ReplicaId that
+        // Horizontal replicas: a configured Kernel:ReplicaId that
         // a live peer already stamps on advancing leases is a fail-closed
         // startup refusal, not a runtime surprise.
         builder.Services.AddHostedService<ReplicaIdentityCheck>();
@@ -191,7 +191,7 @@ public static class KernelServiceCollection
         builder.Services.AddSingleton<Work.NudgeSweeper>();
         builder.Services.AddHostedService(sp => sp.GetRequiredService<Work.NudgeSweeper>());
 
-        // The session-loss law (Plan 35 C): per-replica loop; per-execution
+        // The session-loss law: per-replica loop; per-execution
         // hysteresis keeps a blip from failing anything, the inbox unique
         // keeps replicas converging on one failed event.
         builder.Services.AddSingleton(
@@ -233,7 +233,7 @@ public static class KernelServiceCollection
         return builder;
     }
 
-    /// <summary>Memory broker (Plan 16): options (fail-closed provider check), the provider port, the broker.</summary>
+    /// <summary>Memory broker: options (fail-closed provider check), the provider port, the broker.</summary>
     private static WebApplicationBuilder AddMemoryFeature(this WebApplicationBuilder builder)
     {
         var memory = builder.Configuration.GetSection(MemoryOptions.SectionName).Get<MemoryOptions>() ?? new MemoryOptions();
@@ -253,7 +253,7 @@ public static class KernelServiceCollection
     }
 
     /// <summary>
-    /// Provider ingest plane (Plan 22, widened by Plan 23 decision 1): the
+    /// Provider ingest plane (widened by the forgejo decision 1): the
     /// <c>Providers</c> registry is registered ALWAYS — an empty registry on
     /// slim composition (the admission gate + completion hook read it); the
     /// store + ingress arms + human-plane routes exist only when at least one

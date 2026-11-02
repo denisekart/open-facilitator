@@ -8,7 +8,7 @@ using Microsoft.Extensions.Configuration;
 namespace Facilitator.Tests.Identity;
 
 /// <summary>
-/// Golden cases for the framework-free core (plan 09 step 3): role = OR-list
+/// Golden cases for the framework-free core: role = OR-list
 /// of AND-rules over arbitrary claim pointers; malformed/missing ⇒ no roles,
 /// never wildcard.
 /// </summary>

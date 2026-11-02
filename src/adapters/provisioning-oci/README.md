@@ -1,6 +1,6 @@
 # @ofac/provisioning-oci
 
-Local OCI provisioning launcher (Plan 35 Phase C): one Node process that is a
+Local OCI provisioning launcher: one Node process that is a
 link-plane endpoint (enroll → capabilities → SignalR, the forgejo-adapter
 shape) and executes the kernel's provisioning decisions against the **local
 Docker Engine socket** — so a killed/idle worker container auto-relaunches and

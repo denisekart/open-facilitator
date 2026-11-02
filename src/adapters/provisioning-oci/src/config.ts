@@ -1,4 +1,4 @@
-// Launcher config (Plan 35 Phase C): YAML file (the connector's worker-law:
+// Launcher config: YAML file (the connector's worker-law:
 // unknown keys rejected by name, every error names its key) + env overlay —
 // env wins, so compose can pin anything the file says. Every key names its
 // consumer; missing required keys fail closed with a named error, never a

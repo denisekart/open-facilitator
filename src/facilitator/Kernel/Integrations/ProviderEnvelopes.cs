@@ -7,16 +7,16 @@ namespace Facilitator.Kernel.Integrations;
 /// <summary>
 /// Kernel-emitted envelopes for the provider plane: the work.progress note,
 /// the decision-7 interim <c>work.assign</c> (the seed-lib SQL pattern —
-/// capability targeting to a named link endpoint until Plan 25 routing), and
-/// the 24(1b) <c>work.steer</c> delivery to the owning gateway. Every
-/// envelope passes <c>EnvelopeValidator</c> at insert (Plan 02 law).
+/// capability targeting to a named link endpoint until capability routing), and
+/// the <c>work.steer</c> delivery to the owning gateway. Every
+/// envelope passes <c>EnvelopeValidator</c> at insert.
 /// </summary>
 public static class ProviderEnvelopes
 {
     /// <summary>Interim deadline: one day (no routing negotiation yet).</summary>
     public static readonly TimeSpan AssignDeadline = TimeSpan.FromDays(1);
 
-    /// <summary>The plan-consistent progress note (kernel source, assignmentId "kernel").</summary>
+    /// <summary>The wire-consistent progress note (kernel source, assignmentId "kernel").</summary>
     public static JsonObject Progress(Guid workId, string note, DateTime now)
     {
         var envelope = EnvelopeFactory.WorkProgress(workId, note, causationId: null);
@@ -106,7 +106,7 @@ public static class ProviderEnvelopes
             },
         };
 
-    /// <summary>Kernel→connector dispatch (Plan 24 1d): a manifest-declared
+    /// <summary>Kernel→connector dispatch: a manifest-declared
     /// provider operation rides a plain <c>work.assign</c> to the owning
     /// gateway, where the team's policy routes the op capability to its
     /// connector unit. Opaque inputs; deliverable kind names the intent.</summary>
@@ -143,7 +143,7 @@ public static class ProviderEnvelopes
             },
         };
 
-    /// <summary>Plan 35 B(5): the bounded nudge (§6.4) — an informational
+    /// <summary>The bounded nudge (§6.4) — an informational
     /// command to the owning gateway; it never re-runs tools and never
     /// escalates authority. Command id <c>nudge:&lt;assignmentId&gt;:&lt;generation&gt;:&lt;episode&gt;</c>
     /// makes one nudge per stall episode single-shot on the outbox ledger.</summary>

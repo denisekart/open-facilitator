@@ -1,4 +1,4 @@
-// OIDC client-credentials token provider (plan 10, mode-(b) enrollment):
+// OIDC client-credentials token provider (mode-(b) enrollment):
 // mints workload tokens straight from the IdP's token endpoint. Enrollment
 // only — the kernel answers with an opaque rotating link token, so runtime
 // traffic never carries these. Implements LinkTokenProvider so a caller can

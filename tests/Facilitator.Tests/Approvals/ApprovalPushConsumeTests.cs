@@ -12,7 +12,7 @@ using Ofac.Protocol.Validation;
 namespace Facilitator.Tests.Approvals;
 
 /// <summary>
-/// Plan 12 kernel wire delta: the Link-plane consume command (row-ownership
+/// Kernel wire delta for approvals: the Link-plane consume command (row-ownership
 /// gate, role gate, single-use 409s) and the decided-push (every terminal
 /// transition enqueues ONE <c>link.&lt;endpoint&gt;</c> outbox row with a
 /// contract-valid <c>approval.decided</c> envelope, atomically with the flip;

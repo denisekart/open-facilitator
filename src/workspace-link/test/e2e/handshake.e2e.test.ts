@@ -1,7 +1,7 @@
-// E2E 1 — handshake (plan step 6 item 1). enroll → capabilities POST →
+// E2E 1 — handshake. enroll → capabilities POST →
 // hello ⇒ welcome; capabilities GET returns the stored manifest; a
 // superseding hello over a LIVE session row bumps the epoch (law pinned in
-// harness.ts). Divergence from the plan wording ("reconnect ⇒ leaseEpoch:2"):
+// harness.ts). Divergence from the original wording ("reconnect ⇒ leaseEpoch:2"):
 // the bump happens on ANY hello over a live row — proven here by client B —
 // while the first hello after a graceful goodbye re-INSERTs and restarts at 1.
 import { describe, expect, it } from "vitest";

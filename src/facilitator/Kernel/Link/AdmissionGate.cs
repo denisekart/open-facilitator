@@ -21,7 +21,7 @@ namespace Facilitator.Kernel.Link;
 /// <param name="Type">Envelope <c>type</c> (empty when absent/non-string).</param>
 /// <param name="IsCommand">Type is a command-class CloudEvent.</param>
 /// <param name="CommandId"><c>data.commandId</c> for commands.</param>
-/// <param name="Principal">The authority admitted commands act under (plan 10 audit actor).</param>
+/// <param name="Principal">The authority admitted commands act under (the audit actor).</param>
 public sealed record AdmissionVerdict(ProblemDetails? Problem, JsonElement Root, string Type, bool IsCommand, string? CommandId, EffectivePrincipal? Principal = null);
 
 /// <summary>
@@ -29,7 +29,7 @@ public sealed record AdmissionVerdict(ProblemDetails? Problem, JsonElement Root,
 /// method and <c>POST /api/link/v1/events</c> via <see cref="LinkIngress"/>:
 /// size gate → parse → receipt-class refusal → envelope validation →
 /// known-command gate → assign-forbidden → evidence evaluation +
-/// <c>authorization.evaluated:link</c> audit (commands only, plan 10).
+/// <c>authorization.evaluated:link</c> audit (commands only).
 /// Fail-closed refusals persist their failed audit inbox row (S:305) here;
 /// an <c>oidc:</c>/<c>kernel:</c> ref that fails validation denies admission
 /// (422 <c>evidence-invalid</c>), any other scheme records a non-authoritative

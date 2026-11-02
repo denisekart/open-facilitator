@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Facilitator.Kernel.Shared.Persistence.Configurations;
 
-/// <summary>facilitator.memory_shares (Plan 16).</summary>
+/// <summary>facilitator.memory_shares.</summary>
 public sealed class MemoryShareEntityConfiguration : IEntityTypeConfiguration<MemoryShareEntity>
 {
     /// <inheritdoc />

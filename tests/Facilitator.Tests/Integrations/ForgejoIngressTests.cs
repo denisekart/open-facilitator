@@ -8,7 +8,7 @@ using System.Text.Json.Nodes;
 namespace Facilitator.Tests.Integrations;
 
 /// <summary>
-/// Plan 23 forgejo arms over the link HTTP path on the registry-based plane:
+/// Forgejo arms over the link HTTP path on the registry-based plane:
 /// a labeled issue (workTrigger true) creates exactly one bound Work — the
 /// redelivery answers <c>duplicate</c> with the stored judgment and zero new
 /// rows; an unbound unlabeled event makes no Work; a comment on a bound issue

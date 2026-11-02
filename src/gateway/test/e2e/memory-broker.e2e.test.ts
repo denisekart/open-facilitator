@@ -1,4 +1,4 @@
-// Memory broker e2e (Plan 16): a fake-link workload retains a project memory
+// Memory broker e2e: a fake-link workload retains a project memory
 // for team-alpha through the Link plane (alice-delegated evidence), a
 // synthetic candidate event lands on the same work's lineage, the foreign team
 // (bob) sees nothing until alice's share — then recalls the entry with its

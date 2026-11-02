@@ -1,4 +1,4 @@
-// Policy audit lines (Plan 12 Step 4, spec §12.2). One structured info line
+// Policy audit lines (spec §12.2). One structured info line
 // per authorization decision the Gateway makes; the kernel-side counterpart
 // (facilitator.audit rows, action `authorization.evaluated:approval`) is
 // unchanged — this is the Gateway mirror. Long-lived tokens NEVER ride the

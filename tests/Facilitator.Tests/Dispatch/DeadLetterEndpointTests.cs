@@ -9,7 +9,7 @@ namespace Facilitator.Tests.Dispatch;
 /// <summary>
 /// appendix §5.6 (A:157): dead-lettered rows become visible on
 /// GET /api/admin/deliveries?state=dead_letter (identity-gated, admin.read)
-/// with reason, newest first (Plan 20 replaced GET /api/dead-letters; the
+/// with reason, newest first (this route replaced GET /api/dead-letters; the
 /// envelope round-trip is proven by the replay test — AdminSurfaceTests).
 /// </summary>
 [Collection("postgres:dispatch-link")]

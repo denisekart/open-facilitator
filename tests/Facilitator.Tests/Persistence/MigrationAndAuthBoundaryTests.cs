@@ -9,7 +9,7 @@ namespace Facilitator.Tests.Persistence;
 /// <summary>
 /// The AddLinkServer migration ships its tables, the LinkSink registers on the
 /// dispatcher's channel table, and the identity gate's path exclusion leaks
-/// nowhere: /api/works keeps behaving exactly as Plan 02 proved, while
+/// nowhere: /api/works keeps behaving exactly as the ingress/dispatch suite proved, while
 /// the link surface answers 401 for missing/unknown link tokens.
 /// </summary>
 [Collection("postgres:persistence")]

@@ -119,7 +119,7 @@ public sealed record MemoryEntryView(
     long UsageCount);
 
 /// <summary>
-/// The memory broker (Plan 16, spec §14.3): the only writer of the memory
+/// The memory broker (spec §14.3): the only writer of the memory
 /// tables and the only authorizer. Access context is built server-side from a
 /// verified principal — a selector in a payload is a hint, a
 /// <c>callerPrincipal</c> in a payload cannot exist (schema-rejected). Every
@@ -837,7 +837,7 @@ public sealed class MemoryBroker(
             .Select(p => new { p.ProjectId, Team = p.Team!.Slug })
             .FirstOrDefaultAsync(ct) is { } row ? (row.ProjectId, row.Team) : null;
 
-    /// <summary>D7: per-Project policy rides <c>projects.config</c> jsonb key <c>memory</c> (Plan 14's carrier law); work scopes read <c>workCandidateDays</c>, project scopes <c>candidateDays</c>.</summary>
+    /// <summary>D7: per-Project policy rides <c>projects.config</c> jsonb key <c>memory</c> (the carrier law); work scopes read <c>workCandidateDays</c>, project scopes <c>candidateDays</c>.</summary>
     private async Task<int?> ProjectRetentionDaysAsync(FacilitatorDbContext db, Guid? projectId, string kind, CancellationToken ct)
     {
         if (projectId is not { } id)

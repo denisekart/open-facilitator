@@ -9,8 +9,8 @@ public sealed record DelegatedIdentity(string Subject, IReadOnlyList<string> Gro
 
 /// <summary>
 /// The authority an admitted command acts under: always the workload
-/// principal, optionally extended by a validated human delegation. Plan 12's
-/// policy engine authorizes against this; the audit row records the outcome.
+/// principal, optionally extended by a validated human delegation. The policy
+/// engine authorizes against this; the audit row records the outcome.
 /// </summary>
 /// <param name="Workload">The authenticated link endpoint's principal.</param>
 /// <param name="Delegated">Validated human delegation, when evidence was Valid AND the enrollment accepts it.</param>

@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Facilitator.Kernel.Shared.Persistence.Configurations;
 
-/// <summary>facilitator.provider_identities (Plan 22, §11.1): the unique
+/// <summary>facilitator.provider_identities (spec §11.1): the unique
 /// (provider, tenant, account) key is the mapping identity — redemption upserts.</summary>
 public sealed class ProviderIdentityEntityConfiguration : IEntityTypeConfiguration<ProviderIdentityEntity>
 {

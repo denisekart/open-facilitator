@@ -74,7 +74,7 @@ public sealed class RoutingSink(
                 .Select(t => t.Slug).FirstOrDefaultAsync(ct)
             : null;
 
-        // The DAG gate (Plan 35 B): an assign whose siblings haven't released
+        // The DAG gate: an assign whose siblings haven't released
         // it requeues with the dispatcher's backoff (never dead-letters) —
         // a sibling's terminal/validated/approved event pulls it forward
         // under the wake law. Audit-first so the pending basis is truthful.
@@ -303,7 +303,7 @@ public sealed class RoutingSink(
     {
         // The DAG-visible identity: derived from the effect command id, so a
         // create that wrote sibling dependencies into `depends_on` before any
-        // funnel ran joins onto exactly this assignment (Plan 35 B(1)).
+        // funnel ran joins onto exactly this assignment.
         var assignmentId = intent.DeterministicAssignmentId.ToString("N");
         db.Assignments.Add(new AssignmentEntity
         {

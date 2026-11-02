@@ -1,6 +1,6 @@
-// Deny-by-default policy port. Plan 12 replaces the guts of DefaultPolicy at
-// the call-sites with a team-policy engine (spec §12); the seam in runtime.ts
-// stays a single injection point (same precedent as Plan 03's
+// Deny-by-default policy port. The team-policy engine (spec §12) replaces
+// the guts of DefaultPolicy at the call-sites; the seam in runtime.ts
+// stays a single injection point (same precedent as
 // ILinkTokenValidator).
 import type { CapabilityDescriptor } from "@ofac/protocol";
 
@@ -25,7 +25,7 @@ export interface PolicyContext {
 export interface PolicyEvaluator {
   evaluate(action: PolicyAction, ctx: PolicyContext): PolicyVerdict;
   /**
-   * The row backing a `confirm` verdict (Plan 12: its `actorAnyOf` becomes
+   * The row backing a `confirm` verdict (its `actorAnyOf` becomes
    * the approval's eligibleActors). Absent/null ⇒ no row to cite (the
    * DefaultPolicy fallback, or a test-injected engine).
    */
@@ -39,7 +39,7 @@ const CANCEL = "org.facilitator.command.work.cancel.v1";
  * Allow `command.forward` iff the target capability is advertised by the
  * child AND (for steer/cancel) the descriptor supports the interaction;
  * `event.forward` always allowed — the child owns the facts it publishes.
- * The no-policy-file fallback (Plan 05 behavior, capability-advertence only).
+ * The no-policy-file fallback (capability-advertence only).
  */
 export class DefaultPolicy implements PolicyEvaluator {
   constructor(private readonly childCapabilities: ReadonlyMap<string, CapabilityDescriptor>) {}
@@ -102,7 +102,7 @@ function actorMatches(row: PolicyRow, ctx: PolicyContext): boolean {
       return true;
     }
     // `role:` needs an OIDC role mapper that minted roles into the evidence;
-    // the realm today carries none, so role rows deny (documented, Plan 12).
+    // the realm today carries none, so role rows deny (documented).
     if (term.startsWith("workload:") && ctx.claims.subject === term) return true;
   }
   return false;

@@ -2,7 +2,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Facilitator.Kernel.Shared.Persistence;
 
-/// <summary>A stored kernel: evidence row (validated at admission; minted/consumed by Plan 11).</summary>
+/// <summary>A stored kernel: evidence row (validated at admission; minted/consumed by the approvals ledger).</summary>
 /// <param name="EvidenceId">The id after <c>kernel:</c>.</param>
 /// <param name="Subject">Canonical subject minted for.</param>
 /// <param name="Claims">jsonb claim snapshot.</param>

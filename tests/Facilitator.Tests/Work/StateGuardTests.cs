@@ -3,7 +3,7 @@ using Facilitator.Kernel.Work;
 namespace Facilitator.Tests.Work;
 
 /// <summary>
-/// §4.1 single authority: the guard table matches the plan's legal edge set
+/// §4.1 single authority: the guard table matches the spec's legal edge set
 /// EXACTLY — no implicit jumps, no self-loops, nothing leaves a terminal
 /// state. Exhaustive over all 8x8 WorkState pairs; no database needed.
 /// </summary>

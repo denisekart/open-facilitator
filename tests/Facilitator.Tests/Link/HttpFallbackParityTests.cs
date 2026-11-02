@@ -13,7 +13,7 @@ namespace Facilitator.Tests.Link;
 /// passes over both transports): pre-handshake 404 session-not-found,
 /// capabilities work without a session, the maxInFlight window bounds claims,
 /// receipts free capacity for the rest, and a duplicate command answers
-/// duplicate via the SAME inbox-dedupe seam as Plan 02 ingress.
+/// duplicate via the SAME inbox-dedupe seam as the CloudEvent ingress.
 /// </summary>
 [Collection("postgres:dispatch-link")]
 public sealed class HttpFallbackParityTests(DispatchDbFixture fixture)

@@ -6,7 +6,7 @@
 // child's executor seam inverted: inbound `command` frames land in the
 // child's handler, replies + events ride back out, heartbeats keep the
 // Gateway's lease open, `goaway` closes honestly. Reconnect is the
-// CALLER's call (Plan 07's adapter owns restart policy): a dead socket
+// CALLER's call (the adapter owns restart policy): a dead socket
 // settles every in-flight handler run so the Gateway can answer receipts
 // truthfully (the reply simply never arrives → transport timeout).
 import { connect } from "node:net";

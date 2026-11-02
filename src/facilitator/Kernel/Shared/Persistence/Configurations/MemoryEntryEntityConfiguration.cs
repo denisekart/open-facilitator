@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 namespace Facilitator.Kernel.Shared.Persistence.Configurations;
 
 /// <summary>
-/// facilitator.memory_entries (Plan 16). The <c>search</c> tsvector generated
+/// facilitator.memory_entries. The <c>search</c> tsvector generated
 /// column and its GIN index are raw SQL in the <c>AddMemoryBroker</c>
 /// migration — deliberately absent from the model: the broker never reads or
 /// writes the column, and Postgres recomputes it when tombstoning empties

@@ -4,7 +4,7 @@ namespace Facilitator.Kernel.Shared.Persistence;
 // for the ADR header). Guid ids are generated client-side; all timestamps are
 // DateTime in UTC (Npgsql legacy timestamp behaviour is NOT enabled).
 
-/// <summary>facilitator.teams — org unit; rows land with Plan 03+ routing.</summary>
+/// <summary>facilitator.teams — org unit; the roster seeder lands rows at startup.</summary>
 public sealed class TeamEntity
 {
     public Guid TeamId { get; set; }
@@ -56,7 +56,7 @@ public sealed class WorkEntity
     public ProjectEntity? Project { get; set; }
 }
 
-/// <summary>facilitator.assignments — §4.1 Assignment aggregate (rows written from Plan 03).</summary>
+/// <summary>facilitator.assignments — §4.1 Assignment aggregate.</summary>
 public sealed class AssignmentEntity
 {
     public Guid AssignmentId { get; set; }
@@ -69,7 +69,7 @@ public sealed class AssignmentEntity
 
     public required string Status { get; set; }
 
-    /// <summary>jsonb — sibling assignment UUIDs gating this intent (Phase B DAG).</summary>
+    /// <summary>jsonb — sibling assignment UUIDs gating this intent (the DAG gate).</summary>
     public string? DependsOn { get; set; }
 
     public int CurrentExecutionGeneration { get; set; }
@@ -101,7 +101,7 @@ public sealed class ExecutionAttemptEntity
     public AssignmentEntity? Assignment { get; set; }
 }
 
-/// <summary>facilitator.nudges — bounded-nudge ledger, one row per stall episode (Phase B).</summary>
+/// <summary>facilitator.nudges — bounded-nudge ledger, one row per stall episode.</summary>
 public sealed class NudgeLedgerEntity
 {
     public Guid AssignmentId { get; set; }
@@ -261,7 +261,7 @@ public sealed class ProviderEventEntity
     public DateTime ReceivedAt { get; set; }
 }
 
-/// <summary>facilitator.link_sessions — §7.3 session leases (schema-only; behaviour in Plan 03).</summary>
+/// <summary>facilitator.link_sessions — §7.3 session leases.</summary>
 public sealed class LinkSessionEntity
 {
     public required string LogicalEndpointId { get; set; }
@@ -319,7 +319,7 @@ public sealed class RoutingDecisionEntity
     public DateTime UpdatedAt { get; set; }
 }
 
-/// <summary>facilitator.link_enrollments — Plan 03 enrollment records (appendix §4).</summary>
+/// <summary>facilitator.link_enrollments — enrollment records (appendix §4).</summary>
 public sealed class LinkEnrollmentEntity
 {
     public Guid EnrollmentId { get; set; }
@@ -344,7 +344,7 @@ public sealed class LinkEnrollmentEntity
 
     public DateTime? RevokedAt { get; set; }
 
-    /// <summary>gateway | child — role bound at enrollment; rotation never re-roles (Plan 10).</summary>
+    /// <summary>gateway | child — role bound at enrollment; rotation never re-roles.</summary>
     public required string Role { get; set; }
 
     /// <summary>True when this enrollment accepts oidc: delegated evidence claims (mode (b) bindings only).</summary>
@@ -357,7 +357,7 @@ public sealed class LinkEnrollmentEntity
     public string? WorkloadSubject { get; set; }
 }
 
-/// <summary>facilitator.link_deliveries — Plan 03 durable delivery/receipt ledger (S:1336 delivery_receipts).</summary>
+/// <summary>facilitator.link_deliveries — durable delivery/receipt ledger (S:1336 delivery_receipts).</summary>
 public sealed class LinkDeliveryEntity
 {
     public Guid DeliveryId { get; set; }
@@ -381,7 +381,7 @@ public sealed class LinkDeliveryEntity
     public DateTime? RedeliverAfter { get; set; }
 }
 
-/// <summary>facilitator.approvals — Plan 11 lifecycle authority (record/respond/consume/revoke).</summary>
+/// <summary>facilitator.approvals — approval lifecycle authority (record/respond/consume/revoke).</summary>
 public sealed class ApprovalEntity
 {
     public Guid ApprovalId { get; set; }
@@ -418,12 +418,12 @@ public sealed class ApprovalEntity
     /// <summary>Digest provenance: recomputed | digest-unverified (1.0 senders without action).</summary>
     public string DigestVerification { get; set; } = "recomputed";
 
-    /// <summary>Plan 12: the Link endpoint (Gateway) that recorded this approval;
+    /// <summary>The Link endpoint (Gateway) that recorded this approval;
     /// decided-push addressing + consume authorization. Null for non-Link recorders.</summary>
     public string? RequestedByEndpointId { get; set; }
 }
 
-/// <summary>facilitator.communication_bindings — Plan 22: canonical conversation →
+/// <summary>facilitator.communication_bindings — canonical conversation →
 /// Work binding (thread routing + reply addressing + outbound post ledger).</summary>
 public sealed class CommunicationBindingEntity
 {
@@ -549,7 +549,7 @@ public sealed class IdentityRoleEntity
     public DateTime UpdatedAt { get; set; }
 }
 
-/// <summary>facilitator.evidence — kernel-issued evidence references (Plan 10 validation, Plan 11 mint/consume).</summary>
+/// <summary>facilitator.evidence — kernel-issued evidence references (admission validation, ledger mint/consume).</summary>
 public sealed class EvidenceEntity
 {
     /// <summary>The id after the <c>kernel:</c> scheme (PK).</summary>
@@ -628,7 +628,7 @@ public sealed class ArtifactEntity
 
 /// <summary>
 /// facilitator.result_manifests — durable ledger of result manifests recorded against a work
-/// (Plan 15): the kernel is the authority on the manifest revision chain, the declared digests,
+/// — the kernel is the authority on the manifest revision chain, the declared digests,
 /// and the GC pin. The manifest document itself lives as content-addressed bytes in the artifact
 /// store; this row records its identity, its revision lineage, and the output artifact ids it
 /// declares (flattened so the retention sweep can pin referenced blobs in a single set-based check).
@@ -660,7 +660,7 @@ public sealed class ResultManifestEntity
 }
 
 /// <summary>
-/// facilitator.memory_scopes — one home scope per memory entry (Plan 16, spec §14.2):
+/// facilitator.memory_scopes — one home scope per memory entry (spec §14.2):
 /// rows are provisioned lazily by retain (D6), owned by exactly one team. The
 /// canonical selector is the broker-resolved identity, never a worker claim.
 /// </summary>
@@ -681,7 +681,7 @@ public sealed class MemoryScopeEntity
 }
 
 /// <summary>
-/// facilitator.memory_entries — the broker's searchable knowledge rows (Plan 16).
+/// facilitator.memory_entries — the broker's searchable knowledge rows.
 /// <c>team_slug</c> is denormalized from the scope for the single-table ACL
 /// predicate (D2: ACL before search, always in SQL). Tombstoning empties
 /// <c>content</c> in the same tx (D5), which recomputes the stored tsvector
@@ -721,7 +721,7 @@ public sealed class MemoryEntryEntity
 }
 
 /// <summary>
-/// facilitator.memory_shares — explicit cross-team read grants (Plan 16, D2).
+/// facilitator.memory_shares — explicit cross-team read grants (D2).
 /// One row per (entry, grantee); revocation stamps <c>RevokedAt</c> and a
 /// re-grant clears it, so a pair never has duplicate rows.
 /// </summary>
@@ -737,7 +737,7 @@ public sealed class MemoryShareEntity
 
 /// <summary>
 /// facilitator.memory_usage — the <c>memory.used</c> law as data (appendix §6.2,
-/// Plan 16 D3): one row per entry returned to an automated reader (kernel recall
+/// D3): one row per entry returned to an automated reader (kernel recall
 /// or an external attestation via <c>event.memory.used</c>). Rows survive entry
 /// deletion: the audit trail outlives the content.
 /// </summary>
@@ -754,8 +754,8 @@ public sealed class MemoryUsageEntity
 }
 
 /// <summary>
-/// facilitator.admin_config — the operator configuration store (Plan 20,
-/// spec §17.4): one row per editable resource, optimistic <c>row_version</c>
+/// facilitator.admin_config — the operator configuration store (spec
+/// §17.4): one row per editable resource, optimistic <c>row_version</c>
 /// fenced PATCH (If-Match), same-tx audit + bounded history. Stored intent
 /// only: a <c>Config:</c>-file value remains the runtime truth until a
 /// feature reads through.
@@ -782,7 +782,7 @@ public sealed class AdminConfigEntity
 
 /// <summary>
 /// facilitator.admin_config_history — bounded per-resource version trail
-/// (Plan 20): newest 20 versions per resource, written in the same tx as the
+/// newest 20 versions per resource, written in the same tx as the
 /// config row. Rollback = PATCH to a prior payload.
 /// </summary>
 public sealed class AdminConfigVersionEntity
@@ -802,7 +802,7 @@ public sealed class AdminConfigVersionEntity
     public DateTime UpdatedAt { get; set; }
 }
 
-/// <summary>facilitator.provisioning_operations — Plan 35 C: the durable
+/// <summary>facilitator.provisioning_operations — the durable
 /// provisioning ledger. One row per appended launcher operation; the id is
 /// the deterministic trigger identity (<see cref="Kernel.Provisioning.ProvisioningOperationId"/>),
 /// so a replayed trigger lands the same row and the same outbox

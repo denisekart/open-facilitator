@@ -16,8 +16,8 @@ public enum ReMarkOutcome
 }
 
 /// <summary>
-/// The admin mutation seam behind <c>/api/admin/*</c> POSTs (Plan 20):
-/// manifest re-mark touches <c>result_state</c> ONLY (Plan 15 immutability
+/// The admin mutation seam behind <c>/api/admin/*</c> POSTs:
+/// manifest re-mark touches <c>result_state</c> ONLY (immutability
 /// law: an UPDATE may touch nothing but <c>state</c> + <c>result_state</c>,
 /// and the chain law owns <c>state</c>), with a same-tx audit row. Dead-letter
 /// replay lives in <see cref="OutboxRepository"/> beside <c>AppendAsync</c>
@@ -41,7 +41,7 @@ public sealed class AdminMutationStore(
         audit.Append(db, new AuditRecord(actor, "admin.manifest.re-mark", $"/api/admin/manifests/{manifestId}/re-mark", "allow", null, null, null,
             System.Text.Json.JsonSerializer.Serialize(new { manifestId, resultState })));
         await db.SaveChangesAsync(ct);
-        // The wake law (Plan 35 B): a validated re-mark releases a
+        // The wake law: a validated re-mark releases a
         // `result_validated` gate — pull the work's gated routing intents
         // forward so the funnel re-evaluates now, not at backoff.
         await Facilitator.Kernel.Work.DependencyGate.WakeGatedRoutingIntentsAsync(

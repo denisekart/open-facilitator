@@ -1,4 +1,4 @@
-// The artifact capability against the in-process stub kernel (Plan 15):
+// The artifact capability against the in-process stub kernel:
 // upload law (ticket in-band, proxied PUT, kernel-verified digest), the
 // duplicate-ack ticket re-attach, the canonical manifest builder (emitted
 // bytes == RFC 8785 form; digest recomputes), the completed-event payload

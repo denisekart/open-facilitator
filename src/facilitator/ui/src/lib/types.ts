@@ -1,5 +1,5 @@
 /* Mirrors of the kernel's camelCase admin DTOs (src/facilitator/Kernel/Admin).
-   No client-side aggregation: one type per wire shape (plan 21 decision 9). */
+   No client-side aggregation: one type per wire shape. */
 
 export interface AdminSummary {
   teams: number;

@@ -1,6 +1,6 @@
-// The ChildExecutor seam: serializable messages, in-process today. Plan 07
-// freezes this vocabulary as the cross-process HarnessAdapter contract and
-// Plan 06 carries it over a socket, so every message is a plain
+// The ChildExecutor seam: serializable messages, in-process today. The
+// HarnessAdapter contract freezes this vocabulary cross-process and the
+// socket transport carries it, so every message is a plain
 // JSON-serializable object — no live handles cross the boundary.
 //
 // EmbeddedChild wraps an SDK LinkHandler (createEchoHandler/createStubHandler
@@ -154,7 +154,7 @@ export class EmbeddedChild implements ChildExecutor {
         if (record === undefined) return { kind: "unknown", executionId: msg.executionId };
         // The embedded echo/stub child has no mid-flight work to abort: a
         // stop settles the execution `completed` (a real adapter answers the
-        // child's own truth over the socket, Plan 06+).
+        // child's own truth over the socket).
         record.state = "completed";
         return { kind: "accepted", executionId: msg.executionId };
       }

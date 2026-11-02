@@ -1,8 +1,8 @@
-// Idempotent seed init (Plan 23 decision 7, the mm-init.mjs law in package
+// Idempotent seed init (decision 7, the mm-init.mjs law in package
 // code): login-first, 409-reconcile. Against FORGEJO_URL as the admin:
 //   1. login; no account yet ⇒ POST /user/sign_up — with zero users a forge
 //      promotes the first signup to admin (step 0: no anonymous first-admin
-//      REST route; the plan's contingency applies). INSTALL_LOCK=true with no
+//      REST route; the contingency applies). INSTALL_LOCK=true with no
 //      admin still serves /user/sign_up.
 //   2. a PAT (409-reconcile: reruns mint under a fresh name).
 //   3. org `demo`, repo `<org>/widgets` with an initial README (409-reconcile).

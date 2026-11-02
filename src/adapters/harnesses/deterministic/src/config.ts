@@ -24,10 +24,10 @@ export interface WorkerConfig {
   childWorkspaceId: string;
   /** Env overlay applied: OFAC_CHILD_SECRET wins over the file. */
   token?: string | undefined;
-  /** Kernel origin for the artifact byte path (Plan 15); OFAC_KERNEL_URL overlay. Required. */
+  /** Kernel origin for the artifact byte path; OFAC_KERNEL_URL overlay. Required. */
   kernelUrl: string;
   /**
-   * Bearer for the kernel link plane (Plan 15); OFAC_KERNEL_TOKEN overlay.
+   * Bearer for the kernel link plane; OFAC_KERNEL_TOKEN overlay.
    * The Gateway-facing `token` is NOT a kernel credential unless it is one
    * (mode-(a) enrollment issues a separate linkToken); unset ⇒ the worker's
    * own `token` is sent verbatim.

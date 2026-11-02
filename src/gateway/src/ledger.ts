@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS child_state (
 );
 `;
 
-// Plan 12 v3: confirm-held assignments park here while an approval is
+// v3: confirm-held assignments park here while an approval is
 // pending — a side table, NOT a bindings-state widening: reconcile,
 // probeChild and the quota law all read `running`, and a disguised-pending
 // binding would be reported lost on restart.
@@ -282,7 +282,7 @@ export class ExecutionLedger {
         `BEGIN IMMEDIATE;${DDL_BINDINGS}${DDL_CHILD_STATE}${DDL_PENDING}PRAGMA user_version = ${SCHEMA_VERSION};COMMIT;`,
       );
     } else if (version === 1) {
-      // v1 (plan 05) files carry bindings WITHOUT the child fence and no
+      // v1 files carry bindings WITHOUT the child fence and no
       // child_state table; the ALTER's DEFAULT 0 keeps every pre-v2 row
       // honest (generation 0 = never connected through a child transport).
       this.db.exec(
@@ -293,18 +293,18 @@ export class ExecutionLedger {
           `PRAGMA user_version = ${SCHEMA_VERSION};COMMIT;`,
       );
     } else if (version === 2) {
-      // v2 (plan 06/10) files gain only the Plan 12 pending side table.
+      // v2 files gain only the pending side table.
       this.db.exec(`BEGIN IMMEDIATE;${DDL_PENDING}PRAGMA user_version = ${SCHEMA_VERSION};COMMIT;`);
     } else if (version === 3) {
-      // v3 (plan 12) files: the execution_generation ALTER below (idempotent).
+      // v3 files: the execution_generation ALTER below (idempotent).
     } else if (version !== SCHEMA_VERSION) {
       throw new Error(
         `bindings: unsupported schema version ${version} (this build writes ${SCHEMA_VERSION})`,
       );
     }
-    // Plan 35 B(4), idempotent for every pre-v4 file (v1/v2/v3-era): the
+    // Idempotent for every pre-v4 file (v1/v2/v3-era): the
     // event stamp splits from the S:329 freshness fence. DEFAULT 1: every
-    // pre-B envelope rode generation 1 (the kernel's pre-B constant).
+    // pre-split envelope rode generation 1 (the kernel's pre-split constant).
     const cols = this.db.pragma("table_info(bindings)", { simple: false }) as {
       name: string;
     }[];

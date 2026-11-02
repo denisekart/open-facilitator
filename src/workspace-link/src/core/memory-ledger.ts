@@ -1,4 +1,4 @@
-// In-memory Ledger for unit tests and the Plan 05 in-process harness. Mirrors
+// In-memory Ledger for unit tests and in-process harnesses. Mirrors
 // SqliteLedger semantics (delivery_id OR dedupe_key ⇒ duplicate) exactly.
 import type { InsertResult, Ledger, LedgerRow, LedgerState } from "./ledger.js";
 

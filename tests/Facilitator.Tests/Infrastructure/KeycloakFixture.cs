@@ -81,7 +81,7 @@ public sealed class KeycloakFixture : IAsyncLifetime
     /// <summary>Access token for the <c>facilitator-cli</c> service account (holds the operator realm roles).</summary>
     public static Task<string> TokenForClientAsync() => Task.FromResult(CliToken);
 
-    /// <summary>Client-credentials token for any realm client (plan 10 mode-(b) enrollment + evidence).</summary>
+    /// <summary>Client-credentials token for any realm client (mode-(b) enrollment + evidence).</summary>
     public static Task<string> TokenForClientAsync(string clientId, string clientSecret) =>
         MintAsync(new Dictionary<string, string>
         {

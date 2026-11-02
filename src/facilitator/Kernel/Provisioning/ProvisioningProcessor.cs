@@ -14,7 +14,7 @@ using Ofac.Protocol.Validation;
 namespace Facilitator.Kernel.Provisioning;
 
 /// <summary>
-/// The provisioning scale law (Plan 35 C): a periodic sweep that observes the
+/// The provisioning scale law: a periodic sweep that observes the
 /// fleet and appends launcher operations — each one a deterministic-id row on
 /// <c>facilitator.provisioning_operations</c> plus a
 /// <c>command.provision.start|stop.v1</c> outbox row to
@@ -148,7 +148,7 @@ public sealed class ProvisioningProcessor(
     {
         await using var db = await contextFactory.CreateDbContextAsync(ct);
 
-        // N-replica serialization (Plan 35 D audit): two replicas'
+        // N-replica serialization: two replicas'
         // read-evaluate-flush windows interleave without it — both read the
         // pre-commit ledger, both pass the inflight/maxWorkers gates, both
         // append ops whose work-keyed ids DIFFER across arms (worker-lost vs

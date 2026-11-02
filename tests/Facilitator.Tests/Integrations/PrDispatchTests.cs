@@ -10,7 +10,7 @@ using Facilitator.Tests.Results;
 namespace Facilitator.Tests.Integrations;
 
 /// <summary>
-/// Plan 24(1d/1e): the completed-manifest reader + head-branch resolver. A
+/// The completed-manifest reader + head-branch resolver. A
 /// recorded manifest whose assignment rode a provider-configured
 /// PrRequestCapability dispatches its <c>structuredResult.prRequest</c> as a
 /// <c>vcs.change_request.create</c> assign to the assignment's owning

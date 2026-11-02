@@ -1,6 +1,6 @@
 # @ofac/forgejo-adapter
 
-Forgejo communication adapter (Plan 23): one Node process that owns both
+Forgejo communication adapter: one Node process that owns both
 edges — an inbound Forgejo **webhook receiver** (`POST /hooks/forgejo`) that
 normalizes deliveries into `org.facilitator.event.provider.{issue,change_request,pipeline}.v1`
 events with `data.provider = "forgejo"`,

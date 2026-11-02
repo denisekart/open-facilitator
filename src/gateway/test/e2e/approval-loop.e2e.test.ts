@@ -1,4 +1,4 @@
-// Plan 12 step 6: THE §12 loop, across real process + DB boundaries. A
+// THE §12 loop, across real process + DB boundaries. A
 // confirm-scoped assign rides the kernel to a shared-mode Gateway with a real
 // fleet child; the Gateway records approval.required (kernel recomputes the
 // Gateway-computed digest); a human answers over REST as a real user
@@ -147,7 +147,7 @@ function cancelEnvelope(assign: Record<string, unknown>): LinkDeliveryV1["envelo
   };
 }
 
-describe.skipIf(!E2E)("gateway approval loop e2e (Plan 12)", () => {
+describe.skipIf(!E2E)("gateway approval loop e2e", () => {
   const harness: Harness = useFacilitator();
   let gw: GatewayHandleConfig;
   let handle: GatewayHandle;

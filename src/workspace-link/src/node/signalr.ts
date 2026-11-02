@@ -2,7 +2,7 @@
 // (LinkHub.cs): server methods Hello/Envelope/Receipt/Heartbeat/Goodbye,
 // client-method pushes Deliver/FlowControl/Disconnect. Bearer rides the
 // WebSocket upgrade via accessTokenFactory (S:624 — never ?access_token=);
-// skipNegotiation + WebSockets matches the server's Plan 03 test-harness
+// skipNegotiation + WebSockets matches the server's link test-harness
 // connect pattern (LinkTestHarness.cs FakeLinkClient). The SDK's own
 // supervisor owns re-hello (the server bumps the epoch on every hello
 // regardless), so SignalR's automatic reconnect stays OFF.

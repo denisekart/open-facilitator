@@ -11,7 +11,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Facilitator.Kernel.Work;
 
 /// <summary>
-/// The memory REST surface (Plan 16): retain / recall / get / promote / correct
+/// The memory REST surface: retain / recall / get / promote / correct
 /// / share / revoke / delete / export. Bodies are parsed manually (the
 /// ApprovalEndpoints law — the kernel validates, never model-binds untrusted
 /// JSON); the access context is built from the gate-resolved principal only.

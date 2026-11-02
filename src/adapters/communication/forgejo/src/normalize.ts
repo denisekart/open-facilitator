@@ -1,4 +1,4 @@
-// Pure inbound normalization (no I/O, Plan 23 decision 6): a Forgejo webhook
+// Pure inbound normalization (no I/O, decision 6): a Forgejo webhook
 // payload in, one normalized provider event out — or null when the delivery
 // must be DROPPED (audit line only, 200 back):
 //

@@ -43,7 +43,7 @@ public static class ApprovalDigest
     }
 
     /// <summary>
-    /// The Result Manifest digest law (Plan 15, spec §15.3): SHA-256 over the
+    /// The Result Manifest digest law (spec §15.3): SHA-256 over the
     /// RFC 8785 canonical form of an arbitrary document, NFC-normalized with
     /// the same normalization as <see cref="Compute"/> — one law, two
     /// documents. The <c>@ofac/protocol</c> <c>computeManifestDigest</c>

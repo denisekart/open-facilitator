@@ -1,8 +1,8 @@
 // The deterministic harness: a two-step, zero-randomness research run that
-// behaves identically every time (Plan 07's worked example — third-party
-// implementers copy this file as the shape of "harness hooks").
+// behaves identically every time — the worked example third-party
+// implementers copy as the shape of "harness hooks".
 // Script (locked): progress → sleep → progress → sleep → write report →
-// publish assignment.completed.v1. Completion truth (Plan 15): the report
+// publish assignment.completed.v1. Completion truth: the report
 // bytes are UPLOADED to the kernel artifact store over the link plane
 // (child link token), an immutable canonical Result Manifest is uploaded as
 // an artifact, and the completed event carries resultManifestRef +
@@ -73,7 +73,7 @@ export function createDeterministicHooks(options: DeterministicRunOptions): Dete
     const inputs = data["inputs"] as Record<string, unknown> | undefined;
     const objective = typeof inputs?.["objective"] === "string" ? inputs["objective"] : workId;
     const capabilityId = String(data["capabilityId"] ?? "research.analyze");
-    // Plan 12: the confirm-loop e2e rides research.publish — identical
+    // The confirm-loop e2e rides research.publish — identical
     // deterministic script, published-flavored artifact + conclusion.
     const publishing = capabilityId === "research.publish";
     const t0 = Date.now();

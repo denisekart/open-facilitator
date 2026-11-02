@@ -1,4 +1,4 @@
-// E2E standalone (Plan 06 step 6): a STANDALONE gateway boots with an empty
+// E2E standalone: a STANDALONE gateway boots with an empty
 // fleet — the spec's zero-child allowance — links + reconciles + is ready,
 // the kernel serves no manifest, and a child that shows up LATER is
 // accepted and union-POSTs. The late child then reconnects the fleet to

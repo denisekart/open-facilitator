@@ -10,7 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Facilitator.Tests.Approvals;
 
 /// <summary>
-/// Plan 11 lifecycle vertical (spec §12.1–12.2, appendix §7): record via
+/// The approval lifecycle vertical (spec §12.1–12.2, appendix §7): record via
 /// <c>/api/ingress/events</c> (digest recompute + compare, digest-as-declared
 /// for 1.0 senders), the human REST pair (eligibility law D4, single use,
 /// lazy expiry, revocation-before-apply, <c>kernel:</c> receipt mint law D5),

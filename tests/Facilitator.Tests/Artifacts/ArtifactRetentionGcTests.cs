@@ -4,7 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Facilitator.Tests.Artifacts;
 
 /// <summary>
-/// The retention-GC pass (plan 14 D7/D8, spec appendix 8.2) on the filesystem
+/// The retention-GC pass (D7/D8, spec appendix 8.2) on the filesystem
 /// leg with a fake clock: <c>Nd</c> policies collect once lapsed and
 /// unreferenced, a live Work pins the blob, <c>permanent</c> and
 /// <c>archive</c> never expire, expired pending slots sweep without touching

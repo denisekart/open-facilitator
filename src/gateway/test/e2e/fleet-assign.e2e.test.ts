@@ -1,4 +1,4 @@
-// E2E fleet-assign (Plan 06 step 6): a SHARED gateway with two REAL child
+// E2E fleet-assign: a SHARED gateway with two REAL child
 // processes. Laws proven across process boundaries: boot with zero
 // connected children and NO manifest at the kernel; union POST only after
 // child churn; per-capability routing to the advertising child; the echo

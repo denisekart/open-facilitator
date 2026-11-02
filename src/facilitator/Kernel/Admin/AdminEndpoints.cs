@@ -10,7 +10,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Facilitator.Kernel.Admin;
 
 /// <summary>
-/// <c>/api/admin/*</c> (Plan 20, spec §17): the operator read/write surface
+/// <c>/api/admin/*</c> (spec §17): the operator read/write surface
 /// the embedded inspector consumes. Endpoints stay thin like
 /// <c>MapIdentityApi</c> — parse, delegate to the stores, map. Authorization
 /// is 100% config-driven (<c>admin.read</c>/<c>admin.mutate</c> bindings in

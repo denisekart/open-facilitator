@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Facilitator.Kernel.Shared.Persistence.Configurations;
 
-/// <summary>facilitator.provisioning_operations — Plan 35 C provisioning
+/// <summary>facilitator.provisioning_operations — the provisioning
 /// ledger: the id-keyed operation audit the sweep's dedupe + cap counts read.</summary>
 public sealed class ProvisioningOpEntityConfiguration : IEntityTypeConfiguration<ProvisioningOpEntity>
 {

@@ -9,7 +9,7 @@ using Npgsql;
 namespace Facilitator.Tests.Work;
 
 /// <summary>
-/// Plan 35 Phase D (was 29): the fail-closed replica identity gate and the
+/// The fail-closed replica identity gate and the
 /// per-replica fleet view. A configured <c>Kernel:ReplicaId</c> is the lease
 /// identity, so the gate must refuse to start beside a twin (a session row
 /// stamped with my id whose lease ADVANCES — only a live process can advance

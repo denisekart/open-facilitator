@@ -440,8 +440,8 @@ export function kitSocketPath(): string {
 }
 
 // ---------------------------------------------------------------------------
-// startStubKernel — the in-process kernel stand-in for the artifact client
-// (Plan 15). Implements the link-plane byte path the client speaks: POST
+// startStubKernel — the in-process kernel stand-in for the artifact client.
+// Implements the link-plane byte path the client speaks: POST
 // /api/link/v1/events answers a request_upload command with 202 + the ticket
 // in-band on `data` (fs-style by default: no presigned uploadUrl, so the
 // client PUTs to uploadLocation); the matching PUT stores the bytes and
@@ -461,7 +461,7 @@ export interface StubKernel {
   readonly url: string;
   /** artifactId (lowercase guid, no dashes) → stored bytes + mediaType + kernel digest. */
   readonly artifacts: Map<string, { bytes: Buffer; mediaType: string; digest: string }>;
-  /** entryId → retained memory content (Plan 16 stub leg). */
+  /** entryId → retained memory content (stub memory leg). */
   readonly memories: Map<string, { content: string; scopeSelector: string }>;
   /** Every envelope the stub received (assert completed-event legs against it). */
   readonly events: Array<Record<string, unknown>>;
@@ -552,7 +552,7 @@ export async function startStubKernel(opts?: {
           });
           return;
         }
-        // Plan 16 memory legs: retain stores in-memory and answers the
+        // Memory legs: retain stores in-memory and answers the
         // receipt in-band (candidate, like the kernel's D4 law); recall
         // substring-matches the store and answers the D8 shape.
         if (env["type"] === "org.facilitator.command.memory.retain.v1") {

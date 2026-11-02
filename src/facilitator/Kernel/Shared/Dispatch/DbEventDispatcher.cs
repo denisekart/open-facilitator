@@ -116,7 +116,7 @@ public sealed class DbEventDispatcher : IEventDispatcher
             {
                 if (!_sinks.TryGetValue(ChannelOf(row.RecipientEndpointId), out var sink))
                 {
-                    // No route (e.g. link.* until Plan 03 session routing):
+                    // No route (e.g. link.* with no session routing):
                     // requeue with backoff, never dead-letter (locked decision).
                     _metrics.DeliveryLatency(stopwatch.Elapsed.TotalMilliseconds);
                     await _outbox.RequeueAsync(row.OutboxId, $"no sink registered for channel '{ChannelOf(row.RecipientEndpointId)}'", ct);
@@ -163,7 +163,7 @@ public sealed class DbEventDispatcher : IEventDispatcher
 
     private async Task HandleFailureAsync(OutboxRow row, string error, bool noRoute, CancellationToken ct)
     {
-        // "No route" (link.* before Plan 03 routing exists) requeues forever
+        // "No route" (link.* with no live session) requeues forever
         // with backoff — never dead-letters (locked decision).
         if (row.Attempts >= MaxAttempts && !noRoute)
         {

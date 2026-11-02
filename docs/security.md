@@ -1,7 +1,7 @@
 # Security posture
 
-Status: reflects Plans 09–10 (OIDC identity foundation + workload identity)
-plus the artifact-store and result-manifest laws below.
+Covers the OIDC identity foundation, workload identity, and the
+artifact-store and result-manifest laws below.
 The human plane federates to any OIDC IdP; roles are operator-defined claim
 rules; every gate decision audits.
 
@@ -101,7 +101,7 @@ deny ⇒ `403 forbidden` (both RFC 9457, camelCase).
 | `GET /api/works/{id}/manifests` | OIDC bearer; gated `manifests.read` (mirrors `artifacts.read`, includes `team-member`) | Work's recorded manifest chain, newest-first; work-scope 404 non-disclosure |
 | `POST /api/works/{id}/approvals/{approvalId}/respond` | OIDC bearer; gated `approvals.respond` | Human decision; eligibility + single use below |
 | `/api/identity/roles*` | OIDC bearer; PUT/DELETE gated `identity.roles.manage` | runtime role rules |
-| `/api/admin/*` | OIDC bearer; gated `admin.read` (GETs) / `admin.mutate` (PATCH/POST) | Operator surface (Plan 20): roll-ups, search, detail, links, merged deliveries, metrics, runtime config (If-Match + `X-Change-Reason`; every PATCH audits `admin.config.patch` + a bounded history row), dead-letter replay, manifest re-mark |
+| `/api/admin/*` | OIDC bearer; gated `admin.read` (GETs) / `admin.mutate` (PATCH/POST) | Operator surface: roll-ups, search, detail, links, merged deliveries, metrics, runtime config (If-Match + `X-Change-Reason`; every PATCH audits `admin.config.patch` + a bounded history row), dead-letter replay, manifest re-mark |
 | `/api/link/v1*`, `/hubs/link` | link plane (`linkToken`) | enrollment + evidence, below |
 
 The kernel refuses to boot at all with an invalid/incomplete `identity:`
@@ -113,7 +113,7 @@ block (`IdentityStartupCheck`, fail closed in every environment).
 - Envelopes fail closed: schema/envelope violations ⇒ `400`, command types outside the 7-type known-command table ⇒ `422 unknown-command`, and the rejected envelope is still persisted to the `inbox` as an audit record (state `failed`).
 - Duplicate admission (same `(event_source, event_id)`, `command_id`, or `(provider, provider_delivery_id)`) returns `200 {"status":"duplicate"}` and reprocesses nothing — replay is cheap and side-effect-free by construction.
 
-## Provider ingress (Plans 22 + 23)
+## Provider ingress
 
 Provider events ride the **link plane**: the adapter authenticates with its
 `linkToken` like any link endpoint, and the `AdmissionGate` provider arm
@@ -188,8 +188,8 @@ principal, reason = `delegation-validated` / `delegation-refused` /
 `wrong-audience`, `unknown-id`, `consumed`, …), and `detail` jsonb carrying
 `delegatedSubject` + team/role — never a raw token. Audit failure on an allow
 path ⇒ `503 auth-unavailable` (fail closed). The effective principal (always
-workload + optional validated human) is what Plan 12's policy engine will
-authorize against.
+workload + optional validated human) is what the Gateway team policy engine
+authorizes against.
 
 ## Approval lifecycle (spec §12.1–12.2, appendix §7)
 
@@ -206,7 +206,7 @@ authorize against.
 - **Single use**: a respond decides via one conditional
   `UPDATE ... WHERE state='pending'` — exactly one concurrent decider wins,
   every replay denies `409 approval-already-consumed` even for byte-identical
-  command JSON (§12.2). Consume (`approved→consumed`, Plan 12's hook) is the
+  command JSON (§12.2). Consume (`approved→consumed`) is the
   same conditional-update shape.
 - **Lazy expiry**: no timer. Every read/respond first applies
   `UPDATE ... SET state='expired' WHERE state='pending' AND expires_at<=now`
@@ -237,7 +237,7 @@ approvalId/digest/decision/actor, `policy_version` `approval-v1`; gate
 evaluations on the REST pair ride `authorization.evaluated:approvals.read`/
 `:approvals.respond`) — never a raw token.
 
-## Team policy engine + the confirm round-trip (spec §12, Plan 12)
+## Team policy engine + the confirm round-trip (spec §12)
 
 The Gateway evaluates every inbound command against the team's policy
 file (`policy.inline` / `policy.path` in `gateway.yaml`; the path resolves
@@ -262,8 +262,8 @@ evaluates them.
 `data.inputs["resource"]` when that field is a string, else the
 `capabilityId` itself. A `resources[]` term matches on exact equality, `*`
 (matches anything), or a single trailing `*` prefix-glob
-(`repository:svc-*`). Finer per-connector resources are later-plan
-territory.
+(`repository:svc-*`). Finer per-connector resources are not yet
+implemented.
 
 **Actor-claim law** (`src/gateway/src/claims.ts`): the Gateway trusts
 exactly two identity sources — its own workload identity, and an
@@ -418,8 +418,8 @@ set — `decision`, `reason`, `workId`/`assignmentId`/`capabilityId`,
   honesty: content dropped from the live table ages out of each operator's
   backup window on its own schedule.
 
-## Deferred to later plans
+## Deferred
 
-| Concern | Plan |
+| Concern | Status |
 |---|---|
-| Refresh-token / session lifecycle for interactive UIs | 13+ |
+| Refresh-token / session lifecycle for interactive UIs | Not yet implemented — interactive sessions ride access-token expiry only, so signing out means the token lapsing |

@@ -1,4 +1,4 @@
-// Plan 01 Step 6: regenerate committed C#/TS DTOs from the frozen JSON Schemas.
+// Regenerate the committed C#/TS DTOs from the frozen JSON Schemas.
 // One render pass per language over the sorted schema set so shared `$defs`
 // types (ArtifactRef, Deliverable, ...) are emitted exactly once. Type names
 // come from each schema's `title` (filename-derived), e.g.
@@ -19,7 +19,7 @@ const schemaDirs = [join(repo, "protocol/json-schema"), join(repo, "protocol/clo
 // stop/reject reason, and its $ref into capability-manifest.v1.json renames
 // the published CapabilityDescriptor types. Contract consumers (fixture
 // harnesses, docs) validate against the schema, not the DTOs, so no generated
-// name is worth that churn. policy-file.v1.json (Plan 12) is a Gateway-local
+// name is worth that churn. policy-file.v1.json is a Gateway-local
 // artifact: mirrored + registered for loader validation, no wire DTO wanted.
 const CODEGEN_SKIP = new Set(["adapter.v1.json", "policy-file.v1.json"]);
 const schemas = schemaDirs

@@ -380,8 +380,8 @@ export type TrustMode = "shared-runtime" | "separate-process-same-host" | "isola
 
 /**
  * Bootstrap enrollment response. linkToken/expiresAt are additive (OpenAPI 1.0.1): the
- * interim link-token credential until Plan 05 OIDC principals; a server MAY omit both when
- * it issues no bearer credential.
+ * interim link-token credential the Link server issues at enrollment; a server MAY omit
+ * both when it issues no bearer credential.
  */
 export interface EnrollResponseV1 {
   enrollmentId: string;
@@ -480,7 +480,7 @@ export interface ResultManifestObject {
 export interface ArtifactRef {
   artifactId: string;
   /**
-   * Optional handling/classification label (e.g. internal). Plan 15 widened artifactRef
+   * Optional handling/classification label (e.g. internal). artifactRef carries it
    * additively; opaque to the kernel.
    */
   classification?: string;
@@ -488,9 +488,8 @@ export interface ArtifactRef {
   createdBy: string;
   digest: string;
   /**
-   * Optional producer-owned taxonomy label (e.g. analysis.report). Plan 15 widened
-   * artifactRef additively; the kernel treats unknown values as opaque (spec 15.6
-   * extensibility).
+   * Optional producer-owned taxonomy label (e.g. analysis.report). artifactRef carries it
+   * additively; the kernel treats unknown values as opaque (spec 15.6 extensibility).
    */
   kind?: string;
   mediaType: string;

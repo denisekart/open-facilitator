@@ -183,8 +183,8 @@ delivery has two observable shapes: an in-run steer rides the open link as a
 `command.work.steer.v1` row, and a post-completion steer re-dispatches the
 original assign envelope (directive in `inputs.steers`) — the worker
 re-hydrates from the branch/PR lineage instead of a live process. Scaling
-the workspace itself to zero is Plan 28's provisioning story; re-dispatch
-generations fence against a resumed older worker under Plan 27's fencing.
+the workspace itself to zero is a provisioning capability not yet
+implemented; re-dispatch generations fence against a resumed older worker.
 
 ### Conformance
 
@@ -205,10 +205,10 @@ executes `org.facilitator.command.communication.*` deliveries over the
 provider's API. Worked examples: `@ofac/mattermost-adapter`
 (`src/adapters/communication/mattermost/`, facilitator-owned chat leg) and
 `@ofac/forgejo-adapter` (`src/adapters/communication/forgejo/`, team-owned
-forge leg) — their READMEs carry the config law; the seams that survive
-Plan 31's SDK extraction are `normalize` (pure classification), the provider
-client (interface = test seam), the transport listener, and the command
-handler.
+forge leg) — their READMEs carry the config law; the stable seams are
+`normalize` (pure classification), the provider client (interface = test
+seam), the transport listener, and the command handler — the same seams a
+future adapter-SDK extraction would formalize.
 
 **Ownership model**: the kernel facilitates, it is not a security boundary,
 and it is never team-operated. Chat is a facilitator-owned integration in
@@ -317,8 +317,8 @@ Gateway/harness-side statement of how the team uses the broker.
 
 ### Retention homes
 
-Per-Project policy rides the `projects.config` jsonb key `memory`
-(Plan 14's carrier): `{"workCandidateDays": int, "candidateDays": int}` —
+Per-Project policy rides the `projects.config` jsonb key `memory`:
+`{"workCandidateDays": int, "candidateDays": int}` —
 work scopes read `workCandidateDays`, project scopes `candidateDays`,
 matching the `memory.yaml` `retention.*` names. The kernel-level fallback is
 `Memory:Retention:CandidateDays` (90). The retention pass

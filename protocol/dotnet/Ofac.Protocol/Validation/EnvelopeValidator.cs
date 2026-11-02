@@ -10,7 +10,7 @@ namespace Ofac.Protocol.Validation;
 /// <summary>
 /// Outcome of envelope validation. <paramref name="ErrorClass"/> is one of
 /// <c>envelope-violation</c>, <c>schema-violation</c>, <c>payload-too-large</c>,
-/// <c>unknown-command</c> — the same taxonomy as the Plan 01 fixture index.
+/// <c>unknown-command</c> — the same taxonomy as the conformance fixture index.
 /// </summary>
 /// <param name="Ok">True when the payload is contract-valid.</param>
 /// <param name="ErrorClass">Error class when <paramref name="Ok"/> is false.</param>

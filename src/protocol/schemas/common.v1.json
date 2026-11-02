@@ -60,13 +60,13 @@
           "$ref": "common.v1.json#/$defs/rfc3339DateTime"
         },
         "kind": {
-          "description": "Optional producer-owned taxonomy label (e.g. analysis.report). Plan 15 widened artifactRef additively; the kernel treats unknown values as opaque (spec 15.6 extensibility).",
+          "description": "Optional producer-owned taxonomy label (e.g. analysis.report). artifactRef carries it additively; the kernel treats unknown values as opaque (spec 15.6 extensibility).",
           "type": "string",
           "minLength": 1,
           "maxLength": 64
         },
         "classification": {
-          "description": "Optional handling/classification label (e.g. internal). Plan 15 widened artifactRef additively; opaque to the kernel.",
+          "description": "Optional handling/classification label (e.g. internal). artifactRef carries it additively; opaque to the kernel.",
           "type": "string",
           "minLength": 1,
           "maxLength": 64

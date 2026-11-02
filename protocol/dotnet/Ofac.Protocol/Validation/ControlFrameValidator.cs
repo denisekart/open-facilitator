@@ -8,7 +8,7 @@ namespace Ofac.Protocol.Validation;
 /// <summary>
 /// Outcome of control/receipt frame validation. <paramref name="ErrorClass"/>
 /// is <c>schema-violation</c> (frame violates its frozen schema) — the same
-/// taxonomy the Plan 01 fixture index uses.
+/// taxonomy the conformance fixture index uses.
 /// </summary>
 /// <param name="Ok">True when the frame is contract-valid.</param>
 /// <param name="ErrorClass">Error class when <paramref name="Ok"/> is false.</param>

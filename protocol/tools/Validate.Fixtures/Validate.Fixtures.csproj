@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!-- Spec §26.1 item 1's .NET conformance harness: validates every fixture in
-       protocol/conformance-fixtures against the shipped schemas. Plan 02 reuses
-       this as its inbox fixture source. -->
+       protocol/conformance-fixtures against the shipped schemas; the kernel
+       inbox reuses it as its fixture source. -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <RootNamespace>Ofac.Protocol.ValidateFixtures</RootNamespace>

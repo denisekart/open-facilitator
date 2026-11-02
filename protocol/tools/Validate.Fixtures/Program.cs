@@ -1,4 +1,4 @@
-// Spec §26.1 item 1 (.NET side) and Plan 02's inbox fixture source.
+// Spec §26.1 item 1 (.NET side); also the kernel inbox's fixture source.
 // Validates every fixture listed in <fixturesDir>/index.json against the
 // normative schemas in protocol/json-schema + protocol/cloudevents-schemas.
 // Semantics mirror src/protocol/test/fixtures.test.ts (vitest side); the
@@ -153,7 +153,7 @@ foreach (var c in cases)
     }
 }
 
-// ---- result-manifest golden (RFC 8785 manifest digest + canonical-bytes law, Plan 15) ----
+// ---- result-manifest golden (RFC 8785 manifest digest + canonical-bytes law) ----
 {
     var manifestGolden = File.ReadAllText(Path.Combine(fixturesDir, "canonical", "result-manifest-1.sha256")).Trim();
     var manifestRaw = File.ReadAllText(Path.Combine(fixturesDir, "canonical", "result-manifest-1.json"));

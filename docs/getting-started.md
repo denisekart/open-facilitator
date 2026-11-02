@@ -127,7 +127,7 @@ worker echoes verbatim on its progress/completion envelopes, so
 
 ## 6. Admin tour: the embedded inspector
 
-Plan 21 embeds the operator SPA in the kernel itself — no separate portal.
+The kernel embeds the operator SPA itself — no separate portal.
 With the slim stack up (section 3), open `http://localhost:8088`: the SPA
 redirects to Keycloak, sign in `alice`/`alice`, and you are in the
 inspector. Trace the acceptance-run Work without psql:
@@ -204,7 +204,7 @@ This run is part of every task's acceptance criteria — see
 | Artifact | Registry | Coordinate |
 |---|---|---|
 | OCI images (facilitator) | GHCR | `ghcr.io/denisekart/open-facilitator/<name>` |
-| npm packages `@ofac/*` | GitHub Packages npm | `https://npm.pkg.github.com/denisekart` (see repo `.npmrc`; publish flips in Plan 01) |
+| npm packages `@ofac/*` | GitHub Packages npm | `https://npm.pkg.github.com/denisekart` (see repo `.npmrc`; not yet published — packages remain `private`) |
 | Dev Container Features (OCI per spec §8.5; `gateway`, `workspace-link`, `harness-adapter`) | GHCR | `ghcr.io/denisekart/open-facilitator/features/<name>:1` |
 | NuGet | — (public deps from nuget.org; first internal package → `https://nuget.pkg.github.com/denisekart/index.json`) | — |
 

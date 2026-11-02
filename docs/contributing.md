@@ -2,7 +2,7 @@
 
 ## Repository layout
 
-Repo root **is** the spec §22.1 `framework/` tree — no `framework/` subdirectory, `docs/specs/` is the spec node. Each directory's README names the plan that populates it (see repository layout in the root README).
+Repo root **is** the spec §22.1 `framework/` tree — no `framework/` subdirectory, `docs/specs/` is the spec node (see repository layout in the root README).
 
 ## Make targets
 

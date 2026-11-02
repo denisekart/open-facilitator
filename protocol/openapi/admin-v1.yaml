@@ -3,8 +3,8 @@ info:
   title: Facilitator Admin API
   version: 1.0.0
   description: >
-    Hand-maintained mirror of the kernel /api/admin surface (spec section 17,
-    Plan 20) — the operator read models plus the three mutations the embedded
+    Hand-maintained mirror of the kernel /api/admin surface (spec section 17)
+    — the operator read models plus the three mutations the embedded
     inspector may issue. These DTOs are kernel-API contract, not wire protocol:
     unlike link-v1.yaml there are no JSON-Schema $refs and no conformance
     fixtures; runtime tests (tests/Facilitator.Tests/Admin/AdminSurfaceTests.cs,

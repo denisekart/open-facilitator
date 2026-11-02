@@ -1,6 +1,6 @@
 # Wire protocol (v1)
 
-This document describes the implemented wire contract: the JSON Schemas under `protocol/`, the conformance fixtures, and the rules both endpoints MUST follow. It is the as-built companion to spec §5 (`docs/specs/open_facilitator_framework_architecture.md`) and appendix §16 (`docs/specs/open-facilitator-appendix.md`); where the spec proposes and this document records, this document reflects the shipped artifacts. The framework runtime consumes the contract on both sides: the Plan 02 transactional kernel (Kernel ingress below), the Plan 03 Link server (Link transport below), and the Plan 04 Workspace Link SDK (client half below).
+This document describes the implemented wire contract: the JSON Schemas under `protocol/`, the conformance fixtures, and the rules both endpoints MUST follow. It is the as-built companion to spec §5 (`docs/specs/open_facilitator_framework_architecture.md`) and appendix §16 (`docs/specs/open-facilitator-appendix.md`); where the spec proposes and this document records, this document reflects the shipped artifacts. The framework runtime consumes the contract on both sides: the transactional kernel (Kernel ingress below), the Link server (Link transport below), and the Workspace Link SDK (client half below).
 
 ## Message classes and envelopes
 
@@ -70,7 +70,7 @@ Supporting schemas, referenced by the types above and by the HTTP surface:
 |---|---|
 |`receipt.v1.json`|Delivery receipt for commands and events|
 |`control.v1.json`|Handshake and session frames: `hello`, `welcome`, `heartbeat`, `flow_control`, `goodbye`|
-|`result-manifest.v1.json`|`manifestId`, `outputs` (`artifactRef` items, widened additively: optional `kind`/`classification` producer taxonomy labels, opaque to the kernel); optional declared vocabulary `workId`/`assignmentId`/`capability`/`summary`/`structuredResult`/`externalRefs`/`sourceRefs`/`notes`/`createdAt`/`revisionOf`; open model (`additionalProperties: true`) so Plan 09+ extends it additively|
+|`result-manifest.v1.json`|`manifestId`, `outputs` (`artifactRef` items, widened additively: optional `kind`/`classification` producer taxonomy labels, opaque to the kernel); optional declared vocabulary `workId`/`assignmentId`/`capability`/`summary`/`structuredResult`/`externalRefs`/`sourceRefs`/`notes`/`createdAt`/`revisionOf`; open model (`additionalProperties: true`) so future producers extend it additively|
 |`capability-manifest.v1.json`|Advertised capabilities (`apiVersion` `facilitator.framework/v1`), closed model; served by `GET /api/link/v1/capabilities`|
 |`common.v1.json`|Shared `$defs` (`artifactRef`, `deliverable`, `evidenceRef`, `idToken`, `rfc3339DateTime`); no root validation|
 
@@ -84,7 +84,7 @@ Events carry identity in the envelope (`source` + `id` + `time`), so their `data
 
 ## Conformance fixtures
 
-`protocol/conformance-fixtures/index.json` lists every case with its expectation (`valid` or `invalid` plus an `errorClass` from `envelope-violation | schema-violation | payload-too-large | unknown-command | no-common-version`). Fixture files are bare wire payloads, consumable by later plans without unwrapping. `unknown-command` and `no-common-version` cases name the expected response fixture, which the harnesses cross-validate. Two harnesses consume the same index:
+`protocol/conformance-fixtures/index.json` lists every case with its expectation (`valid` or `invalid` plus an `errorClass` from `envelope-violation | schema-violation | payload-too-large | unknown-command | no-common-version`). Fixture files are bare wire payloads, consumable by any language runtime without unwrapping. `unknown-command` and `no-common-version` cases name the expected response fixture, which the harnesses cross-validate. Two harnesses consume the same index:
 
 - TypeScript: `pnpm --filter @ofac/protocol test` (vitest, `src/protocol/test/fixtures.test.ts`)
 - .NET: `dotnet run --project protocol/tools/Validate.Fixtures -c Release`
@@ -101,7 +101,7 @@ Events carry identity in the envelope (`source` + `id` + `time`), so their `data
 
 The contract is transport-independent: the same fixtures MUST validate identically over the SignalR reference transport and the HTTP long-poll fallback, both implemented in the Facilitator (Link transport below; `protocol/openapi/link-v1.yaml` 1.0.2 is the frozen HTTP surface — enroll, events, deliveries, receipts, capabilities GET+POST). Consumers should use the `@ofac/protocol` package (`src/protocol/`): `schemaById` resolves a `dataschema` URI to its schema, `KNOWN_COMMAND_TYPES` is the fail-closed command table, and `validateEnvelope` / `validateReceipt` / `validateControlFrame` return the same `errorClass` taxonomy as the fixtures index.
 
-## Kernel ingress (implemented, Plan 02)
+## Kernel ingress
 
 The Facilitator kernel (`src/facilitator`, namespace `Facilitator.Kernel`) consumes the contract over HTTP today. All endpoints sit under `/api` and require `Authorization: Bearer <token>` (interim bootstrap token; see [`security.md`](security.md)). Errors are RFC 9457 `ProblemDetails` with `type` URIs under `https://errors.openfacilitator.org/v1/`.
 
@@ -128,7 +128,7 @@ The Facilitator kernel (`src/facilitator`, namespace `Facilitator.Kernel`) consu
 |`GET /api/memory/export?scope=…`|NDJSON export of one readable scope's live entries (gated `memory.read`)|`200` NDJSON|
 |`GET /api/memory/{id}`|Entry view + live shares + usage count (gated `memory.read`; non-disclosure `404` for foreign/tombstoned/missing)|`200` entry DTO|
 |`POST /api/memory/{id}/promote` · `POST /api/memory/{id}/correct` · `POST /api/memory/{id}/shares` · `DELETE /api/memory/{id}/shares/{shareId}` · `DELETE /api/memory/{id}`|Owner-team curation (gated `memory.curate`): candidate→active (optional `targetScope` = own team selector only, else the typed `memory-scope-invalid` 422), revision chain (`supersedesEntryId`, the new revision lands `active`), share grant/revoke (grantee must exist; private unsharable), delete = tombstone + content drop + share revocation in one tx|`200` `{entryId, …}` (promote carries `status:"active"`, correct `superseded:true`, shares the `granteeTeam`), `204` on share-revoke and delete|
-|`/api/admin/*`|Operator surface (Plan 20): summary roll-up, universal search, project/work detail + timeline, links, merged deliveries, metrics, config GET/PATCH (If-Match + `X-Change-Reason` law, bounded history), dead-letter replay, manifest re-mark. Gated `admin.read` (GETs) / `admin.mutate` (PATCH/POST) via the config bindings — contract mirror `protocol/openapi/admin-v1.yaml`|see `admin-v1.yaml`|
+|`/api/admin/*`|Operator surface: summary roll-up, universal search, project/work detail + timeline, links, merged deliveries, metrics, config GET/PATCH (If-Match + `X-Change-Reason` law, bounded history), dead-letter replay, manifest re-mark. Gated `admin.read` (GETs) / `admin.mutate` (PATCH/POST) via the config bindings — contract mirror `protocol/openapi/admin-v1.yaml`|see `admin-v1.yaml`|
 
 ### Error contract
 
@@ -156,7 +156,7 @@ The Facilitator kernel (`src/facilitator`, namespace `Facilitator.Kernel`) consu
 |`artifact-size-mismatch`|`422`|PUT byte count ≠ declared `size`; same reject path|
 |`artifact-declaration-mismatch`|`422`|`artifact.available` re-declared a kernel-allocated artifactId with contradicting mediaType/size/digest (first writer owns the row); deny-audited `artifact.reregistration-denied`|
 |`artifact-not-pending`|`409`|Confirm against a slot already spent — `rejected`, lapsed, or `deleted` (a fresh allocation is required); confirm of an object-store slot whose bytes never landed answers `404`, never this|
-|`artifact-not-confirmable`|`409`|Confirm against a `pending` row on a plane that cannot have received direct bytes: the configured adapter mints no URLs (filesystem), or the row's scheme no configured adapter owns (inert row, plan 14 D10)|
+|`artifact-not-confirmable`|`409`|Confirm against a `pending` row on a plane that cannot have received direct bytes: the configured adapter mints no URLs (filesystem), or the row's scheme no configured adapter owns (inert row)|
 |`manifest-not-found`|`404`|Completed event carried `resultManifestRef`: unknown work, foreign-team work, non-GUID ref last segment, or a missing/unverified/foreign manifest artifact — one absent answer everywhere, no existence leak|
 |`manifest-digest-mismatch`|`422`|Stored manifest bytes are not byte-equal their own RFC 8785 canonical form, or the kernel's recompute ≠ the declared `resultDigest`; zero rows written|
 |`manifest-output-unresolvable`|`422`|A manifest `outputs[].artifactId` does not resolve to a verified, digest-matching, same-team artifact; zero rows written|
@@ -187,11 +187,11 @@ A duplicate returns `200 {"status":"duplicate"}` with zero reprocessing — no s
 
 The kernel's own emission path builds outbox envelopes with the same validator before insert — the kernel emits conformant envelopes by construction. Kernel integration tests consume real files from `protocol/conformance-fixtures/` as live inputs to `/api/ingress/events` (e.g. `valid/command.work.steer.json` posted twice proves the duplicate path; `invalid/command.unknown.v1.json` proves fail-closed `unknown-command`; `invalid/envelope.specversion.json` proves `400 envelope-violation`), so the fixtures gate the runtime, not just the harnesses.
 
-## Link transport (implemented, Plan 03)
+## Link transport
 
 The Facilitator serves the Workspace Link contract over two transports with identical application semantics (`src/facilitator/Kernel/Link/`): the SignalR hub at `/hubs/link` (reference transport) and the HTTP surface frozen in `protocol/openapi/link-v1.yaml` 1.0.2 (fallback, every language first-class). Outbox rows addressed `link.<endpointId>` are materialized into the durable delivery ledger `facilitator.link_deliveries` and offered to the endpoint over whichever transport it is speaking.
 
-### Enrollment: dual modes (Plan 10)
+### Enrollment: dual modes
 
 `POST /api/link/v1/enroll` presents its credential in the request body
 (`token`), not a bearer header, and the kernel tells the two modes apart by
@@ -319,7 +319,7 @@ The receipt timestamp is the frozen `processedAt` — the spec §5.2 example's `
 ### Liveness, placement, observability
 
 - The pump (`LinkDeliveryPump : BackgroundService`) materializes `link.<endpointId>` outbox rows into the ledger **only while a live session exists**, then claims within the window and pushes `Deliver` — the claim phase runs ONLY for endpoints with a socket tracked on this replica; without one the pass is materialize-only. It runs after every `hello`/receipt, on every `NOTIFY facilitator_outbox`, on a 2 s safety poll, and inline (materialize-only) before an HTTP claim, which `GET /deliveries` then performs itself. Un-acked rows stay non-`delivered` in the outbox while the link is down — no outbox row is ever tied to a dead socket (§7.3).
-- `LinkSink` (`Channel = "link"`) is a routing liveness probe only: live session ⇒ `true` (the pump owns the row via the DB); no session anywhere ⇒ `false` ⇒ Plan 02's no-route requeue-with-backoff, unchanged.
+- `LinkSink` (`Channel = "link"`) is a routing liveness probe only: live session ⇒ `true` (the pump owns the row via the DB); no session anywhere ⇒ `false` ⇒ the no-route requeue-with-backoff, unchanged.
 - The connection registry tracks THIS replica's sockets only; the DB lease is the cross-replica authority (§7.3).
 - No secrets in WebSocket query strings for framework clients (spec S:624): the bearer header rides both the negotiate request and the WebSocket upgrade; `?access_token=` is accepted ONLY as the documented fallback for non-TypeScript clients that cannot set headers on the upgrade.
 - Observability (appendix §9): span `link.handshake` on activity source `Facilitator.Kernel` (tags `facilitator.endpoint_id`, `facilitator.session_epoch`, `facilitator.protocol_version`); counter `facilitator.link.received`; gauge `facilitator.link.sessions`; link claims reuse `facilitator.delivery.attempts`.
@@ -339,7 +339,7 @@ The receipt timestamp is the frozen `processedAt` — the spec §5.2 example's `
 |`Link:Evidence:Audience`|`facilitator-link`|Required `aud` of `oidc:` evidence and mode-(b) enrollment credentials|
 |`Link:Evidence:ClockSkewSeconds`|30|Tolerated skew on evidence lifetime checks|
 
-## Client half — Workspace Link SDK (implemented, Plan 04)
+## Client half — Workspace Link SDK
 
 `src/workspace-link` (`@ofac/workspace-link`) is the reference client of the surface above. Entry points: package root (stack-agnostic core: `createLinkClient`, `enroll`, handler/transport interfaces, `FaultInjector`), `/node` (`SignalrTransport`, `HttpPollTransport`, `SqliteLedger`, `postCapabilities`), and the `ofac-linkd` bin (headless supervisor: enroll → capabilities → connect → serve; exit codes 0 clean, 2 config, 3 protocol mismatch, 4 enrollment rejected).
 
@@ -368,7 +368,7 @@ Reading: `GET /api/artifacts/{id}` (metadata) and `GET /api/artifacts/{id}/conte
 
 Config: `Storage:Provider` (`filesystem` | `s3`; s3 requires `Storage:S3:{Endpoint,Bucket,Region,AccessKey,SecretKey}`, fail-closed at startup) + `Storage:FileSystem:RootPath`; a stored row's scheme decides every later read/confirm/GC action — provider switch mid-life leaves foreign-scheme rows readable-but-inert. Artifact timeline kinds (`artifact.stored`, `artifact.registered`, `artifact.available`, `artifact.gc`) are legal `work_events.kind` values; the gate roles include `team-member` (any `/groups` claim), which is what lets a foreign-team human reach the ledger's 404 instead of the gate's 403 on reads.
 
-## Result manifests (Plan 15)
+## Result manifests
 
 A completed event's completion truth is an immutable, digest-verifiable **Result Manifest document** stored as an artifact — decoupled from the execution container. The event (registry row above) carries `resultManifestRef` + `resultDigest`; the inline `resultManifest` stays as the deprecated carrier so pre-1.1 producers keep working (ref absent ⇒ the kernel records nothing new).
 
@@ -376,6 +376,6 @@ A completed event's completion truth is an immutable, digest-verifiable **Result
 
 **Recording** (`ResultManifestLedger`, both-plane arm in `ResultIngress`): a completed event with a ref resolves the ref's LAST path segment as the kernel artifact GUID (the `artifact://` logical-URI law: `artifact://{workId}/{assignmentId}/{artifactId}`), fetches the stored bytes, and requires, in one tx: bytes byte-equal their own RFC 8785 canonical form (the producer stores the document ALREADY canonical — non-canonical bytes are rejected, the kernel never rewrites a manifest); recomputed SHA-256-of-canonical-bytes == the wire `resultDigest` == the artifact row's kernel-verified digest; the document's `manifestId` matches the wire declaration; every `outputs[].artifactId` resolves to a verified, digest-matching, same-team artifact row. Any mismatch ⇒ 422 (`manifest-digest-mismatch` / `manifest-output-unresolvable` / `manifest-not-found`), zero rows, deny audit. Match ⇒ `facilitator.result_manifests` row (revision 1 for a fresh assignment) + `manifest.recorded` timeline + audit. The two digest laws stay distinct: manifest digest = SHA-256 over canonical JSON bytes; artifact digests remain SHA-256-of-bytes.
 
-**Revision law:** the kernel chains revisions per assignment — a second completed event for the same assignment records revision N+1 with `revision_of` = the chain tip, flips the tip `superseded` (+ `manifest.superseded` timeline), and releases the superseded manifest's artifact pins. Rows are immutable; `UNIQUE(assignment_id, revision)`. `structuredResult` (when present) is additionally digested on its own (`structured_digest`) for Plan 16+ output-schema validation.
+**Revision law:** the kernel chains revisions per assignment — a second completed event for the same assignment records revision N+1 with `revision_of` = the chain tip, flips the tip `superseded` (+ `manifest.superseded` timeline), and releases the superseded manifest's artifact pins. Rows are immutable; `UNIQUE(assignment_id, revision)`. `structuredResult` (when present) is additionally digested on its own (`structured_digest`) for future output-schema validation.
 
 **Pull surface:** `GET /api/works/{id:guid}/manifests` — the work's chain, newest revision first; gated `manifests.read` (binding mirrors `artifacts.read`, includes `team-member`) + work-scope 404 non-disclosure. The manifest document itself rides the artifact content path: `GET /api/artifacts/{ref-last-segment}/content`. Timeline kinds `manifest.recorded`/`manifest.superseded` are legal `work_events.kind` values. Metrics: `facilitator.manifest.recorded` (tag `origin: link|rest`), `.superseded`, `.digest_mismatch`.

@@ -18,11 +18,12 @@ info:
     principal per spec §5.3); the authenticated principal — not a JSON field —
     determines allowed team/Gateway/workspace identity.
 
-    Implemented in Plan 03 (Link server); Plan 12 extends the admin surface.
+    Served by the kernel Link server; the admin surface mirror lives in
+    admin-v1.yaml.
 
     1.0.1 rationale (additive minor change): EnrollResponse gains the optional
     `linkToken` and `expiresAt` properties — the interim per-endpoint bearer
-    credential the Link server issues until Plan 05 pins OIDC principals — and
+    credential the Link server issues at enrollment — and
     `POST /api/link/v1/capabilities` is added so an endpoint can advertise its
     CapabilityManifest over the HTTP surface. No existing field changed
     meaning or requiredness, so per semver/OpenAPI additive-change
@@ -34,7 +35,7 @@ info:
 
     1.0.2 rationale (additive minor change): EnrollRequest gains the optional
     `role` (enum gateway|child) and `team` (idToken) properties — the workload
-    role and team roster slug a kernel binds at enrollment (Plan 10) — and the
+    role and team roster slug a kernel binds at enrollment — and the
     shared `evidenceRef` bound loosens from 256 to 2048 characters so an
     inline `oidc:<jwt>` delegation evidence reference fits (every value valid
     under 1.0.1 stays valid). No existing field changed meaning or
@@ -186,7 +187,7 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: Placeholder — Plan 05 (identity) pins issuer/audience/claims validation.
+      description: Bearer workload token; issuer/audience/claims validation is pinned by the kernel's OIDC identity configuration.
   schemas:
     EnrollRequest:
       $ref: "../json-schema/enroll-request.v1.json"

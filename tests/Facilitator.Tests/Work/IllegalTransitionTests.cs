@@ -4,7 +4,7 @@ using System.Text.Json;
 namespace Facilitator.Tests.Work;
 
 /// <summary>
-/// §26.1 item 3 (edge guard at the HTTP seam): illegal transitions answer 422
+/// Item 3 (edge guard at the HTTP seam): illegal transitions answer 422
 /// with the typed problem and the edge name, and leave the persisted row
 /// untouched (state + version unchanged).
 /// </summary>

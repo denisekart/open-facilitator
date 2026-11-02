@@ -1,7 +1,7 @@
 # Harness adapters
 
 One directory per harness (Pi, OpenCode, Codex, custom) wrapping the harness
-with a small HarnessAdapter implementation (spec §8, workspace-packaging
+with a small HarnessAdapter implementation (workspace-packaging
 skill). Shipped:
 
 - `adapter-sdk/` — `@ofac/adapter`: the lifecycle law over the child wire

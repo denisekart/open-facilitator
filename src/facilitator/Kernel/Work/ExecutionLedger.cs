@@ -21,7 +21,7 @@ public enum FinalizeOutcome
     /// <summary>Terminal replay against an already-settled assignment; accepted, nothing written.</summary>
     Duplicate,
 
-    /// <summary>§7.4 fence: the event's generation is not the assignment's current
+    /// <summary>Fence: the event's generation is not the assignment's current
     /// generation. The event is REFUSED (422) and the manifest/ledger stay untouched.</summary>
     Fenced,
 }
@@ -117,7 +117,7 @@ public static class ExecutionLedger
              """, ct);
     }
 
-    /// <summary>The terminal-event arm (§7.4 fence + finalize + wake law).
+    /// <summary>The terminal-event arm (fence + finalize + wake law).
     /// <paramref name="outcome"/> is <c>completed</c> or <c>failed</c>. A
     /// no-assignment-row event (connector op, legacy inline) is
     /// <see cref="FinalizeOutcome.NoAssignment"/> — accepted, untouched.</summary>

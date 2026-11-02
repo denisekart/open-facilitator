@@ -45,7 +45,7 @@ public static class MemoryEndpoints
             if (request is null)
             {
                 return Results.Problem(ProblemErrors.SchemaViolation(
-                    "retain requires scopeSelector, type (one of the seven §14.4 classifications), content, and provenance{source,evidenceRef,createdBy,createdAt}"));
+                    "retain requires scopeSelector, type (one of the seven classifications), content, and provenance{source,evidenceRef,createdBy,createdAt}"));
             }
 
             var result = await broker.RetainAsync(MemoryAccessContext.From(principal), request, ct);

@@ -4,7 +4,7 @@ using System.Net.Sockets;
 namespace Facilitator.Kernel.Shared.Storage;
 
 /// <summary>
-/// The external-ref screen (spec §15.4: external refs are <c>unverified</c>
+/// The external-ref screen (external refs are <c>unverified</c>
 /// and the kernel NEVER fetches them — a declaration is a claim, and only a
 /// claim an operator bound AND that survives the SSRF screen upgrades to
 /// <c>verified</c>). Laws, in order: absolute http(s) URL with no userinfo;

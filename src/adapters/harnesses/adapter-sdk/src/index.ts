@@ -1,6 +1,6 @@
 // @ofac/adapter — the HarnessAdapter lifecycle contract as a library
-// (spec §8.3; wire profile: protocol/json-schema/adapter.v1.json). Thin by
-// law: the native harness stays authoritative (S:422); this package owns
+// (wire profile: protocol/json-schema/adapter.v1.json). Thin by
+// law: the native harness stays authoritative; this package owns
 // the child-connection lifecycle (register, reply law, restart policy,
 // reconcile-honest registry) and NOTHING of the harness's behavior.
 //

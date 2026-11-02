@@ -5,7 +5,7 @@ using System.Text.Json;
 namespace Facilitator.Tests.Work;
 
 /// <summary>
-/// §7.4 optimistic fencing under real concurrency: two steers racing on the
+/// Optimistic fencing under real concurrency: two steers racing on the
 /// same expectedVersion serialize behind the per-Work advisory lock, so
 /// exactly one wins (200) and the loser sees 409 version-conflict carrying
 /// the new currentVersion.

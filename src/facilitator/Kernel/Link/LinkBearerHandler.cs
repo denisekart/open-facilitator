@@ -11,8 +11,7 @@ namespace Facilitator.Kernel.Link;
 /// <summary>
 /// Hub authentication scheme "facilitator-link": bearer tokens (Authorization
 /// header on negotiate AND on the WebSocket upgrade; <c>?access_token=</c> is
-/// accepted only on a WebSocket upgrade — our TS clients send headers, spec
-/// S:624 forbids secrets in query strings for browser-side code, and
+/// accepted only on a WebSocket upgrade — our TS clients send headers, and
 /// long-polling is not used in-repo). Resolves through the SAME
 /// <see cref="ILinkTokenValidator"/> seam as the HTTP surface.
 /// </summary>

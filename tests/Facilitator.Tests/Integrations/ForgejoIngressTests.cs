@@ -197,7 +197,7 @@ public sealed class ForgejoIngressTests(DispatchDbFixture fixture) : IAsyncLifet
     [Fact]
     public async Task TerminalTransitionCompletesToForgejoEndpoint()
     {
-        // The misaddressing regression (verification §): a forgejo-bound Work's
+        // The misaddressing regression (a known verification trap): a forgejo-bound Work's
         // completion reply must ride link.<forgejo endpoint>, not a singleton.
         var (factory, link, _, endpoint) = await EnabledForgejoPlane(mattermost: false);
         var issue = IssueNumber();

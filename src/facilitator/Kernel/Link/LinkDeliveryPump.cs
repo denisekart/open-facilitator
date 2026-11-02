@@ -9,12 +9,12 @@ namespace Facilitator.Kernel.Link;
 /// Materializes link-addressed outbox rows into the ledger and pushes
 /// <c>Deliver</c> frames to this replica's live sockets. Runs: after every
 /// Hello / receipt (inline <see cref="PumpEndpointAsync"/>), on every
-/// <c>NOTIFY facilitator_outbox</c>, on a 2 s safety poll (NOTIFY is a hint,
-/// §7.3). The claim phase only runs with a tracked socket; the HTTP fallback
+/// <c>NOTIFY facilitator_outbox</c>, on a 2 s safety poll (NOTIFY is a hint).
+/// The claim phase only runs with a tracked socket; the HTTP fallback
 /// principal claims through GET /deliveries after <see cref="MaterializeForClaimAsync"/>.
 /// Also the lease sweeper: sessions whose <c>lease_until</c> passed get their
 /// tracked connection closed with a
-/// <c>Disconnect</c> (§7.3: lease expiry, not TCP, ends a session) — every
+/// <c>Disconnect</c> (lease expiry, not TCP, ends a session) — every
 /// lease decision reads the clock via <see cref="TimeProvider"/> inside
 /// <see cref="LinkService"/>, so fake clocks drive the sweeper in tests.
 /// </summary>

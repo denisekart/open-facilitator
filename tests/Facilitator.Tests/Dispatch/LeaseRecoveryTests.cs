@@ -7,7 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Facilitator.Tests.Dispatch;
 
 /// <summary>
-/// §7.2 lease recovery: a row whose lease expired (crashed replica) is
+/// Lease recovery: a row whose lease expired (crashed replica) is
 /// reclaimed by <see cref="IEventDispatcher.ReclaimExpiredLeasesAsync"/> and
 /// delivered by the next drain. The UPDATE here simulates exactly what a dead
 /// lease looks like after the 30 s window.

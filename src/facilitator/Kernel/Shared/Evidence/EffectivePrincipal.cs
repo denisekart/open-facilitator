@@ -2,7 +2,7 @@ using Facilitator.Kernel.Shared.Auth;
 
 namespace Facilitator.Kernel.Shared.Evidence;
 
-/// <summary>A human delegation carried by validated evidence (appendix §3.2 step 3).</summary>
+/// <summary>A human delegation carried by validated evidence.</summary>
 /// <param name="Subject">Canonical subject (<c>oidc:iss|sub</c>).</param>
 /// <param name="Groups">Group claims from the evidence.</param>
 public sealed record DelegatedIdentity(string Subject, IReadOnlyList<string> Groups);
@@ -18,7 +18,7 @@ public sealed record DelegatedIdentity(string Subject, IReadOnlyList<string> Gro
 public sealed record EffectivePrincipal(LinkPrincipal Workload, DelegatedIdentity? Delegated, string Outcome)
 {
     /// <summary>
-    /// Appendix §3.2 step 3, one pure function: workload-only for every
+    /// One pure function: workload-only for every
     /// non-Valid state; <c>delegation-refused</c> (still workload-only, allowed)
     /// when the enrollment rejects delegated claims; extended only on
     /// Valid + accepts. Invalid refs never reach here — they deny at admission.

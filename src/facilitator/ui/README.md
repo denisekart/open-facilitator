@@ -1,6 +1,6 @@
 # `@ofac/ui` — embedded admin SPA
 
-The operator inspector of spec §17: one responsive SPA served by the kernel
+The operator inspector: one responsive SPA served by the kernel
 itself (no separate portal). Svelte 5 runes + vite; no component library —
 the handful of primitives live in `src/components/`.
 

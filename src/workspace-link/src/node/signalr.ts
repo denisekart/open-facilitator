@@ -1,7 +1,7 @@
 // SignalR transport (reference transport). Mirrors the as-built server
 // (LinkHub.cs): server methods Hello/Envelope/Receipt/Heartbeat/Goodbye,
 // client-method pushes Deliver/FlowControl/Disconnect. Bearer rides the
-// WebSocket upgrade via accessTokenFactory (S:624 — never ?access_token=);
+// WebSocket upgrade via accessTokenFactory (never ?access_token=);
 // skipNegotiation + WebSockets matches the server's link test-harness
 // connect pattern (LinkTestHarness.cs FakeLinkClient). The SDK's own
 // supervisor owns re-hello (the server bumps the epoch on every hello

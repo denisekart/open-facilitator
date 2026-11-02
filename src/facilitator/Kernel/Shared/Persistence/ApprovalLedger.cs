@@ -63,10 +63,10 @@ public enum ApprovalDecisionOutcome
     /// <summary>Row is <c>expired</c> (lazy flip included) — respond denies.</summary>
     Expired,
 
-    /// <summary>Row is <c>revoked</c> — revocation-before-apply (appendix §7.3) denies.</summary>
+    /// <summary>Row is <c>revoked</c> — revocation-before-apply denies.</summary>
     Revoked,
 
-    /// <summary>Row already decided/consumed — atomic single use (spec §12.2) denies a second respond.</summary>
+    /// <summary>Row already decided/consumed — atomic single use denies a second respond.</summary>
     AlreadyConsumed,
 
     /// <summary>Effective actor does not intersect <c>eligibleActors</c> (law D4).</summary>
@@ -80,7 +80,7 @@ public enum ApprovalDecisionOutcome
 public sealed record ApprovalDecision(ApprovalDecisionOutcome Outcome, ApprovalView? Row = null, string? EvidenceRef = null);
 
 /// <summary>
-/// The approvals ledger (spec §12.1–12.2 + appendix §7): the only
+/// The approvals ledger: the only
 /// writer of <c>facilitator.approvals</c>. State transitions are conditional
 /// UPDATEs — the database is the single-use arbiter (law D3, no advisory
 /// locks); expiry materializes lazily on read/respond (no janitor); every
@@ -528,7 +528,7 @@ public sealed class ApprovalLedger(
         await AppendDecidedAsync(db, entity, "expired", decidedBy: string.Empty, evidenceRef: string.Empty, ct);
     }
 
-    // Decided-push (spec §12.1 step 5's other half). One link-addressed
+    // Decided-push: the other half. One link-addressed
     // outbox row per terminal transition, staged on the caller's context so the
     // flip and its push commit atomically (outbox law). Deterministic
     // command_id ("approval-decided:<id>:<decision>") makes a re-decision of the

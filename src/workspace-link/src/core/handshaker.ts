@@ -43,7 +43,7 @@ export class Handshaker {
       protocolVersions: ["v1"],
       supportedTransports: transport.supportedTransports ?? ["signalr"],
       endpointId: this.deps.endpointId,
-      // Transient per attempt (S:1246): fresh random hex on every hello.
+      // Transient per attempt: fresh random hex on every hello.
       instanceId: `lnk-${randomBytes(8).toString("hex")}`,
       capabilityManifestDigest:
         typeof this.deps.capabilityManifestDigest === "function"

@@ -1,4 +1,4 @@
-// Deny-by-default policy port. The team-policy engine (spec §12) replaces
+// Deny-by-default policy port. The team-policy engine replaces
 // the guts of DefaultPolicy at the call-sites; the seam in runtime.ts
 // stays a single injection point (same precedent as
 // ILinkTokenValidator).
@@ -109,7 +109,7 @@ function actorMatches(row: PolicyRow, ctx: PolicyContext): boolean {
 }
 
 /**
- * The spec §12 team engine: fleet-honesty pre-pass, then first-match-wins
+ * The team-policy engine: fleet-honesty pre-pass, then first-match-wins
  * over the ordered rows; an implicit final deny closes the list. `conditions`
  * are advisory for connectors — the engine never evaluates them.
  */
@@ -119,7 +119,7 @@ export class TeamPolicy implements PolicyEvaluator {
     private readonly childCapabilities: ReadonlyMap<string, CapabilityDescriptor>,
   ) {}
 
-  /** The audit citation for decisions made by this engine (§12.2). */
+  /** The audit citation for decisions made by this engine. */
   get policyId(): string {
     return this.policy.policyId;
   }

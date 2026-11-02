@@ -32,7 +32,7 @@ public sealed record MemorySearchHit(Guid EntryId, double Rank);
 public sealed record AuthorizedMemoryDeletion(Guid EntryId, DateTime Now);
 
 /// <summary>
-/// The provider seam (spec §14.3): the broker authorizes, the provider stores /
+/// The provider seam: the broker authorizes, the provider stores /
 /// searches / deletes inside the broker's transaction. <c>postgres-fts</c> is
 /// the only implementation (D10); a Hindsight adapter lands behind
 /// this same port — never as an empty class.
@@ -50,7 +50,7 @@ public interface IMemoryProvider
 }
 
 /// <summary>
-/// The reference profile (spec §14.7): the kernel's own Postgres is the store
+/// The reference profile: the kernel's own Postgres is the store
 /// and the index. Lexical <c>websearch_to_tsquery</c> over the stored tsvector
 /// generated column, ranked by <c>ts_rank</c>; the D2 predicate — owner team,
 /// facilitator-visible, live share, with the private cross-team block — is

@@ -1,6 +1,6 @@
 # @ofac/adapter — write your own HarnessAdapter
 
-The HarnessAdapter contract (spec §8.3) as a TypeScript library: you implement
+The HarnessAdapter contract as a TypeScript library: you implement
 `HarnessHooks` around your harness (CLI subprocess, SDK, in-process engine);
 this package speaks the frozen child wire (`protocol/json-schema/adapter.v1.json`,
 the profile of the shipped 06 child transport) to a Gateway. Invocation is
@@ -9,7 +9,7 @@ spawned CLI.
 
 Worked example to copy: `../deterministic` (config loader, CLI, `sample/`).
 
-## Authority law (S:422)
+## Authority law
 
 The **harness** is authoritative over execution state; the **adapter** is
 thin translation; the **Gateway** mediates. Consequences baked into this
@@ -20,7 +20,7 @@ package:
 - The SDK publishes exactly one terminal event: `assignment.failed.v1`
   (`retryable: true`) when `onExecute` returns `{kind:"failed"}` or throws.
 - A steer against a harness with no `onSteer` hook replies `unsupported` —
-  report, never reinterpret (S:436).
+  report, never reinterpret.
 - An unknown `executionId` replies `unknown` — the Gateway's reconcile probe
   then decides `running` vs `lost`; never lie from amnesia.
 

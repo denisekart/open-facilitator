@@ -17,10 +17,9 @@ namespace Facilitator.Kernel.Shared.Persistence;
 public sealed record ClaimedDelivery(DeliveryDto Delivery, long SessionEpoch);
 
 /// <summary>
-/// The durable delivery/receipt ledger (<c>link_deliveries</c>, S:1336
-/// delivery_receipts). Delivery identity = outbox id, so a receipt for an
+/// The durable delivery/receipt ledger (<c>link_deliveries</c>). Delivery identity = outbox id, so a receipt for an
 /// already-acked delivery answers the LATEST attempt and the
-/// dropped-receipt → redelivery → duplicate loop terminates (A:155-157).
+/// dropped-receipt → redelivery → duplicate loop terminates.
 /// The pump owns every transition except the receipt ack, which flips the
 /// matching outbox row in the SAME transaction (the dispatcher never
 /// double-charges a link row).
@@ -213,8 +212,7 @@ public sealed class LinkLedger(
     /// Record a receipt. Terminal receipts (<c>accepted</c>, <c>duplicate</c>,
     /// and rejections with a permanent reason: policy, no-binding, unsupported)
     /// flip the ledger row to acked AND the matching outbox row to delivered in
-    /// ONE transaction so the dispatcher never double-charges (spec §5.3,
-    /// A:309). A RETRYABLE rejection — <c>child-busy</c> / <c>child-disconnected</c>
+    /// ONE transaction so the dispatcher never double-charges. A RETRYABLE rejection — <c>child-busy</c> / <c>child-disconnected</c>
     /// / <c>child-offline</c>, the transient-capacity reasons the gateway
     /// documents as "honest, retryable upstream" — is NOT terminal: the receipt
     /// jsonb is recorded, the row stays in-flight behind a short redelivery
@@ -268,7 +266,7 @@ public sealed class LinkLedger(
         if (!requeue)
         {
             await OutboxRepository.MarkDeliveredOnAsync(db, deliveryId, now, ct);
-            // §7.4 execution-attempt law: an accepted assign receipt IS the
+            // Execution-attempt law: an accepted assign receipt IS the
             // proof of execution start — open the attempt row (execution id =
             // delivery id) and walk the assignment to running, in this tx.
             await Facilitator.Kernel.Work.ExecutionLedger.OpenAttemptOnAckAsync(db, deliveryId, now, ct);

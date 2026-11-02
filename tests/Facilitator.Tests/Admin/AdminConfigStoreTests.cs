@@ -6,7 +6,7 @@ using System.Text.Json;
 namespace Facilitator.Tests.Admin;
 
 /// <summary>
-/// Spec §17.4: the DB-backed admin config surface — closed
+/// The DB-backed admin config surface — closed
 /// validation registry, true If-Match optimistic revision, same-tx
 /// history + audit, bounded newest-20 retention. Stored intent only: the
 /// suite proves the write ledger, not a runtime read-through.

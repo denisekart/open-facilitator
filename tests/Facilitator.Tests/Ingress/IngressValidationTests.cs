@@ -4,7 +4,7 @@ using System.Text;
 namespace Facilitator.Tests.Ingress;
 
 /// <summary>
-/// §26.1 item 9: wire guards at the ingress edge — 256 KiB body limit,
+/// Wire guards at the ingress edge — 256 KiB body limit,
 /// bootstrap-token auth on /api (anonymous /health), 404 problem for unknown
 /// works.
 /// </summary>

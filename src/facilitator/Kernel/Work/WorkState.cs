@@ -1,6 +1,6 @@
 namespace Facilitator.Kernel.Work;
 
-/// <summary>Canonical Work states (spec §4.1).</summary>
+/// <summary>Canonical Work states.</summary>
 public enum WorkState
 {
     Open,
@@ -13,7 +13,7 @@ public enum WorkState
     Failed,
 }
 
-/// <summary>Canonical Assignment states (spec §4.1).</summary>
+/// <summary>Canonical Assignment states.</summary>
 public enum AssignmentState
 {
     Proposed,
@@ -28,7 +28,7 @@ public enum AssignmentState
 }
 
 /// <summary>
-/// Single authority for legal state edges (spec §4.1). No implicit jumps:
+/// Single authority for legal state edges. No implicit jumps:
 /// every transition the kernel performs is looked up here first, so the
 /// "do not invent shortcuts" rule is enforced by exactly one table.
 /// </summary>

@@ -1,6 +1,6 @@
 // The artifact capability of `@ofac/adapter`: upload bytes to the
 // kernel over the link plane and build/complete a Result Manifest — so a
-// third-party harness gets spec §15.3's completion truth without touching
+// third-party harness gets completion truth without touching
 // wire details (envelopes, tickets, canonicalization, the digest law).
 //
 // Credential law (as-built): the CHILD LINK TOKEN IS the workload
@@ -196,7 +196,7 @@ export interface ResultManifestInput {
   revisionOf?: string;
   capability?: string;
   summary?: string;
-  /** Compact structured class (spec §15.3 class 1). */
+  /** Compact structured class (class 1). */
   structuredResult?: Record<string, unknown>;
   /** Document/binary class (class 2). */
   outputs: ResultManifestOutput[];
@@ -272,7 +272,7 @@ export type CompletedEventContext = {
 };
 
 /**
- * The completed-event payload law (spec §15.3): four
+ * The completed-event payload law: four
  * frozen fields + the deprecated inline `{manifestId, outputs: []}` +
  * `resultManifestRef` (the uploaded manifest doc's logical URI) +
  * `resultDigest`. `ref` and `digest` ride together (schema if/then).

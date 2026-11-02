@@ -10,7 +10,7 @@ namespace Facilitator.Tests.Memory;
 /// a candidate names a live Work, so ownership follows the
 /// Work's Project→Team lineage and the entry lands promotable + timeline-noted;
 /// a used attestation carries no verifiable team, so the read law denies while
-/// the plane still answers accepted (§14.6: routing never blocks on memory).
+/// the plane still answers accepted (routing never blocks on memory).
 /// </summary>
 [Collection("postgres:work")]
 public sealed class MemoryEventArmTests(PostgresFixture fixture)

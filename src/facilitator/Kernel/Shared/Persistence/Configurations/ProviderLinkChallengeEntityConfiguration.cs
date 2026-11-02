@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Facilitator.Kernel.Shared.Persistence.Configurations;
 
-/// <summary>facilitator.provider_link_challenges (spec §11): single-use codes.
+/// <summary>facilitator.provider_link_challenges: single-use codes.
 /// Redemption looks a code up by its sha256; the partial index keeps the hot
 /// path (unredeemed codes) tight.</summary>
 public sealed class ProviderLinkChallengeEntityConfiguration : IEntityTypeConfiguration<ProviderLinkChallengeEntity>

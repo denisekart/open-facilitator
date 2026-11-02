@@ -35,7 +35,7 @@ public sealed class ProviderOptions
     /// overlays and operators, never parsed by the kernel).</summary>
     public string? SiteUrl { get; init; }
 
-    /// <summary>Bot provider-account id: the exact-match echo-suppression filter (§13.4).
+    /// <summary>Bot provider-account id: the exact-match echo-suppression filter.
     /// When set, no probe runs — the adapter runs as the bot user.</summary>
     public string? BotUserId { get; init; }
 

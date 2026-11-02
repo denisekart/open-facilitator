@@ -9,7 +9,7 @@ namespace Facilitator.Tests.Infrastructure;
 /// <summary>
 /// Shared plumbing for the link suites: enroll/hello/receipt payload
 /// builders over the frozen fixtures, a SignalR fake link client (WebSockets,
-/// bearer header — no secrets in query strings, spec S:624) over a
+/// bearer header — no secrets in query strings) over a
 /// Kestrel-bound factory, and a controllable <see cref="TimeProvider"/> so
 /// lease math never sleeps on wall clock.
 /// </summary>
@@ -36,7 +36,7 @@ internal static class LinkTestHarness
     /// <summary>
     /// The frozen hello fixture rewritten for a test endpoint: fresh instance,
     /// offered protocol versions, junk lastKnownAck (a hint the server MUST
-    /// ignore — §26.1 item 2 server half).
+    /// ignore).
     /// </summary>
     internal static JsonElement HelloFrame(string endpointId, params string[] protocolVersions)
     {

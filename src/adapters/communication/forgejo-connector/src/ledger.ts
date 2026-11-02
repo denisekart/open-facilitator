@@ -1,4 +1,4 @@
-// The connector_actions intent ledger (decision 5, appendix §5.4; the
+// The connector_actions intent ledger (decision 5; the
 // gateway ledger.ts schema pattern): durable op-intent truth, a separate
 // SQLite file from any link ledger. `command_id` is the PRIMARY KEY — the
 // commandId repeats on every delivery retry, so a replayed command reads the

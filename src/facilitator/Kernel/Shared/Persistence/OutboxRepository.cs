@@ -198,7 +198,7 @@ public sealed class OutboxRepository(
         return row.OutboxId;
     }
 
-    /// <summary>Newest dead letters (admin visibility, appendix §5.6).</summary>
+    /// <summary>Newest dead letters (admin visibility).</summary>
     public async Task<IReadOnlyList<DeadLetterRow>> ListDeadLettersAsync(int limit, CancellationToken ct)
     {
         await using var db = await contextFactory.CreateDbContextAsync(ct);

@@ -1,4 +1,4 @@
-// Bootstrap enrollment (spec §16.2, OpenAPI POST /api/link/v1/enroll). Plain
+// Bootstrap enrollment (OpenAPI POST /api/link/v1/enroll). Plain
 // global fetch — no Node-only imports — guarded by the enrollment SECRET in
 // the body (not a bearer header, docs/protocol.md "Auth").
 import type { EnrollRequestV1, EnrollResponseV1 } from "@ofac/protocol";

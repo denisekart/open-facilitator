@@ -1,4 +1,4 @@
-// FaultInjector (test mode, A:360): dropped receipts, partitions, duplicate
+// FaultInjector (test mode): dropped receipts, partitions, duplicate
 // Deliver pushes — against the real client state machine + MemoryLedger.
 import { describe, expect, it } from "vitest";
 import type { LinkDeliveryV1 } from "@ofac/protocol";
@@ -59,7 +59,7 @@ describe("FaultInjector", () => {
       logger: createMemoryLogger(),
     });
     await client.start();
-    // The dropped-receipt loop (S:302): deliver → handler runs → receipt
+    // The dropped-receipt loop: deliver → handler runs → receipt
     // swallowed → server redelivers → duplicate, handler NOT re-run.
     inner.pushDeliver(makeDelivery("del-1"));
     await flush(8);

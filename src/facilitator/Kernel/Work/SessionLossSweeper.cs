@@ -25,7 +25,7 @@ namespace Facilitator.Kernel.Work;
 /// <c>event.assignment.failed.v1</c> (<c>reason=session-lease-expired</c>,
 /// <c>retryable=true</c>) through the same inbox + <see cref="ResultIngress"/>
 /// finalize path a real worker event rides (the DB stays the coordination
-/// authority, §7). Hysteresis: the first offline pass only marks the attempt
+/// authority). Hysteresis: the first offline pass only marks the attempt
 /// suspect (in memory); a pass that sees a live lease clears the mark — a
 /// blip shorter than two sweeps never fails anything. The inbox row's
 /// (source,event_id) uniqueness is the cross-replica dedupe: the event id is

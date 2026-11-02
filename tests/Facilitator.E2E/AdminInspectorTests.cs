@@ -16,7 +16,7 @@ namespace Facilitator.E2E;
 
 /// <summary>
 /// Browser tier: the embedded SPA against a real Kestrel kernel +
-/// hosted Keycloak login, driven end-to-end (spec §17.6 walkthrough, UI
+/// hosted Keycloak login, driven end-to-end (the UI walkthrough,
 /// edition): login gate, search→inspector→approval, links, dead-letter
 /// replay with the replay-once toast, config PATCH with the 412 conflict
 /// path, and the anonymous gate. Sequential on the shared fixture pair;

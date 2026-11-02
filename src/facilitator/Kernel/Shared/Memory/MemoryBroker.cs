@@ -71,7 +71,7 @@ public sealed record MemoryRecallRequest(
     int? MaxTokens = null,
     bool IncludeSuperseded = false);
 
-/// <summary>One recalled entry with the §6.3 metadata law: provenance + policy label ride every hit; <c>evidence-only</c> rows surface the summary where the caller may see, full text only via evidence (D2).</summary>
+/// <summary>One recalled entry with the metadata law: provenance + policy label ride every hit; <c>evidence-only</c> rows surface the summary where the caller may see, full text only via evidence (D2).</summary>
 public sealed record MemoryRecallEntry(
     Guid EntryId,
     string ScopeId,
@@ -87,7 +87,7 @@ public sealed record MemoryRecallEntry(
     string TeamSlug,
     string RetrievalReason);
 
-/// <summary>The D8 response: §14.11 verbatim field names.</summary>
+/// <summary>The D8 response: verbatim field names.</summary>
 public sealed record MemoryRecallResponse(
     string RequestId,
     string ProviderProfile,
@@ -119,7 +119,7 @@ public sealed record MemoryEntryView(
     long UsageCount);
 
 /// <summary>
-/// The memory broker (spec §14.3): the only writer of the memory
+/// The memory broker: the only writer of the memory
 /// tables and the only authorizer. Access context is built server-side from a
 /// verified principal — a selector in a payload is a hint, a
 /// <c>callerPrincipal</c> in a payload cannot exist (schema-rejected). Every
@@ -338,7 +338,7 @@ public sealed class MemoryBroker(
         return View(row, selector, shares, usage);
     }
 
-    /// <summary>Promote (owner-team review, §14.6): candidate→active in place. <paramref name="targetSelector"/> is accepted only as the owner team's <c>team:</c> selector (v1 law); timeline note when the entry is work-linked.</summary>
+    /// <summary>Promote (owner-team review): candidate→active in place. <paramref name="targetSelector"/> is accepted only as the owner team's <c>team:</c> selector (v1 law); timeline note when the entry is work-linked.</summary>
     public async Task<MemoryOpOutcome> PromoteAsync(
         MemoryAccessContext caller, Guid entryId, string? targetSelector, CancellationToken ct)
     {
@@ -386,7 +386,7 @@ public sealed class MemoryBroker(
         return MemoryOpOutcome.Ok;
     }
 
-    /// <summary>Correct (§14.6): a revision+1 row supersedes the old one in the same tx; the chain links via <c>supersedes_entry_id</c>. Curation stays REST (D4).</summary>
+    /// <summary>Correct: a revision+1 row supersedes the old one in the same tx; the chain links via <c>supersedes_entry_id</c>. Curation stays REST (D4).</summary>
     public async Task<MemoryOpOutcome> CorrectAsync(
         MemoryAccessContext caller, Guid entryId, string content, string? contentSummary, CancellationToken ct)
     {
@@ -446,7 +446,7 @@ public sealed class MemoryBroker(
         return MemoryOpOutcome.Ok;
     }
 
-    /// <summary>Share (explicit cross-team grant, §14.2): private entries are unsharable by construction; the grantee must exist in the roster. Re-grant revives a revoked row (no duplicates).</summary>
+    /// <summary>Share (explicit cross-team grant): private entries are unsharable by construction; the grantee must exist in the roster. Re-grant revives a revoked row (no duplicates).</summary>
     public async Task<MemoryOpOutcome> ShareAsync(MemoryAccessContext caller, Guid entryId, string granteeTeam, CancellationToken ct)
     {
         var now = timeProvider.GetUtcNow().UtcDateTime;
@@ -554,7 +554,7 @@ public sealed class MemoryBroker(
         return MemoryOpOutcome.Ok;
     }
 
-    /// <summary>Export (§14.3 core for portable text): NDJSON of the caller-readable, live entries of one resolved scope (appendix §6.1 field names).</summary>
+    /// <summary>Export (core for portable text): NDJSON of the caller-readable, live entries of one resolved scope (field names).</summary>
     public async Task<string?> ExportAsync(MemoryAccessContext caller, string scopeSelector, CancellationToken ct)
     {
         await using var db = await contextFactory.CreateDbContextAsync(ct);
@@ -593,9 +593,9 @@ public sealed class MemoryBroker(
     }
 
     /// <summary>
-    /// The external attestation path (appendix §6.2): an <c>event.memory.used</c>
+    /// The external attestation path: an <c>event.memory.used</c>
     /// records the same usage row an in-kernel recall writes. The event plane
-    /// never 500s on memory (§14.6) — an unknown entry or unreadable team
+    /// never 500s on memory — an unknown entry or unreadable team
     /// audits a deny and swallows (the arm answers accepted either way).
     /// </summary>
     public async Task RecordUsageAsync(
@@ -876,7 +876,7 @@ public sealed class MemoryBroker(
     {
         if (status != "candidate")
         {
-            // Reviewed knowledge (REST-human active) expires per Project lifetime, not by the candidate clock (§14.6).
+            // Reviewed knowledge (REST-human active) expires per Project lifetime, not by the candidate clock.
             return null;
         }
 

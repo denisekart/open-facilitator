@@ -15,7 +15,7 @@ using Ofac.Protocol.Validation;
 namespace Facilitator.Kernel.Routing;
 
 /// <summary>
-/// The routing funnel (spec §10): the ONLY producer of <c>work.assign</c> rows.
+/// The routing funnel: the ONLY producer of <c>work.assign</c> rows.
 /// Sits on the dispatcher's <c>routing</c> channel — the same
 /// <c>FOR UPDATE SKIP LOCKED</c> + lease choke point as every other sink, so
 /// replicas route one intent at a time without a second queue. One pass of an
@@ -29,7 +29,7 @@ namespace Facilitator.Kernel.Routing;
 /// No candidate ⇒ the audit row records <c>no-candidate</c> vs
 /// <c>no-capacity</c> (an advertised-slot check distinguishes them) and the
 /// row requeues with backoff forever — never dead-letters, because the
-/// endpoint may simply not have booted yet (§18 scale-up reads that row).
+/// endpoint may simply not have booted yet (scale-up reads that row).
 /// The <see cref="IDecisionProvider"/> seam is advisory-only: it sees the
 /// allowed set and its preference is adopted only when in-set, audited.
 /// </summary>
@@ -101,7 +101,7 @@ public sealed class RoutingSink(
             UpsertAudit(db, audit, intent, work.WorkId, allowedJson, chosen: null, "pending", pendingBasis, providerRef: null, now);
             await db.SaveChangesAsync(ct);
             await tx.CommitAsync(ct);
-            // §10 no-route law: requeue with backoff, never dead-letter.
+            // No-route law: requeue with backoff, never dead-letter.
             throw new RoutePendingException(pendingBasis);
         }
 
@@ -224,7 +224,7 @@ public sealed class RoutingSink(
     private static int Specificity(JsonNode descriptor) =>
         DescriptorFields.Count(f => descriptor.AsObject().ContainsKey(f));
 
-    /// <summary>Preference law (§10.1): an intent preference (rule/global
+    /// <summary>Preference law: an intent preference (rule/global
     /// endpoint) is honored when in-set; otherwise the deterministic head
     /// stands. An <c>routing-defaults</c> provider is consulted over the
     /// allowed set only and an out-of-set answer falls back, audited;

@@ -5,7 +5,7 @@ using System.Text.Json;
 namespace Facilitator.Tests.Work;
 
 /// <summary>
-/// The §7.4 generation fence: a terminal completed event whose
+/// The generation fence: a terminal completed event whose
 /// stamped <c>executionGeneration</c> is not the assignment's
 /// <c>current_execution_generation</c> is REFUSED — 422 <c>stale-generation</c>,
 /// the inbox row settles <c>failed</c> with the fence error, and the

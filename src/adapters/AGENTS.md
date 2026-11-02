@@ -2,7 +2,7 @@
 
 ## Purpose
 Adapters grouped by function: `communication/` holds provider adapters
-(spec §13; each speaks the link plane, never the kernel core), `harnesses/`
+(each speaks the link plane, never the kernel core), `harnesses/`
 holds execution-harness adapters. Place a new adapter by what it talks to:
 an external system that feeds events in or takes messages out ⇒
 `communication/<name>/`; a workspace execution harness (runs assignments) ⇒
@@ -10,10 +10,10 @@ an external system that feeds events in or takes messages out ⇒
 `forgejo` + `forgejo-connector` (team-owned forge: webhook normalizer +
 Gateway-child ops executor), `harnesses/adapter-sdk` (the HarnessAdapter
 lifecycle library), and `harnesses/deterministic` (the worked-example
-worker). `kafka` is a spec-derived stub — a README stating its future role.
+worker). `kafka` is a documented stub — a README stating its future role.
 
 ## Truth anchors
-- `../../docs/specs/open_facilitator_framework_architecture.md` §13 —
+- `../../docs/specs/open_facilitator_framework_architecture.md` —
   communication adapter requirements each directory implements.
 - `harnesses/adapter-sdk/README.md` — write-your-own-adapter walkthrough.
 - `../../protocol/json-schema/adapter.v1.json` — the normative child wire.

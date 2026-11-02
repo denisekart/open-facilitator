@@ -1,9 +1,9 @@
 // @ofac/gateway — the team-side composition over @ofac/workspace-link:
 // one Link endpoint (gw.<slug>), a fleet of children (embedded builtin or
 // socket-attached) behind the serializable ChildExecutor vocabulary, the
-// §6.1 execution ledger + per-child fleet state, reconcile-on-restart, a
+// Execution ledger + per-child fleet state, reconcile-on-restart, a
 // deny-by-default policy seam, and a localhost diagnostics endpoint.
-// The Gateway composes the SDK — it never forks it (spec S:471).
+// The Gateway composes the SDK — it never forks it.
 export const GATEWAY_PACKAGE = "@ofac/gateway";
 
 export {

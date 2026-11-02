@@ -7,7 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Facilitator.Tests.Dispatch;
 
 /// <summary>
-/// §26 slice-1 exit test: "Restart after accepted event; no loss or duplicate
+/// Exit test: "Restart after accepted event; no loss or duplicate
 /// business command". Factory A runs WITHOUT the OutboxDispatcher timer, so
 /// accepted commands' outbox rows are durable but undelivered; A dies. Factory
 /// B over the same container drains them exactly once (ledger + DB

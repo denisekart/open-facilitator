@@ -27,7 +27,7 @@ public static class ProvisionEnvelopes
         WorkloadSpec spec, string source, DateTime now, TimeSpan deadlineWindow) =>
         Envelope(StartType, opId, workloadId, team, reason, source, now, deadlineWindow, Spec(spec, workloadId));
 
-    /// <summary>Stop command: the same envelope minus the spec.</summary>
+    /// <summary>Stop command: the same envelope minus the design.</summary>
     public static JsonObject Stop(
         string opId, string workloadId, string team, string reason,
         string source, DateTime now, TimeSpan deadlineWindow) =>

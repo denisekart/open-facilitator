@@ -337,7 +337,7 @@ export class LinkClient {
       await this.options.transport.receipt(receipt);
     } catch (error) {
       // A dropped receipt is survivable: the server redelivers, our ledger
-      // answers `duplicate`, the loop terminates (S:302).
+      // answers `duplicate`, the loop terminates.
       await this.rotation.maybeRefresh(error);
       this.logger.warn("receipt send failed (server will redeliver)", {
         ...correlation,

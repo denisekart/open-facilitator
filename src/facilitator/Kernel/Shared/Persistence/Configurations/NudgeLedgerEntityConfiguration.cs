@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Facilitator.Kernel.Shared.Persistence.Configurations;
 
-/// <summary>facilitator.nudges — bounded-nudge ledger (§5.3): one row per
+/// <summary>facilitator.nudges — bounded-nudge ledger: one row per
 /// (assignment, generation, stall episode); cap rides <c>nudge_count</c>.</summary>
 public sealed class NudgeLedgerEntityConfiguration : IEntityTypeConfiguration<NudgeLedgerEntity>
 {

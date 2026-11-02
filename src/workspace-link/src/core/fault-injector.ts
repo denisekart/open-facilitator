@@ -1,4 +1,4 @@
-// Test mode (appendix §12.3 / A:360): a transport wrapper with explicit
+// Test mode: a transport wrapper with explicit
 // policy callbacks — dropped receipts, network partitions, duplicate
 // deliveries. No env-var magic: the consumer (or a test) composes the faults.
 import type { EnvelopeObject, LinkDeliveryV1, ReceiptV1 } from "@ofac/protocol";

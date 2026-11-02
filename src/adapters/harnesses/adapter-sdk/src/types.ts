@@ -1,4 +1,4 @@
-// The public surface of `@ofac/adapter` (spec §8.3): the HarnessAdapter
+// The public surface of `@ofac/adapter`: the HarnessAdapter
 // lifecycle contract as a TypeScript API over the shipped child wire
 // (`connectChild` from @ofac/gateway, profiled by
 // protocol/json-schema/adapter.v1.json). Documentation-grade types only —
@@ -7,7 +7,7 @@ import type { CapabilityManifestV1, EnvelopeCommand, EnvelopeEvent } from "@ofac
 import type { LinkLogger } from "@ofac/workspace-link";
 
 /**
- * §8.3 S:442's Adapter Descriptor, documentation-grade (NOT on the wire in
+ * The Adapter Descriptor, documentation-grade (NOT on the wire in
  * v1: registration carries the capability manifest, not the descriptor).
  */
 export interface AdapterDescriptor {
@@ -22,7 +22,7 @@ export interface AdapterDescriptor {
 }
 
 /**
- * The persistence seam (S:442): a resumable harness plugs its
+ * The persistence seam: a resumable harness plugs its
  * assignmentId/executionGeneration ↔ nativeRunId store in here. Nothing
  * in-repo implements it — `restart-with-context` is the sanctioned v1 path,
  * and the reconcile law (probe ⇒ `unknown` ⇒ `lost`) already covers honesty.
@@ -77,7 +77,7 @@ export interface HarnessHooks {
    */
   onExecute(ctx: RunContext): Promise<RunOutcome>;
   onSteer?(directive: string, ctx: RunContext): void;
-  /** Cooperative interrupt (§8.3 S:439); hard termination is the runtime's job. */
+  /** Cooperative interrupt; hard termination is the runtime's job. */
   onCancel?(reason: string, ctx: RunContext): void;
   /** Reserved seam; v1's execution registry answers `status` itself. */
   statusProvider?(): { readonly activeCount: number };

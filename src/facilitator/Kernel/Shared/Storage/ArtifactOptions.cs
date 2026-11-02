@@ -23,7 +23,7 @@ public sealed class ArtifactOptions
 
     /// <summary>
     /// Operator bindings that make an external artifact URL a trust claim
-    /// (spec §15.4): a declaration whose <c>storageUrl</c> prefix-matches a
+    ///a declaration whose <c>storageUrl</c> prefix-matches a
     /// binding waives the SSRF address screen (scheme/userinfo laws always
     /// apply); a clean screen stores the row <c>verified</c>. Empty (default)
     /// means every external ref stays <c>unverified</c>.

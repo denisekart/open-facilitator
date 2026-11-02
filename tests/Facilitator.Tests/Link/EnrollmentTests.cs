@@ -3,7 +3,7 @@ using System.Text.Json;
 namespace Facilitator.Tests.Link;
 
 /// <summary>
-/// §26.1 item 2 (enrollment half) + appendix §4: enrollment mints a per-endpoint
+/// Enrollment law: enrollment mints a per-endpoint
 /// link token, wrong bootstrap secret is 401 <c>enrollment-secret-invalid</c>,
 /// re-enrollment rotates the token (the old one stops validating immediately),
 /// trustMode is carried, and the enrollment binds to the config-seeded team roster.
@@ -34,7 +34,7 @@ public sealed class EnrollmentTests(DispatchDbFixture fixture)
         AssertTrue(json.GetProperty("expiresAt").TryGetDateTime(out var expiresAt), "expiresAt is a timestamp");
         AssertTrue(expiresAt > DateTime.UtcNow.AddHours(719), "expiresAt honors the 720h default lifetime");
 
-        // enrollment record fields stay server-side (appendix §4): exactly these four
+        // enrollment record fields stay server-side: exactly these four
         Assert.Equal(4, json.EnumerateObject().Count());
 
         // the token IS the principal: capabilities answers 404 capabilities-not-found
@@ -90,7 +90,7 @@ public sealed class EnrollmentTests(DispatchDbFixture fixture)
         var newToken = second.GetProperty("linkToken").GetString()!;
         Assert.NotEqual(oldToken, newToken);
 
-        // §26.1 item 2 lever: the rotated-away token stops validating immediately.
+        // Lever: the rotated-away token stops validating immediately.
         using var oldProbe = await factory.CreateLinkClient(oldToken).GetAsync("/api/link/v1/capabilities");
         Assert.Equal(System.Net.HttpStatusCode.Unauthorized, oldProbe.StatusCode);
 

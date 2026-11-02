@@ -3,8 +3,8 @@ using Facilitator.Kernel.Shared.Persistence;
 namespace Facilitator.Kernel.Shared.Dispatch;
 
 /// <summary>
-/// Thin timer over <see cref="IEventDispatcher"/> (no new container, spec
-/// §25.3): 250 ms when busy, exponential backoff to 5 s when idle, plus a
+/// Thin timer over <see cref="IEventDispatcher"/> (no new container):
+/// 250 ms when busy, exponential backoff to 5 s when idle, plus a
 /// <c>LISTEN facilitator_outbox</c> wake (<see cref="PgWakeListener"/>).
 /// NOTIFY is a hint only — correctness never depends on the wake — so every
 /// failure on the listener or on a drain is caught and logged; the loop

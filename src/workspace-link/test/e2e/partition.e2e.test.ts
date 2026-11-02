@@ -1,4 +1,4 @@
-// E2E 5 — partition + supersede (plan step 6 item 5, A:360 test mode).
+// E2E 5 — partition + supersede via the injected-fault transport.
 // While partitioned, an event publish BUFFERS in the client's outbox and
 // resolves `accepted` (handler-side outcome stands); a superseding second
 // client forces the first off (frozen goodbye `session-superseded`); after

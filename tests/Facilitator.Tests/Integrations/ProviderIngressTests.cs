@@ -167,7 +167,7 @@ public sealed class ProviderIngressTests(DispatchDbFixture fixture) : IAsyncLife
     [Fact]
     public async Task DmSlashLinkMintsChallengeWithoutMention()
     {
-        // §11 delivers linking to UNLINKED accounts via DM, and a DM post
+        // The chat plane delivers linking to UNLINKED accounts via DM, and a DM post
         // normalizes message.v1 (never mention.v1) — the mint must ride the
         // message arm or a fresh account can never start linking.
         var (factory, link, _, _) = await EnabledPlane();

@@ -4,7 +4,7 @@ namespace Facilitator.Kernel.Shared.Persistence;
 
 /// <summary>
 /// The ONE Postgres wake-notify form: <c>pg_notify(channel, payload)</c> with
-/// a parameterized payload. NOTIFY is a hint only (spec §7.3) — correctness
+/// a parameterized payload. NOTIFY is a hint only — correctness
 /// never depends on the wake, only latency does.
 /// </summary>
 public static class PostgresNotifications

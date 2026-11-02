@@ -3,7 +3,7 @@
 // accepts ⇒ receipt `acked` server-side; the two events the handler published
 // reach the kernel inbox (`processed`); re-seeding the SAME envelope (fresh
 // outbox row ⇒ fresh deliveryId, same dedupe identity) answers `duplicate`
-// without re-invoking the handler (A:303-304, §26.1 item 3 client half).
+// without re-invoking the handler (the client-side duplicate law).
 import { describe, expect, it } from "vitest";
 import { createEchoHandler, type LinkHandler } from "../../src/index.js";
 import type { EnvelopeCommand, WorkAssignCommandV1Data } from "@ofac/protocol";
@@ -82,7 +82,7 @@ describe.skipIf(!E2E)("link delivery pipeline", () => {
     });
     expect(a.client.counters.duplicate).toBe(1);
     expect(a.client.counters.delivered).toBe(2);
-    // Handler NOT re-invoked for the duplicate (client-side half of §26.1 item 3).
+    // Handler NOT re-invoked for the duplicate (client-side half).
     expect(
       seen.filter((c) => c === (envelope.data as { commandId: string }).commandId),
     ).toHaveLength(1);

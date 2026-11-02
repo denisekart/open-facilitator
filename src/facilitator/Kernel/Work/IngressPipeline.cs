@@ -11,7 +11,7 @@ using Ofac.Protocol.Validation;
 namespace Facilitator.Kernel.Work;
 
 /// <summary>
-/// Shared plumbing for the inline ingress paths (appendix §5.3, spec §19.3):
+/// Shared plumbing for the inline ingress paths:
 /// span/metrics wrapping, inbox settle, and the ONE steer-result switch every
 /// caller of <c>ApplySteerAsync</c> must answer identically.
 /// </summary>

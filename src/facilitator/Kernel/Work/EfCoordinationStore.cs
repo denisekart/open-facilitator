@@ -9,9 +9,9 @@ using Ofac.Protocol.Validation;
 namespace Facilitator.Kernel.Work;
 
 /// <summary>
-/// EF Core implementation of the §20 coordination seam. Each mutation opens
+/// EF Core implementation of the coordination seam. Each mutation opens
 /// one transaction, takes <c>pg_advisory_xact_lock(hashtext(work_id))</c> so
-/// per-Work decisions serialize, applies a version-checked UPDATE (spec §7.4),
+/// per-Work decisions serialize, applies a version-checked UPDATE,
 /// appends the timeline + outbox rows, and pokes <c>NOTIFY facilitator_outbox</c>
 /// (hint only) — all before commit.
 /// </summary>
@@ -119,7 +119,7 @@ public sealed class EfCoordinationStore(
         }
 
         var now = timeProvider.GetUtcNow().UtcDateTime;
-        // §7.4: an explicit re-dispatch is the next execution generation of
+        // An explicit re-dispatch is the next execution generation of
         // the work's assignment line (max prior attempt + 1; 1 for a bare work).
         var priorGeneration = await db.ExecutionAttempts.AsNoTracking()
             .Where(a => a.Assignment!.WorkId == workId)
@@ -311,7 +311,7 @@ public sealed class EfCoordinationStore(
     /// delivers it to the bound child or honestly rejects
     /// (<c>no-binding</c>/<c>child-disconnected</c>) — a rejected steer is
     /// a normal result, the timeline row + progress note stand either way.
-    /// No live execution ⇒ §23.1's restart-with-context leg: a fresh routing
+    /// No live execution ⇒ the restart-with-context leg: a fresh routing
     /// intent re-dispatches through the funnel (no arm addresses an endpoint
     /// directly) reusing the ORIGINAL envelope's capability/target/inputs
     /// (the worker re-hydrates from the branch + PR lineage); the original
@@ -343,7 +343,7 @@ public sealed class EfCoordinationStore(
             .FirstOrDefaultAsync(ct);
         if (latest is not null && !AttemptTerminal.Contains(latest.Status))
         {
-            // §7.4: a live steer does NOT bump the generation — it rides the
+            // A live steer does NOT bump the generation — it rides the
             // live attempt's generation, so the worker's echoed terminal
             // events still fence-match the assignment.
             var steer = Facilitator.Kernel.Integrations.ProviderEnvelopes.Steer(
@@ -397,7 +397,7 @@ public sealed class EfCoordinationStore(
             ExtraInputsJson: extraInputs.Count > 0 ? extraInputs.ToJsonString() : null,
             ActorEvidenceRef: originalData["actorEvidenceRef"]?.GetValue<string>()
                 ?? $"kernel:steer:{commandId}",
-            // §7.4 generation fencing: a re-dispatch is the next execution
+            // Generation fencing: a re-dispatch is the next execution
             // generation of the assignment's work line (prior attempt's + 1);
             // terminal events from the fenced-over run stop matching it.
             ExecutionGeneration: latest?.Generation + 1 ?? 1);
@@ -487,7 +487,7 @@ public sealed class EfCoordinationStore(
 
     /// <summary>Completion hook: a terminal transition of a bound Work
     /// appends one <c>command.communication.reply.v1</c> to the bound
-    /// conversation, inside the SAME transaction (the §13.2 reply law; the
+    /// conversation, inside the SAME transaction (the reply law; the
     /// deterministic <c>communication-reply:&lt;transitionEventId&gt;</c>
     /// commandId makes retries idempotent on the ledger). No binding or no
     /// registered provider ⇒ zero rows.</summary>

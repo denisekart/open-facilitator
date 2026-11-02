@@ -9,7 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Facilitator.Tests.Memory;
 
 /// <summary>
-/// The D9 write guards and the §14.6 retention pass: a per-team daily budget
+/// The D9 write guards and the retention pass: a per-team daily budget
 /// answers the typed 422 + audit deny, and an expired candidate tombstones
 /// (content drop ⇒ out of every search, shares revoked, <c>memory.gc</c>
 /// audited) under the second hosted loop's explicit pass.

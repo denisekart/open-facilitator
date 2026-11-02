@@ -37,7 +37,7 @@ public sealed record LinkAdmission(ProblemDetails? Problem, string? Status, Guid
 /// SignalR <c>Envelope</c> hub method and <c>POST /api/link/v1/events</c>
 /// (identical semantics on both transports). The validation prefix lives in
 /// <see cref="AdmissionGate"/>; this class keeps dedupe (the shared
-/// <see cref="IngressStore"/> insert, spec S:301) + dispatch: work.steer runs
+/// <see cref="IngressStore"/> insert) + dispatch: work.steer runs
 /// the SAME ApplySteerAsync path as Work's ingress, the other known commands
 /// settle as a processed no-op, event-class settles accepted with no side
 /// effects, and the receipt-class / assign / unknown-command classes were

@@ -2,7 +2,7 @@ namespace Facilitator.Kernel.Shared.Storage;
 
 /// <summary>
 /// Optional store capability: mint S3-standard presigned URLs so upload and
-/// download byte flows bypass the kernel (spec §15.4 portable retrieval). An
+/// download byte flows bypass the kernel (portable retrieval). An
 /// adapter that cannot hand out URLs (filesystem) simply does not implement
 /// this; callers probe with <c>is IStoreSignedUrlSource</c> and fall back to
 /// the kernel-proxied surface. A URL is only ever minted for a key the

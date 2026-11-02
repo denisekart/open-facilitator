@@ -392,7 +392,7 @@ describe("work.assign routing", () => {
   });
 });
 
-describe("reconcile-on-restart (§6.3)", () => {
+describe("reconcile-on-restart", () => {
   it("running row + fresh child `unknown` ⇒ row lost, ONE retryable assignment.failed from the GATEWAY, before ready", async () => {
     const cfg = config();
     const paths = testPaths(cfg.stateDir);
@@ -441,7 +441,7 @@ describe("reconcile-on-restart (§6.3)", () => {
   });
 });
 
-describe("connectionGeneration fencing (S:329)", () => {
+describe("connectionGeneration fencing", () => {
   it("event against an old generation: stale-generation log, row unchanged, nothing forwarded", async () => {
     const captured: ((env: EnvelopeEvent) => Promise<EnvelopeAck>)[] = [];
     const { rt, mock, lines } = await booted({

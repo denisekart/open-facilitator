@@ -1,5 +1,5 @@
 // E2E standalone: a STANDALONE gateway boots with an empty
-// fleet — the spec's zero-child allowance — links + reconciles + is ready,
+// fleet — the design's zero-child allowance — links + reconciles + is ready,
 // the kernel serves no manifest, and a child that shows up LATER is
 // accepted and union-POSTs. The late child then reconnects the fleet to
 // life: diagnostics report it connected with generation 1.

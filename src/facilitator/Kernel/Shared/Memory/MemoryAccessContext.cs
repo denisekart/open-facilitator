@@ -5,7 +5,7 @@ using Facilitator.Kernel.Shared.Storage;
 namespace Facilitator.Kernel.Shared.Memory;
 
 /// <summary>
-/// The server-side authority view of whoever asked (spec §14.3): built ONLY
+/// The server-side authority view of whoever asked: built ONLY
 /// from a verified principal — the OIDC REST principal or the link plane's
 /// <see cref="EffectivePrincipal"/> — never from agent JSON. The broker
 /// resolves every scope against this context; a caller-supplied selector is a

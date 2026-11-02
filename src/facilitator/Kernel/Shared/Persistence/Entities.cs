@@ -31,7 +31,7 @@ public sealed class ProjectEntity
     public TeamEntity? Team { get; set; }
 }
 
-/// <summary>facilitator.works — the §4.1 Work aggregate root.</summary>
+/// <summary>facilitator.works — the Work aggregate root.</summary>
 public sealed class WorkEntity
 {
     public Guid WorkId { get; set; }
@@ -40,10 +40,10 @@ public sealed class WorkEntity
 
     public required string Objective { get; set; }
 
-    /// <summary>Wire state name (CHECK-constrained to the §4.1 set).</summary>
+    /// <summary>Wire state name (CHECK-constrained to the set).</summary>
     public required string State { get; set; }
 
-    /// <summary>Optimistic-fencing version (spec §7.4); bumped atomically with every state change.</summary>
+    /// <summary>Optimistic-fencing version; bumped atomically with every state change.</summary>
     public long Version { get; set; }
 
     /// <summary>Inbox row that created this Work (lineage).</summary>
@@ -56,7 +56,7 @@ public sealed class WorkEntity
     public ProjectEntity? Project { get; set; }
 }
 
-/// <summary>facilitator.assignments — §4.1 Assignment aggregate.</summary>
+/// <summary>facilitator.assignments — Assignment aggregate.</summary>
 public sealed class AssignmentEntity
 {
     public Guid AssignmentId { get; set; }
@@ -144,7 +144,7 @@ public sealed class WorkEventEntity
     public WorkEntity? Work { get; set; }
 }
 
-/// <summary>facilitator.inbox — transactional ingress (§7.1, §19.2 superset).</summary>
+/// <summary>facilitator.inbox — transactional ingress (dedupe inbox).</summary>
 public sealed class InboxEntity
 {
     public Guid InboxId { get; set; }
@@ -153,7 +153,7 @@ public sealed class InboxEntity
 
     public required string EventId { get; set; }
 
-    /// <summary>Business-command dedupe key (unique when present, §7.1).</summary>
+    /// <summary>Business-command dedupe key (unique when present).</summary>
     public string? CommandId { get; set; }
 
     public string? Provider { get; set; }
@@ -163,7 +163,7 @@ public sealed class InboxEntity
     /// <summary>jsonb document (the full source envelope/body).</summary>
     public required string Payload { get; set; }
 
-    /// <summary>sha256 hex of the exact wire bytes (§7.1 provider-path audit).</summary>
+    /// <summary>sha256 hex of the exact wire bytes (provider-path audit).</summary>
     public required string PayloadSha256 { get; set; }
 
     public Guid? WorkId { get; set; }
@@ -186,7 +186,7 @@ public sealed class InboxEntity
     public DateTime? ProcessedAt { get; set; }
 }
 
-/// <summary>facilitator.outbox — transactional egress (§7.2, appendix §5.2).</summary>
+/// <summary>facilitator.outbox — transactional egress.</summary>
 public sealed class OutboxEntity
 {
     public Guid OutboxId { get; set; }
@@ -227,7 +227,7 @@ public sealed class OutboxEntity
     public DateTime? ProcessedAt { get; set; }
 }
 
-/// <summary>facilitator.dead_letters — appendix §5.6: diagnostics + original CloudEvent.</summary>
+/// <summary>facilitator.dead_letters: diagnostics + original CloudEvent.</summary>
 public sealed class DeadLetterEntity
 {
     public Guid DeadLetterId { get; set; }
@@ -242,7 +242,7 @@ public sealed class DeadLetterEntity
     public DateTime CreatedAt { get; set; }
 }
 
-/// <summary>facilitator.provider_events — §7.1 audit of the full provider source.</summary>
+/// <summary>facilitator.provider_events — audit of the full provider source.</summary>
 public sealed class ProviderEventEntity
 {
     public Guid ProviderEventId { get; set; }
@@ -261,7 +261,7 @@ public sealed class ProviderEventEntity
     public DateTime ReceivedAt { get; set; }
 }
 
-/// <summary>facilitator.link_sessions — §7.3 session leases.</summary>
+/// <summary>facilitator.link_sessions — session leases.</summary>
 public sealed class LinkSessionEntity
 {
     public required string LogicalEndpointId { get; set; }
@@ -319,7 +319,7 @@ public sealed class RoutingDecisionEntity
     public DateTime UpdatedAt { get; set; }
 }
 
-/// <summary>facilitator.link_enrollments — enrollment records (appendix §4).</summary>
+/// <summary>facilitator.link_enrollments — enrollment records.</summary>
 public sealed class LinkEnrollmentEntity
 {
     public Guid EnrollmentId { get; set; }
@@ -357,7 +357,7 @@ public sealed class LinkEnrollmentEntity
     public string? WorkloadSubject { get; set; }
 }
 
-/// <summary>facilitator.link_deliveries — durable delivery/receipt ledger (S:1336 delivery_receipts).</summary>
+/// <summary>facilitator.link_deliveries — durable delivery/receipt ledger.</summary>
 public sealed class LinkDeliveryEntity
 {
     public Guid DeliveryId { get; set; }
@@ -444,7 +444,7 @@ public sealed class CommunicationBindingEntity
     public DateTime CreatedAt { get; set; }
 }
 
-/// <summary>facilitator.provider_identities — §11.1 verified provider-account mapping
+/// <summary>facilitator.provider_identities — verified provider-account mapping
 /// (provider, tenant, accountId) → (oidc issuer, subject) with redemption provenance.</summary>
 public sealed class ProviderIdentityEntity
 {
@@ -460,7 +460,7 @@ public sealed class ProviderIdentityEntity
 
     public required string OidcSubject { get; set; }
 
-    /// <summary>The challenge row that provened this mapping (§11 single-use code).</summary>
+    /// <summary>The challenge row that provened this mapping (single-use code).</summary>
     public Guid? ChallengeId { get; set; }
 
     public DateTime CreatedAt { get; set; }
@@ -468,7 +468,7 @@ public sealed class ProviderIdentityEntity
     public DateTime UpdatedAt { get; set; }
 }
 
-/// <summary>facilitator.provider_link_challenges — §11 single-use linking codes:
+/// <summary>facilitator.provider_link_challenges — single-use linking codes:
 /// minted by a /link mention, delivered by bot DM, redeemed on the human plane.</summary>
 public sealed class ProviderLinkChallengeEntity
 {
@@ -498,7 +498,7 @@ public sealed class ProviderLinkChallengeEntity
     public DateTime? RedeemedAt { get; set; }
 }
 
-/// <summary>facilitator.audit — every authorization-gate decision, allow and deny (appendix §3.2 step 5).</summary>
+/// <summary>facilitator.audit — every authorization-gate decision, allow and deny.</summary>
 public sealed class AuditEventEntity
 {
     public Guid AuditId { get; set; }
@@ -660,7 +660,7 @@ public sealed class ResultManifestEntity
 }
 
 /// <summary>
-/// facilitator.memory_scopes — one home scope per memory entry (spec §14.2):
+/// facilitator.memory_scopes — one home scope per memory entry:
 /// rows are provisioned lazily by retain (D6), owned by exactly one team. The
 /// canonical selector is the broker-resolved identity, never a worker claim.
 /// </summary>
@@ -693,7 +693,7 @@ public sealed class MemoryEntryEntity
     public Guid ScopeId { get; set; }
     /// <summary>Owner team (denormalized from the scope for the ACL predicate).</summary>
     public string TeamSlug { get; set; } = string.Empty;
-    /// <summary>One of the seven §14.4 classifications (CHECK).</summary>
+    /// <summary>One of the seven classifications (CHECK).</summary>
     public string Type { get; set; } = string.Empty;
     public string Content { get; set; } = string.Empty;
     public string MediaType { get; set; } = "text/plain";
@@ -736,7 +736,7 @@ public sealed class MemoryShareEntity
 }
 
 /// <summary>
-/// facilitator.memory_usage — the <c>memory.used</c> law as data (appendix §6.2,
+/// facilitator.memory_usage — the <c>memory.used</c> law as data (
 /// D3): one row per entry returned to an automated reader (kernel recall
 /// or an external attestation via <c>event.memory.used</c>). Rows survive entry
 /// deletion: the audit trail outlives the content.
@@ -754,8 +754,8 @@ public sealed class MemoryUsageEntity
 }
 
 /// <summary>
-/// facilitator.admin_config — the operator configuration store (spec
-/// §17.4): one row per editable resource, optimistic <c>row_version</c>
+/// facilitator.admin_config — the operator configuration store:
+/// one row per editable resource, optimistic <c>row_version</c>
 /// fenced PATCH (If-Match), same-tx audit + bounded history. Stored intent
 /// only: a <c>Config:</c>-file value remains the runtime truth until a
 /// feature reads through.
@@ -823,7 +823,7 @@ public sealed class ProvisioningOpEntity
     /// <summary>The managed workload (= its link endpoint id).</summary>
     public required string WorkloadId { get; set; }
 
-    /// <summary>The owning team slug (the spec's team, wire-required).</summary>
+    /// <summary>The owning team slug (wire-required).</summary>
     public required string Team { get; set; }
 
     /// <summary>start | stop.</summary>

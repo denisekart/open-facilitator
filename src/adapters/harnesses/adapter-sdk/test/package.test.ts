@@ -1,4 +1,4 @@
-// The published surface of @ofac/adapter: everything the locked §8.3 API
+// The published surface of @ofac/adapter: everything the locked API
 // names, reachable from the BUILT dist (what a third-party import sees).
 import { describe, expect, it } from "vitest";
 

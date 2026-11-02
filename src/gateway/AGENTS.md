@@ -22,7 +22,7 @@ childwire).
 - **Stamp law:** a binding's `connectionGeneration` is the accepting session's
   leaseEpoch — `onAssign` awaits the first welcome (`awaitSessionEpoch()`)
   because a delivery frame can beat the handshake continuation; an epoch-0 row
-  would make reconcile's freshness law (§6.3, fence below) lie.
+  would make reconcile's freshness law (fence below) lie.
 - **Reconcile completes before the ready line**; redeliveries can't race it
   because the SDK ledger answers `duplicate` without touching bindings.
 - **Exit codes are linkd's law:** 0 clean · 2 config · 3 protocol mismatch ·

@@ -53,7 +53,7 @@ outbound echo and inbound event dedupe to one row. **Every** executed
 command records its provider object id keyed by
 the command's `idempotencyKey` in the SQLite post-ledger BEFORE the receipt
 goes out — a delivery replay answers `accepted` without touching Mattermost,
-so replays never double-post (§13.3). `update` only edits a post the ledger
+so replays never double-post. `update` only edits a post the ledger
 proves the adapter created; `acknowledge` is a no-op accepted. After a
 successful reply/update, the bot's own `message.v1` echo rides back through
 `CommandContext.publishEvent` so the kernel records the outbound post id into

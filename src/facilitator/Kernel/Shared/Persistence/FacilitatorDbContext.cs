@@ -1,13 +1,13 @@
 
 using Microsoft.EntityFrameworkCore;
-// ADR (spec §7.2/§7.4, §19.3): Why this schema looks like this —
+// ADR: Why this schema looks like this —
 //  * `inbox`/`outbox` carry their own lease + attempt columns so claims run as
 //    short `FOR UPDATE SKIP LOCKED` transactions; the dispatcher calls sinks
-//    OUTSIDE any transaction (no remote I/O inside a long tx, §19.3).
-//  * `works.version` is the optimistic fence (§7.4): every state change is a
+//    OUTSIDE any transaction (no remote I/O inside a long tx).
+//  * `works.version` is the optimistic fence: every state change is a
 //    version-checked UPDATE inside a per-Work `pg_advisory_xact_lock`, so two
 //    concurrent causal decisions cannot overwrite one another.
-//  * `NOTIFY facilitator_outbox` is a HINT only (§7.3): correctness comes from
+//  * `NOTIFY facilitator_outbox` is a HINT only: correctness comes from
 //    the polling claim query, never from the wake.
 //  * Tables beyond the original ingress/dispatch write set (link_sessions,
 //    approvals, communication_bindings, teams/projects/assignments
@@ -15,7 +15,7 @@ using Microsoft.EntityFrameworkCore;
 //    needs a disruptive re-baseline.
 namespace Facilitator.Kernel.Shared.Persistence;
 
-/// <summary>The single transactional foundation (spec §19), schema <c>facilitator</c>.</summary>
+/// <summary>The single transactional foundation, schema <c>facilitator</c>.</summary>
 public class FacilitatorDbContext(DbContextOptions<FacilitatorDbContext> options) : DbContext(options)
 {
     public DbSet<TeamEntity> Teams => Set<TeamEntity>();

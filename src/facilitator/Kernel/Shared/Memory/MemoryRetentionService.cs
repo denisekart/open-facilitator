@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore.Storage;
 namespace Facilitator.Kernel.Shared.Memory;
 
 /// <summary>
-/// The memory retention pass (spec §14.6): the second hosted loop
+/// The memory retention pass: the second hosted loop
 /// (advisory lock <c>420003</c> — 420001 is migrations, 420002 artifact GC),
 /// independent of the artifact loop by design. Candidates whose
 /// <c>expires_at</c> lapsed are tombstoned under the D5 law — content drop
@@ -50,7 +50,7 @@ public sealed class MemoryRetentionService(
             catch (Exception ex)
             {
                 // Log-and-continue: a failed pass retries next tick — a memory
-                // outage never takes the host down (§14.6).
+                // outage never takes the host down.
                 logger.LogWarning(ex, "memory retention pass failed; retrying next tick");
             }
         }

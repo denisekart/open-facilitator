@@ -30,8 +30,7 @@ public sealed record ApprovalArm(ProblemDetails? Problem, string Status, string?
 /// from the command's <c>actorEvidenceRef</c> via <see cref="ResolveWireActorAsync"/>
 /// (no AdmissionGate on that surface); the Link plane hands over the gate's
 /// already-screened delegated identity. A workload-only response (no verified
-/// human) denies 403 <c>approval-actor-unknown</c> — non-repudiation (§12.1
-/// step 4) needs a verified subject.
+/// human) denies 403 <c>approval-actor-unknown</c> — non-repudiation needs a verified subject.
 /// </summary>
 public sealed class ApprovalIngress(
     IApprovalLedger ledger,
@@ -72,7 +71,7 @@ public sealed class ApprovalIngress(
 
     /// <summary>
     /// Command arm: a Link-plane workload (the Gateway that recorded the
-    /// approval) consumes an approved row before applying it (spec §12.1 step 5).
+    /// approval) consumes an approved row before applying it.
     /// Authorization is the ledger's caller-endpoint gate (row ownership), not a
     /// human identity — a foreign or non-gateway caller sees 404/403.
     /// </summary>

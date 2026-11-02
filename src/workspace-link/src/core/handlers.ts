@@ -1,4 +1,4 @@
-// Built-in handlers (locked decision): enough to run §26.1's
+// Built-in handlers (locked decision): enough to run the
 // client-side items end-to-end without a harness. The deterministic
 // worker replaces them; embedders compose createEchoHandler/createStubHandler.
 import type { EnvelopeCommand, WorkAssignCommandV1Data } from "@ofac/protocol";

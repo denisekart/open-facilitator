@@ -6,7 +6,7 @@
 // this module is already authorized (privilege ceiling: the forge token
 // lives only in this process).
 //
-// Ambiguous-timeout law (§5.4): when a mutation's HTTP answer is lost
+// Ambiguous-timeout law: when a mutation's HTTP answer is lost
 // (timeout/5xx on a write), the run fails with the ledger row left `pending`
 // and NO provider object id; a later attempt reconciles by READ before
 // touching the forge again. (Ops here fail fast on transport errors, so the

@@ -17,9 +17,9 @@ namespace Facilitator.Kernel.Link;
 /// The Workspace Link hub: thin transport, no work execution. Server methods
 /// <c>Hello</c>/<c>Envelope</c>/<c>Receipt</c>/<c>Heartbeat</c>/<c>Goodbye</c>;
 /// client methods <c>Welcome</c> (Hello's return value), <c>Deliver</c>,
-/// <c>FlowControl</c>, <c>Disconnect</c> (spec S:294). Authoritative liveness
+/// <c>FlowControl</c>, <c>Disconnect</c>. Authoritative liveness
 /// is the <c>link_sessions</c> lease, not socket state; this replica's
-/// registry only knows its own sockets (§7.3). Bearer auth runs through the
+/// registry only knows its own sockets. Bearer auth runs through the
 /// <c>facilitator-link</c> scheme, which shares the
 /// <see cref="ILinkTokenValidator"/> seam with the HTTP surface.
 /// </summary>
@@ -47,7 +47,7 @@ public sealed class LinkHub(
     public const string TeamSlugClaim = "facilitator.team_slug";
 
     /// <summary>
-    /// Handshake (spec §5.3): validate the hello frame, intersect
+    /// Handshake: validate the hello frame, intersect
     /// protocolVersions with the server's <c>["v1"]</c> — empty intersection
     /// mints a session id WITHOUT a link_sessions row and returns null after
     /// pushing the frozen goodbye frame — else bump the epoch (superseding +
@@ -79,7 +79,7 @@ public sealed class LinkHub(
             ? lka.GetString()
             : null;
 
-        // appendix §4: trustMode MUST be logged at every reconnect.
+        // TrustMode MUST be logged at every reconnect.
         logger.LogInformation(
             "link hello endpoint={EndpointId} instance={InstanceId} trustMode={TrustMode} lastKnownAck={LastKnownAck} (hint only)",
             endpointId, instanceId, principal.TrustMode, lastKnownAck ?? "-");
@@ -116,7 +116,7 @@ public sealed class LinkHub(
         span?.SetTag("facilitator.session_epoch", epoch);
         span?.SetTag("facilitator.protocol_version", negotiated);
 
-        // §5.3 step 4: pending deliveries come from the ledger, immediately.
+        // Pending deliveries come from the ledger, immediately.
         await pump.PumpEndpointAsync(endpointId, options.MaxInFlight, Context.ConnectionAborted);
         registry.Wake(endpointId);
 
@@ -134,7 +134,7 @@ public sealed class LinkHub(
     }
 
     /// <summary>
-    /// Receipt for a delivered envelope: the ledger is truth (S:291) and
+    /// Receipt for a delivered envelope: the ledger is truth and
     /// <see cref="LinkReceipts.CommitAsync"/> is the single commit path shared
     /// with the HTTP receipt endpoint.
     /// </summary>

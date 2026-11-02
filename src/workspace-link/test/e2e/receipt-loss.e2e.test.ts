@@ -1,4 +1,4 @@
-// E2E 4 — receipt loss (plan step 6 item 4, S:302, A:156). Client drops the
+// E2E 4 — receipt loss. Client drops the
 // receipt for delivery X ⇒ the server's in-flight lease (shortened to 2 s
 // for this file's server) expires ⇒ the sweeper releases X to pending ⇒
 // re-claim re-pushes (attempts=2) ⇒ the client's ledger answers `duplicate`

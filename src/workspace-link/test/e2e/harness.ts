@@ -106,7 +106,7 @@ export async function userToken(username: string, password: string): Promise<str
  * A delegated-action evidence token — password grant on
  * `ofac-evidence`, whose mappers stamp `delegation: true` + groups + the
  * facilitator-api audience. The Gateway verifies an `oidc:<jwt>`
- * actorEvidenceRef against exactly this shape (§11).
+ * actorEvidenceRef against exactly this shape.
  */
 export async function evidenceToken(username: string, password: string): Promise<string> {
   const response = await fetch(`${KEYCLOAK_URL}/realms/facilitator/protocol/openid-connect/token`, {

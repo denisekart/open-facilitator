@@ -7,7 +7,7 @@
 // this transport keeps a hidden SignalR connection that does
 // hello + heartbeats; deliveries flow through the frozen HTTP surface.
 // Because the keeper socket is a tracked hub connection, the pump MAY push
-// Deliver to it instead of leaving rows for the poll (§7.3: any live socket
+// Deliver to it instead of leaving rows for the poll (any live socket
 // claims) — the transport forwards keeper frames into the client pipeline,
 // and the ledger dedupes either arrival surface.
 //
@@ -75,7 +75,7 @@ export class HttpPollTransport implements LinkTransport {
       new SignalrTransport({ baseUrl: options.baseUrl, token: this.token as never });
     // The keeper socket is a tracked hub connection, so the server may
     // legitimately push Deliver/FlowControl/Disconnect to it (the pump
-    // claims for ANY live socket, §7.3). Forwarding keeps both arrival
+    // claims for ANY live socket). Forwarding keeps both arrival
     // surfaces feeding the same client pipeline — the ledger dedupes, so
     // a push-then-poll race can never double-run a delivery.
     this.keeper.onDeliver((d) => this.deliver.emit(d));

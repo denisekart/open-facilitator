@@ -6,7 +6,7 @@ using System.Text.Json;
 namespace Facilitator.Tests.Cli;
 
 /// <summary>
-/// §26.1 item 5: the Facilitator assembly doubles as its own client. A real
+/// The Facilitator assembly doubles as its own client. A real
 /// server process (same container, unique port) is started, then the SAME
 /// assembly is run in <c>cli</c> mode as a child process against the public
 /// HTTP API — create + get round-trip through JSON, no backdoor.

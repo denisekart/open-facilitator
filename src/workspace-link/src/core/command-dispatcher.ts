@@ -1,6 +1,6 @@
 // Command dispatch: run the mounted handler for one delivery, map its
 // outcome onto a receipt, and flip the ledger BEFORE the receipt ships
-// (S:302 — post-crash, the row explains the gap and redelivery lands on
+// (post-crash, the row explains the gap and redelivery lands on
 // `duplicate`, terminating the loop).
 import { KNOWN_COMMAND_TYPES } from "@ofac/protocol";
 import type { EnvelopeCommand, EnvelopeEvent, LinkDeliveryV1, ReceiptV1 } from "@ofac/protocol";
@@ -144,7 +144,7 @@ export class CommandDispatcher {
     // Fencing: the receipt echoes the delivered command's execution
     // epoch (when it carried one) so the kernel fences a stale execution.
     receipt = { ...receipt, ...epochField(delivery.envelope) };
-    // Ledger flip BEFORE the receipt (S:302).
+    // Ledger flip BEFORE the receipt.
     ledger.markState(delivery.deliveryId, state);
     await sendReceipt(delivery.deliveryId, receipt, correlation);
   }

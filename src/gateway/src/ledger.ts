@@ -1,9 +1,9 @@
 // The Gateway execution ledger: one SQLite file (<stateDir>/gateway.sqlite3)
-// holding the §6.1 binding tuple per accepted command. Delivery-level dedupe
+// holding the binding tuple per accepted command. Delivery-level dedupe
 // stays in the SDK's SqliteLedger (link.sqlite3, second file, second
 // concern); THIS table is the execution truth reconcile-on-restart reads.
-// Room preserved for a sibling `connector_actions` table (appendix §5.4) —
-// separate tables, no overloading (A:146).
+// Room preserved for a sibling `connector_actions` table —
+// separate tables, no overloading.
 import type { Ledger } from "@ofac/workspace-link";
 import { chmodSync, existsSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS bindings (
   assignment_id TEXT NOT NULL,
   execution_id  TEXT NOT NULL,                -- gateway-issued, assigned at accept time
   work_id       TEXT NOT NULL,                -- reconcile's assignment.failed needs it
-  connection_generation INTEGER NOT NULL,     -- leaseEpoch at write time (S:329 freshness fence)
+  connection_generation INTEGER NOT NULL,     -- leaseEpoch at write time (freshness fence)
   execution_generation  INTEGER NOT NULL DEFAULT 1, -- assign envelope's executionGeneration (event stamp)
   child_generation INTEGER NOT NULL DEFAULT 0, -- child-connection fence (v2); 0 = pre-child-era row
   state         TEXT NOT NULL CHECK (state IN ('running','completed','failed','lost')),
@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS bindings (
 
 // Per-child fleet truth (v2): the child connection fence is Gateway-internal —
 // `child_generation` bumps on every re-register and fences inbound frames;
-// `connection_generation` stays the Link leaseEpoch (spec §6.3 tuple).
+// `connection_generation` stays the Link leaseEpoch.
 const DDL_CHILD_STATE = `
 CREATE TABLE IF NOT EXISTS child_state (
   child_id         TEXT PRIMARY KEY,
@@ -303,7 +303,7 @@ export class ExecutionLedger {
       );
     }
     // Idempotent for every pre-v4 file (v1/v2/v3-era): the
-    // event stamp splits from the S:329 freshness fence. DEFAULT 1: every
+    // event stamp splits from the freshness fence. DEFAULT 1: every
     // pre-split envelope rode generation 1 (the kernel's pre-split constant).
     const cols = this.db.pragma("table_info(bindings)", { simple: false }) as {
       name: string;

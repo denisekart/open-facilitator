@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Facilitator.Kernel.Shared.Persistence.Configurations;
 
-/// <summary>facilitator.evidence — kernel-issued evidence references (appendix §3.2 kernel: scheme).</summary>
+/// <summary>facilitator.evidence — kernel-issued evidence references (kernel: scheme).</summary>
 public sealed class EvidenceEntityConfiguration : IEntityTypeConfiguration<EvidenceEntity>
 {
     /// <inheritdoc />

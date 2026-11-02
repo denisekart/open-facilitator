@@ -7,7 +7,7 @@ using LinkOptions = Facilitator.Kernel.Link.LinkOptions;
 
 namespace Facilitator.Kernel.Shared.Evidence;
 
-/// <summary>Validation state of an <c>actorEvidenceRef</c> (appendix §3.2).</summary>
+/// <summary>Validation state of an <c>actorEvidenceRef</c>.</summary>
 public enum EvidenceState
 {
     /// <summary>No reference presented — workload authority only.</summary>
@@ -26,7 +26,7 @@ public enum EvidenceState
     Invalid,
 }
 
-/// <summary>One evidence-validation outcome (appendix §3.2 steps 2–4).</summary>
+/// <summary>One evidence-validation outcome.</summary>
 /// <param name="Scheme">Scheme prefix before the first colon ("" when absent).</param>
 /// <param name="State">Validation state.</param>
 /// <param name="DelegatedSubject">Canonical human subject (<c>oidc:iss|sub</c>) when Valid.</param>
@@ -39,7 +39,7 @@ public sealed record EvidenceOutcome(string Scheme, EvidenceState State, string?
 }
 
 /// <summary>
-/// Scheme-split evidence validator (appendix §3.2): <c>oidc:&lt;jwt&gt;</c>
+/// Scheme-split evidence validator: <c>oidc:&lt;jwt&gt;</c>
 /// verifies signature/iss/aud/exp/nbf + the required <c>delegation: true</c>
 /// claim against the realm JWKS; <c>kernel:&lt;id&gt;</c> resolves through
 /// <see cref="IEvidenceStore"/> (unknown/expired/consumed ⇒ Invalid). Every
@@ -91,7 +91,7 @@ public sealed class EvidenceValidator(OidcJwks jwks, IEvidenceStore evidence, Li
             return new EvidenceOutcome("oidc", EvidenceState.Invalid, null, [], "missing-subject");
         }
 
-        // §3.3 authoritative claim set: sub + groups + scope (scope rides to
+        // Authoritative claim set: sub + groups + scope (scope rides to
         // the policy engine; groups first).
         var groups = OidcClaims.ArrayOrSpaced(payload, "groups");
         return new EvidenceOutcome("oidc", EvidenceState.Valid, $"oidc:{verified.Token!.Issuer}|{subject}", groups, null);

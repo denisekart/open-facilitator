@@ -89,7 +89,7 @@ Gateway that cannot report truth is broken.
 |File|Table|Purpose|
 |---|---|---|
 |`link.sqlite3`|`ledger` (SDK)|Delivery inbox: dedupe by `delivery_id` OR `dedupe_key` (= `commandId` for commands) — the replay/duplicate law|
-|`gateway.sqlite3`|`bindings`|§6.1 tuples: `delivery_id, dedupe_key, gateway_id, child_id, assignment_id, execution_id, work_id, state, connection_generation, child_generation, error` — `execution_id` is primary identity; `dedupe_key` UNIQUE, so a redelivered command re-answers instead of re-executing|
+|`gateway.sqlite3`|`bindings`| Binding tuples: `delivery_id, dedupe_key, gateway_id, child_id, assignment_id, execution_id, work_id, state, connection_generation, child_generation, error` — `execution_id` is primary identity; `dedupe_key` UNIQUE, so a redelivered command re-answers instead of re-executing|
 |`gateway.sqlite3`|`child_state`|Fleet durability: per-child last manifest + digest, online/offline, generation fence — survives restarts so /status + reconcile stay honest before any child reconnects|
 |`gateway.sqlite3`|`pending_actions`|Confirm park: one row per `confirm` verdict — approvalId, the exact command envelope, the digested action record, settle state (`awaiting-approval|consumed|failed|expired|revoked`) — replayed against the kernel on reconnect (reconcile polls `GET /api/works/{id}/approvals`)|
 
@@ -101,7 +101,7 @@ real unix-socket listener/child pairs, no kernel network. `pnpm test:e2e`
 harness: assign→echo-complete→inbox-processed, SIGKILL reconcile,
 graceful-restart duplicate, token rotation; two-process fleet assign +
 union POST, child SIGKILL → probe-lost + survivor keeps flowing,
-standalone zero-child boot + late child; the full §12 confirm loop
+standalone zero-child boot + late child; the full confirm loop
 (approval.required → human respond → decided-push → consume → execute once,
 plus deny / cancel-on-pending / cross-team ceiling) rides a real kernel +
 Keycloak + Postgres in `approval-loop.e2e.test.ts`.

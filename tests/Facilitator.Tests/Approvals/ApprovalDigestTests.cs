@@ -8,7 +8,7 @@ using Facilitator.Kernel.Shared;
 namespace Facilitator.Tests.Approvals;
 
 /// <summary>
-/// Law D2: the kernel digest of the appendix §7.2 approval record must
+/// Law D2: the kernel digest of the approval record must
 /// equal the committed cross-language golden regardless of source key order or
 /// unicode spelling (the TS mirror runs the same golden in the protocol suite,
 /// and the .NET fixture harness compiles the same helper).
@@ -32,7 +32,7 @@ public sealed class ApprovalDigestTests
         var baseline = ApprovalDigest.Compute(id, action, actors, expiresAt, createdAt);
 
         // Same action, every object's keys reversed + every string re-spelled
-        // in NFD (decomposed accents): the §7.1 law (NFC + sorted keys) makes
+        // in NFD (decomposed accents): the law (NFC + sorted keys) makes
         // the canonical form — hence the digest — identical.
         var flipped = JsonDocument.Parse(Reverse(action).ToJsonString()).RootElement;
         Assert.Equal(baseline, ApprovalDigest.Compute(id, flipped, actors, expiresAt, createdAt));

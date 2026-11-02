@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Facilitator.Kernel.Shared.Persistence.Configurations;
 
-/// <summary>facilitator.admin_config + admin_config_history (spec §17.4).</summary>
+/// <summary>facilitator.admin_config + admin_config_history.</summary>
 public sealed class AdminConfigEntityConfiguration :
     IEntityTypeConfiguration<AdminConfigEntity>,
     IEntityTypeConfiguration<AdminConfigVersionEntity>

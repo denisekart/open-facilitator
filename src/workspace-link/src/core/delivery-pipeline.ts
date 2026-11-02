@@ -1,4 +1,4 @@
-// The delivery pipeline law (S:301–302): validate BEFORE persisting, persist
+// The delivery pipeline law: validate BEFORE persisting, persist
 // BEFORE answering. A broken envelope is refused without a ledger row (it is
 // not a delivery we can ever reconcile); an unknown COMMAND type enters the
 // ledger as `unsupported` so a redelivery answers `duplicate` instead of
@@ -54,7 +54,7 @@ export class DeliveryPipeline {
     const bytes = Buffer.byteLength(JSON.stringify(delivery.envelope), "utf8");
     const shape = validateEnvelope(delivery.envelope);
     if (!shape.ok) {
-      // Fail-closed taxonomy (S:309): an unknown COMMAND type is `unsupported`
+      // Fail-closed taxonomy: an unknown COMMAND type is `unsupported`
       // and enters the ledger (a redelivery must answer `duplicate`, not
       // re-run the fail-closed path); any other envelope violation is
       // `rejected` with NO ledger row — an envelope we can't parse is not a
@@ -91,7 +91,7 @@ export class DeliveryPipeline {
       });
       return;
     }
-    // 2) Durable inbox BEFORE any answer (S:301): fresh | duplicate.
+    // 2) Durable inbox BEFORE any answer: fresh | duplicate.
     const env = delivery.envelope;
     const dedupe = dedupeKeyOf(env, KNOWN_COMMAND_TYPES);
     if (ledger.insertIfNew(delivery.deliveryId, env, dedupe) === "duplicate") {

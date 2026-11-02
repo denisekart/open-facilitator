@@ -12,7 +12,7 @@ using Ofac.Protocol.Validation;
 namespace Facilitator.Kernel.Work;
 
 /// <summary>
-/// The bounded nudge (§5.3): a host service that sweeps live assignments for
+/// The bounded nudge: a host service that sweeps live assignments for
 /// silence and re-prods the owning gateway at most <see cref="NudgeCap"/>
 /// times per stall episode. The policy is an <c>admin_config</c> row
 /// (<c>nudge-policy</c>, <c>{"staleAfterMinutes": N}</c>) — no row means no
@@ -36,7 +36,7 @@ public sealed class NudgeSweeper(
     ILogger<NudgeSweeper> logger,
     Facilitator.Kernel.Work.NudgeSweeper.NudgeOptions options) : BackgroundService
 {
-    /// <summary>§5.3: three nudges per stall episode, then stalled.</summary>
+    /// <summary>Three nudges per stall episode, then stalled.</summary>
     public const int NudgeCap = 3;
 
     /// <summary>admin_config resource carrying <c>staleAfterMinutes</c>.</summary>
@@ -169,7 +169,7 @@ public sealed class NudgeSweeper(
                 continue; // alive
             }
 
-            // Episode law (§5.3): one episode per stall spell. The latest
+            // Episode law: one episode per stall spell. The latest
             // ledger row's episode continues while the assignment stays
             // silent; observed progress past the episode's recorded activity
             // opens the NEXT episode (the budget is per episode).

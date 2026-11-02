@@ -3,7 +3,7 @@ using System.Text.Json;
 namespace Facilitator.Tests.Link;
 
 /// <summary>
-/// §26.1 item 3 + appendix §10.1 (A:303-304): an outbox row addressed
+/// Delivery flow: an outbox row addressed
 /// <c>link.&lt;endpoint&gt;</c> reaches the live socket as a Deliver frame
 /// whose envelope passes the shared validator, and an accepted receipt flips
 /// outbox AND ledger in one transaction with the receipt stored verbatim.

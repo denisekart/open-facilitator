@@ -1,4 +1,4 @@
-// E2E 2 (§26.1 item 7 basis): SIGKILL mid-flight, restart, reconcile.
+// E2E 2: SIGKILL mid-flight, restart, reconcile.
 // Deterministic recipe: a `stub` child accepts and NEVER completes, so an
 // execution sits `running`; SIGKILL (no goodbye ⇒ the kernel session row
 // survives); restart on the same stateDir/gatewayId ⇒ epoch bumps, the

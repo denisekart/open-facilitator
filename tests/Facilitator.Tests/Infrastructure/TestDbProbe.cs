@@ -554,7 +554,7 @@ public sealed class TestDbProbe : IAsyncDisposable
         string TeamSlug, string Status, string Content, string ContentHash, int Revision,
         string SupersedesEntryId, string ExpiresAt, bool Indexed);
 
-    /// <summary>Usage rows recorded for one entry (the §6.2 usage-event law), optionally one purpose.</summary>
+    /// <summary>Usage rows recorded for one entry (the usage-event law), optionally one purpose.</summary>
     public Task<long> MemoryUsageCount(Guid entryId, string? purpose = null) =>
         ScalarLong(
             "SELECT count(*) FROM facilitator.memory_usage WHERE entry_id = $1"
@@ -1116,7 +1116,7 @@ public sealed class TestDbProbe : IAsyncDisposable
             cmd => cmd.Parameters.AddWithValue(endpointId));
 
     /// <summary>The nudge ledger rows for an assignment (episode, count,
-    /// generation), ordered by episode — the §5.3 bounded-nudge window.</summary>
+    /// generation), ordered by episode — the bounded-nudge window.</summary>
     public async Task<List<(int Episode, int NudgeCount, int Generation)>> NudgeRowsForAssignment(Guid assignmentId)
     {
         await using var connection = await _dataSource.OpenConnectionAsync();

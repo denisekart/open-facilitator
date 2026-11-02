@@ -5,7 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Facilitator.Tests.Dispatch;
 
 /// <summary>
-/// appendix §5.2/§5.6: a sink that always refuses (returns false) burns the
+/// A sink that always refuses (returns false) burns the
 /// five charged attempts and dead-letters the row — a <c>dead_letters</c> row
 /// with reason + original envelope, outbox <c>status='dead_letter'</c>. Backoff
 /// (2^a·2s, capped) is side-stepped by backdating <c>available_at</c> between

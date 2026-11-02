@@ -2,7 +2,7 @@ namespace Facilitator.Kernel.Shared.Identity;
 
 /// <summary>
 /// Strongly-typed binding of the <c>identity:</c> configuration section
-/// (spec §11.2): OIDC token validation, claim-pointer normalization, the
+///OIDC token validation, claim-pointer normalization, the
 /// open role-rule dictionary, and the operation gates. Vendor-neutral — the
 /// kernel speaks OIDC and RFC 6901 only. <see cref="Validate"/> implements
 /// the staged fail-closed boot rules; any error refuses startup.
@@ -15,7 +15,7 @@ public sealed class IdentityOptions
     /// <summary>Oidc: discovery + issuer/audience validation settings.</summary>
     public OidcSection Oidc { get; set; } = new();
 
-    /// <summary>Claims: principal normalization pointers (spec §11.2 verbatim).</summary>
+    /// <summary>Claims: principal normalization pointers (verbatim).</summary>
     public ClaimsSection Claims { get; set; } = new();
 
     /// <summary>Roles: role name -> OR-list of rules; a rule is an AND of conditions.</summary>
@@ -208,7 +208,7 @@ public sealed class OidcSection
     public bool RequireHttps { get; set; } = true;
 }
 
-/// <summary>identity:claims — principal normalization (spec §11.2 block).</summary>
+/// <summary>identity:claims — principal normalization (block).</summary>
 public sealed class ClaimsSection
 {
     /// <summary>Pointer to the subject identifier (required).</summary>
@@ -286,7 +286,7 @@ public sealed class OperationBinding
     public List<string> RolesAnyOf { get; set; } = [];
 }
 
-/// <summary>The three claim value shapes (spec §11.2).</summary>
+/// <summary>The three claim value shapes.</summary>
 public static class ClaimShape
 {
     /// <summary>JSON array of strings.</summary>

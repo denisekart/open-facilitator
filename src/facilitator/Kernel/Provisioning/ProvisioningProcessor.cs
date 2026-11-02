@@ -210,7 +210,7 @@ public sealed class ProvisioningProcessor(
 
         var managed = specs.Keys.ToArray();
 
-        // Liveness: the link lease is the online authority (§7.3, the nudge
+        // Liveness: the link lease is the online authority (the nudge
         // sweeper's law). One query, all managed workloads.
         var live = (await db.LinkSessions.AsNoTracking()
             .Where(s => managed.Contains(s.LogicalEndpointId) && s.LeaseUntil > now)

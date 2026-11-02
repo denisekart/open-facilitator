@@ -3,7 +3,7 @@ using System.Text.Json;
 namespace Facilitator.Tests.Link;
 
 /// <summary>
-/// spec S:304: with maxInFlight=1 the server pauses the client (FlowControl
+/// Flow control: with maxInFlight=1 the server pauses the client (FlowControl
 /// maxInFlight:0, the frozen schema allows 0) once the window is full, and
 /// resumes (FlowControl maxInFlight:configured) when a receipt frees
 /// capacity — after which the next queued row is delivered.

@@ -1,6 +1,6 @@
 // The durable local delivery ledger seam. SQLite implementation in `"./node"`;
 // an in-memory implementation ships in core so consumers (and in-process
-// harnesses) can run the client without a file. Law (S:301): the
+// harnesses) can run the client without a file. Law: the
 // inbox row is persisted BEFORE the `accepted` receipt leaves the client.
 export type LedgerState = "received" | "processed" | "failed" | "unsupported";
 
@@ -14,7 +14,7 @@ export interface LedgerRow {
 export interface Ledger {
   /**
    * Atomic check-and-insert on the dedupe identity: `commandId` for known
-   * command types, CloudEvents `(source,id)` otherwise (server law S:301).
+   * command types, CloudEvents `(source,id)` otherwise (server law).
    * "duplicate" answers on a `delivery_id` OR `dedupe_key` hit — the handler
    * must NOT run and a `duplicate` receipt is the answer. EXCEPTION
    * (retryable-rejection law): a `failed` row was rejected without side

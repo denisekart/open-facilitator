@@ -1,5 +1,5 @@
 // The link command dispatcher: kernel → adapter side effects over the
-// Mattermost REST client, under the spec §13.3 idempotency law — the
+// Mattermost REST client, under the idempotency law — the
 // post-ledger is consulted BEFORE any provider mutation, so a delivery
 // replay answers `accepted` with the stored result and never double-posts.
 // After a successful reply/update the bot's own message.v1 echo rides back

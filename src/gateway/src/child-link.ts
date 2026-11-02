@@ -250,7 +250,7 @@ export interface ChildStatusRow {
  * The live fleet + its durable shadow: `child_state` rows seed the offline
  * side at boot, registrations move children online, disconnects move them
  * back offline (routes to an offline child answer honestly
- * `child-disconnected`, S:318 "children can disconnect or be replaced").
+ * `child-disconnected`: children can disconnect or be replaced).
  */
 export class ChildFleet {
   /** Per-child config (quota/timeout/token), keyed by childWorkspaceId. */
@@ -385,7 +385,7 @@ export class ChildFleet {
   }
 
   /**
-   * Routing law (S:318): an ONLINE advertiser wins; an offline advertiser
+   * Routing law: an ONLINE advertiser wins; an offline advertiser
    * stays routable so the answer is the honest `child-disconnected`, never a
    * silent re-route.
    */

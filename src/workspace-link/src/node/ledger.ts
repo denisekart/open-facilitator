@@ -1,5 +1,5 @@
 // The durable delivery ledger + outbound-event outbox on better-sqlite3.
-// Synchronous API = the persist-before-`accepted` law (S:301) is one
+// Synchronous API = the persist-before-`accepted` law is one
 // BEGIN IMMEDIATE transaction, no await gaps. Schema version 1 via
 // PRAGMA user_version; WAL + busy_timeout for the linkd/CLI co-existence.
 import { chmodSync, existsSync } from "node:fs";

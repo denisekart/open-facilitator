@@ -328,7 +328,7 @@ public sealed class PrDispatchTests(DispatchDbFixture fixture) : IAsyncLifetime,
     /// <summary>The completed-with-ref fixture rewritten: the assignmentId
     /// rides the ASSIGN envelope's wire value verbatim (id-token free form),
     /// and the generation stamp rides the assignment's current generation —
-    /// the §7.4 fence refuses a terminal event from any other generation.</summary>
+    /// the fence refuses a terminal event from any other generation.</summary>
     private static string Completed(Guid workId, string wireAssignmentId, string manifestId, Guid manifestArtifactId, string resultDigest)
     {
         var envelope = JsonNode.Parse(PostgresFixture.ReadFixture("valid/event.assignment.completed.with-manifest-ref.json"))!.AsObject();

@@ -11,7 +11,7 @@ namespace Facilitator.Tests.Integrations;
 /// A steer on a provider-created Work reaches the owning
 /// gateway. A live execution attempt (seeded assignment + attempt over the
 /// label-routed assign) ⇒ a schema-shaped <c>work.steer.v1</c> outbox
-/// row to the ORIGINAL assign's endpoint. No live execution (§23.1 restart-
+/// row to the ORIGINAL assign's endpoint. No live execution (restart-
 /// with-context) ⇒ a <c>work-redispatch:&lt;steerCommandId&gt;</c> assign the
 /// funnel emits from a routing intent reusing the original capability/target/
 /// inputs with a fresh assignmentId; replay of the steer command is deduped

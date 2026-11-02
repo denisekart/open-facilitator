@@ -5,7 +5,7 @@ using System.Text.Json;
 namespace Facilitator.Tests.Link;
 
 /// <summary>
-/// §5.5 + appendix A:305-306 over the HTTP fallback: fail-closed typed
+/// Wire guards over the HTTP fallback: fail-closed typed
 /// <c>unsupported</c> + a failed audit inbox row for unknown commands,
 /// work.assign is illegal FROM a link, both accepted content types admit,
 /// receipt-class envelopes are 400, and 262144 bytes is the hard 413 gate.
@@ -30,7 +30,7 @@ public sealed class LinkIngressTests(DispatchDbFixture fixture)
         var problem = await response.Content.ReadJsonAsync();
         Assert.Equal(ProblemBase + "unsupported", problem.GetProperty("type").GetString());
 
-        // audit trail (S:305): the envelope is persisted, state failed.
+        // audit trail: the envelope is persisted, state failed.
         Assert.True(await fixture.Db.InboxFailedFor(id));
     }
 

@@ -9,7 +9,7 @@ using Ofac.Protocol.Validation;
 namespace Facilitator.Kernel.Work;
 
 /// <summary>
-/// Inline ingress use-cases (appendix §5.3, spec §19.3): every write is
+/// Inline ingress use-cases: every write is
 /// inbox-deduped, then runs its business effect through the SAME
 /// coordination-store transactions a future poller would use. Slice 1 is
 /// synchronous-by-design; the iteration happens per request.
@@ -45,7 +45,7 @@ public sealed class IngressProcessor(
             : null;
         commandId ??= Guid.NewGuid().ToString("N");
 
-        // Routing intents (§10): an explicit `assignments[]` array, or the
+        // Routing intents: an explicit `assignments[]` array, or the
         // implicit single assignment from the top-level capability pair.
         // The funnel resolves the endpoint; a create without any capability
         // stays a bare Work (operator dispatches later).

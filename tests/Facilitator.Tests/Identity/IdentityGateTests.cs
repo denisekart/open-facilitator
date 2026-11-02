@@ -6,7 +6,7 @@ using System.Text.Json;
 namespace Facilitator.Tests.Identity;
 
 /// <summary>
-/// §26.1 item 5 (claim-path/issuer/audience halves) + the negative
+/// The identity gate: claim-path/issuer/audience checks + the negative
 /// proof: a realm-minted token holding the mapped role passes the
 /// <c>work.write</c> gate; a token without it is 403'd with a deny audit row
 /// (reason <c>no-role-match</c>), and the audit <c>detail</c> never stores a

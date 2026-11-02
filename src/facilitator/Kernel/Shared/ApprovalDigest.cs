@@ -8,11 +8,11 @@ using Jcs.Net;
 namespace Facilitator.Kernel.Shared;
 
 /// <summary>
-/// The kernel's approval action digest (appendix §7.1–7.2): SHA-256 over the
+/// The kernel's approval action digest: SHA-256 over the
 /// RFC 8785 canonical form of the approval record
 /// <c>{"approvalId","action","eligibleActors","expiresAt","createdAt"}</c>,
 /// rendered <c>sha256:&lt;64 hex&gt;</c>. <c>nonce</c> is deliberately excluded
-/// (§7.3: the anti-replay nonce is ledger-only). Canonicalization is the same
+/// (the anti-replay nonce is ledger-only). Canonicalization is the same
 /// pinned <see cref="Jcs.Net"/> pipeline the conformance harness uses, and the
 /// <c>@ofac/protocol</c> <c>computeActionDigest</c> export is the byte-for-byte
 /// TS mirror checked against <c>canonical/approval-record-1.sha256</c>.
@@ -22,7 +22,7 @@ public static class ApprovalDigest
     /// <summary>UTC second-precision RFC 3339 — both languages must render timestamps identically.</summary>
     internal const string TimestampFormat = "yyyy-MM-dd'T'HH:mm:ss'Z'";
 
-    /// <summary>Compute the digest of the §7.2 record wrapping <paramref name="action"/> (verbatim payload).</summary>
+    /// <summary>Compute the digest of the record wrapping <paramref name="action"/> (verbatim payload).</summary>
     public static string Compute(
         string approvalId,
         JsonElement action,
@@ -43,7 +43,7 @@ public static class ApprovalDigest
     }
 
     /// <summary>
-    /// The Result Manifest digest law (spec §15.3): SHA-256 over the
+    /// The Result Manifest digest law: SHA-256 over the
     /// RFC 8785 canonical form of an arbitrary document, NFC-normalized with
     /// the same normalization as <see cref="Compute"/> — one law, two
     /// documents. The <c>@ofac/protocol</c> <c>computeManifestDigest</c>
@@ -69,7 +69,7 @@ public static class ApprovalDigest
 
     // Deep-copy the payload to normalized CLR scalars: source key order and
     // raw number spellings never leak (numbers become doubles — shortest
-    // round-trip on both stacks; strings are NFC-normalized per §7.1, a
+    // round-trip on both stacks; strings are NFC-normalized, a
     // no-op for input that is already NFC).
     private static object? Normalize(JsonElement element) => element.ValueKind switch
     {

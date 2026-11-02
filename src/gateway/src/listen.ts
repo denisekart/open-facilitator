@@ -188,7 +188,7 @@ export async function startChildListener(
           if (frame.type === "hello") onHello(conn, frame as HelloFrame);
           return; // a non-hello first frame just waits out the hello deadline
         }
-        refreshLease(conn); // any frame is liveness (S:386 cadence law)
+        refreshLease(conn); // any frame is liveness (cadence law)
         if (frame.type === "reply" || frame.type === "event") {
           // Child-generation fence (locked): a frame from a superseded
           // connection changes NOTHING — log, drop, never settle/forward.

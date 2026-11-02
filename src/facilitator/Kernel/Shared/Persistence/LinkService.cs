@@ -11,7 +11,7 @@ namespace Facilitator.Kernel.Shared.Persistence;
 
 /// <summary>A live (lease-unexpired) session view.</summary>
 /// <param name="EndpointId">Logical endpoint.</param>
-/// <param name="SessionEpoch">Current owner epoch (spec §7.3).</param>
+/// <param name="SessionEpoch">Current owner epoch.</param>
 /// <param name="CapabilitiesDigest">Digest advertised at Hello, when any.</param>
 public sealed record LiveSession(string EndpointId, long SessionEpoch, string? CapabilitiesDigest);
 
@@ -21,7 +21,7 @@ public sealed record LiveSession(string EndpointId, long SessionEpoch, string? C
 public sealed record ExpiredSession(string EndpointId, long SessionEpoch);
 
 /// <summary>
-/// DB-side session operations over <c>link_sessions</c> (spec §7.3): the
+/// DB-side session operations over <c>link_sessions</c>: the
 /// lease — not socket state — is the authority on liveness. Every clock read
 /// flows through <see cref="TimeProvider"/> so lease math is testable without
 /// wall-clock sleeps. Raw SQL mirrors <c>IngressStore</c> (no change tracker
@@ -34,14 +34,14 @@ public sealed class LinkService(
 {
     private readonly string _replicaId = KernelOptions.ReplicaId(configuration);
 
-    /// <summary>Replica identity stamped on every session row (spec §7.3 placement).</summary>
+    /// <summary>Replica identity stamped on every session row (placement).</summary>
     public string ReplicaId => _replicaId;
 
     /// <summary>
     /// Open or supersede: epoch = max(existing)+1, lease = now +
     /// heartbeatSeconds*3 (clamped ≥ 15 s). Returns the new epoch; a second
     /// Hello while a live session exists bumps past it (caller pushes
-    /// <c>Disconnect</c> to the old connection — spec §16.2).
+    /// <c>Disconnect</c> to the old connection).
     /// </summary>
     public async Task<long> OpenSessionAsync(string endpointId, string instanceId, string? capabilitiesDigest, int heartbeatSeconds, CancellationToken ct)
     {

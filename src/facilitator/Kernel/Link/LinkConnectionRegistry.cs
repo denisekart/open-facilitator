@@ -2,11 +2,11 @@ using System.Threading.Channels;
 
 using Facilitator.Kernel.Shared;
 
-/// <summary>One live hub connection on THIS replica (§7.3: a replica owns only its own sockets).</summary>
+/// <summary>One live hub connection on THIS replica (a replica owns only its own sockets).</summary>
 /// <param name="ConnectionId">SignalR connection id.</param>
 /// <param name="EndpointId">Authenticated logical endpoint.</param>
 /// <param name="SessionEpoch">Epoch the handshake minted.</param>
-/// <param name="TrustMode">Declared trust mode (logged per Hello, appendix §4).</param>
+/// <param name="TrustMode">Declared trust mode (logged per Hello).</param>
 public sealed record LinkConnection(string ConnectionId, string EndpointId, long SessionEpoch, string TrustMode);
 
 /// <summary>
@@ -44,7 +44,7 @@ public sealed class LinkConnectionRegistry(IConfiguration configuration)
     /// <summary>
     /// Wait until <paramref name="probe"/> reports work or <paramref name="wait"/>
     /// elapses; wakes come from <see cref="Wake"/> plus a 1 s polling safety net
-    /// (NOTIFY is a hint, §7.3 — correctness never depends on it).
+    /// (NOTIFY is a hint — correctness never depends on it).
     /// </summary>
     public async Task WaitForWakeAsync(string endpointId, TimeSpan wait, Func<Task<bool>> probe, CancellationToken ct)
     {

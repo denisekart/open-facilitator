@@ -1,7 +1,7 @@
-// Gateway config: `.facilitator/gateway.yaml` (spec §8.4 layout) parsed +
-// validated field-by-field. The spec is silent on the key set, so THIS file
+// Gateway config: `.facilitator/gateway.yaml` (layout) parsed +
+// validated field-by-field. The target design is silent on the key set, so THIS file
 // is the lock. Config v2: the deployment `mode`
-// (embedded | shared | standalone, spec §9.1), the `children:` fleet block
+// (embedded | shared | standalone), the `children:` fleet block
 // and the `childTransport:` block; the embedded path (`child:`) stays
 // exactly as shipped — a v1 file (no `mode`) loads as `mode: "embedded"`.
 // Unknown top-level keys are config errors — fail loud on typos rather than
@@ -22,7 +22,7 @@ export type TrustMode = (typeof TRUST_MODES)[number];
 
 export type ChildMode = "echo" | "stub";
 
-/** §9.1 deployment mode; one binary, mode comes from config, not a flag. */
+/** Deployment mode; one binary, mode comes from config, not a flag. */
 export type GatewayMode = "embedded" | "shared" | "standalone";
 
 /** One entry of the shared/standalone `children:` fleet block. */
@@ -480,7 +480,7 @@ export function parseConfig(yamlText: string, options: ParseConfigOptions = {}):
       const list = root["children"];
       if (!Array.isArray(list)) fail("children", "must be a sequence");
       children = parseChildren(list);
-      // standalone may boot with zero children (spec S:330); shared may not.
+      // standalone may boot with zero children; shared may not.
       if (mode === "shared" && children.length === 0) {
         fail("children", "must be non-empty when mode is 'shared'");
       }

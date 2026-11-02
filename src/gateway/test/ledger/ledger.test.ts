@@ -36,7 +36,7 @@ function binding(over: Partial<NewBinding> = {}): NewBinding {
 }
 
 describe("ExecutionLedger binding tuple", () => {
-  it("inserts and reads back the full §6.1 tuple", () => {
+  it("inserts and reads back the full tuple", () => {
     const l = open();
     l.insert(binding());
     const row = l.byExecution("exec-abc123");

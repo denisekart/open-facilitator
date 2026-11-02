@@ -7,7 +7,7 @@ namespace Facilitator.Kernel.Shared.Persistence;
 /// <summary>
 /// The ONE <c>LISTEN facilitator_outbox</c> wake loop: a dedicated connection
 /// releases the caller's semaphore on every wake notification. NOTIFY is a
-/// hint only (spec §7.3) — a lost listener costs latency, never correctness,
+/// hint only — a lost listener costs latency, never correctness,
 /// so every failure is caught and logged and the caller degrades to polling.
 /// </summary>
 public sealed class PgWakeListener(
@@ -58,7 +58,7 @@ public sealed class PgWakeListener(
         }
         catch (Exception ex)
         {
-            // NOTIFY is a hint: losing the listener only costs latency (§7.3).
+            // NOTIFY is a hint: losing the listener only costs latency.
             logger.LogWarning(ex, "outbox LISTEN wake lost; consumer continues polling");
         }
     }

@@ -1,4 +1,4 @@
-// Policy audit lines (spec §12.2). One structured info line
+// Policy audit lines. One structured info line
 // per authorization decision the Gateway makes; the kernel-side counterpart
 // (facilitator.audit rows, action `authorization.evaluated:approval`) is
 // unchanged — this is the Gateway mirror. Long-lived tokens NEVER ride the
@@ -18,7 +18,7 @@ export interface PolicyAuditFields {
   gatewayWorkload: string;
   /** Principal 3: the human behind verified evidence; absent = machine-only. */
   humanSubject?: string | undefined;
-  /** `<owner>/<sha256-12>` — the policy revision consulted (§12.2). */
+  /** `<owner>/<sha256-12>` — the policy revision consulted. */
   policyId: string;
   actionDigest?: string | undefined;
   evidenceRef?: string | undefined;
@@ -26,7 +26,7 @@ export interface PolicyAuditFields {
   correlationId?: string | undefined;
 }
 
-/** `authorization.evaluated` — the §12.2 field set, minus long-lived tokens. */
+/** `authorization.evaluated` — the field set, minus long-lived tokens. */
 export function auditPolicy(logger: LinkLogger, fields: PolicyAuditFields): void {
   logger.info("authorization.evaluated", { ...fields });
 }

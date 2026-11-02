@@ -3,13 +3,13 @@ using System.Diagnostics.Metrics;
 namespace Facilitator.Kernel.Shared.Dispatch;
 
 /// <summary>
-/// The <c>facilitator</c> meter's instruments (appendix §9.1). Queue-depth
+/// The <c>facilitator</c> meter's instruments. Queue-depth
 /// gauges serve from a 5-second cache refreshed by the dispatcher loop, so
 /// observable callbacks never hit the database synchronously.
 /// </summary>
 public sealed class KernelMetrics
 {
-    /// <summary>Meter name (appendix §9.1).</summary>
+    /// <summary>Meter name.</summary>
     public const string MeterName = "facilitator";
 
     private readonly Counter<long> _deliveryAttempts;
@@ -51,9 +51,9 @@ public sealed class KernelMetrics
     public KernelMetrics()
     {
         var meter = new Meter(MeterName);
-        // Admin metrics snapshot (spec §17): an in-process listener
+        // Admin metrics snapshot: an in-process listener
         // accumulates every long counter of this meter, so the roll-up needs
-        // no scrape backend (§17: no time-series query).
+        // no scrape backend (no time-series query).
         _counterListener = new System.Diagnostics.Metrics.MeterListener
         {
             InstrumentPublished = static (instrument, listener) =>
@@ -75,7 +75,7 @@ public sealed class KernelMetrics
         meter.CreateObservableGauge("facilitator.outbox.queue_depth", () => Volatile.Read(ref _outboxDepth), description: "Pending outbox rows");
         meter.CreateObservableGauge("facilitator.inbox.queue_depth", () => Volatile.Read(ref _inboxDepth), description: "Pending inbox rows");
         meter.CreateObservableGauge("facilitator.delivery.dead_letter_count", () => Volatile.Read(ref _deadLetters), description: "Dead-lettered rows");
-        meter.CreateObservableGauge("facilitator.link.sessions", () => Volatile.Read(ref _linkSessions), description: "Live link sessions (appendix §9.1)");
+        meter.CreateObservableGauge("facilitator.link.sessions", () => Volatile.Read(ref _linkSessions), description: "Live link sessions");
         _linkReceived = meter.CreateCounter<long>("facilitator.link.received", description: "Envelopes admitted over the link surface");
         _identityDecisions = meter.CreateCounter<long>("facilitator.identity.decisions", description: "Authorization-gate decisions (tag: decision)");
         _linkEvidence = meter.CreateCounter<long>("facilitator.link.evidence", description: "actorEvidenceRef evaluations on link admission (tags: scheme, outcome)");
@@ -111,16 +111,16 @@ public sealed class KernelMetrics
     /// <summary>Record sink-call latency in milliseconds.</summary>
     public void DeliveryLatency(double ms) => _deliveryLatency.Record(ms);
 
-    /// <summary>Record one envelope admitted over the link surface (appendix §9.1).</summary>
+    /// <summary>Record one envelope admitted over the link surface.</summary>
     public void LinkReceived() => _linkReceived.Add(1);
 
-    /// <summary>Record one evidence evaluation on the link plane (tags per appendix §9.1).</summary>
+    /// <summary>Record one evidence evaluation on the link plane (tagged).</summary>
     /// <param name="scheme">Evidence scheme ("" for absent/malformed).</param>
     /// <param name="outcome">workload-only | delegation-validated | evidence-unverified:* | evidence-malformed | delegation-refused | evidence-invalid:*.</param>
     public void LinkEvidence(string scheme, string outcome) => _linkEvidence.Add(1,
         new KeyValuePair<string, object?>("scheme", scheme), new KeyValuePair<string, object?>("outcome", outcome));
 
-    /// <summary>Record one identity-gate decision (appendix §3.2 step 5).</summary>
+    /// <summary>Record one identity-gate decision.</summary>
     /// <param name="decision">allow | deny.</param>
     public void IdentityDecision(string decision) => _identityDecisions.Add(1, new KeyValuePair<string, object?>("decision", decision));
 

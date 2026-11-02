@@ -1,4 +1,4 @@
-// The op law (decision 5, §5.4): every op ledger-first; replay of the same
+// The op law (decision 5): every op ledger-first; replay of the same
 // commandId answers the recorded provider object id with ZERO provider
 // calls; an ambiguous timeout (504 after the mutation landed) leaves the row
 // pending and the retry reconciles by READ — never a second mutation; a

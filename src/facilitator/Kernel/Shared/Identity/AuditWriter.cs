@@ -26,7 +26,7 @@ public sealed record AuditRecord(
     string Detail);
 
 /// <summary>
-/// The single audit append helper (appendix §3.2 step 5) — every plan after
+/// The single audit append helper — every plan after
 /// 09 writes its audit rows through here. Append shape mirrors
 /// <see cref="IngressStore"/>: <see cref="IDbContextFactory{TContext}"/> +
 /// <see cref="TimeProvider"/>, client-side Guid. Exceptions propagate — an

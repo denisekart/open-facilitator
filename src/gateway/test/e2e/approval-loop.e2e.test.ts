@@ -1,4 +1,4 @@
-// THE §12 loop, across real process + DB boundaries. A
+// THE loop, across real process + DB boundaries. A
 // confirm-scoped assign rides the kernel to a shared-mode Gateway with a real
 // fleet child; the Gateway records approval.required (kernel recomputes the
 // Gateway-computed digest); a human answers over REST as a real user

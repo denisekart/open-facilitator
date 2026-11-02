@@ -56,7 +56,7 @@ public sealed class CloudEventIngress(
         {
             if (verdict.ErrorClass == "unknown-command")
             {
-                // §5.4: fail closed, but persist the audit row.
+                // Fail closed, but persist the audit row.
                 await inbox.InsertInboxAsync(
                     Guid.NewGuid(), EnvelopeReader.SourceOf(root), EnvelopeReader.EventIdOf(root), null, rawBody,
                     null, "failed", null, ct);

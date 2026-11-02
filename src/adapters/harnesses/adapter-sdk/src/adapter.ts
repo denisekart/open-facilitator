@@ -1,5 +1,5 @@
 // createAdapter: connectChild + the lifecycle law. The adapter is thin by
-// design (S:422: the native harness stays authoritative); everything in
+// design: the native harness stays authoritative; everything in
 // here is transport honesty:
 //
 // - every `command` frame gets exactly one `reply` (the locked reply kinds),
@@ -231,7 +231,7 @@ class Adapter implements AdapterHandle {
           return { kind: "unsupported" };
         }
         if (record.steered === undefined && this.opts.hooks.onSteer === undefined) {
-          // S:436: unsupported steering is REPORTED, never reinterpreted.
+          // Unsupported steering is REPORTED, never reinterpreted.
           return { kind: "unsupported" };
         }
         const directive = directiveOf(message.command);

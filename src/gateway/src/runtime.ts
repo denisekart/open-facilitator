@@ -6,21 +6,21 @@
 // opens so a command the kernel pushes on session-open meets its child, not
 // a boot-window `child-disconnected`: a restart leg's re-hydrated
 // assign must never die in that window) → start() → first welcome ⇒
-// RECONCILE (§6.3) → ready line → heartbeats.
+// RECONCILE → ready line → heartbeats.
 //
 // Stamp law: a binding row pins TWO generations —
 // connectionGeneration is the leaseEpoch of the session that accepted the
-// command (the S:329 freshness fence: a frame recorded under a dead
+// command (the freshness fence: a frame recorded under a dead
 // connection is not forwarded), executionGeneration is the assign
 // envelope's assignment generation, the value every event this execution
-// publishes carries so the kernel's §7.4 fence matches the assignment row.
+// publishes carries so the kernel's fence matches the assignment row.
 // The childGeneration is the child link's fence at insert time (embedded:
 // 0 — no transport, no re-register). A delivery frame can be dispatched
 // before start()'s welcome continuation lands, so onAssign AWAITS the first
 // welcome rather than reading a possibly-null session — an unstamped
 // (epoch 0) row would make the reconcile generation-freshness law lie.
 //
-// Routing law (S:318): work.assign = capability lookup over the fleet —
+// Routing law: work.assign = capability lookup over the fleet —
 // nobody advertises ⇒ unsupported (no row, mirror of the policy-deny
 // no-row law); the advertised child is offline ⇒ rejected child-disconnected
 // (honest, retryable upstream); quota full ⇒ rejected child-busy; then
@@ -687,7 +687,7 @@ export class GatewayRuntime {
       return { kind: "unsupported", reason: `no-child-advertises: ${data.capabilityId}` };
     }
     if (!route.online) {
-      // S:318 honesty: the advertiser is known and gone; retry upstream —
+      // Fleet honesty: the advertiser is known and gone; retry upstream —
       // but a child mid-boot (kernel pushes on session-open, a socket child
       // dials ~100 ms later) gets one bounded hold first, so a re-hydrated
       // assign landing in that window is EXECUTED, not killed by a receipt
@@ -706,7 +706,7 @@ export class GatewayRuntime {
     const decision = await this.decide("command.forward", cmd, member.childId);
     const epoch = await this.awaitSessionEpoch();
     if (decision.verdict === "confirm") {
-      // §12.1 hold: pending row + approval.required, accepted receipt; the
+      // Confirm hold: pending row + approval.required, accepted receipt; the
       // decided-push (or a reconcile poll) executes or settles it later.
       this.audit(decision, "confirm-required");
       return this.holdForApproval(cmd, deliveryId, decision, member, epoch);
@@ -849,7 +849,7 @@ export class GatewayRuntime {
   // ── policy decision plumbing ───────────────────────────────────
 
   /**
-   * The whole resource-derivation law (§12): the connector-supplied
+   * The whole resource-derivation law: the connector-supplied
    * `inputs.resource` when present, else the capability id itself as the
    * wildcard-capability resource. Finer resources are connector territory.
    */
@@ -904,7 +904,7 @@ export class GatewayRuntime {
     return { verdict: this.policy.evaluate("event.forward", ctx), ctx, matchedRow: null };
   }
 
-  /** One §12.2 audit line per decision; long-lived tokens NEVER included. */
+  /** One audit line per decision; long-lived tokens NEVER included. */
   private audit(decision: PolicyDecision, reason: string): void {
     const { ctx } = decision;
     auditPolicy(this.logger, {
@@ -925,10 +925,10 @@ export class GatewayRuntime {
   // ── approval lifecycle ─────────────────────────────────────────
 
   /**
-   * Confirm hold (spec §12.1): mint the approval, park a pending row BEFORE
+   * Confirm hold: mint the approval, park a pending row BEFORE
    * publishing (crash ⇒ reconcile, never a lost action), publish
    * approval.required, answer accepted. The decision arrives as a
-   * decided-push (§12.1 step 5) or via reconcile polling.
+   * decided-push or via reconcile polling.
    */
   private async holdForApproval(
     cmd: EnvelopeCommand,
@@ -957,7 +957,7 @@ export class GatewayRuntime {
       assignmentId: data.assignmentId,
     };
     if (data.workId !== undefined) action["workId"] = data.workId;
-    // The frozen §7.2 record: the kernel recomputes and compares.
+    // The frozen approval record: the kernel recomputes and compares.
     const record = { approvalId, action, eligibleActors, expiresAt, createdAt };
     const actionDigest = computeActionDigest(record);
     this.paths.execution.insertPending({
@@ -1012,7 +1012,7 @@ export class GatewayRuntime {
   }
 
   /**
-   * Decided-push ingest (§12.1 step 5). The receipt is accepted whatever
+   * Decided-push ingest. The receipt is accepted whatever
    * happens here; every settle is ledger-side. A push for an unknown or
    * already-terminal approval is a no-op (late/replayed push); a createdAt
    * mismatch against the stored digest record means the push is NOT for the
@@ -1057,7 +1057,7 @@ export class GatewayRuntime {
   }
 
   /**
-   * Approved: re-evaluate current state (appendix §7.3 — a stale policy or a
+   * Approved: re-evaluate current state (a stale policy or a
    * vanished capability denies even after a human approved), consume the
    * approval synchronously, then bind + start like a plain assign.
    */
@@ -1417,7 +1417,7 @@ export class GatewayRuntime {
     }
   }
 
-  /** Approval-lifecycle audit lines (§12.2): same shape, lifecycle reasons. */
+  /** Approval-lifecycle audit lines: same shape, lifecycle reasons. */
   private approvalAudit(
     reason: string,
     workId: string | null,
@@ -1472,7 +1472,7 @@ export class GatewayRuntime {
   }
 
   /**
-   * Forward the CHILD's event bytes, stamping nothing (S:329 fence first).
+   * Forward the CHILD's event bytes, stamping nothing (fence first).
    * The child-generation fence precedes everything: a frame on a superseded
    * connection changes NOTHING (no settle, no forward).
    */
@@ -1508,7 +1508,7 @@ export class GatewayRuntime {
   }
 
   /**
-   * §6.3 reconcile, right after the FIRST welcome: every `running` row goes
+   * Reconcile, right after the FIRST welcome: every `running` row goes
    * to ITS child (embedded / live link); a child that is not here cannot
    * answer — lost (never re-executed, never silently deleted, reported via
    * ONE retryable assignment.failed). Rows of children that reconnect LATER
@@ -1575,7 +1575,7 @@ export class GatewayRuntime {
     });
   }
 
-  /** S:329: work recorded under a dead connection cannot settle or forward. */
+  /** Work recorded under a dead connection cannot settle or forward. */
   private fence(row: BindingRow, action: string): "fresh" | "stale" {
     const epoch = this.client?.session?.leaseEpoch ?? 0;
     if (row.connectionGeneration === epoch) return "fresh";

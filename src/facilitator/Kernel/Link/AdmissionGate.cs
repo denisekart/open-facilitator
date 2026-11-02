@@ -30,7 +30,7 @@ public sealed record AdmissionVerdict(ProblemDetails? Problem, JsonElement Root,
 /// size gate → parse → receipt-class refusal → envelope validation →
 /// known-command gate → assign-forbidden → evidence evaluation +
 /// <c>authorization.evaluated:link</c> audit (commands only).
-/// Fail-closed refusals persist their failed audit inbox row (S:305) here;
+/// Fail-closed refusals persist their failed audit inbox row here;
 /// an <c>oidc:</c>/<c>kernel:</c> ref that fails validation denies admission
 /// (422 <c>evidence-invalid</c>), any other scheme records a non-authoritative
 /// workload-only outcome, and a failed audit write on an allow path is 503
@@ -80,7 +80,7 @@ public sealed class AdmissionGate(
         {
             if (verdict.ErrorClass == "unknown-command")
             {
-                // §5.5: fail closed, but persist the audit row.
+                // Fail closed, but persist the audit row.
                 await AuditAsync(root, rawBody, ct);
                 return Refused(ProblemErrors.Unsupported($"command type '{type}' is outside the v1 contract"));
             }
@@ -115,7 +115,7 @@ public sealed class AdmissionGate(
         var isProviderEvent = ProviderEventClass.IsProviderClass(type);
         if (isProviderEvent)
         {
-            // Fail-closed (§7.1 provider path): the class is on the wire, but a
+            // Fail-closed (provider path): the class is on the wire, but a
             // kernel without that provider, a type outside the central domain
             // set, or a sender that is not the provider section's own endpoint
             // refuses it (failed audit inbox row, the S:305 precedent) instead
@@ -157,7 +157,7 @@ public sealed class AdmissionGate(
             return new AdmissionVerdict(null, root, type, isCommand, commandId);
         }
 
-        // appendix §3.2: evidence evaluation + authorization.evaluated:link, commands only.
+        // Evidence evaluation + authorization.evaluated:link, commands only.
         var evidenceRef = root.GetProperty("data").TryGetProperty("actorEvidenceRef", out var er)
             && er.ValueKind == JsonValueKind.String ? er.GetString() : null;
         var outcome = await evidence.EvaluateAsync(evidenceRef, ct);

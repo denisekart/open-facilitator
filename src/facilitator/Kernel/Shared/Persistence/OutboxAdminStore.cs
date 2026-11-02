@@ -7,7 +7,7 @@ namespace Facilitator.Kernel.Shared.Persistence;
 /// </summary>
 public sealed class OutboxAdminStore(OutboxRepository outbox)
 {
-    /// <summary>Newest dead letters, newest first (appendix §5.6).</summary>
+    /// <summary>Newest dead letters, newest first.</summary>
     public Task<IReadOnlyList<DeadLetterRow>> ListDeadLettersAsync(int limit, CancellationToken ct) =>
         outbox.ListDeadLettersAsync(limit, ct);
 

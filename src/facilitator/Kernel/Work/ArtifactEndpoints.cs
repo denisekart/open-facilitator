@@ -95,7 +95,7 @@ public static class ArtifactEndpoints
                 }
 
                 // Object-store backends hand out a presigned GET and answer 302:
-                // retrieval bytes bypass the kernel (spec §15.4 portable
+                // retrieval bytes bypass the kernel (portable
                 // retrieval). The URL rides the row's own key + the allocation
                 // TTL law; HttpClient auto-follows, so consumers see the same
                 // bytes with one extra hop.

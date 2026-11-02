@@ -50,7 +50,7 @@ public sealed record AdminConfigMutationResult(AdminConfigOutcome Outcome, Admin
 public sealed record AdminConfigHistoryEntry(long Version, JsonElement Payload, string Author, string Reason, DateTime UpdatedAt);
 
 /// <summary>
-/// The <c>facilitator.admin_config</c> store (spec §17.4): plain
+/// The <c>facilitator.admin_config</c> store: plain
 /// field-shape validation against a closed registry, version-fenced PATCH
 /// (the roles conditional-write template), same-tx history row + audit +
 /// newest-20 retention. Stored intent only — no kernel behavior reads these

@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Facilitator.Kernel.Shared.Dispatch;
 
 /// <summary>
-/// §20 dispatcher surface: claim + deliver one batch, and reclaim expired
+/// Dispatcher surface: claim + deliver one batch, and reclaim expired
 /// leases. The <see cref="OutboxDispatcher"/> hosted service is a thin timer
 /// over these; tests drive them directly (restart/crash simulation).
 /// </summary>
@@ -26,9 +26,9 @@ public interface IEventDispatcher
 /// Postgres-backed outbox dispatcher. The claim runs <c>FOR UPDATE SKIP LOCKED</c>
 /// inside a short tx (expired leases are claimable by the same predicate) and
 /// lives in <see cref="OutboxRepository"/>; sinks are called OUTSIDE any tx
-/// (spec §19.3). Failures requeue with capped exponential backoff; five charged
-/// attempts dead-letter the row with the original envelope snapshot (appendix
-/// §5.2/§5.6). Every outbox-state SET runs through <see cref="OutboxRepository"/>.
+/// Failures requeue with capped exponential backoff; five charged
+/// attempts dead-letter the row with the original envelope snapshot.
+/// Every outbox-state SET runs through <see cref="OutboxRepository"/>.
 /// </summary>
 public sealed class DbEventDispatcher : IEventDispatcher
 {

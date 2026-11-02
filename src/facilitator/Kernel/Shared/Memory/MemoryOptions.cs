@@ -2,7 +2,7 @@ namespace Facilitator.Kernel.Shared.Memory;
 
 /// <summary>
 /// Memory-broker configuration (<c>Memory</c> section). The only
-/// shipped provider profile is <c>postgres-fts</c> (spec §14.7): the shared
+/// shipped provider profile is <c>postgres-fts</c>: the shared
 /// kernel Postgres is the store and the index — no new container. An unknown
 /// provider value fails startup (no silent fallback, the artifact-options
 /// law). Hindsight/custom stay documented seams behind <see cref="IMemoryProvider"/>.
@@ -15,13 +15,13 @@ public sealed class MemoryOptions
     /// <summary>Active provider profile; only <c>postgres-fts</c> ships. Read once at composition.</summary>
     public string Provider { get; set; } = "postgres-fts";
 
-    /// <summary>Retention policy defaults (spec §14.6: candidates age out sooner than reviewed knowledge).</summary>
+    /// <summary>Retention policy defaults (candidates age out sooner than reviewed knowledge).</summary>
     public RetentionOptions Retention { get; set; } = new();
 
     /// <summary>Retention-pass scheduling (the second hosted loop, advisory lock 420003).</summary>
     public GcOptions Gc { get; set; } = new();
 
-    /// <summary>Write-amplification guards (spec §14.8 #3).</summary>
+    /// <summary>Write-amplification guards.</summary>
     public QuotaOptions Quota { get; set; } = new();
 
     /// <summary>Candidate/expiry defaults; per-Project <c>projects.config</c> key <c>memory</c> overrides (D7).</summary>

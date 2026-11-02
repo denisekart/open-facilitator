@@ -1,6 +1,6 @@
 namespace Facilitator.Kernel.Shared;
 
-/// <summary>Decision kinds the seam is consulted for (spec §10.2). Only the
+/// <summary>Decision kinds the seam is consulted for. Only the
 /// deterministic authorization evaluator may allow/deny; providers return
 /// PREFERENCES over a kernel-computed allowed set, and out-of-set answers
 /// fall back deterministically, audited.</summary>
@@ -31,7 +31,7 @@ public sealed record RoutingCandidate(string EndpointId, int Specificity, DateTi
 /// set; anything else keeps the deterministic order.</summary>
 public sealed record DecisionOutcome(string PreferredCandidate, string Rationale, double? Confidence);
 
-/// <summary>The advisory decision seam (spec §10.2). Implementations must be
+/// <summary>The advisory decision seam. Implementations must be
 /// side-effect-free and cancellation-respecting; a null return means "no
 /// preference — the deterministic order stands". The shipped
 /// <see cref="DeterministicDecisionProvider"/> always returns null; a model

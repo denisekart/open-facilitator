@@ -62,10 +62,10 @@ public sealed record ConversationTarget(
 /// then the business-effect arms appending outbox rows, all before commit.
 /// Duplicate on <c>(provider, provider_delivery_id)</c> answers
 /// <c>duplicate</c> with zero new rows: delivery metadata is never business
-/// completion (§7.5). Echo law (§13.4): events authored by the configured bot
+/// completion. Echo law: events authored by the configured bot
 /// id settle as the outbound-post ledger update only (binding
 /// <c>parent_message_id</c>) — suppressed before the inbox, no arm effects.
-/// Reaction-never-consent (§13.3): the reaction arm writes the timeline note +
+/// Reaction-never-consent: the reaction arm writes the timeline note +
 /// configured ack ONLY; it has no path to <c>approval.respond</c> or any Work
 /// transition — the deny-list is structural (no transition call site exists in
 /// this arm) and test-enforced.
@@ -92,7 +92,7 @@ public sealed class ProviderEventStore(
 
     private const string CodeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
-    /// <summary>Challenge lifetime (§11: single-use, short).</summary>
+    /// <summary>Challenge lifetime (single-use, short).</summary>
     public static readonly TimeSpan ChallengeTtl = TimeSpan.FromMinutes(15);
 
     private const string InsertProviderEventSql = """
@@ -107,7 +107,7 @@ public sealed class ProviderEventStore(
 
     private string? resolvedBotId;
 
-    /// <summary>Exact-match echo identity (§13.4): the configured id wins; else
+    /// <summary>Exact-match echo identity: the configured id wins; else
     /// resolve once from the provider via GET <see cref="ProviderOptions.BotIdentityProbeUrl"/>
     /// under the bot token (live bot ids are provider-generated, so compose
     /// cannot pin them). The probe is pure config data: providers that
@@ -247,7 +247,7 @@ public sealed class ProviderEventStore(
                 saved?.VerifiedReference is null ? null : new { judgment = saved.VerifiedReference });
         }
 
-        // 2. Echo law (§13.4): a bot-authored event is the outbound-post ledger
+        // 2. Echo law: a bot-authored event is the outbound-post ledger
         // write — suppress before the inbox, persist to the binding. One
         // exemption (mirrored in the adapter's normalizer): a bot's own
         // change_request opened/reopened is a load-bearing state change — the
@@ -425,7 +425,7 @@ public sealed class ProviderEventStore(
 
     // ---- arms ---------------------------------------------------------------
 
-    // Mention (§13.2/§21.2 step 3): identity-gated, binding-idempotent Work
+    // Mention: identity-gated, binding-idempotent Work
     // creation or thread input, then the low-noise ack. /link mints a challenge
     // and never a Work.
     private async Task<ArmEffect> MentionArmAsync(
@@ -532,7 +532,7 @@ public sealed class ProviderEventStore(
         return new ArmEffect(workId, $"work/{workId}");
     }
 
-    // Reaction (§13.3): timeline note + configured ack ONLY. There is
+    // Reaction: timeline note + configured ack ONLY. There is
     // deliberately no approval/transition call in this arm — reaction never
     // feeds consent.
     private async Task<ArmEffect> ReactionArmAsync(
@@ -575,7 +575,7 @@ public sealed class ProviderEventStore(
         return new ArmEffect(binding?.WorkId, binding?.WorkId is { } w ? $"reaction:audited:work/{w}" : "reaction:audited:unbound");
     }
 
-    // Message: /link anywhere (a DM is how §11 delivers the challenge to an
+    // Message: /link anywhere (a DM is how the kernel delivers the challenge to an
     // unlinked account — DMs normalize message.v1, never mention.v1) mints a
     // challenge; a bound-thread/DM follow-up feeds Work input; everything
     // else is audited (the provider_events + inbox rows) with no effect. Code
@@ -606,7 +606,7 @@ public sealed class ProviderEventStore(
     // Two effects only — Work input and Work creation — zero forge workflow.
     // The ADAPTER decides the Work-trigger label policy (workTrigger flag);
     // the kernel just reads the flag (malleability law). A forge actor's
-    // identity is audit-only here (judgment law: identity:not-required) — §11
+    // identity is audit-only here (judgment law: identity:not-required) —
     // linking stays chat-first, so no provider_identities gate on these arms.
 
     private async Task<ArmEffect> IssueArmAsync(
@@ -649,7 +649,7 @@ public sealed class ProviderEventStore(
             b.Provider == reference.Provider && b.Channel == reference.Channel && b.RootMessageId == reference.Root, ct);
         if (binding?.WorkId is not { } workId)
         {
-            // §24(1e) head-branch resolver: the PR-number binding cannot
+            // Head-branch resolver: the PR-number binding cannot
             // exist at manifest time (the number is minted provider-side),
             // so the prRequest reader parked a marker binding keyed by the
             // head branch (`branch:<ref>`). An opened/reopened event whose
@@ -896,7 +896,7 @@ public sealed class ProviderEventStore(
         AppendCommand(db, ProviderEnvelopes.Progress(workId, note, now), options, now, workId);
     }
 
-    /// <summary>The provider arm's routing intent (spec §10): a work-created
+    /// <summary>The provider arm's routing intent: a work-created
     /// event contributes <c>{team, capability, inputs, commandIdBase}</c> to
     /// the funnel instead of addressing an endpoint — the funnel resolves the
     /// candidate (rule/global <c>AssignEndpointId</c> survives as an optional

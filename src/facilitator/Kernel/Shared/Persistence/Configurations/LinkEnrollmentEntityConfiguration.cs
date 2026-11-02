@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Facilitator.Kernel.Shared.Persistence.Configurations;
 
-/// <summary>facilitator.link_enrollments — appendix §4 enrollment records.</summary>
+/// <summary>facilitator.link_enrollments — enrollment records.</summary>
 public sealed class LinkEnrollmentEntityConfiguration : IEntityTypeConfiguration<LinkEnrollmentEntity>
 {
     /// <inheritdoc />

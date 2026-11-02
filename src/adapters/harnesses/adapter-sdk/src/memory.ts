@@ -1,6 +1,6 @@
 // The memory capability of `@ofac/adapter`: retain/recall against
 // the kernel broker over the link plane — the same in-band-ack law as the
-// artifact client (spec §14.3, appendix §6). The child link token is the
+// artifact client. The child link token is the
 // credential; `actorEvidenceRef` is schema-required, so the client always
 // rides a pointer (default `workload:adapter`, non-authoritative unless an
 // `oidc:`/`kernel:` evidence rides along). A workload retain lands
@@ -15,7 +15,7 @@ const RECALL_TYPE = "org.facilitator.command.memory.recall.v1";
 const CANDIDATE_TYPE = "org.facilitator.event.memory.candidate.v1";
 const USED_TYPE = "org.facilitator.event.memory.used.v1";
 
-/** The §14.4 classifications (schema enum). */
+/** The classifications (schema enum). */
 export type MemoryType =
   | "observed_fact"
   | "experience"
@@ -25,7 +25,7 @@ export type MemoryType =
   | "hypothesis"
   | "preference";
 
-/** The §14.11 recall purposes (schema enum). */
+/** The recall purposes (schema enum). */
 export type RecallPurpose =
   "assignment.context" | "requirements.clarification" | "report.synthesis";
 
@@ -121,7 +121,7 @@ export interface MemoryClient {
   retain(req: RetainRequest): Promise<RetainReceipt>;
   /** Recall: fresh uuid commandId per call (a read; the honest duplicate answer is a re-run). */
   recall(req: RecallRequest): Promise<RecallResponse>;
-  /** Attest that a recalled entry was used (appendix §6.2): publishes the frozen `event.memory.used` envelope. */
+  /** Attest that a recalled entry was used: publishes the frozen `event.memory.used` envelope. */
   attest(usage: UsageAttestation): Promise<void>;
   /** Build (not send) the frozen candidate envelope — the caller publishes it on its own transport. */
   buildMemoryCandidateEvent(input: MemoryCandidateInput): EnvelopeEvent;

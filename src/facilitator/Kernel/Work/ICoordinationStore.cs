@@ -27,7 +27,7 @@ public abstract record TransitionResult
     /// <summary>Transition applied; carries the reloaded work.</summary>
     public sealed record Ok(WorkView Work) : TransitionResult;
 
-    /// <summary>Version fence failed; caller must rehydrate (spec §7.4).</summary>
+    /// <summary>Version fence failed; caller must rehydrate.</summary>
     public sealed record Conflict(long CurrentVersion) : TransitionResult;
 
     /// <summary>Edge not in the guard table; message names the edge.</summary>
@@ -57,7 +57,7 @@ public abstract record SteerResult
 }
 
 /// <summary>
-/// The §20 durable coordination seam: every mutation is ONE transaction —
+/// The durable coordination seam: every mutation is ONE transaction —
 /// per-Work advisory xact lock → guard check → version-checked UPDATE →
 /// work_events append → outbox append → NOTIFY → commit. Sinks/providers are
 /// only ever called after commit, by the dispatcher.

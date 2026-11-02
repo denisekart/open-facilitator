@@ -21,7 +21,7 @@ public static class ProblemErrors
     /// <summary>422 illegal state transition (message names the edge).</summary>
     public static ProblemDetails InvalidTransition(string edge) =>
         Create("invalid-state-transition", "Invalid state transition", StatusCodes.Status422UnprocessableEntity,
-            $"transition {edge} is not a legal edge of the §4.1 state machine");
+            $"transition {edge} is not a legal edge of the state machine");
 
     /// <summary>409 optimistic version fence failure.</summary>
     public static ProblemDetails VersionConflict(long currentVersion)
@@ -66,7 +66,7 @@ public static class ProblemErrors
 
     /// <summary>422 a terminal execution event whose stamped execution generation is not
     /// the assignment's current one — a late completion from a fenced-over generation.
-    /// §7.4 fencing: the stale event is refused, never finalized.</summary>
+    /// Fencing: the stale event is refused, never finalized.</summary>
     public static ProblemDetails StaleGeneration(int eventGeneration, int currentGeneration) =>
         Create("stale-generation", "Stale execution generation", StatusCodes.Status422UnprocessableEntity,
             $"terminal event stamped generation {eventGeneration} does not match the assignment's "
@@ -169,7 +169,7 @@ public static class ProblemErrors
         Create("approval-not-found", "Approval not found", StatusCodes.Status404NotFound,
             $"no approval '{approvalId}' in the ledger");
 
-    /// <summary>409 approval already decided/consumed — atomic single use (spec §12.2).</summary>
+    /// <summary>409 approval already decided/consumed — atomic single use.</summary>
     public static ProblemDetails ApprovalAlreadyConsumed(string approvalId) =>
         Create("approval-already-consumed", "Approval already consumed", StatusCodes.Status409Conflict,
             $"approval '{approvalId}' was already decided — a replay denies even with identical command JSON");
@@ -179,7 +179,7 @@ public static class ProblemErrors
         Create("approval-expired", "Approval expired", StatusCodes.Status409Conflict,
             $"approval '{approvalId}' is past its expiresAt");
 
-    /// <summary>409 approval revoked before use (appendix §7.3).</summary>
+    /// <summary>409 approval revoked before use.</summary>
     public static ProblemDetails ApprovalRevoked(string approvalId) =>
         Create("approval-revoked", "Approval revoked", StatusCodes.Status409Conflict,
             $"approval '{approvalId}' was revoked before use");
@@ -224,7 +224,7 @@ public static class ProblemErrors
         Create("memory-not-found", "Memory entry not found", StatusCodes.Status404NotFound,
             $"no memory entry '{entryId}' visible to this principal");
 
-    /// <summary>422 the team's daily retain budget is spent (§14.8 write-amplification law).</summary>
+    /// <summary>422 the team's daily retain budget is spent (write-amplification law).</summary>
     public static ProblemDetails MemoryQuotaExceeded(string team) =>
         Create("memory-quota-exceeded", "Memory quota exceeded", StatusCodes.Status422UnprocessableEntity,
             $"team '{team}' has spent its daily retain budget");

@@ -25,7 +25,7 @@ export type { ProblemDetails };
 export const MAX_ENVELOPE_BYTES = 262144;
 
 /**
- * The kernel's approval-decision push (spec §12.1 step 5). An event
+ * The kernel's approval-decision push. An event
  * CLASS, yet it routes as work: the dispatcher hands it to the handler's
  * `onDecided` arm instead of the fact-event auto-ack.
  */
@@ -160,7 +160,7 @@ export interface LinkStats {
   reconnects: number;
 }
 
-/** Injected logger (default console); correlation IDs ride JSON fields (A:281). */
+/** Injected logger (default console); correlation IDs ride JSON fields. */
 export interface LinkLogger {
   debug(msg: string, fields?: Record<string, unknown>): void;
   info(msg: string, fields?: Record<string, unknown>): void;

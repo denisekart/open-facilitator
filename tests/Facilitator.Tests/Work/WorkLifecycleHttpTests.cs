@@ -4,7 +4,7 @@ using System.Net;
 namespace Facilitator.Tests.Work;
 
 /// <summary>
-/// §26.1 item 2: a Work driven purely over HTTP walks
+/// A Work driven purely over HTTP walks
 /// open→planning→active→review→completed with rising expectedVersion; the
 /// timeline records exactly created + 4 state.transition rows; the dispatcher
 /// drains every kernel.log outbox row and each envelope is contract-valid.

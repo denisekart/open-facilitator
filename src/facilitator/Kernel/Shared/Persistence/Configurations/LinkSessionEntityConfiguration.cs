@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Facilitator.Kernel.Shared.Persistence.Configurations;
 
-/// <summary>facilitator.link_sessions — §7.3 session leases.</summary>
+/// <summary>facilitator.link_sessions — session leases.</summary>
 public sealed class LinkSessionEntityConfiguration : IEntityTypeConfiguration<LinkSessionEntity>
 {
     /// <inheritdoc />

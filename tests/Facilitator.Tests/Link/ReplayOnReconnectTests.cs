@@ -3,7 +3,7 @@ using System.Text.Json;
 namespace Facilitator.Tests.Link;
 
 /// <summary>
-/// spec S:291 + §26.1 item 2 server half: after the socket dies WITHOUT a
+/// Replay-on-reconnect (server half): after the socket dies WITHOUT a
 /// receipt, a fresh hello (new epoch) replays exactly the un-acked delivery —
 /// the resume cursor (<c>lastKnownAck</c>) is a hint, the receipt ledger is
 /// truth. An acked delivery never replays. Real wire: SignalR over WebSockets.
@@ -51,7 +51,7 @@ public sealed class ReplayOnReconnectTests(DispatchDbFixture fixture)
         // the socket dies with the second delivery in flight, no receipt.
         await first.Connection.DisposeAsync();
 
-        // the in-flight lease must lapse before the row is re-claimable (§5.4).
+        // the in-flight lease must lapse before the row is re-claimable.
         factory.Clock!.Advance(TimeSpan.FromSeconds(6));
 
         await using var second = await FakeLinkClient.ConnectAsync(factory.ServerAddress, token);

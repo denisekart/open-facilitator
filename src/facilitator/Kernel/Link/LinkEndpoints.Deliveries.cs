@@ -35,9 +35,9 @@ public static partial class LinkEndpoints
                 return Results.Problem(ProblemErrors.SessionNotFound(principal.EndpointId));
             }
 
-            // Every delivery read refreshes the lease (S:314): long-poll IS
+            // Every delivery read refreshes the lease: long-poll IS
             // the heartbeat for a socketless principal, so a polling adapter
-            // never loses its session to the sweeper (§7.3 lease = truth).
+            // never loses its session to the sweeper (lease = truth).
             await sessions.TouchSessionAsync(principal.EndpointId, session.SessionEpoch, options.HeartbeatSeconds, ct);
             var claimed = await ClaimWindowAsync(principal.EndpointId, session.SessionEpoch, ledger, pump, registry, options, request, ct);
             if (claimed.Count == 0 && wait(request) > 0)

@@ -69,7 +69,7 @@ function groupClaims(groups: readonly string[], username?: string): PolicyContex
 }
 
 describe("loadPolicyFile", () => {
-  it("loads the spec-shaped document and derives a stable revision", () => {
+  it("loads the design-shaped document and derives a stable revision", () => {
     const loaded = loadPolicyFile(POLICY_YAML);
     expect(loaded.file.owner).toBe("team-alpha");
     expect(loaded.file.policies).toHaveLength(3);
@@ -314,7 +314,7 @@ describe("extractClaims", () => {
 });
 
 describe("auditPolicy", () => {
-  it("emits one authorization.evaluated line with the §12.2 field set", () => {
+  it("emits one authorization.evaluated line with the field set", () => {
     const lines: { msg: string; fields?: Record<string, unknown> | undefined }[] = [];
     const logger = {
       debug: () => undefined,

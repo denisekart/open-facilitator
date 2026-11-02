@@ -5,7 +5,7 @@ namespace Facilitator.Kernel.Shared.Identity;
 /// <summary>
 /// RFC 6901 claim-pointer resolution against a verified token payload
 /// (<see cref="JsonElement"/>). Missing or malformed resolution yields the
-/// empty sequence — never a wildcard (spec §11.2 deny-on-missing).
+/// empty sequence — never a wildcard (deny-on-missing).
 /// </summary>
 public static class ClaimPointers
 {

@@ -43,7 +43,7 @@ public sealed class RoleRuleEngineTests
     public void GoogleShapes_SubjectEqualsAndAmrContains_GrantRole()
     {
         // Tokens from an external IdP with NO group claims: identity via the
-        // verified (iss, sub) pair + amr — the spec §11.2 operator use-case.
+        // verified (iss, sub) pair + amr — the operator use-case.
         var payload = Json("""
         {
           "iss": "https://accounts.google.com",

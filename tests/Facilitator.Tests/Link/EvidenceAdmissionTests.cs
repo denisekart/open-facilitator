@@ -4,7 +4,7 @@ using System.Text.Json.Nodes;
 namespace Facilitator.Tests.Link;
 
 /// <summary>
-/// Evidence law on link admission (appendix §3.2): a kernel-checkable
+/// Evidence law on link admission: a kernel-checkable
 /// ref that FAILS validation denies admission (422 evidence-invalid + audit
 /// deny), any other scheme records a workload-only allow
 /// (<c>authorization.evaluated:link</c>), and a Valid ref on an

@@ -1,4 +1,4 @@
-// E2E 3 — crash replay (plan step 6 item 3, §26.1 item 2 client half).
+// E2E 3 — crash replay (the client half of the replay law).
 // linkd (child process) + two deliveries; freeze the process (SIGSTOP) the
 // instant d2 reaches the wire, hard-kill it (SIGKILL) before the handler can
 // answer, restart with the SAME state file + same endpoint:

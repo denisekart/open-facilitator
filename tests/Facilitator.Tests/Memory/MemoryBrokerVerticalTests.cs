@@ -9,7 +9,7 @@ namespace Facilitator.Tests.Memory;
 /// <summary>
 /// The memory vertical: a human retains over REST (lands <c>active</c>,
 /// D4), the row + hash + audit ride the broker's tx, recall answers the D8 shape
-/// and writes the §6.2 usage rows, content dedupe returns the stored identity,
+/// and writes the usage rows, content dedupe returns the stored identity,
 /// and a foreign team sees nothing (no count, no existence hint).
 /// </summary>
 [Collection("postgres:work")]
@@ -41,7 +41,7 @@ public sealed class MemoryBrokerVerticalTests(PostgresFixture fixture)
         Assert.Contains(await _fixture.Db.AuditRows(),
             a => a.Action == "memory.retained" && a.Resource == $"memory/{entryId}" && a.Decision == "allow");
 
-        // Recall: D8 shape, entry present, usage law (§6.2): one row per entry.
+        // Recall: D8 shape, entry present, usage law: one row per entry.
         var recall = await KernelOps.PostJsonAsync(alice, "/api/memory/recall",
             MemoryTestKit.RecallBody(term), HttpStatusCode.OK);
         var entry = Assert.Single(recall.GetProperty("entries").EnumerateArray());

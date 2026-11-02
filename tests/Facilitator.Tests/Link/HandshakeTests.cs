@@ -3,7 +3,7 @@ using System.Text.Json;
 namespace Facilitator.Tests.Link;
 
 /// <summary>
-/// §26.1 item 2 (server half) + appendix §10.1 (A:300-301): hello→welcome on
+/// Handshake (server half): hello→welcome on
 /// the negotiated v1, epochs monotonic across reconnects, a v9-only client
 /// gets the frozen typed goodbye (fixture pair invalid/control.hello.v9-only →
 /// valid/control.goodbye.incompatible) and a null welcome, and a second hello
@@ -31,7 +31,7 @@ public sealed class HandshakeTests(DispatchDbFixture fixture)
         Assert.False(string.IsNullOrEmpty(welcome.GetProperty("sessionId").GetString()));
         Assert.Equal(1L, await fixture.Db.SessionEpoch(endpoint));
 
-        // §16.2: restarts re-use the logical id, get a new session + higher epoch.
+        // Restarts re-use the logical id, get a new session + higher epoch.
         await using var second = await FakeLinkClient.ConnectAsync(factory.ServerAddress, token);
         var reconnected = await second.HelloAsync(LinkTestHarness.HelloFrame(endpoint));
         Assert.Equal(2, reconnected.GetProperty("leaseEpoch").GetInt64());

@@ -6,7 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Facilitator.Tests.Link;
 
 /// <summary>
-/// §7.3: the DB lease — not TCP — ends a session. Heartbeat refreshes
+/// The DB lease — not TCP — ends a session. Heartbeat refreshes
 /// lease_until for a matching epoch only; a stale epoch gets false + a typed
 /// Disconnect; the pump's sweeper closes lease-expired sessions (fake clock:
 /// no wall-clock sleeps beyond the pump's own 2 s tick).

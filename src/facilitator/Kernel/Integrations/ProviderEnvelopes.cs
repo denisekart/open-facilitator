@@ -143,7 +143,7 @@ public static class ProviderEnvelopes
             },
         };
 
-    /// <summary>The bounded nudge (§6.4) — an informational
+    /// <summary>The bounded nudge — an informational
     /// command to the owning gateway; it never re-runs tools and never
     /// escalates authority. Command id <c>nudge:&lt;assignmentId&gt;:&lt;generation&gt;:&lt;episode&gt;</c>
     /// makes one nudge per stall episode single-shot on the outbox ledger.</summary>

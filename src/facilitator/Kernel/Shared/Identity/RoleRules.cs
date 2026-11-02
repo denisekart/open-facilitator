@@ -25,7 +25,7 @@ public sealed record RoleCondition(
 public sealed record RoleRuleDocument(IReadOnlyList<RoleRule> Rules);
 
 /// <summary>
-/// Pure, framework-free evaluator (the standards-only core, spec §11.2):
+/// Pure, framework-free evaluator (the standards-only core):
 /// a role is granted iff any of its rules' conditions ALL pass. Anything
 /// malformed — bad jsonb, unknown op, unresolvable non-exists condition —
 /// skips that rule (never wildcard-grants).

@@ -7,7 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Facilitator.Tests.Dispatch;
 
 /// <summary>
-/// appendix §5.6 (A:157): dead-lettered rows become visible on
+/// Dead-lettered rows become visible on
 /// GET /api/admin/deliveries?state=dead_letter (identity-gated, admin.read)
 /// with reason, newest first (this route replaced GET /api/dead-letters; the
 /// envelope round-trip is proven by the replay test — AdminSurfaceTests).

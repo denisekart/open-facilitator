@@ -10,7 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Facilitator.Tests.Admin;
 
 /// <summary>
-/// Spec §17: the <c>/api/admin/*</c> operator surface. Read models
+/// The <c>/api/admin/*</c> operator surface. Read models
 /// over seeded ledgers, the dead-letter replay round-trip (byte-identical
 /// envelope re-dispatch + replay-once fence), manifest re-mark, and the
 /// config-driven authz matrix. Joins <c>postgres:dispatch-link</c>: the

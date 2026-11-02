@@ -8,7 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Facilitator.Tests.Work;
 
 /// <summary>
-/// The §5.3 bounded-nudge law on a fake clock: no policy row means no
+/// The bounded-nudge law on a fake clock: no policy row means no
 /// nudging; a stale + online lane earns exactly one command.work.nudge.v1 per
 /// pass until the per-episode cap of three spends the budget; fresh activity
 /// (an acked delivery) keeps the lane alive; an endpoint without a live

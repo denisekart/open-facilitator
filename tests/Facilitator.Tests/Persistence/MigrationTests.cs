@@ -1,7 +1,7 @@
 namespace Facilitator.Tests.Persistence;
 
 /// <summary>
-/// §26.1 item 1: against a fresh container, app startup runs
+/// Against a fresh container, app startup runs
 /// <c>MigrateAsync</c> (Database:AutoMigrate=true), leaving the
 /// <c>facilitator</c> schema with the coordination tables and their CHECK
 /// constraints. Assertions are pure information_schema queries, so the test

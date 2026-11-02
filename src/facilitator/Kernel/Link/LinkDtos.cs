@@ -7,7 +7,7 @@ namespace Facilitator.Kernel.Link;
 /// One durable delivery — the SAME JSON object on the SignalR <c>Deliver</c>
 /// client method and the HTTP <c>GET /deliveries</c> items (OpenAPI
 /// <c>Delivery</c> component / link-delivery.v1.json). Receipts reference the
-/// durable deliveryId, never the socket (spec §5.2).
+/// durable deliveryId, never the socket.
 /// </summary>
 /// <param name="DeliveryId">Delivery identity = the outbox row id.</param>
 /// <param name="Envelope">The full CloudEvent envelope.</param>

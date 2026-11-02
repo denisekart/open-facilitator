@@ -8,7 +8,7 @@ using Facilitator.Tests.Infrastructure;
 namespace Facilitator.Tests.Memory;
 
 /// <summary>
-/// The frozen candidate lifecycle (spec §14.6) over both planes: a workload
+/// The frozen candidate lifecycle over both planes: a workload
 /// retain lands <c>candidate</c> (D4) with the receipt in-band, a candidate
 /// event records entry + timeline, promote flips to <c>active</c> (REST
 /// curation only), correct supersedes in a revision chain, delete tombstones

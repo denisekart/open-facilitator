@@ -2,7 +2,7 @@
 // for team-alpha through the Link plane (alice-delegated evidence), a
 // synthetic candidate event lands on the same work's lineage, the foreign team
 // (bob) sees nothing until alice's share — then recalls the entry with its
-// provenance + accessControl metadata (§6.3 law). psql confirms the ledger.
+// provenance + accessControl metadata. psql confirms the ledger.
 import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
@@ -113,7 +113,7 @@ describe.skipIf(!E2E)("memory broker e2e", () => {
     expect(((await bobBefore.json()) as { entries: unknown[] }).entries).toHaveLength(0);
 
     // 4. Alice shares the entry to team-beta; bob now recalls it WITH the
-    // §6.3 metadata (provenance + accessControl ride every result).
+    // Metadata (provenance + accessControl ride every result).
     const alice = await userToken("alice", "alice");
     const share = await fetch(`${harness.baseUrl}/api/memory/${entryId}/shares`, {
       method: "POST",

@@ -6,7 +6,7 @@ namespace Facilitator.Kernel.Shared.Persistence;
 
 /// <summary>
 /// Write-path seam for the ingress endpoints: inbox dedupe insert (ON CONFLICT
-/// DO NOTHING, spec §7.1) and the raw-SQL queries the endpoints expose.
+/// DO NOTHING) and the raw-SQL queries the endpoints expose.
 /// </summary>
 public sealed class IngressStore(IDbContextFactory<FacilitatorDbContext> contextFactory, TimeProvider timeProvider)
 {
@@ -72,7 +72,7 @@ public sealed class IngressStore(IDbContextFactory<FacilitatorDbContext> context
 
     /// <summary>
     /// Settle an inbox row: <c>processed</c> on success, <c>failed</c> when an
-    /// error is recorded — dedupe-on-success (appendix §5.3).
+    /// error is recorded — dedupe-on-success.
     /// </summary>
     public async Task MarkProcessedAsync(Guid inboxId, string? error, CancellationToken ct)
     {

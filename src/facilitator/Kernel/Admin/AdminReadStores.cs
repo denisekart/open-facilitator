@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Facilitator.Kernel.Admin;
 
-/// <summary>GET /api/admin/summary roll-up (spec §17.2; every section table-derived).</summary>
+/// <summary>GET /api/admin/summary roll-up (every section table-derived).</summary>
 public sealed record AdminSummary(
     int Teams,
     int Projects,
@@ -40,7 +40,7 @@ public sealed record AdminSearchResults(
     IReadOnlyList<AdminSearchHit> Memories,
     IReadOnlyList<AdminSearchHit> Messages);
 
-/// <summary>GET /api/admin/links row (appendix §4.3: trustMode displayed; lease = online authority).</summary>
+/// <summary>GET /api/admin/links row (trustMode displayed; lease = online authority).</summary>
 public sealed record AdminLinkRow(
     string EndpointId,
     string Team,
@@ -53,7 +53,7 @@ public sealed record AdminLinkRow(
     string? ReplicaId,
     int LiveSockets);
 
-/// <summary>Assignment affected by an offline gateway (appendix §17.2 stale view).</summary>
+/// <summary>Assignment affected by an offline gateway (stale view).</summary>
 public sealed record AdminAffectedAssignment(Guid AssignmentId, Guid WorkId, string Status);
 
 /// <summary>GET /api/admin/links: gateway rows + affected assignments of offline teams.</summary>
@@ -126,7 +126,7 @@ public sealed record AdminWorkDetail(
 /// <summary>Assignment row with its execution attempts. <c>DependsOnJson</c>
 /// is the raw DAG gate (additive pass-through, the AllowedCandidates precedent);
 /// <c>NudgeCount</c>/<c>Stalled</c> derive from the nudge ledger at the
-/// assignment's current generation (§5.3: stalled = the cap is spent).</summary>
+/// assignment's current generation (stalled = the cap is spent).</summary>
 public sealed record AdminAssignmentRow(
     Guid AssignmentId,
     string Status,
@@ -163,7 +163,7 @@ public sealed record AdminProvisioningRow(
     DateTime UpdatedAt);
 
 /// <summary>
-/// The admin read models (spec §17.2): bounded <c>GroupBy</c> counts
+/// The admin read models: bounded <c>GroupBy</c> counts
 /// and <c>Take</c>-limited projections over the existing ledgers — one
 /// round-trip per section, the <c>EfCoordinationStore.TimelineAsync</c>
 /// pattern. Stale gateways collapse into offline (the sweeper deletes expired
@@ -207,7 +207,7 @@ public sealed class AdminReadStores(
     }
 
     /// <summary>
-    /// SQL-bounded universal search (§17.2): typed sections, each
+    /// SQL-bounded universal search: typed sections, each
     /// <c>LIMIT</c>ed, <c>ILIKE</c> over text columns; a guid-shaped q also
     /// matches the message id columns by equality.
     /// </summary>
@@ -302,7 +302,7 @@ public sealed class AdminReadStores(
                     .Select(e => new AdminAttemptRow(e.ExecutionId, e.Generation, e.Status, e.StartedAt, e.EndedAt))
                     .ToList(),
                 a.DependsOn,
-                // Doctrine (§5.3): the budget is per stall episode, so both
+                // Doctrine: the budget is per stall episode, so both
                 // fields read the LATEST episode's ledger row — progress that
                 // opens a fresh episode clears the stalled flag.
                 (int?)db.Nudges.Where(n => n.AssignmentId == a.AssignmentId

@@ -26,7 +26,7 @@ public sealed record MemoryArm(ProblemDetails? Problem, string Status, object? D
 /// principal (D4: a workload retain lands <c>candidate</c>; curation never
 /// rides this plane) and answer in-band on the ack <c>data</c> (the
 /// request_upload ticket precedent). The two frozen events never refuse on
-/// memory trouble — §14.6: basic routing is never blocked on memory — an
+/// memory trouble — basic routing is never blocked on memory — an
 /// unresolvable candidate or attestation audits a deny inside the broker and
 /// the arm still answers accepted.
 /// </summary>
@@ -163,14 +163,14 @@ public sealed class MemoryIngress(
         return new MemoryArm(null, "accepted");
     }
 
-    /// <summary>Event arm: the frozen <c>event.memory.used</c> attestation records the same usage row an in-kernel recall writes (appendix §6.2). Unknown entry/consumer: broker audits + swallows.</summary>
+    /// <summary>Event arm: the frozen <c>event.memory.used</c> attestation records the same usage row an in-kernel recall writes. Unknown entry/consumer: broker audits + swallows.</summary>
     public async Task<MemoryArm> HandleUsedAsync(
         JsonElement root, EffectivePrincipal? principal, CancellationToken ct)
     {
         var data = root.GetProperty("data");
         // CE plane: no workload row exists, so the consumer's team cannot be
         // verified — the broker's read law denies (audit + swallow) unless the
-        // entry is facilitator-visible. §14.6: the plane still answers accepted.
+        // entry is facilitator-visible — the plane still answers accepted.
         var caller = principal is not null
             ? MemoryAccessContext.From(principal)
             : new MemoryAccessContext(

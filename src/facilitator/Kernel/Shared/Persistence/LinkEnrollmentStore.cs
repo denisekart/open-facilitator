@@ -25,9 +25,9 @@ public sealed record EnrollmentResult(Guid EnrollmentId, string EndpointId, Guid
 }
 
 /// <summary>
-/// Enrollment + link-token store (appendix §4): validates the bootstrap
+/// Enrollment + link-token store: validates the bootstrap
 /// enrollment secret, upserts by endpoint_id rotating the token (an old token
-/// stops validating immediately — the §26.1 item-2 invalidation lever), and
+/// stops validating immediately — the item-2 invalidation lever), and
 /// resolves bearer tokens for <see cref="ILinkTokenValidator"/>.
 /// </summary>
 public sealed class LinkEnrollmentStore(
@@ -124,7 +124,7 @@ public sealed class LinkEnrollmentStore(
 
         await db.SaveChangesAsync(ct);
 
-        // appendix §4: trustMode MUST be logged at enrollment (and every Hello).
+        // TrustMode MUST be logged at enrollment (and every Hello).
         logger.LogInformation(
             "link endpoint enrolled endpoint={EndpointId} instance={InstanceId} trustMode={TrustMode} team={TeamId} role={Role}",
             endpointId, instanceId, trustMode, team.TeamId, role);

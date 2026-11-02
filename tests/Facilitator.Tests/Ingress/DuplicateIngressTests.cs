@@ -4,7 +4,7 @@ using System.Text;
 namespace Facilitator.Tests.Ingress;
 
 /// <summary>
-/// §26.1 items 3-4: the real conformance fixture drives CloudEvents ingress —
+/// The real conformance fixture drives CloudEvents ingress —
 /// accepted once, duplicate on replay, exactly one business effect — while
 /// unknown commands fail closed with an audit inbox row and envelope
 /// violations answer 400.

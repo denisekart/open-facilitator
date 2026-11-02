@@ -60,7 +60,7 @@ public sealed class ResultIngress(
     {
         var data = root.GetProperty("data");
 
-        // §7.4 fence, BEFORE any ledger effect: a terminal event stamped at a
+        // Fence, BEFORE any ledger effect: a terminal event stamped at a
         // generation the assignment has moved past is refused (422) — the
         // manifest stays unrecorded, the inbox settles refused, and a
         // redelivery of the same stale event fences identically.

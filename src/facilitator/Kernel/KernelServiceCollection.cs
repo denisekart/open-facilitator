@@ -32,7 +32,7 @@ namespace Facilitator.Kernel;
 /// <c>Kernel/</c> — a new feature is one line in <see cref="AddKernel"/> plus
 /// its own extension. Also the OTel wiring (component packages — the
 /// OpenTelemetry.AspNetCore meta-package is not used; OTLP exporter only when
-/// <c>Otel:Endpoint</c> is configured, spec §22.2).
+/// <c>Otel:Endpoint</c> is configured).
 /// </summary>
 public static class KernelServiceCollection
 {
@@ -183,7 +183,7 @@ public static class KernelServiceCollection
         builder.Services.AddSingleton<IDecisionProvider, DeterministicDecisionProvider>();
         builder.Services.AddSingleton<ISink, Routing.RoutingSink>();
 
-        // The bounded nudge (§5.3): a per-replica sweep loop; the policy row
+        // The bounded nudge: a per-replica sweep loop; the policy row
         // (admin_config 'nudge-policy') decides whether it does anything.
         builder.Services.AddSingleton(
             builder.Configuration.GetSection(Work.NudgeSweeper.NudgeOptions.SectionName).Get<Work.NudgeSweeper.NudgeOptions>()
@@ -241,7 +241,7 @@ public static class KernelServiceCollection
         builder.Services.AddSingleton<IMemoryProvider>(sp => memory.Provider switch
         {
             // Read once at composition: no hot-swap. postgres-fts is the only
-            // shipped profile (spec §14.7); hindsight/custom are documented seams.
+            // shipped profile; hindsight/custom are documented seams.
             "postgres-fts" => new PostgresFtsMemoryProvider(),
             _ => throw new InvalidOperationException(
                 $"Memory:Provider '{memory.Provider}' is unknown (only 'postgres-fts' ships) — fail-closed."),

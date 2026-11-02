@@ -5,7 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Facilitator.Tests.Link;
 
 /// <summary>
-/// spec S:302 + §26.1 item 3 (lost-receipt loop): a delivery that is never
+/// The lost-receipt loop: a delivery that is never
 /// receipted becomes re-claimable once its in-flight lease passes, the replay
 /// is the SAME deliveryId (ledger identity), attempts increments, and a second
 /// receipt is 204-idempotent — the dropped-receipt → redelivery → duplicate

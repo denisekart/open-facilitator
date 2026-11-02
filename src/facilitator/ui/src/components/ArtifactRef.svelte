@@ -4,7 +4,7 @@
 
   let { artifactId }: { artifactId: string } = $props();
 
-  /** Reads GET /api/artifacts/{id} metadata (never the storage URI, spec §9). */
+  /** Reads GET /api/artifacts/{id} metadata (never the storage URI). */
   let artifact = $state<{ artifactId: string; mediaType: string; size: number; state: string } | null>(null);
   let error = $state<string | null>(null);
   let loading = $state(false);

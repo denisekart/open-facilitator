@@ -3,7 +3,7 @@ using System.Text.Json;
 namespace Facilitator.Kernel.Shared.Identity;
 
 /// <summary>
-/// The verified human/service principal behind a kernel request (spec §11.1):
+/// The verified human/service principal behind a kernel request:
 /// identity is the verified pair <c>(iss, sub)</c>; everything else is
 /// operator-mapped display/authorization context. The canonical audit/timeline
 /// actor string is <c>oidc:&lt;iss&gt;|&lt;sub&gt;</c>; display names never enter it.

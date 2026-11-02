@@ -5,7 +5,7 @@ namespace Facilitator.Kernel.Shared.Storage;
 public sealed record ArtifactPut(string RelativePath, string DigestHex, long Bytes);
 
 /// <summary>
-/// The artifact byte-store port (spec §15.4): content-addressed blobs keyed by
+/// The artifact byte-store port: content-addressed blobs keyed by
 /// a hex SHA-256 digest, addressed through opaque relative paths. A put hashes
 /// the received stream itself and lands the blob at the COMPUTED digest's path
 /// — the port never trusts a caller-declared address, so a mismatched upload

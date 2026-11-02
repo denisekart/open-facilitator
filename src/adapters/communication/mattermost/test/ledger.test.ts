@@ -1,4 +1,4 @@
-// The §13.3 idempotency-ledger law + the channel-type cache, against a fake
+// The idempotency-ledger law + the channel-type cache, against a fake
 // MattermostApi with ZERO HTTP: a replayed reply command must answer accepted
 // without ever touching the provider again.
 import { mkdtempSync, rmSync } from "node:fs";

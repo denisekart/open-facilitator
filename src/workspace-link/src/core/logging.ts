@@ -1,5 +1,5 @@
-// Default console logger with correlation-ID JSON fields (appendix §9 /
-// A:281): every line carries whatever of {workId, assignmentId, deliveryId,
+// Default console logger with correlation-ID JSON fields:
+// Every line carries whatever of {workId, assignmentId, deliveryId,
 // endpointId, reason} the call site supplied.
 import type { LinkLogger } from "./types.js";
 

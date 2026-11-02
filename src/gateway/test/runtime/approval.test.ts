@@ -317,7 +317,7 @@ afterEach(async () => {
   }
 });
 
-describe("confirm hold (spec §12.1)", () => {
+describe("confirm hold", () => {
   it("confirm verdict: pending row + approval.required (digest, actors, nonce, correlation) + accepted receipt, no binding row", async () => {
     const { mock, paths } = await booted();
     mock.pushDeliver(assignDelivery("cmd-a"));
@@ -359,7 +359,7 @@ describe("confirm hold (spec §12.1)", () => {
   });
 });
 
-describe("decided-push (§12.1 step 5)", () => {
+describe("decided-push", () => {
   it("approved: consume command sent, binding row, child start, pending executing, receipt accepted", async () => {
     const { mock, paths } = await booted();
     mock.pushDeliver(assignDelivery("cmd-a"));

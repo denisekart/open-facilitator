@@ -51,7 +51,7 @@ describe("parseConfig happy path", () => {
     expect(config.linkToken).toBeUndefined();
   });
 
-  it("loads from a YAML file (spec §8.4 layout)", () => {
+  it("loads from a YAML file (layout)", () => {
     const file = join(stateDir(), "gateway.yaml");
     writeFileSync(file, BASE);
     expect(loadConfigFile(file, { hasStoredToken: () => false }).gatewayId).toBe("gw.team-alpha");
@@ -249,7 +249,7 @@ describe("parseConfig mode matrix (config v2)", () => {
     });
   });
 
-  it("boots standalone with zero children (spec S:330)", () => {
+  it("boots standalone with zero children", () => {
     const config = parseConfig(STANDALONE, { hasStoredToken: () => false });
     expect(config.mode).toBe("standalone");
     expect(config.children).toBeUndefined();

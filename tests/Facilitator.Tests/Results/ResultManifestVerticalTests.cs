@@ -210,6 +210,49 @@ public sealed class ResultManifestVerticalTests(PostgresFixture fixture)
     }
 
     [Fact]
+    public async Task ProjectlessWorkManifestListReadsForAdminOnly()
+    {
+        // The work's team lookup materializes a NULLABLE slug: a project-less
+        // work answers 200-empty to an admin (its documented team-less law),
+        // and the work-scope 404 to everyone else — never a 500 from the
+        // LEFT JOIN materializing NULL into a non-nullable member.
+        using var factory = Host();
+        var kernel = factory.CreateAuthedClient();
+        var (workId, _) = await KernelOps.CreateWorkAsync(kernel, "project-less manifest list");
+
+        var alice = await ArtifactTestKit.UserClientAsync(factory, "alice");
+        Assert.Empty((await KernelOps.GetJsonAsync(alice, $"/api/works/{workId}/manifests", HttpStatusCode.OK)).EnumerateArray());
+
+        var bob = await ArtifactTestKit.UserClientAsync(factory, "bob");
+        using var denied = await bob.GetAsync($"/api/works/{workId}/manifests");
+        Assert.Equal(HttpStatusCode.NotFound, denied.StatusCode);
+    }
+
+    [Fact]
+    public async Task ProjectlessWorkCompletedManifestDegradesLikeForeignTeam()
+    {
+        // A manifest recorded against a project-less work: the work has no
+        // team lineage, so the strict same-team check cannot be satisfied —
+        // the same non-disclosing 404 a foreign team's work gets, no rows.
+        using var factory = Host();
+        var kernel = factory.CreateAuthedClient();
+        var (workId, _) = await KernelOps.CreateWorkAsync(kernel, "project-less completed");
+        var link = await LinkClientAsync(factory, kernel);
+
+        var doc = ResultManifestTestKit.ManifestDoc("man-projectless");
+        var (bytes, digest) = ResultManifestTestKit.ManifestBytes(doc);
+        var artifactId = await ResultManifestTestKit.UploadManifestAsync(link, workId, bytes);
+
+        var assignmentId = Guid.NewGuid();
+        using var response = await link.PostAsync("/api/link/v1/events",
+            new StringContent(ResultManifestTestKit.CompletedEnvelope(workId, assignmentId, "man-projectless", artifactId, digest), System.Text.Encoding.UTF8, "application/json"));
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Contains("manifest-not-found", ResultManifestTestKit.ProblemType(response));
+        Assert.Empty(await _fixture.Db.ManifestRowsForAssignment(assignmentId));
+    }
+
+
+    [Fact]
     public async Task UnresolvableOutputsRefuse422WithoutRows()
     {
         using var factory = Host();

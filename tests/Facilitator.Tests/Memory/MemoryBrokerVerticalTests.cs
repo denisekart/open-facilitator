@@ -118,6 +118,27 @@ public sealed class MemoryBrokerVerticalTests(PostgresFixture fixture)
         Assert.Equal(0, await _fixture.Db.MemoryShareCount(entryId, "team-beta"));
     }
 
+    [Fact]
+    public async Task WorkSelectorOnProjectlessWorkLandsInCallerTeamLineage()
+    {
+        // The work-selector's team join materializes a NULLABLE slug: a work
+        // with no project falls into the caller's team scope lineage (the
+        // documented law), instead of faulting on the missing join.
+        using var factory = Host();
+        var alice = await ArtifactTestKit.UserClientAsync(factory, "alice");
+        var (workId, _) = await KernelOps.CreateWorkAsync(factory.CreateAuthedClient(), "projectless retain");
+        var term = $"wls{Guid.NewGuid():N}";
+
+        var created = await KernelOps.PostJsonAsync(alice, "/api/memory/retain",
+            MemoryTestKit.RetainBody($"work:{workId}", $"retained against a project-less work {term}"),
+            HttpStatusCode.Created);
+        var entryId = Guid.Parse(created.GetProperty("entryId").GetString()!);
+
+        var row = await _fixture.Db.MemoryEntry(entryId);
+        Assert.NotNull(row);
+        Assert.Equal("team-alpha", row.TeamSlug);
+    }
+
     private KernelTestFactory Host() =>
         new(_fixture, noDispatcher: true, settings: MemoryTestKit.WorkloadBinding);
 }

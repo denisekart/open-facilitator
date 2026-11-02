@@ -712,7 +712,7 @@ public sealed class MemoryBroker(
 
                 var link = await db.Works.AsNoTracking()
                     .Where(w => w.WorkId == work)
-                    .Select(w => new { w.ProjectId, ProjectTeam = w.Project!.Team!.Slug })
+                    .Select(w => new { w.ProjectId, ProjectTeam = w.ProjectId == null ? null : w.Project!.Team!.Slug })
                     .FirstOrDefaultAsync(ct);
                 if (link is null)
                 {

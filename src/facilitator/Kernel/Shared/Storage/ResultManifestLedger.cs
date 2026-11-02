@@ -116,7 +116,7 @@ public sealed class ResultManifestLedger(
         // same 404-shaped answer as a foreign or missing artifact).
         var work = await db.Works.AsNoTracking()
             .Where(w => w.WorkId == workId)
-            .Select(w => new { w.Version, TeamSlug = w.Project!.Team!.Slug })
+            .Select(w => new { w.Version, TeamSlug = w.ProjectId == null ? null : w.Project!.Team!.Slug })
             .FirstOrDefaultAsync(ct);
         if (work is null)
         {
@@ -124,6 +124,10 @@ public sealed class ResultManifestLedger(
         }
 
         // The manifest artifact must be a verified, same-team, kernel-readable row.
+        // A work with no project has no team lineage, so the strict same-team
+        // equality below can never be satisfied: the answer degrades exactly
+        // like a foreign team's — the same 404-shaped ArtifactMissing
+        // (non-disclosure), never a crash.
         var artifact = await db.Artifacts.AsNoTracking()
             .FirstOrDefaultAsync(a => a.ArtifactId == manifestArtifactId, ct);
         if (artifact is null
@@ -359,18 +363,19 @@ public sealed class ResultManifestLedger(
         Guid workId, IReadOnlyList<string> groups, IReadOnlySet<string> roles, CancellationToken ct)
     {
         await using var db = await contextFactory.CreateDbContextAsync(ct);
-        var team = await db.Works.AsNoTracking()
+        var work = await db.Works.AsNoTracking()
             .Where(w => w.WorkId == workId)
-            .Select(w => w.Project!.Team!.Slug)
+            .Select(w => new { w.ProjectId, TeamSlug = w.ProjectId == null ? null : w.Project!.Team!.Slug })
             .FirstOrDefaultAsync(ct);
-        if (team is null)
+        if (work is null)
         {
             return null;
         }
 
         // Work-scope 404 law: a foreign team's work is indistinguishable from
-        // an unknown one; a team-less work reads only to an admin.
-        if (!roles.Contains("framework-admin") && !groups.Contains($"/teams/{team}"))
+        // an unknown one; a team-less work (no project) reads only to an admin.
+        if (!roles.Contains("framework-admin")
+            && (work.TeamSlug is null || !groups.Contains($"/teams/{work.TeamSlug}")))
         {
             return null;
         }

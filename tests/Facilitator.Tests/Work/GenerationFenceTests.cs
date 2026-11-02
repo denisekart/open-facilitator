@@ -126,6 +126,56 @@ public sealed class GenerationFenceTests(PostgresFixture fixture) : IAsyncLifeti
         Assert.Equal(4, data.GetProperty("executionGeneration").GetInt32());
     }
 
+    [Fact]
+    public async Task ProjectlessWorkRedispatch_SurvivesTeamLookup_IntentIsTeamless()
+    {
+        // The re-dispatch arm's work→project→team join materializes a NULLABLE
+        // slug: a project-less work answers 202 with a team-agnostic intent
+        // (no team field), never a 500 from NULL hitting a non-nullable member.
+        using var factory = new KernelTestFactory(fixture, noDispatcher: true);
+        using var kernel = factory.CreateAuthedClient();
+        var (workId, _) = await KernelOps.CreateWorkAsync(kernel, "projectless redispatch");
+
+        var steerId = Guid.NewGuid().ToString("N");
+        var body = JsonSerializer.Serialize(new Dictionary<string, object?>
+        {
+            ["capabilityId"] = "research.analyze",
+            ["objective"] = "retry without a project",
+            ["commandId"] = steerId,
+        });
+        var requested = await KernelOps.PostJsonAsync(
+            kernel, $"/api/works/{workId}/redispatch", body, HttpStatusCode.Accepted);
+        Assert.Equal("redispatch-requested", requested.GetProperty("status").GetString());
+
+        var intent = await fixture.Db.OutboxEnvelopeByCommand($"routing:work-redispatch:{steerId}");
+        Assert.NotNull(intent);
+        using var doc = JsonDocument.Parse(intent!);
+        Assert.False(doc.RootElement.GetProperty("data").TryGetProperty("team", out _));
+    }
+
+    [Fact]
+    public async Task ProjectlessWorkSteerWithTerminalAssign_RedispatchesTeamAgnostically()
+    {
+        // The steer re-dispatch arm reads the work's team the same way: a
+        // project-less work rides a team-less routing intent, no crash.
+        using var factory = new KernelTestFactory(fixture, noDispatcher: true);
+        using var kernel = factory.CreateAuthedClient();
+        var (workId, _) = await KernelOps.CreateWorkAsync(kernel, "projectless steer redispatch");
+        var assignmentId = Guid.NewGuid();
+        await fixture.Db.SeedAssignLedgerRowWithContext(
+            workId, assignmentId, "gf.nolink", "research.analyze", "original objective");
+
+        var steerCommand = "gf-steer-" + Guid.NewGuid().ToString("N");
+        Assert.Equal(HttpStatusCode.OK, (await kernel.PostAsync(
+            $"/api/works/{workId}/steer",
+            new StringContent($$"""{"directive":"quiet","commandId":"{{steerCommand}}","expectedVersion":1}""", Encoding.UTF8, "application/json"))).StatusCode);
+
+        var intent = await fixture.Db.OutboxEnvelopeByCommand($"routing:work-redispatch:{steerCommand}");
+        Assert.NotNull(intent);
+        using var doc = JsonDocument.Parse(intent!);
+        Assert.False(doc.RootElement.GetProperty("data").TryGetProperty("team", out _));
+    }
+
     // --- plumbing -------------------------------------------------------------
 
     private static string Leaf() => Guid.NewGuid().ToString("N")[..10];

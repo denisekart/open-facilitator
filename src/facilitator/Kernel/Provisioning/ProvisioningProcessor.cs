@@ -781,7 +781,7 @@ public sealed class ProvisioningProcessor(
         extraInputs.Remove("sourceRefs", out _);
         var work = await db.Works.AsNoTracking()
             .Where(w => w.WorkId == workId)
-            .Select(w => new { w.Objective, TeamSlug = w.Project!.Team!.Slug }).FirstOrDefaultAsync(ct);
+            .Select(w => new { w.Objective, TeamSlug = w.ProjectId == null ? null : w.Project!.Team!.Slug }).FirstOrDefaultAsync(ct);
         var endpoint = original.RecipientEndpointId.StartsWith("link.", StringComparison.Ordinal)
             ? original.RecipientEndpointId["link.".Length..] : original.RecipientEndpointId;
         return new RoutingIntent(

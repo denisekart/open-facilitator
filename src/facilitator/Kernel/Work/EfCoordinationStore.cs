@@ -111,7 +111,7 @@ public sealed class EfCoordinationStore(
         await WorkLockAsync(db, workId, ct);
         var work = await db.Works.AsNoTracking()
             .Where(w => w.WorkId == workId)
-            .Select(w => new { w.Objective, TeamSlug = w.Project!.Team!.Slug, w.ProjectId })
+            .Select(w => new { w.Objective, TeamSlug = w.ProjectId == null ? null : w.Project!.Team!.Slug, w.ProjectId })
             .FirstOrDefaultAsync(ct);
         if (work is null)
         {
@@ -382,7 +382,7 @@ public sealed class EfCoordinationStore(
         const string baseCommandId = "work-redispatch";
         var workTeamSlug = await db.Works.AsNoTracking()
             .Where(w => w.WorkId == workId)
-            .Select(w => w.Project!.Team!.Slug).FirstOrDefaultAsync(ct);
+            .Select(w => w.ProjectId == null ? null : w.Project!.Team!.Slug).FirstOrDefaultAsync(ct);
         var redispatchIntent = new RoutingIntent(
             workId,
             originalData["capabilityId"]!.GetValue<string>(),

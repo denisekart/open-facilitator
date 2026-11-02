@@ -1,4 +1,4 @@
-# verify-replicas.sh — Plan 35 Phase D: the two-replica matrix (spec §7),
+# verify-replicas.sh — the two-replica matrix (spec §7),
 # run by `referencectl verify --replicas` after `up slim --replicas 2`.
 # Reuses verify.sh's step-record machinery (step_pass/step_fail read
 # $VERIFY_RESULTS); the caller owns VERIFY_RESULTS + the report.

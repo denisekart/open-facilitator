@@ -35,7 +35,7 @@ overlays=(-f compose.slim.yaml -f compose.provisioning.yaml)
 [ -n "${FULL:-}" ] && overlays+=(-f compose.full.yaml)
 compose() { (cd "$REF" && docker compose --env-file versions.env --env-file .env "${overlays[@]}" -p facilitator-demo "$@"); }
 
-# Phase D: REPLICAS=2 (or `up slim --replicas 2`) adds the two-replica
+# REPLICAS=2 (or `up slim --replicas 2`) adds the two-replica
 # overlay so every compose verb (up/ps/logs/down/exec) sees facilitator-b
 # + the LB; the replica matrix then has a single-file compose definition.
 # The full-profile replica legs (adapters + coding workspace riding the LB)
@@ -149,7 +149,7 @@ cmd_status() {
     "fetch('http://127.0.0.1:8099/status').then(r=>r.ok?r.json():Promise.reject(r.status)).then(s=>process.stdout.write(JSON.stringify(s)))" \
     | jq '{gatewayId, state, session, children, awaitingApproval}' \
     || { echo "gateway probe FAILED (demo-workspace 127.0.0.1:8099/status)" >&2; rc=1; }
-  # Phase D: when an LB answers at :8089 (the two-replica shape), show the
+  # When an LB answers at :8089 (the two-replica shape), show the
   # fleet view — who answers, per-replica live leases (stamp count vs
   # sockets held), queue depth.
   if curl -fs --max-time 5 -o /dev/null http://localhost:8089/health; then

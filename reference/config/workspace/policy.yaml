@@ -15,7 +15,7 @@ policies:
     resources: ["*"]
     actorAnyOf: []
     effect: allow
-  # Plan 23 forgejo ops (exact capability rows: the engine has no
+  # Forgejo ops (exact capability rows: the engine has no
   # capability glob). Reads and comments run free; anything that mutates
   # forge-visible state (push, PR create, CI trigger) parks for a human
   # confirm. actorAnyOf names the team group so a member (alice) can answer

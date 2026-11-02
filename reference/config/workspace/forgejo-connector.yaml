@@ -1,4 +1,4 @@
-# Forgejo ops connector (Plan 23, decision 5): a second child of the demo
+# Forgejo ops connector: a second child of the demo
 # Gateway, privileged forge writes behind team policy. Full-profile only:
 # the 40- supervisor unit stays inert (exit 0) unless FORGEJO_URL is set,
 # and the policy rows + kernel section for forgejo exist only with the full

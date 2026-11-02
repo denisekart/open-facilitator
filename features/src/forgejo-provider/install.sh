@@ -40,7 +40,7 @@ chmod 0755 /usr/local/bin/ofac-forgejo-connector
 
 install -m 0755 "$FEATURE_DIR/pkg/ofac-supervisor.sh" "$SHARE/ofac-supervisor.sh"
 
-# Opt-in by existence (Plan 23 decision 9): without FORGEJO_URL the unit
+# Opt-in by existence: without FORGEJO_URL the unit
 # exits 0 immediately — installing the Feature in a chat-only workspace
 # changes nothing. Mirrors the compose unit (reference/container/units/40-
 # forgejo-connector.sh): same opt-in + exit-code law, image-path invocation.

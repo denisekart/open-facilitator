@@ -153,7 +153,7 @@ step_idp_login() {
     || { step_fail "kernel rejected the client_credentials token"; return 1; }
   verify_get "$VERIFY_TOKEN_ALICE" /api/admin/deliveries?state=dead_letter >/dev/null \
     || { step_fail "kernel rejected the alice token"; return 1; }
-  # Admin read surface (Plan 20): the alice (framework-admin) token must see
+  # Admin read surface: the alice (framework-admin) token must see
   # the summary roll-up — proves the admin.read binding end-to-end.
   verify_get "$VERIFY_TOKEN_ALICE" /api/admin/summary | jq -e '.workByState' >/dev/null \
     || { step_fail "admin summary unreadable for alice"; return 1; }
@@ -441,8 +441,8 @@ step_pass() { step_pass_record "$VERIFY_CURRENT_STEP" "$(( $(verify_now_ms) - VE
 step_fail() { step_fail_record "$VERIFY_CURRENT_STEP" "$(( $(verify_now_ms) - VERIFY_CURRENT_STARTED ))" "$*"; }
 
 step_worker_restart_resume() {
-  # Plan 35 Phase C inversion: the killed worker is the kernel-PROVISIONED
-  # elastic container (team-beta), not the compose demo-workspace. The
+  # The killed worker is the kernel-PROVISIONED elastic container
+  # (team-beta), not the compose demo-workspace. The
   # continuity law: kill-9 => exactly ONE honest retryable failed => the
   # kernel's worker-lost arm relaunches the container through the launcher
   # AND re-queues the work's routing intent (new generation) => completion

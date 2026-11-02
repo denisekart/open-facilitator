@@ -89,9 +89,9 @@ compose-full:
 	@echo "Slim stack + forgejo :3000, mattermost :8065, kafka :9092, ollama :11434 (loopback)"
 	@echo "Provider adapter :8066 (GET /healthz), kernel provider section ON. Live proof: make provider-e2e"
 
-# Provider-ingest live proof (Plan 22 + 23 + 24): the full stack must be up
-# first (`make compose-full`); 20 steps (plan 35 Phase C adds provision-cold-start,
-# provision-kill9), verify-shaped report.
+# Provider-ingest live proof (Mattermost + Forgejo + coding-worker + provisioning
+# legs): the full stack must be up first (`make compose-full`); verify-shaped
+# report over every provider and provisioning leg.
 # Step selection: make provider-e2e ARGS="--only provider-boot".
 provider-e2e:
 	@echo "Provider E2E tier: needs the FULL stack (make compose-full) — mattermost :8065, adapter :8066, kernel :8088."

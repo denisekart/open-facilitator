@@ -15,8 +15,8 @@ SEED_REALM=${SEED_REALM:-facilitator}
 SEED_REF=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 
 seed_compose() {
-  # The provisioning overlay is part of the slim acceptance env (plan 35
-  # Phase C): kernel scale law + OCI launcher ride every stack operation.
+  # The provisioning overlay is part of the slim acceptance env: the
+  # kernel scale law + OCI launcher ride every stack operation.
   (cd "$SEED_REF" && docker compose --env-file versions.env --env-file .env \
     -f compose.slim.yaml -f compose.provisioning.yaml -p facilitator-demo "$@")
 }

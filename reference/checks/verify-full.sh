@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# verify-full.sh — the full-profile provider-ingest acceptance run (Plan 22
-# step 5, the local gate; hosted ref-env CI is commented out by free-tier law).
+# verify-full.sh — the full-profile provider-ingest acceptance run (the local
+# gate; hosted ref-env CI is commented out by free-tier law).
 # Sources verify.sh for the shared primitives (recording, polling, psql,
 # kernel REST) and drives the Mattermost leg over the published provider port:
 # a real @facilitator mention creates a Work, the deterministic worker runs it,
@@ -147,7 +147,7 @@ step_provider_link_challenge() {
   [ -n "$challenge_code" ] \
     || { step_fail "challenge row exists but the DM reply carries no code"; full_logs facilitator; return 1; }
 
-  # 2. Redeem on the human plane as a Keycloak'd identity (deviation D2).
+  # 2. Redeem on the human plane as a Keycloak'd identity.
   local alice_token
   alice_token=$(seed_mint_user_token alice alice) \
     || { step_fail "could not mint the alice token"; return 1; }
@@ -312,9 +312,9 @@ full_reaction_acked() {
     jq -e '[.[] | select(.emoji_name=="eye")] | length >= 1' >/dev/null
 }
 
-# --- Forgejo REST helpers (Plan 23 step 6) ------------------------------------
-# D6: every call rides HTTP Basic with the admin password (Forgejo accepts
-# Basic wherever a token would; the plan's login-POST token adds nothing).
+# --- Forgejo REST helpers --------------------------------------------------
+# Every call rides HTTP Basic with the admin password (Forgejo accepts
+# Basic wherever a token would; a login-POST token adds nothing).
 # Author = ofac-admin ≠ bot facilitator-bot, so these events pass the
 # adapter's echo filter exactly as a human's would.
 forgejo_api() { # forgejo_api METHOD PATH [BODY]
@@ -398,7 +398,7 @@ step_forgejo_connector_pr() {
     '{"new_branch_name":"bot/topic","old_branch_name":"main"}' >/dev/null || true
   VERIFY_TOKEN_ALICE=${VERIFY_TOKEN_ALICE:-$(seed_mint_user_token alice alice)} \
     || { step_fail "alice token mint failed"; return 1; }
-  # The raw-outbox assign the plan prescribes (seed_dispatch's shape, the
+  # Raw-outbox assign (seed_dispatch's shape, the
   # connector's op inputs): confirm-held by policy, so an approval row must
   # appear and alice's respond must release exactly one PR.
   local command_id assignment_id envelope
@@ -441,8 +441,10 @@ step_forgejo_connector_pr() {
     || { step_fail "no exactly-one open PR from bot/topic 90s after approval"; full_logs demo-workspace facilitator; return 1; }
   poll_until 60 full_connector_completed >/dev/null \
     || { step_fail "connector assignment.completed never landed for $FJ_WORK"; full_logs demo-workspace facilitator; return 1; }
-  # D5: the as-built pull_request arm binds by (forgejo, repo, PR number) —
-  # the branch→issue link resolver is Plan 24's. Seed the PR-number binding
+  # The pull_request arm binds by (forgejo, repo, PR number). The kernel's
+  # head-branch resolver only mints such a binding for a PR whose head branch
+  # has a parked `branch:<ref>` marker (the coding arm's prRequest reader
+  # parks it), so seed the PR-number binding
   # for the review/CI legs (same fixture style as this step's outbox row).
   full_psql "INSERT INTO facilitator.communication_bindings
       (binding_id, provider, channel, root_message_id, work_id, idempotency_key, created_at)
@@ -518,7 +520,7 @@ step_forgejo_ci_note() {
     || { step_fail "no provider.input note with the failure verdict 45s after the status"; full_logs forgejo-adapter facilitator; return 1; }
   step_pass "commit-status failure annotated $FJ_WORK (status on PR head + signed ci delivery)"
 }
-# --- Coding-worker legs (Plan 24 step 6: §23.1) --------------------------------
+# --- Coding-worker legs (spec §23.1) ------------------------------------------
 # A fresh ofac:coding-labeled issue arms a coding Work (rule-matched assign to
 # gw.coding, team-coding), the coding worker clones/changes/pushes, the kernel
 # manifest reader opens the PR through the coding connector, a PR review
@@ -766,7 +768,7 @@ step_two_repo_dependency() {
   poll_until 15 fj_tr_steer_row >/dev/null \
     || { step_fail "no steer timeline row for $work"; full_logs facilitator; return 1; }
   # Re-dispatch lands generation 2 for the assignment line (the steer had no
-  # live attempt: both executions had ended — the 24 re-dispatch branch).
+  # live attempt: both executions had ended — the §23.1 re-dispatch branch).
   fj_tr_gen2() {
     full_psql "SELECT 1 FROM facilitator.outbox WHERE work_id = '$work'
         AND command_id LIKE 'routing:work-redispatch:%'
@@ -824,7 +826,7 @@ step_two_repo_dependency() {
   step_pass "two-repo Work: gated dispatch -> wake -> 2 executions, steer -> gen-2 re-dispatch, straggler fenced 422, cycle rejected"
 }
 
-# --- provisioning legs (plan 35 Phase C) -------------------------------------
+# --- provisioning legs -------------------------------------------------------
 
 elastic_running() { # container exists and is running
   [ "$(docker inspect -f '{{.State.Running}}' ofac-gw-team-beta 2>/dev/null || true)" = true ]

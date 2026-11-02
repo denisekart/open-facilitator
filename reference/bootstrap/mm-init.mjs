@@ -1,4 +1,4 @@
-// Plan 22 step 4: Mattermost provisioning one-shot for the full profile.
+// Mattermost provisioning one-shot for the full profile.
 // A fresh team-edition server has no users, and 11.x removed both the
 // unauthenticated setup endpoint and shell tools from the TE image, so
 // bootstrapping rides OPEN SIGNUP over REST: with EnableOpenServer the first

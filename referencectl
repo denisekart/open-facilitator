@@ -12,9 +12,14 @@
 #   ./referencectl token [--user U --password P]   mint an operator token (client
 #                                    credentials; --user mints a password-grant one)
 #   ./referencectl work [--objective TEXT]  create a Work and print its timeline
-#   ./referencectl verify [--json] [--only id,id]  run the acceptance steps against a
+#   ./referencectl verify [--json] [--only ids]  run the acceptance steps against a
 #                                    booted stack (seeds its own works; exit 0 iff all pass)
 #   ./referencectl verify --replicas  run the two-replica matrix (case a-e, spec §7)
+#   ./referencectl verify --full [--json]  run EVERY tier — slim 11 + full-profile 20 +
+#                                    replica matrix — against the full two-replica stack
+#                                    (kernel :8088 + LB :8089 + provider ports); one
+#                                    merged JSON report with --json, exit 0 iff every
+#                                    step passed and no tier was skipped
 set -euo pipefail
 
 ROOT=$(cd -- "$(dirname -- "$0")" && pwd)
@@ -214,12 +219,135 @@ cmd_verify() {
     run_verify_replicas "$@"
     return $?
   fi
+  if [ "${1:-}" = "--full" ]; then
+    shift
+    run_verify_all_tiers "$@"
+    return $?
+  fi
   curl -fs --max-time 10 -o /dev/null "$KERNEL/health" \
     || { echo "referencectl: kernel not reachable at $KERNEL — run 'referencectl up slim --no-seed' first" >&2; exit 2; }
   # The acceptance runner: sources the step library and reports per step.
   # shellcheck source=reference/checks/verify.sh
   . "$REF/checks/verify.sh"
   run_verify "$@"
+}
+
+run_verify_all_tiers() {
+  # --full: the three acceptance tiers, each kept on its own runner (its own
+  # step order, deps, and compose handling) — this gate only merges the
+  # verify-shaped reports into one. A tier whose stack isn't up is recorded
+  # skipped with the reason and forces a non-zero exit; a failing tier still
+  # hands over to the next, so the run always reports the full picture.
+  local json=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --json) json=1 ;;
+      *) echo "referencectl: verify --full: unknown flag '$1' (--only selects single-tier runs)" >&2; exit 2 ;;
+    esac
+    shift
+  done
+  # shellcheck source=reference/checks/verify.sh
+  . "$REF/checks/verify.sh"
+  # shellcheck source=checks/verify-replicas.sh
+  . "$REF/checks/verify-replicas.sh"
+  # global, not local: the RETURN trap fires after locals pop (set -u).
+  local exit_code=0 out rc=0
+  TIER_REPORTS=$(mktemp)
+  trap 'rm -f "$TIER_REPORTS"' RETURN
+  local t0=$VERIFY_T0
+  # The stack shape this gate expects: both replicas + the LB answering.
+  # The full-profile legs must then ride the LB (REPLICAS keeps the
+  # overlay's `-lb` config mounts in their internal compose verbs).
+  local replicas_up=0
+  if curl -fs --max-time 10 -o /dev/null "http://localhost:8089/health" \
+     && curl -fs --max-time 10 -o /dev/null "http://localhost:8090/health"; then
+    replicas_up=1; export REPLICAS=2
+  fi
+
+  record_tier() { # <tier> <report-json> — tag + persist one tier's report
+    # A runner that bailed before reporting (token/seed precondition) yields
+    # an empty report: record the tier as failed, not absent.
+    if [ -z "$2" ]; then
+      jq -cn --arg t "$1" \
+        '{tier:$t, profile:$t, exitCode:1, tierStatus:"fail", reason:"tier runner produced no report", steps:[]}' >>"$TIER_REPORTS"
+    else
+      jq -c --arg t "$1" '. + {tier: $t}' <<<"$2" >>"$TIER_REPORTS"
+    fi
+  }
+  skip_tier() { # <tier> <reason>
+    echo "referencectl: tier '$1' skipped — $2" >&2
+    jq -cn --arg t "$1" --arg r "$2" \
+      '{tier:$t, profile:$t, exitCode:1, tierStatus:"skipped", reason:$r, steps:[]}' >>"$TIER_REPORTS"
+  }
+
+  # Tier 1: the slim 11, direct against :8088 (the replica tier's own case
+  # re-runs the suite through the LB). Human PASS/FAIL lines stream to
+  # stderr from the runners; only the verify-shaped report is captured.
+  if curl -fs --max-time 10 -o /dev/null "$KERNEL/health"; then
+    out=$(run_verify --json) || rc=$?
+    record_tier slim "$out"
+  else
+    skip_tier slim "kernel not reachable at $KERNEL — run 'referencectl up slim --no-seed' first"
+  fi
+
+  # Tier 2: the full-profile 20, standalone against :8088 the same way
+  # `make provider-e2e` drives it; REPLICAS keeps the LB-mounted legs (this
+  # stack shape is two-replica, so those legs ride the LB).
+  if curl -fs --max-time 10 -o /dev/null "http://127.0.0.1:8066/healthz" \
+     && curl -fs --max-time 10 -o /dev/null "http://127.0.0.1:8065/api/v4/system/ping" \
+     && curl -fs --max-time 10 -o /dev/null "http://127.0.0.1:3000/api/v1/version"; then
+    out=$(REF="$REF" KERNEL="$KERNEL" IDP="$IDP" REALM="$REALM" \
+      bash "$REF/checks/verify-full.sh" --json) || rc=$?
+    record_tier full "$out"
+  else
+    skip_tier full "full-profile stack not up (adapter :8066 / mattermost :8065 / forgejo :3000) — run 'FULL=1 referencectl up slim --replicas 2' first"
+  fi
+
+  # Tier 3: the two-replica matrix (:8089 LB + both replicas answering).
+  VERIFY_RESULTS=$(mktemp)
+  if [ "$replicas_up" = 1 ]; then
+    add_replicas_overlay
+    out=$(run_verify_replicas --json) || rc=$?
+    record_tier replicas "$out"
+  else
+    skip_tier replicas "no two-replica LB at :8089/:8090 — run 'referencectl up slim --replicas 2' first"
+  fi
+  rm -f "$VERIFY_RESULTS"
+
+  local report
+  report=$(jq -s --argjson started "$t0" --argjson now "$(date +%s%3N)" '
+    ( [ .[] | . as $t | .steps[] | . + {tier: $t.tier, note: .detail} | del(.detail) ] ) as $steps |
+    { profile: "full",
+      startedAt: ($started | tostring),
+      durationMs: ($now - $started),
+      tiers: ( map({ key: .tier, value: {
+                  status: (.tierStatus // (if .exitCode == 0 then "pass" else "fail" end)),
+                  reason: (.reason // null) } })
+              | from_entries ),
+      summary: ( $steps | group_by(.tier)
+                 | map({ key: .[0].tier, value: {
+                     steps: length,
+                     passed: ([.[] | select(.status == "pass")] | length),
+                     failed: ([.[] | select(.status == "fail")] | length),
+                     skipped: ([.[] | select(.status == "skipped")] | length) } })
+                 | from_entries ),
+      steps: $steps,
+      exitCode: (if any(.[]?; .exitCode != 0) then 1 else 0 end)
+    }' "$TIER_REPORTS")
+  exit_code=$(jq -r .exitCode <<<"$report")
+
+  if [ "$json" = 1 ]; then
+    printf '%s\n' "$report"
+  else
+    jq -r '
+      . as $r |
+      ( .steps[] | "\(.tier)/\(.id): \(.status) (\(.durationMs)ms)\(if .note != "" then " — \(.note)" else "" end)" ),
+      ( .tiers | to_entries[] | . as $e |
+        "tier \($e.key): \($e.value.status) passed=\(($r.summary[$e.key].passed) // 0)/\(($r.summary[$e.key].steps) // 0)\(if $e.value.reason then " — " + $e.value.reason else "" end)" )
+      ' <<<"$report" >&2
+    jq -r '"\(.steps|length) steps · exit \(.exitCode) · \(.durationMs) ms"' <<<"$report" >&2
+  fi
+  return "$exit_code"
 }
 
 verb=${1:-}

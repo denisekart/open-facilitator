@@ -1025,7 +1025,7 @@ step_provision_kill9() {
 full_run_step() { # <id>
   local id=$1 dep started
   for dep in $(full_deps_of "$id"); do
-    grep -q "^$dep|" "$VERIFY_RESULTS" || full_run_step "$dep"
+    grep -q "^$dep|" "$VERIFY_RESULTS" || { full_run_step "$dep" || true; }
     if grep -q "^$dep|fail\|^$dep|skipped" "$VERIFY_RESULTS"; then
       verify_step_skip "$id" "dependency $dep did not pass"
       return 0
@@ -1080,7 +1080,10 @@ run_verify_full() {
   local id
   for id in "${FULL_ORDER[@]}"; do
     case " ${VERIFY_REQUESTED[*]} " in
-      *" $id "*) full_run_step "$id" ;;
+      # Continue-and-report: a failing step must not errexit the run before
+      # the remaining legs and the report (the missing-record sweep below
+      # and the recorded fail itself carry the outcome).
+      *" $id "*) full_run_step "$id" || true ;;
     esac
   done
   local missing_exit=0

@@ -338,6 +338,14 @@ VERIFY_R_ORDER=(replica-lb-distribution replica-full-suite replica-dedupe
                 replica-kill replica-lease-handover replica-steer-conflict)
 
 run_verify_replicas() {
+  local json=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --json) json=1 ;;
+      *) verify_human "referencectl: verify --replicas: unknown flag '$1'"; return 2 ;;
+    esac
+    shift
+  done
   VERIFY_R_RESULTS=$(mktemp)
   trap 'rm -f "$VERIFY_R_RESULTS"' RETURN
   # The step library + seed primitives (the matrix rides verify.sh's record
@@ -364,7 +372,23 @@ run_verify_replicas() {
       || verify_step_fail "$id" $(( $(verify_now_ms) - VERIFY_CURRENT_STARTED )) "step recorded nothing"
   done
   VERIFY_RESULTS=$outer_results
+  exit_code=0
   grep -Eq '\|fail\|' "$VERIFY_R_RESULTS" && exit_code=1
-  cat "$VERIFY_R_RESULTS" >&2
+  # Verify-shaped report over the matrix's own records (the aggregate gate
+  # merges it alongside the slim and full-profile tier reports).
+  local report
+  report=$(jq -Rs --arg profile replicas --argjson exit "$exit_code" --argjson started "$VERIFY_T0" '
+    { profile: $profile,
+      startedAt: ($started | tostring),
+      durationMs: 0,
+      exitCode: $exit,
+      steps: [ splits("\n") | select(length > 0)
+              | capture("^(?<id>[^|]+)\\|(?<status>[^|]+)\\|(?<durationMs>[0-9]+)\\|(?<detail>.*)$")
+              | { id, status, durationMs: (.durationMs | tonumber), detail } ] }' "$VERIFY_R_RESULTS")
+  report=$(jq --argjson now "$(verify_now_ms)" --argjson started "$VERIFY_T0" \
+    '.durationMs = ($now - $started)' <<<"$report")
+  if [ "$json" = 1 ]; then printf '%s\n' "$report"; else
+    cat "$VERIFY_R_RESULTS" >&2
+  fi
   return "$exit_code"
 }

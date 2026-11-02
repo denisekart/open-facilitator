@@ -113,6 +113,13 @@ describe("provision handler (fake docker over unix socket)", () => {
   const mutations = (mark: number): RecordedRequest[] =>
     fake.calls(mark).filter((r) => r.method !== "GET");
 
+  /** Container-plane verbs only: a prior test's deadline-aborted pull can
+   *  land its request event on the fake server after the abort already
+   *  resolved (transport-plane lag under CPU starvation), so image-plane
+   *  bleed into the window is scheduler noise, not handler behavior. */
+  const containerOps = (mark: number): RecordedRequest[] =>
+    mutations(mark).filter((r) => r.path.startsWith("/containers/"));
+
   describe("provision.start", () => {
     it("creates exactly one container with the exact create payload (existing image: ZERO pulls)", async () => {
       fake.inventory.length = 0;
@@ -334,7 +341,7 @@ describe("provision handler (fake docker over unix socket)", () => {
         ctx,
       );
       expect(outcome).toEqual({ kind: "accepted" });
-      expect(mutations(mark).map((r) => `${r.method} ${r.path}`)).toEqual([
+      expect(containerOps(mark).map((r) => `${r.method} ${r.path}`)).toEqual([
         "POST /containers/c1/stop?t=10",
         "DELETE /containers/c1",
         "POST /containers/c2/stop?t=10",

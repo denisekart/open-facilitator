@@ -1,0 +1,19 @@
+{
+  "name": "@ofac/link-client-foreign",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Foreign-shape link client: a hand-rolled WebSocket link client proving the kernel speaks the published wire contract to any conformant implementation. Imports nothing from the workspace — only the surface documented in protocol/openapi/link-v1.yaml and protocol/json-schema.",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "pnpm build && node --test 'dist/test/*.test.js'",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:"
+  }
+}

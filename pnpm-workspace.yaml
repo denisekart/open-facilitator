@@ -10,6 +10,7 @@ packages:
   - "src/adapters/communication/forgejo-connector"
   - "src/adapters/provisioning-oci"
   - "examples/full/coding-worker"
+  - "protocol/tools/link-client-foreign"
 
 allowBuilds:
   better-sqlite3: false

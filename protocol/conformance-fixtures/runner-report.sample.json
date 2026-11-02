@@ -1,0 +1,256 @@
+{
+  "generatedAt": "2026-11-02T10:11:16Z",
+  "kernel": "http://localhost:8089",
+  "realm": "facilitator",
+  "scenarios": [
+    {
+      "item": 1,
+      "scenario": "schema-valid-fixture-replay",
+      "status": "pass",
+      "evidence": {
+        "status": 202,
+        "inboxId": "cf183584-2ab0-4b52-9888-7d0aabe74039",
+        "note": "the 129-case fixture suite is validated offline by protocol/tools/Validate.Fixtures (both .NET and TS harnesses); this replays one member of it through the live public surface"
+      }
+    },
+    {
+      "item": 1,
+      "scenario": "schema-invalid-fixture-typed-refusal",
+      "status": "pass",
+      "evidence": {
+        "perFixture": {
+          "invalid/command.assign.unknown-field.json": {
+            "status": 400,
+            "error": "schema-violation"
+          },
+          "invalid/command.unknown.v1.json": {
+            "status": 422,
+            "error": "unknown-command"
+          },
+          "invalid/payload.too-large.json": {
+            "status": 413,
+            "error": "payload-too-large"
+          }
+        },
+        "law": "schema-violation and envelope-violation answer 400, unknown-command 422, payload-too-large 413 \u2014 the locked error contract"
+      }
+    },
+    {
+      "item": 1,
+      "scenario": "payload-limit-413",
+      "status": "pass",
+      "evidence": {
+        "status": 413,
+        "error": "payload-too-large",
+        "bytes": 270423,
+        "plane": "/api/link/v1/events"
+      }
+    },
+    {
+      "item": 1,
+      "scenario": "unknown-command-rejection-typed",
+      "status": "pass",
+      "evidence": {
+        "linkPlane": {
+          "status": 422,
+          "error": "unsupported"
+        },
+        "adminPlane": {
+          "status": 422,
+          "error": "unknown-command"
+        },
+        "fixture": "invalid/command.unknown.v1.json"
+      }
+    },
+    {
+      "item": 1,
+      "scenario": "major-version-negotiation-goodbye",
+      "status": "pass",
+      "evidence": {
+        "goodbye": {
+          "kind": "goodbye",
+          "sessionId": "6fc6913257264e92898c6684ec165a40",
+          "reason": "no-compatible-protocol-version"
+        },
+        "helloCompletionResult": null,
+        "fixtureParity": "the goodbye frame matches protocol/conformance-fixtures/valid/control.goodbye.incompatible.json\u0027s reason (invalid/control.hello.v9-only.json is the offline mirror of this offer)"
+      }
+    },
+    {
+      "item": 2,
+      "scenario": "foreign-client-link-lifecycle",
+      "status": "deferred",
+      "evidence": {
+        "reason": "kernel routing dead-letters the intent before any Deliver push; the link-surface legs the client proved stand on their own",
+        "provenLegs": "enroll \u002B capability advertisement \u002B handshake \u002B lease",
+        "workId": "39791188-4d9c-4b8c-8e5e-8c8b9e6fcc72",
+        "handshake": {
+          "event": "handshaked",
+          "leaseEpoch": 1,
+          "sessionId": "dcec7d74e3d94ba6bdef6bf38052deac",
+          "protocolVersion": "v1",
+          "mode": "phase1"
+        },
+        "clientError": null,
+        "kernelDeadLetterEvidence": {
+          "plane": "dead_letter",
+          "id": "1c4a7308-b14b-49e9-86bb-1d6bbc272c9a",
+          "state": "dead_letter",
+          "attempts": 5,
+          "lastError": "Nullable object must have a value.",
+          "availableAt": "2026-11-02T10:09:20.78781Z",
+          "endpointId": "routing.kernel",
+          "sessionEpoch": null,
+          "redeliverAfter": null,
+          "reason": "Nullable object must have a value.",
+          "updatedAt": "2026-11-02T10:09:20.849424Z"
+        }
+      }
+    },
+    {
+      "item": 3,
+      "scenario": "duplicated-provider-event-single-inbox-row",
+      "status": "pass",
+      "evidence": {
+        "first": {
+          "status": 202,
+          "inboxId": "3ec516af-f720-4cc6-802a-c77dc375209a"
+        },
+        "second": {
+          "status": 200,
+          "bodyStatus": "duplicate",
+          "inboxId": "3ec516af-f720-4cc6-802a-c77dc375209a"
+        },
+        "inboxRowsDelta": 1
+      }
+    },
+    {
+      "item": 4,
+      "scenario": "optimistic-version-conflict-steer",
+      "status": "pass",
+      "evidence": {
+        "staleSteer": {
+          "status": 409,
+          "error": "version-conflict",
+          "currentVersion": 1
+        },
+        "correctSteer": {
+          "status": 200,
+          "version": 2
+        }
+      }
+    },
+    {
+      "item": 5,
+      "scenario": "approval-roundtrip-and-replay",
+      "status": "pass",
+      "evidence": {
+        "armed": {
+          "status": 202,
+          "digest": "sha256:b366bc1bcb03154950ebc71309d370d0c523c0e5560d7ce76e62e8e714dade87",
+          "digestVerification": "recomputed"
+        },
+        "listStatus": 200,
+        "respond": {
+          "status": 200,
+          "body": {
+            "status": "decided",
+            "approvalId": "fd981667-c762-4e95-b922-3193f8a68440",
+            "state": "approved",
+            "evidenceRef": "kernel:db5c28719a26455b94a08a33a3bbc5a8"
+          }
+        },
+        "replayedRespond": {
+          "status": 409,
+          "error": "approval-already-consumed"
+        },
+        "timelineStatus": 200
+      }
+    },
+    {
+      "item": 6,
+      "scenario": "shared/isolated Gateway trust modes",
+      "status": "deferred",
+      "evidence": {
+        "reason": "covered by the reference environment\u0027s gateway legs (slim compose boots the declared trust modes)"
+      }
+    },
+    {
+      "item": 7,
+      "scenario": "gateway multiplexing three workers",
+      "status": "deferred",
+      "evidence": {
+        "reason": "covered by the reference environment\u0027s gateway legs"
+      }
+    },
+    {
+      "item": 8,
+      "scenario": "team policy cross-write prevention",
+      "status": "deferred",
+      "evidence": {
+        "reason": "covered by the kernel test suite"
+      }
+    },
+    {
+      "item": 9,
+      "scenario": "provider-tier behaviors",
+      "status": "deferred",
+      "evidence": {
+        "reason": "outside runner scope (needs Mattermost/Forgejo)"
+      }
+    },
+    {
+      "item": 10,
+      "scenario": "multi-assignment DAG works",
+      "status": "deferred",
+      "evidence": {
+        "reason": "outside runner scope (needs a worker fleet)"
+      }
+    },
+    {
+      "item": 11,
+      "scenario": "memory scope ACLs",
+      "status": "deferred",
+      "evidence": {
+        "reason": "outside runner scope (needs the memory backend)"
+      }
+    },
+    {
+      "item": 12,
+      "scenario": "artifact digest/SSRF legs",
+      "status": "deferred",
+      "evidence": {
+        "reason": "outside runner scope (needs artifact storage flows)"
+      }
+    },
+    {
+      "item": 13,
+      "scenario": "nudge rate cap and stalled/offline law",
+      "status": "deferred",
+      "evidence": {
+        "reason": "outside runner scope (needs a live worker fleet)"
+      }
+    },
+    {
+      "item": 14,
+      "scenario": "Kafka at-least-once integration",
+      "status": "deferred",
+      "evidence": {
+        "reason": "deferred:plan-26"
+      }
+    },
+    {
+      "item": 15,
+      "scenario": "bootstrap-from-empty and referencectl verify",
+      "status": "deferred",
+      "evidence": {
+        "reason": "covered by referencectl verify (item 15 tier)"
+      }
+    }
+  ],
+  "summary": {
+    "pass": 8,
+    "fail": 0,
+    "deferred": 11
+  }
+}

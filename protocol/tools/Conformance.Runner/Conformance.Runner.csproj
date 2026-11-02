@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The config-driven kernel conformance runner (conformance items 1-5):
+       points at ANY conformant kernel (base URL + credentials + team via
+       JSON config or CLI flags) and records per-item pass/fail/deferred
+       evidence into a JSON report. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Ofac.Conformance</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Jcs.Net" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Compile the kernel's digest helper directly (source), mirroring the
+         Validate.Fixtures harness: the runner must compute approval digests
+         with the production implementation, and a ProjectReference to the
+         web app would drag EF Core into this harness. -->
+    <Compile Include="../../../src/facilitator/Kernel/Shared/ApprovalDigest.cs" />
+  </ItemGroup>
+</Project>

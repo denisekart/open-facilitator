@@ -93,7 +93,11 @@ services:
     build:
       context: ..
       dockerfile: src/facilitator/Dockerfile
-    image: ${OCI_REGISTRY:?set in versions.env}/facilitator:${FRAMEWORK_TAG:?set in versions.env}
+    # Digest pin once release digests land (FACILITATOR_DIGEST in versions.env,
+    # written by the release workflow); an empty value keeps tag-based local
+    # builds (FRAMEWORK_TAG) working — compose renders the @digest form when
+    # set and the :tag form otherwise, so no second compose file is needed.
+    image: ${OCI_REGISTRY:?set in versions.env}/facilitator${FACILITATOR_DIGEST:+@}${FACILITATOR_DIGEST:-:${FRAMEWORK_TAG:?set in versions.env}}
     # ONE env source shared verbatim with the replica twin (compose.replicas.
     # yaml EXTENDS this service; the provisioning overlay's arm lives here
     # too, since every live path loads that overlay — a twin can never drift

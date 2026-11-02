@@ -80,7 +80,7 @@ jobs:
       - name: versions.env completeness
         run: |
           missing=0
-          for key in POSTGRES_TAG KEYCLOAK_TAG KAFKA_TAG FORGEJO_TAG MATTERMOST_TAG SEAWEEDFS_TAG ASPIRE_TAG OLLAMA_TAG AWSCLI_TAG OCI_REGISTRY FACILITATOR_DIGEST FRAMEWORK_TAG; do
+          for key in POSTGRES_TAG KEYCLOAK_TAG KAFKA_TAG FORGEJO_TAG MATTERMOST_TAG SEAWEEDFS_TAG ASPIRE_TAG OLLAMA_TAG AWSCLI_TAG OCI_REGISTRY FRAMEWORK_TAG POSTGRES_DIGEST KEYCLOAK_DIGEST KAFKA_DIGEST FORGEJO_DIGEST MATTERMOST_DIGEST SEAWEEDFS_DIGEST ASPIRE_DIGEST OLLAMA_DIGEST FACILITATOR_DIGEST RUNTIME_DIGEST; do
             grep -q "^${key}=" reference/versions.env || { echo "missing ${key}"; missing=1; }
           done
           exit $missing
@@ -207,6 +207,45 @@ jobs:
 #         run: |
 #           docker compose --env-file versions.env --env-file .env -f compose.slim.yaml down -v
 #
+
+  conformance:
+    # The conformance package against a live slim stack: the .NET runner's
+    # item 1-5 scenarios + the foreign-shape link client's two-phase
+    # lifecycle, with the JSON report kept as an artifact.
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          cache: true
+          # locks live per-project, none at repo root (see dotnet job)
+          cache-dependency-path: "**/packages.lock.json"
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -C protocol/tools/link-client-foreign build
+      - run: dotnet build protocol/tools/Conformance.Runner -c Release
+      - name: boot slim stack
+        run: ./referencectl up slim --no-seed
+      - name: runner + foreign client against the live kernel
+        run: |
+          dotnet protocol/tools/Conformance.Runner/bin/Release/net10.0/Conformance.Runner.dll \
+            --kernel-url http://localhost:8088 --idp-url http://localhost:8080 \
+            --realm facilitator --username alice --password alice \
+            --enrollment-token "$(grep '^DEMO_ENROLLMENT_TOKEN=' reference/.env | cut -d= -f2)" \
+            --link-client "node ${GITHUB_WORKSPACE}/protocol/tools/link-client-foreign/dist/src/main.js" \
+            --out conformance-report.json
+      - name: upload report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: conformance-report
+          path: conformance-report.json
+
   link-e2e:
     runs-on: ubuntu-latest
     services:
@@ -339,7 +378,7 @@ jobs:
         run: dotnet test tests/Facilitator.E2E -c Release --no-build
 
   features:
-    # Feature install contract on both arches (spec §8.5): unit-test each
+    # Feature install contract on both arches: unit-test each
     # Feature in isolated containers, plus a combo scenario proving the
     # supervisor/unit composition and install idempotency.
     runs-on: ${{ matrix.os }}

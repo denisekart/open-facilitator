@@ -3,6 +3,11 @@ name: Release
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to pin digests for (digest-pin job only)
+        default: latest
 
 jobs:
   containers:
@@ -41,7 +46,7 @@ jobs:
   # Dev Container Features (OCI distribution): each features/src/<name>
   # publishes as an OCI image under …/features/<name>, tagged with the
   # feature version + major. Payload tarballs are built from source, so the
-  # install layer needs no npm registry (spec §8.2).
+  # install layer needs no npm registry.
   features:
     runs-on: ubuntu-latest
     permissions:
@@ -75,11 +80,11 @@ jobs:
               ghcr.io/denisekart/open-facilitator/features/$name:1.0.0
           done
 
-  # npm publish seam (inert until Plan 01 ships a consumable @ofac/protocol):
+  # npm publish seam (inert until a consumable @ofac/protocol ships):
   # packages flip private:false, then `npm pkg set version` + `npm publish` to
   # https://npm.pkg.github.com/denisekart via GITHUB_TOKEN.
   publish-npm:
-    # Inert until Plan 01: set the ENABLE_NPM_PUBLISH repo variable to activate.
+    # Inert seam: set the ENABLE_NPM_PUBLISH repo variable to activate.
     if: ${{ vars.ENABLE_NPM_PUBLISH == 'true' }}
     runs-on: ubuntu-latest
     permissions:
@@ -88,8 +93,81 @@ jobs:
     steps:
       - run: echo "inert seam — see comment in job definition"
 
-  # SBOM generation + digest pinning into reference/versions.env (*_DIGEST
-  # keys, incl. a future RUNTIME_DIGEST for node-runtime) + green conformance
-  # matrix gate (spec §22.6).
-  # sbom: cyclonedx-gomod/npm/dotnet per artifact, attached to the GitHub release.
-  # digest-pin: resolve pushed digests, PR or commit them back to versions.env.
+  # SBOM for every shipped artifact, attached to the GitHub release:
+  # cyclonedx-dotnet for the .NET solution, @cyclonedx/cyclonedx-npm for the
+  # pnpm workspace. Both analyze the restored dependency graph, no execution.
+  sbom:
+    needs: containers
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          cache: true
+          # locks live per-project, none at repo root (see the CI dotnet job)
+          cache-dependency-path: "**/packages.lock.json"
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: dotnet tool install --global CycloneDX
+      - run: echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+      - name: .NET solution SBOM
+        run: dotnet sbom --output sbom-dotnet --filename sbom.cdx.json
+      - name: pnpm workspace SBOM
+        run: npx --yes @cyclonedx/cyclonedx-npm -- --output-file sbom-npm.cdx.json
+      - name: attach to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            sbom-dotnet/sbom.cdx.json
+            sbom-npm.cdx.json
+
+  # Digest pins: resolve the immutable digests of the images the reference
+  # environment pulls — both source-built images the containers job pushes
+  # (tag `latest` stands in on workflow_dispatch) and every third-party image
+  # versions.env pins — and write the *_DIGEST keys back to versions.env.
+  # compose.slim.yaml consumes FACILITATOR_DIGEST as an @digest image ref
+  # when set, :tag when empty, so local builds keep working. The commit-back
+  # runs only when a value actually changed (git diff guard).
+  digest-pin:
+    needs: containers
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - name: rewrite *_DIGEST keys
+        run: |
+          set -euo pipefail
+          # Tags come from versions.env itself — one source for "what we run".
+          set -a; . reference/versions.env; set +a
+          pin() { # key image
+            local d
+            d=$(docker buildx imagetools inspect --format '{{.Manifest.Digest}}' "$2")
+            [ -n "$d" ] && sed -i "s|^$1=.*|$1=$d|" reference/versions.env
+          }
+          tag="${{ github.event_name == 'push' && github.ref_name || inputs.tag }}"
+          pin FACILITATOR_DIGEST ghcr.io/denisekart/open-facilitator/facilitator:${tag}
+          pin RUNTIME_DIGEST ghcr.io/denisekart/open-facilitator/node-runtime:${tag}
+          pin POSTGRES_DIGEST postgres:${POSTGRES_TAG}
+          pin KEYCLOAK_DIGEST quay.io/keycloak/keycloak:${KEYCLOAK_TAG}
+          pin KAFKA_DIGEST apache/kafka:${KAFKA_TAG}
+          pin FORGEJO_DIGEST codeberg.org/forgejo/forgejo:${FORGEJO_TAG}
+          pin MATTERMOST_DIGEST mattermost/mattermost-team-edition:${MATTERMOST_TAG}
+          pin SEAWEEDFS_DIGEST chrislusf/seaweedfs:${SEAWEEDFS_TAG}
+          pin ASPIRE_DIGEST mcr.microsoft.com/dotnet/aspire-dashboard:${ASPIRE_TAG}
+          pin OLLAMA_DIGEST ollama/ollama:${OLLAMA_TAG}
+      - name: commit changed pins
+        run: |
+          set -euo pipefail
+          git diff --quiet reference/versions.env && { echo "no digest changes"; exit 0; }
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add reference/versions.env
+          git commit -m "release: digest pins ${{ github.event_name == 'push' && github.ref_name || inputs.tag }}"
+          git push

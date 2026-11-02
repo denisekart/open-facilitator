@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-11-02T10:11:16Z",
-  "kernel": "http://localhost:8089",
+  "generatedAt": "2026-11-02T12:37:04Z",
+  "kernel": "http://localhost:8088",
   "realm": "facilitator",
   "scenarios": [
     {
@@ -9,7 +9,7 @@
       "status": "pass",
       "evidence": {
         "status": 202,
-        "inboxId": "cf183584-2ab0-4b52-9888-7d0aabe74039",
+        "inboxId": "01c49b19-5464-4135-b189-e7ef72258d1a",
         "note": "the 129-case fixture suite is validated offline by protocol/tools/Validate.Fixtures (both .NET and TS harnesses); this replays one member of it through the live public surface"
       }
     },
@@ -69,7 +69,7 @@
       "evidence": {
         "goodbye": {
           "kind": "goodbye",
-          "sessionId": "6fc6913257264e92898c6684ec165a40",
+          "sessionId": "ece16881b79746a5938de6ce83c307fd",
           "reason": "no-compatible-protocol-version"
         },
         "helloCompletionResult": null,
@@ -79,32 +79,24 @@
     {
       "item": 2,
       "scenario": "foreign-client-link-lifecycle",
-      "status": "deferred",
+      "status": "pass",
       "evidence": {
-        "reason": "kernel routing dead-letters the intent before any Deliver push; the link-surface legs the client proved stand on their own",
-        "provenLegs": "enroll \u002B capability advertisement \u002B handshake \u002B lease",
-        "workId": "39791188-4d9c-4b8c-8e5e-8c8b9e6fcc72",
-        "handshake": {
-          "event": "handshaked",
-          "leaseEpoch": 1,
-          "sessionId": "dcec7d74e3d94ba6bdef6bf38052deac",
-          "protocolVersion": "v1",
-          "mode": "phase1"
+        "phase1": {
+          "deliveryId": "8a616321-925e-4e80-a22f-f106b4f6f06d",
+          "workId": "a9da369d-c0b4-4fe9-b53b-ca16dfe8397d",
+          "abruptDrop": true
         },
-        "clientError": null,
-        "kernelDeadLetterEvidence": {
-          "plane": "dead_letter",
-          "id": "1c4a7308-b14b-49e9-86bb-1d6bbc272c9a",
-          "state": "dead_letter",
-          "attempts": 5,
-          "lastError": "Nullable object must have a value.",
-          "availableAt": "2026-11-02T10:09:20.78781Z",
-          "endpointId": "routing.kernel",
-          "sessionEpoch": null,
-          "redeliverAfter": null,
-          "reason": "Nullable object must have a value.",
-          "updatedAt": "2026-11-02T10:09:20.849424Z"
-        }
+        "phase2": {
+          "event": "summary",
+          "phase": "phase2",
+          "replayed": "375daa5a-857c-4b58-b5d6-7c681f7295e6",
+          "acked": true,
+          "redelivered": null,
+          "expectedRedeliver": null
+        },
+        "tokenRotation": null,
+        "phase2Exit": 0,
+        "note": "two processes, foreign imports only: enroll/advertise/handshake/deliver/drop/re-enroll/replay/receipt/goodbye"
       }
     },
     {
@@ -114,12 +106,12 @@
       "evidence": {
         "first": {
           "status": 202,
-          "inboxId": "3ec516af-f720-4cc6-802a-c77dc375209a"
+          "inboxId": "d6c59374-4ef1-424d-b5e2-d765518bcc12"
         },
         "second": {
           "status": 200,
           "bodyStatus": "duplicate",
-          "inboxId": "3ec516af-f720-4cc6-802a-c77dc375209a"
+          "inboxId": "d6c59374-4ef1-424d-b5e2-d765518bcc12"
         },
         "inboxRowsDelta": 1
       }
@@ -147,7 +139,7 @@
       "evidence": {
         "armed": {
           "status": 202,
-          "digest": "sha256:b366bc1bcb03154950ebc71309d370d0c523c0e5560d7ce76e62e8e714dade87",
+          "digest": "sha256:51549e96bab35fd37ab5c1657e67f6a9aeb718b66251bcabeccba5d998b6c7b7",
           "digestVerification": "recomputed"
         },
         "listStatus": 200,
@@ -155,9 +147,9 @@
           "status": 200,
           "body": {
             "status": "decided",
-            "approvalId": "fd981667-c762-4e95-b922-3193f8a68440",
+            "approvalId": "31f99e0a-b006-44ce-8604-66a929979bc2",
             "state": "approved",
-            "evidenceRef": "kernel:db5c28719a26455b94a08a33a3bbc5a8"
+            "evidenceRef": "kernel:bbec222557644dfdb60680fd6e85a6a5"
           }
         },
         "replayedRespond": {
@@ -249,8 +241,8 @@
     }
   ],
   "summary": {
-    "pass": 8,
+    "pass": 9,
     "fail": 0,
-    "deferred": 11
+    "deferred": 10
   }
 }

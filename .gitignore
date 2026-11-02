@@ -4,8 +4,14 @@
 .idea/
 
 # Build outputs (once implementation starts)
-bin/
-obj/
+# 2026-11-02: narrowed from a bare `bin/` — that also matched the TypeScript
+# packages' SOURCE entrypoints (src/*/src/bin/*.ts, the tsup bin targets), so
+# a clean CI checkout silently lost every gateway/linkd/worker/connector bin
+# source and features/build.mjs failed its install-contract assert.
+# .NET build output is always bin/{Debug,Release}/.
+**/bin/Debug/
+**/bin/Release/
+**/obj/
 dist/
 node_modules/
 coverage/

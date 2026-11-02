@@ -478,7 +478,10 @@ describe("multiplexing three workers over two adapter kinds", () => {
     const f = await fleetBoot(THREE_CHILDREN, TRANSPORT);
     const a = await f.attach("alpha", adapterAdvert("research", ["research.analyze"], "alpha"));
     const b = await f.attach("bravo", adapterAdvert("render", ["report.render"], "bravo"));
-    const c = await f.attach("charlie", adapterAdvert("research", ["research.summarize"], "charlie"));
+    const c = await f.attach(
+      "charlie",
+      adapterAdvert("research", ["research.summarize"], "charlie"),
+    );
     const receiptFor = (deliveryId: string) =>
       waitFor(
         `receipt ${deliveryId}`,
@@ -525,9 +528,11 @@ describe("multiplexing three workers over two adapter kinds", () => {
     // One worker disconnects: it drops out of the union, the other two stay up.
     await b.conn.close();
     await waitFor("bravo offline", () =>
-      f.rt.gatewayStatus().children.some(
-        (row) => row.childWorkspaceId === "gw.fleet-test/bravo" && row.state === "offline",
-      ),
+      f.rt
+        .gatewayStatus()
+        .children.some(
+          (row) => row.childWorkspaceId === "gw.fleet-test/bravo" && row.state === "offline",
+        ),
     );
     const shrunk = await waitFor("union re-POST", () => {
       const manifest = f.kernel.bodies

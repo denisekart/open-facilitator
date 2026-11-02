@@ -16,7 +16,16 @@ jobs:
       - uses: actions/setup-dotnet@v6
         with:
           cache: true
-      - run: dotnet build OpenFacilitator.slnx -c Release
+          # setup-dotnet's cache resolves lock files from the repo root and
+          # errors "Dependencies lock file is not found" when none is there;
+          # this repo commits one packages.lock.json per project (CPM stays
+          # the version authority), so point the glob at them explicitly.
+          cache-dependency-path: "**/packages.lock.json"
+      # 2026-11-02: restore-time enforcement of the committed lock graphs —
+      # drift against Directory.Packages.props fails the restore instead of
+      # silently rewriting the lock files during the build's implicit restore.
+      - run: dotnet restore OpenFacilitator.slnx --locked-mode
+      - run: dotnet build OpenFacilitator.slnx -c Release --no-restore
       # Kernel suite only: the browser tier runs in `admin-e2e` (chromium-provisioned).
       - run: dotnet test tests/Facilitator.Tests/Facilitator.Tests.csproj -c Release --no-build -- --blame-hang-timeout 2m
       - name: conformance fixtures (.NET harness)
@@ -217,6 +226,8 @@ jobs:
       - uses: actions/setup-dotnet@v6
         with:
           cache: true
+          # locks live per-project, none at repo root (see dotnet job)
+          cache-dependency-path: "**/packages.lock.json"
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
@@ -264,6 +275,8 @@ jobs:
       - uses: actions/setup-dotnet@v6
         with:
           cache: true
+          # locks live per-project, none at repo root (see dotnet job)
+          cache-dependency-path: "**/packages.lock.json"
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
@@ -313,10 +326,13 @@ jobs:
       - uses: actions/setup-dotnet@v6
         with:
           cache: true
+          # locks live per-project, none at repo root (see dotnet job)
+          cache-dependency-path: "**/packages.lock.json"
       - run: pnpm install --frozen-lockfile
       - name: build SPA (stages wwwroot before the kernel build embeds it)
         run: pnpm -r build
-      - run: dotnet build OpenFacilitator.slnx -c Release
+      - run: dotnet restore OpenFacilitator.slnx --locked-mode
+      - run: dotnet build OpenFacilitator.slnx -c Release --no-restore
       - name: install chromium
         run: node tests/Facilitator.E2E/bin/Release/net10.0/.playwright/package/cli.js install --with-deps chromium
       - name: admin inspector e2e
@@ -380,6 +396,8 @@ jobs:
       - uses: actions/setup-dotnet@v6
         with:
           cache: true
+          # locks live per-project, none at repo root (see dotnet job)
+          cache-dependency-path: "**/packages.lock.json"
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:

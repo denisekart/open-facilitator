@@ -14,8 +14,11 @@ export default tseslint.config(
       "**/*.svelte",
       "src/facilitator/wwwroot/",
       // .NET build output: the Playwright NuGet package stages a vendored
-      // npm tree (CommonJS) under tests/Facilitator.E2E/bin — not ours to lint.
-      "**/bin/",
+      // npm tree (CommonJS) under tests/Facilitator.E2E/bin — not ours to
+      // lint. 2026-11-02: narrowed from `**/bin/` so the TypeScript
+      // packages' src/bin entrypoints stay linted like every other source.
+      "**/bin/Debug/",
+      "**/bin/Release/",
       "**/obj/",
     ],
   },

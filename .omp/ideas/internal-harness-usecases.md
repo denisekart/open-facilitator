@@ -1,0 +1,26 @@
+Now we have to think about the user experience and other usecases for having AI in the facilitator, not just in the workspaces.
+
+! Important: AI workloads should be completely simulated in repeatable tests anywhere in the codebase - AI is unpredictable by design, so make sure that none of the deterministic tests rely on any AI/LLM outputs ever (make that a rule)
+
+I was thinking of the following scenarios:
+
+- Users usually talk/write in natural human-understandable speech/text. I want LLM to be the "decoder" layer on the facilitator side. If AI is not reachable in the facilitator (a real scenario that can happen), humans should still be able to issue commands and receive updates, although in a more non-human way (there should be graceful degradation)
+    - When AI is not available, users can use slash commands or mentions (keep it consistent, keep it understandable) to interact with the facilitator. e.g. Hey @facilitator-bot Please /run-ci-tests - this should be a completely understandable and parsable command when AI cannot decode it. The @facilitator-bot is probably a placeholder here - users should be able to name their own bots (well, the admins at least). The slash commands should be mappable to workloads or commands or to something that can make routing possible - let's figure it out, so we don't add unnecessary logic.
+    - When AI is available however, we can use it to determine that e.g. natural text "Hey facilitator, can you please run ci tests and let me know the outcome" should be possible to map to proper commands and intent using AI with nicely formatter system/user instructions as well as needed context (RAG is my thinking here - but using text, not vectors if not necessary). There should be a way to encode user and system instructions in a standardized way - I was thinking of using razor engine to power the prompt generation (something like this: https://denace.dev/using-razor-outside-of-web) or use jinja templates - what ever allows me to isolate the prompts from the core of the facilitator and adds minimal dependencies.
+    - We can use two types of AI - systemone decision models for deterministic and fast decisions. I was thinking of hosting this via litellm, so hopefully there is a standardized API spec somewhere that we can utilize internally. Of course desicion models are not necessary, and such actions can be degraded to using regular LLMs with well defined prompts and outputs to achieve the same thing. We can use decision models to aid in routing, intent, next steps (e.g. Should I reply to the chat if something fails), and anything else that makes sense for decision models.
+    - the normal LLM AI can be used to aid in understanding, help refining prompts, help in communication (how do I format the user reply based on the information I received so I don't respond with json or a lot of bloat). There should probably be some form of preference setting for how much the AI is acually verbose versus short and quiet.
+    - I will also be hosting my own LLM externally from this project using litellm and openaicompletions, but we should be able to hook into any provider needed.
+
+    Maybe the harness for the facilitator can just be a "regular" harness we developed with some specialized permissions (e.g. Accessing system context, accessing common/team owned memories, accessing administration API, etc.)
+    Because of the blast radious, the "internal harness" should only be capable of participating in internal workloads described in this idea - never be available to teams using the facilitator directly.
+
+
+- The second improvement I was thinking is that we could add a simple "chat" screen on the admin interface where the admins would be able to "naturally" configure and monitor the system. Of course then we need a way to implement some form of "confirm action" - e.g. the admin says, please create a new team named "foo-bar" and generate and display the joining token, so I can pass it to the team. - in that case, the LLM should break down intent, decompose it to individial actions needed to be taken, and a "confirm" button or something should be displayed on each of the actions before the LLM takes them (with proper machine generated descriptions on what is about to happen). The historical chats should be stored and browsable ofcourse, and the audit trails should point to the original admin prompting the LLM + some indication that an LLM actually executed the instructions. The AI chat should only be available when the admin has some admin LLM level role - admins should not receive this role automatically, it needs to be granted.
+
+Any tests or verifications during development should completely simulate AI - there will be no AI available during ci/development/release or anywhere else. Assume that I will do manual conformance testing after implementation is done.
+
+Again - the facilitator should be able to run with or without AI, and when running with AI, it should be able to run with or without decision models (systemone).
+
+This is a very rough outline. Let's plan it together and refine it before making an actual plan for implementation. Ask as many questions as needed - do not assume anything - ask the question.
+
+Let's refine and build up a proper plan together.

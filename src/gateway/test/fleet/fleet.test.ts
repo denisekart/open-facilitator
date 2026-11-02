@@ -1,5 +1,5 @@
 // Fleet-mode unit tier: a SHARED-mode runtime (mock kernel link + real unix
-// socket listener + two `connectChild` children) exercises the routing laws
+// socket listener + three `connectChild` children) exercises the routing laws
 // the 05 embedded suite cannot reach: per-child routing, quota, offline
 // honesty, union re-POST, and the re-register reconcile probe.
 import { mkdtempSync } from "node:fs";
@@ -99,6 +99,31 @@ function manifestAdvert(capIds: string[], childName: string): CapabilityManifest
       ...base.capabilities[0],
       id,
       outputKinds: [`${id.replaceAll(".", "-")}.result`],
+    })) as [CapabilityDescriptor, ...CapabilityDescriptor[]],
+  };
+}
+
+/**
+ * A union-vocabulary advert tagged with an adapter-harness profile:
+ * "research" keeps the builtin descriptor (asynchronous, steerable);
+ * "render" flips to a synchronous, non-steerable profile — so a POSTed
+ * union proves distinct adapter METADATA per kind, not just distinct ids.
+ */
+function adapterAdvert(
+  kind: "research" | "render",
+  capIds: string[],
+  childName: string,
+): CapabilityManifestV1 {
+  const advert = manifestAdvert(capIds, childName);
+  if (kind === "research") return advert;
+  return {
+    ...advert,
+    capabilities: advert.capabilities.map((capability) => ({
+      ...capability,
+      execution: "synchronous",
+      acceptedContexts: ["inline-text"],
+      supportsSteering: false,
+      supportsCancellation: false,
     })) as [CapabilityDescriptor, ...CapabilityDescriptor[]],
   };
 }
@@ -266,6 +291,20 @@ const TWO_CHILDREN = `  - name: alpha
     maxInFlight: 1
     timeoutSeconds: 120
 `;
+
+const THREE_CHILDREN = `  - name: alpha
+    token: tok
+    maxInFlight: 2
+    timeoutSeconds: 120
+  - name: bravo
+    token: tok
+    maxInFlight: 1
+    timeoutSeconds: 120
+  - name: charlie
+    token: tok
+    maxInFlight: 1
+    timeoutSeconds: 120
+`;
 const TRANSPORT = `  socket:
     path: child.sock
   handshakeTimeoutSeconds: 5
@@ -359,7 +398,7 @@ describe("shared-mode fleet routing", () => {
   });
 
   it("boot-race law: assign pushed on session-open EXECUTES once the child dials within the grace", async () => {
-    // Plan 24 restart leg: after a restart the kernel pushes the queued
+    // Restart leg: after a restart the kernel pushes the queued
     // re-hydrated assign the instant the link opens, while the worker's
     // socket child is still mid-boot. The listener is bound BEFORE the
     // session and the offline route holds, so the command runs instead of
@@ -431,6 +470,94 @@ describe("shared-mode fleet routing", () => {
       assignmentId: "asg-seed",
     });
     await a.conn.close();
+  });
+});
+
+describe("multiplexing three workers over two adapter kinds", () => {
+  it("union carries all three; per-kind assign routes home; a disconnect leaves the survivors flowing", async () => {
+    const f = await fleetBoot(THREE_CHILDREN, TRANSPORT);
+    const a = await f.attach("alpha", adapterAdvert("research", ["research.analyze"], "alpha"));
+    const b = await f.attach("bravo", adapterAdvert("render", ["report.render"], "bravo"));
+    const c = await f.attach("charlie", adapterAdvert("research", ["research.summarize"], "charlie"));
+    const receiptFor = (deliveryId: string) =>
+      waitFor(
+        `receipt ${deliveryId}`,
+        () => f.mock.receipts.find((r) => r.deliveryId === deliveryId) ?? false,
+      );
+    const rowOf = (commandId: string) =>
+      f.paths.execution.all().find((row) => row.dedupeKey === commandId);
+
+    await waitFor(
+      "union POST",
+      () => f.kernel.calls.filter((call) => call === "capabilities").length >= 1,
+    );
+    // Churn coalesces into exactly ONE POST of the FULL three-way union.
+    await new Promise((r) => setTimeout(r, 300));
+    const posts = f.kernel.bodies.map((body) => JSON.parse(body) as CapabilityManifestV1);
+    expect(posts).toHaveLength(1);
+    expect(posts[0]?.ownerTeam).toBe("default");
+    expect(posts[0]?.capabilities.map((cap) => cap.id).sort()).toEqual([
+      "report.render",
+      "research.analyze",
+      "research.summarize",
+    ]);
+    // Adapter metadata travels with the descriptor, not just the capability id.
+    expect(posts[0]?.capabilities.find((cap) => cap.id === "report.render")).toMatchObject({
+      execution: "synchronous",
+      supportsSteering: false,
+    });
+
+    // A kind-A assign routes to its advertiser; the other workers stay idle.
+    f.mock.pushDeliver(assign("cmd-mux-a1", "research.analyze"));
+    expect((await receiptFor("del-cmd-mux-a1")).status).toBe("accepted");
+    expect(rowOf("cmd-mux-a1")?.childId).toBe("gw.fleet-test/alpha");
+    await waitFor("alpha answered", () => a.answered.length > 0);
+    expect(b.answered).toEqual([]);
+    expect(c.answered).toEqual([]);
+
+    // A kind-B assign routes to the B advertiser, never to an A worker.
+    f.mock.pushDeliver(assign("cmd-mux-b1", "report.render"));
+    expect((await receiptFor("del-cmd-mux-b1")).status).toBe("accepted");
+    expect(rowOf("cmd-mux-b1")?.childId).toBe("gw.fleet-test/bravo");
+    await waitFor("bravo answered", () => b.answered.length > 0);
+    expect(c.answered).toEqual([]);
+
+    // One worker disconnects: it drops out of the union, the other two stay up.
+    await b.conn.close();
+    await waitFor("bravo offline", () =>
+      f.rt.gatewayStatus().children.some(
+        (row) => row.childWorkspaceId === "gw.fleet-test/bravo" && row.state === "offline",
+      ),
+    );
+    const shrunk = await waitFor("union re-POST", () => {
+      const manifest = f.kernel.bodies
+        .map((body) => JSON.parse(body) as CapabilityManifestV1)
+        .find((m) => m.capabilities.length === 2);
+      return manifest ?? false;
+    });
+    expect(shrunk.capabilities.map((cap) => cap.id).sort()).toEqual([
+      "research.analyze",
+      "research.summarize",
+    ]);
+    expect(
+      f.rt
+        .gatewayStatus()
+        .children.filter((row) => row.state === "connected")
+        .map((row) => row.childWorkspaceId)
+        .sort(),
+    ).toEqual(["gw.fleet-test/alpha", "gw.fleet-test/charlie"]);
+
+    // Both survivors still EXECUTE, each on its own kind's capability.
+    f.mock.pushDeliver(assign("cmd-mux-a2", "research.analyze"));
+    expect((await receiptFor("del-cmd-mux-a2")).status).toBe("accepted");
+    expect(rowOf("cmd-mux-a2")?.childId).toBe("gw.fleet-test/alpha");
+    f.mock.pushDeliver(assign("cmd-mux-c2", "research.summarize"));
+    expect((await receiptFor("del-cmd-mux-c2")).status).toBe("accepted");
+    expect(rowOf("cmd-mux-c2")?.childId).toBe("gw.fleet-test/charlie");
+    await waitFor("both survivors answered", () => a.answered.length > 1 && c.answered.length > 0);
+
+    await a.conn.close();
+    await c.conn.close();
   });
 });
 

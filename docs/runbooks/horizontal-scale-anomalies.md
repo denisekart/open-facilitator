@@ -72,7 +72,18 @@ zero parked rows):** the *same* result — 4/6 pass, fleet view a=2/b=3,
 **replica-kill FAIL at an identical 61.2 s**, nested
 `worker-restart-resume` FAIL (138 s). Reproduced 2/2 with identical
 timing signature → recorded as a **defect found**, not a slow-poll
-flake. Evidence for the kill leg: LB `connect() failed (111)` against
+flake — with one caveat recorded after the fact: a sibling acceptance
+run drove `verify --full` tiers against this same stack during the
+window (its replica tier also SIGKILLs a victim and runs the nested
+suite), so the leg-budget *attribution* is owed a clean-volume
+reproduction. The two structural observations stand regardless of who
+runs the leg: the eviction-plus-backoff ladder arithmetic
+(`max_fails=1 fail_timeout=30s` + SignalR 0/2/5/10/30 s + gateway
+backoff ≈ 76 s) exceeds the leg's 60 s budget, and epoch is per session
+row — a re-created row lawfully starts at epoch 1, so the leg's
+epoch-bump assertion is row-identity-dependent, not
+failover-dependent. Evidence for the kill leg: LB `connect() failed
+(111)` against
 the victim; the victim-stamped gateway (`gw.coding`) log shows its
 reconnect ladder running the full 2 s/5 s/10 s/30 s backoff — lost
 04:47:10, attempts 04:47:19 → 04:47:56, new session only at 04:48:26
@@ -88,7 +99,8 @@ this deployment shape. Kernel-side laws (SKIP LOCKED handover, dedupe,
 fencing, steer conflict) all verified green both runs.
 
 Probe of the nested-suite leg in isolation
-(`./referencectl verify --only worker-restart-resume`, 05:22–05:24):
+(`./referencectl verify --only worker-restart-resume`, 05:22–05:24 — the
+sibling's `verify --full` runs may have overlapped this window as well):
 `FAIL worker-restart-resume (121.8 s) — provisioned elastic never went
 live+idle` — the leg's 120 s window for the launcher-provisioned
 `gw.team-beta` worker to register and idle elapsed with the container

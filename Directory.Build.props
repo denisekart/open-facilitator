@@ -7,5 +7,10 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <AnalysisLevel>latest</AnalysisLevel>
     <Deterministic>true</Deterministic>
+    <!-- Committed packages.lock.json per project: setup-dotnet v6 enables
+         NuGet audit by default and requires a lock file per restore graph.
+         Versions stay centrally pinned in Directory.Packages.props; the lock
+         files only freeze the resolved graph (regenerate with dotnet restore). -->
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
   </PropertyGroup>
 </Project>

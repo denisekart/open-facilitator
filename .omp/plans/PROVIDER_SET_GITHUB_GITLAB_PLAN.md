@@ -103,3 +103,17 @@ New packages `src/adapters/communication/gitlab` (`@ofac/gitlab-adapter`) + `...
 - GitLab CE on arm64: use the official `gitlab/gitlab-ce:latest` arm64 image (≥17 ships arm64); if omnibus boot proves flaky under WSL, fall back to `Bitnami gitlab` or bump `shm_size`/`--memory` in the make target — the leg script only needs API-reachability, so the image choice is swappable.
 - `Providers__Github__/__Gitlab__` sections are pure config; example env lines ship with the tracks, real enablement stays opt-in per deployment (kernel boots provider-less).
 - Recorded GitHub/GitLab webhook fixtures come from official docs pages (docs.github.com/webhooks-and-events/webhooks, docs.gitlab.com user/project webhook examples) fetched at implementation time — no live account needed.
+
+## Implementation Status (executed 2026-11-03)
+
+|Phase|State|Evidence|
+|---|---|---|
+| 1.1–1.3 schema/sink/provider-core | Implemented | 133 fixture cases; `WebhookSinkTests` (outbox row, replay dedupe, 404); `provider-core` unit tier |
+| 1.4 forgejo/mattermost cutover | Implemented | forgejo legs POST to the kernel sink; `make provider-e2e` 20/20 clean-stack; per-run nonce on the synthesized status (sink dedupes on body hash) |
+| 2A GitHub | Implemented | 56+25 unit, 3 e2e (real kernel/Gateway/fake); resolve SHIPS via GraphQL `resolveReviewThread` (contingency not triggered); ambiguity law proven at the unit tier |
+| 2B GitLab | Implemented | 17+15 unit, 5 e2e; `make gitlab-up` cold seed 3m5s measured arm64; verify-gitlab SKIP×7 exit 0 floor proven; GitLab-18 quirks (rails-runner PAT, readiness via /users/sign_in, label `name`, loopback webhook allowlist) documented in `tools/gitlab/init-gitlab.sh` |
+| 3 docs+gates | Implemented | signposts + skills updated; build/lint/typecheck, `make test` (405 kernel + all vitest tiers) green |
+
+Plan-wording correction: `PrRequestCapability` marks the ASSIGNMENT capability whose
+completed manifest may carry a prRequest (forgejo ships `coding.implement`), not the
+connector op id — 2A's README documents the working shape.

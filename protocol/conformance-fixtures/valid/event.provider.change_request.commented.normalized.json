@@ -1,0 +1,37 @@
+{
+  "specversion": "1.0",
+  "id": "01JGITLAB-mr-commented-normalized",
+  "source": "urn:ofac:provider:gitlab:team-alpha",
+  "type": "org.facilitator.event.provider.change_request.v1",
+  "subject": "provider/gitlab/change_request-7",
+  "time": "2026-10-29T09:00:00Z",
+  "datacontenttype": "application/json",
+  "dataschema": "https://schemas.openfacilitator.org/v1/event.provider.change_request.v1.json",
+  "data": {
+    "reference": {
+      "provider": "gitlab",
+      "providerInstanceId": "gitlab-local",
+      "tenantOrOrganizationId": "group",
+      "channelOrResourceId": "group/widgets",
+      "rootThreadId": "7",
+      "subjectRef": "7",
+      "conversationKind": "comment",
+      "authorProviderAccountId": "alice"
+    },
+    "provider": "gitlab",
+    "providerDeliveryId": "b5a2c6e8-0a4c-4a52-9d13-1e0f2a3b4c5d",
+    "actorProviderAccountId": "alice",
+    "action": "commented",
+    "text": "@ofac-bot please rework the error path",
+    "headRef": "feature/error-path",
+    "labels": ["ofac:work"],
+    "commentId": "501",
+    "payload": {
+      "object_kind": "note",
+      "object_attributes": {
+        "id": 501,
+        "note": "@ofac-bot please rework the error path"
+      }
+    }
+  }
+}

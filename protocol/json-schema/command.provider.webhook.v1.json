@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openfacilitator.org/v1/command.provider.webhook.v1.json",
+  "title": "ProviderWebhookCommandV1Data",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["commandId", "provider", "contentType", "body", "headers"],
+  "properties": {
+    "commandId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "provider": {
+      "$ref": "common.v1.json#/$defs/idToken",
+      "description": "Provider token the sink routed this delivery under (path segment {provider})."
+    },
+    "deliveryId": {
+      "$ref": "common.v1.json#/$defs/idToken",
+      "description": "Vendor delivery id when the kernel could extract one; adapters derive their own dedupe key otherwise."
+    },
+    "contentType": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "Verbatim Content-Type of the inbound HTTP delivery."
+    },
+    "body": {
+      "type": "string",
+      "description": "Raw request body, base64-encoded. Verbatim bytes preserve HMAC signature verifiability provider-side.",
+      "contentEncoding": "base64"
+    },
+    "headers": {
+      "type": "object",
+      "description": "Verbatim inbound webhook headers (signature, event, delivery-id headers included). Signature verification is provider-local in the adapter.",
+      "additionalProperties": {
+        "type": "string"
+      }
+    }
+  }
+}

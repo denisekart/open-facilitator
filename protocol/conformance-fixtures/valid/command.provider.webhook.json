@@ -1,0 +1,23 @@
+{
+  "specversion": "1.0",
+  "id": "01JCOMMAND-provider-webhook",
+  "source": "urn:facilitator:instance:main",
+  "type": "org.facilitator.command.provider.webhook.v1",
+  "subject": "provider/forgejo/webhook/01JDELIVERY",
+  "time": "2026-10-29T09:00:00Z",
+  "datacontenttype": "application/json",
+  "dataschema": "https://schemas.openfacilitator.org/v1/command.provider.webhook.v1.json",
+  "data": {
+    "commandId": "cmd-201",
+    "provider": "forgejo",
+    "deliveryId": "01JDELIVERYabc",
+    "contentType": "application/json",
+    "body": "eyJhY3Rpb24iOiJvcGVuZWQifQ==",
+    "headers": {
+      "content-type": "application/json",
+      "user-agent": "Forgejo Webhooks",
+      "x-forgejo-event": "issues",
+      "x-hub-signature-256": "sha256=4f5f4a2a1b3c8d9e0f1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f70"
+    }
+  }
+}

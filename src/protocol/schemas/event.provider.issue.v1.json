@@ -40,6 +40,21 @@
       "maxLength": 8192,
       "description": "Issue/comment body excerpt feeding Work input (for action=commented)."
     },
+    "headRef": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "description": "Adapter-normalized head ref of the conversation's branch context, when the provider exposes one. The kernel MUST prefer this over digging into `payload`."
+    },
+    "labels": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128
+      },
+      "description": "Adapter-normalized label names on the issue (providers shape labels differently; normalization is the adapter's job). The kernel MUST prefer these over digging into `payload`."
+    },
     "payload": {
       "type": "object",
       "description": "Verbatim provider event payload as received by the adapter.",

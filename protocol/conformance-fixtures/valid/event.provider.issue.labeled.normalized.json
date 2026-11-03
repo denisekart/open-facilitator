@@ -1,0 +1,42 @@
+{
+  "specversion": "1.0",
+  "id": "01JGITHUB-issue-labeled-normalized",
+  "source": "urn:ofac:provider:github:team-alpha",
+  "type": "org.facilitator.event.provider.issue.v1",
+  "subject": "provider/github/issue-42",
+  "time": "2026-10-29T09:00:00Z",
+  "datacontenttype": "application/json",
+  "dataschema": "https://schemas.openfacilitator.org/v1/event.provider.issue.v1.json",
+  "data": {
+    "reference": {
+      "provider": "github",
+      "providerInstanceId": "github-com",
+      "tenantOrOrganizationId": "acme",
+      "channelOrResourceId": "acme/widgets",
+      "rootThreadId": "42",
+      "subjectRef": "42",
+      "conversationKind": "comment",
+      "authorProviderAccountId": "alice"
+    },
+    "provider": "github",
+    "providerDeliveryId": "72d316a0-cc42-11ec-9a69-81c6e5b8fbb0",
+    "actorProviderAccountId": "alice",
+    "action": "labeled",
+    "workTrigger": true,
+    "headRef": "feature/widgets",
+    "labels": ["ofac:work", "bug"],
+    "payload": {
+      "action": "labeled",
+      "number": 42,
+      "repository": {
+        "full_name": "acme/widgets"
+      },
+      "sender": {
+        "login": "alice"
+      },
+      "label": {
+        "name": "ofac:work"
+      }
+    }
+  }
+}

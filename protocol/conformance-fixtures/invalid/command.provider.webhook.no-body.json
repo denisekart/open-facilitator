@@ -1,0 +1,19 @@
+{
+  "specversion": "1.0",
+  "id": "01JCOMMAND-provider-webhook-bad",
+  "source": "urn:facilitator:instance:main",
+  "type": "org.facilitator.command.provider.webhook.v1",
+  "subject": "provider/forgejo/webhook/01JDELIVERY",
+  "time": "2026-10-29T09:00:00Z",
+  "datacontenttype": "application/json",
+  "dataschema": "https://schemas.openfacilitator.org/v1/command.provider.webhook.v1.json",
+  "data": {
+    "commandId": "cmd-202",
+    "provider": "forgejo",
+    "contentType": "application/json",
+    "headers": {
+      "content-type": "application/json"
+    },
+    "signature": "sha256=deadbeef"
+  }
+}

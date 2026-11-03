@@ -43,6 +43,27 @@
       "maxLength": 8192,
       "description": "Review/comment body excerpt (for action=reviewed|commented)."
     },
+    "headRef": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "description": "Adapter-normalized source/head branch of the change request. The kernel MUST prefer this over digging into `payload`."
+    },
+    "labels": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128
+      },
+      "description": "Adapter-normalized label names on the change request. The kernel MUST prefer these over digging into `payload`."
+    },
+    "commentId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "Adapter-normalized review/discussion comment id for action=commented|reviewed, so dialogue replies (`vcs.discussion.reply`) need no vendor payload digging."
+    },
     "payload": {
       "type": "object",
       "description": "Verbatim provider event payload as received by the adapter.",

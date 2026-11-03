@@ -625,6 +625,50 @@ namespace Ofac.Protocol
         public string? workId { get; set; }
     }
 
+    public partial class ProviderWebhookCommandV1Data
+    {
+        /// <summary>
+        /// Raw request body, base64-encoded. Verbatim bytes preserve HMAC signature verifiability
+        /// provider-side.
+        /// </summary>
+        [JsonPropertyName("body")]
+        public string body { get; set; }
+
+        [JsonPropertyName("commandId")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string commandId { get; set; }
+
+        /// <summary>
+        /// Verbatim Content-Type of the inbound HTTP delivery.
+        /// </summary>
+        [JsonPropertyName("contentType")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string contentType { get; set; }
+
+        /// <summary>
+        /// Vendor delivery id when the kernel could extract one; adapters derive their own dedupe
+        /// key otherwise.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("deliveryId")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string? deliveryId { get; set; }
+
+        /// <summary>
+        /// Verbatim inbound webhook headers (signature, event, delivery-id headers included).
+        /// Signature verification is provider-local in the adapter.
+        /// </summary>
+        [JsonPropertyName("headers")]
+        public Dictionary<string, string> headers { get; set; }
+
+        /// <summary>
+        /// Provider token the sink routed this delivery under (path segment {provider}).
+        /// </summary>
+        [JsonPropertyName("provider")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string provider { get; set; }
+    }
+
     public partial class ProvisionStartCommandV1Data
     {
         [JsonPropertyName("actorEvidenceRef")]
@@ -1372,6 +1416,33 @@ namespace Ofac.Protocol
         public string actorProviderAccountId { get; set; }
 
         /// <summary>
+        /// Adapter-normalized review/discussion comment id for action=commented|reviewed, so
+        /// dialogue replies (`vcs.discussion.reply`) need no vendor payload digging.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("commentId")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string? commentId { get; set; }
+
+        /// <summary>
+        /// Adapter-normalized source/head branch of the change request. The kernel MUST prefer this
+        /// over digging into `payload`.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("headRef")]
+        [JsonConverter(typeof(StickyMinMaxLengthCheckConverter))]
+        public string? headRef { get; set; }
+
+        /// <summary>
+        /// Adapter-normalized label names on the change request. The kernel MUST prefer these over
+        /// digging into `payload`.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("labels")]
+        [JsonConverter(typeof(IndigoDecodeArrayConverter))]
+        public string[]? labels { get; set; }
+
+        /// <summary>
         /// Verbatim provider event payload as received by the adapter.
         /// </summary>
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -1455,6 +1526,25 @@ namespace Ofac.Protocol
         [JsonPropertyName("actorProviderAccountId")]
         [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
         public string actorProviderAccountId { get; set; }
+
+        /// <summary>
+        /// Adapter-normalized head ref of the conversation's branch context, when the provider
+        /// exposes one. The kernel MUST prefer this over digging into `payload`.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("headRef")]
+        [JsonConverter(typeof(StickyMinMaxLengthCheckConverter))]
+        public string? headRef { get; set; }
+
+        /// <summary>
+        /// Adapter-normalized label names on the issue (providers shape labels differently;
+        /// normalization is the adapter's job). The kernel MUST prefer these over digging into
+        /// `payload`.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("labels")]
+        [JsonConverter(typeof(IndigoDecodeArrayConverter))]
+        public string[]? labels { get; set; }
 
         /// <summary>
         /// Verbatim provider event payload as received by the adapter.
@@ -3269,6 +3359,39 @@ namespace Ofac.Protocol
         }
 
         public static readonly ProviderChangeRequestEventV1DataActionConverter Singleton = new ProviderChangeRequestEventV1DataActionConverter();
+    }
+
+    internal class IndigoDecodeArrayConverter : JsonConverter<string[]>
+    {
+        public override bool CanConvert(Type t) => t == typeof(string[]);
+
+        public override string[] Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            reader.Read();
+            var value = new List<string>();
+            while (reader.TokenType != JsonTokenType.EndArray)
+            {
+                var converter = PurpleMinMaxLengthCheckConverter.Singleton;
+                var arrayItem = (string)converter.Read(ref reader, typeof(string), options);
+                value.Add(arrayItem);
+                reader.Read();
+            }
+            return value.ToArray();
+        }
+
+        public override void Write(Utf8JsonWriter writer, string[] value, JsonSerializerOptions options)
+        {
+            writer.WriteStartArray();
+            foreach (var arrayItem in value)
+            {
+                var converter = PurpleMinMaxLengthCheckConverter.Singleton;
+                converter.Write(writer, arrayItem, options);
+            }
+            writer.WriteEndArray();
+            return;
+        }
+
+        public static readonly IndigoDecodeArrayConverter Singleton = new IndigoDecodeArrayConverter();
     }
 
     internal class ProviderIssueEventV1DataActionConverter : JsonConverter<ProviderIssueEventV1DataAction>

@@ -247,6 +247,33 @@ export type Type =
   | "hypothesis"
   | "preference";
 
+export interface ProviderWebhookCommandV1Data {
+  /**
+   * Raw request body, base64-encoded. Verbatim bytes preserve HMAC signature verifiability
+   * provider-side.
+   */
+  body: string;
+  commandId: string;
+  /**
+   * Verbatim Content-Type of the inbound HTTP delivery.
+   */
+  contentType: string;
+  /**
+   * Vendor delivery id when the kernel could extract one; adapters derive their own dedupe
+   * key otherwise.
+   */
+  deliveryId?: string;
+  /**
+   * Verbatim inbound webhook headers (signature, event, delivery-id headers included).
+   * Signature verification is provider-local in the adapter.
+   */
+  headers: { [key: string]: string };
+  /**
+   * Provider token the sink routed this delivery under (path segment {provider}).
+   */
+  provider: string;
+}
+
 export interface ProvisionStartCommandV1Data {
   actorEvidenceRef: string;
   commandId: string;
@@ -531,6 +558,21 @@ export interface ProviderChangeRequestEventV1Data {
   action: ProviderChangeRequestEventV1DataAction;
   actorProviderAccountId: string;
   /**
+   * Adapter-normalized review/discussion comment id for action=commented|reviewed, so
+   * dialogue replies (`vcs.discussion.reply`) need no vendor payload digging.
+   */
+  commentId?: string;
+  /**
+   * Adapter-normalized source/head branch of the change request. The kernel MUST prefer this
+   * over digging into `payload`.
+   */
+  headRef?: string;
+  /**
+   * Adapter-normalized label names on the change request. The kernel MUST prefer these over
+   * digging into `payload`.
+   */
+  labels?: string[];
+  /**
    * Verbatim provider event payload as received by the adapter.
    */
   payload?: { [key: string]: unknown };
@@ -565,6 +607,17 @@ export interface ConversationReference {
 export interface ProviderIssueEventV1Data {
   action: ProviderIssueEventV1DataAction;
   actorProviderAccountId: string;
+  /**
+   * Adapter-normalized head ref of the conversation's branch context, when the provider
+   * exposes one. The kernel MUST prefer this over digging into `payload`.
+   */
+  headRef?: string;
+  /**
+   * Adapter-normalized label names on the issue (providers shape labels differently;
+   * normalization is the adapter's job). The kernel MUST prefer these over digging into
+   * `payload`.
+   */
+  labels?: string[];
   /**
    * Verbatim provider event payload as received by the adapter.
    */

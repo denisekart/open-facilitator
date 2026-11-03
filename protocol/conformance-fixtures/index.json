@@ -308,6 +308,12 @@
       "errorClass": "schema-violation"
     },
     {
+      "file": "invalid/command.provider.webhook.no-body.json",
+      "expect": "invalid",
+      "class": "command",
+      "errorClass": "schema-violation"
+    },
+    {
       "file": "invalid/command.unknown.v1.json",
       "expect": "invalid",
       "class": "command",
@@ -570,6 +576,12 @@
       "type": "org.facilitator.event.provider.issue.v1"
     },
     {
+      "file": "valid/event.provider.issue.labeled.normalized.json",
+      "expect": "valid",
+      "class": "event",
+      "type": "org.facilitator.event.provider.issue.v1"
+    },
+    {
       "file": "valid/event.provider.issue.commented.json",
       "expect": "valid",
       "class": "event",
@@ -607,6 +619,12 @@
     },
     {
       "file": "valid/event.provider.change_request.commented.json",
+      "expect": "valid",
+      "class": "event",
+      "type": "org.facilitator.event.provider.change_request.v1"
+    },
+    {
+      "file": "valid/event.provider.change_request.commented.normalized.json",
       "expect": "valid",
       "class": "event",
       "type": "org.facilitator.event.provider.change_request.v1"
@@ -778,6 +796,12 @@
       "expect": "valid",
       "class": "command",
       "type": "org.facilitator.command.provision.stop.v1"
+    },
+    {
+      "file": "valid/command.provider.webhook.json",
+      "expect": "valid",
+      "class": "command",
+      "type": "org.facilitator.command.provider.webhook.v1"
     }
   ]
 }

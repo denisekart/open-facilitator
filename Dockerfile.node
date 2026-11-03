@@ -19,6 +19,10 @@ COPY src/adapters/provider-core/package.json src/adapters/provider-core/
 COPY src/adapters/communication/mattermost/package.json src/adapters/communication/mattermost/
 COPY src/adapters/communication/forgejo/package.json src/adapters/communication/forgejo/
 COPY src/adapters/communication/forgejo-connector/package.json src/adapters/communication/forgejo-connector/
+COPY src/adapters/communication/github/package.json src/adapters/communication/github/
+COPY src/adapters/communication/github-connector/package.json src/adapters/communication/github-connector/
+COPY src/adapters/communication/gitlab/package.json src/adapters/communication/gitlab/
+COPY src/adapters/communication/gitlab-connector/package.json src/adapters/communication/gitlab-connector/
 COPY src/adapters/provisioning-oci/package.json src/adapters/provisioning-oci/
 COPY examples/full/coding-worker/package.json examples/full/coding-worker/
 RUN pnpm install --frozen-lockfile
@@ -32,6 +36,10 @@ COPY src/adapters/provider-core/ src/adapters/provider-core/
 COPY src/adapters/communication/mattermost/ src/adapters/communication/mattermost/
 COPY src/adapters/communication/forgejo/ src/adapters/communication/forgejo/
 COPY src/adapters/communication/forgejo-connector/ src/adapters/communication/forgejo-connector/
+COPY src/adapters/communication/github/ src/adapters/communication/github/
+COPY src/adapters/communication/github-connector/ src/adapters/communication/github-connector/
+COPY src/adapters/communication/gitlab/ src/adapters/communication/gitlab/
+COPY src/adapters/communication/gitlab-connector/ src/adapters/communication/gitlab-connector/
 COPY src/adapters/provisioning-oci/ src/adapters/provisioning-oci/
 COPY examples/full/coding-worker/ examples/full/coding-worker/
 RUN pnpm -r build

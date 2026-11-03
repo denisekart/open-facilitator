@@ -1,0 +1,45 @@
+{
+  "name": "@ofac/github-adapter",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "GitHub provider adapter: inbound webhook fan-out consumer on the @ofac/provider-core adapter face (HMAC-SHA256 law, vendor->domain normalizer, bot-identity replies).",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "github-adapter": "./dist/bin/adapter.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/denisekart/open-facilitator.git",
+    "directory": "src/adapters/communication/github"
+  },
+  "scripts": {
+    "build": "tsup src/index.ts src/bin/adapter.ts --format esm --dts --target node22 --silent",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@ofac/protocol": "workspace:*",
+    "@ofac/provider-core": "workspace:*",
+    "@ofac/workspace-link": "workspace:*",
+    "better-sqlite3": "catalog:"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "catalog:",
+    "@types/node": "catalog:",
+    "tsup": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

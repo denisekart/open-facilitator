@@ -1,0 +1,41 @@
+{
+  "name": "@ofac/github-connector",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "GitHub connector: gateway fleet child executing privileged GitHub operations.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "github-connector": "./dist/bin/connector.js"
+  },
+  "scripts": {
+    "build": "tsup src/index.ts src/bin/connector.ts --format esm --dts --target node22 --silent",
+    "test": "vitest run",
+    "test:e2e": "vitest run --config vitest.e2e.config.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@ofac/adapter": "workspace:*",
+    "@ofac/gateway": "workspace:*",
+    "@ofac/github-adapter": "workspace:*",
+    "@ofac/protocol": "workspace:*",
+    "@ofac/provider-core": "workspace:*",
+    "@ofac/workspace-link": "workspace:*",
+    "better-sqlite3": "catalog:",
+    "yaml": "catalog:"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "catalog:",
+    "@types/node": "catalog:",
+    "tsup": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

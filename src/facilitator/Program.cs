@@ -1,5 +1,6 @@
 using Facilitator.Kernel;
 using Facilitator.Kernel.Admin;
+using Facilitator.Kernel.Ai;
 using Facilitator.Kernel.Integrations;
 using Facilitator.Kernel.Link;
 using Facilitator.Kernel.Shared.Auth;
@@ -41,6 +42,7 @@ app.MapMemoryApi();
 app.MapLinkApi(app.Environment);
 app.MapIdentityApi();
 app.MapAdminApi();
+app.MapChatApi();
 app.MapProviderIdentitiesApi();
 app.MapUiConfig(builder.Configuration);
 // Embedded operator SPA: hashed assets + SPA fallback. Non-/api

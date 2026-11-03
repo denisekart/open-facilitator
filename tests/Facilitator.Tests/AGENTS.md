@@ -31,5 +31,9 @@ internals.
 ## Invariants
 - Tests are independent: GUID-scoped work/endpoint ids, no cross-class state;
   classes in different collections run in parallel.
+- Simulation rule: deterministic tests never construct a real AI gateway —
+  `KernelTestFactory` swaps `IAiGateway`/`IDecisionGateway` for
+  `FakeAiGateway`/`FakeDecisionGateway` unconditionally (fixture-replayed AI
+  behavior); `ScriptedLlmHandler` covers the real gateways' wire paths.
 - Dev-only endpoints (`/api/dev/*`) exist because tests run the server in
   Development; production behavior of those routes is out of scope here.

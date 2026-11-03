@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ChatView from "./components/ChatView.svelte";
   import ConfigView from "./components/ConfigView.svelte";
   import DeliveriesView from "./components/DeliveriesView.svelte";
   import HealthStrip from "./components/HealthStrip.svelte";
@@ -9,7 +10,7 @@
   import { health } from "./lib/health.svelte.js";
   import type { AdminSearchResults, SearchSection } from "./lib/types.js";
 
-  type Panel = "none" | "links" | "deliveries" | "config";
+  type Panel = "none" | "links" | "deliveries" | "config" | "chat";
 
   let booted = $state(false);
   let bootError = $state<string | null>(null);
@@ -29,10 +30,11 @@
     { key: "memories", label: "memories" },
     { key: "messages", label: "messages" },
   ];
-  const VIEW_BUTTONS: { key: Panel; label: string }[] = [
+  const VIEW_BUTTONS: { key: Panel; label: string; needsChatRole?: boolean }[] = [
     { key: "links", label: "Links" },
     { key: "deliveries", label: "Deliveries" },
     { key: "config", label: "Config" },
+    { key: "chat", label: "AiDeck", needsChatRole: true },
   ];
 
   let debounce: ReturnType<typeof setTimeout> | undefined;
@@ -110,6 +112,7 @@
   const operatorRoles = $derived(
     session.roles.filter((role) => role.startsWith("framework-") || role.startsWith("kernel-")),
   );
+  const viewButtons = $derived(VIEW_BUTTONS.filter((b) => !b.needsChatRole || session.canChat));
 </script>
 
 {#if bootError}
@@ -128,7 +131,7 @@
   </main>
 {:else}
   <div class="mx-auto max-w-6xl p-4">
-    <header class="mb-4 flex items-center justify-between gap-4">
+    <header class="mb-4 flex flex-wrap items-center justify-between gap-4">
       <h1 class="text-lg font-medium">Facilitator</h1>
       <div class="flex items-center gap-2">
         <span class="badge bg-raised text-ink-2" data-testid="identity-chip">
@@ -140,7 +143,7 @@
 
     <div class="mb-4 flex gap-2">
       <input
-        class="input"
+        class="input min-w-0 grow"
         placeholder="search works, projects, artifacts, memories…"
         bind:value={query}
         oninput={onQuery}
@@ -197,8 +200,8 @@
       </div>
     {/if}
 
-    <nav class="mb-4 flex gap-2" aria-label="views">
-      {#each VIEW_BUTTONS as { key, label }}
+    <nav class="mb-4 flex flex-wrap gap-2" aria-label="views">
+      {#each viewButtons as { key, label }}
         <button
           class="btn {panel === key ? 'btn-primary' : ''}"
           data-testid={`view-${key}`}
@@ -213,6 +216,8 @@
       <DeliveriesView />
     {:else if panel === "config"}
       <ConfigView />
+    {:else if panel === "chat"}
+      <ChatView />
     {/if}
 
     <div class="mt-4">

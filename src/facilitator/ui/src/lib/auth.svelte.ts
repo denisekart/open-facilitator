@@ -5,6 +5,9 @@ import { makeApiFetch, toApiError, uiBootstrap, type Fetcher } from "./api.js";
 /** Realm roles that grant the admin surface (mirrors admin.read/admin.mutate bindings). */
 const OPERATOR_ROLES = ["framework-admin", "kernel-operator"];
 
+/** Realm role that grants the AiDeck chat surface (mirrors the chat.* bindings). */
+const AI_OPERATOR_ROLES = ["ai-operator"];
+
 interface TokenClaims {
   groups?: string[];
   realm_access?: { roles?: string[] };
@@ -51,6 +54,10 @@ export class AuthSession {
 
   get canMutate(): boolean {
     return this.roles.some((role) => OPERATOR_ROLES.includes(role));
+  }
+
+  get canChat(): boolean {
+    return this.roles.some((role) => AI_OPERATOR_ROLES.includes(role));
   }
 
   get displayName(): string {

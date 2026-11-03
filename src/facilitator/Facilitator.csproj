@@ -10,7 +10,9 @@
 
   <ItemGroup>
     <PackageReference Include="AWSSDK.S3" />
-
+    <!-- Advisory writes need a host object in the context (we render
+         primitives-only) and have no shipped fix on any 5.x/7.x. -->
+    <PackageReference Include="Scriban" NoWarn="NU1902;NU1903;NU1904" />
     <PackageReference Include="Jcs.Net" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" />
@@ -23,6 +25,10 @@
     <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
     <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
     <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- AiDeck prompt templates: embedded, with optional directory override. -->
+    <EmbeddedResource Include="Ai/Templates/*.scriban" />
   </ItemGroup>
 
 </Project>

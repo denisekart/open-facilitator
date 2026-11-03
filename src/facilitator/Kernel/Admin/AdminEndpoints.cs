@@ -74,6 +74,11 @@ public static class AdminEndpoints
         group.MapGet("/replicas", async (AdminReadStores stores, CancellationToken ct) =>
             Results.Ok(await stores.ReplicasAsync(ct)));
 
+        // Audit trail read (the chat history screen's evidence surface); the
+        // admin.read binding covers it via /api/admin/audit.
+        group.MapGet("/audit", async (string? action, string? actor, DateTime? since, int? limit, AdminReadStores stores, CancellationToken ct) =>
+            Results.Ok(await stores.AuditAsync(action, actor, since, limit ?? 50, ct)));
+
         MapConfig(group);
         MapMutations(group);
 

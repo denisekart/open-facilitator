@@ -853,3 +853,145 @@ public sealed class ProvisioningOpEntity
 
     public DateTime UpdatedAt { get; set; }
 }
+
+/// <summary>facilitator.ai_turns — the AI ledger: one row per AI touch,
+/// both directions (in = decoded human/provider message, out = composed
+/// reply). Doubles as the conversation-memory source for the context
+/// builder and as the audit of what the model saw and said.</summary>
+public sealed class AiTurnEntity
+{
+    public Guid TurnId { get; set; }
+
+    public DateTime OccurredAt { get; set; }
+
+    /// <summary>Conversation key: provider|channel|root (provider plane) or
+    /// chat:&lt;session-id&gt; (admin chat plane).</summary>
+    public required string ConversationKey { get; set; }
+
+    /// <summary>Canonical oidc actor for the chat plane; null on the provider plane.</summary>
+    public string? Actor { get; set; }
+
+    /// <summary>Provider account id on the provider plane; null on the chat plane.</summary>
+    public string? ProviderAccountId { get; set; }
+
+    /// <summary>in | out.</summary>
+    public required string Direction { get; set; }
+
+    public required string Text { get; set; }
+
+    /// <summary>slash | model | fallback — how the turn was decided.</summary>
+    public required string Basis { get; set; }
+
+    public string? TemplateId { get; set; }
+
+    /// <summary>The decode/chat contract document, when one was parsed.</summary>
+    public string? Decoded { get; set; }
+
+    public string? EndpointName { get; set; }
+
+    public int? PromptTokens { get; set; }
+
+    public int? CompletionTokens { get; set; }
+
+    public string? TraceId { get; set; }
+}
+
+/// <summary>facilitator.actor_preferences — per-actor AI reply verbosity.
+/// Precedence: row &gt; admin_config llm.verbosityDefault.</summary>
+public sealed class ActorPreferenceEntity
+{
+    /// <summary>Canonical oidc actor (oidc:iss|sub form).</summary>
+    public required string Actor { get; set; }
+
+    /// <summary>terse | balanced | proactive.</summary>
+    public required string Verbosity { get; set; }
+
+    public string Extras { get; set; } = "{}";
+
+    public DateTime UpdatedAt { get; set; }
+}
+
+/// <summary>facilitator.chat_sessions — an admin chat conversation
+/// (browsable history; the chat plane's unit of ownership).</summary>
+public sealed class ChatSessionEntity
+{
+    public Guid SessionId { get; set; }
+
+    /// <summary>Canonical oidc actor of the owner.</summary>
+    public required string Actor { get; set; }
+
+    /// <summary>First user turn, truncated to 80 chars.</summary>
+    public required string Title { get; set; }
+
+    public DateTime CreatedAt { get; set; }
+
+    public DateTime LastMessageAt { get; set; }
+}
+
+/// <summary>facilitator.chat_messages — one stored turn of a chat session.</summary>
+public sealed class ChatMessageEntity
+{
+    public Guid MessageId { get; set; }
+
+    public Guid SessionId { get; set; }
+
+    /// <summary>user | assistant.</summary>
+    public required string Role { get; set; }
+
+    public required string Text { get; set; }
+
+    /// <summary>model | fallback | slash.</summary>
+    public required string Basis { get; set; }
+
+    public string? TemplateId { get; set; }
+
+    public DateTime CreatedAt { get; set; }
+
+    public string? TraceId { get; set; }
+
+    public ChatSessionEntity? Session { get; set; }
+}
+
+/// <summary>facilitator.chat_actions — one AI-PROPOSED kernel API call,
+/// executed only on explicit confirm, under the confirming admin's own
+/// bearer token. History rows persist forever; audit points here.</summary>
+public sealed class ChatActionEntity
+{
+    public Guid ActionId { get; set; }
+
+    public Guid SessionId { get; set; }
+
+    public Guid MessageId { get; set; }
+
+    public required string Method { get; set; }
+
+    public required string Path { get; set; }
+
+    /// <summary>Proposed request body (jsonb text; null = no body).</summary>
+    public string? Body { get; set; }
+
+    /// <summary>Machine-readable description shown on the action card.</summary>
+    public required string Description { get; set; }
+
+    /// <summary>pending | executed | failed | cancelled.</summary>
+    public string Status { get; set; } = "pending";
+
+    /// <summary>Optimistic single-execution fence (app-incremented, the
+    /// admin_config precedent): the claim UPDATE fences on it.</summary>
+    public long RowVersion { get; set; }
+
+    public int? StatusCode { get; set; }
+
+    /// <summary>Response body captured on execution (jsonb or text).</summary>
+    public string? Result { get; set; }
+
+    public DateTime CreatedAt { get; set; }
+
+    public string? ExecutedBy { get; set; }
+
+    public DateTime? ExecutedAt { get; set; }
+
+    public ChatSessionEntity? Session { get; set; }
+
+    public ChatMessageEntity? Message { get; set; }
+}

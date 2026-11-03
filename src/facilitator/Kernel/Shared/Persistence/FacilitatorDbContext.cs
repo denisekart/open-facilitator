@@ -80,6 +80,17 @@ public class FacilitatorDbContext(DbContextOptions<FacilitatorDbContext> options
 
     public DbSet<ProvisioningOpEntity> ProvisioningOps => Set<ProvisioningOpEntity>();
 
+    public DbSet<AiTurnEntity> AiTurns => Set<AiTurnEntity>();
+
+    public DbSet<ActorPreferenceEntity> ActorPreferences => Set<ActorPreferenceEntity>();
+
+    public DbSet<ChatSessionEntity> ChatSessions => Set<ChatSessionEntity>();
+
+    public DbSet<ChatMessageEntity> ChatMessages => Set<ChatMessageEntity>();
+
+    public DbSet<ChatActionEntity> ChatActions => Set<ChatActionEntity>();
+
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder model)
     {

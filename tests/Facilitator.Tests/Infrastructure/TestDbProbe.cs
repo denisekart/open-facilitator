@@ -1397,4 +1397,106 @@ public sealed class TestDbProbe : IAsyncDisposable
                 cmd.Parameters.AddWithValue(launcherEndpoint);
                 cmd.Parameters.AddWithValue(eventType);
             });
+
+    /// <summary>facilitator.ai_turns rows for one conversation key with a
+    /// given basis (the slash/model/fallback ledger law).</summary>
+    public Task<long> AiTurnCount(string conversationKey, string basis) =>
+        ScalarLong(
+            "SELECT count(*) FROM facilitator.ai_turns WHERE conversation_key = $1 AND basis = $2",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(conversationKey);
+                cmd.Parameters.AddWithValue(basis);
+            });
+
+    /// <summary>facilitator.ai_turns count for one conversation key, any basis.</summary>
+    public Task<long> AiTurnCountTotal(string conversationKey) =>
+        ScalarLong("SELECT count(*) FROM facilitator.ai_turns WHERE conversation_key = $1",
+            cmd => cmd.Parameters.AddWithValue(conversationKey));
+
+    /// <summary>Ledger texts of a conversation's turns of one basis (chronological).</summary>
+    public async Task<List<string>> AiTurnTexts(string conversationKey, string basis)
+    {
+        await using var connection = await _dataSource.OpenConnectionAsync();
+        await using var cmd = new NpgsqlCommand(
+            "SELECT text FROM facilitator.ai_turns WHERE conversation_key = $1 AND basis = $2 ORDER BY occurred_at",
+            connection);
+        cmd.Parameters.AddWithValue(conversationKey);
+        cmd.Parameters.AddWithValue(basis);
+        var rows = new List<string>();
+        await using var reader = await cmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            rows.Add(reader.GetString(0));
+        }
+
+        return rows;
+    }
+
+    /// <summary>decoded jsonb of the newest ledger 'in' row of a conversation
+    /// (null when no model pass was ledgered).</summary>
+    public async Task<string?> AiTurnDecoded(string conversationKey)
+    {
+        await using var connection = await _dataSource.OpenConnectionAsync();
+        await using var cmd = new NpgsqlCommand(
+            "SELECT decoded::text FROM facilitator.ai_turns "
+            + "WHERE conversation_key = $1 AND direction = 'in' AND decoded IS NOT NULL "
+            + "ORDER BY occurred_at DESC LIMIT 1",
+            connection);
+        cmd.Parameters.AddWithValue(conversationKey);
+        var value = await cmd.ExecuteScalarAsync();
+        return value is null or DBNull ? null : (string)value;
+    }
+
+    /// <summary>Status + charged attempts of a command's outbox row (null when absent).</summary>
+    public async Task<(string Status, int Attempts)?> OutboxStatusAttemptsByCommand(string commandId)
+    {
+        await using var connection = await _dataSource.OpenConnectionAsync();
+        await using var cmd = new NpgsqlCommand(
+            "SELECT status, attempts FROM facilitator.outbox WHERE command_id = $1", connection);
+        cmd.Parameters.AddWithValue(commandId);
+        await using var reader = await cmd.ExecuteReaderAsync();
+        if (!await reader.ReadAsync())
+        {
+            return null;
+        }
+
+        return (reader.GetString(0), reader.GetInt32(1));
+    }
+
+    /// <summary>Count of outbox rows carrying a command id (single-row law checks).</summary>
+    public Task<long> OutboxCountByCommand(string commandId) =>
+        ScalarLong("SELECT count(*) FROM facilitator.outbox WHERE command_id = $1",
+            cmd => cmd.Parameters.AddWithValue(commandId));
+
+    /// <summary>Age a command's row past its backoff so the dispatcher may claim it now.</summary>
+    public Task ExpireOutboxBackoffByCommand(string commandId) =>
+        NonQuery("UPDATE facilitator.outbox SET available_at = now() - interval '1 hour' WHERE command_id = $1",
+            cmd => cmd.Parameters.AddWithValue(commandId));
+
+    /// <summary>Settle every pending outbox row (family hygiene: the claim
+    /// is global and cross-class debris can starve a fresh row out of the
+    /// batch or get re-delivered against the wrong host's fakes).</summary>
+    public Task SettlePendingOutboxRows() =>
+        NonQuery("UPDATE facilitator.outbox SET status = 'delivered', processed_at = now() WHERE status = 'pending'",
+            _ => { });
+
+    /// <summary>Hand a command's row back to the head of the queue (the crash-replay
+    /// simulation: a committed pass whose outbox row never settled).</summary>
+    public Task ReplayOutboxRowByCommand(string commandId) =>
+        NonQuery(
+            "UPDATE facilitator.outbox SET status = 'pending', attempts = 0, available_at = now(), "
+            + "lease_owner = NULL, leased_until = NULL WHERE command_id = $1",
+            cmd => cmd.Parameters.AddWithValue(commandId));
+
+    /// <summary>Hand-mint an actor verbosity preference row (precedence tests).</summary>
+    public Task SeedActorPreference(string actor, string verbosity) =>
+        NonQuery(
+            "INSERT INTO facilitator.actor_preferences (actor, verbosity, extras, updated_at) "
+            + "VALUES ($1, $2, '{}'::jsonb, now()) ON CONFLICT (actor) DO UPDATE SET verbosity = $2",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(actor);
+                cmd.Parameters.AddWithValue(verbosity);
+            });
 }

@@ -23,6 +23,36 @@ namespace Facilitator.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.ActorPreferenceEntity", b =>
+                {
+                    b.Property<string>("Actor")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("actor");
+
+                    b.Property<string>("Extras")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("extras");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("Verbosity")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("verbosity");
+
+                    b.HasKey("Actor");
+
+                    b.ToTable("actor_preferences", "facilitator", t =>
+                        {
+                            t.HasCheckConstraint("actor_preferences_verbosity_chk", "verbosity IN ('terse','balanced','proactive')");
+                        });
+                });
+
             modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.AdminConfigEntity", b =>
                 {
                     b.Property<string>("Resource")
@@ -95,6 +125,89 @@ namespace Facilitator.Migrations
                     b.HasKey("Resource", "Version");
 
                     b.ToTable("admin_config_history", "facilitator");
+                });
+
+            modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.AiTurnEntity", b =>
+                {
+                    b.Property<Guid>("TurnId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("turn_id");
+
+                    b.Property<string>("Actor")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("actor");
+
+                    b.Property<string>("Basis")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("basis");
+
+                    b.Property<int?>("CompletionTokens")
+                        .HasColumnType("integer")
+                        .HasColumnName("completion_tokens");
+
+                    b.Property<string>("ConversationKey")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("conversation_key");
+
+                    b.Property<string>("Decoded")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("decoded");
+
+                    b.Property<string>("Direction")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("direction");
+
+                    b.Property<string>("EndpointName")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("endpoint_name");
+
+                    b.Property<DateTime>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<int?>("PromptTokens")
+                        .HasColumnType("integer")
+                        .HasColumnName("prompt_tokens");
+
+                    b.Property<string>("ProviderAccountId")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("provider_account_id");
+
+                    b.Property<string>("TemplateId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("template_id");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("text");
+
+                    b.Property<string>("TraceId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("trace_id");
+
+                    b.HasKey("TurnId");
+
+                    b.HasIndex("ConversationKey", "OccurredAt")
+                        .HasDatabaseName("ix_ai_turns_conversation_key_occurred_at");
+
+                    b.ToTable("ai_turns", "facilitator", t =>
+                        {
+                            t.HasCheckConstraint("ai_turns_basis_chk", "basis IN ('slash','model','fallback')");
+
+                            t.HasCheckConstraint("ai_turns_direction_chk", "direction IN ('in','out')");
+                        });
                 });
 
             modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.ApprovalEntity", b =>
@@ -403,6 +516,176 @@ namespace Facilitator.Migrations
                         {
                             t.HasCheckConstraint("audit_decision_check", "decision IN ('allow', 'deny')");
                         });
+                });
+
+            modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.ChatActionEntity", b =>
+                {
+                    b.Property<Guid>("ActionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("action_id");
+
+                    b.Property<string>("Body")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("body");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("description");
+
+                    b.Property<DateTime?>("ExecutedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("executed_at");
+
+                    b.Property<string>("ExecutedBy")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("executed_by");
+
+                    b.Property<Guid>("MessageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("message_id");
+
+                    b.Property<string>("Method")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("method");
+
+                    b.Property<string>("Path")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("path");
+
+                    b.Property<string>("Result")
+                        .HasColumnType("text")
+                        .HasColumnName("result");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<Guid>("SessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("session_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("status");
+
+                    b.Property<int?>("StatusCode")
+                        .HasColumnType("integer")
+                        .HasColumnName("status_code");
+
+                    b.HasKey("ActionId");
+
+                    b.HasIndex("MessageId");
+
+                    b.HasIndex("SessionId");
+
+                    b.HasIndex("Status")
+                        .HasDatabaseName("ix_chat_actions_status");
+
+                    b.ToTable("chat_actions", "facilitator", t =>
+                        {
+                            t.HasCheckConstraint("chat_actions_status_chk", "status IN ('pending','executed','failed','cancelled')");
+                        });
+                });
+
+            modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.ChatMessageEntity", b =>
+                {
+                    b.Property<Guid>("MessageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("message_id");
+
+                    b.Property<string>("Basis")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("basis");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("role");
+
+                    b.Property<Guid>("SessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("session_id");
+
+                    b.Property<string>("TemplateId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("template_id");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("text");
+
+                    b.Property<string>("TraceId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("trace_id");
+
+                    b.HasKey("MessageId");
+
+                    b.HasIndex("SessionId", "CreatedAt")
+                        .HasDatabaseName("ix_chat_messages_session_id_created_at");
+
+                    b.ToTable("chat_messages", "facilitator", t =>
+                        {
+                            t.HasCheckConstraint("chat_messages_basis_chk", "basis IN ('model','fallback','slash')");
+
+                            t.HasCheckConstraint("chat_messages_role_chk", "role IN ('user','assistant')");
+                        });
+                });
+
+            modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.ChatSessionEntity", b =>
+                {
+                    b.Property<Guid>("SessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("session_id");
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("actor");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime>("LastMessageAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_message_at");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("title");
+
+                    b.HasKey("SessionId");
+
+                    b.HasIndex("LastMessageAt")
+                        .HasDatabaseName("ix_chat_sessions_last_message_at");
+
+                    b.ToTable("chat_sessions", "facilitator");
                 });
 
             modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.CommunicationBindingEntity", b =>
@@ -1775,6 +2058,39 @@ namespace Facilitator.Migrations
                         .HasConstraintName("assignments_work_id_fkey");
 
                     b.Navigation("Work");
+                });
+
+            modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.ChatActionEntity", b =>
+                {
+                    b.HasOne("Facilitator.Kernel.Shared.Persistence.ChatMessageEntity", "Message")
+                        .WithMany()
+                        .HasForeignKey("MessageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("chat_actions_message_id_fkey");
+
+                    b.HasOne("Facilitator.Kernel.Shared.Persistence.ChatSessionEntity", "Session")
+                        .WithMany()
+                        .HasForeignKey("SessionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("chat_actions_session_id_fkey");
+
+                    b.Navigation("Message");
+
+                    b.Navigation("Session");
+                });
+
+            modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.ChatMessageEntity", b =>
+                {
+                    b.HasOne("Facilitator.Kernel.Shared.Persistence.ChatSessionEntity", "Session")
+                        .WithMany()
+                        .HasForeignKey("SessionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("chat_messages_session_id_fkey");
+
+                    b.Navigation("Session");
                 });
 
             modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.ExecutionAttemptEntity", b =>

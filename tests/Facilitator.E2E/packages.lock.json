@@ -686,7 +686,8 @@
           "OpenTelemetry": "[1.20.1, )",
           "OpenTelemetry.Exporter.OpenTelemetryProtocol": "[1.20.1, )",
           "OpenTelemetry.Extensions.Hosting": "[1.20.1, )",
-          "OpenTelemetry.Instrumentation.AspNetCore": "[1.20.1, )"
+          "OpenTelemetry.Instrumentation.AspNetCore": "[1.20.1, )",
+          "Scriban": "[7.5.3, )"
         }
       },
       "ofac.protocol": {
@@ -779,6 +780,12 @@
         "dependencies": {
           "OpenTelemetry.Api.ProviderBuilderExtensions": "[1.20.1, 2.0.0)"
         }
+      },
+      "Scriban": {
+        "type": "CentralTransitive",
+        "requested": "[7.5.3, )",
+        "resolved": "7.5.3",
+        "contentHash": "yeusmR5XJYfGJ2Wj8I92TagqV3n6dggeurnq+cfYPZ4YMFmZMuAG8YSLqExrB9Z9Gx99YGR4ABzVkAHcLlTOmw=="
       }
     }
   }

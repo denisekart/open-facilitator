@@ -342,6 +342,12 @@ The framework's adoption thesis: first-party adapters are ordinary _implementati
 **Sequencing:** lands BEFORE 24 starts (24 must not pin the vendor-shaped wire); this is a clean cutover of 22/23's per-provider event surface, no shims.
 **Depends on:** 22, 23
 
+### Plan 36 — AiDeck: in-kernel AI decode plane + admin chat assistant
+
+**Status:** 🟡 implemented locally — full-solution build + lint + typecheck green; AI suites + ChatPlane browser tier: execution record `36-ai-decoder-aideck.md`
+**Objective:** The kernel decodes human provider messages (mention arm): deterministic slash plane first, LLM decode second (dispatcher channel `decode`, strict command contract, model may only SELECT a registry verb), verbatim-Work fallback always — AI outage never fails or DLQs ingest. Two ports, one failure law (`AiUnavailableException` = degrade): chat completions + LiteLLM decisions API; every decision point runs the decisions-API → LLM-classifier → deterministic ladder. Admin chat plane (`/api/chat/**`): proposals executed under the confirming human's own bearer (`aiInitiated` audit), per-actor verbosity, role-gated (`ai-operator`).
+**Depends on:** 22, 25 (decision seam), 20 (admin config), 21 (SPA)
+
 ---
 
 ## Cross-plan rules

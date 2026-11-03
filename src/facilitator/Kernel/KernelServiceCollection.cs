@@ -48,6 +48,7 @@ public static class KernelServiceCollection
         builder.AddMemoryFeature();
         builder.AddIntegrationsFeature();
         builder.AddProvisioningFeature();
+        builder.AddAiFeature();
         return builder;
     }
 
@@ -270,6 +271,53 @@ public static class KernelServiceCollection
             builder.Services.AddSingleton<ProviderEventStore>();
         }
 
+        return builder;
+    }
+
+    /// <summary>
+    /// AiDeck: the in-process AI subsystem. File config (<c>Ai:</c> — named
+    /// endpoints, fail-closed per endpoint; absent section = inert everywhere,
+    /// AI is optional by spec) × the <c>admin_config llm</c> row (hot policy;
+    /// absent row = inert, the NudgeSweeper precedent). Two wire formats, two
+    /// ports: chat completions (<see cref="Ai.IAiGateway"/>) and the
+    /// LiteLLM decisions API (<see cref="Ai.IDecisionGateway"/>); every
+    /// decision point degrades decisions-API → LLM classifier → deterministic
+    /// order. The single command registry feeds both the slash parser and the
+    /// decode prompt; decode rides the dispatcher (channel <c>decode</c>) so
+    /// no ingest tx is held open across LLM HTTP.
+    /// </summary>
+    private static WebApplicationBuilder AddAiFeature(this WebApplicationBuilder builder)
+    {
+        var ai = Facilitator.Kernel.Ai.AiOptions.Load(builder.Configuration);
+        builder.Services.AddSingleton(ai);
+        builder.Services.AddHttpClient("ai");
+        builder.Services.AddHttpClient("chat-loopback");
+        builder.Services.AddSingleton<Facilitator.Kernel.Ai.IAiGateway, Facilitator.Kernel.Ai.OpenAiChatCompletionsGateway>();
+        builder.Services.AddSingleton<Facilitator.Kernel.Ai.IDecisionGateway, Facilitator.Kernel.Ai.LiteLlmDecisionsGateway>();
+        builder.Services.AddSingleton<Facilitator.Kernel.Ai.PromptRenderer>();
+        builder.Services.AddSingleton(Facilitator.Kernel.Ai.CommandRegistry.BuiltIns);
+        builder.Services.AddSingleton<Facilitator.Kernel.Ai.AiPolicyStore>();
+        builder.Services.AddSingleton<Facilitator.Kernel.Ai.CommandApplier>();
+        builder.Services.AddSingleton<Facilitator.Kernel.Ai.ReplyComposer>();
+        // MemoryBroker ships scoped for the human plane; every dependency it
+        // has is a singleton, so the decode path legally holds a singleton
+        // instance (a singleton sink may not capture the scoped registration).
+        builder.Services.AddSingleton<Facilitator.Kernel.Ai.DecodeContextBuilder>(sp => new Facilitator.Kernel.Ai.DecodeContextBuilder(
+            new MemoryBroker(
+                sp.GetRequiredService<IDbContextFactory<FacilitatorDbContext>>(),
+                sp.GetRequiredService<AuditWriter>(),
+                sp.GetRequiredService<IMemoryProvider>(),
+                sp.GetRequiredService<KernelMetrics>(),
+                sp.GetRequiredService<TimeProvider>(),
+                sp.GetRequiredService<MemoryOptions>()),
+            sp.GetRequiredService<Facilitator.Kernel.Ai.AiPolicyStore>(),
+            sp.GetRequiredService<IDbContextFactory<FacilitatorDbContext>>()));
+        builder.Services.AddSingleton<ISink, Facilitator.Kernel.Ai.DecodeSink>();
+        builder.Services.AddSingleton<IDecisionProvider, Facilitator.Kernel.Ai.ModelDecisionProvider>();
+        builder.Services.AddSingleton<Facilitator.Kernel.Ai.CommunicationDecision>();
+        builder.Services.AddSingleton<Facilitator.Kernel.Ai.ChatProcessor>();
+        builder.Services.AddSingleton<Facilitator.Kernel.Ai.ChatActionExecutor>();
+        builder.Services.AddHostedService<Facilitator.Kernel.Ai.AiActionGaugeSweeper>();
         return builder;
     }
 

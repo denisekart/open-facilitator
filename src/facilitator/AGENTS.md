@@ -20,6 +20,16 @@ plus the read-mostly Admin surface.
   writers as `routing:<base>:<key>` outbox rows.
 - `Kernel/Link/` — workspace-link server (enroll, hub, admission, deliveries,
   receipts, ledger).
+- `Kernel/Ai/` — AiDeck: the AI decode plane. `CommandRegistry` (built-in verbs
+  + admin_config `commands` row) is the single source of effects — the slash
+  parser and the LLM's decode prompt read the SAME registry; the AI may only
+  SELECT a verb, never invent one. Decode runs on dispatcher channel `decode`
+  (never inside the ingest tx); every AI touch ledgers to `ai_turns`. Gateway
+  ports `IAiGateway` (chat completions) + `IDecisionGateway` (LiteLLM
+  `/v1/decisions`) fail-closed on `Ai:Endpoints` (absent section ⇒ inert, no
+  boot error); the `llm` admin_config row is the hot policy (absent ⇒ inert).
+  Chat plane (`/api/chat/**`): actions are proposals executed under the
+  confirming admin's own bearer via loopback (audit `aiInitiated`).
 - `Kernel/Admin/` — `/api/admin` operator surface (read stores, config store
   with the If-Match/`X-Change-Reason` law, replay + re-mark mutations);
   authorization is config bindings only (`admin.read`/`admin.mutate`).
@@ -29,7 +39,9 @@ plus the read-mostly Admin surface.
 - `Kernel/Shared/` — not a feature: Auth, Dispatch, Persistence, CLI, metrics,
   Storage (artifact byte port + ledgers), Memory (broker + provider port).
 - `Kernel/KernelServiceCollection.cs` — composition root; `AddSharedKernel` /
-  `AddWorkFeature` / `AddLinkFeature` / `AddStorageFeature` / `AddMemoryFeature`.
+  `AddWorkFeature` / `AddLinkFeature` / `AddStorageFeature` / `AddMemoryFeature`
+  / `AddAiFeature` (AiDeck: options + both gateway ports + renderer/registry/
+  ledger/policy + sinks/services).
 - `Migrations/` + `Kernel/Shared/Persistence/Configurations/` — schema truth,
   one `IEntityTypeConfiguration<T>` per entity.
 - Wire truth lives outside: `../protocol/dotnet/Ofac.Protocol`.

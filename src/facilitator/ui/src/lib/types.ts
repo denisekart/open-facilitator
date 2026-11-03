@@ -206,3 +206,45 @@ export interface UiConfig {
   oidcAuthority: string;
   oidcClientId: string;
 }
+
+// ---- AiDeck chat plane (Kernel/Ai/ChatEndpoints) ----
+
+export type ChatVerbosity = "terse" | "balanced" | "proactive";
+
+export interface ChatSession {
+  sessionId: string;
+  title: string;
+  lastMessageAt: string | null;
+  actor: string;
+}
+
+export interface ChatMessage {
+  messageId: string;
+  role: "user" | "assistant";
+  text: string;
+  basis: string;
+  createdAt: string;
+  actions?: ChatAction[];
+}
+
+export interface ChatAction {
+  actionId: string;
+  method: string;
+  path: string;
+  body?: unknown;
+  description: string;
+  status: "pending" | "executed" | "failed" | "cancelled";
+  statusCode?: number | null;
+  result?: unknown;
+}
+
+export interface ChatReply {
+  sessionId: string;
+  messageId: string;
+  reply: string;
+  actions: ChatAction[];
+}
+
+export interface ChatPreferences {
+  verbosity: ChatVerbosity;
+}

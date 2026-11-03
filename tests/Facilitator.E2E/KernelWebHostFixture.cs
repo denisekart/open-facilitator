@@ -20,15 +20,19 @@ public sealed class KernelWebHostFixture : WebApplicationFactory<Program>
     private readonly PostgresFixture _postgres;
     private readonly bool _noDispatcher;
     private readonly Func<IServiceProvider, ISink>? _sinkOverride;
+    private readonly HttpMessageHandler? _aiHandler;
 
     /// <param name="postgres">Shared Postgres container fixture.</param>
     /// <param name="noDispatcher">True removes the OutboxDispatcher hosted service.</param>
     /// <param name="sinkOverride">When set, replaces the kernel.log stub sink.</param>
-    public KernelWebHostFixture(PostgresFixture postgres, bool noDispatcher = false, Func<IServiceProvider, ISink>? sinkOverride = null)
+    /// <param name="aiHandler">When set, the AiDeck chat gateway runs its REAL wire path against this
+    /// handler (canned LiteLLM responses — the browser tier stays deterministic).</param>
+    public KernelWebHostFixture(PostgresFixture postgres, bool noDispatcher = false, Func<IServiceProvider, ISink>? sinkOverride = null, HttpMessageHandler? aiHandler = null)
     {
         _postgres = postgres;
         _noDispatcher = noDispatcher;
         _sinkOverride = sinkOverride;
+        _aiHandler = aiHandler;
         UseKestrel(0);
     }
 
@@ -63,6 +67,14 @@ public sealed class KernelWebHostFixture : WebApplicationFactory<Program>
         builder.UseSetting("Link:Teams:1", "team-beta");
         builder.UseSetting("Link:Evidence:Audience", "facilitator-link");
         builder.UseSetting("Storage:Gc:IntervalSeconds", "3600");
+        if (_aiHandler is not null)
+        {
+            // The chat-plane test composes a live policy row; the gateway
+            // itself is handler-backed (deterministic, no network).
+            builder.UseSetting("Ai:Endpoints:decoder:BaseUrl", "http://litellm.test:4000");
+            builder.UseSetting("Ai:Endpoints:decoder:Model", "fake-decoder");
+            builder.UseSetting("Ai:Endpoints:decoder:ApiKey", "test");
+        }
 
         builder.ConfigureTestServices(services =>
         {
@@ -83,6 +95,21 @@ public sealed class KernelWebHostFixture : WebApplicationFactory<Program>
 
                 // Last registration per channel wins in DbEventDispatcher.
                 services.AddSingleton(_sinkOverride);
+            }
+
+            if (_aiHandler is not null)
+            {
+                foreach (var d2 in services.Where(d => d.ServiceType == typeof(Facilitator.Kernel.Ai.IAiGateway)).ToArray())
+                {
+                    services.Remove(d2);
+                }
+
+                services.AddSingleton<Facilitator.Kernel.Ai.IAiGateway>(new Facilitator.Kernel.Ai.OpenAiChatCompletionsGateway(
+                    new Facilitator.Kernel.Ai.AiOptions
+                    {
+                        Endpoints = { ["decoder"] = new Facilitator.Kernel.Ai.AiEndpointOptions { BaseUrl = "http://litellm.test:4000", Model = "fake-decoder", ApiKey = "test" } },
+                    },
+                    _aiHandler));
             }
         });
     }

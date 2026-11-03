@@ -162,6 +162,20 @@ public sealed record AdminProvisioningRow(
     DateTime CreatedAt,
     DateTime UpdatedAt);
 
+/// <summary>One audit trail row (GET /api/admin/audit) — the gate and
+/// feature audit writes, newest first, with the jsonb detail surfaced as a
+/// raw element.</summary>
+public sealed record AdminAuditRow(
+    Guid AuditId,
+    DateTime OccurredAt,
+    string? Actor,
+    string Action,
+    string? Resource,
+    string Decision,
+    string? Reason,
+    JsonElement Detail,
+    string? TraceId);
+
 /// <summary>
 /// The admin read models: bounded <c>GroupBy</c> counts
 /// and <c>Take</c>-limited projections over the existing ledgers — one
@@ -448,6 +462,42 @@ public sealed class AdminReadStores(
                 o.OperationId, o.WorkloadId, o.Team, o.Operation, o.State,
                 o.WorkId, o.AssignmentId, o.Generation, o.Reason, o.CreatedAt, o.UpdatedAt))
             .ToListAsync(ct);
+    }
+
+    /// <summary>
+    /// GET /api/admin/audit: the audit trail, newest first, filterable by
+    /// action (exact), actor (exact), and a <c>since</c> floor. <c>limit</c>
+    /// defaults to 50, capped at 200 — the chat history screen points here
+    /// after AI-initiated executions.
+    /// </summary>
+    public async Task<IReadOnlyList<AdminAuditRow>> AuditAsync(string? action, string? actor, DateTime? since, int limit, CancellationToken ct)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(ct);
+        var take = Math.Clamp(limit <= 0 ? 50 : limit, 1, 200);
+        var query = db.Audit.AsNoTracking();
+        if (action is { Length: > 0 })
+        {
+            query = query.Where(a => a.Action == action);
+        }
+
+        if (actor is { Length: > 0 })
+        {
+            query = query.Where(a => a.Actor == actor);
+        }
+
+        if (since is { } floor)
+        {
+            query = query.Where(a => a.OccurredAt >= floor);
+        }
+
+        var rows = await query
+            .OrderByDescending(a => a.OccurredAt).ThenByDescending(a => a.AuditId)
+            .Take(take)
+            .Select(a => new { a.AuditId, a.OccurredAt, a.Actor, a.Action, a.Resource, a.Decision, a.Reason, a.Detail, a.TraceId })
+            .ToListAsync(ct);
+        return rows.Select(a => new AdminAuditRow(
+            a.AuditId, a.OccurredAt, a.Actor, a.Action, a.Resource, a.Decision, a.Reason,
+            JsonDocument.Parse(a.Detail).RootElement.Clone(), a.TraceId)).ToList();
     }
 
     /// <summary>Per-replica fleet view: live link-session leases

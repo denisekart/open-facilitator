@@ -24,6 +24,10 @@
       {
         "name": "gateway-workload",
         "description": "Gateway workload identity: polls its own work's approvals (Plan 12 reconcile)."
+      },
+      {
+        "name": "ai-operator",
+        "description": "AiDeck chat plane authority (chat.use/chat.execute/chat.read-all). Never auto-granted."
       }
     ]
   },
@@ -264,7 +268,7 @@
       "username": "alice",
       "enabled": true,
       "firstName": "Alice",
-      "realmRoles": ["default-roles-facilitator", "framework-admin"],
+      "realmRoles": ["default-roles-facilitator", "framework-admin", "ai-operator"],
       "groups": ["/teams/team-alpha"],
       "credentials": [
         {

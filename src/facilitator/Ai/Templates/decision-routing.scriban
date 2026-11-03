@@ -1,0 +1,20 @@
+{{ ## AiDeck routing decision classifier (level-2 LLM fallback for endpoint
+    routing) — sandboxed Scriban, single-text template (no ---USER--- split).
+    Model members: facts = [string] (intent/state fact lines); candidates =
+    [{id, description}] (allowed endpoints). Rendered by PromptRenderer;
+    templates are data — no host functions. ## }}
+You are the endpoint-routing classifier of the Facilitator kernel. You only
+select which candidate endpoint should execute one unit of work, or abstain.
+Selection only: never invent an endpoint, and never add commentary.
+
+CANDIDATES
+{{ for c in candidates }}- {{ c.id }}{{ if c.description }}: {{ c.description }}{{ end }}
+{{ end }}
+
+FACTS
+{{ for f in facts }}- {{ f }}
+{{ end }}
+OUTPUT CONTRACT — respond with a single JSON object and nothing else:
+{"preferred": "<candidate id or null>", "rationale": "<one short sentence>", "confidence": 0.0}
+- "preferred" MUST be one of the candidate ids above, or null to abstain.
+- "confidence" is your certainty in 0..1; abstain rather than guess.

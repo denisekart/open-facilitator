@@ -1,5 +1,6 @@
 using System.Text.Json;
 
+using Facilitator.Kernel.Ai;
 using Facilitator.Kernel.Shared.Persistence;
 
 using Microsoft.EntityFrameworkCore;
@@ -19,7 +20,9 @@ public sealed class EfCoordinationStore(
     IDbContextFactory<FacilitatorDbContext> contextFactory,
     EnvelopeValidator envelopeValidator,
     TimeProvider timeProvider,
-    Facilitator.Kernel.Integrations.ProviderRegistry? providers = null) : ICoordinationStore
+    Facilitator.Kernel.Integrations.ProviderRegistry? providers = null,
+    AiPolicyStore? aiPolicies = null,
+    CommunicationDecision? communication = null) : ICoordinationStore
 {
     private const string KernelLogChannel = "kernel.log";
 
@@ -197,7 +200,7 @@ public sealed class EfCoordinationStore(
         });
 
         AppendWorkProgress(db, workId, $"work {current.State}→{to.Wire()}", causationId: null, createdAt: now);
-        AppendProviderCompletionReply(db, workId, to, transitionEventId, now);
+        await AppendProviderCompletionReplyAsync(db, workId, to, current.State, transitionEventId, now, ct);
         await db.SaveChangesAsync(ct);
         await NotifyAsync(db, workId, ct);
         await tx.CommitAsync(ct);
@@ -490,9 +493,14 @@ public sealed class EfCoordinationStore(
     /// conversation, inside the SAME transaction (the reply law; the
     /// deterministic <c>communication-reply:&lt;transitionEventId&gt;</c>
     /// commandId makes retries idempotent on the ledger). No binding or no
-    /// registered provider ⇒ zero rows.</summary>
-    private void AppendProviderCompletionReply(
-        FacilitatorDbContext db, Guid workId, WorkState to, Guid transitionEventId, DateTime now)
+    /// registered provider ⇒ zero rows. When AiDeck is live the
+    /// <see cref="CommunicationDecision"/> is consulted first: "silent" ⇒
+    /// zero rows; "react" ⇒ the reaction envelope variant (expressible here
+    /// via <c>ReactEnvelope</c>, same idempotent commandId); null / "reply"
+    /// / AI-unavailable ⇒ the deterministic reply verbatim — the AI may
+    /// suppress or soften an update, never swallow one it did not see.</summary>
+    private async Task AppendProviderCompletionReplyAsync(
+        FacilitatorDbContext db, Guid workId, WorkState to, string fromState, Guid transitionEventId, DateTime now, CancellationToken ct)
     {
         if (!StateGuard.IsTerminal(to))
         {
@@ -506,11 +514,20 @@ public sealed class EfCoordinationStore(
             return;
         }
 
+        var action = await CommunicationActionAsync(db, binding, to, fromState, ct);
+        if (action == "silent")
+        {
+            return;
+        }
+
         var target = new Facilitator.Kernel.Integrations.ConversationTarget(
             binding.Provider, null, binding.Channel, binding.RootMessageId, binding.ParentMessageId,
             null, "thread", null);
-        var envelope = Facilitator.Kernel.Integrations.ProviderEventStore.ReplyEnvelope(
-            target, $"Work reached {to.Wire()}.", $"communication-reply:{transitionEventId}", $"work/{workId}", now);
+        var envelope = action == "react"
+            ? Facilitator.Kernel.Integrations.ProviderEventStore.ReactEnvelope(
+                target, Facilitator.Kernel.Integrations.ProviderEventStore.ReactionAckEmoji, $"communication-reply:{transitionEventId}", $"work/{workId}", now)
+            : Facilitator.Kernel.Integrations.ProviderEventStore.ReplyEnvelope(
+                target, $"Work reached {to.Wire()}.", $"communication-reply:{transitionEventId}", $"work/{workId}", now);
         var json = envelope.ToJsonString();
         var verdict = envelopeValidator.Validate(json);
         if (!verdict.Ok)
@@ -524,7 +541,7 @@ public sealed class EfCoordinationStore(
             RecipientEndpointId = $"link.{endpoint}",
             AggregateType = "work",
             AggregateId = workId,
-            EventType = "org.facilitator.command.communication.reply.v1",
+            EventType = envelope["type"]!.GetValue<string>(),
             CommandId = $"communication-reply:{transitionEventId}",
             Envelope = json,
             WorkId = workId,
@@ -533,6 +550,41 @@ public sealed class EfCoordinationStore(
             Attempts = 0,
             CreatedAt = now,
         });
+    }
+
+    /// <summary>The advisory communication answer for this completion ("reply"
+    /// | "react" | "silent"), or null = no preference. Inert policy (absent
+    /// <c>llm</c> row, disabled, AI seam absent) and
+    /// <see cref="AiUnavailableException"/> both yield null — today's
+    /// deterministic reply always stands when the model did not speak. The
+    /// recency signal is the ledger: any AiDeck turn on this conversation in
+    /// the last hour counts as an engaged conversation.</summary>
+    private async Task<string?> CommunicationActionAsync(
+        FacilitatorDbContext db, CommunicationBindingEntity binding, WorkState to, string fromState, CancellationToken ct)
+    {
+        if (aiPolicies is null || communication is null)
+        {
+            return null;
+        }
+
+        var policy = await aiPolicies.LoadAsync(db, ct);
+        if (!policy.Enabled)
+        {
+            return null;
+        }
+
+        var recentConversation = await db.AiTurns.AsNoTracking().AnyAsync(
+            t => t.ConversationKey == AiLedgerStore.ProviderKey(binding.Provider, binding.Channel, binding.RootMessageId)
+                 && t.OccurredAt >= timeProvider.GetUtcNow().UtcDateTime.AddHours(-1), ct);
+        try
+        {
+            return await communication.DecideAsync(
+                "work.completion", $"work reached {to.Wire()} (from {fromState})", recentConversation, ct);
+        }
+        catch (AiUnavailableException)
+        {
+            return null;
+        }
     }
 
     private static Task NotifyAsync(FacilitatorDbContext db, Guid workId, CancellationToken ct) =>

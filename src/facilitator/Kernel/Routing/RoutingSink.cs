@@ -228,8 +228,9 @@ public sealed class RoutingSink(
     /// endpoint) is honored when in-set; otherwise the deterministic head
     /// stands. An <c>routing-defaults</c> provider is consulted over the
     /// allowed set only and an out-of-set answer falls back, audited;
-    /// an unregistered provider (e.g. the reserved <c>"model"</c>) falls back
-    /// with the <c>model-fallback</c> basis.</summary>
+    /// a configured provider with no implementation in this host, or one
+    /// that returns no preference (e.g. <c>"model"</c> when AiDeck is inert),
+    /// falls back with the <c>model-fallback</c> basis.</summary>
     private async Task<(string Chosen, string Basis, string? ProviderRef)> ChooseAsync(
         FacilitatorDbContext db, RoutingIntent intent, List<RoutingCandidate> candidates, string? workTeamSlug, CancellationToken ct)
     {
@@ -250,8 +251,9 @@ public sealed class RoutingSink(
         var provider = providers.FirstOrDefault(p => p.Name == name);
         if (provider is null)
         {
-            // Stored-accepted, no implementation registered (the reserved
-            // "model" seam): deterministic stands, audited.
+            // Configured provider has no implementation registered in this
+            // host (e.g. AiDeck absent so "model" is unresolvable):
+            // deterministic stands, audited.
             return (candidates[0].EndpointId, "model-fallback", name);
         }
 
@@ -271,7 +273,10 @@ public sealed class RoutingSink(
             return (outcome.PreferredCandidate, "preference-satisfied", provider.Name);
         }
 
-        return (candidates[0].EndpointId, "deterministic-order", provider.Name);
+        // The provider was consulted and expressed no preference (inert
+        // policy, refusal, off-set or low-confidence answer): the model
+        // declined to steer — audited model-fallback, deterministic stands.
+        return (candidates[0].EndpointId, "model-fallback", provider.Name);
     }
 
     private static async Task<string?> ConfiguredProviderAsync(FacilitatorDbContext db, CancellationToken ct)

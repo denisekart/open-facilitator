@@ -25,6 +25,7 @@
     <Compile Include="../Facilitator.Tests/Infrastructure/PostgresFixture.cs" />
     <Compile Include="../Facilitator.Tests/Infrastructure/KeycloakFixture.cs" />
     <Compile Include="../Facilitator.Tests/Infrastructure/TestDbProbe.cs" />
+    <Compile Include="../Facilitator.Tests/Infrastructure/AiFakes.cs" />
   </ItemGroup>
 
   <ItemGroup>

@@ -36,6 +36,10 @@ public sealed class KernelMetrics
     private readonly Histogram<double> _memoryRecallLatency;
     private readonly Counter<long> _provisioningOps;
     private readonly Counter<long> _sessionLoss;
+    private readonly Counter<long> _aiDecode;
+    private readonly Counter<long> _aiGatewayErrors;
+    private readonly Counter<long> _aiChatMessages;
+    private readonly Counter<long> _aiChatActions;
     private readonly Histogram<double> _deliveryLatency;
     private readonly Histogram<double> _ingressLatency;
     private readonly Histogram<double> _artifactStoreLatency;
@@ -44,6 +48,7 @@ public sealed class KernelMetrics
     private long _deadLetters;
     private long _linkSessions;
     private long _gcLastPassAgeSeconds;
+    private long _aiPendingActions;
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, long> _counterTotals = new(StringComparer.Ordinal);
     private readonly System.Diagnostics.Metrics.MeterListener _counterListener;
 
@@ -100,6 +105,13 @@ public sealed class KernelMetrics
         _provisioningOps = meter.CreateCounter<long>("facilitator.provisioning.ops", description: "Provisioning ops appended by the scale-law sweep (tags: operation, reason)");
         _sessionLoss = meter.CreateCounter<long>("facilitator.link.session_loss", description: "Executions failed by the session-loss law (tag: reason)");
         _memoryRecallLatency = meter.CreateHistogram<double>("facilitator.memory.recall.latency", unit: "ms", description: "Recall query latency");
+        _aiDecode = meter.CreateCounter<long>("facilitator.ai.decode.total", description: "Decode pipeline outcomes (tag: basis)");
+        _aiGatewayErrors = meter.CreateCounter<long>("facilitator.ai.gateway.errors", description: "AI gateway failures (tag: endpoint)");
+        _aiChatMessages = meter.CreateCounter<long>("facilitator.ai.chat.messages", description: "Admin chat assistant messages (tag: basis)");
+        _aiChatActions = meter.CreateCounter<long>("facilitator.ai.chat.actions", description: "Admin chat proposed actions reaching a terminal status (tag: status)");
+        // 5-second-cache law (same as the queue-depth gauges): the callback serves a
+        // volatile-cached value refreshed by a background poller, never the DB.
+        meter.CreateObservableGauge("facilitator.ai.chat.actions.pending", () => Volatile.Read(ref _aiPendingActions), description: "Pending chat action proposals");
     }
 
     /// <summary>Record one charged delivery attempt.</summary>
@@ -204,6 +216,29 @@ public sealed class KernelMetrics
     /// <summary>Record one execution failed by the session-loss law.</summary>
     public void SessionLoss(string reason) => _sessionLoss.Add(1,
         new KeyValuePair<string, object?>("reason", reason));
+
+    /// <summary>Record one decode-pipeline outcome.</summary>
+    /// <param name="basis">slash | model | fallback.</param>
+    public void AiDecode(string basis) => _aiDecode.Add(1, new KeyValuePair<string, object?>("basis", basis));
+
+    /// <summary>Record one AI gateway failure.</summary>
+    /// <param name="endpoint">The configured endpoint name (e.g. decoder | decision).</param>
+    public void AiGatewayError(string endpoint) => _aiGatewayErrors.Add(1, new KeyValuePair<string, object?>("endpoint", endpoint));
+
+    /// <summary>Record one admin-chat assistant message.</summary>
+    /// <param name="basis">model | fallback | slash.</param>
+    public void AiChatMessage(string basis) => _aiChatMessages.Add(1, new KeyValuePair<string, object?>("basis", basis));
+
+    /// <summary>Record one admin-chat proposed action reaching a terminal status.</summary>
+    /// <param name="status">executed | failed | cancelled.</param>
+    public void AiChatAction(string status) => _aiChatActions.Add(1, new KeyValuePair<string, object?>("status", status));
+
+    /// <summary>
+    /// Refresh the cached pending-chat-action gauge. Like the queue-depth gauges,
+    /// the observable callback serves this volatile-cached value (refreshed by the
+    /// dispatcher's 5-second cache loop), never a synchronous DB read.
+    /// </summary>
+    public void SetAiPendingActions(long pending) => Volatile.Write(ref _aiPendingActions, pending);
 
     /// <summary>Refresh the GC last-pass-age gauge (written by the GC loop each pass).</summary>
     public void SetGcLastPassAge(long seconds) => Volatile.Write(ref _gcLastPassAgeSeconds, seconds);

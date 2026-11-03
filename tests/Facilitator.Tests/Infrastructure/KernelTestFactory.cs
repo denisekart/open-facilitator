@@ -24,6 +24,7 @@ public sealed class KernelTestFactory : WebApplicationFactory<Program>
     private readonly PostgresFixture _fixture;
     private readonly bool _noDispatcher;
     private readonly Func<IServiceProvider, ISink>? _sinkOverride;
+    private readonly AiFixtures _ai;
     private readonly IReadOnlyDictionary<string, string?>? _settings;
     private readonly bool _fakeClock;
 
@@ -32,7 +33,7 @@ public sealed class KernelTestFactory : WebApplicationFactory<Program>
     /// <param name="noDispatcher">True removes the OutboxDispatcher hosted service.</param>
     /// <param name="sinkOverride">When set, replaces the kernel.log stub sink.</param>
     /// <param name="settings">Extra config settings (e.g. <c>Link:MaxInFlight</c>), applied via UseSetting.</param>
-    /// <param name="fakeClock">True swaps TimeProvider.System for <see cref="FakeTimeProvider"/> (exposed via <see cref="Clock"/>).</param>
+    /// <param name="aiFixtures">Pre-seeded fake-gateway pair (when null a fresh pair ships — the simulation rule: the real AI ports are ALWAYS swapped).</param>
     /// <param name="useKestrel">True runs the app on a real Kestrel socket (WebSockets for SignalR tests).</param>
     public KernelTestFactory(
         PostgresFixture fixture,
@@ -40,13 +41,15 @@ public sealed class KernelTestFactory : WebApplicationFactory<Program>
         Func<IServiceProvider, ISink>? sinkOverride = null,
         IReadOnlyDictionary<string, string?>? settings = null,
         bool fakeClock = false,
-        bool useKestrel = false)
+        bool useKestrel = false,
+        AiFixtures? aiFixtures = null)
     {
         _fixture = fixture;
         _noDispatcher = noDispatcher;
         _sinkOverride = sinkOverride;
         _settings = settings;
         _fakeClock = fakeClock;
+        _ai = aiFixtures ?? new AiFixtures();
         if (fakeClock)
         {
             Clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
@@ -99,6 +102,21 @@ public sealed class KernelTestFactory : WebApplicationFactory<Program>
         {
             builder.UseSetting("Link:LeaseSweeperEnabled", "false");
         }
+
+        // Simulation rule: deterministic tests never construct a real
+        // gateway — both AI ports are swapped UNCONDITIONALLY (and no test
+        // host configures an Ai:Endpoints section, so a real gateway would
+        // throw at composition anyway; AiSimulationGuardTests enforces both).
+        builder.ConfigureTestServices(services =>
+        {
+            foreach (var descriptor in services.Where(d => d.ServiceType == typeof(Facilitator.Kernel.Ai.IAiGateway) || d.ServiceType == typeof(Facilitator.Kernel.Ai.IDecisionGateway)).ToArray())
+            {
+                services.Remove(descriptor);
+            }
+
+            services.AddSingleton<Facilitator.Kernel.Ai.IAiGateway>(_ai.Chat);
+            services.AddSingleton<Facilitator.Kernel.Ai.IDecisionGateway>(_ai.Decisions);
+        });
         if (_settings is not null)
         {
             foreach (var (key, value) in _settings)

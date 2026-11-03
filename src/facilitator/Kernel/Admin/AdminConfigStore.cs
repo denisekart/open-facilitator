@@ -76,6 +76,8 @@ public sealed class AdminConfigStore(
         "nudge-policy",
         "workload-scale",
         "routing-defaults",
+        "llm",
+        "commands",
     ];
 
     /// <summary>Stored view, or null when the resource was never written.</summary>
@@ -204,7 +206,7 @@ public sealed class AdminConfigStore(
     private static AdminConfigView ToView(AdminConfigEntity c) =>
         new(c.Resource, JsonDocument.Parse(c.Payload).RootElement.Clone(), c.RowVersion, c.Author, c.Reason, c.UpdatedAt);
 
-    // Closed validation registry — five known shapes, plain field checks
+    // Closed validation registry — seven known shapes, plain field checks
     // (a schema engine would be more dependency than the problem justifies).
     // Each validator returns null when the payload is valid, else the detail.
     private static readonly Dictionary<string, Func<JsonElement, string?>> Validators = new(StringComparer.Ordinal)
@@ -233,6 +235,20 @@ public sealed class AdminConfigStore(
         // ^ "model" is stored-accepted as the seam for future model routing: no
         // registered implementation falls back deterministic with a model-fallback
         // audit flag (RoutingSink), so no config-schema change lands later.
+        ["llm"] = payload => FirstError(
+            UnknownFields(payload, "enabled", "verbosityDefault", "replyMode", "decisionEndpoint", "decisionMode", "maxOutputTokens"),
+            BoolField(payload, "enabled"),
+            EnumField(payload, "verbosityDefault", ["terse", "balanced", "proactive"]),
+            EnumField(payload, "replyMode", ["model", "template"]),
+            OptionalStringField(payload, "decisionEndpoint", 1, 128),
+            EnumField(payload, "decisionMode", ["auto", "llm", "off"]),
+            IntField(payload, "maxOutputTokens", 40, 4000)),
+        // ^ AiDeck hot policy: absent row = AiDeck inert (NudgeSweeper precedent);
+        // secrets stay in Ai: file config, never here.
+        ["commands"] = ValidateCommands,
+        // ^ Slash/decode command registry — CommandRegistry.Merge reads the
+        // stored payload; malformed entries degrade there, this gate keeps
+        // garbage off the wire (array shape + verb charset + dup verbs).
     };
 
     private static string? FirstError(params string?[] errors) => errors.FirstOrDefault(static e => e is not null);
@@ -290,6 +306,114 @@ public sealed class AdminConfigStore(
 
     private static string? OptionalStringField(JsonElement payload, string name, int minLen, int maxLen) =>
         payload.TryGetProperty(name, out _) ? StringField(payload, name, minLen, maxLen) : null;
+
+    private static string? BoolField(JsonElement payload, string name)
+    {
+        if (!payload.TryGetProperty(name, out var value)
+            || (value.ValueKind != JsonValueKind.True && value.ValueKind != JsonValueKind.False))
+        {
+            return $"'{name}' must be a boolean";
+        }
+
+        return null;
+    }
+
+    // Structured validator for `commands` (the scalar helper set can't express
+    // arrays): root object, only field `commands`, array of entries with a
+    // charset-clean verb + non-empty description, optional capabilityId string,
+    // optional args array of {name: string, required: bool}, no dup verbs.
+    private static string? ValidateCommands(JsonElement payload)
+    {
+        if (payload.ValueKind != JsonValueKind.Object)
+        {
+            return "payload must be a JSON object";
+        }
+
+        if (UnknownFields(payload, "commands") is { } unknown)
+        {
+            return unknown;
+        }
+
+        if (!payload.TryGetProperty("commands", out var commands) || commands.ValueKind != JsonValueKind.Array)
+        {
+            return "payload must carry a 'commands' array";
+        }
+
+        var verbs = new List<string>();
+        foreach (var entry in commands.EnumerateArray())
+        {
+            if (entry.ValueKind != JsonValueKind.Object)
+            {
+                return "'commands[]' entries must be JSON objects";
+            }
+
+            if (StringField(entry, "verb", 1, 128) is { } verbError)
+            {
+                return verbError;
+            }
+
+            var verb = entry.GetProperty("verb").GetString()!;
+            if (!Facilitator.Kernel.Ai.CommandRegistry.VerbPattern.IsMatch(verb))
+            {
+                return "'commands[].verb' must match [a-z0-9-]+ (no leading slash)";
+            }
+
+            if (verbs.Contains(verb, StringComparer.OrdinalIgnoreCase))
+            {
+                return $"'commands[].verb' duplicated: '{verb}'";
+            }
+
+            verbs.Add(verb);
+
+            if (entry.EnumerateObject().Any(p => p.Name is not ("verb" or "description" or "capabilityId" or "args")))
+            {
+                return $"'commands[]' entry '{verb}' has unknown fields";
+            }
+
+            if (StringField(entry, "description", 1, 512) is { } descriptionError)
+            {
+                return descriptionError;
+            }
+
+            if (entry.TryGetProperty("capabilityId", out var capability) && capability.ValueKind != JsonValueKind.String)
+            {
+                return $"'commands[].capabilityId' must be a string when present";
+            }
+
+            if (entry.TryGetProperty("args", out var args))
+            {
+                if (args.ValueKind != JsonValueKind.Array)
+                {
+                    return $"'commands[].args' must be an array";
+                }
+
+                foreach (var arg in args.EnumerateArray())
+                {
+                    if (arg.ValueKind != JsonValueKind.Object)
+                    {
+                        return "'commands[].args' entries must be JSON objects";
+                    }
+
+                    if (arg.EnumerateObject().Any(p => p.Name is not ("name" or "required")))
+                    {
+                        return "'commands[].args' entries carry unknown fields";
+                    }
+
+                    if (StringField(arg, "name", 1, 128) is { } nameError)
+                    {
+                        return nameError;
+                    }
+
+                    if (BoolField(arg, "required") is { } requiredError)
+                    {
+                        return requiredError;
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
 
     private static string? RangeOrder(JsonElement payload)
     {

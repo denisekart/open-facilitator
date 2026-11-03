@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
+using Facilitator.Kernel.Ai;
 using Facilitator.Kernel.Link;
 using Facilitator.Kernel.Shared;
 using Facilitator.Kernel.Shared.Auth;
@@ -76,7 +77,10 @@ public sealed class ProviderEventStore(
     KernelMetrics metrics,
     ProviderRegistry registry,
     IServiceScopeFactory scopeFactory,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    CommandApplier applier,
+    AiPolicyStore policyStore,
+    AiOptions aiOptions)
 {
     /// <summary>Per-team home for provider-created Work: the manifest
     /// ledger's team scope resolves Work → Project → Team, so a Work with no
@@ -302,7 +306,7 @@ public sealed class ProviderEventStore(
             ProviderEventClass.Issue => await IssueArmAsync(db, workload, options, data, reference, providerDeliveryId, now, ct),
             ProviderEventClass.ChangeRequest => await ChangeRequestArmAsync(db, provider, options, data, reference, providerDeliveryId, now, ct),
             ProviderEventClass.Pipeline => await PipelineArmAsync(db, data, reference, providerDeliveryId, now, ct),
-            ProviderEventClass.Message => await MessageArmAsync(db, options, data, reference, providerDeliveryId, now, ct),
+            ProviderEventClass.Message => await MessageArmAsync(db, workload, options, data, reference, providerDeliveryId, now, ct),
             _ => new ArmEffect(null, "observe:unhandled"),
         };
         inbox.WorkId = effect.Work;
@@ -322,6 +326,14 @@ public sealed class ProviderEventStore(
             await scope.ServiceProvider.GetRequiredService<Facilitator.Kernel.Work.ICoordinationStore>()
                 .ApplySteerAsync(steer.WorkId, steer.Directive,
                     $"{provider}-review:{providerDeliveryId}", steer.ExpectedVersion, ct);
+        }
+        // Command effects riding their own transaction (approval respond via
+        // ApprovalIngress) run post-commit in a fresh scope — the steer
+        // precedent; the judgment is already on the ledger row.
+        if (effect.PostCommit is { } postCommit)
+        {
+            using var postScope = scopeFactory.CreateScope();
+            await postCommit(postScope.ServiceProvider);
         }
         metrics.LinkReceived();
         metrics.InboxProcessed();
@@ -425,8 +437,10 @@ public sealed class ProviderEventStore(
 
     // ---- arms ---------------------------------------------------------------
 
-    // Mention: identity-gated, binding-idempotent Work
-    // creation or thread input, then the low-noise ack. /link mints a challenge
+    // Mention: identity-gated, binding-idempotent. The slash plane parses
+    // the merged command registry (synchronous, zero AI); live AiDeck
+    // queues remaining non-command text for async decode; inert AiDeck keeps
+    // the verbatim-Work behavior plus the no-AI hint. /link mints a challenge
     // and never a Work.
     private async Task<ArmEffect> MentionArmAsync(
         FacilitatorDbContext db, Facilitator.Kernel.Shared.Auth.LinkPrincipal workload, ProviderOptions options, JsonElement data, Reference reference, string deliveryId, string replyVsReaction, DateTime now, CancellationToken ct)
@@ -476,60 +490,46 @@ public sealed class ProviderEventStore(
             return new ArmEffect(null, "mention:bound-no-work");
         }
 
-        var workId = Guid.NewGuid();
-        var objective = Trim(text);
-        // The result-manifest ledger scopes through Work -> Project -> Team:
-        // a provider-created Work lands in the workload team's provider
-        // project (find-or-create; fixed name ⇒ one project per team).
-        var project = await db.Projects.FirstOrDefaultAsync(
-            p => p.TeamId == workload.TeamId && p.Name == ProviderProjectName, ct);
-        if (project is null)
+        // Slash plane (deterministic, synchronous): a registry verb (or an
+        // unknown "/x" — the applier answers with the /help pointer) runs the
+        // shared CommandApplier in THIS transaction; effects riding their own
+        // transaction (approval respond) return a PostCommit action, invoked
+        // after commit exactly like the steer precedent in the caller.
+        var commands = CommandRegistry.Merge(CommandRegistry.BuiltIns, await CommandsPayloadAsync(db, ct));
+        var policy = await policyStore.LoadAsync(db, ct);
+        if (CommandParser.TryParse(text, commands) is { } parsed)
         {
-            project = new ProjectEntity
-            {
-                ProjectId = Guid.NewGuid(),
-                TeamId = workload.TeamId,
-                Name = ProviderProjectName,
-                Config = "{}",
-                CreatedAt = now,
-            };
-            db.Projects.Add(project);
+            var commandEffect = await applier.ApplyAsync(
+                db, now, parsed, commands, reference, options, actor, workload.TeamId,
+                deliveryId, replyVsReaction, policy, ct);
+            return new ArmEffect(commandEffect.WorkId, commandEffect.Judgment, PostCommit: commandEffect.PostCommit);
         }
-        db.Works.Add(new WorkEntity
+
+        // Non-command text with a live decoder: queue the async decode
+        // (deterministic command id => crash-replay idempotent) and
+        // provisional-ack with a REACTION regardless of replyVsReaction —
+        // the decode's own answer is the reply, a reply here would
+        // double-talk; the reaction key stays out of the decode fallback's
+        // mention:<delivery>:ack slot.
+        if (policy.Enabled && aiOptions.HasEndpoints)
         {
-            WorkId = workId,
-            ProjectId = project.ProjectId,
-            Objective = objective,
-            State = "open",
-            Version = 1,
-            CreatedAt = now,
-            UpdatedAt = now,
-        });
-        db.WorkEvents.Add(new WorkEventEntity
-        {
-            EventId = Guid.NewGuid(),
-            WorkId = workId,
-            WorkVersion = 1,
-            Kind = "created",
-            Actor = $"link:{reference.Provider}:{actor}",
-            Detail = JsonSerializer.Serialize(new Dictionary<string, string> { ["objective"] = objective }),
-            CreatedAt = now,
-        });
-        AppendProgressRow(db, options, workId, $"work created ({reference.Provider} mention)", now);
-        db.CommunicationBindings.Add(new CommunicationBindingEntity
-        {
-            BindingId = Guid.NewGuid(),
-            Provider = reference.Provider,
-            Channel = reference.Channel,
-            RootMessageId = reference.Root,
-            ParentMessageId = reference.MessageId,
-            WorkId = workId,
-            IdempotencyKey = deliveryId,
-            CreatedAt = now,
-        });
-        AppendRoutingIntentForWork(db, options, workId, objective, reference, null, project.TeamId, now);
-        await AckAsync(db, options, reference, deliveryId, replyVsReaction, now, ct);
-        return new ArmEffect(workId, $"work/{workId}");
+            AppendDecodeRow(db, text, reference, actor, deliveryId, workload.TeamId, replyVsReaction, now);
+            AppendCommand(db, ReactEnvelope(
+                TargetOf(reference),
+                AckEmoji,
+                $"decode:{deliveryId}:ack",
+                $"provider/{reference.Provider}/{reference.MessageId ?? deliveryId}",
+                now), options, now, workId: null);
+            return new ArmEffect(null, "decode:queued");
+        }
+
+        // Inert AiDeck (absent/disabled `llm` row or no endpoints): the
+        // exact verbatim Work + ack the arm always created, plus the hint
+        // line that the slash plane works without AI — the shared fallback
+        // helper the decode sink uses too, ledgered basis=fallback.
+        var verbatim = await applier.VerbatimWorkAsync(
+            db, now, text, reference, options, actor, workload.TeamId, deliveryId, replyVsReaction, ct);
+        return new ArmEffect(verbatim.WorkId, verbatim.Judgment, PostCommit: verbatim.PostCommit);
     }
 
     // Reaction: timeline note + configured ack ONLY. There is
@@ -577,11 +577,13 @@ public sealed class ProviderEventStore(
 
     // Message: /link anywhere (a DM is how the kernel delivers the challenge to an
     // unlinked account — DMs normalize message.v1, never mention.v1) mints a
-    // challenge; a bound-thread/DM follow-up feeds Work input; everything
-    // else is audited (the provider_events + inbox rows) with no effect. Code
-    // redemption rides the human plane (D2), so other DM text is never parsed.
+    // challenge; a slash command anywhere runs the slash plane (a DM is how a
+    // human drives /help or /status without a mention); a bound-thread/DM
+    // follow-up feeds Work input; everything else is audited (the
+    // provider_events + inbox rows) with no effect. Code redemption rides the
+    // human plane (D2), so other DM text is never parsed.
     private async Task<ArmEffect> MessageArmAsync(
-        FacilitatorDbContext db, ProviderOptions options, JsonElement data, Reference reference, string deliveryId, DateTime now, CancellationToken ct)
+        FacilitatorDbContext db, Facilitator.Kernel.Shared.Auth.LinkPrincipal workload, ProviderOptions options, JsonElement data, Reference reference, string deliveryId, DateTime now, CancellationToken ct)
     {
         var text = data.GetProperty("text").GetString() ?? string.Empty;
         if (text.TrimStart().StartsWith("/link", StringComparison.Ordinal))
@@ -589,6 +591,24 @@ public sealed class ProviderEventStore(
             await MintChallengeAsync(db, options, reference,
                 data.GetProperty("actorProviderAccountId").GetString() ?? string.Empty, now, ct);
             return new ArmEffect(null, "link:challenged");
+        }
+
+        // Slash plane on the DM/unmentioned path: only an actual parse
+        // (leading "/") enters the applier — free DM text keeps its
+        // binding-input behavior below.
+        if (text.TrimStart().StartsWith("/", StringComparison.Ordinal))
+        {
+            var commands = CommandRegistry.Merge(CommandRegistry.BuiltIns, await CommandsPayloadAsync(db, ct));
+            if (CommandParser.TryParse(text, commands) is { } parsed)
+            {
+                var policy = await policyStore.LoadAsync(db, ct);
+                var actor = data.GetProperty("actorProviderAccountId").GetString() ?? string.Empty;
+                var teamGuid = workload.TeamId;
+                var commandEffect = await applier.ApplyAsync(
+                    db, now, parsed, commands, reference, options, actor, teamGuid,
+                    deliveryId, "reply", policy, ct);
+                return new ArmEffect(commandEffect.WorkId, commandEffect.Judgment, PostCommit: commandEffect.PostCommit);
+            }
         }
 
         var binding = await db.CommunicationBindings.FirstOrDefaultAsync(b =>
@@ -832,7 +852,11 @@ public sealed class ProviderEventStore(
     /// recorded on the provider_events ledger, and an optional deferred steer
     /// (work, directive, expected version) the caller applies post-commit via
     /// ICoordinationStore — review steers cannot join the arm's tx.</summary>
-    internal sealed record ArmEffect(Guid? Work, string Judgment, (Guid WorkId, string Directive, long ExpectedVersion)? Steer = null);
+    internal sealed record ArmEffect(
+        Guid? Work,
+        string Judgment,
+        (Guid WorkId, string Directive, long ExpectedVersion)? Steer = null,
+        Func<IServiceProvider, Task>? PostCommit = null);
 
     // ---- helpers ------------------------------------------------------------
 
@@ -1038,6 +1062,77 @@ public sealed class ProviderEventStore(
         });
     }
 
+    /// <summary>The custom command row's payload (admin_config
+    /// <c>commands</c>), null when absent — merged over the built-ins by
+    /// every slash-plane entry point.</summary>
+    internal static async Task<JsonElement?> CommandsPayloadAsync(FacilitatorDbContext db, CancellationToken ct)
+    {
+        var payload = await db.AdminConfig.AsNoTracking()
+            .Where(c => c.Resource == "commands")
+            .Select(c => c.Payload)
+            .FirstOrDefaultAsync(ct);
+        if (payload is not { Length: > 0 } text)
+        {
+            return null;
+        }
+
+        try
+        {
+            return JsonDocument.Parse(text).RootElement.Clone();
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Queue one async decode: an internal-channel outbox row
+    /// (recipient <c>decode.kernel</c> — like <c>kernel.log</c>, an internal
+    /// payload with no wire schema, so it bypasses the command-envelope
+    /// validator; every row the sink emits back IS validator-gated). The
+    /// deterministic <c>decode:&lt;deliveryId&gt;</c> command id makes a
+    /// crash-replayed arm idempotent on the outbox unique constraint.</summary>
+    private static void AppendDecodeRow(
+        FacilitatorDbContext db, string text, Reference reference, string actor,
+        string deliveryId, Guid teamId, string replyVsReaction, DateTime now)
+    {
+        var envelope = new JsonObject
+        {
+            ["specversion"] = "1.0",
+            ["id"] = Guid.NewGuid().ToString("N"),
+            ["source"] = "urn:facilitator:kernel",
+            ["type"] = DecodeSink.RequestType,
+            ["subject"] = $"provider/{reference.Provider}/{reference.MessageId ?? deliveryId}",
+            ["time"] = now.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
+            ["datacontenttype"] = "application/json",
+            ["data"] = new JsonObject
+            {
+                ["text"] = text,
+                ["reference"] = TargetNode(TargetOf(reference)),
+                ["actorProviderAccountId"] = actor,
+                ["providerDeliveryId"] = deliveryId,
+                ["teamId"] = teamId.ToString(),
+                ["replyVsReaction"] = replyVsReaction,
+                ["workId"] = null,
+            },
+        };
+        db.Outbox.Add(new OutboxEntity
+        {
+            OutboxId = Guid.NewGuid(),
+            CommandId = $"decode:{deliveryId}",
+            RecipientEndpointId = "decode.kernel",
+            AggregateType = "work",
+            AggregateId = null,
+            EventType = DecodeSink.RequestType,
+            Envelope = envelope.ToJsonString(),
+            WorkId = null,
+            Status = "pending",
+            AvailableAt = now,
+            Attempts = 0,
+            CreatedAt = now,
+        });
+    }
+
     private static async Task<string> NotificationPreferenceAsync(FacilitatorDbContext db, CancellationToken ct)
     {
         var row = await db.AdminConfig.AsNoTracking().FirstOrDefaultAsync(c => c.Resource == "notifications", ct);
@@ -1077,7 +1172,7 @@ public sealed class ProviderEventStore(
     private static string Trim(string text) =>
         text.Length <= 2000 ? text : text[..2000];
 
-    internal sealed record Reference(string Provider, string Tenant, string Channel, string Root, string? MessageId, string Kind);
+    public sealed record Reference(string Provider, string Tenant, string Channel, string Root, string? MessageId, string Kind);
 
     internal static Reference ReferenceOf(JsonElement data, string provider)
     {

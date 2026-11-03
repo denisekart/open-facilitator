@@ -6,7 +6,8 @@
 export type FieldSpec =
   | { kind: "int"; name: string; min: number; max: number }
   | { kind: "enum"; name: string; values: string[] }
-  | { kind: "string"; name: string; min: number; max: number };
+  | { kind: "string"; name: string; min: number; max: number }
+  | { kind: "bool"; name: string };
 
 export interface ResourceSpec {
   resource: string;
@@ -47,7 +48,45 @@ export const CONFIG_RESOURCES: ResourceSpec[] = [
       { kind: "string", name: "preferTeam", min: 1, max: 128 },
     ],
   },
+  {
+    // AiDeck hot policy (absent row = AiDeck inert); secrets stay in Ai: file config.
+    resource: "llm",
+    fields: [
+      { kind: "bool", name: "enabled" },
+      { kind: "enum", name: "verbosityDefault", values: ["terse", "balanced", "proactive"] },
+      { kind: "enum", name: "replyMode", values: ["model", "template"] },
+      { kind: "string", name: "decisionEndpoint", min: 1, max: 128 },
+      { kind: "enum", name: "decisionMode", values: ["auto", "llm", "off"] },
+      { kind: "int", name: "maxOutputTokens", min: 40, max: 4000 },
+    ],
+  },
+  // Structured array resource ({commands:[...]}) — no scalar fields to render;
+  // the kernel validator owns its shape (CommandRegistry law: malformed = built-ins only).
+  {
+    resource: "commands",
+    fields: [],
+  },
 ];
+
+/** Mirror of the `llm` payload (AiDeck hot policy; absent row = inert). */
+export interface LlmConfig {
+  enabled: boolean;
+  verbosityDefault: "terse" | "balanced" | "proactive";
+  replyMode: "model" | "template";
+  decisionEndpoint?: string;
+  decisionMode: "auto" | "llm" | "off";
+  maxOutputTokens: number;
+}
+
+/** Mirror of the `commands` payload (custom slash/decode verbs merged over built-ins). */
+export interface CommandsConfig {
+  commands: {
+    verb: string;
+    description: string;
+    capabilityId?: string;
+    args?: { name: string; required: boolean }[];
+  }[];
+}
 
 /** Client-side mirror of the workload-scale min<=max rule. */
 export function localValidationError(

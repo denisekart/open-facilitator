@@ -25,11 +25,16 @@ export interface FakeForge {
   comments: FakeComment[];
   statuses: { sha: string; state: string; context: string }[];
   branches: string[];
+  /** issue key `<repo>#<n>` → label names the forge holds. */
+  labels: Map<string, string[]>;
+  reviews: { repo: string; number: number; event: string; body: string }[];
   /** When set, the NEXT pr-create POST answers 504 after creating the row. */
   loseNextPrResponse: boolean;
   /** Counts POSTs so tests prove zero-double-fire. */
   prPosts: number;
   commentPosts: number;
+  labelPosts: number;
+  reviewPosts: number;
   /** Clears rows AND sequence counters (test isolation). */
   reset(): void;
   close(): Promise<void>;
@@ -38,6 +43,7 @@ export interface FakeForge {
 export async function startFakeForge(): Promise<FakeForge> {
   let nextPr = 1;
   let nextComment = 1;
+  let nextReview = 1;
 
   const forge: FakeForge = {
     url: "",
@@ -45,19 +51,28 @@ export async function startFakeForge(): Promise<FakeForge> {
     comments: [],
     statuses: [],
     branches: ["main"],
+    labels: new Map(),
+    reviews: [],
     loseNextPrResponse: false,
     prPosts: 0,
     commentPosts: 0,
+    labelPosts: 0,
+    reviewPosts: 0,
     reset: () => {
       forge.prs.length = 0;
       forge.comments.length = 0;
       forge.statuses.length = 0;
       forge.branches.length = 1;
+      forge.labels.clear();
+      forge.reviews.length = 0;
       forge.prPosts = 0;
       forge.commentPosts = 0;
+      forge.labelPosts = 0;
+      forge.reviewPosts = 0;
       forge.loseNextPrResponse = false;
       nextPr = 1;
       nextComment = 1;
+      nextReview = 1;
     },
     close: async () => undefined,
   };
@@ -88,12 +103,60 @@ export async function startFakeForge(): Promise<FakeForge> {
 
       const repo = `${parts[3]}/${parts[4]}`;
       const rest = parts.slice(5);
-      if (rest[0] === "pulls" && req.method === "GET") {
+      if (rest[0] === "pulls" && rest[1] === undefined && req.method === "GET") {
         json(
           res,
           200,
           forge.prs.filter((pr) => pr.state === "open"),
         );
+        return;
+      }
+
+      if (
+        rest[0] === "pulls" &&
+        rest[1] !== undefined &&
+        rest[2] === undefined &&
+        req.method === "GET"
+      ) {
+        const pr = forge.prs.find((p) => p.number === Number(rest[1]));
+        if (pr === undefined) {
+          json(res, 404, { message: "no PR" });
+          return;
+        }
+
+        json(res, 200, {
+          number: pr.number,
+          state: pr.state,
+          title: pr.title,
+          merged: false,
+          head: pr.head,
+        });
+        return;
+      }
+
+      if (rest[0] === "pulls" && rest[2] === "reviews" && req.method === "POST") {
+        forge.reviewPosts += 1;
+        const input = JSON.parse(body) as { event: string; body: string };
+        forge.reviews.push({
+          repo,
+          number: Number(rest[1]),
+          event: input.event,
+          body: input.body,
+        });
+        json(res, 201, { id: nextReview, html_url: `http://fake/reviews/${String(nextReview)}` });
+        nextReview += 1;
+        return;
+      }
+
+      if (rest[0] === "issues" && rest[2] === "labels" && req.method === "POST") {
+        forge.labelPosts += 1;
+        const input = JSON.parse(body) as { labels: string[] };
+        const key = `${repo}#${String(rest[1])}`;
+        const held = forge.labels.get(key) ?? [];
+        forge.labels.set(key, [...new Set([...held, ...input.labels])]);
+        // The real route answers 205 Reset-Content.
+        res.writeHead(205);
+        res.end();
         return;
       }
 

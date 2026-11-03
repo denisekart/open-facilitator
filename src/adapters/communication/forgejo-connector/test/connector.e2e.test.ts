@@ -120,7 +120,7 @@ heartbeatSeconds: 5
         ...process.env,
         FORGEJO_URL: forge.url,
         FORGEJO_TOKEN: "bot-pat",
-        FORGEJO_ENABLE_VCS: "true",
+        FORGEJO_ENABLE_MRS: "true",
         OFAC_CHILD_SECRET: "tok",
       },
       stdio: ["ignore", "pipe", "pipe"],

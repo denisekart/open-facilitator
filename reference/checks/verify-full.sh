@@ -349,9 +349,9 @@ step_forgejo_seed() {
   forgejo_api GET /api/v1/repos/demo/widgets/issues/1 | jq -e '.title == "Seed: summarize the repository layout"' >/dev/null \
     || { step_fail "sample issue #1 missing"; full_logs forgejo-init; return 1; }
   forgejo_api GET /api/v1/repos/demo/widgets/hooks \
-    | jq -e '[.[] | select(.config.url == "http://forgejo-adapter:8067/hooks/forgejo")] | length >= 1' >/dev/null \
-    || { step_fail "no webhook registered at the adapter"; full_logs forgejo-init forgejo-adapter; return 1; }
-  step_pass "seed repo, sample issue, and adapter webhook all exist"
+    | jq -e '[.[] | select(.config.url == "http://facilitator:8080/api/ingress/webhooks/forgejo")] | length >= 1' >/dev/null \
+    || { step_fail "no webhook registered at the kernel sink"; full_logs forgejo-init forgejo-adapter; return 1; }
+  step_pass "seed repo, sample issue, and kernel-sink webhook all exist"
 }
 
 step_forgejo_issue_work() {
@@ -493,12 +493,15 @@ step_forgejo_ci_note() {
   # absent from the hook vocabulary (open feature request forgejo/forgejo
   # #9325). So the delivery is synthesized here with the shared hook secret,
   # byte-identical to the shape a 16 with #9325 will send: this proves the
-  # adapter's HMAC verify + sha→PR resolution + ci.v1 normalization and the
-  # kernel's ci arm; only Forgejo's own queueing of this one event is stubbed.
+  # kernel's sink + fan-out, the adapter's HMAC verify + sha→PR resolution +
+  # ci.v1 normalization, and the kernel's ci arm; only Forgejo's own queueing
+  # of this one event is stubbed.
   local body dlv sig
+  # the sink dedupes on sha256(rawBody), so the synthesized body carries a
+  # per-run nonce (a real provider never re-sends a byte-identical status).
   body=$(jq -cn --arg repo "demo/widgets" --arg sha "$FJ_PR_SHA" \
-    --arg who "ofac-admin" '{
-      status: "failure", sha: $sha, description: "verify ci leg",
+    --arg who "ofac-admin" --arg nonce "$(date +%s)$RANDOM" '{
+      status: "failure", sha: $sha, description: ("verify ci leg " + $nonce),
       context: "ofac/verify",
       repository: { full_name: $repo },
       sender: { login: $who }
@@ -506,7 +509,7 @@ step_forgejo_ci_note() {
   dlv=$(seed_new_uuid)
   sig=$(printf '%s' "$body" |
     openssl dgst -sha256 -hmac "$VERIFY_FORGEJO_HOOK_SECRET" -hex | awk '{print $NF}')
-  curl -fsS --max-time 10 -X POST "$VERIFY_FORGEJO_ADAPTER/hooks/forgejo" \
+  curl -fsS --max-time 10 -X POST "$VERIFY_KERNEL/api/ingress/webhooks/forgejo" \
     -H 'Content-Type: application/json' \
     -H "X-Forgejo-Delivery: $dlv" \
     -H "X-Forgejo-Event: status" \

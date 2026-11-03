@@ -2,7 +2,7 @@
 # (own sqlite ledger — per-instance idempotency, the shared bot PAT) so the
 # prRequest/PR-comment dispatch rides team-coding's gateway + policy. Env
 # overlay (config.ts): FORGEJO_URL, FORGEJO_TOKEN|FORGEJO_TOKEN_FILE,
-# FORGEJO_ENABLE_ISSUES/VCS/CI, OFAC_CHILD_SECRET, OFAC_KERNEL_URL,
+# FORGEJO_ENABLE_ISSUES/VCS/MRS/PIPELINE, OFAC_CHILD_SECRET, OFAC_KERNEL_URL,
 # OFAC_ADAPTER_LOG.
 childWorkspaceId: gw.coding/forgejo-connector
 team: team-coding

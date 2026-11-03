@@ -30,6 +30,21 @@ export const issueLabeledOther = {
   issue: { number: 1, labels: [{ id: 3, name: "bug" }] },
 };
 
+// Forgejo 16 renamed the labeling action: top-level label is null and the
+// new label rides issue.labels[] (verified live against 16.0.7).
+export const issueLabelUpdated = {
+  action: "label_updated",
+  number: 1,
+  repository: { full_name: "demo/widgets" },
+  sender: { login: "alice" },
+  label: null,
+  issue: {
+    number: 1,
+    body: "Summarize the repository layout",
+    labels: [{ id: 7, name: "ofac:work" }],
+  },
+};
+
 export const commentOnIssue = {
   action: "created",
   repository: { full_name: "demo/widgets" },
@@ -45,7 +60,10 @@ export const commentOnPr = {
   comment: { id: "11", body: "Nit: rename the retry counter." },
   issue: {
     number: 2,
-    pull_request: { url: "http://git.localhost/api/v1/repos/demo/widgets/pulls/2" },
+    pull_request: {
+      url: "http://git.localhost/api/v1/repos/demo/widgets/pulls/2",
+      head: { ref: "feature/summarizer" },
+    },
   },
 };
 
@@ -54,7 +72,12 @@ export const prOpened = {
   number: 2,
   repository: { full_name: "demo/widgets" },
   sender: { login: "alice" },
-  pull_request: { number: 2, body: "Adds the summarizer", merged: false, head: { sha: "abc123" } },
+  pull_request: {
+    number: 2,
+    body: "Adds the summarizer",
+    merged: false,
+    head: { sha: "abc123", ref: "feature/summarizer" },
+  },
 };
 
 export const prClosedMerged = {

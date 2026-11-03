@@ -54,6 +54,18 @@ class FakeApi implements ForgejoApi {
   }
 
   async createBranch(): Promise<void> {
+    /* unused */
+  }
+
+  async addLabels(): Promise<void> {
+    throw new Error("unused");
+  }
+
+  async getPullRequest(): Promise<never> {
+    throw new Error("unused");
+  }
+
+  async reviewPullRequest(): Promise<never> {
     throw new Error("unused");
   }
 }

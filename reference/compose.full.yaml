@@ -13,9 +13,10 @@ services:
       # CheckAdminPrivilege law promotes the first anonymous signup to admin.
       FORGEJO__security__INSTALL_LOCK: "true"
       # 16.x webhooks are SSRF-filtered (default allowlist: loopback only) —
-      # the hook may dial the adapter service, nothing else (verified live:
-      # every delivery denied "webhook can only call allowed HTTP servers").
-      FORGEJO__webhook__ALLOWED_HOST_LIST: forgejo-adapter
+      # the hook may dial the kernel sink, nothing else: the facilitator is
+      # the only web-exposed point, and the sink fans the verbatim delivery
+      # to the adapter over the link plane (provider-set plan 1.4).
+      FORGEJO__webhook__ALLOWED_HOST_LIST: facilitator
     volumes:
       - forgejo_data:/data
     ports:
@@ -135,7 +136,7 @@ services:
   # Bootstrap one-shot: first-admin signup (no anonymous admin-REST route on
   # 16.x — the plan's contingency: signup form while INSTALL_LOCK is set and
   # zero users exist), bot account + repo write, org/repo/label/sample-issue,
-  # webhook registration at the adapter, bot PAT published to
+  # webhook registration at the kernel sink, bot PAT published to
   # forgejo_provision (0444-atomic, mm-init law). Exits 0 when done.
   forgejo-init:
     image: ${OCI_REGISTRY:?set in versions.env}/node-runtime:${FRAMEWORK_TAG:?set in versions.env}
@@ -167,7 +168,7 @@ services:
 
   # Provider ingest adapter (Plan 23): webhook HMAC in, link-plane endpoint
   # out. /healthz published loopback for the e2e probe; the forge's webhook
-  # targets it in-network (init registers that exact URL).
+  # targets the kernel sink (init registers that exact URL, fan-out rides links).
   forgejo-adapter:
     image: ${OCI_REGISTRY:?set in versions.env}/node-runtime:${FRAMEWORK_TAG:?set in versions.env}
     command: ["node", "/app/forgejo-adapter/dist/bin/adapter.js", "run"]
@@ -210,7 +211,8 @@ services:
       FORGEJO_TOKEN_FILE: /provision/forgejo-bot-token
       FORGEJO_ENABLE_ISSUES: "true"
       FORGEJO_ENABLE_VCS: "true"
-      FORGEJO_ENABLE_CI: "true"
+      FORGEJO_ENABLE_MRS: "true"
+      FORGEJO_ENABLE_PIPELINE: "true"
     volumes:
       - workspace_state:/var/lib/ofac
       - ../features/shared/ofac-supervisor.sh:/opt/ofac/ofac-supervisor.sh:ro
@@ -249,6 +251,7 @@ services:
       FORGEJO_TOKEN_FILE: /provision/forgejo-bot-token
       FORGEJO_ENABLE_ISSUES: "true"
       FORGEJO_ENABLE_VCS: "true"
+      FORGEJO_ENABLE_MRS: "true"
     volumes:
       - coding_workspace_state:/var/lib/ofac
       - ../features/shared/ofac-supervisor.sh:/opt/ofac/ofac-supervisor.sh:ro

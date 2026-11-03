@@ -43,10 +43,8 @@ export interface AdapterConfig {
   botUser: string;
   /** SQLite state file: comment ledger (idempotency law). */
   statePath: string;
-  /** Webhook + GET /healthz listen port. */
+  /** GET /healthz listen port (the webhook edge lives on the kernel sink). */
   port: number;
-  /** Webhook route (decision 6). */
-  hookPath: string;
   logLevel: "debug" | "info" | "warn" | "error";
 }
 
@@ -121,7 +119,6 @@ export function parseEnvConfig(env: Record<string, string | undefined>): Adapter
     botUser: required(env, "FORGEJO_BOT_USER"),
     statePath: env["OFAC_STATE_PATH"] ?? "./ofac-forgejo-adapter.sqlite3",
     port,
-    hookPath: env["OFAC_HOOK_PATH"] ?? "/hooks/forgejo",
     logLevel: logLevel as AdapterConfig["logLevel"],
   };
 }

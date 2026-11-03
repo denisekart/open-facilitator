@@ -13,9 +13,8 @@ import {
   loadConnectorConfigFile,
   type ConnectorConfig,
 } from "../config.js";
-import { ActionLedger } from "../ledger.js";
+import { ActionLedger, createConnectorHooks } from "@ofac/provider-core";
 import { createOps } from "../ops.js";
-import { createConnectorHooks } from "../hooks.js";
 import { ForgejoClient } from "@ofac/forgejo-adapter";
 
 const USAGE = `forgejo-connector run --config <path.to/connector.yaml>
@@ -25,7 +24,7 @@ or 127.0.0.1 TCP), registers the flag-filtered forge op manifest, and
 executes privileged forge ops (PRs, comments, branches, commit statuses) for
 every assignment the Gateway routes. Env overlay: OFAC_CHILD_SECRET wins
 over the file's token; FORGEJO_URL + FORGEJO_TOKEN|FORGEJO_TOKEN_FILE name
-the forge + bot credential; FORGEJO_ENABLE_ISSUES/VCS/CI gate the advertised
+the forge + bot credential; FORGEJO_ENABLE_ISSUES/VCS/MRS/PIPELINE gate the
 domains; OFAC_ADAPTER_LOG sets the log level.
 Exit codes: 0 clean, 1 runtime, 2 config error, 3 register denied (auto-restart off).`;
 

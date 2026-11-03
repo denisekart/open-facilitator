@@ -20,11 +20,10 @@ credential is ever taken.
 
 | Op                                                 | Gated by                                       | Effect                                                                                               |
 | -------------------------------------------------- | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `vcs.issue.read`                                   | `FORGEJO_ENABLE_ISSUES`                        | fetch issue + labels (read-before-reconcile)                                                         |
-| `vcs.issue.comment` / `vcs.change_request.comment` | `FORGEJO_ENABLE_ISSUES` / `FORGEJO_ENABLE_VCS` | comment as the bot, ledger-keyed by `idempotencyKey`                                                 |
+| `vcs.issue.read` / `vcs.issue.comment` / `vcs.issue.label` | `FORGEJO_ENABLE_ISSUES`   | fetch issue, comment as the bot, attach labels (read-before-reconcile)                               |
 | `vcs.branch.push`                                  | `FORGEJO_ENABLE_VCS`                           | create/update a branch via raw-file refs                                                             |
-| `vcs.change_request.create`                        | `FORGEJO_ENABLE_VCS`                           | open a PR; the Gateway policy confirm-holds this class, so the approval flow supplies actor evidence |
-| `vcs.pipeline.trigger`                             | `FORGEJO_ENABLE_CI`                            | POST a commit status                                                                                 |
+| `vcs.change_request.create` / `.read` / `.comment` / `.review` | `FORGEJO_ENABLE_MRS`   | open/read/comment/review a PR; the Gateway policy confirm-holds this class, so the approval flow supplies actor evidence |
+| `vcs.pipeline.trigger`                             | `FORGEJO_ENABLE_PIPELINE`                      | POST a commit status                                                                                 |
 
 A disabled domain is invisible on the wire: the manifest omits its ops, so
 no command row can ever route to it.
@@ -43,7 +42,7 @@ exit-3 register-denied idiom).
 | `OFAC_CHILD_SECRET`                                                  | Fleet token — the Gateway's child secret, never a kernel credential |
 | `FORGEJO_URL`                                                        | Required. The forge the ops execute against                         |
 | `FORGEJO_TOKEN` or `FORGEJO_TOKEN_FILE`                              | Required. Bot PAT, direct or file's first line (0400)               |
-| `FORGEJO_ENABLE_ISSUES` / `FORGEJO_ENABLE_VCS` / `FORGEJO_ENABLE_CI` | Opt-in flags (`"true"`/`"1"`); unset domains don't advertise        |
+| `FORGEJO_ENABLE_ISSUES` / `_VCS` / `_MRS` / `_PIPELINE`                | Opt-in flags (`"true"`/`"1"`); unset domains don't advertise        |
 | `OFAC_KERNEL_URL`                                                    | Artifact-seam shape only (default `http://127.0.0.1:8080`)          |
 | `OFAC_ADAPTER_LOG`                                                   | Log level (default `info`)                                          |
 

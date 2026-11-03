@@ -7,7 +7,7 @@
 //   2. a PAT (409-reconcile: reruns mint under a fresh name).
 //   3. org `demo`, repo `<org>/widgets` with an initial README (409-reconcile).
 //   4. label `ofac:work` + a sample issue carrying it (title-keyed reconcile).
-//   5. the repo webhook → the adapter's in-network hook URL with the shared
+//   5. the repo webhook → the kernel sink's in-network URL with the shared
 //      secret (list-first: one hook only).
 //   6. write the bot token file 0444-atomic (the handoff law; the
 //      adapter/connector read FORGEJO_TOKEN_FILE).

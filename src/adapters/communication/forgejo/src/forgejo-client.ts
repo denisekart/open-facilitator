@@ -69,6 +69,27 @@ export interface ForgejoApi {
     description: string,
     context: string,
   ): Promise<void>;
+  /** Attach label NAMES to an issue (connector `vcs.issue.label`; verified
+   *  against the pinned 16.0.7 source: POST issues/{n}/labels accepts names). */
+  addLabels(repo: string, number: number, labels: readonly string[]): Promise<void>;
+  /** Read a PR (connector `vcs.change_request.read`). */
+  getPullRequest(repo: string, number: number): Promise<ForgejoPullRequestDetail>;
+  /** Submit a review (connector `vcs.change_request.review`; event is the
+   *  wire state: APPROVED | REQUEST_CHANGES | COMMENT). */
+  reviewPullRequest(
+    repo: string,
+    number: number,
+    event: string,
+    body: string,
+  ): Promise<{ id: number }>;
+}
+
+export interface ForgejoPullRequestDetail {
+  number: number;
+  state: string;
+  title: string;
+  merged: boolean;
+  head: { sha: string; ref: string };
 }
 
 interface CommentDto {
@@ -118,7 +139,8 @@ export class ForgejoClient implements ForgejoApi {
       throw new ForgejoError(call, response.status, text.slice(0, 200));
     }
 
-    if (response.status === 204) {
+    if (response.status === 204 || response.status === 205) {
+      // 205: the label-add route answers Reset-Content (pinned 16.0.7 source).
       return undefined as T;
     }
 
@@ -207,5 +229,41 @@ export class ForgejoClient implements ForgejoApi {
     );
     const hit = dtos.find((dto) => dto.body.includes(marker));
     return hit === undefined ? undefined : { id: hit.id, html_url: hit.html_url };
+  }
+
+  async addLabels(repo: string, number: number, labels: readonly string[]): Promise<void> {
+    await this.request<void>("addLabels", "POST", `/repos/${repo}/issues/${number}/labels`, {
+      labels: [...labels],
+    });
+  }
+
+  async getPullRequest(repo: string, number: number): Promise<ForgejoPullRequestDetail> {
+    const dto = await this.request<ForgejoPullRequestDetail>(
+      "getPullRequest",
+      "GET",
+      `/repos/${repo}/pulls/${number}`,
+    );
+    return {
+      number: dto.number,
+      state: dto.state,
+      title: dto.title,
+      merged: dto.merged === true,
+      head: { sha: dto.head?.sha ?? "", ref: dto.head?.ref ?? "" },
+    };
+  }
+
+  async reviewPullRequest(
+    repo: string,
+    number: number,
+    event: string,
+    body: string,
+  ): Promise<{ id: number }> {
+    const dto = await this.request<{ id: number }>(
+      "reviewPullRequest",
+      "POST",
+      `/repos/${repo}/pulls/${number}/reviews`,
+      { event, body },
+    );
+    return { id: dto.id };
   }
 }

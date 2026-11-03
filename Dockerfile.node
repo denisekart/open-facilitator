@@ -15,6 +15,7 @@ COPY src/workspace-link/package.json src/workspace-link/
 COPY src/gateway/package.json src/gateway/
 COPY src/adapters/harnesses/adapter-sdk/package.json src/adapters/harnesses/adapter-sdk/
 COPY src/adapters/harnesses/deterministic/package.json src/adapters/harnesses/deterministic/
+COPY src/adapters/provider-core/package.json src/adapters/provider-core/
 COPY src/adapters/communication/mattermost/package.json src/adapters/communication/mattermost/
 COPY src/adapters/communication/forgejo/package.json src/adapters/communication/forgejo/
 COPY src/adapters/communication/forgejo-connector/package.json src/adapters/communication/forgejo-connector/
@@ -27,6 +28,7 @@ COPY src/workspace-link/ src/workspace-link/
 COPY src/gateway/ src/gateway/
 COPY src/adapters/harnesses/adapter-sdk/ src/adapters/harnesses/adapter-sdk/
 COPY src/adapters/harnesses/deterministic/ src/adapters/harnesses/deterministic/
+COPY src/adapters/provider-core/ src/adapters/provider-core/
 COPY src/adapters/communication/mattermost/ src/adapters/communication/mattermost/
 COPY src/adapters/communication/forgejo/ src/adapters/communication/forgejo/
 COPY src/adapters/communication/forgejo-connector/ src/adapters/communication/forgejo-connector/

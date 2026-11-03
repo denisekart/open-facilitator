@@ -1,9 +1,10 @@
 # @ofac/forgejo-adapter
 
 Forgejo communication adapter: one Node process that owns both
-edges — an inbound Forgejo **webhook receiver** (`POST /hooks/forgejo`) that
-normalizes deliveries into `org.facilitator.event.provider.{issue,change_request,pipeline}.v1`
-events with `data.provider = "forgejo"`,
+edges — inbound: the kernel webhook sink (`POST /api/ingress/webhooks/forgejo`,
+the facilitator being the only web-exposed point) fans verbatim deliveries here
+as `command.provider.webhook.v1`, and this adapter verifies the HMAC and
+normalizes them into `org.facilitator.event.provider.{issue,change_request,pipeline}.v1`
 and an outbound **link** to the Facilitator kernel (enroll → capabilities →
 `communication.reply.v1` command execution → event publish). All state
 (comment ledger, idempotency) is local SQLite; the kernel sees only the link.
@@ -33,7 +34,7 @@ Exit codes: 0 clean · 1 runtime failure · 2 config error.
 | `OFAC_PROVIDER_INSTANCE_ID`             | Event reference axis (default `local-git`)                        |
 | `FORGEJO_WORK_LABELS`                   | Comma list; `labeled` ∩ set ⇒ `workTrigger` (default `ofac:work`) |
 | `OFAC_STATE_PATH`                       | SQLite path (default `./ofac-forgejo-adapter.sqlite3`)            |
-| `PORT` / `OFAC_HEALTH_PORT`             | Serves `/healthz` + `/hooks/forgejo` (default 8067)               |
+| `PORT` / `OFAC_HEALTH_PORT`             | Serves `/healthz` only (default 8067)                             |
 
 `init` adds `DEMO_FORGEJO_ADMIN_USER|PASSWORD|EMAIL`, `FORGEJO_INIT_ORG`,
 `FORGEJO_INIT_REPO`, `FORGEJO_INIT_ISSUE_TITLE`, `FORGEJO_HOOK_URL`,

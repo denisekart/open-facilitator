@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { ForgejoClient } from "@ofac/forgejo-adapter";
-import { ActionLedger, ActionLedgerConflictError } from "../src/ledger.js";
+import { ActionLedger, ActionLedgerConflictError } from "@ofac/provider-core";
 import { createOps, payloadSha256, type OpTable } from "../src/ops.js";
 import { startFakeForge, type FakeForge } from "./fake-forge.js";
 
@@ -127,6 +127,79 @@ describe("issue.read", () => {
   });
 });
 
+describe("issue.label", () => {
+  it("attaches labels once (205 accepted); replay zero second POST", async () => {
+    const result = await ops["vcs.issue.label"]!("cmd-20", {
+      repo: "demo/widgets",
+      issue: 7,
+      labels: ["ofac:work"],
+    });
+    expect(result.providerObjectId).toBe("labels demo/widgets#7:ofac:work");
+    expect(forge.labelPosts).toBe(1);
+    expect(forge.labels.get("demo/widgets#7")).toEqual(["ofac:work"]);
+
+    const replay = await ops["vcs.issue.label"]!("cmd-20", {
+      repo: "demo/widgets",
+      issue: 7,
+      labels: ["ofac:work"],
+    });
+    expect(replay.structured["replayed"]).toBe(true);
+    expect(forge.labelPosts).toBe(1);
+  });
+
+  it("an empty labels array is a validation error, no ledger row", async () => {
+    await expect(
+      ops["vcs.issue.label"]!("cmd-21", { repo: "demo/widgets", issue: 7, labels: [] }),
+    ).rejects.toThrow(/non-empty string array/);
+    expect(ledger.find("cmd-21")).toBeUndefined();
+  });
+});
+
+describe("change_request.read + review", () => {
+  it("reads a PR the forge holds (ledgered like any op)", async () => {
+    await ops["vcs.change_request.create"]!("cmd-22", prInputs);
+    const read = await ops["vcs.change_request.read"]!("cmd-23", {
+      repo: "demo/widgets",
+      issue: 1,
+    });
+    expect(read.structured["headRef"]).toBe("bot/topic");
+    expect(read.structured["state"]).toBe("open");
+    expect(ledger.find("cmd-23")?.state).toBe("executed");
+  });
+
+  it("review posts once with the wire event; replay zero second POST", async () => {
+    const result = await ops["vcs.change_request.review"]!("cmd-24", {
+      repo: "demo/widgets",
+      issue: 2,
+      event: "APPROVED",
+      body: "lgtm",
+    });
+    expect(result.providerObjectId).toBe("review 1");
+    expect(forge.reviews).toEqual([
+      { repo: "demo/widgets", number: 2, event: "APPROVED", body: "lgtm" },
+    ]);
+    const replay = await ops["vcs.change_request.review"]!("cmd-24", {
+      repo: "demo/widgets",
+      issue: 2,
+      event: "APPROVED",
+      body: "lgtm",
+    });
+    expect(replay.structured["replayed"]).toBe(true);
+    expect(forge.reviewPosts).toBe(1);
+  });
+
+  it("an unknown review event fails closed before the ledger", async () => {
+    await expect(
+      ops["vcs.change_request.review"]!("cmd-25", {
+        repo: "demo/widgets",
+        issue: 2,
+        event: "DISMISSED",
+      }),
+    ).rejects.toThrow(/APPROVED\|REQUEST_CHANGES\|COMMENT/);
+    expect(ledger.find("cmd-25")).toBeUndefined();
+  });
+});
+
 describe("vcs.branch.push", () => {
   it("creates once; a replayed command after an ambiguous timeout accepts the 409 as truth", async () => {
     const result = await ops["vcs.branch.push"]!("cmd-7", {
@@ -195,9 +268,9 @@ describe("ledger durability + input validation", () => {
   it("missing inputs fail per-op with the key named", async () => {
     await expect(
       ops["vcs.change_request.create"]!("cmd-12", { repo: "demo/widgets" }),
-    ).rejects.toThrow(/inputs\.head: required string/);
+    ).rejects.toThrow(/input 'head' required/);
     await expect(
       ops["vcs.issue.read"]!("cmd-13", { repo: "demo/widgets", issue: "x" }),
-    ).rejects.toThrow(/inputs\.issue: required positive integer/);
+    ).rejects.toThrow(/input 'issue' must be a positive integer/);
   });
 });

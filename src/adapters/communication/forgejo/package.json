@@ -30,6 +30,7 @@
   },
   "dependencies": {
     "@ofac/protocol": "workspace:*",
+    "@ofac/provider-core": "workspace:*",
     "@ofac/workspace-link": "workspace:*",
     "better-sqlite3": "catalog:"
   },

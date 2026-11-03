@@ -1,123 +1,232 @@
-// The webhook edge law (decision 6): HMAC over the RAW bytes, verified before
-// parsing, both header forms (bare hex X-Forgejo-Signature / X-Gitea-Signature
-// and the GitHub-compatible sha256=-prefixed copy); a bad or missing signature
-// answers 401 with zero processing; X-Forgejo-Delivery + X-Forgejo-Event pass
-// through untouched as the dedupe identity.
+// The webhook edge law (decision 6, fan-out form): the kernel sink rode the
+// verbatim delivery here inside a command.provider.webhook.v1; the seam
+// verifies the HMAC over the RAW bytes BEFORE any parsing — both header forms
+// (bare hex X-Forgejo-Signature / X-Gitea-Signature and the GitHub-compatible
+// sha256=-prefixed copy) — and a bad or missing signature answers
+// `bad-signature` with zero processing. X-Forgejo-Delivery + X-Forgejo-Event
+// pass through untouched as the dedupe identity. Status deliveries resolve
+// the sha→PR number through the injected API (the I/O arm).
 import { createHmac } from "node:crypto";
-import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import type { AddressInfo } from "node:net";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { readWebhookRequest, verifySignature, type WebhookVerdict } from "../src/webhook.js";
+import { describe, expect, it } from "vitest";
+import type { LinkLogger } from "@ofac/workspace-link";
+import type { WebhookDelivery } from "@ofac/provider-core/node";
+import { createForgejoNormalizer } from "../src/webhook.js";
+import type { ForgejoApi } from "../src/forgejo-client.js";
+import type { NormalizeContext } from "../src/normalize.js";
+import { issueOpened, statusFailure } from "./fixtures/payloads.js";
 
 const SECRET = "s3cret-hook";
-const BODY = JSON.stringify({
-  action: "opened",
-  number: 1,
-  repository: { full_name: "demo/widgets" },
-});
+const CTX: NormalizeContext = {
+  providerInstanceId: "local-git",
+  tenantOrOrganizationId: "git.localhost",
+  workLabels: new Set(["ofac:work"]),
+  botUser: "ofac-bot",
+};
+
+const silent: LinkLogger = {
+  debug: () => undefined,
+  info: () => undefined,
+  warn: () => undefined,
+  error: () => undefined,
+};
+
+class FakeApi implements ForgejoApi {
+  constructor(private readonly prs: number[] = [7]) {}
+  shaLookups: { repo: string; sha: string }[] = [];
+
+  async postComment(): Promise<{ id: number; html_url: string }> {
+    throw new Error("unused");
+  }
+  async openPr(): Promise<never> {
+    throw new Error("unused");
+  }
+  async prsForHeadSha(repo: string, sha: string): Promise<number[]> {
+    this.shaLookups.push({ repo, sha });
+    return this.prs;
+  }
+  async commitStatus(): Promise<void> {
+    /* unused */
+  }
+  async openPrsForHead(): Promise<number[]> {
+    throw new Error("unused");
+  }
+  async findCommentByMarker(): Promise<never> {
+    throw new Error("unused");
+  }
+  async getIssue(): Promise<never> {
+    throw new Error("unused");
+  }
+  async createBranch(): Promise<void> {
+    throw new Error("unused");
+  }
+  async addLabels(): Promise<void> {
+    throw new Error("unused");
+  }
+  async getPullRequest(): Promise<never> {
+    throw new Error("unused");
+  }
+  async reviewPullRequest(): Promise<never> {
+    throw new Error("unused");
+  }
+}
 
 function hex(body: string): string {
   return createHmac("sha256", SECRET).update(body, "utf8").digest("hex");
 }
 
-describe("verifySignature", () => {
-  it("accepts the bare-hex form (the Gitea-family gotcha: NO sha256= prefix)", () => {
-    expect(verifySignature(BODY, SECRET, hex(BODY))).toBe(true);
-  });
+function delivery(body: string, headers: Record<string, string>): WebhookDelivery {
+  return {
+    provider: "forgejo",
+    contentType: "application/json",
+    rawBody: Buffer.from(body, "utf8"),
+    headers,
+  };
+}
 
-  it("accepts the GitHub-compatible prefixed copy", () => {
-    expect(verifySignature(BODY, SECRET, `sha256=${hex(BODY)}`)).toBe(true);
-  });
+function normalizer(api: ForgejoApi | undefined) {
+  return createForgejoNormalizer({ ctx: CTX, webhookSecret: SECRET, api, logger: silent });
+}
 
-  it("rejects a tampered body, a wrong secret, and a missing header", () => {
-    expect(verifySignature(BODY + " ", SECRET, hex(BODY))).toBe(false);
-    expect(verifySignature(BODY, "other", hex(BODY))).toBe(false);
-    expect(verifySignature(BODY, SECRET, undefined)).toBe(false);
-    expect(verifySignature(BODY, SECRET, "zz")).toBe(false);
-  });
-});
+describe("createForgejoNormalizer signature law", () => {
+  const body = JSON.stringify(issueOpened);
 
-describe("readWebhookRequest (http edge)", () => {
-  let server: ReturnType<typeof createServer>;
-  let url: string;
-  const box: { verdict: WebhookVerdict | undefined } = { verdict: undefined };
-  const peek = (): WebhookVerdict | undefined => box.verdict;
-  let settled: Promise<void> = Promise.resolve();
-  let settle: () => void = () => undefined;
-
-  beforeAll(async () => {
-    server = createServer((req: IncomingMessage, res: ServerResponse) => {
-      void readWebhookRequest(req, res, SECRET).then((verdict) => {
-        box.verdict = verdict;
-        settle();
-      });
-    });
-    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-    url = `http://127.0.0.1:${(server.address() as AddressInfo).port}/hooks/forgejo`;
-  });
-
-  afterAll(() => {
-    server.close();
-  });
-  async function post(headers: Record<string, string>): Promise<number> {
-    box.verdict = undefined;
-    settled = new Promise<void>((resolve) => {
-      settle = resolve;
-    });
-    const response = await fetch(url, { method: "POST", headers, body: BODY });
-    const status = response.status;
-    // Await the helper's own verdict signal — never a guessed duration; the
-    // 4xx paths settle too, so this resolves on every branch.
-    await Promise.race([settled, new Promise((resolve) => response.arrayBuffer().then(resolve))]);
-    await settled;
-    return status;
-  }
-
-  it("verified delivery answers 202 and yields the passthrough identity", async () => {
-    const status = await post({
-      "content-type": "application/json",
-      "x-forgejo-signature": hex(BODY),
-      "x-forgejo-delivery": "d-42",
-      "x-forgejo-event": "issues",
-    });
-    expect(status).toBe(202);
-    expect(peek()).toEqual({
-      kind: "delivery",
-      deliveryId: "d-42",
-      eventKind: "issues",
-      payload: JSON.parse(BODY),
-    });
+  it("accepts the bare-hex form (the Gitea-family gotcha: NO sha256= prefix)", async () => {
+    const verdict = await normalizer(new FakeApi())(
+      delivery(body, {
+        "x-forgejo-signature": hex(body),
+        "x-forgejo-delivery": "dlv-1",
+        "x-forgejo-event": "issues",
+      }),
+    );
+    expect(verdict.kind).toBe("normalized");
+    expect(verdict.kind === "normalized" && verdict.events).toHaveLength(1);
+    expect(verdict.kind === "normalized" && verdict.events[0]?.data.providerDeliveryId).toBe(
+      "dlv-1",
+    );
   });
 
   it("the gitea-mirror headers work too", async () => {
-    const status = await post({
-      "content-type": "application/json",
-      "x-gitea-signature": hex(BODY),
-      "x-gitea-delivery": "d-43",
-      "x-gitea-event": "issue_comment",
-    });
-    expect(status).toBe(202);
-    const delivered = peek();
-    expect(delivered?.kind === "delivery" && delivered.deliveryId).toBe("d-43");
+    const verdict = await normalizer(new FakeApi())(
+      delivery(body, {
+        "x-gitea-signature": hex(body),
+        "x-gitea-delivery": "dlv-2",
+        "x-gitea-event": "issues",
+      }),
+    );
+    expect(verdict.kind === "normalized" && verdict.events[0]?.data.providerDeliveryId).toBe(
+      "dlv-2",
+    );
   });
 
-  it("bad signature answers 401, no delivery", async () => {
-    const status = await post({
-      "content-type": "application/json",
-      "x-forgejo-signature": "deadbeef",
-      "x-forgejo-delivery": "d-44",
-      "x-forgejo-event": "issues",
-    });
-    expect(status).toBe(401);
-    expect(peek()?.kind).toBe("unauthorized");
+  it("accepts the GitHub-compatible prefixed copy", async () => {
+    const verdict = await normalizer(new FakeApi())(
+      delivery(body, {
+        "x-hub-signature-256": `sha256=${hex(body)}`,
+        "x-forgejo-delivery": "dlv-3",
+        "x-forgejo-event": "issues",
+      }),
+    );
+    expect(verdict.kind).toBe("normalized");
   });
 
-  it("a missing delivery id on a verified body answers 400", async () => {
-    const status = await post({
-      "content-type": "application/json",
-      "x-forgejo-signature": hex(BODY),
-    });
-    expect(status).toBe(400);
-    expect(peek()?.kind).toBe("invalid-payload");
+  it("a tampered body, a wrong secret, and a missing header all answer bad-signature", async () => {
+    const n = normalizer(undefined);
+    expect(
+      (
+        await n(
+          delivery(body + "x", {
+            "x-forgejo-signature": hex(body),
+            "x-forgejo-delivery": "d",
+            "x-forgejo-event": "issues",
+          }),
+        )
+      ).kind,
+    ).toBe("bad-signature");
+    expect(
+      (
+        await n(
+          delivery(body, {
+            "x-forgejo-signature": "f".repeat(64),
+            "x-forgejo-delivery": "d",
+            "x-forgejo-event": "issues",
+          }),
+        )
+      ).kind,
+    ).toBe("bad-signature");
+    expect(
+      (await n(delivery(body, { "x-forgejo-delivery": "d", "x-forgejo-event": "issues" }))).kind,
+    ).toBe("bad-signature");
+  });
+
+  it("a verified delivery without the passthrough identity drops (zero events)", async () => {
+    const verdict = await normalizer(new FakeApi())(
+      delivery(body, { "x-forgejo-signature": hex(body), "x-forgejo-event": "issues" }),
+    );
+    expect(verdict).toEqual({ kind: "normalized", events: [] });
+  });
+
+  it("an unmapped event kind drops with zero events", async () => {
+    const verdict = await normalizer(new FakeApi())(
+      delivery(body, {
+        "x-forgejo-signature": hex(body),
+        "x-forgejo-delivery": "dlv-4",
+        "x-forgejo-event": "create",
+      }),
+    );
+    expect(verdict).toEqual({ kind: "normalized", events: [] });
+  });
+});
+
+describe("status arm (I/O sha resolution)", () => {
+  it("resolves the PR number through the API and normalizes pipeline.v1", async () => {
+    const api = new FakeApi([7]);
+    const body = JSON.stringify(statusFailure);
+    const verdict = await normalizer(api)(
+      delivery(body, {
+        "x-forgejo-signature": hex(body),
+        "x-forgejo-delivery": "dlv-9",
+        "x-forgejo-event": "status",
+      }),
+    );
+    expect(api.shaLookups).toEqual([{ repo: "demo/widgets", sha: "abc123" }]);
+    expect(verdict.kind === "normalized" && verdict.events).toHaveLength(1);
+    expect(verdict.kind === "normalized" && verdict.events[0]?.data.reference.rootThreadId).toBe(
+      "7",
+    );
+  });
+
+  it("an unresolvable sha drops the delivery", async () => {
+    const api = new FakeApi([]);
+    const body = JSON.stringify(statusFailure);
+    const verdict = await normalizer(api)(
+      delivery(body, {
+        "x-forgejo-signature": hex(body),
+        "x-forgejo-delivery": "dlv-10",
+        "x-forgejo-event": "status",
+      }),
+    );
+    expect(verdict).toEqual({ kind: "normalized", events: [] });
+  });
+
+  it("no bot token (api undefined): status drops, everything else normalizes", async () => {
+    const statusBody = JSON.stringify(statusFailure);
+    const drop = await normalizer(undefined)(
+      delivery(statusBody, {
+        "x-forgejo-signature": hex(statusBody),
+        "x-forgejo-delivery": "dlv-11",
+        "x-forgejo-event": "status",
+      }),
+    );
+    expect(drop).toEqual({ kind: "normalized", events: [] });
+
+    const issueBody = JSON.stringify(issueOpened);
+    const keep = await normalizer(undefined)(
+      delivery(issueBody, {
+        "x-forgejo-signature": hex(issueBody),
+        "x-forgejo-delivery": "dlv-12",
+        "x-forgejo-event": "issues",
+      }),
+    );
+    expect(keep.kind === "normalized" && keep.events).toHaveLength(1);
   });
 });

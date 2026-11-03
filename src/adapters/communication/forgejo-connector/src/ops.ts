@@ -11,84 +11,33 @@
 // and NO provider object id; a later attempt reconciles by READ before
 // touching the forge again. (Ops here fail fast on transport errors, so the
 // pending row is written first and reconciled by the retry.)
-import { createHash } from "node:crypto";
 import type { ForgejoApi } from "@ofac/forgejo-adapter";
-import type { ActionLedger } from "./ledger.js";
-
-export class OpError extends Error {
-  constructor(
-    readonly op: string,
-    message: string,
-  ) {
-    super(`${op}: ${message}`);
-    this.name = "OpError";
-  }
-}
-
-export interface OpResult {
-  /** The provider object the op touched, wire-presented (e.g. `PR demo/widgets#7`). */
-  providerObjectId: string;
-  /** Machine-readable result payload for the completed event. */
-  structured: Record<string, unknown>;
-}
-
-/** Canonical digest of the op inputs: stable key order, JSON encoding. */
-export function payloadSha256(inputs: Record<string, unknown>): string {
-  const sorted: Record<string, unknown> = {};
-  for (const key of Object.keys(inputs).sort()) {
-    sorted[key] = inputs[key];
-  }
-
-  return "sha256:" + createHash("sha256").update(JSON.stringify(sorted), "utf8").digest("hex");
-}
-
-function required(inputs: Record<string, unknown>, key: string, op: string): string {
-  const v = inputs[key];
-  if (typeof v !== "string" || v === "") throw new OpError(op, `inputs.${key}: required string`);
-  return v;
-}
-
-function requiredNumber(inputs: Record<string, unknown>, key: string, op: string): number {
-  const v = inputs[key];
-  const n = typeof v === "number" ? v : typeof v === "string" && v !== "" ? Number(v) : Number.NaN;
-  if (!Number.isInteger(n) || n <= 0)
-    throw new OpError(op, `inputs.${key}: required positive integer`);
-  return n;
-}
-
-/** The comment body stamp: the ledger idempotency marker rides in the body,
- *  so a lost response is reconcilable by READ of the forge's own truth. */
-function stampedBody(body: string, commandId: string): string {
-  return `${body}\n\n<!-- ofac-cmd:${commandId} -->`;
-}
-
-const MARKER = (commandId: string): string => `ofac-cmd:${commandId}`;
+import {
+  CMD_MARKER,
+  OpError,
+  payloadSha256,
+  replayFrom,
+  required,
+  requiredNumber,
+  stampedBody,
+  type ActionLedger,
+  type OpResult,
+  type OpRunner,
+  type OpTable,
+} from "@ofac/provider-core";
+export { CMD_MARKER, OpError, payloadSha256, type OpResult, type OpRunner, type OpTable };
+export type { ActionLedger };
 
 export interface OpDeps {
   api: ForgejoApi;
   ledger: ActionLedger;
 }
 
-export type OpRunner = (commandId: string, inputs: Record<string, unknown>) => Promise<OpResult>;
-
-/** One runner per op id; the manifest filter decides which are reachable. */
-export type OpTable = Record<string, OpRunner>;
-
 export function createOps(deps: OpDeps): OpTable {
   const { api, ledger } = deps;
-
-  /** Shared replay law: an executed row answers with the recorded id, full stop. */
-  function replay(commandId: string): OpResult | undefined {
-    const row = ledger.find(commandId);
-    if (row !== undefined && row.state === "executed" && row.providerObjectId !== null) {
-      return {
-        providerObjectId: row.providerObjectId,
-        structured: { replayed: true, providerObjectId: row.providerObjectId },
-      };
-    }
-
-    return undefined; // absent or pending: the domain proceeds (and reconciles)
-  }
+  /** Shared replay law (provider-core): an executed row answers with the
+   *  recorded id, full stop. */
+  const replay = (commandId: string): OpResult | undefined => replayFrom(ledger, commandId);
 
   const prCreate: OpRunner = async (commandId, inputs) => {
     const op = "vcs.change_request.create";
@@ -142,7 +91,7 @@ export function createOps(deps: OpDeps): OpTable {
       // Ambiguous-timeout reconcile: the forge answers whether the stamped
       // comment already exists; a lost response NEVER double-posts.
       const stamp = stampedBody(body, commandId);
-      const found = await api.findCommentByMarker(repo, number, MARKER(commandId));
+      const found = await api.findCommentByMarker(repo, number, CMD_MARKER(commandId));
       const comment = found ?? (await api.postComment(repo, number, stamp));
       const id = `comment ${comment.id}`;
       ledger.settle(commandId, id);
@@ -197,11 +146,86 @@ export function createOps(deps: OpDeps): OpTable {
     return { providerObjectId: id, structured: { repo, sha, state, context } };
   };
 
+  const issueLabel: OpRunner = async (commandId, inputs) => {
+    const op = "vcs.issue.label";
+    const repo = required(inputs, "repo", op);
+    const number = requiredNumber(inputs, "issue", op);
+    const raw = inputs["labels"];
+    if (!Array.isArray(raw) || raw.length === 0 || raw.some((l) => typeof l !== "string")) {
+      throw new OpError(op, "inputs.labels must be a non-empty string array");
+    }
+    const labels = raw as string[];
+    ledger.insert(commandId, op, payloadSha256({ repo, issue: number, labels }));
+    const cached = replay(commandId);
+    if (cached !== undefined) return cached;
+
+    // Label-add is a set-union upsert on the forge: a re-fire after an
+    // ambiguous timeout converges, so a blind retry is safe.
+    await api.addLabels(repo, number, labels);
+    const id = `labels ${repo}#${number}:${labels.join(",")}`;
+    ledger.settle(commandId, id);
+    return { providerObjectId: id, structured: { repo, issue: number, labels } };
+  };
+
+  const prRead: OpRunner = async (commandId, inputs) => {
+    const op = "vcs.change_request.read";
+    const repo = required(inputs, "repo", op);
+    const number = requiredNumber(inputs, "issue", op);
+    ledger.insert(commandId, op, payloadSha256({ repo, issue: number }));
+    const cached = replay(commandId);
+    if (cached !== undefined) return cached;
+    const dto = await api.getPullRequest(repo, number);
+    const id = `PR ${repo}#${dto.number}`;
+    ledger.settle(commandId, id);
+    return {
+      providerObjectId: id,
+      structured: {
+        repo,
+        number: dto.number,
+        state: dto.state,
+        title: dto.title,
+        merged: dto.merged,
+        headSha: dto.head.sha,
+        headRef: dto.head.ref,
+      },
+    };
+  };
+
+  const REVIEW_EVENTS: Record<string, true> = {
+    APPROVED: true,
+    REQUEST_CHANGES: true,
+    COMMENT: true,
+  };
+
+  const prReview: OpRunner = async (commandId, inputs) => {
+    const op = "vcs.change_request.review";
+    const repo = required(inputs, "repo", op);
+    const number = requiredNumber(inputs, "issue", op);
+    const event = required(inputs, "event", op);
+    if (!(event in REVIEW_EVENTS)) {
+      throw new OpError(op, `event must be APPROVED|REQUEST_CHANGES|COMMENT, got '${event}'`);
+    }
+    const body = typeof inputs["body"] === "string" ? inputs["body"] : "";
+    ledger.insert(commandId, op, payloadSha256({ repo, issue: number, event, body }));
+    const cached = replay(commandId);
+    if (cached !== undefined) return cached;
+    const review = await api.reviewPullRequest(repo, number, event, body);
+    const id = `review ${review.id}`;
+    ledger.settle(commandId, id);
+    return {
+      providerObjectId: id,
+      structured: { repo, issue: number, event, reviewId: review.id },
+    };
+  };
+
   return {
     "vcs.change_request.create": prCreate,
     "vcs.issue.read": issueRead,
     "vcs.issue.comment": makeComment(false),
+    "vcs.issue.label": issueLabel,
+    "vcs.change_request.read": prRead,
     "vcs.change_request.comment": makeComment(true),
+    "vcs.change_request.review": prReview,
     "vcs.branch.push": branchPush,
     "vcs.pipeline.trigger": ciTrigger,
   };

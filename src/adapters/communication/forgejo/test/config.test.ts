@@ -29,7 +29,6 @@ describe("parseEnvConfig", () => {
     expect(config.endpointId).toBe("forgejo-adapter");
     expect(config.workLabels).toEqual(["ofac:work"]);
     expect(config.port).toBe(8067);
-    expect(config.hookPath).toBe("/hooks/forgejo");
     expect(config.providerInstanceId).toBe("local-git");
   });
 

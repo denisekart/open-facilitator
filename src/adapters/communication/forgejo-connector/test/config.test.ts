@@ -34,7 +34,7 @@ describe("parseConnectorConfig", () => {
     expect(config.transport.socketPath).toBe(join(dir, "child.sock"));
     expect(config.statePath).toBe(join(dir, "forgejo-connector.sqlite3"));
     expect(config.heartbeatSeconds).toBe(30);
-    expect(config.flags).toEqual({ issues: false, vcs: false, ci: false });
+    expect(config.flags).toEqual({ issues: false, vcs: false, mrs: false, pipeline: false });
     expect(config.logLevel).toBe("info");
   });
 
@@ -78,17 +78,28 @@ describe("parseConnectorConfig", () => {
   });
 
   it("flags gate the manifest; no flags at all is a config-level nothing-to-advertise", () => {
-    const manifest = connectorManifest("team-alpha", { issues: true, vcs: false, ci: true });
+    const manifest = connectorManifest("team-alpha", {
+      issues: true,
+      vcs: false,
+      mrs: false,
+      pipeline: true,
+    });
     expect(manifest.capabilities.map((c) => c.id)).toEqual([
       "vcs.issue.read",
       "vcs.issue.comment",
+      "vcs.issue.label",
       "vcs.pipeline.trigger",
     ]);
-    expect(() => connectorManifest("team-alpha", { issues: false, vcs: false, ci: false })).toThrow(
-      /no op domain enabled/,
-    );
-    const all = connectorManifest("team-alpha", { issues: true, vcs: true, ci: true });
-    expect(all.capabilities).toHaveLength(6);
+    expect(() =>
+      connectorManifest("team-alpha", { issues: false, vcs: false, mrs: false, pipeline: false }),
+    ).toThrow(/no op domain enabled/);
+    const all = connectorManifest("team-alpha", {
+      issues: true,
+      vcs: true,
+      mrs: true,
+      pipeline: true,
+    });
+    expect(all.capabilities).toHaveLength(9);
     expect(all.ownerTeam).toBe("team-alpha");
   });
 });

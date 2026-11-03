@@ -6,17 +6,9 @@
 // command.communication.* execute over REST v4 under the post-ledger
 // idempotency law.
 import { createServer, type Server } from "node:http";
-import { randomBytes } from "node:crypto";
-import type { EnvelopeEvent } from "@ofac/protocol";
-import {
-  buildEvent,
-  createLinkClient,
-  enroll,
-  type LinkClient,
-  type LinkLogger,
-  type LinkTokenProvider,
-} from "@ofac/workspace-link";
-import { SignalrTransport, SqliteLedger, postCapabilities } from "@ofac/workspace-link/node";
+import type { LinkClient, LinkLogger } from "@ofac/workspace-link";
+import type { NormalizedEvent as ProviderCoreEvent } from "@ofac/provider-core";
+import { runProviderAdapter } from "@ofac/provider-core/node";
 import { deriveTenant, type AdapterConfig } from "./config.js";
 import {
   asPost,
@@ -103,53 +95,54 @@ export async function run(
   };
   const source = `urn:ofac:provider:mattermost:${tenant}`;
 
-  // ── link plane: enroll (secret mode) → capabilities → client ───────────
-  const activeToken = { value: "" };
-  const enrollSelf = async (): Promise<void> => {
-    const response = await enroll({
-      baseUrl: config.kernelUrl,
-      token: config.enrollSecret,
+  // ── link plane: the @ofac/provider-core adapter face owns enroll (secret
+  // mode, 401 re-enroll) → capabilities → SignalrTransport + SqliteLedger
+  // client wiring; mattermost has NO webhook edge (normalizeWebhook:
+  // undefined — WsListener keeps inbound trust on the bot credential).
+  // causationid rides a mutable closure: no WS/replay call site passes one
+  // today, but the parameter's behavior is preserved exactly — decorate
+  // reads it synchronously inside handle.ready's client.start, before its
+  // first await can interleave another publish.
+  let pendingCausationid: string | undefined;
+  const handle = await runProviderAdapter(
+    {
+      kernelUrl: config.kernelUrl,
+      enrollSecret: config.enrollSecret,
       endpointId: config.endpointId,
-      instanceId: `lnk-${randomBytes(8).toString("hex")}`,
-      trustMode: "isolated-executor",
-      role: "child",
       team: config.team,
-    });
-    if (response.linkToken !== undefined) activeToken.value = response.linkToken;
-  };
-  const token: LinkTokenProvider = {
-    getToken: async () => activeToken.value,
-    // 401 ⇒ rotate: re-enrollment mints a fresh token (linkd's precedent).
-    refresh: enrollSelf,
-  };
-  await enrollSelf();
-  if (activeToken.value === "") {
-    throw new Error("enrollment issued no linkToken");
-  }
-  const { digest } = await postCapabilities(communicationManifest(config.team), {
-    baseUrl: config.kernelUrl,
-    getToken: token.getToken,
-    ...(deps.fetchImpl === undefined ? {} : { fetchImpl: deps.fetchImpl }),
-  });
+      statePath: config.statePath,
+      manifest: communicationManifest(config.team),
+      normalizeWebhook: undefined,
+      handler: createAdapterHandler({ api, state, identity, logger }),
+      logger,
+      // Mattermost envelope law: the subject is the message id (else the
+      // delivery id), never the generic subjectRef. The core spreads the
+      // decorate result LAST, so this override wins.
+      decorate: (event) => {
+        const data = event.data as unknown as {
+          reference: { messageId?: string };
+          providerDeliveryId: string;
+        };
+        return {
+          subject: String(data.reference.messageId ?? data.providerDeliveryId),
+          ...(pendingCausationid === undefined ? {} : { causationid: pendingCausationid }),
+        };
+      },
+      ...(deps.fetchImpl === undefined ? {} : { fetchImpl: deps.fetchImpl }),
+    },
+    source,
+  );
 
-  const client = createLinkClient({
-    transport: new SignalrTransport({ baseUrl: config.kernelUrl, token }),
-    ledger: new SqliteLedger(config.statePath),
-    endpointId: config.endpointId,
-    capabilityManifestDigest: digest,
-    token,
-    handler: createAdapterHandler({ api, state, identity, logger }),
-    logger,
-  });
-
+  // The chat-domain data shapes (message/mention/reaction) are not members
+  // of the core's forge-domain union, so the event rides handle.publish
+  // through the widening cast; the envelope bytes are unchanged.
   const publish = async (event: NormalizedEvent, causationid?: string): Promise<void> => {
-    const env: EnvelopeEvent = buildEvent(event.type, {
-      source,
-      subject: String(event.data.reference.messageId ?? event.data.providerDeliveryId),
-      data: event.data as unknown as Record<string, unknown>,
-      ...(causationid === undefined ? {} : { causationid }),
-    });
-    await client.publishEvent(env);
+    pendingCausationid = causationid;
+    try {
+      await handle.publish(event as unknown as ProviderCoreEvent);
+    } finally {
+      pendingCausationid = undefined;
+    }
   };
 
   const normalizeCtx: NormalizeContext = {
@@ -206,8 +199,7 @@ export async function run(
 
   let health: Server | undefined;
 
-  const ready = (async () => {
-    await client.start();
+  const ready = handle.ready.then(async () => {
     // Startup replay (mention-only, per plan): posts newer than the persisted
     // cursor (else last 24h) across the bot's channels; the provider-events
     // ledger kernel-side dedupes overlaps with the live WS stream.
@@ -247,7 +239,7 @@ export async function run(
       botId: bot.id,
       kernel: config.kernelUrl,
     });
-  })();
+  });
 
   // Persist the cursor continuously: any later boot replays only after this point.
   const cursor = setInterval(() => {
@@ -255,7 +247,7 @@ export async function run(
   }, 30_000);
 
   return {
-    client,
+    client: handle.client,
     ready,
     async shutdown() {
       clearInterval(cursor);
@@ -263,7 +255,7 @@ export async function run(
       await listener.close();
       if (health !== undefined)
         await new Promise<void>((resolve) => health?.close(() => resolve()));
-      await client.stop("adapter-shutdown");
+      await handle.shutdown();
       state.close();
     },
   };

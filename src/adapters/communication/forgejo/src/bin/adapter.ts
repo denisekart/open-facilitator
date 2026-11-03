@@ -12,11 +12,11 @@ run env: OFAC_KERNEL_URL OFAC_ENROLL_SECRET OFAC_ENDPOINT_ID OFAC_TEAM
      FORGEJO_BOT_USER (required)
      OFAC_PROVIDER_INSTANCE_ID (default local-git) FORGEJO_WORK_LABELS
      (default ofac:work) OFAC_STATE_PATH (default ./ofac-forgejo-adapter.sqlite3)
-     PORT|OFAC_HEALTH_PORT (default 8067: /healthz + /hooks/forgejo) OFAC_ADAPTER_LOG
+     PORT|OFAC_HEALTH_PORT (default 8067: GET /healthz only) OFAC_ADAPTER_LOG
 init env: run env plus
      DEMO_FORGEJO_ADMIN_USER DEMO_FORGEJO_ADMIN_PASSWORD DEMO_FORGEJO_ADMIN_EMAIL
      FORGEJO_INIT_ORG (default demo) FORGEJO_INIT_REPO (default demo/widgets)
-     FORGEJO_HOOK_URL (default http://forgejo-adapter:8067/hooks/forgejo)
+     FORGEJO_HOOK_URL (default <OFAC_KERNEL_URL>/api/ingress/webhooks/forgejo)
 Exit codes: 0 clean, 1 runtime, 2 config error.`;
 
 export async function main(argv: readonly string[], env: NodeJS.ProcessEnv): Promise<number> {
@@ -62,8 +62,7 @@ export async function main(argv: readonly string[], env: NodeJS.ProcessEnv): Pro
         workLabel: config.workLabels[0] ?? "ofac:work",
         codingIssueTitle: env["FORGEJO_INIT_CODING_ISSUE_TITLE"] ?? "Seed: add a changelog entry",
         codingLabel: env["FORGEJO_INIT_CODING_LABEL"] ?? "ofac:coding",
-        hookUrl:
-          env["FORGEJO_HOOK_URL"] ?? `http://forgejo-adapter:${config.port}${config.hookPath}`,
+        hookUrl: env["FORGEJO_HOOK_URL"] ?? `${config.kernelUrl}/api/ingress/webhooks/forgejo`,
         webhookSecret: config.webhookSecret,
         botTokenFile: env["FORGEJO_TOKEN_FILE"] ?? config.statePath + ".token",
       });

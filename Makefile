@@ -1,4 +1,4 @@
-.PHONY: restore build test lint format protocol db-update compose-slim compose-full compose-down clean link-e2e gateway-e2e worker-e2e admin-e2e example-slim-up docs-check provider-e2e
+.PHONY: restore build test lint format protocol db-update compose-slim compose-full compose-down clean link-e2e gateway-e2e worker-e2e admin-e2e example-slim-up docs-check provider-e2e gitlab-up gitlab-down
 
 restore:
 	dotnet restore OpenFacilitator.slnx
@@ -96,6 +96,39 @@ compose-full:
 provider-e2e:
 	@echo "Provider E2E tier: needs the FULL stack (make compose-full) — mattermost :8065, adapter :8066, kernel :8088."
 	REF="$(CURDIR)/reference" bash reference/checks/verify-full.sh $(ARGS)
+	@echo "GitLab is on-demand, not in this set: make gitlab-up && ./reference/checks/verify-gitlab.sh"
+
+# --- On-demand GitLab CE (arm64-capable omnibus image, off by default) --------
+# Boots GitLab CE loopback on :8929 with a minimal omnibus profile
+# (prometheus/grafana/registry/alertmanager off — the arm64 WSL memory
+# contingency), waits for the web UI, then runs the idempotent API
+# bootstrap (root PAT minted in-container — recent GitLab refuses password
+# app-auth; bot user + PAT, org/project from tools/gitlab/seed/, work
+# label, sample issue, project webhook -> the kernel sink, local-target
+# allowlist on). The kernel must carry an enabled Providers__Gitlab__
+# section for the legs to PASS (see
+# src/adapters/communication/gitlab/README.md for the example lines).
+gitlab-up:
+	docker rm -f facilitator-gitlab 2>/dev/null || true
+	docker run -d --name facilitator-gitlab --shm-size=256m --memory=6g \
+	  -p 127.0.0.1:8929:8929 -p 127.0.0.1:8922:22 \
+	  -v ofac-gitlab-config:/etc/gitlab -v ofac-gitlab-logs:/var/log/gitlab \
+	  -v ofac-gitlab-data:/var/opt/gitlab \
+	  -e GITLAB_ROOT_PASSWORD="$(or $(GITLAB_ROOT_PASSWORD),0fac-Rt7Vm4Xq2Lz)" \
+	  -e GITLAB_OMNIBUS_CONFIG="external_url 'http://127.0.0.1:8929'; gitlab_rails['gitlab_shell_ssh_port']=8922; prometheus['enable']=false; alertmanager['enable']=false; registry['enable']=false; puma['worker_processes']=2; sidekiq['max_concurrency']=8" \
+	  docker.io/gitlab/gitlab-ce:latest
+	GITLAB_URL=http://127.0.0.1:8929 \
+	  GITLAB_ROOT_PASSWORD="$(or $(GITLAB_ROOT_PASSWORD),0fac-Rt7Vm4Xq2Lz)" \
+	  GITLAB_WEBHOOK_TOKEN="$(or $(GITLAB_WEBHOOK_TOKEN),ofac-hook-token)" \
+	  GITLAB_TOKEN_FILE="$(CURDIR)/.ofac-artifacts/gitlab-bot-token" \
+	  GITLAB_CONTAINER=facilitator-gitlab \
+	  bash tools/gitlab/init-gitlab.sh
+	@echo "GitLab CE on http://127.0.0.1:8929 (root pw 0fac-Rt7Vm4Xq2Lz). Legs: ./reference/checks/verify-gitlab.sh — teardown: make gitlab-down"
+
+gitlab-down:
+	docker rm -f facilitator-gitlab 2>/dev/null || true
+	docker volume rm ofac-gitlab-config ofac-gitlab-logs ofac-gitlab-data 2>/dev/null || true
+	@echo "GitLab CE container + volumes removed."
 
 compose-down:
 	cd reference && docker compose --env-file versions.env --env-file .env \

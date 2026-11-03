@@ -38,7 +38,7 @@ you touch — the nearest file wins.
 |.NET test suite|`tests/Facilitator.Tests/AGENTS.md`|
 |Reference environment inputs|`reference/AGENTS.md`|
 |Dev Container Features|`features/AGENTS.md`|
-|Communication/harness adapters|`src/adapters/AGENTS.md`|
+|Communication/harness adapters (forgejo/github/gitlab pairs on provider-core)|`src/adapters/AGENTS.md`|
 
 ## Follow the truth
 - Work request path: `src/facilitator/Kernel/Work/WorkEndpoints.cs` route

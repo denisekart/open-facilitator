@@ -8,11 +8,13 @@ an external system that feeds events in or takes messages out ⇒
 `communication/<name>/`; a workspace execution harness (runs assignments) ⇒
 `harnesses/<name>/`. Shipped: `mattermost` (facilitator-owned chat leg),
 `forgejo` + `forgejo-connector` (team-owned forge: fan-out normalizer +
-Gateway-child ops executor), `provider-core` (the shared scaffolding BOTH
-faces ride — single way to integrate a provider), `harnesses/adapter-sdk`
-(the HarnessAdapter lifecycle library), and `harnesses/deterministic` (the
-worked-example worker). `kafka` is a documented stub — a README stating its
-future role.
+Gateway-child ops executor), the same pair shape for `github{,-connector}`
+and `gitlab{,-connector}` (GitHub unit/e2e-only via an exported fake; GitLab
+additionally on-demand via `make gitlab-up` + `reference/checks/verify-gitlab.sh`),
+`provider-core` (the shared scaffolding BOTH faces ride — single way to
+integrate a provider), `harnesses/adapter-sdk` (the HarnessAdapter lifecycle
+library), and `harnesses/deterministic` (the worked-example worker).
+`kafka` remains a documented stub — a README stating its future role.
 
 ## Truth anchors
 - `../../docs/specs/open_facilitator_framework_architecture.md` —

@@ -1,0 +1,10 @@
+// Single noEmit config for src + tests + configs (tsup builds without it).
+{
+  "extends": "../../../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "lib": ["ES2024", "DOM"],
+    "types": ["node"]
+  },
+  "include": ["src", "test", "vitest.config.ts", "vitest.e2e.config.ts"]
+}

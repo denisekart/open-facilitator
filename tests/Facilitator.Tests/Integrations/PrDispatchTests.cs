@@ -367,11 +367,13 @@ public sealed class PrDispatchTests(DispatchDbFixture fixture) : IAsyncLifetime,
             ["number"] = int.Parse(number, System.Globalization.CultureInfo.InvariantCulture),
             ["labels"] = new JsonArray(new JsonObject { ["name"] = label }),
         };
+        // The adapter-normalized field: the kernel reads this, never the payload.
+        data["labels"] = new JsonArray(label);
         return doc.ToJsonString();
     }
 
     /// <summary>The change_request opened fixture rewritten for a fresh PR
-    /// whose verbatim payload carries <c>pull_request.head.ref</c>. The
+    /// carrying the normalized <c>headRef</c>. The
     /// <paramref name="actor"/> rides both actor fields (the kernel echo law
     /// keys on <c>actorProviderAccountId</c>).</summary>
     private static string OpenedEvent(string deliveryId, string repo, string number, string headRef, string actor = "alice")
@@ -389,6 +391,8 @@ public sealed class PrDispatchTests(DispatchDbFixture fixture) : IAsyncLifetime,
         var payload = data["payload"]!.AsObject();
         payload["number"] = int.Parse(number, System.Globalization.CultureInfo.InvariantCulture);
         payload["pull_request"] = new JsonObject { ["head"] = new JsonObject { ["ref"] = headRef } };
+        // The adapter-normalized field: the kernel reads this, never the payload.
+        data["headRef"] = headRef;
         return doc.ToJsonString();
     }
 }

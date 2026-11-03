@@ -11,7 +11,11 @@ namespace Facilitator.Kernel.Integrations;
 /// endpoint and reply addressing is always <c>link.&lt;that provider's
 /// EndpointId&gt;</c> — never a global singleton. Absent sections ⇒ zero routes,
 /// zero stores, provider event classes refuse with <c>unsupported</c>. The
-/// kernel boots provider-less by default.
+/// kernel boots provider-less by default; human-plane provider routes exist
+/// only when at least one section is enabled. The <c>POST /api/ingress/webhooks/{provider}</c>
+/// sink fans raw forge deliveries out to <c>link.&lt;EndpointId&gt;</c> as
+/// <c>command.provider.webhook.v1</c> rows: raw bytes + verbatim headers ride
+/// untouched, so signature verification stays provider-local in the adapter.
 /// </summary>
 public sealed class ProviderOptions
 {

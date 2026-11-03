@@ -12,8 +12,11 @@ namespace Facilitator.Kernel.Shared.Identity;
 /// The kernel-edge human-plane gate, placed after <c>UseAuthorization</c> so
 /// the resolved endpoint (route template + method) is available:
 /// <list type="bullet">
-/// <item>Outside <c>/api/*</c> and on the link surface (<c>/api/link/v1*</c>):
-/// untouched — the link plane guards itself.</item>
+/// <item>Outside <c>/api/*</c>, on the link surface (<c>/api/link/v1*</c>), and
+/// on the anonymous webhook sink (<c>POST /api/ingress/webhooks/*</c>):
+/// untouched — the link plane guards itself; the webhook sink is guarded by
+/// the provider's own signature verification (adapter-side) plus the rate
+/// limiter, since external forges cannot hold kernel principals.</item>
 /// <item>Inside <c>/api/*</c>: an authenticated OIDC principal is REQUIRED —
 /// anonymous answers 401 with the standing ProblemDetails.</item>
 /// <item>The payload is mapped through the operator's claim pointers, roles
@@ -38,7 +41,9 @@ public sealed class IngressRoleGateMiddleware(
     {
         var path = context.Request.Path;
         if (!path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase)
-            || path.StartsWithSegments("/api/link/v1", StringComparison.OrdinalIgnoreCase))
+            || path.StartsWithSegments("/api/link/v1", StringComparison.OrdinalIgnoreCase)
+            || (path.StartsWithSegments("/api/ingress/webhooks", StringComparison.OrdinalIgnoreCase)
+                && HttpMethods.IsPost(context.Request.Method)))
         {
             await next(context);
             return;

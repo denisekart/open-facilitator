@@ -44,6 +44,7 @@ app.MapIdentityApi();
 app.MapAdminApi();
 app.MapChatApi();
 app.MapProviderIdentitiesApi();
+app.MapWebhookIngressApi();
 app.MapUiConfig(builder.Configuration);
 // Embedded operator SPA: hashed assets + SPA fallback. Non-/api
 // paths ride past the role gate, so the static surface stays anonymous.

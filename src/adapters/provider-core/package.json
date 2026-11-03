@@ -1,0 +1,47 @@
+{
+  "name": "@ofac/provider-core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Provider-agnostic scaffolding for forge/provider integrations: the adapter link-plane run loop with a webhook fan-out receiver, and the connector config/ledger/manifest/hooks face. Single way to integrate: every provider adapter/connector rides this package.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./node": {
+      "types": "./dist/node.d.ts",
+      "import": "./dist/node.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/denisekart/open-facilitator.git",
+    "directory": "src/adapters/provider-core"
+  },
+  "scripts": {
+    "build": "tsup src/index.ts src/node.ts --format esm --dts --target node22 --silent",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@ofac/adapter": "workspace:*",
+    "@ofac/protocol": "workspace:*",
+    "@ofac/workspace-link": "workspace:*",
+    "better-sqlite3": "catalog:",
+    "yaml": "catalog:"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "catalog:",
+    "@types/node": "catalog:",
+    "tsup": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

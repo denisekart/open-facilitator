@@ -228,6 +228,8 @@ public sealed class SteerDeliveryTests(DispatchDbFixture fixture) : IAsyncLifeti
             ["number"] = int.Parse(number, System.Globalization.CultureInfo.InvariantCulture),
             ["labels"] = new JsonArray(new JsonObject { ["name"] = label }),
         };
+        // The adapter-normalized field: the kernel reads this, never the payload.
+        data["labels"] = new JsonArray(label);
         return doc.ToJsonString();
     }
 }

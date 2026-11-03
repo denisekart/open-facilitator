@@ -64,6 +64,10 @@ public sealed class TestDbProbe : IAsyncDisposable
         return rows.Count == 0 ? null : Assert.Single(rows);
     }
 
+    /// <summary>Recipient channels of a command's outbox rows.</summary>
+    public Task<List<string>> OutboxRecipientsByCommand(string commandId) =>
+        TextList("SELECT recipient_endpoint_id FROM facilitator.outbox WHERE command_id = $1", commandId);
+
     /// <summary>Envelope jsonb snapshots for a work's outbox rows.</summary>
     public Task<List<string>> OutboxEnvelopes(Guid workId) =>
         TextList("SELECT envelope::text FROM facilitator.outbox WHERE work_id = $1", workId);
@@ -1059,6 +1063,22 @@ public sealed class TestDbProbe : IAsyncDisposable
 
     /// <summary>The binding's Work id for one provider's conversation.</summary>
     public async Task<Guid?> BindingWorkId(string provider, string channel, string root) => (await BindingFor(provider, channel, root)).WorkId;
+
+    /// <summary>Hand-mint a communication_bindings row (branch-marker arms
+    /// need a parked <c>branch:&lt;ref&gt;</c> binding without the full
+    /// manifest-upload flow).</summary>
+    public Task SeedBinding(string provider, string channel, string root, Guid workId) =>
+        NonQuery(
+            "INSERT INTO facilitator.communication_bindings "
+            + "(binding_id, provider, channel, root_message_id, parent_message_id, work_id, idempotency_key, created_at) "
+            + "VALUES (gen_random_uuid(), $1, $2, $3, NULL, $4, 'seed:' || gen_random_uuid()::text, now())",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(provider);
+                cmd.Parameters.AddWithValue(channel);
+                cmd.Parameters.AddWithValue(root);
+                cmd.Parameters.AddWithValue(workId);
+            });
 
     /// <summary>provider_identities row for a (provider, tenant, account) triple.</summary>
     public async Task<bool> ProviderIdentityExists(string provider, string tenant, string accountId) =>

@@ -726,33 +726,16 @@ public sealed class ProviderEventStore(
         return new ArmEffect(null, $"observe:{action}");
     }
 
-    /// <summary>The PR head branch of a change-request event's verbatim
-    /// provider payload (<c>pull_request.head.ref</c>, the Gitea-family
-    /// shape; <c>head.ref</c> top-level also honored). Null when absent.</summary>
+    /// <summary>The PR head branch of a change-request event: the adapter-
+    /// normalized top-level <c>headRef</c> — the kernel never digs vendor
+    /// payload shapes. Null when absent.</summary>
     internal static string? PayloadHeadRef(JsonElement data)
     {
-        if (!data.TryGetProperty("payload", out var payload) || payload.ValueKind != JsonValueKind.Object)
-        {
-            return null;
-        }
-
-        foreach (var holder in new[] { "pull_request", "pr" })
-        {
-            if (payload.TryGetProperty(holder, out var pr) && pr.ValueKind == JsonValueKind.Object
-                && pr.TryGetProperty("head", out var head) && head.ValueKind == JsonValueKind.Object
-                && head.TryGetProperty("ref", out var reference) && reference.ValueKind == JsonValueKind.String)
-            {
-                return reference.GetString();
-            }
-        }
-
-        if (payload.TryGetProperty("head", out var top) && top.ValueKind == JsonValueKind.Object
-            && top.TryGetProperty("ref", out var topRef) && topRef.ValueKind == JsonValueKind.String)
-        {
-            return topRef.GetString();
-        }
-
-        return null;
+        return data.TryGetProperty("headRef", out var normalized)
+            && normalized.ValueKind == JsonValueKind.String
+            && normalized.GetString() is { Length: > 0 } headRef
+            ? headRef
+            : null;
     }
 
     private async Task<ArmEffect> PipelineArmAsync(
@@ -982,49 +965,24 @@ public sealed class ProviderEventStore(
             rule.Label is { Length: > 0 } label && labels.Contains(label.ToLowerInvariant()));
     }
 
-    /// <summary>The adapter forwards the provider body verbatim in
-    /// <c>data.payload</c>; label names live under top-level <c>label.name</c>,
-    /// top-level <c>labels[]</c>, and <c>issue.labels[]</c> (Gitea-family
-    /// shapes, mirroring what the forgejo adapter reads). Lowercased set.</summary>
+    /// <summary>Label set of a provider event: the adapter-normalized
+    /// top-level <c>labels[]</c> — the kernel never digs vendor payload
+    /// shapes. Lowercased set.</summary>
     internal static HashSet<string> PayloadLabels(JsonElement data)
     {
         var labels = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        if (!data.TryGetProperty("payload", out var payload) || payload.ValueKind != JsonValueKind.Object)
+        if (data.TryGetProperty("labels", out var normalized) && normalized.ValueKind == JsonValueKind.Array)
         {
-            return labels;
-        }
-
-        CollectLabelNames(labels, payload);
-        if (payload.TryGetProperty("issue", out var issue) && issue.ValueKind == JsonValueKind.Object)
-        {
-            CollectLabelNames(labels, issue);
-        }
-
-        return labels;
-    }
-
-    private static void CollectLabelNames(HashSet<string> labels, JsonElement container)
-    {
-        if (container.TryGetProperty("label", out var single)
-            && single.ValueKind == JsonValueKind.Object
-            && single.TryGetProperty("name", out var name)
-            && name.ValueKind == JsonValueKind.String)
-        {
-            labels.Add(name.GetString()!);
-        }
-
-        if (container.TryGetProperty("labels", out var array) && array.ValueKind == JsonValueKind.Array)
-        {
-            foreach (var label in array.EnumerateArray())
+            foreach (var label in normalized.EnumerateArray())
             {
-                if (label.ValueKind == JsonValueKind.Object
-                    && label.TryGetProperty("name", out var itemName)
-                    && itemName.ValueKind == JsonValueKind.String)
+                if (label.ValueKind == JsonValueKind.String && label.GetString() is { Length: > 0 } labelName)
                 {
-                    labels.Add(itemName.GetString()!);
+                    labels.Add(labelName);
                 }
             }
         }
+
+        return labels;
     }
 
     private void AppendCommand(

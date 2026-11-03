@@ -153,6 +153,15 @@ public static class KernelServiceCollection
                         Window = TimeSpan.FromMinutes(1),
                         AutoReplenishment = true,
                     }));
+            options.AddPolicy<string>("webhook", context =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "anonymous",
+                    factory: _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 120,
+                        Window = TimeSpan.FromMinutes(1),
+                        AutoReplenishment = true,
+                    }));
         });
         builder.Services.AddSingleton<LinkEnrollmentSecret>();
         builder.Services.AddSingleton<LinkEnrollmentStartupCheck>();

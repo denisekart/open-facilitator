@@ -7,10 +7,12 @@ holds execution-harness adapters. Place a new adapter by what it talks to:
 an external system that feeds events in or takes messages out ⇒
 `communication/<name>/`; a workspace execution harness (runs assignments) ⇒
 `harnesses/<name>/`. Shipped: `mattermost` (facilitator-owned chat leg),
-`forgejo` + `forgejo-connector` (team-owned forge: webhook normalizer +
-Gateway-child ops executor), `harnesses/adapter-sdk` (the HarnessAdapter
-lifecycle library), and `harnesses/deterministic` (the worked-example
-worker). `kafka` is a documented stub — a README stating its future role.
+`forgejo` + `forgejo-connector` (team-owned forge: fan-out normalizer +
+Gateway-child ops executor), `provider-core` (the shared scaffolding BOTH
+faces ride — single way to integrate a provider), `harnesses/adapter-sdk`
+(the HarnessAdapter lifecycle library), and `harnesses/deterministic` (the
+worked-example worker). `kafka` is a documented stub — a README stating its
+future role.
 
 ## Truth anchors
 - `../../docs/specs/open_facilitator_framework_architecture.md` —
@@ -20,9 +22,12 @@ worker). `kafka` is a documented stub — a README stating its future role.
 
 ## Develop here
 - One directory per adapter, under the function group it belongs to.
-- New communication adapter: one directory per provider under
-  `communication/` (pattern: `communication/mattermost` — link-plane consumer,
-  `@ofac/workspace-link` as a library); register it in `pnpm-workspace.yaml`
+- New communication adapter: one directory pair per provider under
+  `communication/` consuming `@ofac/provider-core` (adapter face
+  `runProviderAdapter` + the webhook-receiver seam; connector face config-law
+  /action-ledger/hooks/ops — provider-local code stays REST client, signature
+  scheme, vendor→domain mapping, init seeding; pattern:
+  `communication/forgejo{,-connector}`); register it in `pnpm-workspace.yaml`
   and, when it ships in the node image, in `Dockerfile.node`'s deploy list.
 - New harness adapter: copy `harnesses/deterministic` and run the conformance
   kit (`@ofac/adapter/testing`).

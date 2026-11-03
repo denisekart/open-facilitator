@@ -52,6 +52,7 @@ you touch — the nearest file wins.
   → `src/facilitator/Kernel/Shared/Persistence/LinkLedger.cs` →
   `src/facilitator/Kernel/Link/LinkDeliveryPump.cs`; receipts from both
   transports converge on `src/facilitator/Kernel/Link/LinkReceipts.cs`.
+- Provider webhook path: kernel sink `POST /api/ingress/webhooks/{provider}` (`src/facilitator/Kernel/Integrations/WebhookIngressEndpoints.cs`) → outbox `command.provider.webhook.v1` → the adapter's `@ofac/provider-core` webhook-receiver seam.
 - New endpoint: the feature's `*Endpoints.cs`. New table: entity in
   `src/facilitator/Kernel/Shared/Persistence/Entities.cs` + configuration
   under `Configurations/` + migration. New wire message type: schema in

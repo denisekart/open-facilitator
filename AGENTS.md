@@ -10,16 +10,14 @@ execution authority team-side; small adapters wrap the harnesses.
 ## Truth pointers
 - `docs/specs/` — normative for the *target* design; the code is authoritative
   for what *exists*. Check the tree before assuming a module/table exists.
-- Implementation status: `.omp/plans/IMPLEMENTATION_ROADMAP_PLAN.md` (link
-  only — never mirror its contents here).
+- Implementation status: `.omp/plans/IMPLEMENTATION_ROADMAP_PLAN.md` (link only — never mirror).
 - Wire contract: `protocol/` (schemas, fixtures, OpenAPI) — `src/protocol/AGENTS.md`.
 
 ## Commands
 - `make build` — restore + Release build (both stacks). **Zero warnings is a
   build requirement on both stacks** (`TreatWarningsAsErrors`;
   `eslint --max-warnings 0`; strict `tsconfig.base.json`).
-- `make test` — xUnit + vitest + conformance fixtures; the .NET suite has a
-  < 10 min wall budget (testcontainers Postgres).
+- `make test` — xUnit + vitest + conformance fixtures; the .NET suite has a < 10 min wall budget (testcontainers Postgres).
 - `make lint`, `make docs-check`, `pnpm -r --if-present typecheck`.
 - **Acceptance law:** the slim reference env is acceptance-required for every task and locally IS the gate (hosted ref-env CI jobs commented out, free-tier): `up slim --no-seed && referencectl verify` exits 0, from clean.
 - e2e tier: `make link-e2e` (needs Postgres at `FACILITATOR_PG`; own server per file).
@@ -39,6 +37,7 @@ you touch — the nearest file wins.
 |Reference environment inputs|`reference/AGENTS.md`|
 |Dev Container Features|`features/AGENTS.md`|
 |Communication/harness adapters (forgejo/github/gitlab pairs on provider-core)|`src/adapters/AGENTS.md`|
+|AWS reference deployment (CDK, non-prod launcher)|`examples/aws/AGENTS.md`|
 
 ## Follow the truth
 - Work request path: `src/facilitator/Kernel/Work/WorkEndpoints.cs` route

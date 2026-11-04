@@ -1,0 +1,18 @@
+// CDK app: tsc emits bin/lib to dist (cdk.json runs dist/bin/app.js); tests typecheck in place.
+// exactOptionalPropertyTypes is off package-wide: aws-cdk-lib's resource
+// interfaces carry optional members whose implementations legitimately
+// return `T | undefined` getters, so the strict-undefined rule rejects
+// every concrete->interface assignment (Bucket->IBucket, Cluster->ICluster).
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "exactOptionalPropertyTypes": false,
+    "rootDir": ".",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2024"],
+    "types": ["node"]
+  },
+  "include": ["bin", "lib", "test", "vitest.config.ts"]
+}

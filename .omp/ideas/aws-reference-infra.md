@@ -2,12 +2,12 @@ Reference infra for AWS
 
 Goal: a presentable "this is how you deploy open-facilitator on AWS"
 picture — docs + reference CDK (TypeScript) stacks, per workload, in-repo
-(e.g. `deploy/aws/`). Not a product; an opinionated, boring-defaults
+(e.g. `reference/deployment/aws/`). Not a product; an opinionated, boring-defaults
 starting point teams fork.
 
 ## Shape
 
-- Assume separate AWS accounts (AWS Organizations): a **platform account**
+- Assume separate AWS accounts (AWS Tenants within an organization): a **platform account**
   (the facilitator — one persistent kernel per the framework docs) and one
   or more **team accounts** (gateways, workspaces, connectors, harnesses).
   Trust flows one way: team accounts assume roles / hold enroll secrets;
@@ -22,7 +22,8 @@ starting point teams fork.
 
 1. **network stack** — VPC (2 AZs), private subnets + NAT, VPC endpoints
    (S3, Secrets Manager, ECR, Logs — keeps the launch-credential flow off
-   NAT), security-group baselines. Per account.
+   NAT), security-group baselines. Per account. Some teams can also have this 
+   I set up already, so either deploying the network stack or attaching to one would be good choices
 2. **data stack (platform acct)** — RDS Postgres (Multi-AZ for "real",
    single-AZ cheapest option to keep a demo tier), S3 artifacts bucket
    (the kernel's artifact-store seam is S3-compatible already → S3 native;
@@ -72,13 +73,13 @@ Provisioned-concurrency, Cognito vs corporate SSO).
 ## Open questions (for the plan)
 
 - GitHub Actions OIDC → ECR + cdk deploy (repo already ships GHA) vs
-  CodePipeline; probably GHA + `cdk deploy --require-approval broadening`.
+  CodePipeline; probably GHA + `cdk deploy --require-approval broadening`. - a: no need for cdk deploy to be included anywhere in any of the live pipelines. Make sure to outline the approach in the readme.
 - CDK in-repo language: TypeScript (matches workspace-link/adapters
-  toolchain, one pnpm workspace member under `deploy/aws/`).
+  toolchain, one pnpm workspace member under `deploy/aws/`). - a: typescript!
 - Secrets rotation story for link tokens (short-lived enrollment is the
-  protocol's answer; Secrets Manager rotation lambda may be overkill).
+  protocol's answer; Secrets Manager rotation lambda may be overkill). - a: short lived enrollment
 - Whether the reference ships an "all-in-one small" tier (Fargate + RDS
-  serverless v2 + one NAT) so a small team can run the whole platform
+  serverless v2 + one NAT) so a small team can run the whole platform - a: no, make it compatible with every usecase, focus on gitlab if we need to have a focus. Otherwise, just a reference implementation, nothing else. We never ship gitlab platform or any other platforms we interact with (we can ship a small setup for aws native OIDC solution - probably federating from another IDP)
   account cheaply — mirrors the slim profile's role.
 - Data transfer/VPC-endpoint sizing for artifact-heavy workloads.
 
@@ -86,3 +87,17 @@ Provisioned-concurrency, Cognito vs corporate SSO).
 
 - Kubernetes/EKS variant (a doc note: "EKS is a valid other answer,
   unbuilt"), multi-region, Terraform parity.
+
+
+Any tests or verifications during development should completely simulate AI - there will be no AI available during ci/development/release.
+Feel free to use services adjacent to AWS when testing and developing (localstack and similar - as long as open source and free) - no AWS credentials will be available anytime during development
+Make sure that proper documentation exists - especially the reasoning behind choosing specific services and not the alternatives.
+The implementor (after plan approval) can also install any skills or other aid necessary to properly and securely and cleanly develop the CDK solution before starting implementation.
+VPCs, IDPs and other things that make sense to exist in companies already can of course exist - keep this in mind when developing IaC - the option is either to create or reference. Databases and other solution local infractructure should always be created, never referenced.
+Try wrapping common building blocks into components instead of putting everything in a stack directly. It should be easy for the teams to adopt parts of the reference infra if needed.
+
+This is a very rough outline. Let's plan it together and refine it before making an actual plan for implementation. Ask as many questions as needed - do not assume anything - ask the question.
+
+Prefer asking more questions than less - more rounds of questions are expected, not just a single round. Let's nail down the functionality before we implement it
+
+Let's refine and build up a proper plan together.

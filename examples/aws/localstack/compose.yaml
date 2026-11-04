@@ -1,0 +1,19 @@
+# LocalStack smoke stack (local only — never CI, no AWS creds anywhere).
+# The free `localstack/localstack` image covers the deploy subset deployctl
+# asserts (EC2/VPC, S3, RDS, Secrets Manager, Cognito); ALB+WAF and ECS are
+# excluded from the smoke set (partial coverage → synth/snapshot tests only).
+# Bring-up + teardown are owned by `./deployctl smoke` (up -d … down -v).
+services:
+  localstack:
+    image: localstack/localstack:4
+    container_name: ofac-smoke-localstack
+    ports:
+      - "4566:4566" # edge
+    environment:
+      DEBUG: ""
+      AWS_DEFAULT_REGION: us-east-1
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:4566/_localstack/health | grep -q '\"S3\"'"]
+      interval: 2s
+      timeout: 5s
+      retries: 30

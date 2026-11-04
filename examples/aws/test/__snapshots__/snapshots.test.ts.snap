@@ -1,0 +1,5901 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`golden snapshots > ofac-example-data 1`] = `
+{
+  "Outputs": {
+    "ArtifactBucketName": {
+      "Description": "artifact-store bucket name",
+      "Value": {
+        "Ref": "ArtifactsD26CF9E8",
+      },
+    },
+    "ExportsOutputFnGetAttArtifactsD26CF9E8Arn33B08790": {
+      "Export": {
+        "Name": "ofac-example-data:ExportsOutputFnGetAttArtifactsD26CF9E8Arn33B08790",
+      },
+      "Value": {
+        "Fn::GetAtt": [
+          "ArtifactsD26CF9E8",
+          "Arn",
+        ],
+      },
+    },
+    "ExportsOutputFnGetAttDatabaseCluster5B53A178EndpointAddressF04326D4": {
+      "Export": {
+        "Name": "ofac-example-data:ExportsOutputFnGetAttDatabaseCluster5B53A178EndpointAddressF04326D4",
+      },
+      "Value": {
+        "Fn::GetAtt": [
+          "DatabaseCluster5B53A178",
+          "Endpoint.Address",
+        ],
+      },
+    },
+    "ExportsOutputFnGetAttDatabaseDbSg4E409684GroupIdD2249FED": {
+      "Export": {
+        "Name": "ofac-example-data:ExportsOutputFnGetAttDatabaseDbSg4E409684GroupIdD2249FED",
+      },
+      "Value": {
+        "Fn::GetAtt": [
+          "DatabaseDbSg4E409684",
+          "GroupId",
+        ],
+      },
+    },
+    "ExportsOutputRefArtifactsD26CF9E83B61D1EB": {
+      "Export": {
+        "Name": "ofac-example-data:ExportsOutputRefArtifactsD26CF9E83B61D1EB",
+      },
+      "Value": {
+        "Ref": "ArtifactsD26CF9E8",
+      },
+    },
+  },
+  "Parameters": {
+    "BootstrapVersion": {
+      "Default": "/cdk-bootstrap/hnb659fds/version",
+      "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]",
+      "Type": "AWS::SSM::Parameter::Value<String>",
+    },
+  },
+  "Resources": {
+    "ArtifactsAccessLogs4D97777C": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "AccessControl": "LogDeliveryWrite",
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256",
+              },
+            },
+          ],
+        },
+        "LifecycleConfiguration": {
+          "Rules": [
+            {
+              "ExpirationInDays": 180,
+              "Status": "Enabled",
+            },
+          ],
+        },
+        "OwnershipControls": {
+          "Rules": [
+            {
+              "ObjectOwnership": "ObjectWriter",
+            },
+          ],
+        },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true,
+        },
+        "Tags": [
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+      },
+      "Type": "AWS::S3::Bucket",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "ArtifactsAccessLogsPolicy78EDC0E2": {
+      "Properties": {
+        "Bucket": {
+          "Ref": "ArtifactsAccessLogs4D97777C",
+        },
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "s3:*",
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false",
+                },
+              },
+              "Effect": "Deny",
+              "Principal": {
+                "AWS": "*",
+              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "ArtifactsAccessLogs4D97777C",
+                    "Arn",
+                  ],
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "ArtifactsAccessLogs4D97777C",
+                          "Arn",
+                        ],
+                      },
+                      "/*",
+                    ],
+                  ],
+                },
+              ],
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+      },
+      "Type": "AWS::S3::BucketPolicy",
+    },
+    "ArtifactsD26CF9E8": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "KMSMasterKeyID": {
+                  "Fn::GetAtt": [
+                    "ArtifactsKmsKey777DAD83",
+                    "Arn",
+                  ],
+                },
+                "SSEAlgorithm": "aws:kms",
+              },
+            },
+          ],
+        },
+        "LifecycleConfiguration": {
+          "Rules": [
+            {
+              "AbortIncompleteMultipartUpload": {
+                "DaysAfterInitiation": 3,
+              },
+              "NoncurrentVersionExpiration": {
+                "NoncurrentDays": 30,
+              },
+              "Status": "Enabled",
+            },
+            {
+              "Status": "Enabled",
+              "Transitions": [
+                {
+                  "StorageClass": "STANDARD_IA",
+                  "TransitionInDays": 90,
+                },
+              ],
+            },
+          ],
+        },
+        "LoggingConfiguration": {
+          "DestinationBucketName": {
+            "Ref": "ArtifactsAccessLogs4D97777C",
+          },
+          "LogFilePrefix": "artifacts/",
+        },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true,
+        },
+        "Tags": [
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+        "VersioningConfiguration": {
+          "Status": "Enabled",
+        },
+      },
+      "Type": "AWS::S3::Bucket",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "ArtifactsKmsKey777DAD83": {
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "Description": "ofac artifact-store CMK",
+        "EnableKeyRotation": true,
+        "KeyPolicy": {
+          "Statement": [
+            {
+              "Action": "kms:*",
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition",
+                      },
+                      ":iam::111111111111:root",
+                    ],
+                  ],
+                },
+              },
+              "Resource": "*",
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "Tags": [
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+      },
+      "Type": "AWS::KMS::Key",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "ArtifactsPolicy645FC833": {
+      "Properties": {
+        "Bucket": {
+          "Ref": "ArtifactsD26CF9E8",
+        },
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "s3:*",
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false",
+                },
+              },
+              "Effect": "Deny",
+              "Principal": {
+                "AWS": "*",
+              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "ArtifactsD26CF9E8",
+                    "Arn",
+                  ],
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "ArtifactsD26CF9E8",
+                          "Arn",
+                        ],
+                      },
+                      "/*",
+                    ],
+                  ],
+                },
+              ],
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+      },
+      "Type": "AWS::S3::BucketPolicy",
+    },
+    "DatabaseCluster5B53A178": {
+      "DeletionPolicy": "Snapshot",
+      "Properties": {
+        "CopyTagsToSnapshot": true,
+        "DBClusterParameterGroupName": {
+          "Ref": "DatabaseParams4A0C7523",
+        },
+        "DBSubnetGroupName": {
+          "Ref": "DatabaseClusterSubnets5540150D",
+        },
+        "DatabaseName": "facilitator",
+        "DeletionProtection": false,
+        "EnableCloudwatchLogsExports": [
+          "postgresql",
+        ],
+        "Engine": "aurora-postgresql",
+        "EngineVersion": "17.5",
+        "KmsKeyId": {
+          "Fn::GetAtt": [
+            "DatabaseKmsKeyACD35E5E",
+            "Arn",
+          ],
+        },
+        "MasterUserPassword": {
+          "Fn::Join": [
+            "",
+            [
+              "{{resolve:secretsmanager:",
+              {
+                "Ref": "DatabaseClusterSecretD1FB634F",
+              },
+              ":SecretString:password::}}",
+            ],
+          ],
+        },
+        "MasterUsername": {
+          "Fn::Join": [
+            "",
+            [
+              "{{resolve:secretsmanager:",
+              {
+                "Ref": "DatabaseClusterSecretD1FB634F",
+              },
+              ":SecretString:username::}}",
+            ],
+          ],
+        },
+        "Port": 5432,
+        "ServerlessV2ScalingConfiguration": {
+          "MaxCapacity": 2,
+          "MinCapacity": 0.5,
+        },
+        "StorageEncrypted": true,
+        "Tags": [
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+        "VpcSecurityGroupIds": [
+          {
+            "Fn::GetAtt": [
+              "DatabaseDbSg4E409684",
+              "GroupId",
+            ],
+          },
+        ],
+      },
+      "Type": "AWS::RDS::DBCluster",
+      "UpdateReplacePolicy": "Snapshot",
+    },
+    "DatabaseClusterReader78FE9854": {
+      "DeletionPolicy": "Delete",
+      "DependsOn": [
+        "DatabaseClusterWriterD43085C6",
+      ],
+      "Properties": {
+        "DBClusterIdentifier": {
+          "Ref": "DatabaseCluster5B53A178",
+        },
+        "DBInstanceClass": "db.serverless",
+        "Engine": "aurora-postgresql",
+        "PromotionTier": 2,
+        "PubliclyAccessible": false,
+        "Tags": [
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+      },
+      "Type": "AWS::RDS::DBInstance",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "DatabaseClusterSecretAttachmentDC8466C0": {
+      "Properties": {
+        "SecretId": {
+          "Ref": "DatabaseClusterSecretD1FB634F",
+        },
+        "TargetId": {
+          "Ref": "DatabaseCluster5B53A178",
+        },
+        "TargetType": "AWS::RDS::DBCluster",
+      },
+      "Type": "AWS::SecretsManager::SecretTargetAttachment",
+    },
+    "DatabaseClusterSecretD1FB634F": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "Description": {
+          "Fn::Join": [
+            "",
+            [
+              "Generated by the CDK for stack: ",
+              {
+                "Ref": "AWS::StackName",
+              },
+            ],
+          ],
+        },
+        "GenerateSecretString": {
+          "ExcludeCharacters": " %+~\`#$&*()|[]{}:;<>?!'/@"\\",
+          "GenerateStringKey": "password",
+          "PasswordLength": 30,
+          "SecretStringTemplate": "{"username":"facilitator"}",
+        },
+        "KmsKeyId": {
+          "Fn::GetAtt": [
+            "DatabaseKmsKeyACD35E5E",
+            "Arn",
+          ],
+        },
+        "Name": "facilitator/example-db",
+        "Tags": [
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+      },
+      "Type": "AWS::SecretsManager::Secret",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "DatabaseClusterSubnets5540150D": {
+      "Properties": {
+        "DBSubnetGroupDescription": "Subnets for Cluster database",
+        "SubnetIds": [
+          {
+            "Fn::ImportValue": "ofac-example-network:ExportsOutputRefVpcCreatedPrivateSubnet1Subnet7643CE4890940587",
+          },
+          {
+            "Fn::ImportValue": "ofac-example-network:ExportsOutputRefVpcCreatedPrivateSubnet2SubnetA311D4C147C0897F",
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+      },
+      "Type": "AWS::RDS::DBSubnetGroup",
+    },
+    "DatabaseClusterWriterD43085C6": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "DBClusterIdentifier": {
+          "Ref": "DatabaseCluster5B53A178",
+        },
+        "DBInstanceClass": "db.serverless",
+        "Engine": "aurora-postgresql",
+        "PromotionTier": 0,
+        "PubliclyAccessible": false,
+        "Tags": [
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+      },
+      "Type": "AWS::RDS::DBInstance",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "DatabaseDbSg4E409684": {
+      "Properties": {
+        "GroupDescription": "ofac RDS: 5432 admitted by a kernel-stack-owned rule",
+        "SecurityGroupEgress": [
+          {
+            "CidrIp": "255.255.255.255/32",
+            "Description": "Disallow all traffic",
+            "FromPort": 252,
+            "IpProtocol": "icmp",
+            "ToPort": 86,
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+        "VpcId": {
+          "Fn::ImportValue": "ofac-example-network:ExportsOutputRefVpcCreatedD03360A5C9BB017F",
+        },
+      },
+      "Type": "AWS::EC2::SecurityGroup",
+    },
+    "DatabaseKmsKeyACD35E5E": {
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "Description": "ofac RDS storage + master-secret CMK",
+        "EnableKeyRotation": true,
+        "KeyPolicy": {
+          "Statement": [
+            {
+              "Action": "kms:*",
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition",
+                      },
+                      ":iam::111111111111:root",
+                    ],
+                  ],
+                },
+              },
+              "Resource": "*",
+            },
+            {
+              "Action": [
+                "kms:Decrypt",
+                "kms:Encrypt",
+                "kms:ReEncrypt*",
+                "kms:GenerateDataKey*",
+              ],
+              "Condition": {
+                "StringEquals": {
+                  "kms:ViaService": "secretsmanager.eu-west-1.amazonaws.com",
+                },
+              },
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition",
+                      },
+                      ":iam::111111111111:root",
+                    ],
+                  ],
+                },
+              },
+              "Resource": "*",
+            },
+            {
+              "Action": [
+                "kms:CreateGrant",
+                "kms:DescribeKey",
+              ],
+              "Condition": {
+                "StringEquals": {
+                  "kms:ViaService": "secretsmanager.eu-west-1.amazonaws.com",
+                },
+              },
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition",
+                      },
+                      ":iam::111111111111:root",
+                    ],
+                  ],
+                },
+              },
+              "Resource": "*",
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "Tags": [
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+      },
+      "Type": "AWS::KMS::Key",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "DatabaseParams4A0C7523": {
+      "Properties": {
+        "Description": "Cluster parameter group for aurora-postgresql17",
+        "Family": "aurora-postgresql17",
+        "Parameters": {
+          "rds.force_ssl": "1",
+        },
+        "Tags": [
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+      },
+      "Type": "AWS::RDS::DBClusterParameterGroup",
+    },
+  },
+  "Rules": {
+    "CheckBootstrapVersion": {
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Not": [
+              {
+                "Fn::Contains": [
+                  [
+                    "1",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                  ],
+                  {
+                    "Ref": "BootstrapVersion",
+                  },
+                ],
+              },
+            ],
+          },
+          "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI.",
+        },
+      ],
+    },
+  },
+}
+`;
+
+exports[`golden snapshots > ofac-example-identity 1`] = `
+{
+  "Outputs": {
+    "ExportsOutputFnGetAttIdentityPool9E5AED46Arn39C43825": {
+      "Export": {
+        "Name": "ofac-example-identity:ExportsOutputFnGetAttIdentityPool9E5AED46Arn39C43825",
+      },
+      "Value": {
+        "Fn::GetAtt": [
+          "IdentityPool9E5AED46",
+          "Arn",
+        ],
+      },
+    },
+    "ExportsOutputRefIdentityApiClientDD59074527BBA291": {
+      "Export": {
+        "Name": "ofac-example-identity:ExportsOutputRefIdentityApiClientDD59074527BBA291",
+      },
+      "Value": {
+        "Ref": "IdentityApiClientDD590745",
+      },
+    },
+    "ExportsOutputRefIdentityPool9E5AED46E896D158": {
+      "Export": {
+        "Name": "ofac-example-identity:ExportsOutputRefIdentityPool9E5AED46E896D158",
+      },
+      "Value": {
+        "Ref": "IdentityPool9E5AED46",
+      },
+    },
+    "OidcIssuer": {
+      "Description": "OIDC issuer (byte-match for identity:oidc:authority)",
+      "Value": {
+        "Fn::Join": [
+          "",
+          [
+            "https://cognito-idp.eu-west-1.amazonaws.com/",
+            {
+              "Ref": "IdentityPool9E5AED46",
+            },
+          ],
+        ],
+      },
+    },
+    "SpaClientId": {
+      "Description": "SPA (PKCE) client id for the operator UI",
+      "Value": {
+        "Ref": "IdentityApiClientDD590745",
+      },
+    },
+  },
+  "Parameters": {
+    "BootstrapVersion": {
+      "Default": "/cdk-bootstrap/hnb659fds/version",
+      "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]",
+      "Type": "AWS::SSM::Parameter::Value<String>",
+    },
+  },
+  "Resources": {
+    "IdentityApiClientDD590745": {
+      "Properties": {
+        "AccessTokenValidity": 60,
+        "AllowedOAuthFlows": [
+          "code",
+        ],
+        "AllowedOAuthFlowsUserPoolClient": true,
+        "AllowedOAuthScopes": [
+          "openid",
+          "email",
+          "profile",
+        ],
+        "CallbackURLs": [
+          "https://kernel.example.org/",
+        ],
+        "ClientName": "facilitator-api",
+        "GenerateSecret": false,
+        "IdTokenValidity": 60,
+        "LogoutURLs": [
+          "https://kernel.example.org/",
+        ],
+        "PreventUserExistenceErrors": "ENABLED",
+        "SupportedIdentityProviders": [
+          "COGNITO",
+        ],
+        "TokenValidityUnits": {
+          "AccessToken": "minutes",
+          "IdToken": "minutes",
+        },
+        "UserPoolId": {
+          "Ref": "IdentityPool9E5AED46",
+        },
+      },
+      "Type": "AWS::Cognito::UserPoolClient",
+    },
+    "IdentityCliClient18E70D0F": {
+      "Properties": {
+        "AllowedOAuthFlows": [
+          "client_credentials",
+        ],
+        "AllowedOAuthFlowsUserPoolClient": true,
+        "AllowedOAuthScopes": [
+          "openid",
+        ],
+        "ClientName": "facilitator-cli",
+        "GenerateSecret": true,
+        "PreventUserExistenceErrors": "ENABLED",
+        "SupportedIdentityProviders": [
+          "COGNITO",
+        ],
+        "UserPoolId": {
+          "Ref": "IdentityPool9E5AED46",
+        },
+      },
+      "Type": "AWS::Cognito::UserPoolClient",
+    },
+    "IdentityDomain7439B6B7": {
+      "Properties": {
+        "Domain": "example-kernel",
+        "UserPoolId": {
+          "Ref": "IdentityPool9E5AED46",
+        },
+      },
+      "Type": "AWS::Cognito::UserPoolDomain",
+    },
+    "IdentityPool9E5AED46": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "AccountRecoverySetting": {
+          "RecoveryMechanisms": [
+            {
+              "Name": "verified_phone_number",
+              "Priority": 1,
+            },
+            {
+              "Name": "verified_email",
+              "Priority": 2,
+            },
+          ],
+        },
+        "AdminCreateUserConfig": {
+          "AllowAdminCreateUserOnly": true,
+        },
+        "EmailVerificationMessage": "The verification code to your new account is {####}",
+        "EmailVerificationSubject": "Verify your new account",
+        "EnabledMfas": [
+          "SMS_MFA",
+        ],
+        "MfaConfiguration": "OPTIONAL",
+        "Policies": {
+          "PasswordPolicy": {
+            "MinimumLength": 12,
+            "RequireLowercase": true,
+            "RequireNumbers": true,
+            "RequireSymbols": true,
+            "RequireUppercase": true,
+            "TemporaryPasswordValidityDays": 3,
+          },
+        },
+        "SmsConfiguration": {
+          "ExternalId": "ofacexampleidentityIdentityPoolA020AD2D",
+          "SnsCallerArn": {
+            "Fn::GetAtt": [
+              "IdentityPoolsmsRole4806C945",
+              "Arn",
+            ],
+          },
+        },
+        "SmsVerificationMessage": "The verification code to your new account is {####}",
+        "UserPoolName": "facilitator",
+        "UserPoolTags": {
+          "ofac:env": "example",
+          "ofac:role": "platform",
+        },
+        "UsernameConfiguration": {
+          "CaseSensitive": false,
+        },
+        "VerificationMessageTemplate": {
+          "DefaultEmailOption": "CONFIRM_WITH_CODE",
+          "EmailMessage": "The verification code to your new account is {####}",
+          "EmailSubject": "Verify your new account",
+          "SmsMessage": "The verification code to your new account is {####}",
+        },
+      },
+      "Type": "AWS::Cognito::UserPool",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "IdentityPoolsmsRole4806C945": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Condition": {
+                "StringEquals": {
+                  "sts:ExternalId": "ofacexampleidentityIdentityPoolA020AD2D",
+                },
+              },
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "cognito-idp.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "Policies": [
+          {
+            "PolicyDocument": {
+              "Statement": [
+                {
+                  "Action": "sns:Publish",
+                  "Effect": "Allow",
+                  "Resource": "*",
+                },
+              ],
+              "Version": "2012-10-17",
+            },
+            "PolicyName": "sns-publish",
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+  },
+  "Rules": {
+    "CheckBootstrapVersion": {
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Not": [
+              {
+                "Fn::Contains": [
+                  [
+                    "1",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                  ],
+                  {
+                    "Ref": "BootstrapVersion",
+                  },
+                ],
+              },
+            ],
+          },
+          "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI.",
+        },
+      ],
+    },
+  },
+}
+`;
+
+exports[`golden snapshots > ofac-example-kernel 1`] = `
+{
+  "Outputs": {
+    "ExportsOutputRefWebFaceAlb371BA2D271670875": {
+      "Export": {
+        "Name": "ofac-example-kernel:ExportsOutputRefWebFaceAlb371BA2D271670875",
+      },
+      "Value": {
+        "Ref": "WebFaceAlb371BA2D2",
+      },
+    },
+  },
+  "Parameters": {
+    "BootstrapVersion": {
+      "Default": "/cdk-bootstrap/hnb659fds/version",
+      "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]",
+      "Type": "AWS::SSM::Parameter::Value<String>",
+    },
+  },
+  "Resources": {
+    "ClusterC2E21B66": {
+      "Properties": {
+        "Tags": [
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+      },
+      "Type": "AWS::ECS::Cluster",
+    },
+    "DbIngress": {
+      "Properties": {
+        "Description": "kernel tasks -> RDS 5432",
+        "FromPort": 5432,
+        "GroupId": {
+          "Fn::ImportValue": "ofac-example-data:ExportsOutputFnGetAttDatabaseDbSg4E409684GroupIdD2249FED",
+        },
+        "IpProtocol": "tcp",
+        "SourceSecurityGroupId": {
+          "Fn::GetAtt": [
+            "KernelServiceSg2511D412",
+            "GroupId",
+          ],
+        },
+        "ToPort": 5432,
+      },
+      "Type": "AWS::EC2::SecurityGroupIngress",
+    },
+    "KernelAdotLogsF20FB819": {
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "LogGroupName": "/ofac/ofac-example-kernel/adot",
+        "RetentionInDays": 731,
+        "Tags": [
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+      },
+      "Type": "AWS::Logs::LogGroup",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "KernelArtifactsPolicy3997F887": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "s3:GetObject",
+                "s3:PutObject",
+                "s3:DeleteObject",
+                "s3:ListBucket",
+                "s3:AbortMultipartUpload",
+                "s3:CopyObject",
+              ],
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::ImportValue": "ofac-example-data:ExportsOutputFnGetAttArtifactsD26CF9E8Arn33B08790",
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::ImportValue": "ofac-example-data:ExportsOutputFnGetAttArtifactsD26CF9E8Arn33B08790",
+                      },
+                      "/*",
+                    ],
+                  ],
+                },
+              ],
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "KernelArtifactsPolicy3997F887",
+        "Roles": [
+          {
+            "Ref": "KernelTaskDefTaskRole435874EB",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "KernelDbSecretPolicy3C7F0308": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "secretsmanager:GetSecretValue",
+              "Effect": "Allow",
+              "Resource": "arn:aws:secretsmanager:eu-west-1:111111111111:secret:facilitator/example-db-*",
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "KernelDbSecretPolicy3C7F0308",
+        "Roles": [
+          {
+            "Ref": "KernelTaskDefTaskRole435874EB",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "KernelLogs376EF984": {
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "LogGroupName": "/ofac/ofac-example-kernel/kernel",
+        "RetentionInDays": 731,
+        "Tags": [
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+      },
+      "Type": "AWS::Logs::LogGroup",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "KernelService16D17CD2": {
+      "DependsOn": [
+        "KernelTaskDefTaskRoleDefaultPolicyE5F063B8",
+        "KernelTaskDefTaskRole435874EB",
+        "WebFaceAlbHttpsAdminRuleRule69A88508",
+        "WebFaceAlbHttpsLinkRuleRule0F770839",
+        "WebFaceAlbHttpsB6D1EA33",
+        "WebFaceAlbHttpsWebhookRuleRule33987D72",
+      ],
+      "Properties": {
+        "Cluster": {
+          "Ref": "ClusterC2E21B66",
+        },
+        "DeploymentConfiguration": {
+          "Alarms": {
+            "AlarmNames": [],
+            "Enable": false,
+            "Rollback": false,
+          },
+          "DeploymentCircuitBreaker": {
+            "Enable": true,
+            "Rollback": true,
+          },
+          "MaximumPercent": 200,
+          "MinimumHealthyPercent": 50,
+        },
+        "DeploymentController": {
+          "Type": "ECS",
+        },
+        "DesiredCount": 2,
+        "EnableECSManagedTags": false,
+        "HealthCheckGracePeriodSeconds": 120,
+        "LaunchType": "FARGATE",
+        "LoadBalancers": [
+          {
+            "ContainerName": "kernel",
+            "ContainerPort": 8080,
+            "TargetGroupArn": {
+              "Ref": "KernelTg38E08C0D",
+            },
+          },
+        ],
+        "NetworkConfiguration": {
+          "AwsvpcConfiguration": {
+            "AssignPublicIp": "DISABLED",
+            "SecurityGroups": [
+              {
+                "Fn::GetAtt": [
+                  "KernelServiceSg2511D412",
+                  "GroupId",
+                ],
+              },
+            ],
+            "Subnets": [
+              {
+                "Fn::ImportValue": "ofac-example-network:ExportsOutputRefVpcCreatedPrivateSubnet1Subnet7643CE4890940587",
+              },
+              {
+                "Fn::ImportValue": "ofac-example-network:ExportsOutputRefVpcCreatedPrivateSubnet2SubnetA311D4C147C0897F",
+              },
+            ],
+          },
+        },
+        "PlatformVersion": "LATEST",
+        "Tags": [
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "kernel",
+          },
+        ],
+        "TaskDefinition": {
+          "Ref": "KernelTaskDefEBD09CE8",
+        },
+      },
+      "Type": "AWS::ECS::Service",
+    },
+    "KernelServiceSg2511D412": {
+      "Properties": {
+        "GroupDescription": "ofac kernel: ingress from the ALB only",
+        "SecurityGroupEgress": [
+          {
+            "CidrIp": "0.0.0.0/0",
+            "Description": "Allow all outbound traffic by default",
+            "IpProtocol": "-1",
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+        "VpcId": {
+          "Fn::ImportValue": "ofac-example-network:ExportsOutputRefVpcCreatedD03360A5C9BB017F",
+        },
+      },
+      "Type": "AWS::EC2::SecurityGroup",
+    },
+    "KernelServiceSgfromofacexamplekernelWebFaceSg7C40CCC68080162A8352": {
+      "Properties": {
+        "Description": "Load balancer to target",
+        "FromPort": 8080,
+        "GroupId": {
+          "Fn::GetAtt": [
+            "KernelServiceSg2511D412",
+            "GroupId",
+          ],
+        },
+        "IpProtocol": "tcp",
+        "SourceSecurityGroupId": {
+          "Fn::GetAtt": [
+            "WebFaceSgFCD2D953",
+            "GroupId",
+          ],
+        },
+        "ToPort": 8080,
+      },
+      "Type": "AWS::EC2::SecurityGroupIngress",
+    },
+    "KernelServiceTaskCountTarget453E7E0A": {
+      "DependsOn": [
+        "KernelTaskDefTaskRoleDefaultPolicyE5F063B8",
+        "KernelTaskDefTaskRole435874EB",
+      ],
+      "Properties": {
+        "MaxCapacity": 6,
+        "MinCapacity": 2,
+        "ResourceId": {
+          "Fn::Join": [
+            "",
+            [
+              "service/",
+              {
+                "Ref": "ClusterC2E21B66",
+              },
+              "/",
+              {
+                "Fn::GetAtt": [
+                  "KernelService16D17CD2",
+                  "Name",
+                ],
+              },
+            ],
+          ],
+        },
+        "RoleARN": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":iam::111111111111:role/aws-service-role/ecs.application-autoscaling.amazonaws.com/AWSServiceRoleForApplicationAutoScaling_ECSService",
+            ],
+          ],
+        },
+        "ScalableDimension": "ecs:service:DesiredCount",
+        "ServiceNamespace": "ecs",
+        "Tags": [
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "kernel",
+          },
+        ],
+      },
+      "Type": "AWS::ApplicationAutoScaling::ScalableTarget",
+    },
+    "KernelServiceTaskCountTargetCpu8CCCFEE5": {
+      "DependsOn": [
+        "KernelTaskDefTaskRoleDefaultPolicyE5F063B8",
+        "KernelTaskDefTaskRole435874EB",
+      ],
+      "Properties": {
+        "PolicyName": "ofacexamplekernelKernelServiceTaskCountTargetCpu787EA825",
+        "PolicyType": "TargetTrackingScaling",
+        "ScalingTargetId": {
+          "Ref": "KernelServiceTaskCountTarget453E7E0A",
+        },
+        "TargetTrackingScalingPolicyConfiguration": {
+          "PredefinedMetricSpecification": {
+            "PredefinedMetricType": "ECSServiceAverageCPUUtilization",
+          },
+          "TargetValue": 60,
+        },
+      },
+      "Type": "AWS::ApplicationAutoScaling::ScalingPolicy",
+    },
+    "KernelServiceTaskCountTargetMemory3F4CE7B0": {
+      "DependsOn": [
+        "KernelTaskDefTaskRoleDefaultPolicyE5F063B8",
+        "KernelTaskDefTaskRole435874EB",
+      ],
+      "Properties": {
+        "PolicyName": "ofacexamplekernelKernelServiceTaskCountTargetMemoryF9ECE104",
+        "PolicyType": "TargetTrackingScaling",
+        "ScalingTargetId": {
+          "Ref": "KernelServiceTaskCountTarget453E7E0A",
+        },
+        "TargetTrackingScalingPolicyConfiguration": {
+          "PredefinedMetricSpecification": {
+            "PredefinedMetricType": "ECSServiceAverageMemoryUtilization",
+          },
+          "TargetValue": 60,
+        },
+      },
+      "Type": "AWS::ApplicationAutoScaling::ScalingPolicy",
+    },
+    "KernelTaskDefEBD09CE8": {
+      "Properties": {
+        "ContainerDefinitions": [
+          {
+            "Environment": [
+              {
+                "Name": "Storage__Provider",
+                "Value": "s3",
+              },
+              {
+                "Name": "Storage__S3__Endpoint",
+                "Value": "https://s3.eu-west-1.amazonaws.com",
+              },
+              {
+                "Name": "Storage__S3__Bucket",
+                "Value": {
+                  "Fn::ImportValue": "ofac-example-data:ExportsOutputRefArtifactsD26CF9E83B61D1EB",
+                },
+              },
+              {
+                "Name": "Storage__S3__Region",
+                "Value": "eu-west-1",
+              },
+              {
+                "Name": "Storage__S3__ForcePathStyle",
+                "Value": "false",
+              },
+              {
+                "Name": "Link__HeartbeatSeconds",
+                "Value": "5",
+              },
+              {
+                "Name": "Otel__Endpoint",
+                "Value": "http://127.0.0.1:4318",
+              },
+              {
+                "Name": "OTEL_EXPORTER_OTLP_ENDPOINT",
+                "Value": "http://127.0.0.1:4318",
+              },
+              {
+                "Name": "OTEL_EXPORTER_OTLP_PROTOCOL",
+                "Value": "http/protobuf",
+              },
+              {
+                "Name": "OTEL_SERVICE_NAME",
+                "Value": "facilitator",
+              },
+              {
+                "Name": "identity__oidc__authority",
+                "Value": {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "https://cognito-idp.eu-west-1.amazonaws.com/",
+                      {
+                        "Fn::ImportValue": "ofac-example-identity:ExportsOutputRefIdentityPool9E5AED46E896D158",
+                      },
+                    ],
+                  ],
+                },
+              },
+              {
+                "Name": "identity__oidc__audience",
+                "Value": "facilitator-api",
+              },
+              {
+                "Name": "identity__oidc__requireHttps",
+                "Value": "true",
+              },
+              {
+                "Name": "ui__oidcAuthority",
+                "Value": {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "https://cognito-idp.eu-west-1.amazonaws.com/",
+                      {
+                        "Fn::ImportValue": "ofac-example-identity:ExportsOutputRefIdentityPool9E5AED46E896D158",
+                      },
+                    ],
+                  ],
+                },
+              },
+              {
+                "Name": "ui__oidcClientId",
+                "Value": {
+                  "Fn::ImportValue": "ofac-example-identity:ExportsOutputRefIdentityApiClientDD59074527BBA291",
+                },
+              },
+              {
+                "Name": "ConnectionStrings__Facilitator",
+                "Value": {
+                  "Fn::Sub": [
+                    "Host=\${Host};Database=facilitator;Username=facilitator;Password={{resolve:secretsmanager:\${Name}:SecretString:password}}",
+                    {
+                      "Host": {
+                        "Fn::ImportValue": "ofac-example-data:ExportsOutputFnGetAttDatabaseCluster5B53A178EndpointAddressF04326D4",
+                      },
+                      "Name": "facilitator/example-db",
+                    },
+                  ],
+                },
+              },
+            ],
+            "Essential": true,
+            "HealthCheck": {
+              "Command": [
+                "CMD-SHELL",
+                "curl -fsS http://127.0.0.1:8080/health || exit 1",
+              ],
+              "Interval": 30,
+              "Retries": 3,
+              "StartPeriod": 60,
+              "Timeout": 5,
+            },
+            "Image": "ghcr.io/denisekart/open-facilitator/kernel@sha256:0000000000000000000000000000000000000000000000000000000000000000",
+            "LogConfiguration": {
+              "LogDriver": "awslogs",
+              "Options": {
+                "awslogs-group": {
+                  "Ref": "KernelLogs376EF984",
+                },
+                "awslogs-region": "eu-west-1",
+                "awslogs-stream-prefix": "kernel",
+              },
+            },
+            "Name": "kernel",
+            "PortMappings": [
+              {
+                "ContainerPort": 8080,
+                "Protocol": "tcp",
+              },
+            ],
+          },
+          {
+            "Command": [
+              "--config=env:ADOT_CONFIG",
+            ],
+            "Environment": [
+              {
+                "Name": "ADOT_CONFIG",
+                "Value": "{"receivers":{"otlp":{"protocols":{"grpc":{"endpoint":"0.0.0.0:4317"},"http":{"endpoint":"0.0.0.0:4318"}}}},"processors":{"batch":{}},"exporters":{"awsemf":{"namespace":"\${env:ADOT_NAMESPACE}"},"awsxray":{},"debug":{}},"service":{"pipelines":{"metrics":{"receivers":["otlp"],"processors":["batch"],"exporters":["awsemf"]},"traces":{"receivers":["otlp"],"processors":["batch"],"exporters":["awsxray"]},"logs":{"receivers":["otlp"],"processors":["batch"],"exporters":["debug"]}}}}",
+              },
+              {
+                "Name": "ADOT_NAMESPACE",
+                "Value": "facilitator",
+              },
+            ],
+            "Essential": true,
+            "Image": "public.ecr.aws/otel/opentelemetry-collector-contrib:0.144.0",
+            "LogConfiguration": {
+              "LogDriver": "awslogs",
+              "Options": {
+                "awslogs-group": {
+                  "Ref": "KernelAdotLogsF20FB819",
+                },
+                "awslogs-region": "eu-west-1",
+                "awslogs-stream-prefix": "adot",
+              },
+            },
+            "Name": "adot",
+          },
+        ],
+        "Cpu": "1024",
+        "ExecutionRoleArn": {
+          "Fn::GetAtt": [
+            "KernelTaskDefExecutionRole610397A0",
+            "Arn",
+          ],
+        },
+        "Family": "ofacexamplekernelKernelTaskDefD185A987",
+        "Memory": "2048",
+        "NetworkMode": "awsvpc",
+        "RequiresCompatibilities": [
+          "FARGATE",
+        ],
+        "Tags": [
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+        "TaskRoleArn": {
+          "Fn::GetAtt": [
+            "KernelTaskDefTaskRole435874EB",
+            "Arn",
+          ],
+        },
+      },
+      "Type": "AWS::ECS::TaskDefinition",
+    },
+    "KernelTaskDefExecutionRole610397A0": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "ecs-tasks.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "Tags": [
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "KernelTaskDefExecutionRoleDefaultPolicy645EC79E": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "logs:CreateLogStream",
+                "logs:PutLogEvents",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "KernelLogs376EF984",
+                  "Arn",
+                ],
+              },
+            },
+            {
+              "Action": [
+                "logs:CreateLogStream",
+                "logs:PutLogEvents",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "KernelAdotLogsF20FB819",
+                  "Arn",
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "KernelTaskDefExecutionRoleDefaultPolicy645EC79E",
+        "Roles": [
+          {
+            "Ref": "KernelTaskDefExecutionRole610397A0",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "KernelTaskDefTaskRole435874EB": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "ecs-tasks.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "Tags": [
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "KernelTaskDefTaskRoleDefaultPolicyE5F063B8": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "cloudwatch:PutMetricData",
+                "logs:CreateLogStream",
+                "logs:PutLogEvents",
+                "logs:DescribeLogGroups",
+                "logs:DescribeLogStreams",
+                "logs:CreateLogGroup",
+                "xray:PutTraceSegments",
+                "xray:PutTelemetryRecords",
+                "xray:GetSamplingRules",
+                "xray:GetSamplingTargets",
+              ],
+              "Effect": "Allow",
+              "Resource": "*",
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "KernelTaskDefTaskRoleDefaultPolicyE5F063B8",
+        "Roles": [
+          {
+            "Ref": "KernelTaskDefTaskRole435874EB",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "KernelTg38E08C0D": {
+      "Properties": {
+        "HealthCheckIntervalSeconds": 30,
+        "HealthCheckPath": "/health",
+        "HealthCheckTimeoutSeconds": 10,
+        "HealthyThresholdCount": 2,
+        "Port": 8080,
+        "Protocol": "HTTP",
+        "Tags": [
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+        "TargetGroupAttributes": [
+          {
+            "Key": "stickiness.enabled",
+            "Value": "false",
+          },
+        ],
+        "TargetType": "ip",
+        "UnhealthyThresholdCount": 3,
+        "VpcId": {
+          "Fn::ImportValue": "ofac-example-network:ExportsOutputRefVpcCreatedD03360A5C9BB017F",
+        },
+      },
+      "Type": "AWS::ElasticLoadBalancingV2::TargetGroup",
+    },
+    "WafAcl6E87F7DA": {
+      "Properties": {
+        "DefaultAction": {
+          "Allow": {},
+        },
+        "Rules": [
+          {
+            "Action": {
+              "Block": {},
+            },
+            "Name": "ofac-rate-public-paths",
+            "Priority": 1,
+            "Statement": {
+              "RateBasedStatement": {
+                "AggregateKeyType": "IP",
+                "Limit": 500,
+                "ScopeDownStatement": {
+                  "OrStatement": {
+                    "Statements": [
+                      {
+                        "ByteMatchStatement": {
+                          "FieldToMatch": {
+                            "UriPath": {},
+                          },
+                          "PositionalConstraint": "STARTS_WITH",
+                          "SearchString": "/api/ingress/",
+                          "TextTransformations": [
+                            {
+                              "Priority": 0,
+                              "Type": "NONE",
+                            },
+                          ],
+                        },
+                      },
+                      {
+                        "ByteMatchStatement": {
+                          "FieldToMatch": {
+                            "UriPath": {},
+                          },
+                          "PositionalConstraint": "STARTS_WITH",
+                          "SearchString": "/api/link/v1/enroll",
+                          "TextTransformations": [
+                            {
+                              "Priority": 0,
+                              "Type": "NONE",
+                            },
+                          ],
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
+            },
+            "VisibilityConfig": {
+              "CloudWatchMetricsEnabled": true,
+              "MetricName": "ofac-rate-public-paths",
+              "SampledRequestsEnabled": true,
+            },
+          },
+          {
+            "Action": {
+              "Block": {},
+            },
+            "Name": "ofac-KnownBadInputs",
+            "Priority": 10,
+            "Statement": {
+              "ManagedRuleGroupStatement": {
+                "Name": "AWSManagedRulesKnownBadInputsRuleSet",
+                "VendorName": "AWS",
+              },
+            },
+            "VisibilityConfig": {
+              "CloudWatchMetricsEnabled": true,
+              "MetricName": "ofac-KnownBadInputs",
+              "SampledRequestsEnabled": true,
+            },
+          },
+          {
+            "Action": {
+              "Block": {},
+            },
+            "Name": "ofac-IPReputation",
+            "Priority": 11,
+            "Statement": {
+              "ManagedRuleGroupStatement": {
+                "Name": "AWSManagedRulesAmazonIpReputationList",
+                "VendorName": "AWS",
+              },
+            },
+            "VisibilityConfig": {
+              "CloudWatchMetricsEnabled": true,
+              "MetricName": "ofac-IPReputation",
+              "SampledRequestsEnabled": true,
+            },
+          },
+          {
+            "Action": {
+              "Block": {},
+            },
+            "Name": "ofac-SQLi",
+            "Priority": 12,
+            "Statement": {
+              "ManagedRuleGroupStatement": {
+                "Name": "AWSManagedRulesSQLiRuleSet",
+                "VendorName": "AWS",
+              },
+            },
+            "VisibilityConfig": {
+              "CloudWatchMetricsEnabled": true,
+              "MetricName": "ofac-SQLi",
+              "SampledRequestsEnabled": true,
+            },
+          },
+        ],
+        "Scope": "REGIONAL",
+        "Tags": [
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+        "VisibilityConfig": {
+          "CloudWatchMetricsEnabled": true,
+          "MetricName": "ofac-webacl",
+          "SampledRequestsEnabled": true,
+        },
+      },
+      "Type": "AWS::WAFv2::WebACL",
+    },
+    "WebFaceAlb371BA2D2": {
+      "DependsOn": [
+        "WebFaceAlbLogsPolicy4F79950B",
+      ],
+      "Properties": {
+        "LoadBalancerAttributes": [
+          {
+            "Key": "deletion_protection.enabled",
+            "Value": "true",
+          },
+          {
+            "Key": "routing.http2.enabled",
+            "Value": "true",
+          },
+          {
+            "Key": "idle_timeout.timeout_seconds",
+            "Value": "60",
+          },
+          {
+            "Key": "routing.http.drop_invalid_header_fields.enabled",
+            "Value": "true",
+          },
+          {
+            "Key": "access_logs.s3.enabled",
+            "Value": "true",
+          },
+          {
+            "Key": "access_logs.s3.bucket",
+            "Value": {
+              "Ref": "WebFaceAlbLogsCBFCEF01",
+            },
+          },
+          {
+            "Key": "access_logs.s3.prefix",
+            "Value": "alb/",
+          },
+        ],
+        "Scheme": "internet-facing",
+        "SecurityGroups": [
+          {
+            "Fn::GetAtt": [
+              "WebFaceSgFCD2D953",
+              "GroupId",
+            ],
+          },
+        ],
+        "Subnets": [
+          {
+            "Fn::ImportValue": "ofac-example-network:ExportsOutputRefVpcCreatedNatSubnet1Subnet6049CAC8021F6433",
+          },
+          {
+            "Fn::ImportValue": "ofac-example-network:ExportsOutputRefVpcCreatedNatSubnet2SubnetAAED97FB39048D51",
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+        "Type": "application",
+      },
+      "Type": "AWS::ElasticLoadBalancingV2::LoadBalancer",
+    },
+    "WebFaceAlbDnsD948D884": {
+      "Properties": {
+        "Name": "/ofac/kernel.example.org/alb-dns",
+        "Tags": {
+          "ofac:env": "example",
+          "ofac:role": "platform",
+        },
+        "Type": "String",
+        "Value": {
+          "Fn::GetAtt": [
+            "WebFaceAlb371BA2D2",
+            "DNSName",
+          ],
+        },
+      },
+      "Type": "AWS::SSM::Parameter",
+    },
+    "WebFaceAlbHttp9E1D8BA3": {
+      "Properties": {
+        "DefaultActions": [
+          {
+            "RedirectConfig": {
+              "Port": "443",
+              "Protocol": "HTTPS",
+              "StatusCode": "HTTP_301",
+            },
+            "Type": "redirect",
+          },
+        ],
+        "LoadBalancerArn": {
+          "Ref": "WebFaceAlb371BA2D2",
+        },
+        "Port": 80,
+        "Protocol": "HTTP",
+        "Tags": [
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+      },
+      "Type": "AWS::ElasticLoadBalancingV2::Listener",
+    },
+    "WebFaceAlbHttpsAdminRuleRule69A88508": {
+      "Properties": {
+        "Actions": [
+          {
+            "AuthenticateCognitoConfig": {
+              "OnUnauthenticatedRequest": "authenticate",
+              "Scope": "openid email profile",
+              "SessionTimeout": 28800,
+              "UserPoolArn": {
+                "Fn::ImportValue": "ofac-example-identity:ExportsOutputFnGetAttIdentityPool9E5AED46Arn39C43825",
+              },
+              "UserPoolClientId": {
+                "Fn::ImportValue": "ofac-example-identity:ExportsOutputRefIdentityApiClientDD59074527BBA291",
+              },
+              "UserPoolDomain": "example-kernel.auth.eu-west-1.amazoncognito.com",
+            },
+            "Order": 1,
+            "Type": "authenticate-cognito",
+          },
+          {
+            "Order": 2,
+            "TargetGroupArn": {
+              "Ref": "KernelTg38E08C0D",
+            },
+            "Type": "forward",
+          },
+        ],
+        "Conditions": [
+          {
+            "Field": "path-pattern",
+            "PathPatternConfig": {
+              "Values": [
+                "/api/admin/*",
+                "/api/works*",
+                "/ui-config",
+              ],
+            },
+          },
+        ],
+        "ListenerArn": {
+          "Ref": "WebFaceAlbHttpsB6D1EA33",
+        },
+        "Priority": 100,
+        "Tags": [
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+      },
+      "Type": "AWS::ElasticLoadBalancingV2::ListenerRule",
+    },
+    "WebFaceAlbHttpsB6D1EA33": {
+      "Properties": {
+        "Certificates": [
+          {
+            "CertificateArn": {
+              "Ref": "WebFaceCert318E1D69",
+            },
+          },
+        ],
+        "DefaultActions": [
+          {
+            "AuthenticateCognitoConfig": {
+              "OnUnauthenticatedRequest": "authenticate",
+              "Scope": "openid email profile",
+              "SessionTimeout": "28800",
+              "UserPoolArn": {
+                "Fn::ImportValue": "ofac-example-identity:ExportsOutputFnGetAttIdentityPool9E5AED46Arn39C43825",
+              },
+              "UserPoolClientId": {
+                "Fn::ImportValue": "ofac-example-identity:ExportsOutputRefIdentityApiClientDD59074527BBA291",
+              },
+              "UserPoolDomain": "example-kernel.auth.eu-west-1.amazoncognito.com",
+            },
+            "Order": 1,
+            "Type": "authenticate-cognito",
+          },
+          {
+            "Order": 2,
+            "TargetGroupArn": {
+              "Ref": "KernelTg38E08C0D",
+            },
+            "Type": "forward",
+          },
+        ],
+        "LoadBalancerArn": {
+          "Ref": "WebFaceAlb371BA2D2",
+        },
+        "Port": 443,
+        "Protocol": "HTTPS",
+        "SslPolicy": "ELBSecurityPolicy-TLS13-1-2-2021-06",
+        "Tags": [
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+      },
+      "Type": "AWS::ElasticLoadBalancingV2::Listener",
+    },
+    "WebFaceAlbHttpsLinkRuleRule0F770839": {
+      "Properties": {
+        "Actions": [
+          {
+            "TargetGroupArn": {
+              "Ref": "KernelTg38E08C0D",
+            },
+            "Type": "forward",
+          },
+        ],
+        "Conditions": [
+          {
+            "Field": "path-pattern",
+            "PathPatternConfig": {
+              "Values": [
+                "/api/link/v1/*",
+                "/hubs/link",
+                "/events",
+                "/deliveries",
+                "/health",
+              ],
+            },
+          },
+        ],
+        "ListenerArn": {
+          "Ref": "WebFaceAlbHttpsB6D1EA33",
+        },
+        "Priority": 20,
+        "Tags": [
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+      },
+      "Type": "AWS::ElasticLoadBalancingV2::ListenerRule",
+    },
+    "WebFaceAlbHttpsWebhookRuleRule33987D72": {
+      "Properties": {
+        "Actions": [
+          {
+            "TargetGroupArn": {
+              "Ref": "KernelTg38E08C0D",
+            },
+            "Type": "forward",
+          },
+        ],
+        "Conditions": [
+          {
+            "Field": "path-pattern",
+            "PathPatternConfig": {
+              "Values": [
+                "/api/ingress/*",
+              ],
+            },
+          },
+        ],
+        "ListenerArn": {
+          "Ref": "WebFaceAlbHttpsB6D1EA33",
+        },
+        "Priority": 10,
+        "Tags": [
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+      },
+      "Type": "AWS::ElasticLoadBalancingV2::ListenerRule",
+    },
+    "WebFaceAlbLogsCBFCEF01": {
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256",
+              },
+            },
+          ],
+        },
+        "LifecycleConfiguration": {
+          "Rules": [
+            {
+              "ExpirationInDays": 90,
+              "Status": "Enabled",
+            },
+          ],
+        },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true,
+        },
+        "Tags": [
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+      },
+      "Type": "AWS::S3::Bucket",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "WebFaceAlbLogsPolicy4F79950B": {
+      "Properties": {
+        "Bucket": {
+          "Ref": "WebFaceAlbLogsCBFCEF01",
+        },
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "s3:*",
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false",
+                },
+              },
+              "Effect": "Deny",
+              "Principal": {
+                "AWS": "*",
+              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "WebFaceAlbLogsCBFCEF01",
+                    "Arn",
+                  ],
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "WebFaceAlbLogsCBFCEF01",
+                          "Arn",
+                        ],
+                      },
+                      "/*",
+                    ],
+                  ],
+                },
+              ],
+            },
+            {
+              "Action": "s3:PutObject",
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition",
+                      },
+                      ":iam::156460612806:root",
+                    ],
+                  ],
+                },
+              },
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    {
+                      "Fn::GetAtt": [
+                        "WebFaceAlbLogsCBFCEF01",
+                        "Arn",
+                      ],
+                    },
+                    "/alb//AWSLogs/111111111111/*",
+                  ],
+                ],
+              },
+            },
+            {
+              "Action": "s3:PutObject",
+              "Condition": {
+                "StringEquals": {
+                  "s3:x-amz-acl": "bucket-owner-full-control",
+                },
+              },
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "delivery.logs.amazonaws.com",
+              },
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    {
+                      "Fn::GetAtt": [
+                        "WebFaceAlbLogsCBFCEF01",
+                        "Arn",
+                      ],
+                    },
+                    "/alb//AWSLogs/111111111111/*",
+                  ],
+                ],
+              },
+            },
+            {
+              "Action": "s3:GetBucketAcl",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "delivery.logs.amazonaws.com",
+              },
+              "Resource": {
+                "Fn::GetAtt": [
+                  "WebFaceAlbLogsCBFCEF01",
+                  "Arn",
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+      },
+      "Type": "AWS::S3::BucketPolicy",
+    },
+    "WebFaceAlias7D7737C2": {
+      "Properties": {
+        "AliasTarget": {
+          "DNSName": {
+            "Fn::GetAtt": [
+              "WebFaceAlb371BA2D2",
+              "DNSName",
+            ],
+          },
+          "EvaluateTargetHealth": false,
+          "HostedZoneId": {
+            "Fn::GetAtt": [
+              "WebFaceAlb371BA2D2",
+              "CanonicalHostedZoneID",
+            ],
+          },
+        },
+        "HostedZoneId": "Z0000000000000",
+        "Name": "kernel.example.org",
+        "Type": "A",
+      },
+      "Type": "AWS::Route53::RecordSet",
+    },
+    "WebFaceCert318E1D69": {
+      "Properties": {
+        "DomainName": "kernel.example.org",
+        "DomainValidationOptions": [
+          {
+            "DomainName": "kernel.example.org",
+            "HostedZoneId": "Z0000000000000",
+          },
+          {
+            "DomainName": "*.example.org",
+            "HostedZoneId": "Z0000000000000",
+          },
+        ],
+        "SubjectAlternativeNames": [
+          "*.example.org",
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ofac-example-kernel/WebFace/Cert",
+          },
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+        "ValidationMethod": "DNS",
+      },
+      "Type": "AWS::CertificateManager::Certificate",
+    },
+    "WebFaceSgFCD2D953": {
+      "Properties": {
+        "GroupDescription": "ofac web face: 443/80 from anywhere",
+        "SecurityGroupEgress": [
+          {
+            "CidrIp": "0.0.0.0/0",
+            "Description": "Allow to IdP endpoint",
+            "FromPort": 443,
+            "IpProtocol": "tcp",
+            "ToPort": 443,
+          },
+        ],
+        "SecurityGroupIngress": [
+          {
+            "CidrIp": "0.0.0.0/0",
+            "Description": "https",
+            "FromPort": 443,
+            "IpProtocol": "tcp",
+            "ToPort": 443,
+          },
+          {
+            "CidrIp": "0.0.0.0/0",
+            "Description": "http redirect",
+            "FromPort": 80,
+            "IpProtocol": "tcp",
+            "ToPort": 80,
+          },
+          {
+            "CidrIpv6": "::/0",
+            "Description": "https",
+            "FromPort": 443,
+            "IpProtocol": "tcp",
+            "ToPort": 443,
+          },
+          {
+            "CidrIpv6": "::/0",
+            "Description": "http redirect",
+            "FromPort": 80,
+            "IpProtocol": "tcp",
+            "ToPort": 80,
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+        "VpcId": {
+          "Fn::ImportValue": "ofac-example-network:ExportsOutputRefVpcCreatedD03360A5C9BB017F",
+        },
+      },
+      "Type": "AWS::EC2::SecurityGroup",
+    },
+    "WebFaceSgtoofacexamplekernelKernelServiceSgDF6CEA908080A036E508": {
+      "Properties": {
+        "Description": "Load balancer to target",
+        "DestinationSecurityGroupId": {
+          "Fn::GetAtt": [
+            "KernelServiceSg2511D412",
+            "GroupId",
+          ],
+        },
+        "FromPort": 8080,
+        "GroupId": {
+          "Fn::GetAtt": [
+            "WebFaceSgFCD2D953",
+            "GroupId",
+          ],
+        },
+        "IpProtocol": "tcp",
+        "ToPort": 8080,
+      },
+      "Type": "AWS::EC2::SecurityGroupEgress",
+    },
+    "WebFaceWafE4DCF44E": {
+      "Properties": {
+        "ResourceArn": {
+          "Ref": "WebFaceAlb371BA2D2",
+        },
+        "WebACLArn": {
+          "Fn::GetAtt": [
+            "WafAcl6E87F7DA",
+            "Arn",
+          ],
+        },
+      },
+      "Type": "AWS::WAFv2::WebACLAssociation",
+    },
+  },
+  "Rules": {
+    "CheckBootstrapVersion": {
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Not": [
+              {
+                "Fn::Contains": [
+                  [
+                    "1",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                  ],
+                  {
+                    "Ref": "BootstrapVersion",
+                  },
+                ],
+              },
+            ],
+          },
+          "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI.",
+        },
+      ],
+    },
+  },
+}
+`;
+
+exports[`golden snapshots > ofac-example-network 1`] = `
+{
+  "Outputs": {
+    "ExportsOutputRefVpcCreatedD03360A5C9BB017F": {
+      "Export": {
+        "Name": "ofac-example-network:ExportsOutputRefVpcCreatedD03360A5C9BB017F",
+      },
+      "Value": {
+        "Ref": "VpcCreatedD03360A5",
+      },
+    },
+    "ExportsOutputRefVpcCreatedNatSubnet1Subnet6049CAC8021F6433": {
+      "Export": {
+        "Name": "ofac-example-network:ExportsOutputRefVpcCreatedNatSubnet1Subnet6049CAC8021F6433",
+      },
+      "Value": {
+        "Ref": "VpcCreatedNatSubnet1Subnet6049CAC8",
+      },
+    },
+    "ExportsOutputRefVpcCreatedNatSubnet2SubnetAAED97FB39048D51": {
+      "Export": {
+        "Name": "ofac-example-network:ExportsOutputRefVpcCreatedNatSubnet2SubnetAAED97FB39048D51",
+      },
+      "Value": {
+        "Ref": "VpcCreatedNatSubnet2SubnetAAED97FB",
+      },
+    },
+    "ExportsOutputRefVpcCreatedPrivateSubnet1Subnet7643CE4890940587": {
+      "Export": {
+        "Name": "ofac-example-network:ExportsOutputRefVpcCreatedPrivateSubnet1Subnet7643CE4890940587",
+      },
+      "Value": {
+        "Ref": "VpcCreatedPrivateSubnet1Subnet7643CE48",
+      },
+    },
+    "ExportsOutputRefVpcCreatedPrivateSubnet2SubnetA311D4C147C0897F": {
+      "Export": {
+        "Name": "ofac-example-network:ExportsOutputRefVpcCreatedPrivateSubnet2SubnetA311D4C147C0897F",
+      },
+      "Value": {
+        "Ref": "VpcCreatedPrivateSubnet2SubnetA311D4C1",
+      },
+    },
+  },
+  "Parameters": {
+    "BootstrapVersion": {
+      "Default": "/cdk-bootstrap/hnb659fds/version",
+      "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]",
+      "Type": "AWS::SSM::Parameter::Value<String>",
+    },
+  },
+  "Resources": {
+    "VpcBaselineSg9E8032EB": {
+      "Properties": {
+        "GroupDescription": "ofac baseline: egress-only, services add their own ingress",
+        "SecurityGroupEgress": [
+          {
+            "CidrIp": "0.0.0.0/0",
+            "Description": "Allow all outbound traffic by default",
+            "IpProtocol": "-1",
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+        "VpcId": {
+          "Ref": "VpcCreatedD03360A5",
+        },
+      },
+      "Type": "AWS::EC2::SecurityGroup",
+    },
+    "VpcCreatedCloudWatchLogsD66321DA": {
+      "Properties": {
+        "PrivateDnsEnabled": true,
+        "SecurityGroupIds": [
+          {
+            "Fn::GetAtt": [
+              "VpcCreatedCloudWatchLogsSecurityGroup6E4BBCF8",
+              "GroupId",
+            ],
+          },
+        ],
+        "ServiceName": "com.amazonaws.eu-west-1.logs",
+        "SubnetIds": [
+          {
+            "Ref": "VpcCreatedPrivateSubnet1Subnet7643CE48",
+          },
+          {
+            "Ref": "VpcCreatedPrivateSubnet2SubnetA311D4C1",
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ofac-example-network/Vpc/Created",
+          },
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+        "VpcEndpointType": "Interface",
+        "VpcId": {
+          "Ref": "VpcCreatedD03360A5",
+        },
+      },
+      "Type": "AWS::EC2::VPCEndpoint",
+    },
+    "VpcCreatedCloudWatchLogsSecurityGroup6E4BBCF8": {
+      "Properties": {
+        "GroupDescription": "ofac-example-network/Vpc/Created/CloudWatchLogs/SecurityGroup",
+        "SecurityGroupEgress": [
+          {
+            "CidrIp": "0.0.0.0/0",
+            "Description": "Allow all outbound traffic by default",
+            "IpProtocol": "-1",
+          },
+        ],
+        "SecurityGroupIngress": [
+          {
+            "CidrIp": {
+              "Fn::GetAtt": [
+                "VpcCreatedD03360A5",
+                "CidrBlock",
+              ],
+            },
+            "Description": {
+              "Fn::Join": [
+                "",
+                [
+                  "from ",
+                  {
+                    "Fn::GetAtt": [
+                      "VpcCreatedD03360A5",
+                      "CidrBlock",
+                    ],
+                  },
+                  ":443",
+                ],
+              ],
+            },
+            "FromPort": 443,
+            "IpProtocol": "tcp",
+            "ToPort": 443,
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ofac-example-network/Vpc/Created",
+          },
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+        "VpcId": {
+          "Ref": "VpcCreatedD03360A5",
+        },
+      },
+      "Type": "AWS::EC2::SecurityGroup",
+    },
+    "VpcCreatedCognitoCE03803A": {
+      "Properties": {
+        "PrivateDnsEnabled": true,
+        "SecurityGroupIds": [
+          {
+            "Fn::GetAtt": [
+              "VpcCreatedCognitoSecurityGroupD6EB363A",
+              "GroupId",
+            ],
+          },
+        ],
+        "ServiceName": "com.amazonaws.eu-west-1.cognito-idp",
+        "SubnetIds": [
+          {
+            "Ref": "VpcCreatedPrivateSubnet1Subnet7643CE48",
+          },
+          {
+            "Ref": "VpcCreatedPrivateSubnet2SubnetA311D4C1",
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ofac-example-network/Vpc/Created",
+          },
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+        "VpcEndpointType": "Interface",
+        "VpcId": {
+          "Ref": "VpcCreatedD03360A5",
+        },
+      },
+      "Type": "AWS::EC2::VPCEndpoint",
+    },
+    "VpcCreatedCognitoSecurityGroupD6EB363A": {
+      "Properties": {
+        "GroupDescription": "ofac-example-network/Vpc/Created/Cognito/SecurityGroup",
+        "SecurityGroupEgress": [
+          {
+            "CidrIp": "0.0.0.0/0",
+            "Description": "Allow all outbound traffic by default",
+            "IpProtocol": "-1",
+          },
+        ],
+        "SecurityGroupIngress": [
+          {
+            "CidrIp": {
+              "Fn::GetAtt": [
+                "VpcCreatedD03360A5",
+                "CidrBlock",
+              ],
+            },
+            "Description": {
+              "Fn::Join": [
+                "",
+                [
+                  "from ",
+                  {
+                    "Fn::GetAtt": [
+                      "VpcCreatedD03360A5",
+                      "CidrBlock",
+                    ],
+                  },
+                  ":443",
+                ],
+              ],
+            },
+            "FromPort": 443,
+            "IpProtocol": "tcp",
+            "ToPort": 443,
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ofac-example-network/Vpc/Created",
+          },
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+        "VpcId": {
+          "Ref": "VpcCreatedD03360A5",
+        },
+      },
+      "Type": "AWS::EC2::SecurityGroup",
+    },
+    "VpcCreatedD03360A5": {
+      "Properties": {
+        "CidrBlock": "10.42.0.0/16",
+        "EnableDnsHostnames": true,
+        "EnableDnsSupport": true,
+        "InstanceTenancy": "default",
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ofac-example-network/Vpc/Created",
+          },
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+      },
+      "Type": "AWS::EC2::VPC",
+    },
+    "VpcCreatedEcrApi2CCE0C75": {
+      "Properties": {
+        "PrivateDnsEnabled": true,
+        "SecurityGroupIds": [
+          {
+            "Fn::GetAtt": [
+              "VpcCreatedEcrApiSecurityGroup04B99E02",
+              "GroupId",
+            ],
+          },
+        ],
+        "ServiceName": "com.amazonaws.eu-west-1.ecr.api",
+        "SubnetIds": [
+          {
+            "Ref": "VpcCreatedPrivateSubnet1Subnet7643CE48",
+          },
+          {
+            "Ref": "VpcCreatedPrivateSubnet2SubnetA311D4C1",
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ofac-example-network/Vpc/Created",
+          },
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+        "VpcEndpointType": "Interface",
+        "VpcId": {
+          "Ref": "VpcCreatedD03360A5",
+        },
+      },
+      "Type": "AWS::EC2::VPCEndpoint",
+    },
+    "VpcCreatedEcrApiSecurityGroup04B99E02": {
+      "Properties": {
+        "GroupDescription": "ofac-example-network/Vpc/Created/EcrApi/SecurityGroup",
+        "SecurityGroupEgress": [
+          {
+            "CidrIp": "0.0.0.0/0",
+            "Description": "Allow all outbound traffic by default",
+            "IpProtocol": "-1",
+          },
+        ],
+        "SecurityGroupIngress": [
+          {
+            "CidrIp": {
+              "Fn::GetAtt": [
+                "VpcCreatedD03360A5",
+                "CidrBlock",
+              ],
+            },
+            "Description": {
+              "Fn::Join": [
+                "",
+                [
+                  "from ",
+                  {
+                    "Fn::GetAtt": [
+                      "VpcCreatedD03360A5",
+                      "CidrBlock",
+                    ],
+                  },
+                  ":443",
+                ],
+              ],
+            },
+            "FromPort": 443,
+            "IpProtocol": "tcp",
+            "ToPort": 443,
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ofac-example-network/Vpc/Created",
+          },
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+        "VpcId": {
+          "Ref": "VpcCreatedD03360A5",
+        },
+      },
+      "Type": "AWS::EC2::SecurityGroup",
+    },
+    "VpcCreatedEcrDocker6557C31E": {
+      "Properties": {
+        "PrivateDnsEnabled": true,
+        "SecurityGroupIds": [
+          {
+            "Fn::GetAtt": [
+              "VpcCreatedEcrDockerSecurityGroupE076C8FC",
+              "GroupId",
+            ],
+          },
+        ],
+        "ServiceName": "com.amazonaws.eu-west-1.ecr.dkr",
+        "SubnetIds": [
+          {
+            "Ref": "VpcCreatedPrivateSubnet1Subnet7643CE48",
+          },
+          {
+            "Ref": "VpcCreatedPrivateSubnet2SubnetA311D4C1",
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ofac-example-network/Vpc/Created",
+          },
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+        "VpcEndpointType": "Interface",
+        "VpcId": {
+          "Ref": "VpcCreatedD03360A5",
+        },
+      },
+      "Type": "AWS::EC2::VPCEndpoint",
+    },
+    "VpcCreatedEcrDockerSecurityGroupE076C8FC": {
+      "Properties": {
+        "GroupDescription": "ofac-example-network/Vpc/Created/EcrDocker/SecurityGroup",
+        "SecurityGroupEgress": [
+          {
+            "CidrIp": "0.0.0.0/0",
+            "Description": "Allow all outbound traffic by default",
+            "IpProtocol": "-1",
+          },
+        ],
+        "SecurityGroupIngress": [
+          {
+            "CidrIp": {
+              "Fn::GetAtt": [
+                "VpcCreatedD03360A5",
+                "CidrBlock",
+              ],
+            },
+            "Description": {
+              "Fn::Join": [
+                "",
+                [
+                  "from ",
+                  {
+                    "Fn::GetAtt": [
+                      "VpcCreatedD03360A5",
+                      "CidrBlock",
+                    ],
+                  },
+                  ":443",
+                ],
+              ],
+            },
+            "FromPort": 443,
+            "IpProtocol": "tcp",
+            "ToPort": 443,
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ofac-example-network/Vpc/Created",
+          },
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+        "VpcId": {
+          "Ref": "VpcCreatedD03360A5",
+        },
+      },
+      "Type": "AWS::EC2::SecurityGroup",
+    },
+    "VpcCreatedIGW02EA0C14": {
+      "Properties": {
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ofac-example-network/Vpc/Created",
+          },
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+      },
+      "Type": "AWS::EC2::InternetGateway",
+    },
+    "VpcCreatedNatSubnet1DefaultRoute3B492412": {
+      "DependsOn": [
+        "VpcCreatedVPCGW8F4EA347",
+      ],
+      "Properties": {
+        "DestinationCidrBlock": "0.0.0.0/0",
+        "GatewayId": {
+          "Ref": "VpcCreatedIGW02EA0C14",
+        },
+        "RouteTableId": {
+          "Ref": "VpcCreatedNatSubnet1RouteTable9911781F",
+        },
+      },
+      "Type": "AWS::EC2::Route",
+    },
+    "VpcCreatedNatSubnet1EIPAB10C87C": {
+      "Properties": {
+        "Domain": "vpc",
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ofac-example-network/Vpc/Created/NatSubnet1",
+          },
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+      },
+      "Type": "AWS::EC2::EIP",
+    },
+    "VpcCreatedNatSubnet1NATGatewayA8B6E3AB": {
+      "DependsOn": [
+        "VpcCreatedNatSubnet1DefaultRoute3B492412",
+        "VpcCreatedNatSubnet1RouteTableAssociationAAB15F70",
+      ],
+      "Properties": {
+        "AllocationId": {
+          "Fn::GetAtt": [
+            "VpcCreatedNatSubnet1EIPAB10C87C",
+            "AllocationId",
+          ],
+        },
+        "SubnetId": {
+          "Ref": "VpcCreatedNatSubnet1Subnet6049CAC8",
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ofac-example-network/Vpc/Created/NatSubnet1",
+          },
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+      },
+      "Type": "AWS::EC2::NatGateway",
+    },
+    "VpcCreatedNatSubnet1RouteTable9911781F": {
+      "Properties": {
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ofac-example-network/Vpc/Created/NatSubnet1",
+          },
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+        "VpcId": {
+          "Ref": "VpcCreatedD03360A5",
+        },
+      },
+      "Type": "AWS::EC2::RouteTable",
+    },
+    "VpcCreatedNatSubnet1RouteTableAssociationAAB15F70": {
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "VpcCreatedNatSubnet1RouteTable9911781F",
+        },
+        "SubnetId": {
+          "Ref": "VpcCreatedNatSubnet1Subnet6049CAC8",
+        },
+      },
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+    },
+    "VpcCreatedNatSubnet1Subnet6049CAC8": {
+      "Properties": {
+        "AvailabilityZone": "eu-west-1a",
+        "CidrBlock": "10.42.2.0/28",
+        "MapPublicIpOnLaunch": true,
+        "Tags": [
+          {
+            "Key": "aws-cdk:subnet-name",
+            "Value": "Nat",
+          },
+          {
+            "Key": "aws-cdk:subnet-type",
+            "Value": "Public",
+          },
+          {
+            "Key": "Name",
+            "Value": "ofac-example-network/Vpc/Created/NatSubnet1",
+          },
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+        "VpcId": {
+          "Ref": "VpcCreatedD03360A5",
+        },
+      },
+      "Type": "AWS::EC2::Subnet",
+    },
+    "VpcCreatedNatSubnet2DefaultRouteCBDFE26B": {
+      "DependsOn": [
+        "VpcCreatedVPCGW8F4EA347",
+      ],
+      "Properties": {
+        "DestinationCidrBlock": "0.0.0.0/0",
+        "GatewayId": {
+          "Ref": "VpcCreatedIGW02EA0C14",
+        },
+        "RouteTableId": {
+          "Ref": "VpcCreatedNatSubnet2RouteTableAD1FA318",
+        },
+      },
+      "Type": "AWS::EC2::Route",
+    },
+    "VpcCreatedNatSubnet2RouteTableAD1FA318": {
+      "Properties": {
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ofac-example-network/Vpc/Created/NatSubnet2",
+          },
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+        "VpcId": {
+          "Ref": "VpcCreatedD03360A5",
+        },
+      },
+      "Type": "AWS::EC2::RouteTable",
+    },
+    "VpcCreatedNatSubnet2RouteTableAssociation1CDA9F7D": {
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "VpcCreatedNatSubnet2RouteTableAD1FA318",
+        },
+        "SubnetId": {
+          "Ref": "VpcCreatedNatSubnet2SubnetAAED97FB",
+        },
+      },
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+    },
+    "VpcCreatedNatSubnet2SubnetAAED97FB": {
+      "Properties": {
+        "AvailabilityZone": "eu-west-1b",
+        "CidrBlock": "10.42.2.16/28",
+        "MapPublicIpOnLaunch": true,
+        "Tags": [
+          {
+            "Key": "aws-cdk:subnet-name",
+            "Value": "Nat",
+          },
+          {
+            "Key": "aws-cdk:subnet-type",
+            "Value": "Public",
+          },
+          {
+            "Key": "Name",
+            "Value": "ofac-example-network/Vpc/Created/NatSubnet2",
+          },
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+        "VpcId": {
+          "Ref": "VpcCreatedD03360A5",
+        },
+      },
+      "Type": "AWS::EC2::Subnet",
+    },
+    "VpcCreatedPrivateSubnet1RouteTableAssociationC4287BCB": {
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "VpcCreatedPrivateSubnet1RouteTableF313FA05",
+        },
+        "SubnetId": {
+          "Ref": "VpcCreatedPrivateSubnet1Subnet7643CE48",
+        },
+      },
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+    },
+    "VpcCreatedPrivateSubnet1RouteTableF313FA05": {
+      "Properties": {
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ofac-example-network/Vpc/Created/PrivateSubnet1",
+          },
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+        "VpcId": {
+          "Ref": "VpcCreatedD03360A5",
+        },
+      },
+      "Type": "AWS::EC2::RouteTable",
+    },
+    "VpcCreatedPrivateSubnet1Subnet7643CE48": {
+      "Properties": {
+        "AvailabilityZone": "eu-west-1a",
+        "CidrBlock": "10.42.0.0/24",
+        "MapPublicIpOnLaunch": false,
+        "Tags": [
+          {
+            "Key": "aws-cdk:subnet-name",
+            "Value": "Private",
+          },
+          {
+            "Key": "aws-cdk:subnet-type",
+            "Value": "Isolated",
+          },
+          {
+            "Key": "Name",
+            "Value": "ofac-example-network/Vpc/Created/PrivateSubnet1",
+          },
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+        "VpcId": {
+          "Ref": "VpcCreatedD03360A5",
+        },
+      },
+      "Type": "AWS::EC2::Subnet",
+    },
+    "VpcCreatedPrivateSubnet2RouteTable153AD219": {
+      "Properties": {
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ofac-example-network/Vpc/Created/PrivateSubnet2",
+          },
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+        "VpcId": {
+          "Ref": "VpcCreatedD03360A5",
+        },
+      },
+      "Type": "AWS::EC2::RouteTable",
+    },
+    "VpcCreatedPrivateSubnet2RouteTableAssociation30DDF937": {
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "VpcCreatedPrivateSubnet2RouteTable153AD219",
+        },
+        "SubnetId": {
+          "Ref": "VpcCreatedPrivateSubnet2SubnetA311D4C1",
+        },
+      },
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+    },
+    "VpcCreatedPrivateSubnet2SubnetA311D4C1": {
+      "Properties": {
+        "AvailabilityZone": "eu-west-1b",
+        "CidrBlock": "10.42.1.0/24",
+        "MapPublicIpOnLaunch": false,
+        "Tags": [
+          {
+            "Key": "aws-cdk:subnet-name",
+            "Value": "Private",
+          },
+          {
+            "Key": "aws-cdk:subnet-type",
+            "Value": "Isolated",
+          },
+          {
+            "Key": "Name",
+            "Value": "ofac-example-network/Vpc/Created/PrivateSubnet2",
+          },
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+        "VpcId": {
+          "Ref": "VpcCreatedD03360A5",
+        },
+      },
+      "Type": "AWS::EC2::Subnet",
+    },
+    "VpcCreatedS3Endpoint682DB71D": {
+      "Properties": {
+        "RouteTableIds": [
+          {
+            "Ref": "VpcCreatedNatSubnet1RouteTable9911781F",
+          },
+          {
+            "Ref": "VpcCreatedNatSubnet2RouteTableAD1FA318",
+          },
+          {
+            "Ref": "VpcCreatedPrivateSubnet1RouteTableF313FA05",
+          },
+          {
+            "Ref": "VpcCreatedPrivateSubnet2RouteTable153AD219",
+          },
+        ],
+        "ServiceName": {
+          "Fn::Join": [
+            "",
+            [
+              "com.amazonaws.",
+              {
+                "Ref": "AWS::Region",
+              },
+              ".s3",
+            ],
+          ],
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ofac-example-network/Vpc/Created",
+          },
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+        "VpcEndpointType": "Gateway",
+        "VpcId": {
+          "Ref": "VpcCreatedD03360A5",
+        },
+      },
+      "Type": "AWS::EC2::VPCEndpoint",
+    },
+    "VpcCreatedSecretsManager825CFF0C": {
+      "Properties": {
+        "PrivateDnsEnabled": true,
+        "SecurityGroupIds": [
+          {
+            "Fn::GetAtt": [
+              "VpcCreatedSecretsManagerSecurityGroup8D9511A7",
+              "GroupId",
+            ],
+          },
+        ],
+        "ServiceName": "com.amazonaws.eu-west-1.secretsmanager",
+        "SubnetIds": [
+          {
+            "Ref": "VpcCreatedPrivateSubnet1Subnet7643CE48",
+          },
+          {
+            "Ref": "VpcCreatedPrivateSubnet2SubnetA311D4C1",
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ofac-example-network/Vpc/Created",
+          },
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+        "VpcEndpointType": "Interface",
+        "VpcId": {
+          "Ref": "VpcCreatedD03360A5",
+        },
+      },
+      "Type": "AWS::EC2::VPCEndpoint",
+    },
+    "VpcCreatedSecretsManagerSecurityGroup8D9511A7": {
+      "Properties": {
+        "GroupDescription": "ofac-example-network/Vpc/Created/SecretsManager/SecurityGroup",
+        "SecurityGroupEgress": [
+          {
+            "CidrIp": "0.0.0.0/0",
+            "Description": "Allow all outbound traffic by default",
+            "IpProtocol": "-1",
+          },
+        ],
+        "SecurityGroupIngress": [
+          {
+            "CidrIp": {
+              "Fn::GetAtt": [
+                "VpcCreatedD03360A5",
+                "CidrBlock",
+              ],
+            },
+            "Description": {
+              "Fn::Join": [
+                "",
+                [
+                  "from ",
+                  {
+                    "Fn::GetAtt": [
+                      "VpcCreatedD03360A5",
+                      "CidrBlock",
+                    ],
+                  },
+                  ":443",
+                ],
+              ],
+            },
+            "FromPort": 443,
+            "IpProtocol": "tcp",
+            "ToPort": 443,
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ofac-example-network/Vpc/Created",
+          },
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+        "VpcId": {
+          "Ref": "VpcCreatedD03360A5",
+        },
+      },
+      "Type": "AWS::EC2::SecurityGroup",
+    },
+    "VpcCreatedStsA712B83F": {
+      "Properties": {
+        "PrivateDnsEnabled": true,
+        "SecurityGroupIds": [
+          {
+            "Fn::GetAtt": [
+              "VpcCreatedStsSecurityGroupB87ADEF3",
+              "GroupId",
+            ],
+          },
+        ],
+        "ServiceName": "com.amazonaws.eu-west-1.sts",
+        "SubnetIds": [
+          {
+            "Ref": "VpcCreatedPrivateSubnet1Subnet7643CE48",
+          },
+          {
+            "Ref": "VpcCreatedPrivateSubnet2SubnetA311D4C1",
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ofac-example-network/Vpc/Created",
+          },
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+        "VpcEndpointType": "Interface",
+        "VpcId": {
+          "Ref": "VpcCreatedD03360A5",
+        },
+      },
+      "Type": "AWS::EC2::VPCEndpoint",
+    },
+    "VpcCreatedStsSecurityGroupB87ADEF3": {
+      "Properties": {
+        "GroupDescription": "ofac-example-network/Vpc/Created/Sts/SecurityGroup",
+        "SecurityGroupEgress": [
+          {
+            "CidrIp": "0.0.0.0/0",
+            "Description": "Allow all outbound traffic by default",
+            "IpProtocol": "-1",
+          },
+        ],
+        "SecurityGroupIngress": [
+          {
+            "CidrIp": {
+              "Fn::GetAtt": [
+                "VpcCreatedD03360A5",
+                "CidrBlock",
+              ],
+            },
+            "Description": {
+              "Fn::Join": [
+                "",
+                [
+                  "from ",
+                  {
+                    "Fn::GetAtt": [
+                      "VpcCreatedD03360A5",
+                      "CidrBlock",
+                    ],
+                  },
+                  ":443",
+                ],
+              ],
+            },
+            "FromPort": 443,
+            "IpProtocol": "tcp",
+            "ToPort": 443,
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ofac-example-network/Vpc/Created",
+          },
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+        "VpcId": {
+          "Ref": "VpcCreatedD03360A5",
+        },
+      },
+      "Type": "AWS::EC2::SecurityGroup",
+    },
+    "VpcCreatedVPCGW8F4EA347": {
+      "Properties": {
+        "InternetGatewayId": {
+          "Ref": "VpcCreatedIGW02EA0C14",
+        },
+        "VpcId": {
+          "Ref": "VpcCreatedD03360A5",
+        },
+      },
+      "Type": "AWS::EC2::VPCGatewayAttachment",
+    },
+  },
+  "Rules": {
+    "CheckBootstrapVersion": {
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Not": [
+              {
+                "Fn::Contains": [
+                  [
+                    "1",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                  ],
+                  {
+                    "Ref": "BootstrapVersion",
+                  },
+                ],
+              },
+            ],
+          },
+          "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI.",
+        },
+      ],
+    },
+  },
+}
+`;
+
+exports[`golden snapshots > ofac-example-observability 1`] = `
+{
+  "Parameters": {
+    "BootstrapVersion": {
+      "Default": "/cdk-bootstrap/hnb659fds/version",
+      "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]",
+      "Type": "AWS::SSM::Parameter::Value<String>",
+    },
+  },
+  "Resources": {
+    "ObservabilityAlarms72EB291A": {
+      "Properties": {
+        "DisplayName": "ofac kernel alarms",
+        "Tags": [
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+      },
+      "Type": "AWS::SNS::Topic",
+    },
+    "ObservabilityAlb5xx8F5E973A": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "ObservabilityAlarms72EB291A",
+          },
+        ],
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 2,
+        "Dimensions": [
+          {
+            "Name": "LoadBalancer",
+            "Value": {
+              "Fn::ImportValue": "ofac-example-kernel:ExportsOutputRefWebFaceAlb371BA2D271670875",
+            },
+          },
+        ],
+        "EvaluationPeriods": 2,
+        "MetricName": "HTTPCode_Target_5XX_Count",
+        "Namespace": "AWS/ApplicationELB",
+        "Period": 300,
+        "Statistic": "Sum",
+        "Tags": [
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+        "Threshold": 25,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "ObservabilityDeadLettersD587CF1C": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "ObservabilityAlarms72EB291A",
+          },
+        ],
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 2,
+        "EvaluationPeriods": 2,
+        "MetricName": "facilitator.outbox.dead_letters",
+        "Namespace": "facilitator",
+        "Period": 300,
+        "Statistic": "Maximum",
+        "Tags": [
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+        "Threshold": 1,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "ObservabilityOutboxDepth9CB35CD5": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "ObservabilityAlarms72EB291A",
+          },
+        ],
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 2,
+        "EvaluationPeriods": 2,
+        "MetricName": "facilitator.outbox.queue_depth",
+        "Namespace": "facilitator",
+        "Period": 300,
+        "Statistic": "Maximum",
+        "Tags": [
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+        "Threshold": 500,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+  },
+  "Rules": {
+    "CheckBootstrapVersion": {
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Not": [
+              {
+                "Fn::Contains": [
+                  [
+                    "1",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                  ],
+                  {
+                    "Ref": "BootstrapVersion",
+                  },
+                ],
+              },
+            ],
+          },
+          "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI.",
+        },
+      ],
+    },
+  },
+}
+`;
+
+exports[`golden snapshots > ofac-example-team-team-alpha-network 1`] = `
+{
+  "Outputs": {
+    "ExportsOutputRefVpcCreatedD03360A5C9BB017F": {
+      "Export": {
+        "Name": "ofac-example-team-team-alpha-network:ExportsOutputRefVpcCreatedD03360A5C9BB017F",
+      },
+      "Value": {
+        "Ref": "VpcCreatedD03360A5",
+      },
+    },
+    "ExportsOutputRefVpcCreatedPrivateSubnet1Subnet7643CE4890940587": {
+      "Export": {
+        "Name": "ofac-example-team-team-alpha-network:ExportsOutputRefVpcCreatedPrivateSubnet1Subnet7643CE4890940587",
+      },
+      "Value": {
+        "Ref": "VpcCreatedPrivateSubnet1Subnet7643CE48",
+      },
+    },
+    "ExportsOutputRefVpcCreatedPrivateSubnet2SubnetA311D4C147C0897F": {
+      "Export": {
+        "Name": "ofac-example-team-team-alpha-network:ExportsOutputRefVpcCreatedPrivateSubnet2SubnetA311D4C147C0897F",
+      },
+      "Value": {
+        "Ref": "VpcCreatedPrivateSubnet2SubnetA311D4C1",
+      },
+    },
+  },
+  "Parameters": {
+    "BootstrapVersion": {
+      "Default": "/cdk-bootstrap/hnb659fds/version",
+      "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]",
+      "Type": "AWS::SSM::Parameter::Value<String>",
+    },
+  },
+  "Resources": {
+    "VpcBaselineSg9E8032EB": {
+      "Properties": {
+        "GroupDescription": "ofac baseline: egress-only, services add their own ingress",
+        "SecurityGroupEgress": [
+          {
+            "CidrIp": "0.0.0.0/0",
+            "Description": "Allow all outbound traffic by default",
+            "IpProtocol": "-1",
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "team",
+          },
+        ],
+        "VpcId": {
+          "Ref": "VpcCreatedD03360A5",
+        },
+      },
+      "Type": "AWS::EC2::SecurityGroup",
+    },
+    "VpcCreatedCloudWatchLogsD66321DA": {
+      "Properties": {
+        "PrivateDnsEnabled": true,
+        "SecurityGroupIds": [
+          {
+            "Fn::GetAtt": [
+              "VpcCreatedCloudWatchLogsSecurityGroup6E4BBCF8",
+              "GroupId",
+            ],
+          },
+        ],
+        "ServiceName": "com.amazonaws.eu-west-1.logs",
+        "SubnetIds": [
+          {
+            "Ref": "VpcCreatedPrivateSubnet1Subnet7643CE48",
+          },
+          {
+            "Ref": "VpcCreatedPrivateSubnet2SubnetA311D4C1",
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ofac-example-team-team-alpha-network/Vpc/Created",
+          },
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "team",
+          },
+        ],
+        "VpcEndpointType": "Interface",
+        "VpcId": {
+          "Ref": "VpcCreatedD03360A5",
+        },
+      },
+      "Type": "AWS::EC2::VPCEndpoint",
+    },
+    "VpcCreatedCloudWatchLogsSecurityGroup6E4BBCF8": {
+      "Properties": {
+        "GroupDescription": "ofac-example-team-team-alpha-network/Vpc/Created/CloudWatchLogs/SecurityGroup",
+        "SecurityGroupEgress": [
+          {
+            "CidrIp": "0.0.0.0/0",
+            "Description": "Allow all outbound traffic by default",
+            "IpProtocol": "-1",
+          },
+        ],
+        "SecurityGroupIngress": [
+          {
+            "CidrIp": {
+              "Fn::GetAtt": [
+                "VpcCreatedD03360A5",
+                "CidrBlock",
+              ],
+            },
+            "Description": {
+              "Fn::Join": [
+                "",
+                [
+                  "from ",
+                  {
+                    "Fn::GetAtt": [
+                      "VpcCreatedD03360A5",
+                      "CidrBlock",
+                    ],
+                  },
+                  ":443",
+                ],
+              ],
+            },
+            "FromPort": 443,
+            "IpProtocol": "tcp",
+            "ToPort": 443,
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ofac-example-team-team-alpha-network/Vpc/Created",
+          },
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "team",
+          },
+        ],
+        "VpcId": {
+          "Ref": "VpcCreatedD03360A5",
+        },
+      },
+      "Type": "AWS::EC2::SecurityGroup",
+    },
+    "VpcCreatedCognitoCE03803A": {
+      "Properties": {
+        "PrivateDnsEnabled": true,
+        "SecurityGroupIds": [
+          {
+            "Fn::GetAtt": [
+              "VpcCreatedCognitoSecurityGroupD6EB363A",
+              "GroupId",
+            ],
+          },
+        ],
+        "ServiceName": "com.amazonaws.eu-west-1.cognito-idp",
+        "SubnetIds": [
+          {
+            "Ref": "VpcCreatedPrivateSubnet1Subnet7643CE48",
+          },
+          {
+            "Ref": "VpcCreatedPrivateSubnet2SubnetA311D4C1",
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ofac-example-team-team-alpha-network/Vpc/Created",
+          },
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "team",
+          },
+        ],
+        "VpcEndpointType": "Interface",
+        "VpcId": {
+          "Ref": "VpcCreatedD03360A5",
+        },
+      },
+      "Type": "AWS::EC2::VPCEndpoint",
+    },
+    "VpcCreatedCognitoSecurityGroupD6EB363A": {
+      "Properties": {
+        "GroupDescription": "ofac-example-team-team-alpha-network/Vpc/Created/Cognito/SecurityGroup",
+        "SecurityGroupEgress": [
+          {
+            "CidrIp": "0.0.0.0/0",
+            "Description": "Allow all outbound traffic by default",
+            "IpProtocol": "-1",
+          },
+        ],
+        "SecurityGroupIngress": [
+          {
+            "CidrIp": {
+              "Fn::GetAtt": [
+                "VpcCreatedD03360A5",
+                "CidrBlock",
+              ],
+            },
+            "Description": {
+              "Fn::Join": [
+                "",
+                [
+                  "from ",
+                  {
+                    "Fn::GetAtt": [
+                      "VpcCreatedD03360A5",
+                      "CidrBlock",
+                    ],
+                  },
+                  ":443",
+                ],
+              ],
+            },
+            "FromPort": 443,
+            "IpProtocol": "tcp",
+            "ToPort": 443,
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ofac-example-team-team-alpha-network/Vpc/Created",
+          },
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "team",
+          },
+        ],
+        "VpcId": {
+          "Ref": "VpcCreatedD03360A5",
+        },
+      },
+      "Type": "AWS::EC2::SecurityGroup",
+    },
+    "VpcCreatedD03360A5": {
+      "Properties": {
+        "CidrBlock": "10.42.0.0/16",
+        "EnableDnsHostnames": true,
+        "EnableDnsSupport": true,
+        "InstanceTenancy": "default",
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ofac-example-team-team-alpha-network/Vpc/Created",
+          },
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "team",
+          },
+        ],
+      },
+      "Type": "AWS::EC2::VPC",
+    },
+    "VpcCreatedEcrApi2CCE0C75": {
+      "Properties": {
+        "PrivateDnsEnabled": true,
+        "SecurityGroupIds": [
+          {
+            "Fn::GetAtt": [
+              "VpcCreatedEcrApiSecurityGroup04B99E02",
+              "GroupId",
+            ],
+          },
+        ],
+        "ServiceName": "com.amazonaws.eu-west-1.ecr.api",
+        "SubnetIds": [
+          {
+            "Ref": "VpcCreatedPrivateSubnet1Subnet7643CE48",
+          },
+          {
+            "Ref": "VpcCreatedPrivateSubnet2SubnetA311D4C1",
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ofac-example-team-team-alpha-network/Vpc/Created",
+          },
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "team",
+          },
+        ],
+        "VpcEndpointType": "Interface",
+        "VpcId": {
+          "Ref": "VpcCreatedD03360A5",
+        },
+      },
+      "Type": "AWS::EC2::VPCEndpoint",
+    },
+    "VpcCreatedEcrApiSecurityGroup04B99E02": {
+      "Properties": {
+        "GroupDescription": "ofac-example-team-team-alpha-network/Vpc/Created/EcrApi/SecurityGroup",
+        "SecurityGroupEgress": [
+          {
+            "CidrIp": "0.0.0.0/0",
+            "Description": "Allow all outbound traffic by default",
+            "IpProtocol": "-1",
+          },
+        ],
+        "SecurityGroupIngress": [
+          {
+            "CidrIp": {
+              "Fn::GetAtt": [
+                "VpcCreatedD03360A5",
+                "CidrBlock",
+              ],
+            },
+            "Description": {
+              "Fn::Join": [
+                "",
+                [
+                  "from ",
+                  {
+                    "Fn::GetAtt": [
+                      "VpcCreatedD03360A5",
+                      "CidrBlock",
+                    ],
+                  },
+                  ":443",
+                ],
+              ],
+            },
+            "FromPort": 443,
+            "IpProtocol": "tcp",
+            "ToPort": 443,
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ofac-example-team-team-alpha-network/Vpc/Created",
+          },
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "team",
+          },
+        ],
+        "VpcId": {
+          "Ref": "VpcCreatedD03360A5",
+        },
+      },
+      "Type": "AWS::EC2::SecurityGroup",
+    },
+    "VpcCreatedEcrDocker6557C31E": {
+      "Properties": {
+        "PrivateDnsEnabled": true,
+        "SecurityGroupIds": [
+          {
+            "Fn::GetAtt": [
+              "VpcCreatedEcrDockerSecurityGroupE076C8FC",
+              "GroupId",
+            ],
+          },
+        ],
+        "ServiceName": "com.amazonaws.eu-west-1.ecr.dkr",
+        "SubnetIds": [
+          {
+            "Ref": "VpcCreatedPrivateSubnet1Subnet7643CE48",
+          },
+          {
+            "Ref": "VpcCreatedPrivateSubnet2SubnetA311D4C1",
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ofac-example-team-team-alpha-network/Vpc/Created",
+          },
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "team",
+          },
+        ],
+        "VpcEndpointType": "Interface",
+        "VpcId": {
+          "Ref": "VpcCreatedD03360A5",
+        },
+      },
+      "Type": "AWS::EC2::VPCEndpoint",
+    },
+    "VpcCreatedEcrDockerSecurityGroupE076C8FC": {
+      "Properties": {
+        "GroupDescription": "ofac-example-team-team-alpha-network/Vpc/Created/EcrDocker/SecurityGroup",
+        "SecurityGroupEgress": [
+          {
+            "CidrIp": "0.0.0.0/0",
+            "Description": "Allow all outbound traffic by default",
+            "IpProtocol": "-1",
+          },
+        ],
+        "SecurityGroupIngress": [
+          {
+            "CidrIp": {
+              "Fn::GetAtt": [
+                "VpcCreatedD03360A5",
+                "CidrBlock",
+              ],
+            },
+            "Description": {
+              "Fn::Join": [
+                "",
+                [
+                  "from ",
+                  {
+                    "Fn::GetAtt": [
+                      "VpcCreatedD03360A5",
+                      "CidrBlock",
+                    ],
+                  },
+                  ":443",
+                ],
+              ],
+            },
+            "FromPort": 443,
+            "IpProtocol": "tcp",
+            "ToPort": 443,
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ofac-example-team-team-alpha-network/Vpc/Created",
+          },
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "team",
+          },
+        ],
+        "VpcId": {
+          "Ref": "VpcCreatedD03360A5",
+        },
+      },
+      "Type": "AWS::EC2::SecurityGroup",
+    },
+    "VpcCreatedIGW02EA0C14": {
+      "Properties": {
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ofac-example-team-team-alpha-network/Vpc/Created",
+          },
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "team",
+          },
+        ],
+      },
+      "Type": "AWS::EC2::InternetGateway",
+    },
+    "VpcCreatedNatSubnet1DefaultRoute3B492412": {
+      "DependsOn": [
+        "VpcCreatedVPCGW8F4EA347",
+      ],
+      "Properties": {
+        "DestinationCidrBlock": "0.0.0.0/0",
+        "GatewayId": {
+          "Ref": "VpcCreatedIGW02EA0C14",
+        },
+        "RouteTableId": {
+          "Ref": "VpcCreatedNatSubnet1RouteTable9911781F",
+        },
+      },
+      "Type": "AWS::EC2::Route",
+    },
+    "VpcCreatedNatSubnet1EIPAB10C87C": {
+      "Properties": {
+        "Domain": "vpc",
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ofac-example-team-team-alpha-network/Vpc/Created/NatSubnet1",
+          },
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "team",
+          },
+        ],
+      },
+      "Type": "AWS::EC2::EIP",
+    },
+    "VpcCreatedNatSubnet1NATGatewayA8B6E3AB": {
+      "DependsOn": [
+        "VpcCreatedNatSubnet1DefaultRoute3B492412",
+        "VpcCreatedNatSubnet1RouteTableAssociationAAB15F70",
+      ],
+      "Properties": {
+        "AllocationId": {
+          "Fn::GetAtt": [
+            "VpcCreatedNatSubnet1EIPAB10C87C",
+            "AllocationId",
+          ],
+        },
+        "SubnetId": {
+          "Ref": "VpcCreatedNatSubnet1Subnet6049CAC8",
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ofac-example-team-team-alpha-network/Vpc/Created/NatSubnet1",
+          },
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "team",
+          },
+        ],
+      },
+      "Type": "AWS::EC2::NatGateway",
+    },
+    "VpcCreatedNatSubnet1RouteTable9911781F": {
+      "Properties": {
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ofac-example-team-team-alpha-network/Vpc/Created/NatSubnet1",
+          },
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "team",
+          },
+        ],
+        "VpcId": {
+          "Ref": "VpcCreatedD03360A5",
+        },
+      },
+      "Type": "AWS::EC2::RouteTable",
+    },
+    "VpcCreatedNatSubnet1RouteTableAssociationAAB15F70": {
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "VpcCreatedNatSubnet1RouteTable9911781F",
+        },
+        "SubnetId": {
+          "Ref": "VpcCreatedNatSubnet1Subnet6049CAC8",
+        },
+      },
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+    },
+    "VpcCreatedNatSubnet1Subnet6049CAC8": {
+      "Properties": {
+        "AvailabilityZone": "eu-west-1a",
+        "CidrBlock": "10.42.2.0/28",
+        "MapPublicIpOnLaunch": true,
+        "Tags": [
+          {
+            "Key": "aws-cdk:subnet-name",
+            "Value": "Nat",
+          },
+          {
+            "Key": "aws-cdk:subnet-type",
+            "Value": "Public",
+          },
+          {
+            "Key": "Name",
+            "Value": "ofac-example-team-team-alpha-network/Vpc/Created/NatSubnet1",
+          },
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "team",
+          },
+        ],
+        "VpcId": {
+          "Ref": "VpcCreatedD03360A5",
+        },
+      },
+      "Type": "AWS::EC2::Subnet",
+    },
+    "VpcCreatedNatSubnet2DefaultRouteCBDFE26B": {
+      "DependsOn": [
+        "VpcCreatedVPCGW8F4EA347",
+      ],
+      "Properties": {
+        "DestinationCidrBlock": "0.0.0.0/0",
+        "GatewayId": {
+          "Ref": "VpcCreatedIGW02EA0C14",
+        },
+        "RouteTableId": {
+          "Ref": "VpcCreatedNatSubnet2RouteTableAD1FA318",
+        },
+      },
+      "Type": "AWS::EC2::Route",
+    },
+    "VpcCreatedNatSubnet2RouteTableAD1FA318": {
+      "Properties": {
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ofac-example-team-team-alpha-network/Vpc/Created/NatSubnet2",
+          },
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "team",
+          },
+        ],
+        "VpcId": {
+          "Ref": "VpcCreatedD03360A5",
+        },
+      },
+      "Type": "AWS::EC2::RouteTable",
+    },
+    "VpcCreatedNatSubnet2RouteTableAssociation1CDA9F7D": {
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "VpcCreatedNatSubnet2RouteTableAD1FA318",
+        },
+        "SubnetId": {
+          "Ref": "VpcCreatedNatSubnet2SubnetAAED97FB",
+        },
+      },
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+    },
+    "VpcCreatedNatSubnet2SubnetAAED97FB": {
+      "Properties": {
+        "AvailabilityZone": "eu-west-1b",
+        "CidrBlock": "10.42.2.16/28",
+        "MapPublicIpOnLaunch": true,
+        "Tags": [
+          {
+            "Key": "aws-cdk:subnet-name",
+            "Value": "Nat",
+          },
+          {
+            "Key": "aws-cdk:subnet-type",
+            "Value": "Public",
+          },
+          {
+            "Key": "Name",
+            "Value": "ofac-example-team-team-alpha-network/Vpc/Created/NatSubnet2",
+          },
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "team",
+          },
+        ],
+        "VpcId": {
+          "Ref": "VpcCreatedD03360A5",
+        },
+      },
+      "Type": "AWS::EC2::Subnet",
+    },
+    "VpcCreatedPrivateSubnet1RouteTableAssociationC4287BCB": {
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "VpcCreatedPrivateSubnet1RouteTableF313FA05",
+        },
+        "SubnetId": {
+          "Ref": "VpcCreatedPrivateSubnet1Subnet7643CE48",
+        },
+      },
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+    },
+    "VpcCreatedPrivateSubnet1RouteTableF313FA05": {
+      "Properties": {
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ofac-example-team-team-alpha-network/Vpc/Created/PrivateSubnet1",
+          },
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "team",
+          },
+        ],
+        "VpcId": {
+          "Ref": "VpcCreatedD03360A5",
+        },
+      },
+      "Type": "AWS::EC2::RouteTable",
+    },
+    "VpcCreatedPrivateSubnet1Subnet7643CE48": {
+      "Properties": {
+        "AvailabilityZone": "eu-west-1a",
+        "CidrBlock": "10.42.0.0/24",
+        "MapPublicIpOnLaunch": false,
+        "Tags": [
+          {
+            "Key": "aws-cdk:subnet-name",
+            "Value": "Private",
+          },
+          {
+            "Key": "aws-cdk:subnet-type",
+            "Value": "Isolated",
+          },
+          {
+            "Key": "Name",
+            "Value": "ofac-example-team-team-alpha-network/Vpc/Created/PrivateSubnet1",
+          },
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "team",
+          },
+        ],
+        "VpcId": {
+          "Ref": "VpcCreatedD03360A5",
+        },
+      },
+      "Type": "AWS::EC2::Subnet",
+    },
+    "VpcCreatedPrivateSubnet2RouteTable153AD219": {
+      "Properties": {
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ofac-example-team-team-alpha-network/Vpc/Created/PrivateSubnet2",
+          },
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "team",
+          },
+        ],
+        "VpcId": {
+          "Ref": "VpcCreatedD03360A5",
+        },
+      },
+      "Type": "AWS::EC2::RouteTable",
+    },
+    "VpcCreatedPrivateSubnet2RouteTableAssociation30DDF937": {
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "VpcCreatedPrivateSubnet2RouteTable153AD219",
+        },
+        "SubnetId": {
+          "Ref": "VpcCreatedPrivateSubnet2SubnetA311D4C1",
+        },
+      },
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+    },
+    "VpcCreatedPrivateSubnet2SubnetA311D4C1": {
+      "Properties": {
+        "AvailabilityZone": "eu-west-1b",
+        "CidrBlock": "10.42.1.0/24",
+        "MapPublicIpOnLaunch": false,
+        "Tags": [
+          {
+            "Key": "aws-cdk:subnet-name",
+            "Value": "Private",
+          },
+          {
+            "Key": "aws-cdk:subnet-type",
+            "Value": "Isolated",
+          },
+          {
+            "Key": "Name",
+            "Value": "ofac-example-team-team-alpha-network/Vpc/Created/PrivateSubnet2",
+          },
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "team",
+          },
+        ],
+        "VpcId": {
+          "Ref": "VpcCreatedD03360A5",
+        },
+      },
+      "Type": "AWS::EC2::Subnet",
+    },
+    "VpcCreatedS3Endpoint682DB71D": {
+      "Properties": {
+        "RouteTableIds": [
+          {
+            "Ref": "VpcCreatedNatSubnet1RouteTable9911781F",
+          },
+          {
+            "Ref": "VpcCreatedNatSubnet2RouteTableAD1FA318",
+          },
+          {
+            "Ref": "VpcCreatedPrivateSubnet1RouteTableF313FA05",
+          },
+          {
+            "Ref": "VpcCreatedPrivateSubnet2RouteTable153AD219",
+          },
+        ],
+        "ServiceName": {
+          "Fn::Join": [
+            "",
+            [
+              "com.amazonaws.",
+              {
+                "Ref": "AWS::Region",
+              },
+              ".s3",
+            ],
+          ],
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ofac-example-team-team-alpha-network/Vpc/Created",
+          },
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "team",
+          },
+        ],
+        "VpcEndpointType": "Gateway",
+        "VpcId": {
+          "Ref": "VpcCreatedD03360A5",
+        },
+      },
+      "Type": "AWS::EC2::VPCEndpoint",
+    },
+    "VpcCreatedSecretsManager825CFF0C": {
+      "Properties": {
+        "PrivateDnsEnabled": true,
+        "SecurityGroupIds": [
+          {
+            "Fn::GetAtt": [
+              "VpcCreatedSecretsManagerSecurityGroup8D9511A7",
+              "GroupId",
+            ],
+          },
+        ],
+        "ServiceName": "com.amazonaws.eu-west-1.secretsmanager",
+        "SubnetIds": [
+          {
+            "Ref": "VpcCreatedPrivateSubnet1Subnet7643CE48",
+          },
+          {
+            "Ref": "VpcCreatedPrivateSubnet2SubnetA311D4C1",
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ofac-example-team-team-alpha-network/Vpc/Created",
+          },
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "team",
+          },
+        ],
+        "VpcEndpointType": "Interface",
+        "VpcId": {
+          "Ref": "VpcCreatedD03360A5",
+        },
+      },
+      "Type": "AWS::EC2::VPCEndpoint",
+    },
+    "VpcCreatedSecretsManagerSecurityGroup8D9511A7": {
+      "Properties": {
+        "GroupDescription": "ofac-example-team-team-alpha-network/Vpc/Created/SecretsManager/SecurityGroup",
+        "SecurityGroupEgress": [
+          {
+            "CidrIp": "0.0.0.0/0",
+            "Description": "Allow all outbound traffic by default",
+            "IpProtocol": "-1",
+          },
+        ],
+        "SecurityGroupIngress": [
+          {
+            "CidrIp": {
+              "Fn::GetAtt": [
+                "VpcCreatedD03360A5",
+                "CidrBlock",
+              ],
+            },
+            "Description": {
+              "Fn::Join": [
+                "",
+                [
+                  "from ",
+                  {
+                    "Fn::GetAtt": [
+                      "VpcCreatedD03360A5",
+                      "CidrBlock",
+                    ],
+                  },
+                  ":443",
+                ],
+              ],
+            },
+            "FromPort": 443,
+            "IpProtocol": "tcp",
+            "ToPort": 443,
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ofac-example-team-team-alpha-network/Vpc/Created",
+          },
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "team",
+          },
+        ],
+        "VpcId": {
+          "Ref": "VpcCreatedD03360A5",
+        },
+      },
+      "Type": "AWS::EC2::SecurityGroup",
+    },
+    "VpcCreatedStsA712B83F": {
+      "Properties": {
+        "PrivateDnsEnabled": true,
+        "SecurityGroupIds": [
+          {
+            "Fn::GetAtt": [
+              "VpcCreatedStsSecurityGroupB87ADEF3",
+              "GroupId",
+            ],
+          },
+        ],
+        "ServiceName": "com.amazonaws.eu-west-1.sts",
+        "SubnetIds": [
+          {
+            "Ref": "VpcCreatedPrivateSubnet1Subnet7643CE48",
+          },
+          {
+            "Ref": "VpcCreatedPrivateSubnet2SubnetA311D4C1",
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ofac-example-team-team-alpha-network/Vpc/Created",
+          },
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "team",
+          },
+        ],
+        "VpcEndpointType": "Interface",
+        "VpcId": {
+          "Ref": "VpcCreatedD03360A5",
+        },
+      },
+      "Type": "AWS::EC2::VPCEndpoint",
+    },
+    "VpcCreatedStsSecurityGroupB87ADEF3": {
+      "Properties": {
+        "GroupDescription": "ofac-example-team-team-alpha-network/Vpc/Created/Sts/SecurityGroup",
+        "SecurityGroupEgress": [
+          {
+            "CidrIp": "0.0.0.0/0",
+            "Description": "Allow all outbound traffic by default",
+            "IpProtocol": "-1",
+          },
+        ],
+        "SecurityGroupIngress": [
+          {
+            "CidrIp": {
+              "Fn::GetAtt": [
+                "VpcCreatedD03360A5",
+                "CidrBlock",
+              ],
+            },
+            "Description": {
+              "Fn::Join": [
+                "",
+                [
+                  "from ",
+                  {
+                    "Fn::GetAtt": [
+                      "VpcCreatedD03360A5",
+                      "CidrBlock",
+                    ],
+                  },
+                  ":443",
+                ],
+              ],
+            },
+            "FromPort": 443,
+            "IpProtocol": "tcp",
+            "ToPort": 443,
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ofac-example-team-team-alpha-network/Vpc/Created",
+          },
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "team",
+          },
+        ],
+        "VpcId": {
+          "Ref": "VpcCreatedD03360A5",
+        },
+      },
+      "Type": "AWS::EC2::SecurityGroup",
+    },
+    "VpcCreatedVPCGW8F4EA347": {
+      "Properties": {
+        "InternetGatewayId": {
+          "Ref": "VpcCreatedIGW02EA0C14",
+        },
+        "VpcId": {
+          "Ref": "VpcCreatedD03360A5",
+        },
+      },
+      "Type": "AWS::EC2::VPCGatewayAttachment",
+    },
+  },
+  "Rules": {
+    "CheckBootstrapVersion": {
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Not": [
+              {
+                "Fn::Contains": [
+                  [
+                    "1",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                  ],
+                  {
+                    "Ref": "BootstrapVersion",
+                  },
+                ],
+              },
+            ],
+          },
+          "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI.",
+        },
+      ],
+    },
+  },
+}
+`;
+
+exports[`golden snapshots > ofac-example-team-team-alpha-plane 1`] = `
+{
+  "Parameters": {
+    "BootstrapVersion": {
+      "Default": "/cdk-bootstrap/hnb659fds/version",
+      "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]",
+      "Type": "AWS::SSM::Parameter::Value<String>",
+    },
+  },
+  "Resources": {
+    "ClusterC2E21B66": {
+      "Properties": {
+        "Tags": [
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "team",
+          },
+          {
+            "Key": "ofac:team",
+            "Value": "team-alpha",
+          },
+        ],
+      },
+      "Type": "AWS::ECS::Cluster",
+    },
+    "PlaneFleetAp8CCB0CA9": {
+      "Properties": {
+        "AccessPointTags": [
+          {
+            "Key": "Name",
+            "Value": "ofac-example-team-team-alpha-plane/Plane/FleetAp",
+          },
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "team",
+          },
+          {
+            "Key": "ofac:team",
+            "Value": "team-alpha",
+          },
+        ],
+        "FileSystemId": {
+          "Ref": "PlaneWorkspaces3BEA2886",
+        },
+        "PosixUser": {
+          "Gid": "1000",
+          "Uid": "1000",
+        },
+        "RootDirectory": {
+          "CreationInfo": {
+            "OwnerGid": "1000",
+            "OwnerUid": "1000",
+            "Permissions": "775",
+          },
+          "Path": "/workspaces",
+        },
+      },
+      "Type": "AWS::EFS::AccessPoint",
+    },
+    "PlaneGatewayApBFEAFD40": {
+      "Properties": {
+        "AccessPointTags": [
+          {
+            "Key": "Name",
+            "Value": "ofac-example-team-team-alpha-plane/Plane/GatewayAp",
+          },
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "team",
+          },
+          {
+            "Key": "ofac:team",
+            "Value": "team-alpha",
+          },
+        ],
+        "FileSystemId": {
+          "Ref": "PlaneWorkspaces3BEA2886",
+        },
+        "PosixUser": {
+          "Gid": "1001",
+          "Uid": "1001",
+        },
+        "RootDirectory": {
+          "CreationInfo": {
+            "OwnerGid": "1001",
+            "OwnerUid": "1001",
+            "Permissions": "700",
+          },
+          "Path": "/state/gateway",
+        },
+      },
+      "Type": "AWS::EFS::AccessPoint",
+    },
+    "PlaneGatewayLogs5906CDF1": {
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "RetentionInDays": 365,
+        "Tags": [
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "team",
+          },
+          {
+            "Key": "ofac:team",
+            "Value": "team-alpha",
+          },
+        ],
+      },
+      "Type": "AWS::Logs::LogGroup",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "PlaneGatewayService4021AD1A": {
+      "DependsOn": [
+        "PlaneGatewayTaskTaskRoleDefaultPolicy09FD1E0A",
+        "PlaneGatewayTaskTaskRole61144DE0",
+      ],
+      "Properties": {
+        "Cluster": {
+          "Ref": "ClusterC2E21B66",
+        },
+        "DeploymentConfiguration": {
+          "Alarms": {
+            "AlarmNames": [],
+            "Enable": false,
+            "Rollback": false,
+          },
+          "DeploymentCircuitBreaker": {
+            "Enable": true,
+            "Rollback": true,
+          },
+          "MaximumPercent": 200,
+          "MinimumHealthyPercent": 0,
+        },
+        "DeploymentController": {
+          "Type": "ECS",
+        },
+        "DesiredCount": 1,
+        "EnableECSManagedTags": false,
+        "HealthCheckGracePeriodSeconds": 120,
+        "LaunchType": "FARGATE",
+        "NetworkConfiguration": {
+          "AwsvpcConfiguration": {
+            "AssignPublicIp": "DISABLED",
+            "SecurityGroups": [
+              {
+                "Fn::GetAtt": [
+                  "PlaneTasksSgBA949434",
+                  "GroupId",
+                ],
+              },
+            ],
+            "Subnets": [
+              {
+                "Fn::ImportValue": "ofac-example-team-team-alpha-network:ExportsOutputRefVpcCreatedPrivateSubnet1Subnet7643CE4890940587",
+              },
+              {
+                "Fn::ImportValue": "ofac-example-team-team-alpha-network:ExportsOutputRefVpcCreatedPrivateSubnet2SubnetA311D4C147C0897F",
+              },
+            ],
+          },
+        },
+        "PlatformVersion": "LATEST",
+        "Tags": [
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:plane",
+            "Value": "team",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "team",
+          },
+          {
+            "Key": "ofac:team",
+            "Value": "team-alpha",
+          },
+        ],
+        "TaskDefinition": {
+          "Ref": "PlaneGatewayTask72D3E8DE",
+        },
+      },
+      "Type": "AWS::ECS::Service",
+    },
+    "PlaneGatewayTask72D3E8DE": {
+      "Properties": {
+        "ContainerDefinitions": [
+          {
+            "Environment": [
+              {
+                "Name": "OFAC_KERNEL_URL",
+                "Value": "https://kernel.example.org",
+              },
+              {
+                "Name": "STATE_PATH",
+                "Value": "/var/lib/ofac/gateway",
+              },
+            ],
+            "Essential": true,
+            "Image": "ghcr.io/denisekart/open-facilitator/gateway@sha256:0000000000000000000000000000000000000000000000000000000000000000",
+            "LogConfiguration": {
+              "LogDriver": "awslogs",
+              "Options": {
+                "awslogs-group": {
+                  "Ref": "PlaneGatewayLogs5906CDF1",
+                },
+                "awslogs-region": "eu-west-1",
+                "awslogs-stream-prefix": "gateway",
+              },
+            },
+            "MountPoints": [
+              {
+                "ContainerPath": "/var/lib/ofac/gateway",
+                "ReadOnly": false,
+                "SourceVolume": "state",
+              },
+            ],
+            "Name": "gateway",
+            "Secrets": [
+              {
+                "Name": "OFAC_LINK_TOKEN",
+                "ValueFrom": {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition",
+                      },
+                      ":secretsmanager:eu-west-1:222222222222:secret:ofac/team-alpha/link",
+                    ],
+                  ],
+                },
+              },
+            ],
+          },
+        ],
+        "Cpu": "1024",
+        "ExecutionRoleArn": {
+          "Fn::GetAtt": [
+            "PlaneGatewayTaskExecutionRole6ECCB78F",
+            "Arn",
+          ],
+        },
+        "Family": "ofacexampleteamteamalphaplanePlaneGatewayTaskD2D1CBF7",
+        "Memory": "2048",
+        "NetworkMode": "awsvpc",
+        "RequiresCompatibilities": [
+          "FARGATE",
+        ],
+        "Tags": [
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "team",
+          },
+          {
+            "Key": "ofac:team",
+            "Value": "team-alpha",
+          },
+        ],
+        "TaskRoleArn": {
+          "Fn::GetAtt": [
+            "PlaneGatewayTaskTaskRole61144DE0",
+            "Arn",
+          ],
+        },
+        "Volumes": [
+          {
+            "EFSVolumeConfiguration": {
+              "AuthorizationConfig": {
+                "AccessPointId": {
+                  "Ref": "PlaneGatewayApBFEAFD40",
+                },
+                "IAM": "ENABLED",
+              },
+              "FilesystemId": {
+                "Ref": "PlaneWorkspaces3BEA2886",
+              },
+              "TransitEncryption": "ENABLED",
+            },
+            "Name": "state",
+          },
+        ],
+      },
+      "Type": "AWS::ECS::TaskDefinition",
+    },
+    "PlaneGatewayTaskExecutionRole6ECCB78F": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "ecs-tasks.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "Tags": [
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "team",
+          },
+          {
+            "Key": "ofac:team",
+            "Value": "team-alpha",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "PlaneGatewayTaskExecutionRoleDefaultPolicy392EE1D2": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "logs:CreateLogStream",
+                "logs:PutLogEvents",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "PlaneGatewayLogs5906CDF1",
+                  "Arn",
+                ],
+              },
+            },
+            {
+              "Action": [
+                "secretsmanager:GetSecretValue",
+                "secretsmanager:DescribeSecret",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:",
+                    {
+                      "Ref": "AWS::Partition",
+                    },
+                    ":secretsmanager:eu-west-1:222222222222:secret:ofac/team-alpha/link",
+                  ],
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "PlaneGatewayTaskExecutionRoleDefaultPolicy392EE1D2",
+        "Roles": [
+          {
+            "Ref": "PlaneGatewayTaskExecutionRole6ECCB78F",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "PlaneGatewayTaskTaskRole61144DE0": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "ecs-tasks.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "Tags": [
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "team",
+          },
+          {
+            "Key": "ofac:team",
+            "Value": "team-alpha",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "PlaneGatewayTaskTaskRoleDefaultPolicy09FD1E0A": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "elasticfilesystem:ClientMount",
+                "elasticfilesystem:ClientWrite",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "PlaneWorkspaces3BEA2886",
+                  "Arn",
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "PlaneGatewayTaskTaskRoleDefaultPolicy09FD1E0A",
+        "Roles": [
+          {
+            "Ref": "PlaneGatewayTaskTaskRole61144DE0",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "PlaneTasksSgBA949434": {
+      "Properties": {
+        "GroupDescription": "ofac team tasks: egress-only (link plane dials out)",
+        "SecurityGroupEgress": [
+          {
+            "CidrIp": "0.0.0.0/0",
+            "Description": "Allow all outbound traffic by default",
+            "IpProtocol": "-1",
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "team",
+          },
+          {
+            "Key": "ofac:team",
+            "Value": "team-alpha",
+          },
+        ],
+        "VpcId": {
+          "Fn::ImportValue": "ofac-example-team-team-alpha-network:ExportsOutputRefVpcCreatedD03360A5C9BB017F",
+        },
+      },
+      "Type": "AWS::EC2::SecurityGroup",
+    },
+    "PlaneWorkspaceApA483014E": {
+      "Properties": {
+        "AccessPointTags": [
+          {
+            "Key": "Name",
+            "Value": "ofac-example-team-team-alpha-plane/Plane/WorkspaceAp",
+          },
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "team",
+          },
+          {
+            "Key": "ofac:team",
+            "Value": "team-alpha",
+          },
+        ],
+        "FileSystemId": {
+          "Ref": "PlaneWorkspaces3BEA2886",
+        },
+        "PosixUser": {
+          "Gid": "1002",
+          "Uid": "1002",
+        },
+        "RootDirectory": {
+          "CreationInfo": {
+            "OwnerGid": "1002",
+            "OwnerUid": "1002",
+            "Permissions": "700",
+          },
+          "Path": "/state/workspace",
+        },
+      },
+      "Type": "AWS::EFS::AccessPoint",
+    },
+    "PlaneWorkspaceLogsDD5878F8": {
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "RetentionInDays": 365,
+        "Tags": [
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "team",
+          },
+          {
+            "Key": "ofac:team",
+            "Value": "team-alpha",
+          },
+        ],
+      },
+      "Type": "AWS::Logs::LogGroup",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "PlaneWorkspaceServiceB8058B40": {
+      "DependsOn": [
+        "PlaneWorkspaceTaskTaskRoleDefaultPolicy0D2F345A",
+        "PlaneWorkspaceTaskTaskRoleBC65F634",
+      ],
+      "Properties": {
+        "Cluster": {
+          "Ref": "ClusterC2E21B66",
+        },
+        "DeploymentConfiguration": {
+          "Alarms": {
+            "AlarmNames": [],
+            "Enable": false,
+            "Rollback": false,
+          },
+          "DeploymentCircuitBreaker": {
+            "Enable": true,
+            "Rollback": true,
+          },
+          "MaximumPercent": 200,
+          "MinimumHealthyPercent": 0,
+        },
+        "DeploymentController": {
+          "Type": "ECS",
+        },
+        "DesiredCount": 1,
+        "EnableECSManagedTags": false,
+        "HealthCheckGracePeriodSeconds": 120,
+        "LaunchType": "FARGATE",
+        "NetworkConfiguration": {
+          "AwsvpcConfiguration": {
+            "AssignPublicIp": "DISABLED",
+            "SecurityGroups": [
+              {
+                "Fn::GetAtt": [
+                  "PlaneTasksSgBA949434",
+                  "GroupId",
+                ],
+              },
+            ],
+            "Subnets": [
+              {
+                "Fn::ImportValue": "ofac-example-team-team-alpha-network:ExportsOutputRefVpcCreatedPrivateSubnet1Subnet7643CE4890940587",
+              },
+              {
+                "Fn::ImportValue": "ofac-example-team-team-alpha-network:ExportsOutputRefVpcCreatedPrivateSubnet2SubnetA311D4C147C0897F",
+              },
+            ],
+          },
+        },
+        "PlatformVersion": "LATEST",
+        "Tags": [
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:plane",
+            "Value": "team",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "team",
+          },
+          {
+            "Key": "ofac:team",
+            "Value": "team-alpha",
+          },
+        ],
+        "TaskDefinition": {
+          "Ref": "PlaneWorkspaceTask1BA39BE4",
+        },
+      },
+      "Type": "AWS::ECS::Service",
+    },
+    "PlaneWorkspaceTask1BA39BE4": {
+      "Properties": {
+        "ContainerDefinitions": [
+          {
+            "Environment": [
+              {
+                "Name": "OFAC_KERNEL_URL",
+                "Value": "https://kernel.example.org",
+              },
+              {
+                "Name": "STATE_PATH",
+                "Value": "/var/lib/ofac/workspace",
+              },
+            ],
+            "Essential": true,
+            "Image": "ghcr.io/denisekart/open-facilitator/demo-workspace@sha256:0000000000000000000000000000000000000000000000000000000000000000",
+            "LogConfiguration": {
+              "LogDriver": "awslogs",
+              "Options": {
+                "awslogs-group": {
+                  "Ref": "PlaneWorkspaceLogsDD5878F8",
+                },
+                "awslogs-region": "eu-west-1",
+                "awslogs-stream-prefix": "workspace",
+              },
+            },
+            "MountPoints": [
+              {
+                "ContainerPath": "/var/lib/ofac/workspace",
+                "ReadOnly": false,
+                "SourceVolume": "state",
+              },
+            ],
+            "Name": "workspace",
+            "Secrets": [
+              {
+                "Name": "OFAC_LINK_TOKEN",
+                "ValueFrom": {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition",
+                      },
+                      ":secretsmanager:eu-west-1:222222222222:secret:ofac/team-alpha/link",
+                    ],
+                  ],
+                },
+              },
+            ],
+          },
+        ],
+        "Cpu": "1024",
+        "ExecutionRoleArn": {
+          "Fn::GetAtt": [
+            "PlaneWorkspaceTaskExecutionRole1F660413",
+            "Arn",
+          ],
+        },
+        "Family": "ofacexampleteamteamalphaplanePlaneWorkspaceTask9AF31E93",
+        "Memory": "2048",
+        "NetworkMode": "awsvpc",
+        "RequiresCompatibilities": [
+          "FARGATE",
+        ],
+        "Tags": [
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "team",
+          },
+          {
+            "Key": "ofac:team",
+            "Value": "team-alpha",
+          },
+        ],
+        "TaskRoleArn": {
+          "Fn::GetAtt": [
+            "PlaneWorkspaceTaskTaskRoleBC65F634",
+            "Arn",
+          ],
+        },
+        "Volumes": [
+          {
+            "EFSVolumeConfiguration": {
+              "AuthorizationConfig": {
+                "AccessPointId": {
+                  "Ref": "PlaneWorkspaceApA483014E",
+                },
+                "IAM": "ENABLED",
+              },
+              "FilesystemId": {
+                "Ref": "PlaneWorkspaces3BEA2886",
+              },
+              "TransitEncryption": "ENABLED",
+            },
+            "Name": "state",
+          },
+        ],
+      },
+      "Type": "AWS::ECS::TaskDefinition",
+    },
+    "PlaneWorkspaceTaskExecutionRole1F660413": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "ecs-tasks.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "Tags": [
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "team",
+          },
+          {
+            "Key": "ofac:team",
+            "Value": "team-alpha",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "PlaneWorkspaceTaskExecutionRoleDefaultPolicy5B626FE8": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "logs:CreateLogStream",
+                "logs:PutLogEvents",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "PlaneWorkspaceLogsDD5878F8",
+                  "Arn",
+                ],
+              },
+            },
+            {
+              "Action": [
+                "secretsmanager:GetSecretValue",
+                "secretsmanager:DescribeSecret",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:",
+                    {
+                      "Ref": "AWS::Partition",
+                    },
+                    ":secretsmanager:eu-west-1:222222222222:secret:ofac/team-alpha/link",
+                  ],
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "PlaneWorkspaceTaskExecutionRoleDefaultPolicy5B626FE8",
+        "Roles": [
+          {
+            "Ref": "PlaneWorkspaceTaskExecutionRole1F660413",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "PlaneWorkspaceTaskTaskRoleBC65F634": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "ecs-tasks.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "Tags": [
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "team",
+          },
+          {
+            "Key": "ofac:team",
+            "Value": "team-alpha",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "PlaneWorkspaceTaskTaskRoleDefaultPolicy0D2F345A": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "elasticfilesystem:ClientMount",
+                "elasticfilesystem:ClientWrite",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "PlaneWorkspaces3BEA2886",
+                  "Arn",
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "PlaneWorkspaceTaskTaskRoleDefaultPolicy0D2F345A",
+        "Roles": [
+          {
+            "Ref": "PlaneWorkspaceTaskTaskRoleBC65F634",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "PlaneWorkspaces3BEA2886": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "Encrypted": true,
+        "FileSystemTags": [
+          {
+            "Key": "Name",
+            "Value": "ofac-example-team-team-alpha-plane/Plane/Workspaces",
+          },
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:plane",
+            "Value": "team",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "team",
+          },
+          {
+            "Key": "ofac:team",
+            "Value": "team-alpha",
+          },
+        ],
+        "LifecyclePolicies": [
+          {
+            "TransitionToIA": "AFTER_30_DAYS",
+          },
+        ],
+      },
+      "Type": "AWS::EFS::FileSystem",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "PlaneWorkspacesEfsMountTarget19199E603": {
+      "Properties": {
+        "FileSystemId": {
+          "Ref": "PlaneWorkspaces3BEA2886",
+        },
+        "SecurityGroups": [
+          {
+            "Fn::GetAtt": [
+              "PlaneWorkspacesEfsSecurityGroup137F67F6",
+              "GroupId",
+            ],
+          },
+        ],
+        "SubnetId": {
+          "Fn::ImportValue": "ofac-example-team-team-alpha-network:ExportsOutputRefVpcCreatedPrivateSubnet1Subnet7643CE4890940587",
+        },
+      },
+      "Type": "AWS::EFS::MountTarget",
+    },
+    "PlaneWorkspacesEfsMountTarget2CB853451": {
+      "Properties": {
+        "FileSystemId": {
+          "Ref": "PlaneWorkspaces3BEA2886",
+        },
+        "SecurityGroups": [
+          {
+            "Fn::GetAtt": [
+              "PlaneWorkspacesEfsSecurityGroup137F67F6",
+              "GroupId",
+            ],
+          },
+        ],
+        "SubnetId": {
+          "Fn::ImportValue": "ofac-example-team-team-alpha-network:ExportsOutputRefVpcCreatedPrivateSubnet2SubnetA311D4C147C0897F",
+        },
+      },
+      "Type": "AWS::EFS::MountTarget",
+    },
+    "PlaneWorkspacesEfsSecurityGroup137F67F6": {
+      "Properties": {
+        "GroupDescription": "ofac-example-team-team-alpha-plane/Plane/Workspaces/EfsSecurityGroup",
+        "SecurityGroupEgress": [
+          {
+            "CidrIp": "0.0.0.0/0",
+            "Description": "Allow all outbound traffic by default",
+            "IpProtocol": "-1",
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ofac-example-team-team-alpha-plane/Plane/Workspaces",
+          },
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:plane",
+            "Value": "team",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "team",
+          },
+          {
+            "Key": "ofac:team",
+            "Value": "team-alpha",
+          },
+        ],
+        "VpcId": {
+          "Fn::ImportValue": "ofac-example-team-team-alpha-network:ExportsOutputRefVpcCreatedD03360A5C9BB017F",
+        },
+      },
+      "Type": "AWS::EC2::SecurityGroup",
+    },
+  },
+  "Rules": {
+    "CheckBootstrapVersion": {
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Not": [
+              {
+                "Fn::Contains": [
+                  [
+                    "1",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                  ],
+                  {
+                    "Ref": "BootstrapVersion",
+                  },
+                ],
+              },
+            ],
+          },
+          "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI.",
+        },
+      ],
+    },
+  },
+}
+`;

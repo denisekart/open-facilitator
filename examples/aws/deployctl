@@ -1,0 +1,155 @@
+#!/usr/bin/env bash
+# deployctl — the operator loop over the CDK app: diff/deploy/destroy a
+# named environment (envs/<name>.json), per account class, plus a local-only
+# LocalStack smoke. An orchestrator, not a runtime: everything here shells to
+# `pnpm exec cdk`, `docker compose`, and the `aws` CLI.
+#
+# Usage:
+#   ./deployctl plan   --env NAME [--account platform|team:NAME] [--profile P] [cdk args…]
+#   ./deployctl diff   --env NAME [--account …] [--profile P] [cdk args…]   (synth + diff)
+#   ./deployctl deploy --env NAME [--account …] [--profile P] [cdk args…]   (human-run; no CI)
+#   ./deployctl destroy --env NAME [--account …] [--profile P] STACK…
+#   ./deployctl smoke                                  LocalStack bring-up + assertions (local only)
+#
+# --account selects WHICH stacks go on the command line: 'platform' picks
+# ofac-<env>-{network,data,identity,kernel,observability}; 'team:<name>' picks
+# ofac-<env>-team-<name>-{network,plane[,fleet]}. Omit it to name stacks
+# yourself in the trailing args.
+set -euo pipefail
+
+HERE=$(cd -- "$(dirname -- "$0")" && pwd)
+
+usage() {
+  awk '/^set -euo/{exit} NR>1 && /^#/{sub(/^# ?/,"");print}' "$0"
+  exit 2
+}
+
+have() { command -v "$1" >/dev/null 2>&1 || { echo "deployctl: '$1' required" >&2; exit 2; }; }
+
+ENV_NAME=""; ACCOUNT_FILTER=""; ENV_FILE=""
+
+# stack_select — the stack names for the chosen account filter (sets SELECTED).
+stack_select() {
+  SELECTED=()
+  case "$ACCOUNT_FILTER" in
+    platform)
+      SELECTED=(ofac-"$ENV_NAME"-network ofac-"$ENV_NAME"-data ofac-"$ENV_NAME"-identity ofac-"$ENV_NAME"-kernel ofac-"$ENV_NAME"-observability) ;;
+    team:*)
+      local t=${ACCOUNT_FILTER#team:}
+      SELECTED=(ofac-"$ENV_NAME"-team-"$t"-network ofac-"$ENV_NAME"-team-"$t"-plane)
+      # Fleet is an opt-in capability: only pass it when the env file says so.
+      if jq -e --arg t "$t" '.teams[] | select(.name==$t) | .fleet == true' "$ENV_FILE" >/dev/null; then
+        SELECTED+=(ofac-"$ENV_NAME"-team-"$t"-fleet)
+      fi ;;
+    "") ;;  # caller names stacks explicitly
+    *) echo "deployctl: --account takes platform|team:<name>" >&2; exit 2 ;;
+  esac
+}
+
+# cdk_run <verb> <envfile-relative> [flags…] — flags before stacks.
+cdk_run() {
+  local verb=$1 envfile=$2; shift 2
+  local -a extra=("$@")
+  (cd "$HERE" && pnpm exec cdk "$verb" -c "envFile=$envfile" \
+    --path-metadata false --version-reporting false "${extra[@]+"${extra[@]}"}")
+}
+
+cmd_verb() { # diff|deploy|destroy
+  local verb=$1; shift
+  local profile= rest=()
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --env) ENV_NAME=${2:?--env needs a value}; shift 2 ;;
+      --account) ACCOUNT_FILTER=${2:?--account needs a value}; shift 2 ;;
+      --profile) profile=${2:?--profile needs a value}; shift 2 ;;
+      *) rest+=("$1"); shift ;;
+    esac
+  done
+  have pnpm; have jq
+  [ -n "$ENV_NAME" ] || { echo "deployctl: --env NAME required (envs/NAME.json)" >&2; usage; }
+  ENV_FILE="$HERE/envs/$ENV_NAME.json"
+  [ -f "$ENV_FILE" ] || { echo "deployctl: env file not found: $ENV_FILE (copy envs/example.json)" >&2; exit 2; }
+  jq -e . "$ENV_FILE" >/dev/null || { echo "deployctl: env file is not valid JSON: $ENV_FILE" >&2; exit 2; }
+  stack_select
+  local -a args=()
+  [ ${#SELECTED[@]} -gt 0 ] && args+=("${SELECTED[@]}")
+  [ ${#rest[@]} -gt 0 ] && args+=("${rest[@]}")
+  if [ ${#args[@]} -eq 0 ]; then
+    echo "deployctl: no stacks selected — pass --account or name stacks" >&2; usage
+  fi
+  [ "$verb" = deploy ] && args+=(--require-approval never)
+  [ -n "$profile" ] && args+=(--profile "$profile")
+  cdk_run "$verb" "envs/$ENV_NAME.json" ${args[@]+"${args[@]}"}
+}
+
+cmd_smoke() {
+  have docker; have aws; have jq; have pnpm
+  local lsdir="$HERE/localstack"
+  # A crashed prior run (or a probe under another compose project name)
+  # can leave the named container behind; sweep it by name, then project.
+  docker rm -f ofac-smoke-localstack >/dev/null 2>&1 || true
+  docker compose -f "$lsdir/compose.yaml" down -v >/dev/null 2>&1 || true
+  docker compose -f "$lsdir/compose.yaml" up -d
+  trap "docker compose -f '$lsdir/compose.yaml' down -v >/dev/null 2>&1 || true" EXIT
+  # Wait for the edge to answer before any SDK call races it (a cold
+  # arm64 pull+boot can need a couple of minutes).
+  for _ in $(seq 1 180); do
+    curl -fs http://localhost:4566/_localstack/health >/dev/null 2>&1 && break
+    sleep 1
+  done
+  export AWS_ENDPOINT_URL=http://localhost:4566 AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test AWS_DEFAULT_REGION=us-east-1
+  # CDK's env lookup demands a bootstrap marker; the stacks here need no
+  # bootstrap assets (no custom-resource images, no ECR bucket), so a bare
+  # version parameter is exactly what the CLI gate asks for.
+  aws ssm put-parameter --name /cdk-bootstrap/hnb659fds/version \
+    --value 23 --type String --overwrite >/dev/null
+  # The CLI publishes each template to the bootstrap assets bucket; an
+  # empty bucket + versioning is all the publish step checks for.
+  # us-east-1 is the default constraint: a plain create works on both
+  # real AWS and LocalStack (which rejects an explicit LocationConstraint).
+  aws s3api create-bucket --bucket cdk-hnb659fds-assets-000000000000-us-east-1 >/dev/null
+  aws s3api put-bucket-versioning --bucket cdk-hnb659fds-assets-000000000000-us-east-1 \
+    --versioning-configuration Status=Enabled
+  # Single fake account for the smoke; the env file's platform account must
+  # match so per-stack env stays resolvable without lookups. Teams drop out.
+  local envfile="envs/smoke.json"
+  # 'none': LocalStack 4's CFN cannot provision a NatGateway (its EIP
+  # wiring hands back an unusable allocation id), so the smoke topology
+  # is the gateway shape minus the gateway; assertions cover VPC/subnets/
+  # endpoints, S3, RDS, secrets, Cognito — not NAT egress.
+  jq '.platform.account = "000000000000" | .platform.region = "us-east-1" | .platform.natMode = "none" | .teams = []' \
+    "$HERE/envs/example.json" > "$HERE/$envfile"
+  # Documented exclusions: ALB+WAF and ECS have only partial LocalStack
+  # coverage we refuse to depend on — those stacks stay synth/snapshot-only.
+  cdk_run deploy "$envfile" --require-approval never \
+    ofac-smoke-network ofac-smoke-data ofac-smoke-identity
+  local fail=0
+  check() { if eval "$2" >/dev/null 2>&1; then echo "PASS $1"; else echo "FAIL $1" >&2; fail=1; fi; }
+  local vpc bucket secret
+  vpc=$(aws ec2 describe-vpcs --filters Name=tag:Name,Values='*network*' --query 'Vpcs[0].VpcId' --output text || true)
+  check "vpc exists"          "[ -n '${vpc:-}' ] && [ '$vpc' != None ]"
+  check "2 private subnets"   "[ \$(aws ec2 describe-subnets --filters Name=vpc-id,Values=$vpc --query 'length(Subnets)') -ge 2 ]"
+  check "vpc endpoints"       "[ \$(aws ec2 describe-vpc-endpoints --filters Name=vpc-id,Values=$vpc --query 'length(VpcEndpoints)') -ge 1 ]"
+  bucket=$(aws cloudformation describe-stacks --stack-name ofac-smoke-data \
+    --query "Stacks[0].Outputs[?contains(OutputKey,'ArtifactBucket')].OutputValue | [0]" --output text || true)
+  check "bucket versioned"    "aws s3api get-bucket-versioning --bucket '$bucket' --query Status --output text | grep -q Enabled"
+  # Env-scoped secret name: resolve it through the stack's own resource
+  # inventory instead of hardcoding `facilitator/db`.
+  secret=$(aws cloudformation describe-stack-resources --stack-name ofac-smoke-data \
+    --query "StackResources[?ResourceType=='AWS::SecretsManager::Secret'].PhysicalResourceId | [0]" --output text || true)
+  check "db secret exists"    "aws secretsmanager describe-secret --secret-id '${secret:-none}'"
+  # LocalStack's CFN provider does not wire Cognito into the cognito-idp
+  # API mock (list returns empty, outputs render 'unknown'), so pool +
+  # domain are asserted as CREATE_COMPLETE on the identity stack itself.
+  check "cognito pool exists"   "aws cloudformation describe-stack-resources --stack-name ofac-smoke-identity --query \"StackResources[?ResourceType=='AWS::Cognito::UserPool' && ResourceStatus=='CREATE_COMPLETE'] | length(@)\" | grep -q '[1-9]'"
+  check "cognito domain exists" "aws cloudformation describe-stack-resources --stack-name ofac-smoke-identity --query \"StackResources[?ResourceType=='AWS::Cognito::UserPoolDomain' && ResourceStatus=='CREATE_COMPLETE'] | length(@)\" | grep -q '[1-9]'"
+  rm -f "$HERE/$envfile"
+  [ $fail -eq 0 ] && echo "deployctl smoke: all assertions passed" || { echo "deployctl smoke: FAILURES above" >&2; exit 1; }
+}
+
+case "${1:-}" in
+  plan) shift; cmd_verb diff "$@" ;;
+  diff | deploy | destroy) v=$1; shift; cmd_verb "$v" "$@" ;;
+  smoke) shift; cmd_smoke "$@" ;;
+  *) usage ;;
+esac

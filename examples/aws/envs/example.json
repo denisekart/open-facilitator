@@ -1,0 +1,27 @@
+{
+  "platform": {
+    "account": "111111111111",
+    "region": "eu-west-1",
+    "hostedZoneDomain": "example.org",
+    "kernelDomain": "kernel.example.org",
+    "vpc": null,
+    "images": {
+      "kernel": "ghcr.io/denisekart/open-facilitator/kernel@sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "node": "ghcr.io/denisekart/open-facilitator/node-runtime@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  },
+  "teams": [
+    {
+      "name": "team-alpha",
+      "account": "222222222222",
+      "region": "eu-west-1",
+      "vpc": null,
+      "fleet": false,
+      "images": {
+        "gateway": "ghcr.io/denisekart/open-facilitator/gateway@sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "workspace": "ghcr.io/denisekart/open-facilitator/demo-workspace@sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "fleetLauncher": "ghcr.io/denisekart/open-facilitator/fleet-launcher@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    }
+  ]
+}

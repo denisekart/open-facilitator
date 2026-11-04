@@ -1,0 +1,22 @@
+{
+  "name": "example-aws-deploy",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json --noEmit false --outDir dist --declaration false --sourceMap false",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "catalog:",
+    "constructs": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "aws-cdk": "catalog:",
+    "cdk-nag": "^3.0.2",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

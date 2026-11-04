@@ -1,0 +1,29 @@
+{
+  "name": "example-fleet-launcher",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Non-production AWS reference launcher: a link-plane client that dials the kernel and runs an ECS fleet from local static rules. Not part of the supported adapter set.",
+  "bin": {
+    "fleet-launcher": "./dist/bin/launcher.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts src/bin/launcher.ts --format esm --dts --target node22 --silent",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@aws-sdk/client-ecs": "catalog:",
+    "@ofac/protocol": "workspace:*",
+    "@ofac/workspace-link": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "tsup": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

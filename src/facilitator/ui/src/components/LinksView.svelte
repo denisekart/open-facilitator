@@ -1,8 +1,13 @@
 <script lang="ts">
   import { ApiError, getJson } from "../lib/api.js";
-  import { apiFetch } from "../lib/auth.svelte.js";
+  import { apiFetch, session } from "../lib/auth.svelte.js";
   import type { AdminLinksView } from "../lib/types.js";
+  import EnrollmentTokensCard from "./EnrollmentTokensCard.svelte";
   import ProblemNote from "./ProblemNote.svelte";
+
+  // Strictly framework-admin: the enrollment-tokens.manage gate, not the
+  // broader operator surface.
+  const canManageTokens = $derived(session.canManageEnrollmentTokens);
 
   let links = $state<AdminLinksView | null>(null);
   let error = $state<ApiError | null>(null);
@@ -77,3 +82,9 @@
     <p class="text-ink-3">loading…</p>
   {/if}
 </section>
+
+{#if canManageTokens}
+  <div class="mt-4">
+    <EnrollmentTokensCard />
+  </div>
+{/if}

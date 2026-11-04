@@ -8,6 +8,9 @@ const OPERATOR_ROLES = ["framework-admin", "kernel-operator"];
 /** Realm role that grants the AiDeck chat surface (mirrors the chat.* bindings). */
 const AI_OPERATOR_ROLES = ["ai-operator"];
 
+/** Realm role that grants enrollment-token mint/revoke (mirrors the enrollment-tokens.manage binding — strictly framework-admin). */
+const ENROLLMENT_ADMIN_ROLES = ["framework-admin"];
+
 interface TokenClaims {
   groups?: string[];
   realm_access?: { roles?: string[] };
@@ -54,6 +57,10 @@ export class AuthSession {
 
   get canMutate(): boolean {
     return this.roles.some((role) => OPERATOR_ROLES.includes(role));
+  }
+
+  get canManageEnrollmentTokens(): boolean {
+    return this.roles.some((role) => ENROLLMENT_ADMIN_ROLES.includes(role));
   }
 
   get canChat(): boolean {

@@ -3,6 +3,8 @@
 
 export interface AdminSummary {
   teams: number;
+  /** Roster slugs (sorted); drives the mint-card team dropdown. */
+  teamSlugs: string[];
   projects: number;
   workByState: Record<string, number>;
   assignmentsByState: Record<string, number>;
@@ -69,6 +71,26 @@ export interface AdminAffectedAssignment {
 export interface AdminLinksView {
   gateways: AdminLinkRow[];
   affectedAssignments: AdminAffectedAssignment[];
+}
+
+/** One row of GET /api/admin/enroll-tokens (the token literal is never returned). */
+export interface EnrollmentTokenRow {
+  id: string;
+  label: string;
+  team: string;
+  role: string;
+  createdAt: string;
+  expiresAt: string;
+  consumedAt: string | null;
+  consumedEndpointId: string | null;
+  revokedAt: string | null;
+}
+
+/** The 201 body of POST /api/admin/enroll-tokens — the only place the token literal appears. */
+export interface MintedEnrollmentToken {
+  id: string;
+  token: string;
+  expiresAt: string;
 }
 
 export interface AdminDeliveryRow {

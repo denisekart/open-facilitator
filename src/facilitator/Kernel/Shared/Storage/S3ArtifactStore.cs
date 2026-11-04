@@ -25,7 +25,11 @@ public sealed class S3ArtifactStore : IArtifactStore, IStoreSignedUrlSource, IDi
     private readonly string _bucket;
     private readonly bool _presignHttps;
 
-    /// <summary>Bind to <see cref="ArtifactOptions.S3"/>; fails closed naming every missing key.</summary>
+    /// <summary>Bind to <see cref="ArtifactOptions.S3"/>; fails closed naming every missing key.
+    /// Static <c>AccessKey</c>/<c>SecretKey</c> are optional <em>as a pair</em>: both present
+    /// signs SigV4 statically; both absent falls back to the SDK default credential chain
+    /// (task role → IMDSv2 — the shape on AWS, where infra ships zero static keys). A
+    /// half-set pair still fails closed naming both keys.</summary>
     public S3ArtifactStore(ArtifactOptions options)
     {
         var s3 = options.S3;
@@ -45,13 +49,14 @@ public sealed class S3ArtifactStore : IArtifactStore, IStoreSignedUrlSource, IDi
             missing.Add("Storage:S3:Region");
         }
 
-        if (string.IsNullOrWhiteSpace(s3.AccessKey))
+        // Optional as a PAIR: neither set = default chain; a half-set pair fails
+        // closed naming both keys (a lone AccessKey is a misconfiguration, not
+        // a chain request).
+        var hasAccessKey = !string.IsNullOrWhiteSpace(s3.AccessKey);
+        var hasSecretKey = !string.IsNullOrWhiteSpace(s3.SecretKey);
+        if (hasAccessKey != hasSecretKey)
         {
             missing.Add("Storage:S3:AccessKey");
-        }
-
-        if (string.IsNullOrWhiteSpace(s3.SecretKey))
-        {
             missing.Add("Storage:S3:SecretKey");
         }
 
@@ -64,14 +69,21 @@ public sealed class S3ArtifactStore : IArtifactStore, IStoreSignedUrlSource, IDi
         _bucket = s3.Bucket!;
         _presignHttps = !Uri.TryCreate(s3.Endpoint, UriKind.Absolute, out var ep)
             || ep.Scheme == Uri.UriSchemeHttps;
-        _client = new AmazonS3Client(
-            new BasicAWSCredentials(s3.AccessKey, s3.SecretKey),
-            new AmazonS3Config
-            {
-                ServiceURL = s3.Endpoint,
-                ForcePathStyle = s3.ForcePathStyle,
-                AuthenticationRegion = s3.Region,
-            });
+
+        // Both-set = static SigV4 (every S3-compatible endpoint, byte-identical to
+        // before); both-absent = the SDK default credential chain (env → task role
+        // → IMDSv2), which the credential-less client constructor resolves lazily.
+        // Presigning works either way: the URL signer signs with the client's
+        // resolved credentials.
+        var config = new AmazonS3Config
+        {
+            ServiceURL = s3.Endpoint,
+            ForcePathStyle = s3.ForcePathStyle,
+            AuthenticationRegion = s3.Region,
+        };
+        _client = string.IsNullOrWhiteSpace(s3.AccessKey)
+            ? new AmazonS3Client(config)
+            : new AmazonS3Client(new BasicAWSCredentials(s3.AccessKey, s3.SecretKey), config);
     }
 
     /// <summary>Test seam: run against an injected client (same key law).</summary>

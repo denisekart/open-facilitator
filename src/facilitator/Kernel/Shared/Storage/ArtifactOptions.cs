@@ -52,10 +52,12 @@ public sealed class ArtifactOptions
         /// <summary>SigV4 signing region (path-style endpoints still demand one). Required.</summary>
         public string? Region { get; set; }
 
-        /// <summary>Static access key. Required.</summary>
+        /// <summary>Static access key. Optional as a pair with <see cref="SecretKey"/>:
+        /// both set signs SigV4 statically, both unset uses the SDK default credential
+        /// chain (task role → IMDSv2); a half-set pair fails closed.</summary>
         public string? AccessKey { get; set; }
 
-        /// <summary>Static secret key. Required.</summary>
+        /// <summary>Static secret key. Optional as a pair with <see cref="AccessKey"/>.</summary>
         public string? SecretKey { get; set; }
 
         /// <summary>Address buckets as <c>{endpoint}/{bucket}/{key}</c> (what S3-compatible endpoints speak).</summary>

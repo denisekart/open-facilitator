@@ -356,6 +356,40 @@ public sealed class LinkEnrollmentEntity
     /// <summary>Mode (b): subject (client id / service account) of the workload token.</summary>
     public string? WorkloadSubject { get; set; }
 }
+ 
+/// <summary>facilitator.enrollment_tokens — mintable, revocable enrollment tokens (admin-minted; consumed on first enroll).</summary>
+public sealed class EnrollmentTokenEntity
+{
+    public Guid Id { get; set; }
+
+    /// <summary>SHA-256 (base64url) of the minted token literal — the literal itself is never stored.</summary>
+    public required string TokenHash { get; set; }
+
+    public required string Label { get; set; }
+
+    /// <summary>Team roster slug the token binds.</summary>
+    public required string Team { get; set; }
+
+    /// <summary>gateway | child — role the consuming enrollment must carry.</summary>
+    public required string Role { get; set; }
+
+    /// <summary>Subject claim of the minting principal (audit).</summary>
+    public string? CreatedBy { get; set; }
+
+    public DateTime CreatedAt { get; set; }
+
+    public DateTime ExpiresAt { get; set; }
+
+    public DateTime? RevokedAt { get; set; }
+
+    /// <summary>First use (the enroll that consumed it); afterwards the token is that endpoint's standing re-enroll secret.</summary>
+    public DateTime? ConsumedAt { get; set; }
+
+    public string? ConsumedEndpointId { get; set; }
+
+    /// <summary>Enrollment minted on consumption — revoke kills this link enrollment too.</summary>
+    public Guid? LinkEnrollmentId { get; set; }
+}
 
 /// <summary>facilitator.link_deliveries — durable delivery/receipt ledger.</summary>
 public sealed class LinkDeliveryEntity

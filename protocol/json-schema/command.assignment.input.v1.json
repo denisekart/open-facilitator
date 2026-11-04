@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openfacilitator.org/v1/command.assignment.input.v1.json",
+  "title": "AssignmentInputCommandV1Data",
+  "description": "A human answer to a pending event.assignment.input.required.v1. Routed to the Gateway bound to the assignment, which delivers a respond child message to the live run.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "commandId",
+    "requestId",
+    "answer",
+    "actorEvidenceRef"
+  ],
+  "properties": {
+    "commandId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "requestId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "answer": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 16384
+    },
+    "actorEvidenceRef": {
+      "$ref": "common.v1.json#/$defs/evidenceRef"
+    }
+  }
+}

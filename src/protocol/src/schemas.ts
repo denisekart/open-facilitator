@@ -19,6 +19,7 @@ import commandProvisionStop from "../schemas/command.provision.stop.v1.json" wit
 import commandContextFetch from "../schemas/command.context.fetch.v1.json" with { type: "json" };
 import commandApprovalConsume from "../schemas/command.approval.consume.v1.json" with { type: "json" };
 import commandApprovalRespond from "../schemas/command.approval.respond.v1.json" with { type: "json" };
+import commandAssignmentInput from "../schemas/command.assignment.input.v1.json" with { type: "json" };
 import commandArtifactRequestUpload from "../schemas/command.artifact.request_upload.v1.json" with { type: "json" };
 import commandArtifactConfirmUpload from "../schemas/command.artifact.confirm_upload.v1.json" with { type: "json" };
 import commandMemoryRetain from "../schemas/command.memory.retain.v1.json" with { type: "json" };
@@ -30,7 +31,7 @@ import commandCommunicationAcknowledge from "../schemas/command.communication.ac
 import commandProviderWebhook from "../schemas/command.provider.webhook.v1.json" with { type: "json" };
 import eventWorkAccepted from "../schemas/event.work.accepted.v1.json" with { type: "json" };
 import eventWorkProgress from "../schemas/event.work.progress.v1.json" with { type: "json" };
-import eventWorkInputRequired from "../schemas/event.work.input_required.v1.json" with { type: "json" };
+import eventAssignmentInputRequired from "../schemas/event.assignment.input.required.v1.json" with { type: "json" };
 import eventAssignmentCompleted from "../schemas/event.assignment.completed.v1.json" with { type: "json" };
 import eventAssignmentFailed from "../schemas/event.assignment.failed.v1.json" with { type: "json" };
 import eventWorkspaceHeartbeat from "../schemas/event.workspace.heartbeat.v1.json" with { type: "json" };
@@ -75,6 +76,7 @@ const all: JsonSchema[] = [
   commandContextFetch,
   commandApprovalConsume,
   commandApprovalRespond,
+  commandAssignmentInput,
   commandArtifactRequestUpload,
   commandArtifactConfirmUpload,
   commandMemoryRetain,
@@ -88,7 +90,7 @@ const all: JsonSchema[] = [
   commandProviderWebhook,
   eventWorkAccepted,
   eventWorkProgress,
-  eventWorkInputRequired,
+  eventAssignmentInputRequired,
   eventAssignmentCompleted,
   eventAssignmentFailed,
   eventWorkspaceHeartbeat,

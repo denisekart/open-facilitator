@@ -81,6 +81,9 @@
           },
           "supportsNudge": {
             "type": "boolean"
+          },
+          "supportsInteraction": {
+            "type": "boolean"
           }
         },
         "title": "CapabilityDescriptor"

@@ -1,0 +1,16 @@
+{
+  "specversion": "1.0",
+  "id": "01JCOMMAND-assign-input-badev",
+  "source": "urn:kernel:kernel-01",
+  "type": "org.facilitator.command.assignment.input.v1",
+  "subject": "work/work-123/assignment/analysis-1",
+  "time": "2026-10-22T19:10:00Z",
+  "datacontenttype": "application/json",
+  "dataschema": "https://schemas.openfacilitator.org/v1/command.assignment.input.v1.json",
+  "data": {
+    "commandId": "input-inp-exec-77-1",
+    "requestId": "inp-exec-77-1",
+    "answer": "Yes, include on-prem options.",
+    "actorEvidenceRef": "forgejo-comment-5501"
+  }
+}

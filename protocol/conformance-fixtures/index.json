@@ -47,6 +47,12 @@
       "type": "org.facilitator.command.approval.respond.v1"
     },
     {
+      "file": "valid/command.assignment.input.json",
+      "expect": "valid",
+      "class": "command",
+      "type": "org.facilitator.command.assignment.input.v1"
+    },
+    {
       "file": "valid/command.artifact.request-upload.json",
       "expect": "valid",
       "class": "command",
@@ -95,10 +101,10 @@
       "type": "org.facilitator.event.routing.requested.v1"
     },
     {
-      "file": "valid/event.work.input_required.json",
+      "file": "valid/event.assignment.input.required.json",
       "expect": "valid",
       "class": "event",
-      "type": "org.facilitator.event.work.input_required.v1"
+      "type": "org.facilitator.event.assignment.input.required.v1"
     },
     {
       "file": "valid/event.assignment.completed.json",
@@ -541,6 +547,12 @@
     },
     {
       "file": "invalid/command.approval.consume.no-evidence.json",
+      "expect": "invalid",
+      "class": "command",
+      "errorClass": "schema-violation"
+    },
+    {
+      "file": "invalid/command.assignment.input.bad-evidence.json",
       "expect": "invalid",
       "class": "command",
       "errorClass": "schema-violation"

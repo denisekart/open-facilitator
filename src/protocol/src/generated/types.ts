@@ -97,6 +97,7 @@ export interface CapabilityDescriptor {
   outputKinds?: string[];
   outputMediaTypes?: string[];
   supportsCancellation?: boolean;
+  supportsInteraction?: boolean;
   supportsNudge?: boolean;
   supportsSteering?: boolean;
   version: number;
@@ -145,6 +146,17 @@ export interface ArtifactRequestUploadCommandV1Data {
   retentionPolicy?: string;
   size: number;
   workId?: string;
+}
+
+/**
+ * A human answer to a pending event.assignment.input.required.v1. Routed to the Gateway
+ * bound to the assignment, which delivers a respond child message to the live run.
+ */
+export interface AssignmentInputCommandV1Data {
+  actorEvidenceRef: string;
+  answer: string;
+  commandId: string;
+  requestId: string;
 }
 
 export interface CommunicationAcknowledgeCommandV1Data {
@@ -532,6 +544,25 @@ export interface AssignmentFailedEventV1Data {
   workId: string;
 }
 
+/**
+ * An assignment paused mid-execution waiting for human input. Published by the adapter SDK
+ * when a harness calls requestInput; the kernel parks the assignment in the input_required
+ * status and fans the question out to the humans. Answered by command.assignment.input.v1,
+ * which unblocks the live run.
+ */
+export interface AssignmentInputRequiredEventV1Data {
+  assignmentId: string;
+  choices?: string[];
+  contextRef?: string;
+  createdAt: string;
+  deadline?: string;
+  executionGeneration: number;
+  executionId: string;
+  question: string;
+  requestId: string;
+  workId: string;
+}
+
 export interface MemoryCandidateEventV1Data {
   contentSummary: string;
   policyLabel?: PolicyLabel;
@@ -769,12 +800,6 @@ export interface EventRoutingRequestedV1 {
 export interface WorkAcceptedEventV1Data {
   acceptedAt: string;
   assignmentId: string;
-  workId: string;
-}
-
-export interface WorkInputRequiredEventV1Data {
-  assignmentId: string;
-  question: string;
   workId: string;
 }
 

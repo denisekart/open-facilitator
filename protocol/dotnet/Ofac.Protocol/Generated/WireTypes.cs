@@ -265,6 +265,10 @@ namespace Ofac.Protocol
         public bool? supportsCancellation { get; set; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("supportsInteraction")]
+        public bool? supportsInteraction { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("supportsNudge")]
         public bool? supportsNudge { get; set; }
 
@@ -376,6 +380,28 @@ namespace Ofac.Protocol
         public string? workId { get; set; }
     }
 
+    /// <summary>
+    /// A human answer to a pending event.assignment.input.required.v1. Routed to the Gateway
+    /// bound to the assignment, which delivers a respond child message to the live run.
+    /// </summary>
+    public partial class AssignmentInputCommandV1Data
+    {
+        [JsonPropertyName("actorEvidenceRef")]
+        public string actorEvidenceRef { get; set; }
+
+        [JsonPropertyName("answer")]
+        [JsonConverter(typeof(IndigoMinMaxLengthCheckConverter))]
+        public string answer { get; set; }
+
+        [JsonPropertyName("commandId")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string commandId { get; set; }
+
+        [JsonPropertyName("requestId")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string requestId { get; set; }
+    }
+
     public partial class CommunicationAcknowledgeCommandV1Data
     {
         [JsonPropertyName("commandId")]
@@ -437,7 +463,7 @@ namespace Ofac.Protocol
         public string commandId { get; set; }
 
         [JsonPropertyName("emojiName")]
-        [JsonConverter(typeof(IndigoMinMaxLengthCheckConverter))]
+        [JsonConverter(typeof(IndecentMinMaxLengthCheckConverter))]
         public string emojiName { get; set; }
 
         [JsonPropertyName("idempotencyKey")]
@@ -462,7 +488,7 @@ namespace Ofac.Protocol
         public ConversationTarget target { get; set; }
 
         [JsonPropertyName("text")]
-        [JsonConverter(typeof(IndecentMinMaxLengthCheckConverter))]
+        [JsonConverter(typeof(HilariousMinMaxLengthCheckConverter))]
         public string text { get; set; }
     }
 
@@ -480,7 +506,7 @@ namespace Ofac.Protocol
         public ConversationTarget target { get; set; }
 
         [JsonPropertyName("text")]
-        [JsonConverter(typeof(IndecentMinMaxLengthCheckConverter))]
+        [JsonConverter(typeof(HilariousMinMaxLengthCheckConverter))]
         public string text { get; set; }
     }
 
@@ -561,7 +587,7 @@ namespace Ofac.Protocol
         public string commandId { get; set; }
 
         [JsonPropertyName("content")]
-        [JsonConverter(typeof(AmbitiousMinMaxLengthCheckConverter))]
+        [JsonConverter(typeof(IndigoMinMaxLengthCheckConverter))]
         public string content { get; set; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -586,7 +612,7 @@ namespace Ofac.Protocol
         public MemoryRetainCommandV1DataProvenance provenance { get; set; }
 
         [JsonPropertyName("scopeSelector")]
-        [JsonConverter(typeof(HilariousMinMaxLengthCheckConverter))]
+        [JsonConverter(typeof(AmbitiousMinMaxLengthCheckConverter))]
         public string scopeSelector { get; set; }
 
         [JsonPropertyName("type")]
@@ -936,7 +962,7 @@ namespace Ofac.Protocol
         public string deadline { get; set; }
 
         [JsonPropertyName("directive")]
-        [JsonConverter(typeof(AmbitiousMinMaxLengthCheckConverter))]
+        [JsonConverter(typeof(IndigoMinMaxLengthCheckConverter))]
         public string directive { get; set; }
 
         [JsonPropertyName("executionGeneration")]
@@ -1297,7 +1323,7 @@ namespace Ofac.Protocol
         /// </summary>
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("classification")]
-        [JsonConverter(typeof(IndigoMinMaxLengthCheckConverter))]
+        [JsonConverter(typeof(IndecentMinMaxLengthCheckConverter))]
         public string? classification { get; set; }
 
         [JsonPropertyName("createdAt")]
@@ -1316,7 +1342,7 @@ namespace Ofac.Protocol
         /// </summary>
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("kind")]
-        [JsonConverter(typeof(IndigoMinMaxLengthCheckConverter))]
+        [JsonConverter(typeof(IndecentMinMaxLengthCheckConverter))]
         public string? kind { get; set; }
 
         [JsonPropertyName("mediaType")]
@@ -1350,6 +1376,54 @@ namespace Ofac.Protocol
 
         [JsonPropertyName("retryable")]
         public bool retryable { get; set; }
+
+        [JsonPropertyName("workId")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string workId { get; set; }
+    }
+
+    /// <summary>
+    /// An assignment paused mid-execution waiting for human input. Published by the adapter SDK
+    /// when a harness calls requestInput; the kernel parks the assignment in the input_required
+    /// status and fans the question out to the humans. Answered by command.assignment.input.v1,
+    /// which unblocks the live run.
+    /// </summary>
+    public partial class AssignmentInputRequiredEventV1Data
+    {
+        [JsonPropertyName("assignmentId")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string assignmentId { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("choices")]
+        [JsonConverter(typeof(IndigoDecodeArrayConverter))]
+        public string[]? choices { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("contextRef")]
+        public string? contextRef { get; set; }
+
+        [JsonPropertyName("createdAt")]
+        public string createdAt { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("deadline")]
+        public string? deadline { get; set; }
+
+        [JsonPropertyName("executionGeneration")]
+        public long executionGeneration { get; set; }
+
+        [JsonPropertyName("executionId")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string executionId { get; set; }
+
+        [JsonPropertyName("question")]
+        [JsonConverter(typeof(IndigoMinMaxLengthCheckConverter))]
+        public string question { get; set; }
+
+        [JsonPropertyName("requestId")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string requestId { get; set; }
 
         [JsonPropertyName("workId")]
         [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
@@ -1439,7 +1513,7 @@ namespace Ofac.Protocol
         /// </summary>
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("labels")]
-        [JsonConverter(typeof(IndigoDecodeArrayConverter))]
+        [JsonConverter(typeof(IndecentDecodeArrayConverter))]
         public string[]? labels { get; set; }
 
         /// <summary>
@@ -1468,7 +1542,7 @@ namespace Ofac.Protocol
         /// </summary>
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("text")]
-        [JsonConverter(typeof(IndecentMinMaxLengthCheckConverter))]
+        [JsonConverter(typeof(HilariousMinMaxLengthCheckConverter))]
         public string? text { get; set; }
     }
 
@@ -1543,7 +1617,7 @@ namespace Ofac.Protocol
         /// </summary>
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("labels")]
-        [JsonConverter(typeof(IndigoDecodeArrayConverter))]
+        [JsonConverter(typeof(IndecentDecodeArrayConverter))]
         public string[]? labels { get; set; }
 
         /// <summary>
@@ -1572,7 +1646,7 @@ namespace Ofac.Protocol
         /// </summary>
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("text")]
-        [JsonConverter(typeof(IndecentMinMaxLengthCheckConverter))]
+        [JsonConverter(typeof(HilariousMinMaxLengthCheckConverter))]
         public string? text { get; set; }
 
         /// <summary>
@@ -1611,7 +1685,7 @@ namespace Ofac.Protocol
         public ConversationReference reference { get; set; }
 
         [JsonPropertyName("text")]
-        [JsonConverter(typeof(IndecentMinMaxLengthCheckConverter))]
+        [JsonConverter(typeof(HilariousMinMaxLengthCheckConverter))]
         public string text { get; set; }
     }
 
@@ -1643,7 +1717,7 @@ namespace Ofac.Protocol
         public ConversationReference reference { get; set; }
 
         [JsonPropertyName("text")]
-        [JsonConverter(typeof(IndecentMinMaxLengthCheckConverter))]
+        [JsonConverter(typeof(HilariousMinMaxLengthCheckConverter))]
         public string text { get; set; }
     }
 
@@ -1664,7 +1738,7 @@ namespace Ofac.Protocol
         /// </summary>
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("description")]
-        [JsonConverter(typeof(IndecentMinMaxLengthCheckConverter))]
+        [JsonConverter(typeof(HilariousMinMaxLengthCheckConverter))]
         public string? description { get; set; }
 
         /// <summary>
@@ -1696,7 +1770,7 @@ namespace Ofac.Protocol
         public string actorProviderAccountId { get; set; }
 
         [JsonPropertyName("emojiName")]
-        [JsonConverter(typeof(IndigoMinMaxLengthCheckConverter))]
+        [JsonConverter(typeof(IndecentMinMaxLengthCheckConverter))]
         public string emojiName { get; set; }
 
         /// <summary>
@@ -1776,7 +1850,7 @@ namespace Ofac.Protocol
         public string intentId { get; set; }
 
         [JsonPropertyName("objective")]
-        [JsonConverter(typeof(IndecentMinMaxLengthCheckConverter))]
+        [JsonConverter(typeof(HilariousMinMaxLengthCheckConverter))]
         public string objective { get; set; }
 
         /// <summary>
@@ -1828,21 +1902,6 @@ namespace Ofac.Protocol
         [JsonPropertyName("assignmentId")]
         [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
         public string assignmentId { get; set; }
-
-        [JsonPropertyName("workId")]
-        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
-        public string workId { get; set; }
-    }
-
-    public partial class WorkInputRequiredEventV1Data
-    {
-        [JsonPropertyName("assignmentId")]
-        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
-        public string assignmentId { get; set; }
-
-        [JsonPropertyName("question")]
-        [JsonConverter(typeof(AmbitiousMinMaxLengthCheckConverter))]
-        public string question { get; set; }
 
         [JsonPropertyName("workId")]
         [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
@@ -2377,6 +2436,33 @@ namespace Ofac.Protocol
         public static readonly StickyMinMaxLengthCheckConverter Singleton = new StickyMinMaxLengthCheckConverter();
     }
 
+    internal class IndigoMinMaxLengthCheckConverter : JsonConverter<string>
+    {
+        public override bool CanConvert(Type t) => t == typeof(string);
+
+        public override string Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            var value = reader.GetString();
+            if (value.Length >= 1 && value.Length <= 16384)
+            {
+                return value;
+            }
+            throw new Exception("Cannot unmarshal type string");
+        }
+
+        public override void Write(Utf8JsonWriter writer, string value, JsonSerializerOptions options)
+        {
+            if (value.Length >= 1 && value.Length <= 16384)
+            {
+                JsonSerializer.Serialize(writer, value, options);
+                return;
+            }
+            throw new Exception("Cannot marshal type string");
+        }
+
+        public static readonly IndigoMinMaxLengthCheckConverter Singleton = new IndigoMinMaxLengthCheckConverter();
+    }
+
     internal class ConversationKindConverter : JsonConverter<ConversationKind>
     {
         public override bool CanConvert(Type t) => t == typeof(ConversationKind);
@@ -2421,33 +2507,6 @@ namespace Ofac.Protocol
         public static readonly ConversationKindConverter Singleton = new ConversationKindConverter();
     }
 
-    internal class IndigoMinMaxLengthCheckConverter : JsonConverter<string>
-    {
-        public override bool CanConvert(Type t) => t == typeof(string);
-
-        public override string Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
-        {
-            var value = reader.GetString();
-            if (value.Length >= 1 && value.Length <= 64)
-            {
-                return value;
-            }
-            throw new Exception("Cannot unmarshal type string");
-        }
-
-        public override void Write(Utf8JsonWriter writer, string value, JsonSerializerOptions options)
-        {
-            if (value.Length >= 1 && value.Length <= 64)
-            {
-                JsonSerializer.Serialize(writer, value, options);
-                return;
-            }
-            throw new Exception("Cannot marshal type string");
-        }
-
-        public static readonly IndigoMinMaxLengthCheckConverter Singleton = new IndigoMinMaxLengthCheckConverter();
-    }
-
     internal class IndecentMinMaxLengthCheckConverter : JsonConverter<string>
     {
         public override bool CanConvert(Type t) => t == typeof(string);
@@ -2455,7 +2514,7 @@ namespace Ofac.Protocol
         public override string Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             var value = reader.GetString();
-            if (value.Length >= 1 && value.Length <= 8192)
+            if (value.Length >= 1 && value.Length <= 64)
             {
                 return value;
             }
@@ -2464,7 +2523,7 @@ namespace Ofac.Protocol
 
         public override void Write(Utf8JsonWriter writer, string value, JsonSerializerOptions options)
         {
-            if (value.Length >= 1 && value.Length <= 8192)
+            if (value.Length >= 1 && value.Length <= 64)
             {
                 JsonSerializer.Serialize(writer, value, options);
                 return;
@@ -2473,6 +2532,33 @@ namespace Ofac.Protocol
         }
 
         public static readonly IndecentMinMaxLengthCheckConverter Singleton = new IndecentMinMaxLengthCheckConverter();
+    }
+
+    internal class HilariousMinMaxLengthCheckConverter : JsonConverter<string>
+    {
+        public override bool CanConvert(Type t) => t == typeof(string);
+
+        public override string Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            var value = reader.GetString();
+            if (value.Length >= 1 && value.Length <= 8192)
+            {
+                return value;
+            }
+            throw new Exception("Cannot unmarshal type string");
+        }
+
+        public override void Write(Utf8JsonWriter writer, string value, JsonSerializerOptions options)
+        {
+            if (value.Length >= 1 && value.Length <= 8192)
+            {
+                JsonSerializer.Serialize(writer, value, options);
+                return;
+            }
+            throw new Exception("Cannot marshal type string");
+        }
+
+        public static readonly HilariousMinMaxLengthCheckConverter Singleton = new HilariousMinMaxLengthCheckConverter();
     }
 
     internal class PurposeConverter : JsonConverter<Purpose>
@@ -2524,7 +2610,7 @@ namespace Ofac.Protocol
             var value = new List<string>();
             while (reader.TokenType != JsonTokenType.EndArray)
             {
-                var converter = HilariousMinMaxLengthCheckConverter.Singleton;
+                var converter = AmbitiousMinMaxLengthCheckConverter.Singleton;
                 var arrayItem = (string)converter.Read(ref reader, typeof(string), options);
                 value.Add(arrayItem);
                 reader.Read();
@@ -2537,7 +2623,7 @@ namespace Ofac.Protocol
             writer.WriteStartArray();
             foreach (var arrayItem in value)
             {
-                var converter = HilariousMinMaxLengthCheckConverter.Singleton;
+                var converter = AmbitiousMinMaxLengthCheckConverter.Singleton;
                 converter.Write(writer, arrayItem, options);
             }
             writer.WriteEndArray();
@@ -2547,7 +2633,7 @@ namespace Ofac.Protocol
         public static readonly PurpleDecodeArrayConverter Singleton = new PurpleDecodeArrayConverter();
     }
 
-    internal class HilariousMinMaxLengthCheckConverter : JsonConverter<string>
+    internal class AmbitiousMinMaxLengthCheckConverter : JsonConverter<string>
     {
         public override bool CanConvert(Type t) => t == typeof(string);
 
@@ -2571,7 +2657,7 @@ namespace Ofac.Protocol
             throw new Exception("Cannot marshal type string");
         }
 
-        public static readonly HilariousMinMaxLengthCheckConverter Singleton = new HilariousMinMaxLengthCheckConverter();
+        public static readonly AmbitiousMinMaxLengthCheckConverter Singleton = new AmbitiousMinMaxLengthCheckConverter();
     }
 
     internal class ClassificationConverter : JsonConverter<Classification>
@@ -2606,33 +2692,6 @@ namespace Ofac.Protocol
         }
 
         public static readonly ClassificationConverter Singleton = new ClassificationConverter();
-    }
-
-    internal class AmbitiousMinMaxLengthCheckConverter : JsonConverter<string>
-    {
-        public override bool CanConvert(Type t) => t == typeof(string);
-
-        public override string Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
-        {
-            var value = reader.GetString();
-            if (value.Length >= 1 && value.Length <= 16384)
-            {
-                return value;
-            }
-            throw new Exception("Cannot unmarshal type string");
-        }
-
-        public override void Write(Utf8JsonWriter writer, string value, JsonSerializerOptions options)
-        {
-            if (value.Length >= 1 && value.Length <= 16384)
-            {
-                JsonSerializer.Serialize(writer, value, options);
-                return;
-            }
-            throw new Exception("Cannot marshal type string");
-        }
-
-        public static readonly AmbitiousMinMaxLengthCheckConverter Singleton = new AmbitiousMinMaxLengthCheckConverter();
     }
 
     internal class CunningMinMaxLengthCheckConverter : JsonConverter<string>
@@ -3258,6 +3317,39 @@ namespace Ofac.Protocol
         public static readonly MinMaxLengthCheckConverter3 Singleton = new MinMaxLengthCheckConverter3();
     }
 
+    internal class IndigoDecodeArrayConverter : JsonConverter<string[]>
+    {
+        public override bool CanConvert(Type t) => t == typeof(string[]);
+
+        public override string[] Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            reader.Read();
+            var value = new List<string>();
+            while (reader.TokenType != JsonTokenType.EndArray)
+            {
+                var converter = StickyMinMaxLengthCheckConverter.Singleton;
+                var arrayItem = (string)converter.Read(ref reader, typeof(string), options);
+                value.Add(arrayItem);
+                reader.Read();
+            }
+            return value.ToArray();
+        }
+
+        public override void Write(Utf8JsonWriter writer, string[] value, JsonSerializerOptions options)
+        {
+            writer.WriteStartArray();
+            foreach (var arrayItem in value)
+            {
+                var converter = StickyMinMaxLengthCheckConverter.Singleton;
+                converter.Write(writer, arrayItem, options);
+            }
+            writer.WriteEndArray();
+            return;
+        }
+
+        public static readonly IndigoDecodeArrayConverter Singleton = new IndigoDecodeArrayConverter();
+    }
+
     internal class ScopeConverter : JsonConverter<Scope>
     {
         public override bool CanConvert(Type t) => t == typeof(Scope);
@@ -3361,7 +3453,7 @@ namespace Ofac.Protocol
         public static readonly ProviderChangeRequestEventV1DataActionConverter Singleton = new ProviderChangeRequestEventV1DataActionConverter();
     }
 
-    internal class IndigoDecodeArrayConverter : JsonConverter<string[]>
+    internal class IndecentDecodeArrayConverter : JsonConverter<string[]>
     {
         public override bool CanConvert(Type t) => t == typeof(string[]);
 
@@ -3391,7 +3483,7 @@ namespace Ofac.Protocol
             return;
         }
 
-        public static readonly IndigoDecodeArrayConverter Singleton = new IndigoDecodeArrayConverter();
+        public static readonly IndecentDecodeArrayConverter Singleton = new IndecentDecodeArrayConverter();
     }
 
     internal class ProviderIssueEventV1DataActionConverter : JsonConverter<ProviderIssueEventV1DataAction>

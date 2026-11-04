@@ -1,0 +1,22 @@
+{
+  "specversion": "1.0",
+  "id": "01JEVENT-assign-input-required",
+  "source": "urn:workspace:ws-01",
+  "type": "org.facilitator.event.assignment.input.required.v1",
+  "subject": "work/work-123/assignment/analysis-1",
+  "time": "2026-10-22T18:00:00Z",
+  "datacontenttype": "application/json",
+  "dataschema": "https://schemas.openfacilitator.org/v1/event.assignment.input.required.v1.json",
+  "data": {
+    "workId": "work-123",
+    "assignmentId": "analysis-1",
+    "executionId": "exec-77",
+    "requestId": "inp-exec-77-1",
+    "executionGeneration": 1,
+    "question": "Should on-prem options be included?",
+    "createdAt": "2026-10-22T18:00:00Z",
+    "choices": ["yes, include on-prem", "no, cloud only"],
+    "contextRef": "artifact://artifacts/art-9/report.md",
+    "deadline": "2026-10-23T18:00:00Z"
+  }
+}

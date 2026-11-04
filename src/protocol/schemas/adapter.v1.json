@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://schemas.openfacilitator.org/v1/adapter.v1.json",
   "title": "AdapterFrameV1",
-  "description": "One HarnessAdapter lifecycle frame (either direction of the Gateway<->adapter NDJSON wire, one JSON object per line). A verbatim profile of the shipped child transport (src/gateway/src/childwire.ts + child.ts): the six-method HarnessAdapter contract maps start->command(start), steer->command(steer), status->command(status), interrupt->command(stop), observe->the push-based event relay; respond has no v1 frame (adapters advertise no input support). Frames are NOT CloudEvents: the version property is `v: 1`, the discriminator is `type`. The 262144-byte frame limit is a transport-level code constant (MAX_CHILD_FRAME_BYTES), not a schema keyword.",
+  "description": "One HarnessAdapter lifecycle frame (either direction of the Gateway<->adapter NDJSON wire, one JSON object per line). A verbatim profile of the shipped child transport (src/gateway/src/childwire.ts + child.ts): the six-method HarnessAdapter contract maps start->command(start), steer->command(steer), status->command(status), interrupt->command(stop), observe->the push-based event relay, respond->command(respond) (answers a pending input.required in a live run). Frames are NOT CloudEvents: the version property is `v: 1`, the discriminator is `type`. The 262144-byte frame limit is a transport-level code constant (MAX_CHILD_FRAME_BYTES), not a schema keyword.",
   "type": "object",
   "required": ["v", "type"],
   "properties": {
@@ -76,7 +76,8 @@
         { "$ref": "#/$defs/startMessage" },
         { "$ref": "#/$defs/steerMessage" },
         { "$ref": "#/$defs/statusMessage" },
-        { "$ref": "#/$defs/stopMessage" }
+        { "$ref": "#/$defs/stopMessage" },
+        { "$ref": "#/$defs/respondMessage" }
       ]
     },
     "startMessage": {
@@ -121,6 +122,19 @@
         "kind": { "const": "stop" },
         "executionId": { "type": "string", "minLength": 1, "maxLength": 128 },
         "reason": { "type": "string", "minLength": 1, "maxLength": 4096 }
+      }
+    },
+    "respondMessage": {
+      "title": "AdapterRespondMessage",
+      "description": "Gateway -> child: a human answer to a pending input.required request; unblocks the live run.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "executionId", "requestId", "text"],
+      "properties": {
+        "kind": { "const": "respond" },
+        "executionId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "requestId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "text": { "type": "string", "minLength": 1, "maxLength": 16384 }
       }
     },
     "reply": {

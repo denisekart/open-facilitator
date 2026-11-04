@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openfacilitator.org/v1/event.assignment.input.required.v1.json",
+  "title": "AssignmentInputRequiredEventV1Data",
+  "description": "An assignment paused mid-execution waiting for human input. Published by the adapter SDK when a harness calls requestInput; the kernel parks the assignment in the input_required status and fans the question out to the humans. Answered by command.assignment.input.v1, which unblocks the live run.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "workId",
+    "assignmentId",
+    "executionId",
+    "requestId",
+    "executionGeneration",
+    "question",
+    "createdAt"
+  ],
+  "properties": {
+    "workId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "assignmentId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "executionId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "requestId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "executionGeneration": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "question": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 16384
+    },
+    "createdAt": {
+      "$ref": "common.v1.json#/$defs/rfc3339DateTime"
+    },
+    "choices": {
+      "type": "array",
+      "maxItems": 8,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256
+      }
+    },
+    "contextRef": {
+      "$ref": "common.v1.json#/$defs/evidenceRef"
+    },
+    "deadline": {
+      "$ref": "common.v1.json#/$defs/rfc3339DateTime"
+    }
+  }
+}

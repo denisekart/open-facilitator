@@ -135,6 +135,11 @@ public static class ProblemErrors
         Create("team-unknown", "Team unknown", StatusCodes.Status403Forbidden,
             $"team '{team}' is not in the configured roster (Link:Teams)");
 
+    /// <summary>404 unknown admin-minted enrollment token id.</summary>
+    public static ProblemDetails EnrollmentTokenNotFound(Guid id) =>
+        Create("enrollment-token-not-found", "Enrollment token not found", StatusCodes.Status404NotFound,
+            $"no enrollment token {id}");
+
     /// <summary>403 claimed role contradicts the binding or the gw. prefix law.</summary>
     public static ProblemDetails RoleMismatch(string detail) =>
         Create("role-mismatch", "Role mismatch", StatusCodes.Status403Forbidden, detail);

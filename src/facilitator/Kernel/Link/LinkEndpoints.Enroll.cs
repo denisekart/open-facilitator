@@ -17,7 +17,7 @@ public static partial class LinkEndpoints
     // a JWKS-verified OIDC client-credentials JWT bound to a Link:WorkloadIdentities
     // pre-registration. Both mint the same rotating opaque link token.
     private static void MapEnroll(RouteGroupBuilder group) =>
-        group.MapPost("/enroll", async (HttpRequest request, LinkEnrollmentStore store, LinkEnrollmentSecret secret, OidcJwks jwks, LinkOptions options, CancellationToken ct) =>
+        group.MapPost("/enroll", async (HttpRequest request, LinkEnrollmentStore store, EnrollmentTokenStore tokens, LinkEnrollmentSecret secret, OidcJwks jwks, LinkOptions options, CancellationToken ct) =>
         {
             var body = await RequestBodies.ReadAsync(request, ct);
             if (body.TooLarge)
@@ -55,6 +55,8 @@ public static partial class LinkEndpoints
             string team;
             string role;
             bool acceptsDelegated;
+            string enrollSecret = dto.Token;
+            Guid? mintedId = null;
             (string Issuer, string Subject)? workload = null;
             var modeB = jwks.IsOidcCandidate(dto.Token, options.EvidenceAudience);
             if (modeB)
@@ -90,20 +92,49 @@ public static partial class LinkEndpoints
                 // Mode (a): shared-secret enrollment — auth (401) precedes
                 // authorization (403). The body may name a role (default
                 // gateway: pre-Plan-10 compat); the team must be named and
-                // roster-present: no default-team fallback.
-                if (!secret.Matches(dto.Token))
+                // roster-present: no default-team fallback. A presented
+                // minted enrollment token (facilitator.enrollment_tokens)
+                // ignores the static secret entirely: the row's team/role
+                // bind the enrollment, the row's consumption fences the
+                // endpoint (re-enroll only on the consuming endpoint).
+                role = dto.Role ?? "gateway";
+                acceptsDelegated = false;
+                var decision = await tokens.DecideAsync(dto.Token ?? string.Empty, dto.Team ?? string.Empty, role, dto.EndpointId, ct);
+                if (decision.Outcome == MintedTokenOutcome.NotMinted)
+                {
+                    // Hash miss: the static-secret arm decides, byte-identical.
+                    if (!secret.Matches(dto.Token))
+                    {
+                        return Results.Problem(ProblemErrors.EnrollmentSecretInvalid());
+                    }
+
+                    if (string.IsNullOrWhiteSpace(dto.Team))
+                    {
+                        return Results.Problem(ProblemErrors.TeamUnknown("<missing>"));
+                    }
+
+                    team = dto.Team;
+                }
+                else if (decision.Outcome == MintedTokenOutcome.Ok)
+                {
+                    team = decision.Team!;
+                    role = decision.Role!;
+                    enrollSecret = secret.Literal; // the store guard replays the static secret
+                    mintedId = decision.WasConsumed ? null : decision.TokenId;
+                }
+                else if (decision.Outcome is MintedTokenOutcome.Invalid or MintedTokenOutcome.EndpointMismatch)
                 {
                     return Results.Problem(ProblemErrors.EnrollmentSecretInvalid());
                 }
-
-                if (string.IsNullOrWhiteSpace(dto.Team))
+                else if (decision.Outcome == MintedTokenOutcome.RoleMismatch)
                 {
-                    return Results.Problem(ProblemErrors.TeamUnknown("<missing>"));
+                    return Results.Problem(ProblemErrors.RoleMismatch(
+                        $"the minted enrollment token binds role '{decision.Role}', not '{role}'"));
                 }
-
-                team = dto.Team;
-                role = dto.Role ?? "gateway";
-                acceptsDelegated = false;
+                else
+                {
+                    return Results.Problem(ProblemErrors.TeamMismatch(dto.Team ?? "<missing>"));
+                }
             }
 
             // gw. prefix law: the Gateway channel is reserved for gateway-role
@@ -116,7 +147,7 @@ public static partial class LinkEndpoints
 
             EnrollmentResult? result;
             async Task<EnrollmentResult?> Enroll() => await store.EnrollAsync(
-                dto.EndpointId, dto.InstanceId, dto.TrustMode, dto.Token,
+                dto.EndpointId, dto.InstanceId, dto.TrustMode, enrollSecret,
                 team, role, acceptsDelegated, workload, ct);
             try
             {
@@ -148,6 +179,13 @@ public static partial class LinkEndpoints
                 return Results.Problem(known
                     ? ProblemErrors.EnrollmentSecretInvalid()
                     : ProblemErrors.TeamUnknown(team));
+            }
+
+            if (mintedId is not null && !await tokens.TryConsumeAsync(mintedId.Value, dto.EndpointId, result.EnrollmentId, ct))
+            {
+                // Concurrent first use won the consume fence: the token is
+                // that endpoint's standing secret now, not this one's.
+                return Results.Problem(ProblemErrors.EnrollmentSecretInvalid());
             }
 
             return Results.Created($"/api/link/v1/capabilities",

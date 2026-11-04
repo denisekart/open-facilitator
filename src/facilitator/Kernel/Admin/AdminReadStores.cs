@@ -25,6 +25,7 @@ public sealed record AdminSummary(
     int ArtifactsTotal,
     Dictionary<string, int> ManifestsByResultState,
     Dictionary<string, int> MemoryByStatus,
+    IReadOnlyList<string> TeamSlugs,
     int LinkSessionsLive);
 
 /// <summary>One universal-search hit row (identity + a display line + state).</summary>
@@ -209,6 +210,7 @@ public sealed class AdminReadStores(
         var manifests = await GroupByAsync(db.ResultManifests.Select(m => m.ResultState), ct);
         var memory = await GroupByAsync(db.MemoryEntries.Select(m => m.Status), ct);
         var liveSessions = await db.LinkSessions.Where(s => s.LeaseUntil > now).CountAsync(ct);
+        var teamSlugs = await db.Teams.OrderBy(t => t.Slug).Select(t => t.Slug).ToListAsync(ct);
         var gatewayEndpoints = await db.LinkEnrollments.Where(e => e.Role == "gateway").Select(e => e.EndpointId).ToListAsync(ct);
         var onlineEndpoints = await db.LinkSessions
             .Where(s => s.LeaseUntil > now && gatewayEndpoints.Contains(s.LogicalEndpointId))
@@ -217,7 +219,7 @@ public sealed class AdminReadStores(
         return new AdminSummary(
             teams, projects, works, assignments, executions,
             onlineEndpoints.Count, gatewayEndpoints.Count - onlineEndpoints.Count,
-            inbox, outbox, deadLetters, oldestPending, approvals, artifacts, manifests, memory, liveSessions);
+            inbox, outbox, deadLetters, oldestPending, approvals, artifacts, manifests, memory, teamSlugs, liveSessions);
     }
 
     /// <summary>

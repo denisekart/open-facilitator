@@ -18,10 +18,13 @@ public sealed class LinkEnrollmentSecret(IConfiguration configuration, IHostEnvi
 
     internal bool IsConfigured => !string.IsNullOrEmpty(ConfiguredSecret) || environment.IsDevelopment();
 
+    /// <summary>The effective accepted secret literal (a minted-token enroll replays it through <c>EnrollAsync</c>'s guard).</summary>
+    internal string Literal => string.IsNullOrEmpty(ConfiguredSecret) ? DevSecret : ConfiguredSecret;
+
     /// <summary>Constant-time check of a candidate enrollment secret.</summary>
     public bool Matches(string? candidate)
     {
-        var expected = string.IsNullOrEmpty(ConfiguredSecret) ? DevSecret : ConfiguredSecret;
+        var expected = Literal;
         if (candidate is null)
         {
             return false;

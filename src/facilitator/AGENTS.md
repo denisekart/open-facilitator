@@ -19,7 +19,10 @@ plus the read-mostly Admin surface.
   `routing_decisions` audit ledger; intents are appended by Work/Provider
   writers as `routing:<base>:<key>` outbox rows.
 - `Kernel/Link/` — workspace-link server (enroll, hub, admission, deliveries,
-  receipts, ledger).
+  receipts, ledger). Mode-(a) enroll accepts the static `Link:EnrollmentToken`
+  or an admin-minted token (`EnrollmentTokenEndpoints` +
+  `EnrollmentTokenStore`: hash-only rows, first-use consumption, revoke kills
+  the issued link enrollment).
 - `Kernel/Ai/` — AiDeck: the AI decode plane. `CommandRegistry` (built-in verbs
   + admin_config `commands` row) is the single source of effects — the slash
   parser and the LLM's decode prompt read the SAME registry; the AI may only

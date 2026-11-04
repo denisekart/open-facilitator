@@ -42,6 +42,7 @@ app.MapMemoryApi();
 app.MapLinkApi(app.Environment);
 app.MapIdentityApi();
 app.MapAdminApi();
+app.MapEnrollmentTokenApi();
 app.MapChatApi();
 app.MapProviderIdentitiesApi();
 app.MapWebhookIngressApi();

@@ -42,6 +42,8 @@ public class FacilitatorDbContext(DbContextOptions<FacilitatorDbContext> options
 
     public DbSet<LinkEnrollmentEntity> LinkEnrollments => Set<LinkEnrollmentEntity>();
 
+    public DbSet<EnrollmentTokenEntity> EnrollmentTokens => Set<EnrollmentTokenEntity>();
+
     public DbSet<LinkDeliveryEntity> LinkDeliveries => Set<LinkDeliveryEntity>();
 
     public DbSet<ApprovalEntity> Approvals => Set<ApprovalEntity>();

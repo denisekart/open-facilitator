@@ -179,6 +179,12 @@
             "/api/admin/config/{resource}"
           ],
           "rolesAnyOf": ["kernel-operator", "framework-admin"]
+        },
+        {
+          "id": "enrollment-tokens.manage",
+          "methods": ["POST", "GET", "DELETE"],
+          "paths": ["/api/admin/enroll-tokens", "/api/admin/enroll-tokens/{id}"],
+          "rolesAnyOf": ["framework-admin"]
         }
       ]
     }

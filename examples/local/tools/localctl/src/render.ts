@@ -53,7 +53,8 @@ export const LOCAL_WORKER_IMAGE = "ofac-elastic-worker:local";
 export interface Versions {
   POSTGRES_TAG: string;
   KEYCLOAK_TAG: string;
-  MINIO_TAG: string;
+  SEAWEEDFS_TAG: string;
+  AWSCLI_TAG: string;
   ASPIRE_TAG: string;
   CADDY_TAG: string;
   TAILSCALE_TAG: string;
@@ -63,7 +64,8 @@ export interface Versions {
 const VERSION_KEYS = [
   "POSTGRES_TAG",
   "KEYCLOAK_TAG",
-  "MINIO_TAG",
+  "SEAWEEDFS_TAG",
+  "AWSCLI_TAG",
   "ASPIRE_TAG",
   "CADDY_TAG",
   "TAILSCALE_TAG",
@@ -73,7 +75,8 @@ export function loadVersions(): Versions {
   const raw = readDotEnv(path.join(EXAMPLE_DIR, "versions.env"));
   const out: Record<string, string> = {};
   for (const [k, v] of Object.entries(raw)) if (!k.endsWith("_DIGEST") || v !== "") out[k] = v;
-  for (const key of VERSION_KEYS) if (raw[key] === undefined) fail(`versions.env: ${key}:? missing`);
+  for (const key of VERSION_KEYS)
+    if (raw[key] === undefined) fail(`versions.env: ${key}:? missing`);
   return out as Versions;
 }
 
@@ -209,7 +212,7 @@ export function kernelFacilitatorEnv(
     Link__EnrollmentToken: requireSecret(secrets, "OFAC_ENROLLMENT_TOKEN", roles.secretsFile),
     Link__HeartbeatSeconds: "5",
     Storage__Provider: "s3",
-    Storage__S3__Endpoint: "http://minio:9000",
+    Storage__S3__Endpoint: "http://artifacts:8333",
     Storage__S3__Bucket: "facilitator-artifacts",
     Storage__S3__Region: "us-east-1",
     Storage__S3__AccessKey: requireSecret(secrets, "S3_ACCESS_KEY", roles.secretsFile),
@@ -233,8 +236,8 @@ export function kernelFacilitatorEnv(
     Provision__Workloads__0__Env__OFAC_WORKER_TEAM: team,
     Provision__Workloads__0__Env__OFAC_WORKER_ENDPOINT: "elastic-worker-child",
     // $$ = name-indirect: the launcher expands these from ITS env.
-    "Provision__Workloads__0__Env__OFAC_ENROLL_SECRET": "$$OFAC_ENROLLMENT_TOKEN",
-    "Provision__Workloads__0__Env__OFAC_CHILD_SECRET": `$$${childSecretKey(roles, team)}`,
+    Provision__Workloads__0__Env__OFAC_ENROLL_SECRET: "$$OFAC_ENROLLMENT_TOKEN",
+    Provision__Workloads__0__Env__OFAC_CHILD_SECRET: `$$${childSecretKey(roles, team)}`,
     Provision__Workloads__0__Env__OFAC_SUPERVISOR_MAX_RESTARTS: "3",
     "Provision__Workloads__0__Labels__io.facilitator.managed": "kernel-provisioned",
   };
@@ -421,7 +424,9 @@ function caddyBlock(roles: RolesFile, versions: Versions): { block: string; volu
       `    image: ${thirdPartyImage("tailscale/tailscale", versions, "TAILSCALE")}`,
       "    hostname: ofac-kernel",
       "    environment:",
-      "      TS_AUTHKEY: ${" + roles.tailscale.keyEnv + ":?tailscale authkey must be in the operator environment}",
+      "      TS_AUTHKEY: ${" +
+        roles.tailscale.keyEnv +
+        ":?tailscale authkey must be in the operator environment}",
       ...(roles.tailscale.funnel ? ['      TS_ENABLE_FUNNEL: "true"'] : []),
       // Host stack: tailscale takes over the box's own 443 and hands it to
       // Caddy's published port (funnel + MagicDNS both land there).
@@ -449,7 +454,10 @@ function readTemplate(box: "kernel" | "node", file: string): string {
   return readFileSync(path.join(TEMPLATES, box, file), "utf8");
 }
 
-export async function render(roles: RolesFile, opts: { forceResolve?: boolean } = {}): Promise<RenderResult> {
+export async function render(
+  roles: RolesFile,
+  opts: { forceResolve?: boolean } = {},
+): Promise<RenderResult> {
   const versions = loadVersions();
   const secretsFile = path.join(EXAMPLE_DIR, roles.secretsFile);
   const secrets = readDotEnv(secretsFile);
@@ -466,9 +474,27 @@ export async function render(roles: RolesFile, opts: { forceResolve?: boolean } 
   const envName = roles.name;
   const lock = loadLock(EXAMPLE_DIR, envName);
   const images: ResolvedImages = {
-    kernel: await resolveImage("kernel", roles.images.kernel, LOCAL_KERNEL_IMAGE, lock, opts.forceResolve === true),
-    node: await resolveImage("node", roles.images.node, LOCAL_NODE_IMAGE, lock, opts.forceResolve === true),
-    worker: await resolveImage("worker", roles.images.worker, LOCAL_WORKER_IMAGE, lock, opts.forceResolve === true),
+    kernel: await resolveImage(
+      "kernel",
+      roles.images.kernel,
+      LOCAL_KERNEL_IMAGE,
+      lock,
+      opts.forceResolve === true,
+    ),
+    node: await resolveImage(
+      "node",
+      roles.images.node,
+      LOCAL_NODE_IMAGE,
+      lock,
+      opts.forceResolve === true,
+    ),
+    worker: await resolveImage(
+      "worker",
+      roles.images.worker,
+      LOCAL_WORKER_IMAGE,
+      lock,
+      opts.forceResolve === true,
+    ),
   };
   const issuer = issuerOf(roles);
   const outDir = path.join(OUT_ROOT, envName);
@@ -491,18 +517,26 @@ export async function render(roles: RolesFile, opts: { forceResolve?: boolean } 
   // toward the kernel); the UI stays container-local, fronted as configured.
   const aspirePorts = sim
     ? `ports:\n      - "127.0.0.1:${String(ports.aspireUi)}:18888"\n      - "127.0.0.1:7091:18890"`
-    : "ports:\n      - \"18890:18890\"";
+    : 'ports:\n      - "18890:18890"';
   const composeText = sub(readTemplate("kernel", "compose.yaml.tmpl"), {
     IMAGE_POSTGRES: thirdPartyImage("postgres", versions, "POSTGRES"),
     IMAGE_KEYCLOAK: thirdPartyImage("quay.io/keycloak/keycloak", versions, "KEYCLOAK"),
-    IMAGE_MINIO: thirdPartyImage("minio/minio", versions, "MINIO"),
+    IMAGE_S3: thirdPartyImage("chrislusf/seaweedfs", versions, "SEAWEEDFS"),
     IMAGE_ASPIRE: thirdPartyImage("mcr.microsoft.com/dotnet/aspire-dashboard", versions, "ASPIRE"),
     KC_HOSTNAME:
       roles.topology === "sim"
         ? `http://id.localhost:${String(ports.idp)}`
         : `https://${roles.kernel.host}/id`,
-    // sim publishes the IdP for browser/CLI; lan/tailscale ride Caddy /id/*.
-    KC_PORTS: sim ? `ports:\n      - "127.0.0.1:${String(ports.idp)}:8080"` : "ports: []",
+    // sim: the issuer is http://id.localhost:<idp>/... — Keycloak must
+    // LISTEN on <idp> (KC_HTTP_PORT) and answer `id.localhost` INSIDE the
+    // spine, or the kernel's JWKS fetch fails and every admin call 401s
+    // (reference/'s alias law: issuer byte-exact, container == host
+    // reachability). Non-sim: Caddy proxies keycloak:8080 under /id/*.
+    KC_HTTP: sim ? `KC_HTTP_PORT: "${String(ports.idp)}"` : "",
+    KC_ALIAS: sim ? "networks:\n      default:\n        aliases: [id.localhost]" : "",
+    KC_PORTS: sim
+      ? `ports:\n      - "127.0.0.1:${String(ports.idp)}:${String(ports.idp)}"`
+      : "ports: []",
     ASPIRE_PORTS: aspirePorts,
     KERNEL_IMAGE: imageBlock(images.kernel, "kernel", sim),
     KERNEL_PORTS: sim ? `ports:\n      - "127.0.0.1:${String(ports.kernel)}:8080"` : "ports: []",
@@ -512,7 +546,10 @@ export async function render(roles: RolesFile, opts: { forceResolve?: boolean } 
   writeFileSync(path.join(kernelDir, "compose.yaml"), composeText);
   parseYaml(composeText); // a template slip must never reach docker
 
-  writeFileSync(path.join(kernelDir, "facilitator.env"), envLines(kernelFacilitatorEnv(roles, secrets, images)));
+  writeFileSync(
+    path.join(kernelDir, "facilitator.env"),
+    envLines(kernelFacilitatorEnv(roles, secrets, images)),
+  );
   const kernelDotEnv: Record<string, string> = {
     ...versions,
     POSTGRES_PASSWORD: secrets["POSTGRES_PASSWORD"] as string,
@@ -540,7 +577,10 @@ export async function render(roles: RolesFile, opts: { forceResolve?: boolean } 
     const slug = nodeSlug(node.host);
     const dir = path.join(outDir, slug);
     copyTree(path.join(TEMPLATES, "node", "units"), path.join(dir, "units"));
-    copyTree(path.join(EXAMPLE_DIR, "..", "..", "features", "shared"), path.join(dir, "supervisor"));
+    copyTree(
+      path.join(EXAMPLE_DIR, "..", "..", "features", "shared"),
+      path.join(dir, "supervisor"),
+    );
     mkdirSync(path.join(dir, "launcher"), { recursive: true });
     const team = node.teams[0] as string;
     const subs = {
@@ -622,7 +662,8 @@ export async function render(roles: RolesFile, opts: { forceResolve?: boolean } 
  * Throws when the env was never rendered. */
 export function loadBundles(roles: RolesFile): RenderedBox[] {
   const outDir = path.join(OUT_ROOT, roles.name);
-  if (!existsSync(outDir)) fail(`${outDir}:? not rendered — run localctl render --env ${roles.name}`);
+  if (!existsSync(outDir))
+    fail(`${outDir}:? not rendered — run localctl render --env ${roles.name}`);
   const names = ["kernel", ...roles.nodes.map((n) => nodeSlug(n.host))];
   return names.map((name) => {
     const dir = path.join(outDir, name);

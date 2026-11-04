@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { enrollmentStatusLabel, enrollmentTokenStatus, type EnrollmentTokenStatus } from "./enroll-tokens.js";
+import {
+  enrollmentStatusLabel,
+  enrollmentTokenStatus,
+  type EnrollmentTokenStatus,
+} from "./enroll-tokens.js";
 import type { EnrollmentTokenRow } from "./types.js";
 
 const NOW = new Date("2026-11-04T12:00:00Z");
@@ -41,9 +45,7 @@ describe("enrollmentTokenStatus", () => {
   });
 
   it("is expired once expiresAt has passed", () => {
-    expect(
-      enrollmentTokenStatus(row({ expiresAt: "2026-11-04T11:59:59Z" }), NOW),
-    ).toBe("expired");
+    expect(enrollmentTokenStatus(row({ expiresAt: "2026-11-04T11:59:59Z" }), NOW)).toBe("expired");
   });
 
   it("revoked outranks expired and consumed", () => {

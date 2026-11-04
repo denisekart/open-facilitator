@@ -4,7 +4,13 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { must, run, fail } from "./util.js";
-import { EXAMPLE_DIR, LOCAL_KERNEL_IMAGE, LOCAL_NODE_IMAGE, LOCAL_WORKER_IMAGE, type RenderedBox } from "./render.js";
+import {
+  EXAMPLE_DIR,
+  LOCAL_KERNEL_IMAGE,
+  LOCAL_NODE_IMAGE,
+  LOCAL_WORKER_IMAGE,
+  type RenderedBox,
+} from "./render.js";
 import { SHARED_NETWORK } from "./env.js";
 
 export interface BoxDriver {
@@ -55,9 +61,16 @@ async function ensureNetwork(): Promise<void> {
 /** Label-sweep kernel-provisioned workers (referencectl's sweep_managed). */
 export async function sweepManaged(): Promise<void> {
   const r = await run([
-    "docker", "ps", "-aq", "--filter", "label=io.facilitator.managed=kernel-provisioned",
+    "docker",
+    "ps",
+    "-aq",
+    "--filter",
+    "label=io.facilitator.managed=kernel-provisioned",
   ]);
-  const ids = r.stdout.trim().split("\n").filter((s) => s !== "");
+  const ids = r.stdout
+    .trim()
+    .split("\n")
+    .filter((s) => s !== "");
   if (ids.length > 0) await run(["docker", "rm", "-f", ...ids]);
 }
 
@@ -81,4 +94,3 @@ export const simDriver: BoxDriver = {
     return await must(composeProject(box, ["ps", "--format", "json"]));
   },
 };
-

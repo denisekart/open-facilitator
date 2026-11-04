@@ -2,7 +2,14 @@
 // Roles file + secrets + versions.env in, rendered bundles + running
 import { render, hostKernelUrl, hostIdpUrl, EXAMPLE_DIR } from "./render.js";
 import { loadRoles } from "./env.js";
-import { cmdInit, cmdEnrollToken, cmdEnroll, cmdStatus, cmdBackup, cmdUpgrade } from "./commands.js";
+import {
+  cmdInit,
+  cmdEnrollToken,
+  cmdEnroll,
+  cmdStatus,
+  cmdBackup,
+  cmdUpgrade,
+} from "./commands.js";
 import { cmdUp, cmdDown, cmdLogs } from "./drivers.js";
 import { cmdSmoke } from "./smoke.js";
 import { fail } from "./util.js";
@@ -68,10 +75,18 @@ async function main(): Promise<number> {
       return 0;
     }
     case "up":
-      await cmdUp({ env: flags.env, build: flags.build, ...(positional[0] === undefined ? {} : { box: positional[0] }) });
+      await cmdUp({
+        env: flags.env,
+        build: flags.build,
+        ...(positional[0] === undefined ? {} : { box: positional[0] }),
+      });
       return 0;
     case "down":
-      await cmdDown({ env: flags.env, volumes: flags.volumes, ...(positional[0] === undefined ? {} : { box: positional[0] }) });
+      await cmdDown({
+        env: flags.env,
+        volumes: flags.volumes,
+        ...(positional[0] === undefined ? {} : { box: positional[0] }),
+      });
       return 0;
     case "enroll-token":
       if (flags.node === undefined) fail("enroll-token needs --node NAME");
@@ -86,13 +101,21 @@ async function main(): Promise<number> {
       await cmdStatus({ env: flags.env });
       return 0;
     case "logs":
-      await cmdLogs({ env: flags.env, box: flags.box ?? positional[0] ?? fail("logs needs a box name") });
+      await cmdLogs({
+        env: flags.env,
+        box: flags.box ?? positional[0] ?? fail("logs needs a box name"),
+      });
       return 0;
     case "backup":
       await cmdBackup({ env: flags.env });
       return 0;
     case "upgrade":
-      await cmdUpgrade({ env: flags.env, ...(flags.box === undefined && positional[0] === undefined ? {} : { box: flags.box ?? positional[0] }) });
+      await cmdUpgrade({
+        env: flags.env,
+        ...(flags.box === undefined && positional[0] === undefined
+          ? {}
+          : { box: flags.box ?? positional[0] }),
+      });
       return 0;
     case "smoke":
       return await cmdSmoke({ env: flags.env, build: flags.build, cleanExit: flags.cleanExit });
@@ -107,9 +130,7 @@ main().then(
     process.exitCode = code;
   },
   (err) => {
-    console.error(`localctl: ${String(err instanceof Error ? err.stack ?? err.message : err)}`);
+    console.error(`localctl: ${String(err instanceof Error ? (err.stack ?? err.message) : err)}`);
     process.exitCode = 1;
   },
 );
-
-

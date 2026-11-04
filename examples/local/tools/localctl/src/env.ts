@@ -56,7 +56,8 @@ function req(obj: Record<string, unknown>, key: string, where: string): unknown 
 
 function reqString(obj: Record<string, unknown>, key: string, where: string): string {
   const value = req(obj, key, where);
-  if (typeof value !== "string" || value === "") fail(`${where}.${key}:? must be a non-empty string`);
+  if (typeof value !== "string" || value === "")
+    fail(`${where}.${key}:? must be a non-empty string`);
   return value;
 }
 
@@ -90,7 +91,12 @@ export function parseRoles(raw: unknown, where: string): RolesFile {
     if (!isRecord(portsRaw)) fail(`${where}.kernel.ports:? must be an object`);
     ports.kernel = optNumber(portsRaw, "kernel", `${where}.kernel.ports`, DEFAULT_PORTS.kernel);
     ports.idp = optNumber(portsRaw, "idp", `${where}.kernel.ports`, DEFAULT_PORTS.idp);
-    ports.aspireUi = optNumber(portsRaw, "aspireUi", `${where}.kernel.ports`, DEFAULT_PORTS.aspireUi);
+    ports.aspireUi = optNumber(
+      portsRaw,
+      "aspireUi",
+      `${where}.kernel.ports`,
+      DEFAULT_PORTS.aspireUi,
+    );
   }
 
   const nodesRaw = req(raw, "nodes", where);
@@ -120,7 +126,10 @@ export function parseRoles(raw: unknown, where: string): RolesFile {
     for (const key of ["kernel", "node", "worker"] as const) {
       const value = raw["images"][key];
       if (value === undefined || value === "local") continue;
-      if (typeof value !== "string" || !/^[a-z0-9.\/:-]+(@sha256:[0-9a-f]{64}|:[A-Za-z0-9._-]+)$/.test(value))
+      if (
+        typeof value !== "string" ||
+        !/^[a-z0-9./:-]+(@sha256:[0-9a-f]{64}|:[A-Za-z0-9._-]+)$/.test(value)
+      )
         fail(`${where}.images.${key}:? must be "local", "name@sha256:<64hex>", or "name:tag"`);
       images[key] = value;
     }
@@ -172,7 +181,8 @@ export function parseRoles(raw: unknown, where: string): RolesFile {
     secretsFile: reqString(raw, "secretsFile", where),
     ...(Object.keys(externals).length > 0 ? { externals } : {}),
     sshUser: raw["sshUser"] === undefined ? "facilitator" : reqString(raw, "sshUser", where),
-    remoteDir: raw["remoteDir"] === undefined ? "/opt/facilitator" : reqString(raw, "remoteDir", where),
+    remoteDir:
+      raw["remoteDir"] === undefined ? "/opt/facilitator" : reqString(raw, "remoteDir", where),
   };
 }
 

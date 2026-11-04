@@ -4,7 +4,15 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { randomBytes } from "node:crypto";
-import { loadBundles, hostIdpUrl, hostKernelUrl, render, EXAMPLE_DIR, type RenderedBox } from "./render.js";
+import {
+  loadBundles,
+  hostIdpUrl,
+  hostKernelUrl,
+  loadVersions,
+  render,
+  EXAMPLE_DIR,
+  type RenderedBox,
+} from "./render.js";
 import { loadRoles, readDotEnv, type RolesFile } from "./env.js";
 import { loadLock, type ImageKey } from "./lock.js";
 import { mintCliToken, KernelClient } from "./client.js";
@@ -37,7 +45,10 @@ export async function cmdInit(opts: { env: string }): Promise<void> {
       k === "S3_ACCESS_KEY" ? `${k}=ofac-admin` : `${k}=${randomBytes(16).toString("hex")}`,
     ),
     "# Per-team gateway-child secrets (kernel LinkChildSecrets law): one per kernel team.",
-    ...roles.kernel.teams.map((t) => `CHILD_SECRETS_${t.toUpperCase().replace(/[^A-Z0-9]/g, "_")}=${randomBytes(16).toString("hex")}`),
+    ...roles.kernel.teams.map(
+      (t) =>
+        `CHILD_SECRETS_${t.toUpperCase().replace(/[^A-Z0-9]/g, "_")}=${randomBytes(16).toString("hex")}`,
+    ),
   ];
   writeFileSync(file, `${lines.join("\n")}\n`, { mode: 0o600 });
   console.log(`${file}: generated`);
@@ -47,8 +58,11 @@ export async function cmdInit(opts: { env: string }): Promise<void> {
 export function writeBundleSecret(box: RenderedBox, token: string): void {
   const file = box.env.file;
   const lines = readFileSync(file, "utf8").split("\n");
-  const next = lines.map((l) => (l.startsWith("OFAC_ENROLL_SECRET=") ? `OFAC_ENROLL_SECRET=${token}` : l));
-  if (!next.some((l) => l.startsWith("OFAC_ENROLL_SECRET="))) next.push(`OFAC_ENROLL_SECRET=${token}`);
+  const next = lines.map((l) =>
+    l.startsWith("OFAC_ENROLL_SECRET=") ? `OFAC_ENROLL_SECRET=${token}` : l,
+  );
+  if (!next.some((l) => l.startsWith("OFAC_ENROLL_SECRET=")))
+    next.push(`OFAC_ENROLL_SECRET=${token}`);
   writeFileSync(file, next.join("\n"));
 }
 
@@ -75,11 +89,17 @@ export async function cmdEnrollToken(opts: { env: string; node: string }): Promi
     ttlMinutes: roles.kernel.enrollmentTtlMinutes,
   });
   writeBundleSecret(box, minted.token);
-  console.log(`enrollment token for ${opts.node}: ${minted.id} (expires ${minted.expiresAt}) — written into ${box.env.file}`);
+  console.log(
+    `enrollment token for ${opts.node}: ${minted.id} (expires ${minted.expiresAt}) — written into ${box.env.file}`,
+  );
 }
 
 /** localctl enroll NODE: token + up in one step (bring-up order). */
-export async function cmdEnroll(opts: { env: string; node: string; build: boolean }): Promise<void> {
+export async function cmdEnroll(opts: {
+  env: string;
+  node: string;
+  build: boolean;
+}): Promise<void> {
   await cmdEnrollToken(opts);
   await cmdUp({ env: opts.env, box: opts.node, build: opts.build });
 }
@@ -121,7 +141,7 @@ export async function cmdStatus(opts: { env: string }): Promise<void> {
     console.log('\nnote: add "127.0.0.1 id.localhost" to /etc/hosts for browser logins.');
 }
 
-/** localctl backup: pg_dump + mc mirror + aspire/caddy volume tars into a
+/** localctl backup: pg_dump + S3 sync + aspire/caddy volume tars into a
  * dated dir under the roles backupPath (host folder — survives down -v).
  * Runs against the kernel box (sim: this host). */
 export async function cmdBackup(opts: { env: string }): Promise<void> {
@@ -136,15 +156,43 @@ export async function cmdBackup(opts: { env: string }): Promise<void> {
     S3_SECRET_KEY: secrets["S3_SECRET_KEY"] ?? "",
   };
   await must(
-    ["docker", "compose", "-p", "ofackernel", "exec", "-T", "postgres", "pg_dump", "-U", "home", "facilitator"],
+    [
+      "docker",
+      "compose",
+      "-p",
+      "ofackernel",
+      "exec",
+      "-T",
+      "postgres",
+      "pg_dump",
+      "-U",
+      "home",
+      "facilitator",
+    ],
     { env: { ...process.env, ...env } as Record<string, string> },
   ).then((dump) => writeFileSync(path.join(dest, "facilitator.sql"), dump));
+  // mc's Docker Hub repos are gone (Sep 2026); aws-cli s3-syncs the bucket
+  // off the same spine the kernel rides (seaweed's S3 listener on `artifacts`).
   await must(
     [
-      "docker", "run", "--rm", "--network", "ofac-local",
-      "-v", `${dest}:/backup`, "-e", `MINIO_ROOT_USER=${env.S3_ACCESS_KEY}`, "-e", `MINIO_ROOT_PASSWORD=${env.S3_SECRET_KEY}`,
-      "minio/mc:latest", "/bin/sh", "-c",
-      'mc alias set local http://minio:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" && mc mb --ignore-existing local/backup && mc mirror local/facilitator-artifacts /backup/artifacts',
+      "docker",
+      "run",
+      "--rm",
+      "--network",
+      "ofac-local",
+      "-v",
+      `${dest}:/backup`,
+      "-e",
+      `AWS_ACCESS_KEY_ID=${env.S3_ACCESS_KEY}`,
+      "-e",
+      `AWS_SECRET_ACCESS_KEY=${env.S3_SECRET_KEY}`,
+      `amazon/aws-cli:${loadVersions().AWSCLI_TAG}`,
+      "s3",
+      "sync",
+      "s3://facilitator-artifacts",
+      "/backup/artifacts",
+      "--endpoint-url",
+      "http://artifacts:8333",
     ],
     { env: env as Record<string, string> },
   );
@@ -152,8 +200,20 @@ export async function cmdBackup(opts: { env: string }): Promise<void> {
     const exists = await run(["docker", "volume", "inspect", vol]);
     if (exists.code !== 0) continue; // optional service (sim has no caddy; aspire may run transient)
     await must([
-      "docker", "run", "--rm", "-v", `${vol}:/src:ro`, "-v", `${dest}:/backup`,
-      "postgres:17-alpine", "tar", "-czf", `/backup/${vol}.tar.gz`, "-C", "/src", ".",
+      "docker",
+      "run",
+      "--rm",
+      "-v",
+      `${vol}:/src:ro`,
+      "-v",
+      `${dest}:/backup`,
+      "postgres:17-alpine",
+      "tar",
+      "-czf",
+      `/backup/${vol}.tar.gz`,
+      "-C",
+      "/src",
+      ".",
     ]);
   }
   console.log(`backup written: ${dest}`);
@@ -169,6 +229,10 @@ export async function cmdUpgrade(opts: { env: string; box?: string }): Promise<v
   const diffs: (string | number)[][] = [];
   for (const key of ["kernel", "node", "worker"] as ImageKey[])
     if (before[key] !== after[key]) diffs.push([key, before[key] ?? "unset", after[key] ?? "?"]);
-  console.log(diffs.length === 0 ? "upgrade: nothing changed" : `upgrade:\n${table(diffs, ["image", "from", "to"])}`);
+  console.log(
+    diffs.length === 0
+      ? "upgrade: nothing changed"
+      : `upgrade:\n${table(diffs, ["image", "from", "to"])}`,
+  );
   await cmdUp({ env: opts.env, box: opts.box, build: roles.topology === "sim" });
 }

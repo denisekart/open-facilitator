@@ -24,7 +24,7 @@ kernel.tailnet-abc123.ts.net {
 	encode zstd gzip
 }
 
-# Observability stays box-internal: the Aspire UI + MinIO console ride
+# Observability stays box-internal: the Aspire UI + SeaweedFS console ride
 # secondary hostnames only when the operator adds DNS for them; the
 # smoke/status paths talk to the containers directly.
 "
@@ -60,15 +60,22 @@ services:
       KC_BOOTSTRAP_ADMIN_USERNAME: home-admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: \${KEYCLOAK_ADMIN_PASSWORD:?set in the secrets file}
       # start-dev + embedded H2: an example stub, not the reference env's
-      # KC_DB=postgres. Issuer validation is byte-exact, so KC_HOSTNAME must
-      # match identity:oidc:authority in ./facilitator.json.
+      # KC_DB=postgres. No volume for the H2 dir: the image runs a random
+      # UID and the UBI image has no h2 dir to seed one, so a named volume
+      # lands root-owned and Keycloak cannot open its DB. The stub is
+      # disposable — the realm re-imports from ./keycloak on every start.
+      # Issuer validation is byte-exact, so KC_HOSTNAME must match
+      # identity:oidc:authority in ./facilitator.json.
       KC_HOSTNAME: http://id.localhost:7480
       KC_HEALTH_ENABLED: "true"
+      KC_HTTP_PORT: "7480"
     volumes:
       - ./keycloak:/opt/keycloak/data/import:ro
-      - kc_data:/opt/keycloak/data/h2
     ports:
-      - "127.0.0.1:7480:8080"
+      - "127.0.0.1:7480:7480"
+    networks:
+      default:
+        aliases: [id.localhost]
     # UBI-micro ships bash but no HTTP client; probe the management health
     # endpoint over bash's /dev/tcp.
     healthcheck:
@@ -80,37 +87,27 @@ services:
       retries: 30
       start_period: 60s
 
-  minio:
-    image: minio/minio:RELEASE.2025-10-15T17-29-55Z   # minio/minio + minio/mc share the release tag
-    command: ["server", "/data"]
+  # Artifact store (reference/'s service line verbatim): \`weed mini\` seeds
+  # these credentials and pre-creates the facilitator-artifacts bucket —
+  # no one-shot init container needed. (Chosen over MinIO on purpose:
+  # minio/* vanished from Docker Hub Sep 2026, and a home example must
+  # pull from an anonymous-registry the year it ships.)
+  artifacts:
+    image: chrislusf/seaweedfs:4.48                         # chrislusf/seaweedfs — weed mini serves S3 + pre-creates the bucket (reference/'s service line; MinIO's Docker Hub repos were removed Sep 2026)
+    entrypoint: ["weed"]
+    command: ["mini", "-dir=/data"]
     environment:
-      MINIO_ROOT_USER: \${S3_ACCESS_KEY:?set in the secrets file}
-      MINIO_ROOT_PASSWORD: \${S3_SECRET_KEY:?set in the secrets file}
+      AWS_ACCESS_KEY_ID: \${S3_ACCESS_KEY:?set in the secrets file}
+      AWS_SECRET_ACCESS_KEY: \${S3_SECRET_KEY:?set in the secrets file}
+      S3_BUCKET: facilitator-artifacts
     volumes:
-      - minio_data:/data
-    # Any HTTP answer on the readiness probe proves the S3 listener.
+      - artifacts_data:/data
+    # Any HTTP answer (403 unauthenticated included) proves the S3 listener.
     healthcheck:
-      test: ["CMD", "curl", "-s", "-o", "/dev/null", "http://127.0.0.1:9000/minio/health/ready"]
+      test: ["CMD", "curl", "-s", "-o", "/dev/null", "http://127.0.0.1:8333/"]
       interval: 5s
       timeout: 5s
       retries: 15
-
-  # One-shot bucket bootstrap: create-if-absent facilitator-artifacts, then
-  # exit. \`--ignore-existing\` keeps re-up idempotent.
-  minio-init:
-    image: minio/mc:\${MINIO_TAG}
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - >
-        mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" &&
-        mc mb --ignore-existing local/facilitator-artifacts
-    environment:
-      MINIO_ROOT_USER: \${S3_ACCESS_KEY:?set in the secrets file}
-      MINIO_ROOT_PASSWORD: \${S3_SECRET_KEY:?set in the secrets file}
-    depends_on:
-      minio:
-        condition: service_healthy
-    restart: "no"
 
   aspire:
     image: mcr.microsoft.com/dotnet/aspire-dashboard:13.4.2                        # mcr.microsoft.com/dotnet/aspire-dashboard (13.x ASPIRE_* env contract)
@@ -157,21 +154,18 @@ services:
         condition: service_healthy
       keycloak:
         condition: service_healthy
-      minio:
+      artifacts:
         condition: service_healthy
-      minio-init:
-        condition: service_completed_successfully
 
 
 volumes:
   pg_data: {}
-  kc_data: {}
-  minio_data: {}
+  artifacts_data: {}
   
 
 # The shared spine: every kernel service joins the external \`ofac-local\`
 # network (created by \`localctl up\`), so node boxes and kernel-provisioned
-# workers resolve \`facilitator\`, \`keycloak\`, \`minio\`, \`aspire\` by service
+# workers resolve \`facilitator\`, \`keycloak\`, \`artifacts\`, \`aspire\` by service
 # name across compose projects.
 networks:
   default:

@@ -79,7 +79,11 @@ export class KernelClient {
     });
     if (r.status !== 201) fail(`mint enroll-token -> ${r.status}: ${r.body.slice(0, 240)}`);
     const j = obj(JSON.parse(r.body) as unknown);
-    return { id: strField(j, "id"), token: strField(j, "token"), expiresAt: strField(j, "expiresAt") };
+    return {
+      id: strField(j, "id"),
+      token: strField(j, "token"),
+      expiresAt: strField(j, "expiresAt"),
+    };
   }
 
   async listTokens(): Promise<TokenRow[]> {
@@ -116,7 +120,11 @@ export class KernelClient {
     return listField(view, "gateways").map((row) => {
       const j = obj(row);
       if (typeof j["online"] !== "boolean") fail("links row carries no boolean `online`");
-      return { endpointId: strField(j, "endpointId"), team: strField(j, "team"), online: j["online"] };
+      return {
+        endpointId: strField(j, "endpointId"),
+        team: strField(j, "team"),
+        online: j["online"],
+      };
     });
   }
 
@@ -181,19 +189,16 @@ export async function mintCliToken(
   cliSecret: string,
   clientId = "facilitator-cli",
 ): Promise<string> {
-  const response = await fetch(
-    `${idpBaseUrl}/realms/facilitator/protocol/openid-connect/token`,
-    {
-      method: "POST",
-      headers: { "content-type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        grant_type: "client_credentials",
-        client_id: clientId,
-        client_secret: cliSecret,
-      }),
-      signal: AbortSignal.timeout(10_000),
-    },
-  );
+  const response = await fetch(`${idpBaseUrl}/realms/facilitator/protocol/openid-connect/token`, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "client_credentials",
+      client_id: clientId,
+      client_secret: cliSecret,
+    }),
+    signal: AbortSignal.timeout(10_000),
+  });
   const body = obj(await response.json().catch(() => ({})));
   if (response.status !== 200 || typeof body["access_token"] !== "string") {
     const err = typeof body["error"] === "string" ? body["error"] : "no access_token";

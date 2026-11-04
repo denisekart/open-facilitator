@@ -49,7 +49,10 @@ let app: Record<string, unknown> | null = null;
 function mountComponent(component: object, props: Record<string, unknown> = {}): HTMLDivElement {
   container = document.createElement("div");
   document.body.append(container);
-  app = mount(component as never, { target: container, props }) as unknown as Record<string, unknown>;
+  app = mount(component as never, { target: container, props }) as unknown as Record<
+    string,
+    unknown
+  >;
   flushSync();
   return container;
 }
@@ -155,12 +158,14 @@ describe("EnrollmentTokensCard", () => {
 
     byTestId("token-revoke-t9").click();
     await vi.waitFor(() =>
-      expect(calls).toContainEqual({ path: "/api/admin/enroll-tokens/t9", method: "DELETE", body: null }),
+      expect(calls).toContainEqual({
+        path: "/api/admin/enroll-tokens/t9",
+        method: "DELETE",
+        body: null,
+      }),
     );
     // list loaded on mount + reloaded after the revoke
-    await vi.waitFor(() =>
-      expect(calls.filter((c) => c.method === "GET")).toHaveLength(2),
-    );
+    await vi.waitFor(() => expect(calls.filter((c) => c.method === "GET")).toHaveLength(2));
   });
 
   it("surfaces a typed problem from a failed mint", async () => {
@@ -184,9 +189,7 @@ describe("EnrollmentTokensCard", () => {
     setField(byTestId("token-label"), "attic box");
     byTestId("token-mint").click();
 
-    await vi.waitFor(() =>
-      expect(byTestId("forbidden").textContent).toContain("team-unknown"),
-    );
+    await vi.waitFor(() => expect(byTestId("forbidden").textContent).toContain("team-unknown"));
     expect(container?.querySelector("[data-testid='minted-token']")).toBeNull();
   });
 });

@@ -8,8 +8,18 @@
     "enrollmentTtlMinutes": 60
   },
   "nodes": [
-    { "host": "pc1.tailnet-abc123.ts.net", "gatewayId": "gw.pc1", "teams": ["home"], "launcher": true },
-    { "host": "pc2.tailnet-abc123.ts.net", "gatewayId": "gw.pc2", "teams": ["home"], "launcher": true }
+    {
+      "host": "pc1.tailnet-abc123.ts.net",
+      "gatewayId": "gw.pc1",
+      "teams": ["home"],
+      "launcher": true
+    },
+    {
+      "host": "pc2.tailnet-abc123.ts.net",
+      "gatewayId": "gw.pc2",
+      "teams": ["home"],
+      "launcher": true
+    }
   ],
   "images": { "kernel": "local", "node": "local", "worker": "local" },
   "tls": "internal",
@@ -17,8 +27,14 @@
   "backupPath": "/var/backups/facilitator",
   "secretsFile": "secrets/example.env",
   "externals": {
-    "github": { "webhookPath": "/api/ingress/webhooks/github", "secretEnv": "GITHUB_WEBHOOK_SECRET" },
-    "mattermost": { "url": "https://mm.tailnet-abc123.ts.net", "botTokenEnv": "MATTERMOST_BOT_TOKEN" }
+    "github": {
+      "webhookPath": "/api/ingress/webhooks/github",
+      "secretEnv": "GITHUB_WEBHOOK_SECRET"
+    },
+    "mattermost": {
+      "url": "https://mm.tailnet-abc123.ts.net",
+      "botTokenEnv": "MATTERMOST_BOT_TOKEN"
+    }
   },
   "sshUser": "facilitator",
   "remoteDir": "/opt/facilitator"

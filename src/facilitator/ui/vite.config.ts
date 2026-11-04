@@ -22,9 +22,9 @@ export default defineConfig(({ mode }) => ({
   },
   // Component tests mount real components: resolve svelte's browser
   // (client) build, not the node default (the server build has no mount()).
-  resolve: {
-    conditions: mode === "test" ? ["browser"] : [],
-  },
+  // Build MUST keep Vite's default conditions — an explicit array here
+  // REPLACES them, and the SPA bundle silently ships the svelte server build.
+  ...(mode === "test" ? { resolve: { conditions: ["browser"] } } : {}),
   test: {
     environment: "jsdom",
     server: {

@@ -8,7 +8,7 @@ import path from "node:path";
 import { must, run, fail } from "./util.js";
 import type { RenderedBox } from "./render.js";
 import { EXAMPLE_DIR } from "./render.js";
-import type { RolesFile } from "./env.js";
+import { SHARED_NETWORK, type RolesFile } from "./env.js";
 import { type BoxDriver, sweepManaged } from "./compose.js";
 
 export class SshDriver implements BoxDriver {
@@ -20,7 +20,9 @@ export class SshDriver implements BoxDriver {
   /** box "kernel" -> kernel host; node slug -> that node's host. */
   private host(): string {
     if (this.box.kernelBox) return this.roles.kernel.host;
-    const node = this.roles.nodes.find((n) => n.host.split(".")[0]?.toLowerCase() === this.box.name);
+    const node = this.roles.nodes.find(
+      (n) => n.host.split(".")[0]?.toLowerCase() === this.box.name,
+    );
     if (node === undefined) fail(`roles: no node matches box "${this.box.name}"`);
     return node.host;
   }
@@ -43,9 +45,7 @@ export class SshDriver implements BoxDriver {
   async push(): Promise<void> {
     const bundleParent = path.dirname(this.box.dir);
     await this.ssh(["mkdir", "-p", this.remoteDir()]);
-    const push = await run([
-      "tar", "-C", bundleParent, "-cf", "-", this.box.name,
-    ]);
+    const push = await run(["tar", "-C", bundleParent, "-cf", "-", this.box.name]);
     if (push.code !== 0) fail(`tar bundle: ${push.stderr}`);
     await must(
       ["ssh", "-o", "BatchMode=yes", this.target(), "tar", "-C", this.remoteDir(), "-xf", "-"],
@@ -58,10 +58,28 @@ export class SshDriver implements BoxDriver {
    * dir => <remoteDir>/.. x5 lands on the pushed repo root). */
   async pushRepo(): Promise<void> {
     await this.ssh(["mkdir", "-p", path.posix.dirname(path.posix.dirname(this.remoteDir()))]);
-    const r = await run(["git", "-C", path.resolve(EXAMPLE_DIR, "..", ".."), "archive", "--format=tar", "HEAD"]);
-    if (r.code !== 0) fail(`git archive HEAD: ${r.stderr.trim()} — a multi-box "local" image needs a git checkout`);
+    const r = await run([
+      "git",
+      "-C",
+      path.resolve(EXAMPLE_DIR, "..", ".."),
+      "archive",
+      "--format=tar",
+      "HEAD",
+    ]);
+    if (r.code !== 0)
+      fail(`git archive HEAD: ${r.stderr.trim()} — a multi-box "local" image needs a git checkout`);
     await must(
-      ["ssh", "-o", "BatchMode=yes", this.target(), "tar", "-C", path.posix.dirname(path.posix.dirname(this.remoteDir())), "-xf", "-"],
+      [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        this.target(),
+        "tar",
+        "-C",
+        path.posix.dirname(path.posix.dirname(this.remoteDir())),
+        "-xf",
+        "-",
+      ],
       { input: r.stdout },
     );
   }
@@ -69,18 +87,25 @@ export class SshDriver implements BoxDriver {
   private compose(args: string[]): Promise<string> {
     // cd into the bundle dir so relative mounts + build contexts resolve;
     // compose reads the bundle's own compose.yaml + .env from there.
-    return this.ssh(
-      ["sh", "-c", `cd ${this.remoteDir()} && docker compose ${args.join(" ")}`],
-    );
+    return this.ssh(["sh", "-c", `cd ${this.remoteDir()} && docker compose ${args.join(" ")}`]);
   }
 
   async up(_box: RenderedBox, opts: { build: boolean }): Promise<void> {
     await this.push();
+    // The external spine must exist before compose — same ensure law as
+    // the sim driver (each box owns its own ofac-local; workers land on it
+    // via the launcher's allowlisted network).
+    await this.ssh([
+      "sh",
+      "-c",
+      `docker network inspect ${SHARED_NETWORK} >/dev/null 2>&1 || docker network create ${SHARED_NETWORK}`,
+    ]);
     if (opts.build) {
-      const needsRepo =
-        this.roles.images.kernel === "local" || this.roles.images.node === "local";
+      const needsRepo = this.roles.images.kernel === "local" || this.roles.images.node === "local";
       if (needsRepo) {
-        console.warn(`warn: topology "${this.roles.topology}" with a "local" image pushes a repo archive to ${this.host()} (a digest avoids it)`);
+        console.warn(
+          `warn: topology "${this.roles.topology}" with a "local" image pushes a repo archive to ${this.host()} (a digest avoids it)`,
+        );
         await this.pushRepo();
       }
     }
@@ -92,11 +117,11 @@ export class SshDriver implements BoxDriver {
     await sweepManaged();
   }
 
-  async logs(_box: RenderedBox): Promise<void> {
+  async logs(): Promise<void> {
     process.stdout.write(await this.compose(["logs", "--tail", "100"]));
   }
 
-  async ps(_box: RenderedBox): Promise<string> {
+  async ps(): Promise<string> {
     return await this.compose(["ps", "--format", "json"]);
   }
 }

@@ -73,8 +73,8 @@ example-local-smoke:
 	@echo "Local home-deployment example gate: AI-free sim run (needs Docker Engine;"
 	@echo "NOT wired into make test — same posture as the AWS example)."
 	pnpm -C examples/local/tools/localctl build
-	node examples/local/localctl init --env sim
-	node examples/local/localctl smoke --env sim --clean-exit
+	examples/local/localctl init --env sim
+	examples/local/localctl smoke --env sim --clean-exit
 
 db-update:
 	dotnet tool restore

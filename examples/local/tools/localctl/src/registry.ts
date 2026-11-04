@@ -5,14 +5,23 @@
 import { fail, run } from "./util.js";
 import type { ImageKey, Lockfile } from "./lock.js";
 
-export const DIGEST_RE = /^[a-z0-9.\-\/:]+@sha256:[0-9a-f]{64}$/;
-export const TAG_RE = /^[a-z0-9.\-\/:]+:[A-Za-z0-9._-]+$/;
+export const DIGEST_RE = /^[a-z0-9./:-]+@sha256:[0-9a-f]{64}$/;
+export const TAG_RE = /^[a-z0-9./:-]+:[A-Za-z0-9._-]+$/;
 
 export async function resolveTagToDigest(ref: string): Promise<string> {
-  const r = await run(["docker", "buildx", "imagetools", "inspect", "--format", "{{.Digest}}", ref]);
+  const r = await run([
+    "docker",
+    "buildx",
+    "imagetools",
+    "inspect",
+    "--format",
+    "{{.Digest}}",
+    ref,
+  ]);
   if (r.code !== 0) fail(`imagetools inspect ${ref}: ${r.stderr.trim()}`);
   const digest = r.stdout.trim();
-  if (!/^sha256:[0-9a-f]{64}$/.test(digest)) fail(`imagetools inspect ${ref}: unexpected digest "${digest}"`);
+  if (!/^sha256:[0-9a-f]{64}$/.test(digest))
+    fail(`imagetools inspect ${ref}: unexpected digest "${digest}"`);
   const repo = ref.slice(0, ref.lastIndexOf(":"));
   return `${repo}@${digest}`;
 }

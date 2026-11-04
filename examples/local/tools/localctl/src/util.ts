@@ -84,7 +84,12 @@ export interface HttpResponse {
 export async function http(
   method: string,
   url: string,
-  opts: { token?: string; json?: unknown; headers?: Record<string, string>; timeoutMs?: number } = {},
+  opts: {
+    token?: string;
+    json?: unknown;
+    headers?: Record<string, string>;
+    timeoutMs?: number;
+  } = {},
 ): Promise<HttpResponse> {
   const headers: Record<string, string> = { accept: "application/json", ...opts.headers };
   if (opts.token !== undefined) headers.authorization = `Bearer ${opts.token}`;

@@ -356,7 +356,7 @@ public sealed class LinkEnrollmentEntity
     /// <summary>Mode (b): subject (client id / service account) of the workload token.</summary>
     public string? WorkloadSubject { get; set; }
 }
- 
+
 /// <summary>facilitator.enrollment_tokens — mintable, revocable enrollment tokens (admin-minted; consumed on first enroll).</summary>
 public sealed class EnrollmentTokenEntity
 {

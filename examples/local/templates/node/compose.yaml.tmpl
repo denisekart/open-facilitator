@@ -1,0 +1,90 @@
+# Per-box node bundle: persistent team gateway + deterministic worker (one
+# container, supervisor unit law) + the OCI provisioning launcher. Rendered
+# by localctl from the roles file; do not hand-edit rendered output. All
+# secrets/URLs/images ride the bundle .env (compose interpolation); the only
+# structural render decision is the image source (`image:` digest vs local
+# `build:`). NO published ports: gateway diagnostics bind container loopback
+# — the box exposes sshd only (lan/tailscale pushes), every link-plane leg
+# dials OUT.
+name: ofacnode-__NODE__
+
+services:
+  workspace:
+    __NODE_IMAGE_BLOCK__
+    entrypoint: ["/bin/sh", "/opt/ofac/ofac-supervisor.sh"]
+    environment:
+      UNITS_DIR: /opt/ofac/units
+      OFAC_LOG_DIR: /var/lib/ofac/logs
+      GATEWAY_CONFIG: /opt/ofac/config/gateway.yaml
+      WORKER_CONFIG: /opt/ofac/config/worker.yaml
+      # The MINTED enrollment token (localctl enroll-token writes it into
+      # this .env): the gateway's credential until revoked; after first use
+      # it is THIS endpoint's standing re-enroll secret.
+      OFAC_ENROLL_SECRET: ${OFAC_ENROLL_SECRET:?written by localctl enroll-token}
+      OFAC_KERNEL_URL: ${OFAC_KERNEL_URL:?set in the bundle .env}
+      # Child self-enrollment rides the STATIC kernel secret (the break-glass
+      # line — a child workload identity is not a minted gateway token).
+      OFAC_KERNEL_SECRET: ${OFAC_ENROLLMENT_TOKEN:?set in the secrets file}
+      OFAC_WORKER_TEAM: ${OFAC_TEAM:?set in the bundle .env}
+      OFAC_WORKER_ENDPOINT: ${OFAC_WORKER_ENDPOINT:?set in the bundle .env}
+      # Gateway child-wire admission + the worker's hello token.
+      OFAC_CHILD_SECRET: ${__CHILD_SECRETS_ENV__:?set in the secrets file}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTLP_ENDPOINT:?set in the bundle .env}
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+    volumes:
+      # <stateDir>/token: the gateway persists its rotated link token here;
+      # re-enroll-on-401 replays OFAC_ENROLL_SECRET after restarts.
+      - workspace_state:/var/lib/ofac
+      - ./supervisor/ofac-supervisor.sh:/opt/ofac/ofac-supervisor.sh:ro
+      - ./units:/opt/ofac/units:ro
+      - ./config:/opt/ofac/config:ro
+    restart: on-failure:5
+    # Debian-slim ships no curl/wget; probe diagnostics with node's fetch.
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8099/status').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  oci-launcher:
+    __NODE_IMAGE_BLOCK_2__
+    # The Engine socket is root:docker and node-runtime's non-root user
+    # carries neither — this container rides root (a thin socket proxy; the
+    # containers IT creates run as the workload image's own user).
+    user: root
+    command: ["node", "/app/provisioning-oci/dist/bin/launcher.js", "run", "--config", "/opt/ofac/config/adapter.yaml"]
+    environment:
+      # The launcher enrolls role=child — a minted GATEWAY token would 403
+      # role-mismatch — so it rides the static secret too (kernel-side
+      # workload identity law).
+      OFAC_ENROLL_SECRET: ${OFAC_ENROLLMENT_TOKEN:?set in the secrets file}
+      OFAC_ENDPOINT_ID: launcher.__NODE__
+      OFAC_TEAM: ${OFAC_TEAM:?set in the bundle .env}
+      DOCKER_HOST: unix:///var/run/docker.sock
+      OFAC_STATE_PATH: /var/lib/ofac/launcher.sqlite3
+      OFAC_PROV_ALLOWED_IMAGES: ${WORKER_IMAGE:?set in the bundle .env}
+      OFAC_PROV_ALLOWED_NETWORKS: ofac-local
+      # The workload spec's $-names resolve against THIS env: the elastic
+      # container's supervisor + worker self-enroll read these.
+      OFAC_ENROLLMENT_TOKEN: ${OFAC_ENROLLMENT_TOKEN:?set in the secrets file}
+      __CHILD_SECRETS_ENV__: ${__CHILD_SECRETS_ENV__:?set in the secrets file}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTLP_ENDPOINT:?set in the bundle .env}
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - launcher_state:/var/lib/ofac
+      - ./launcher:/opt/ofac/config:ro
+    restart: on-failure:5
+
+volumes:
+  workspace_state: {}
+  launcher_state: {}
+
+# The shared spine: same external network as the kernel bundle (created by
+# `localctl up`), so this box reaches `facilitator`/`aspire` by service name
+# and launcher-provisioned workers land on a network the kernel named.
+networks:
+  default:
+    name: ofac-local
+    external: true

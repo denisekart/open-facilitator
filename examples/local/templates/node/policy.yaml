@@ -1,0 +1,9 @@
+# Node team policy: analyze runs free. First-match-wins with an implicit
+# final deny, so every advertised capability needs a row (the manifest
+# advertises only research.analyze). owner is rendered to the node's team.
+owner: __TEAM__
+policies:
+  - capability: research.analyze
+    resources: ["*"]
+    actorAnyOf: []
+    effect: allow

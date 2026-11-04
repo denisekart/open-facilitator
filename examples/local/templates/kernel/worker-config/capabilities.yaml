@@ -1,0 +1,16 @@
+# The manifest the elastic worker advertises — identical to the node
+# bundle's (same team, same capability), so routing treats persistent and
+# elastic legs uniformly.
+apiVersion: facilitator.framework/v1
+kind: CapabilityManifest
+ownerTeam: home
+capabilities:
+  - id: research.analyze
+    version: 1
+    execution: asynchronous
+    acceptedContexts: [uri-reference]
+    outputKinds: [analysis.report]
+    outputMediaTypes: [text/markdown]
+    supportsSteering: true
+    supportsCancellation: true
+    supportsNudge: false

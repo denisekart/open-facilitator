@@ -1,0 +1,14 @@
+// localctl: strict like the repo base; NodeNext so the built ESM runs on
+// plain node without a loader. exactOptionalPropertyTypes stays on.
+{
+  "extends": "../../../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": ".",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2024"],
+    "types": ["node"]
+  },
+  "include": ["src", "test", "vitest.config.ts"]
+}

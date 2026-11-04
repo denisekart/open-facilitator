@@ -1,0 +1,25 @@
+# Per-node persistent Gateway (mode (a): the minted enrollment token rides
+# OFAC_ENROLL_SECRET). Empty fleet + the deterministic worker attaches late
+# over the in-container unix child socket. Values rendered per node:
+# gatewayId, team, facilitatorUrl.
+apiVersion: facilitator.framework/v1
+kind: Gateway
+gatewayId: __GW_ID__
+team: __TEAM__
+role: gateway
+facilitatorUrl: __KERNEL_URL__
+trustMode: isolated-executor
+stateDir: /var/lib/ofac/gateway
+mode: standalone
+children:
+  # The deterministic worker registers late over the child socket; hello
+  # auth falls back to OFAC_CHILD_SECRET, so no per-child token here.
+  - name: deterministic
+childTransport:
+  socket:
+    path: child.sock
+diagnostics:
+  port: 8099
+heartbeatSeconds: 5
+policy:
+  path: policy.yaml

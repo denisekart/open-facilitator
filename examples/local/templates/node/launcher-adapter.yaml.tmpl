@@ -1,0 +1,14 @@
+# OCI provisioning launcher on the node box: link-plane endpoint receiving
+# org.facilitator.command.provision.start|stop.v1, executing against the
+# local Docker Engine socket. Mode-(a) enrollment on the STATIC kernel
+# secret (the launcher enrolls role=child, so a minted gateway token is the
+# wrong shape). The allowlists are the launch-approved surface: exactly the
+# rendered worker image, exactly the shared ofac-local network. Rendered per
+# node: kernelUrl, endpointId, team.
+kernelUrl: __KERNEL_URL__
+enrollSecretEnv: OFAC_ENROLL_SECRET
+endpointId: __LAUNCHER_ID__
+team: __TEAM__
+statePath: /var/lib/ofac/launcher.sqlite3
+gcMinutes: 60
+stopGraceSeconds: 10

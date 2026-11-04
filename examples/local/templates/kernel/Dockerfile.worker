@@ -1,0 +1,18 @@
+# Launcher-managed elastic worker image: the SAME node-runtime, plus this
+# example's elastic config, the supervisor, and the units baked in at the
+# paths the kernel's Provision__Workloads__0 spec launches (entrypoint
+# /bin/sh /opt/ofac/ofac-supervisor.sh, config baked at /opt/ofac/config).
+# Adapted from reference/container/Dockerfile.elastic so the example is
+# self-contained: build context is the REPO ROOT (the node-runtime base is
+# the locally-built tag or a registry digest the roles file names).
+# Config-only — no rebuilt node bytes, NO host bind mounts: the launcher's
+# approved surface stays image + network (state lives on the container
+# layer: a relaunched gateway re-registers). The elastic identity is
+# deliberately a single baked gateway (gw.elastic/home): every launch of
+# Workloads__0 boots that same config, and the launcher's one-container-per-
+# workload-id law keeps the fleet at most one.
+ARG OFAC_BASE=ofac-node-runtime:local
+FROM ${OFAC_BASE}
+COPY --chown=node:node examples/local/templates/kernel/worker-config/ /opt/ofac/config/
+COPY --chown=node:node features/shared/ofac-supervisor.sh /opt/ofac/ofac-supervisor.sh
+COPY --chown=node:node examples/local/templates/node/units/ /opt/ofac/units/

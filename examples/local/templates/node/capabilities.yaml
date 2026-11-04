@@ -1,0 +1,17 @@
+# The manifest the node worker advertises (mirrors
+# reference/config/workspace/capabilities.yaml, trimmed to the home team +
+# the analyze capability the smoke legs dispatch). ownerTeam is rendered to
+# the node's first team and must equal the Gateway enrollment's team.
+apiVersion: facilitator.framework/v1
+kind: CapabilityManifest
+ownerTeam: __TEAM__
+capabilities:
+  - id: research.analyze
+    version: 1
+    execution: asynchronous
+    acceptedContexts: [uri-reference]
+    outputKinds: [analysis.report]
+    outputMediaTypes: [text/markdown]
+    supportsSteering: true
+    supportsCancellation: true
+    supportsNudge: false

@@ -1,0 +1,10 @@
+# Rendered bundles are products, not sources.
+.out/
+# Operator secrets (localctl init generates them; never commit).
+secrets/
+*.local.env
+# node
+node_modules/
+dist/
+# envs/<env>.lock.json is COMMITTED (the lockfile law): resolved image refs
+# are audit data, not secrets.

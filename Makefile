@@ -1,4 +1,4 @@
-.PHONY: restore build test lint format protocol db-update compose-slim compose-full compose-down clean link-e2e gateway-e2e worker-e2e admin-e2e example-slim-up docs-check provider-e2e gitlab-up gitlab-down
+.PHONY: restore build test lint format protocol db-update compose-slim compose-full compose-down clean link-e2e gateway-e2e worker-e2e admin-e2e example-slim-up docs-check provider-e2e gitlab-up gitlab-down example-local-smoke
 
 restore:
 	dotnet restore OpenFacilitator.slnx
@@ -68,6 +68,13 @@ example-slim-up:
 	@echo "a host Facilitator on :8088 (see examples/slim/.../README.md section 1) and"
 	@echo "'node features/build.mjs' (Feature runtime tarballs) beforehand."
 	npx --yes @devcontainers/cli@^0.79 up --workspace-folder examples/slim/deterministic-research-worker
+
+example-local-smoke:
+	@echo "Local home-deployment example gate: AI-free sim run (needs Docker Engine;"
+	@echo "NOT wired into make test — same posture as the AWS example)."
+	pnpm -C examples/local/tools/localctl build
+	node examples/local/localctl init --env sim
+	node examples/local/localctl smoke --env sim --clean-exit
 
 db-update:
 	dotnet tool restore

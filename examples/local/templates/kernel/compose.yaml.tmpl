@@ -1,0 +1,139 @@
+# Home kernel: identity + persistence + artifacts + observability + the
+# Facilitator. Rendered by localctl from roles file + secrets + versions.env;
+# do not hand-edit rendered output. Interpolates ONLY from the rendered .env
+# (secrets) and the version pins the renderer copies into it.
+name: ofackernel
+
+services:
+  postgres:
+    image: __IMAGE_POSTGRES__
+    environment:
+      POSTGRES_USER: home
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in the secrets file}
+      POSTGRES_DB: facilitator
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U home -d facilitator"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+
+  keycloak:
+    image: __IMAGE_KEYCLOAK__
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: home-admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?set in the secrets file}
+      # start-dev + embedded H2: an example stub, not the reference env's
+      # KC_DB=postgres. Issuer validation is byte-exact, so KC_HOSTNAME must
+      # match identity:oidc:authority in ./facilitator.json.
+      KC_HOSTNAME: __KC_HOSTNAME__
+      KC_HEALTH_ENABLED: "true"
+    volumes:
+      - ./keycloak:/opt/keycloak/data/import:ro
+      - kc_data:/opt/keycloak/data/h2
+    __KC_PORTS__
+    # UBI-micro ships bash but no HTTP client; probe the management health
+    # endpoint over bash's /dev/tcp.
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - bash -c 'exec 3<>/dev/tcp/127.0.0.1/9000 && printf "GET /health HTTP/1.0\r\n\r\n" >&3 && head -n1 <&3 | grep -q " 200 "'
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+
+  minio:
+    image: __IMAGE_MINIO__
+    command: ["server", "/data"]
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:?set in the secrets file}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:?set in the secrets file}
+    volumes:
+      - minio_data:/data
+    # Any HTTP answer on the readiness probe proves the S3 listener.
+    healthcheck:
+      test: ["CMD", "curl", "-s", "-o", "/dev/null", "http://127.0.0.1:9000/minio/health/ready"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+
+  # One-shot bucket bootstrap: create-if-absent facilitator-artifacts, then
+  # exit. `--ignore-existing` keeps re-up idempotent.
+  minio-init:
+    image: minio/mc:${MINIO_TAG}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >
+        mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" &&
+        mc mb --ignore-existing local/facilitator-artifacts
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:?set in the secrets file}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:?set in the secrets file}
+    depends_on:
+      minio:
+        condition: service_healthy
+    restart: "no"
+
+  aspire:
+    image: __IMAGE_ASPIRE__
+    environment:
+      ASPNETCORE_URLS: http://0.0.0.0:18888
+      ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL: http://0.0.0.0:18889
+      ASPIRE_DASHBOARD_OTLP_HTTP_ENDPOINT_URL: http://0.0.0.0:18890
+      ASPIRE_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS: "true"
+      # Transient persistence: the SQLite `Resume` mode landed in dashboard
+      # 13.6; the pinned 13.4.2 (reference's pin) runs in-memory. Documented
+      # caveat in README — the smoke telemetry leg is soft anyway.
+    __ASPIRE_PORTS__
+    # Image ships no shell tooling for a probe; nothing depends on its readiness.
+
+  facilitator:
+    __KERNEL_IMAGE__
+    # ONE env source for the whole kernel contract, rendered verbatim from
+    # the roles file + secrets (same law as reference/config/facilitator.env).
+    env_file:
+      - facilitator.env
+    volumes:
+      - ./facilitator.json:/app/config/facilitator.json:ro
+    __KERNEL_PORTS__
+    # Bounded restart: a cold-start DNS flake surfaces as an Npgsql connect
+    # failure and kills startup; docker treats user STOP/KILL as intentional.
+    restart: on-failure:5
+    # aspnet:10.0 has bash but no HTTP client; probe /health over /dev/tcp.
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080 && printf "GET /health HTTP/1.0\r\n\r\n" >&3 && head -n1 <&3 | grep -q " 200 "'
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+
+__EXTRA_BLOCK__
+volumes:
+  pg_data: {}
+  kc_data: {}
+  minio_data: {}
+  __EXTRA_VOLUMES__
+
+# The shared spine: every kernel service joins the external `ofac-local`
+# network (created by `localctl up`), so node boxes and kernel-provisioned
+# workers resolve `facilitator`, `keycloak`, `minio`, `aspire` by service
+# name across compose projects.
+networks:
+  default:
+    name: ofac-local
+    external: true

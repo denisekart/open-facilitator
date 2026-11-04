@@ -17,6 +17,7 @@ packages:
   - "examples/aws"
   - "examples/aws/fleet-launcher"
   - "examples/full/coding-worker"
+  - "examples/local/tools/localctl"
   - "protocol/tools/link-client-foreign"
 
 allowBuilds:

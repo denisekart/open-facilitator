@@ -1,0 +1,26 @@
+# Rendered by localctl (lan/tailscale topologies only). ONE hostname-keyed
+# site block, `tls internal` (the operator trusts the CA; "acme" swaps the
+# directive for an ACME-issued cert when TLS-terminating DNS exists). The
+# tailscale sidecar (tailscale topology) or the host's own LAN reachability
+# (lan) carries 443 in; nothing else listens inbound on the kernel box.
+__SITE_HOST__ {
+	tls __TLS_DIRECTIVE__
+
+	# Identity: the IdP rides /id so the issuer string
+	# https://<host>/id/realms/facilitator stays byte-identical to
+	# identity:oidc:authority (alias law).
+	handle_path /id/* {
+		reverse_proxy keycloak:8080
+	}
+
+	# Kernel: API + SPA + link plane + webhooks — the whole app face.
+	handle {
+		reverse_proxy facilitator:8080
+	}
+
+	encode zstd gzip
+}
+
+# Observability stays box-internal: the Aspire UI + MinIO console ride
+# secondary hostnames only when the operator adds DNS for them; the
+# smoke/status paths talk to the containers directly.

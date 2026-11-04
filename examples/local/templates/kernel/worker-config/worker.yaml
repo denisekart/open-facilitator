@@ -1,0 +1,14 @@
+# Elastic worker: over the localhost child leg it attaches to the
+# in-container Gateway. The unit self-enrolls on OFAC_ENROLL_SECRET (the
+# spec-env static kernel secret, name-indirect).
+apiVersion: facilitator.framework/v1
+kind: HarnessAdapter
+childWorkspaceId: gw.elastic/deterministic
+kernelUrl: http://facilitator:8080
+transport:
+  socket:
+    path: /var/lib/ofac/gateway/child.sock
+manifestFile: /opt/ofac/config/capabilities.yaml
+workDir: /var/lib/ofac/worker
+stepMs: 800
+heartbeatSeconds: 5

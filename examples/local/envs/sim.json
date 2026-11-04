@@ -1,0 +1,20 @@
+{
+  "name": "sim",
+  "topology": "sim",
+  "kernel": {
+    "host": "facilitator",
+    "ports": { "kernel": 7488, "idp": 7480, "aspireUi": 7490 },
+    "teams": ["home"],
+    "enrollmentTtlMinutes": 60
+  },
+  "nodes": [
+    { "host": "pc1", "gatewayId": "gw.pc1", "teams": ["home"], "launcher": true },
+    { "host": "pc2", "gatewayId": "gw.pc2", "teams": ["home"], "launcher": true }
+  ],
+  "images": { "kernel": "local", "node": "local", "worker": "local" },
+  "tls": "internal",
+  "backupPath": ".out/sim/backups",
+  "secretsFile": "secrets/sim.env",
+  "sshUser": "facilitator",
+  "remoteDir": "/opt/facilitator"
+}

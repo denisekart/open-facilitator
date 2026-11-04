@@ -1,0 +1,7 @@
+# Elastic team policy: same free-allow for research.analyze on team home.
+owner: home
+policies:
+  - capability: research.analyze
+    resources: ["*"]
+    actorAnyOf: []
+    effect: allow

@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# localctl — operator entrypoint for the local home-deployment example.
+# Build once (`pnpm -C tools/localctl build`), then run from anywhere.
+exec node "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/tools/localctl/dist/src/index.js" "$@"

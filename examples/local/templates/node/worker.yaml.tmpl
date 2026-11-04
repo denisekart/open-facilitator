@@ -1,0 +1,16 @@
+# Deterministic worker: over the localhost child leg it attaches to the
+# in-container Gateway. No tokens in this file: OFAC_CHILD_SECRET supplies
+# the child-wire token, and the worker unit's self-enrollment (mode (a) on
+# the STATIC kernel secret) exports OFAC_KERNEL_TOKEN — the worker's own
+# kernel credential for the artifact byte path.
+apiVersion: facilitator.framework/v1
+kind: HarnessAdapter
+childWorkspaceId: __GW_ID__/deterministic
+kernelUrl: __KERNEL_URL__
+transport:
+  socket:
+    path: /var/lib/ofac/gateway/child.sock
+manifestFile: /opt/ofac/config/capabilities.yaml
+workDir: /var/lib/ofac/worker
+stepMs: 800
+heartbeatSeconds: 5

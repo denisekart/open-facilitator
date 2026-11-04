@@ -1,0 +1,23 @@
+# Launcher-managed elastic worker (the kernel's Provision:Workloads:0 image):
+# the SAME gateway code, booted by the OCI launcher. Identity: mode-(a)
+# enrollment on the STATIC kernel secret (spec env OFAC_ENROLL_SECRET,
+# name-indirect), gw.elastic on team home, empty standalone fleet + the
+# deterministic worker child over the in-container unix socket. facilitatorUrl
+# is repointed via OFAC_KERNEL_URL env where needed.
+apiVersion: facilitator.framework/v1
+kind: Gateway
+gatewayId: gw.elastic
+team: home
+role: gateway
+facilitatorUrl: http://facilitator:8080
+trustMode: isolated-executor
+stateDir: /var/lib/ofac/gateway
+mode: standalone
+childTransport:
+  socket:
+    path: child.sock
+diagnostics:
+  port: 8099
+heartbeatSeconds: 5
+policy:
+  path: policy.yaml

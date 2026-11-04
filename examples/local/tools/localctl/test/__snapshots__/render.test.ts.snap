@@ -1,0 +1,281 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`render: lan topology > renders a single 443 site with tls internal 1`] = `
+"# Rendered by localctl (lan/tailscale topologies only). ONE hostname-keyed
+# site block, \`tls internal\` (the operator trusts the CA; "acme" swaps the
+# directive for an ACME-issued cert when TLS-terminating DNS exists). The
+# tailscale sidecar (tailscale topology) or the host's own LAN reachability
+# (lan) carries 443 in; nothing else listens inbound on the kernel box.
+kernel.tailnet-abc123.ts.net {
+	tls internal
+
+	# Identity: the IdP rides /id so the issuer string
+	# https://<host>/id/realms/facilitator stays byte-identical to
+	# identity:oidc:authority (alias law).
+	handle_path /id/* {
+		reverse_proxy keycloak:8080
+	}
+
+	# Kernel: API + SPA + link plane + webhooks — the whole app face.
+	handle {
+		reverse_proxy facilitator:8080
+	}
+
+	encode zstd gzip
+}
+
+# Observability stays box-internal: the Aspire UI + MinIO console ride
+# secondary hostnames only when the operator adds DNS for them; the
+# smoke/status paths talk to the containers directly.
+"
+`;
+
+exports[`render: sim > kernel compose snapshots clean 1`] = `
+"# Home kernel: identity + persistence + artifacts + observability + the
+# Facilitator. Rendered by localctl from roles file + secrets + versions.env;
+# do not hand-edit rendered output. Interpolates ONLY from the rendered .env
+# (secrets) and the version pins the renderer copies into it.
+name: ofackernel
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: home
+      POSTGRES_PASSWORD: \${POSTGRES_PASSWORD:?set in the secrets file}
+      POSTGRES_DB: facilitator
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U home -d facilitator"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.7.5
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: home-admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: \${KEYCLOAK_ADMIN_PASSWORD:?set in the secrets file}
+      # start-dev + embedded H2: an example stub, not the reference env's
+      # KC_DB=postgres. Issuer validation is byte-exact, so KC_HOSTNAME must
+      # match identity:oidc:authority in ./facilitator.json.
+      KC_HOSTNAME: http://id.localhost:7480
+      KC_HEALTH_ENABLED: "true"
+    volumes:
+      - ./keycloak:/opt/keycloak/data/import:ro
+      - kc_data:/opt/keycloak/data/h2
+    ports:
+      - "127.0.0.1:7480:8080"
+    # UBI-micro ships bash but no HTTP client; probe the management health
+    # endpoint over bash's /dev/tcp.
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - bash -c 'exec 3<>/dev/tcp/127.0.0.1/9000 && printf "GET /health HTTP/1.0\\r\\n\\r\\n" >&3 && head -n1 <&3 | grep -q " 200 "'
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+
+  minio:
+    image: minio/minio:RELEASE.2025-10-15T17-29-55Z   # minio/minio + minio/mc share the release tag
+    command: ["server", "/data"]
+    environment:
+      MINIO_ROOT_USER: \${S3_ACCESS_KEY:?set in the secrets file}
+      MINIO_ROOT_PASSWORD: \${S3_SECRET_KEY:?set in the secrets file}
+    volumes:
+      - minio_data:/data
+    # Any HTTP answer on the readiness probe proves the S3 listener.
+    healthcheck:
+      test: ["CMD", "curl", "-s", "-o", "/dev/null", "http://127.0.0.1:9000/minio/health/ready"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+
+  # One-shot bucket bootstrap: create-if-absent facilitator-artifacts, then
+  # exit. \`--ignore-existing\` keeps re-up idempotent.
+  minio-init:
+    image: minio/mc:\${MINIO_TAG}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >
+        mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" &&
+        mc mb --ignore-existing local/facilitator-artifacts
+    environment:
+      MINIO_ROOT_USER: \${S3_ACCESS_KEY:?set in the secrets file}
+      MINIO_ROOT_PASSWORD: \${S3_SECRET_KEY:?set in the secrets file}
+    depends_on:
+      minio:
+        condition: service_healthy
+    restart: "no"
+
+  aspire:
+    image: mcr.microsoft.com/dotnet/aspire-dashboard:13.4.2                        # mcr.microsoft.com/dotnet/aspire-dashboard (13.x ASPIRE_* env contract)
+    environment:
+      ASPNETCORE_URLS: http://0.0.0.0:18888
+      ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL: http://0.0.0.0:18889
+      ASPIRE_DASHBOARD_OTLP_HTTP_ENDPOINT_URL: http://0.0.0.0:18890
+      ASPIRE_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS: "true"
+      # Transient persistence: the SQLite \`Resume\` mode landed in dashboard
+      # 13.6; the pinned 13.4.2 (reference's pin) runs in-memory. Documented
+      # caveat in README — the smoke telemetry leg is soft anyway.
+    ports:
+      - "127.0.0.1:7490:18888"
+      - "127.0.0.1:7091:18890"
+    # Image ships no shell tooling for a probe; nothing depends on its readiness.
+
+  facilitator:
+    image: ofac-facilitator:local
+    build:
+      context: ../../../../..
+      dockerfile: src/facilitator/Dockerfile
+    # ONE env source for the whole kernel contract, rendered verbatim from
+    # the roles file + secrets (same law as reference/config/facilitator.env).
+    env_file:
+      - facilitator.env
+    volumes:
+      - ./facilitator.json:/app/config/facilitator.json:ro
+    ports:
+      - "127.0.0.1:7488:8080"
+    # Bounded restart: a cold-start DNS flake surfaces as an Npgsql connect
+    # failure and kills startup; docker treats user STOP/KILL as intentional.
+    restart: on-failure:5
+    # aspnet:10.0 has bash but no HTTP client; probe /health over /dev/tcp.
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080 && printf "GET /health HTTP/1.0\\r\\n\\r\\n" >&3 && head -n1 <&3 | grep -q " 200 "'
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+
+
+volumes:
+  pg_data: {}
+  kc_data: {}
+  minio_data: {}
+  
+
+# The shared spine: every kernel service joins the external \`ofac-local\`
+# network (created by \`localctl up\`), so node boxes and kernel-provisioned
+# workers resolve \`facilitator\`, \`keycloak\`, \`minio\`, \`aspire\` by service
+# name across compose projects.
+networks:
+  default:
+    name: ofac-local
+    external: true
+"
+`;
+
+exports[`render: sim > node bundle: minted-secret placeholder, no published ports, snapshot 1`] = `
+"# Per-box node bundle: persistent team gateway + deterministic worker (one
+# container, supervisor unit law) + the OCI provisioning launcher. Rendered
+# by localctl from the roles file; do not hand-edit rendered output. All
+# secrets/URLs/images ride the bundle .env (compose interpolation); the only
+# structural render decision is the image source (\`image:\` digest vs local
+# \`build:\`). NO published ports: gateway diagnostics bind container loopback
+# — the box exposes sshd only (lan/tailscale pushes), every link-plane leg
+# dials OUT.
+name: ofacnode-pc1
+
+services:
+  workspace:
+    image: ofac-node-runtime:local
+    build:
+      context: ../../../../..
+      dockerfile: Dockerfile.node
+    entrypoint: ["/bin/sh", "/opt/ofac/ofac-supervisor.sh"]
+    environment:
+      UNITS_DIR: /opt/ofac/units
+      OFAC_LOG_DIR: /var/lib/ofac/logs
+      GATEWAY_CONFIG: /opt/ofac/config/gateway.yaml
+      WORKER_CONFIG: /opt/ofac/config/worker.yaml
+      # The MINTED enrollment token (localctl enroll-token writes it into
+      # this .env): the gateway's credential until revoked; after first use
+      # it is THIS endpoint's standing re-enroll secret.
+      OFAC_ENROLL_SECRET: \${OFAC_ENROLL_SECRET:?written by localctl enroll-token}
+      OFAC_KERNEL_URL: \${OFAC_KERNEL_URL:?set in the bundle .env}
+      # Child self-enrollment rides the STATIC kernel secret (the break-glass
+      # line — a child workload identity is not a minted gateway token).
+      OFAC_KERNEL_SECRET: \${OFAC_ENROLLMENT_TOKEN:?set in the secrets file}
+      OFAC_WORKER_TEAM: \${OFAC_TEAM:?set in the bundle .env}
+      OFAC_WORKER_ENDPOINT: \${OFAC_WORKER_ENDPOINT:?set in the bundle .env}
+      # Gateway child-wire admission + the worker's hello token.
+      OFAC_CHILD_SECRET: \${CHILD_SECRETS_HOME:?set in the secrets file}
+      OTEL_EXPORTER_OTLP_ENDPOINT: \${OTLP_ENDPOINT:?set in the bundle .env}
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+    volumes:
+      # <stateDir>/token: the gateway persists its rotated link token here;
+      # re-enroll-on-401 replays OFAC_ENROLL_SECRET after restarts.
+      - workspace_state:/var/lib/ofac
+      - ./supervisor/ofac-supervisor.sh:/opt/ofac/ofac-supervisor.sh:ro
+      - ./units:/opt/ofac/units:ro
+      - ./config:/opt/ofac/config:ro
+    restart: on-failure:5
+    # Debian-slim ships no curl/wget; probe diagnostics with node's fetch.
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8099/status').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  oci-launcher:
+    image: ofac-node-runtime:local
+    build:
+      context: ../../../../..
+      dockerfile: Dockerfile.node
+    # The Engine socket is root:docker and node-runtime's non-root user
+    # carries neither — this container rides root (a thin socket proxy; the
+    # containers IT creates run as the workload image's own user).
+    user: root
+    command: ["node", "/app/provisioning-oci/dist/bin/launcher.js", "run", "--config", "/opt/ofac/config/adapter.yaml"]
+    environment:
+      # The launcher enrolls role=child — a minted GATEWAY token would 403
+      # role-mismatch — so it rides the static secret too (kernel-side
+      # workload identity law).
+      OFAC_ENROLL_SECRET: \${OFAC_ENROLLMENT_TOKEN:?set in the secrets file}
+      OFAC_ENDPOINT_ID: launcher.pc1
+      OFAC_TEAM: \${OFAC_TEAM:?set in the bundle .env}
+      DOCKER_HOST: unix:///var/run/docker.sock
+      OFAC_STATE_PATH: /var/lib/ofac/launcher.sqlite3
+      OFAC_PROV_ALLOWED_IMAGES: \${WORKER_IMAGE:?set in the bundle .env}
+      OFAC_PROV_ALLOWED_NETWORKS: ofac-local
+      # The workload spec's $-names resolve against THIS env: the elastic
+      # container's supervisor + worker self-enroll read these.
+      OFAC_ENROLLMENT_TOKEN: \${OFAC_ENROLLMENT_TOKEN:?set in the secrets file}
+      CHILD_SECRETS_HOME: \${CHILD_SECRETS_HOME:?set in the secrets file}
+      OTEL_EXPORTER_OTLP_ENDPOINT: \${OTLP_ENDPOINT:?set in the bundle .env}
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - launcher_state:/var/lib/ofac
+      - ./launcher:/opt/ofac/config:ro
+    restart: on-failure:5
+
+volumes:
+  workspace_state: {}
+  launcher_state: {}
+
+# The shared spine: same external network as the kernel bundle (created by
+# \`localctl up\`), so this box reaches \`facilitator\`/\`aspire\` by service name
+# and launcher-provisioned workers land on a network the kernel named.
+networks:
+  default:
+    name: ofac-local
+    external: true
+"
+`;

@@ -1,0 +1,27 @@
+{
+  "resolved": {
+    "kernel": "ofac-facilitator:local",
+    "node": "ofac-node-runtime:local",
+    "worker": "ofac-elastic-worker:local"
+  },
+  "history": [
+    {
+      "image": "kernel",
+      "resolved": "ofac-facilitator:local",
+      "from": "unset",
+      "timestamp": "1970-01-01T00:00:00.000Z"
+    },
+    {
+      "image": "node",
+      "resolved": "ofac-node-runtime:local",
+      "from": "unset",
+      "timestamp": "1970-01-01T00:00:00.000Z"
+    },
+    {
+      "image": "worker",
+      "resolved": "ofac-elastic-worker:local",
+      "from": "unset",
+      "timestamp": "1970-01-01T00:00:00.000Z"
+    }
+  ]
+}

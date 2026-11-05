@@ -57,6 +57,10 @@ describe("worker config law", () => {
     expect(config.askQuestion).toBeUndefined();
   });
 
+  it("accepts heartbeatSeconds (the reference worker.yaml shape)", () => {
+    expect(parse(`${BASE}heartbeatSeconds: 5\n`).heartbeatSeconds).toBe(5);
+  });
+
   it("askQuestion: optional string; non-empty or it names the key", () => {
     expect(parse(`${BASE}askQuestion: which framework?\n`).askQuestion).toBe("which framework?");
     expectFail(`${BASE}askQuestion: 7\n`, "askQuestion");

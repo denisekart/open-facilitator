@@ -62,6 +62,7 @@ const TOP_KEYS: Record<string, true> = {
   manifestFile: true,
   workDir: true,
   stepMs: true,
+  heartbeatSeconds: true,
   askQuestion: true,
   restartBackoffMs: true,
 };

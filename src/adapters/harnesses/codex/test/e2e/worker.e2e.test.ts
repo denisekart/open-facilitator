@@ -7,8 +7,8 @@
 //    resultManifestRef + resultDigest; the manifest document fetched back
 //    through the kernel artifact path re-hashes to the event's digest and
 //    the final-answer artifact's served bytes match their declared digest;
-// 3. SIGKILL mid-run → the SDK's auto-restart re-registers; the lost
-//    execution settles as child-lost (crash law, real harness).
+// 3. SIGKILL mid-run → re-spawn → the probe settles the lost execution as
+//    child-lost (crash law, real harness).
 import { createHash, randomUUID } from "node:crypto";
 import { spawn, type ChildProcess } from "node:child_process";
 import { mkdtempSync, writeFileSync } from "node:fs";
@@ -286,10 +286,18 @@ describe.skipIf(!E2E)("codex worker e2e", () => {
         const s = await gatewayStatus(gw.diagnosticsPort);
         return s.children?.some((c) => c.state === "connected" && c.inFlight === 1) ? s : false;
       });
-      const pid = worker.child.pid!;
-      process.kill(pid, "SIGKILL");
-      // The kernel settles the orphaned execution as child-lost (the
-      // gateway's lease/lost law) — exactly one failed row for asgB.
+      worker.child.kill("SIGKILL"); // die mid-run: no terminal event
+      worker = startWorker({
+        childWorkspaceId: `${gw.gatewayId}/codex`, // SAME id: probe path
+        socket: gw.socketPath ?? "",
+        workDir,
+        kernelUrl: harness.baseUrl,
+        token: childToken,
+      });
+      await worker.ready();
+      // The re-registration probe settles the orphaned execution as
+      // child-lost (the gateway's lease/lost law) — exactly one failed
+      // row for asgB.
       const failed = await waitFor("child-lost failed row", async () => {
         const rows = await inboxRowsByType(
           harness.dbUrl,

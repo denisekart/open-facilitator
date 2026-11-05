@@ -29,13 +29,14 @@ public class LeaseRecoveryTests(DispatchDbFixture fixture)
         await fixture.Db.MarkOutboxLeaseExpired(workId);
         Assert.Equal(1, await fixture.Db.OutboxCountBy(workId, "leased"));
 
-        var reclaimed = await dispatcher.ReclaimExpiredLeasesAsync(CancellationToken.None);
-        Assert.Equal(1, reclaimed);
+        // Reclaim is global over the table, and the family's own hosts can
+        // leave dead-lease debris — assert OUR row via the probe below and
+        // treat the reclaim count as at-least-this-row, like the drain below.
+        Assert.True(await dispatcher.ReclaimExpiredLeasesAsync(CancellationToken.None) >= 1);
         Assert.Equal(1, await fixture.Db.OutboxCountBy(workId, "pending", noLeaseOwner: true));
-        // The drain is global (shared suite DB, parallel collections leave
-        // their own pending rows), so assert OUR row via the probe and treat
-        // the drain count / dev ledger as at-least-this-row, like the
-        // sibling restart-survival poll does.
+        // The drain is global (shared suite DB, parallel classes leave
+        // their own pending rows), so the drain count / dev ledger are
+        // at-least-this-row, like the sibling restart-survival poll.
         Assert.True(await dispatcher.DrainOnceAsync(CancellationToken.None) >= 1);
         Assert.Equal(1, await fixture.Db.OutboxCountBy(workId, "delivered", attempts: 2));
 

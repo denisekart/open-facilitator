@@ -19,6 +19,17 @@ public sealed class WorkCollection : ICollectionFixture<PostgresFixture>, IColle
 [CollectionDefinition("postgres:work:s3")]
 public sealed class WorkS3Collection : ICollectionFixture<PostgresFixture>, ICollectionFixture<KeycloakFixture>, ICollectionFixture<SeaweedFsFixture>;
 
+/// <summary>
+/// Fake-clock retention-GC suites share ONE dedicated container: a pass
+/// driven at an advanced fake <c>now</c> treats every foreign collection's
+/// fresh pending slot (15-min real TTL in the shared DB) as expired and
+/// tombstones it, breaking a parallel upload vertical mid-PUT. Inside this
+/// family the collection serializes; outside it, no foreign fake-clock
+/// sweep can reach these rows and none of these passes touches foreign rows.
+/// </summary>
+[CollectionDefinition("postgres:gc")]
+public sealed class GcCollection : ICollectionFixture<GcDbFixture>, ICollectionFixture<KeycloakFixture>;
+
 /// <summary>CloudEvent-ingress suites (serial among themselves).</summary>
 [CollectionDefinition("postgres:ingress")]
 public sealed class IngressCollection : ICollectionFixture<PostgresFixture>, ICollectionFixture<KeycloakFixture>;

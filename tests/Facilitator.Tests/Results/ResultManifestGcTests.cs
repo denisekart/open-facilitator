@@ -11,10 +11,10 @@ namespace Facilitator.Tests.Results;
 /// retention policy on an unreferenced-by-Work artifact still cannot collect a
 /// blob a recorded manifest vouches for; a superseded manifest releases it.
 /// </summary>
-[Collection("postgres:work")]
-public sealed class ResultManifestGcTests(PostgresFixture fixture)
+[Collection("postgres:gc")]
+public sealed class ResultManifestGcTests(GcDbFixture fixture)
 {
-    private readonly PostgresFixture _fixture = fixture;
+    private readonly GcDbFixture _fixture = fixture;
 
     private const string Hex64 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 

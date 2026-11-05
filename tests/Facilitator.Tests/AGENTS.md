@@ -22,7 +22,10 @@ internals.
   (`[Collection("postgres:<feature>")]`); never spin a container per class.
   The dispatch-link family runs on its OWN container (`DispatchDbFixture`):
   a global outbox claim or a lease sweep on a foreign replica's dispatcher
-  or fake clock destroys this family's drain/sweep assertions.
+  or fake clock destroys this family's drain/sweep assertions. Likewise the
+  fake-clock GC family (`postgres:gc`, `GcDbFixture`): a retention pass at
+  an advanced fake now tombstones foreign pending slots (real 15-min TTL)
+  in a shared DB.
 - DB assertions go through `TestDbProbe` methods; raw SQL strings do not appear
   in test files.
 - Timing: keep waits bounded and generous-but-small; the whole suite has a

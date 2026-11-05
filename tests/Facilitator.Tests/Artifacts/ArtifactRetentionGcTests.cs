@@ -4,18 +4,20 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Facilitator.Tests.Artifacts;
 
 /// <summary>
-/// The retention-GC pass (D7/D8, spec appendix 8.2) on the filesystem
-/// leg with a fake clock: <c>Nd</c> policies collect once lapsed and
-/// unreferenced, a live Work pins the blob, <c>permanent</c> and
-/// <c>archive</c> never expire, expired pending slots sweep without touching
-/// the backend, and a crash-reverted row re-collects cleanly (restart-safety).
-/// Passes are driven explicitly via <see cref="RetentionGcService.RunOnceAsync"/>;
-/// the factory parks the background loop at one hour so no test races it.
+/// The retention-GC pass (D7/D8) on the filesystem leg with a fake clock:
+/// <c>Nd</c> policies collect once lapsed and unreferenced, a live Work pins
+/// the blob, <c>permanent</c> and <c>archive</c> never expire, expired
+/// pending slots sweep without touching the backend, and a crash-reverted
+/// row re-collects cleanly (restart-safety). Passes are driven explicitly via
+/// <see cref="RetentionGcService.RunOnceAsync"/>; the factory parks the
+/// background loop at one hour so no test races it. The family rides its own
+/// container (<see cref="GcDbFixture"/>): a pass at an advanced fake now
+/// must never tombstone a foreign collection's live pending slots.
 /// </summary>
-[Collection("postgres:work")]
-public sealed class ArtifactRetentionGcTests(PostgresFixture fixture)
+[Collection("postgres:gc")]
+public sealed class ArtifactRetentionGcTests(GcDbFixture fixture)
 {
-    private readonly PostgresFixture _fixture = fixture;
+    private readonly GcDbFixture _fixture = fixture;
 
     private const string Hex64 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 

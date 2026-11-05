@@ -125,7 +125,7 @@ describe("codex harness execution", () => {
     const dir = workDir();
     const argvPath = join(dir, "argv.json");
     const hooks = hooksFor(dir, {
-      env: { OFAC_FAKE_ARGV_OUT: argvPath },
+      env: { ...process.env, OFAC_FAKE_ARGV_OUT: argvPath },
     });
     const { ctx, events, progress } = fakeContext("exec-a", "work-a", "asg-a");
     const outcome = await hooks.onExecute(ctx);
@@ -205,7 +205,7 @@ describe("codex harness execution", () => {
 
   it("-o fallback: no agent_message in the stream ⇒ the -o file is the answer carrier", async () => {
     const dir = workDir();
-    const hooks = hooksFor(dir, { env: { OFAC_FAKE_NO_FINAL: "1" } });
+    const hooks = hooksFor(dir, { env: { ...process.env, OFAC_FAKE_NO_FINAL: "1" } });
     const { ctx } = fakeContext("exec-f", "work-f", "asg-f");
     expect(await hooks.onExecute(ctx)).toEqual({ kind: "completed" });
     const final = readFileSync(join(dir, "exec-f", "final.md"), "utf8");
@@ -215,7 +215,7 @@ describe("codex harness execution", () => {
   it("error frames are noise; a nonzero exit is an honest failed outcome with the stderr tail", async () => {
     const dir = workDir();
     const hooks = hooksFor(dir, {
-      env: { OFAC_FAKE_EXIT: "3", OFAC_FAKE_STDERR: "x".repeat(3000) + " boom" },
+      env: { ...process.env, OFAC_FAKE_EXIT: "3", OFAC_FAKE_STDERR: "x".repeat(3000) + " boom" },
     });
     const { ctx, events } = fakeContext("exec-e", "work-e", "asg-e");
     const outcome = await hooks.onExecute(ctx);
@@ -229,7 +229,7 @@ describe("codex harness execution", () => {
 
   it("cancel mid-run: SIGTERM the group, no terminal event, ledger keeps the thread", async () => {
     const dir = workDir();
-    const hooks = hooksFor(dir, { env: { OFAC_FAKE_SLEEP_MS: "10000" } });
+    const hooks = hooksFor(dir, { env: { ...process.env, OFAC_FAKE_SLEEP_MS: "10000" } });
     const { ctx, events, progress, controller } = fakeContext("exec-c", "work-c", "asg-c");
     const running = hooks.onExecute(ctx);
     // Await the real condition: the thread-id note lands once the ledger
@@ -250,7 +250,7 @@ describe("codex harness execution", () => {
     const dir = workDir();
     const argvPath = join(dir, "argv2.json");
     const hooks = hooksFor(dir, {
-      env: { OFAC_FAKE_ARGV_OUT: argvPath },
+      env: { ...process.env, OFAC_FAKE_ARGV_OUT: argvPath },
     });
     const first = fakeContext("exec-r1", "work-r", "asg-r", { generation: 1 });
     expect(await hooks.onExecute(first.ctx)).toEqual({ kind: "completed" });
@@ -273,7 +273,7 @@ describe("codex harness execution", () => {
       codexBin: FAKE,
       promptTemplate: "work on: {objective} ASK(which framework?)",
       mcpShimEntry: SHIM,
-      env: { OFAC_FAKE_ARGV_OUT: argvPath },
+      env: { ...process.env, OFAC_FAKE_ARGV_OUT: argvPath },
     });
     const { ctx, progress } = fakeContext("exec-m", "work-m", "asg-m", { answer: "postgres" });
     const outcome = await hooks.onExecute(ctx);

@@ -354,6 +354,18 @@ jobs:
           FACILITATOR_PG: postgresql://postgres:postgres@localhost:5432/postgres
           KEYCLOAK_URL: http://localhost:8480
         run: pnpm -C src/adapters/harnesses/deterministic test:e2e
+      - name: omp harness worker e2e (omp worker vs standalone gateway)
+        env:
+          FACILITATOR_URL: http://gate-only
+          FACILITATOR_PG: postgresql://postgres:postgres@localhost:5432/postgres
+          KEYCLOAK_URL: http://localhost:8480
+        run: pnpm -C src/adapters/harnesses/omp test:e2e
+      - name: codex harness worker e2e (codex worker vs standalone gateway)
+        env:
+          FACILITATOR_URL: http://gate-only
+          FACILITATOR_PG: postgresql://postgres:postgres@localhost:5432/postgres
+          KEYCLOAK_URL: http://localhost:8480
+        run: pnpm -C src/adapters/harnesses/codex test:e2e
 
   admin-e2e:
     # Browser tier (plan 21): the embedded SPA against a real-Kestrel kernel.

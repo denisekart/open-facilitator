@@ -32,6 +32,7 @@ import { join } from "node:path";
 import { parse } from "yaml";
 import { chmodSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import type {
+  AssignmentInputCommandV1Data,
   CapabilityDescriptor,
   CapabilityManifestV1,
   EnvelopeCommand,
@@ -91,6 +92,7 @@ import { startChildListener, type ChildListener } from "./listen.js";
 const ASSIGN = "org.facilitator.command.work.assign.v1";
 const STEER = "org.facilitator.command.work.steer.v1";
 const CANCEL = "org.facilitator.command.work.cancel.v1";
+const ASSIGNMENT_INPUT = "org.facilitator.command.assignment.input.v1";
 const COMPLETED = "org.facilitator.event.assignment.completed.v1";
 const FAILED = "org.facilitator.event.assignment.failed.v1";
 const HEARTBEAT = "org.facilitator.event.workspace.heartbeat.v1";
@@ -648,6 +650,8 @@ export class GatewayRuntime {
           case STEER:
           case CANCEL:
             return this.onInteraction(cmd, cmd.type === STEER ? "steer" : "cancel");
+          case ASSIGNMENT_INPUT:
+            return this.onAssignmentInput(cmd);
           default:
             return this.passthrough(cmd);
         }
@@ -843,6 +847,71 @@ export class GatewayRuntime {
         this.settleLinkedPending(row.executionId, "completed");
       }
     }
+    return childOutcome(reply);
+  }
+
+  /**
+   * assignment.input bound-child law (mirrors steer/cancel): the running
+   * binding row decides the target; a confirm-held assignment has no row yet
+   * and refuses `pending-approval`; no row at all refuses `no-binding` (the
+   * embedded fleet-of-one passes through). The Gateway-local row STAYS
+   * `running` — an input wait is not a state transition here; the child
+   * answers `accepted` iff the question was still live (unknown/dropped
+   * otherwise). The child reply maps to the receipt via childOutcome.
+   */
+  private async onAssignmentInput(cmd: EnvelopeCommand): Promise<CommandOutcome> {
+    const data = cmd.data as unknown as AssignmentInputCommandV1Data;
+    // The schema carries no assignmentId: the envelope subject is the
+    // addressing (`work/<workId>/assignment/<assignmentId>`, assign law);
+    // a subject that doesn't address an assignment is simply unbound.
+    const addressed = /^work\/[^/]+\/assignment\/([^/]+)$/.exec(cmd.subject ?? "");
+    const assignmentId = addressed?.[1];
+    if (assignmentId === undefined) return { kind: "rejected", reason: "no-binding" };
+    const row = this.paths.execution.byAssignment(assignmentId);
+    if (row === null || row.state !== "running") {
+      const pending = this.paths.execution.pendingByAssignment(assignmentId);
+      if (pending !== null && pending.state === "awaiting-approval") {
+        // An input can only be answered by a live run: a confirm-held
+        // assignment has no child to unblock yet.
+        return { kind: "rejected", reason: "pending-approval" };
+      }
+      if (this.embedded !== null && row === null) return this.passthrough(cmd);
+      return { kind: "rejected", reason: "no-binding" };
+    }
+    const member = this.fleet.member(row.childId);
+    if (member === undefined) {
+      return { kind: "rejected", reason: "child-disconnected" };
+    }
+    const capabilityId = this.capabilityByExecution.get(row.executionId);
+    if (capabilityId !== undefined) {
+      const decision = await this.decide("command.forward", cmd, member.childId, capabilityId);
+      if (decision.verdict === "deny" || decision.verdict === "confirm") {
+        this.audit(decision, `policy-${decision.verdict}`);
+        if (this.embedded !== null && member === this.embeddedMember())
+          return this.passthrough(cmd);
+        return {
+          kind: "rejected",
+          reason:
+            decision.verdict === "confirm"
+              ? `confirm-not-supported-here: ${capabilityId}`
+              : `policy-denied: ${capabilityId}`,
+        };
+      }
+    }
+    let reply: ChildReply;
+    try {
+      reply = await member.executor.send({
+        kind: "respond",
+        executionId: row.executionId,
+        requestId: data.requestId,
+        text: data.answer,
+      });
+    } catch (error) {
+      const reason = error instanceof ChildTransportError ? error.reason : "child-disconnected";
+      return { kind: "rejected", reason };
+    }
+    // The row stays `running`: the answer unblocks the LIVE run; the child's
+    // own terminal event (or a reconcile) settles it later.
     return childOutcome(reply);
   }
 

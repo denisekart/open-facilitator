@@ -33,7 +33,8 @@ export type ChildMessage =
   | { kind: "start"; executionId: string; executionGeneration: number; command: EnvelopeCommand } // work.assign envelope (B4: assignment generation, not link epoch)
   | { kind: "steer"; executionId: string; command: EnvelopeCommand }
   | { kind: "status"; executionId: string }
-  | { kind: "stop"; executionId: string; reason: string }; // work.cancel
+  | { kind: "stop"; executionId: string; reason: string } // work.cancel
+  | { kind: "respond"; executionId: string; requestId: string; text: string }; // assignment.input
 
 export type ChildReply =
   | { kind: "accepted"; executionId: string }
@@ -148,6 +149,15 @@ export class EmbeddedChild implements ChildExecutor {
         const record = this.executions.get(msg.executionId);
         if (record === undefined) return { kind: "unknown", executionId: msg.executionId };
         return { kind: "status", executionId: msg.executionId, state: record.state };
+      }
+      case "respond": {
+        // The builtin echo/stub child never publishes an input.required, so an
+        // answer for a known execution is honestly `unsupported` (no question
+        // to settle); a foreign execution answers `unknown` like every other
+        // interaction.
+        const record = this.executions.get(msg.executionId);
+        if (record === undefined) return { kind: "unknown", executionId: msg.executionId };
+        return { kind: "unsupported", reason: "builtin-child-never-asks" };
       }
       case "stop": {
         const record = this.executions.get(msg.executionId);

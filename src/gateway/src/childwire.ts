@@ -22,7 +22,8 @@ export type ChildWireCommand =
   | { kind: "start"; executionId: string; executionGeneration: number; command: EnvelopeCommand }
   | { kind: "steer"; executionId: string; command: EnvelopeCommand }
   | { kind: "status"; executionId: string }
-  | { kind: "stop"; executionId: string; reason: string };
+  | { kind: "stop"; executionId: string; reason: string }
+  | { kind: "respond"; executionId: string; requestId: string; text: string };
 
 /** `register-ack` denial reasons (locked literals). */
 export type RegisterDenyReason =
@@ -163,6 +164,30 @@ export function createFrameParser(
     if (record["v"] !== 1 || frameType === undefined || !allowed.has(frameType)) {
       onError({ kind: "parse-error", detail: "frame is not a v1 frame of the expected direction" });
       return;
+    }
+    // Respond-frame validation (gateway→child only): a `respond` message MUST
+    // carry its full identity (adapter.v1.json respondMessage law: kind +
+    // executionId + requestId + text). An unknown kind is NOT dropped here —
+    // it reaches the child's handler, which answers the locked `unsupported`.
+    if (frameType === "command" && options.expect === "gateway") {
+      const message = record["message"];
+      if (
+        typeof message === "object" &&
+        message !== null &&
+        (message as Record<string, unknown>)["kind"] === "respond"
+      ) {
+        const m = message as Record<string, unknown>;
+        const ok =
+          typeof m["executionId"] === "string" &&
+          m["executionId"].length > 0 &&
+          typeof m["requestId"] === "string" &&
+          m["requestId"].length > 0 &&
+          typeof m["text"] === "string";
+        if (!ok) {
+          onError({ kind: "parse-error", detail: "respond message missing required fields" });
+          return;
+        }
+      }
     }
     onFrame(doc as ChildWireFrame);
   };

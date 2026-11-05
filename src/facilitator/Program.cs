@@ -36,6 +36,7 @@ app.UseMiddleware<IngressRoleGateMiddleware>();
 app.UseRateLimiter();
 app.MapWorkApi();
 app.MapApprovalsApi();
+app.MapInteractionsApi();
 app.MapArtifactsApi();
 app.MapResultManifestsApi();
 app.MapMemoryApi();

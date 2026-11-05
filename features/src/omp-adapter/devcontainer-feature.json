@@ -1,0 +1,24 @@
+{
+  "id": "ofac-omp-adapter",
+  "version": "1.0.0",
+  "name": "Open Facilitator omp Harness Adapter",
+  "documentationURL": "https://github.com/denisekart/open-facilitator/tree/main/features/src/omp-adapter",
+  "description": "Installs the omp harness worker (oh-my-pi CLI stand-in) as a self-contained Node bundle plus a supervisor unit that attaches it to the team Gateway's child socket. The omp CLI itself is assumed present in the base image (override with requireCli:false). Install order is irrelevant: units carry numeric prefixes and every Feature writes distinct files.",
+  "options": {
+    "configPath": {
+      "type": "string",
+      "default": ".facilitator/omp-harness.yaml",
+      "description": "Worker config the unit starts with; WORKER_CONFIG env overrides at runtime."
+    },
+    "requireCli": {
+      "type": "boolean",
+      "default": true,
+      "description": "Fail the install when the omp CLI is not on PATH. Set false to install the worker bundle without the native CLI present."
+    }
+  },
+  "containerEnv": {},
+  "entrypoint": "/usr/local/share/openfacilitator/ofac-supervisor.sh",
+  "installsAfter": [
+    "ghcr.io/devcontainers/features/node"
+  ]
+}

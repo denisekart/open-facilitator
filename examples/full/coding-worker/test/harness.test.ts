@@ -110,6 +110,8 @@ function fakeContext(
       progress.push(note);
     },
     setSteered: () => undefined,
+    // The coding script never asks; a question here is a bug, so fail loudly.
+    requestInput: () => Promise.reject(new Error("unexpected requestInput")),
   };
   return { ctx, events, progress, controller };
 }

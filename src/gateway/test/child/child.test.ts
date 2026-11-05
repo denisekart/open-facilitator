@@ -58,6 +58,7 @@ describe("ChildMessage vocabulary", () => {
       { kind: "steer", executionId: "exec-1", command: assignCommand() },
       { kind: "status", executionId: "exec-1" },
       { kind: "stop", executionId: "exec-1", reason: "work.cancel" },
+      { kind: "respond", executionId: "exec-1", requestId: "inp-1", text: "postgres" },
     ];
     for (const message of messages) {
       expect(JSON.parse(JSON.stringify(message))).toEqual(message);
@@ -207,6 +208,22 @@ describe("EmbeddedChild stub mode + reconcile answers", () => {
       kind: "unknown",
       executionId: "exec-x",
     });
+  });
+
+  it("respond on a known execution answers unsupported (builtin never asks); unknown for foreign", async () => {
+    const c = child("stub");
+    await c.send({
+      kind: "start",
+      executionId: "exec-1",
+      executionGeneration: 1,
+      command: assignCommand(),
+    });
+    expect(
+      await c.send({ kind: "respond", executionId: "exec-1", requestId: "inp-1", text: "x" }),
+    ).toEqual({ kind: "unsupported", reason: "builtin-child-never-asks" });
+    expect(
+      await c.send({ kind: "respond", executionId: "exec-nope", requestId: "inp-1", text: "x" }),
+    ).toEqual({ kind: "unknown", executionId: "exec-nope" });
   });
 
   it("a closed child rejects: no dispatch after close", async () => {

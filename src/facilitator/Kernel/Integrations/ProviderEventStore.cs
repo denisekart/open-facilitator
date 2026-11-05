@@ -477,6 +477,16 @@ public sealed class ProviderEventStore(
             b.Provider == reference.Provider && b.Channel == reference.Channel && b.RootMessageId == reference.Root, ct);
         if (binding?.WorkId is { } boundWork)
         {
+            // A reply in a thread with a pending question ANSWERS it — the
+            // interactive leg's chat surface (oldest pending request only),
+            // instead of landing generic work input.
+            if (await Facilitator.Kernel.Work.InteractionIngress.TryAutoRespondAsync(
+                    db, envelopeValidator, boundWork, text, reference.Provider, deliveryId, actor, ct) is { } answered)
+            {
+                await AckAsync(db, options, reference, deliveryId, replyVsReaction, now, ct);
+                return new ArmEffect(boundWork, $"input:{answered}:auto-respond");
+            }
+
             await AppendWorkInputAsync(db, reference.Provider, boundWork, InputNote(reference, deliveryId, text), now, ct);
             await AckAsync(db, options, reference, deliveryId, replyVsReaction, now, ct);
             return new ArmEffect(boundWork, $"work/{boundWork}:input");
@@ -616,6 +626,13 @@ public sealed class ProviderEventStore(
         if (binding?.WorkId is not { } workId)
         {
             return new ArmEffect(null, "message:unbound");
+        }
+
+        var messageActor = data.TryGetProperty("actorProviderAccountId", out var acct) ? acct.GetString() ?? "unknown" : "unknown";
+        if (await Facilitator.Kernel.Work.InteractionIngress.TryAutoRespondAsync(
+                db, envelopeValidator, workId, text, reference.Provider, deliveryId, messageActor, ct) is { } answered)
+        {
+            return new ArmEffect(workId, $"input:{answered}:auto-respond");
         }
 
         await AppendWorkInputAsync(db, reference.Provider, workId, InputNote(reference, deliveryId, text: null), now, ct);

@@ -15,6 +15,7 @@ capabilities:
     supportsSteering: true
     supportsCancellation: true
     supportsNudge: false
+    supportsInteraction: true
   # The confirm-scoped capability the approval-loop e2e rides —
   # identical deterministic script, published-flavored artifact.
   - id: research.publish
@@ -26,3 +27,4 @@ capabilities:
     supportsSteering: false
     supportsCancellation: false
     supportsNudge: false
+    supportsInteraction: true

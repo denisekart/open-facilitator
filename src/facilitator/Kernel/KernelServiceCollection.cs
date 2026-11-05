@@ -133,6 +133,8 @@ public static class KernelServiceCollection
         builder.Services.AddScoped<IResultManifestLedger, ResultManifestLedger>();
         builder.Services.AddScoped<ApprovalIngress>();
         builder.Services.AddScoped<MemoryIngress>();
+        builder.Services.AddSingleton(builder.Configuration.GetSection(InteractionOptions.SectionName).Get<InteractionOptions>() ?? new InteractionOptions());
+        builder.Services.AddScoped<InteractionIngress>();
         return builder;
     }
 

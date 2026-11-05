@@ -26,7 +26,8 @@ public sealed class CloudEventIngress(
     ApprovalIngress approvals,
     ArtifactIngress artifacts,
     ResultIngress results,
-    MemoryIngress memory)
+    MemoryIngress memory,
+    InteractionIngress interactions)
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
@@ -97,6 +98,19 @@ public sealed class CloudEventIngress(
 
                 metrics.InboxProcessed();
                 return Results.Accepted(null, new { status = arm.Status, approvalId = arm.ApprovalId, inboxId });
+            }
+
+            if (type == InteractionIngress.InputRequiredType)
+            {
+                var arm = await interactions.HandleEventAsync(root, "cloud-event", ct);
+                if (arm.Refused)
+                {
+                    return await pipeline.SettleAsync(
+                        inboxId, arm.Status, ct, () => IngressPipeline.Problem(arm.Problem!));
+                }
+
+                metrics.InboxProcessed();
+                return Results.Accepted(null, new { status = arm.Status, requestId = arm.RequestId, inboxId });
             }
 
             if (type == "org.facilitator.event.artifact.available.v1")
@@ -181,6 +195,25 @@ public sealed class CloudEventIngress(
             return await pipeline.SettleAsync(
                 inboxId, null, ct,
                 () => Results.Ok(new { status = arm.Status, approvalId = arm.ApprovalId, inboxId }));
+        }
+
+        if (type == InteractionIngress.InputCommandType)
+        {
+            // The answer command on the ungated plane: the identity rides the
+            // envelope's actorEvidenceRef (provider:/kernel:/oidc:), evaluated
+            // inline like the approval respond arm.
+            var (actor, _) = await approvals.ResolveWireActorAsync(root, ct);
+            var arm = await interactions.HandleCommandRespondAsync(
+                root, actor ?? "cloud-event", ct);
+            if (arm.Refused)
+            {
+                return await pipeline.SettleAsync(
+                    inboxId, arm.Status, ct, () => IngressPipeline.Problem(arm.Problem!));
+            }
+
+            return await pipeline.SettleAsync(
+                inboxId, null, ct,
+                () => Results.Ok(new { status = arm.Status, requestId = arm.RequestId, inboxId }));
         }
 
         if (type == MemoryIngress.RetainType || type == MemoryIngress.RecallType)

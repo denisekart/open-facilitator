@@ -507,3 +507,93 @@ describe("SIGTERM drain path", () => {
     });
   });
 });
+function inputCommand(commandId: string, subject: string): LinkDeliveryV1 {
+  return {
+    deliveryId: `del-${commandId}`,
+    deliveredAt: new Date().toISOString(),
+    envelope: {
+      specversion: "1.0",
+      id: `env-${commandId}`,
+      source: "urn:facilitator:instance:unit",
+      type: "org.facilitator.command.assignment.input.v1",
+      subject,
+      time: new Date().toISOString(),
+      datacontenttype: "application/json",
+      dataschema: "https://schemas.openfacilitator.org/v1/command.assignment.input.v1.json",
+      data: {
+        commandId,
+        requestId: "inp-1",
+        answer: "postgres",
+        actorEvidenceRef: "kernel:ev-input",
+      },
+    },
+  };
+}
+
+describe("assignment.input bound-child law", () => {
+  it("running row (embedded): respond reaches the child; row STAYS running", async () => {
+    const { rt, mock } = await booted({
+      handlerFactory: () => ({
+        onCommand: async () => ({ kind: "accepted" }), // silent accept ⇒ row stays running
+      }),
+    });
+    mock.pushDeliver(assignDelivery({ commandId: "cmd-in" }));
+    await waitFor("assign receipt", () => mock.receipts[0] ?? false);
+    expect(rt.executionLedger.byAssignment("asg-cmd-in")?.state).toBe("running");
+
+    mock.pushDeliver(inputCommand("cmd-ans", "work/work-cmd-in/assignment/asg-cmd-in"));
+    const receipt = await waitFor("input receipt", () => mock.receipts[1] ?? false);
+    // The builtin echo child never asks: it answers the locked honest
+    // `unsupported` — the respond message still rode to the child.
+    expect(receipt.status).toBe("unsupported");
+    expect(receipt.reason).toBe("builtin-child-never-asks");
+    // An input wait is NOT a Gateway-local state transition.
+    expect(rt.executionLedger.byAssignment("asg-cmd-in")?.state).toBe("running");
+  });
+
+  it("no binding row (fleet mode): rejected `no-binding`, no passthrough", async () => {
+    const cfg = parseConfig(
+      `
+apiVersion: facilitator.framework/v1
+kind: Gateway
+mode: standalone
+gatewayId: gw.unit-test
+team: default
+facilitatorUrl: http://kernel.test
+enrollmentSecret: enroll-dev
+trustMode: shared-runtime
+stateDir: ${mkdtempSync(join(tmpdir(), "gw-input-"))}
+children: []
+childTransport:
+  socket:
+    path: child.sock
+heartbeatSeconds: 3600
+`,
+      { env: {} },
+    );
+    const paths = testPaths(cfg.stateDir);
+    const mock = new MockTransport();
+    const rt = createGatewayRuntime(cfg, {
+      transportFactory: () => mock,
+      fetchImpl: fakeKernel().fetchImpl,
+      ledgerFactory: () => paths,
+      logger: createMemoryLogger(),
+    });
+    live = { rt, mock, server: fakeKernel(), lines: [], paths };
+    await rt.start();
+    mock.pushDeliver(inputCommand("cmd-orphan", "work/work-x/assignment/asg-orphan"));
+    const receipt = await waitFor("orphan receipt", () => mock.receipts[0] ?? false);
+    expect(receipt.status).toBe("rejected");
+    expect(receipt.reason).toBe("no-binding");
+    // The row was never touched: still zero bindings.
+    expect(rt.executionLedger.all()).toHaveLength(0);
+  });
+
+  it("subject does not address an assignment: rejected `no-binding`", async () => {
+    const { mock } = await booted();
+    mock.pushDeliver(inputCommand("cmd-badsbj", "approval/nope"));
+    const receipt = await waitFor("bad-subject receipt", () => mock.receipts[0] ?? false);
+    expect(receipt.status).toBe("rejected");
+    expect(receipt.reason).toBe("no-binding");
+  });
+});

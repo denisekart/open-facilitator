@@ -49,6 +49,20 @@ export interface RunContext {
   /** Register once; steer frames invoke it. Unregistered ⇒ steer ⇒ `unsupported`. */
   setSteered(cb: (directive: string) => void): void;
   /**
+   * Ask the human, through the Facilitator. The SDK publishes
+   * `event.assignment.input.required.v1` (full envelope, generation stamped
+   * from the assign fence) and the promise stays pending until a `respond`
+   * child message carrying the requestId lands — no timeout (the wire's
+   * deadline is display-only). Rejects `AbortError` when the run is aborted
+   * mid-wait and on adapter close; a respond for a requestId this adapter
+   * never minted (or that arrived after the run died) is dropped silently.
+   */
+  requestInput(req: {
+    readonly question: string;
+    readonly choices?: readonly string[];
+    readonly contextRef?: string;
+  }): Promise<{ readonly text: string }>;
+  /**
    * Opaque native-run id (harness persistence hook). ChildReply has no
    * field for it, so the SDK keeps it in the registry; the harness sets it
    * itself (or via `sessionStore`) — the SDK never reads it.

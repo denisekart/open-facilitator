@@ -1,0 +1,17 @@
+# The manifest the omp worker advertises: the frozen coding.omp v1
+# descriptor — a full TUI stand-in (steering, cancellation and the
+# interactive ask_user leg all supported).
+apiVersion: facilitator.framework/v1
+kind: CapabilityManifest
+ownerTeam: team-alpha
+capabilities:
+  - id: coding.omp
+    version: 1
+    execution: asynchronous
+    acceptedContexts: [uri-reference]
+    outputKinds: [analysis.report]
+    outputMediaTypes: [text/markdown]
+    supportsSteering: true
+    supportsCancellation: true
+    supportsNudge: false
+    supportsInteraction: true

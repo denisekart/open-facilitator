@@ -1,0 +1,444 @@
+// E2E worker tier: the REAL ofac-omp-worker binary against a standalone
+// Gateway + a dedicated Facilitator, driving the fake-omp fixture through
+// the OFAC_OMP_BIN/OFAC_OMP_ARGS seam. Proven end-to-end, observable in
+// the kernel:
+// 1. boot → register → the union capability POST carries coding.omp
+//    (ownerTeam rewritten);
+// 2. seeded work.assign (coding.omp) → progress rows → completed row
+//    carrying resultManifestRef + resultDigest; the manifest fetched back
+//    through the kernel artifact path re-hashes to the event's digest and
+//    the served final.md matches its declared digest;
+// 3. the interactive loop over the REAL wire: the fake calls ask_user →
+//    an input.required event row lands in the kernel inbox → a seeded
+//    command.assignment.input.v1 rides the link plane to the Gateway →
+//    the live run answers its blocked tool call and completes with the
+//    answer embedded in the served bytes;
+// 4. steer mid-run lands on the RUNNING execution (echoed in served
+//    bytes); SIGKILL mid-run → re-spawn → probe `unknown` ⇒ exactly ONE
+//    child-lost assignment.failed (crash law, real harness).
+import { randomUUID } from "node:crypto";
+import { spawn, type ChildProcess } from "node:child_process";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { computeManifestDigest, validateAgainstSchemaId } from "@ofac/protocol";
+import { describe, expect, it } from "vitest";
+import {
+  E2E,
+  gatewayConfig,
+  gatewayStatus,
+  gatewayToken,
+  inboxRowsByType,
+  kernelToken,
+  psql,
+  seedDelivery,
+  startGateway,
+  useFacilitator,
+  userToken,
+  waitFor,
+  type Harness,
+} from "../../../../../gateway/test/e2e/gateway-harness.js";
+import { linkGet, linkPost } from "../../../../../workspace-link/test/e2e/harness.js";
+
+const ROOT = new URL("../../../../../../", import.meta.url).pathname;
+
+const WORKER_BIN = join(ROOT, "src/adapters/harnesses/omp/dist/bin/worker.js");
+const MANIFEST_FILE = join(ROOT, "src/adapters/harnesses/omp/sample/capabilities.yaml");
+const FAKE_OMP = join(ROOT, "src/adapters/harnesses/omp/test/fake-omp.mjs");
+
+interface WorkerHandle {
+  child: ChildProcess;
+  log(): string;
+  ready(): Promise<string>;
+}
+
+/** Spawn the worker binary against the Gateway's child socket. */
+function startWorker(options: {
+  childWorkspaceId: string;
+  socket: string;
+  workDir: string;
+  kernelUrl: string;
+  token: string;
+}): WorkerHandle {
+  const dir = mkdtempSync(join(tmpdir(), "omp-e2e-"));
+  const configPath = join(dir, "worker.yaml");
+  writeFileSync(
+    configPath,
+    `apiVersion: facilitator.framework/v1
+kind: HarnessAdapter
+childWorkspaceId: ${options.childWorkspaceId}
+token: ${options.token}
+kernelUrl: ${options.kernelUrl}
+transport:
+  socket:
+    path: ${options.socket}
+manifestFile: ${MANIFEST_FILE}
+workDir: ${options.workDir}
+heartbeatSeconds: 1
+interactivity: mcp
+`,
+  );
+  const child = spawn("node", [WORKER_BIN, "run", "--config", configPath], {
+    stdio: ["ignore", "pipe", "pipe"],
+    env: {
+      ...process.env,
+      OFAC_OMP_BIN: process.execPath, // the fake-CLI seam: node fake-omp.mjs
+      OFAC_OMP_ARGS: JSON.stringify([FAKE_OMP]),
+      OFAC_FAKE_OMP_HOLD_MS: "20000", // a wide steer/kill window
+    },
+  });
+  let log = "";
+  child.stdout?.on("data", (c: Buffer) => {
+    log += c.toString();
+  });
+  child.stderr?.on("data", (c: Buffer) => {
+    log += c.toString();
+  });
+  return {
+    child,
+    log: () => log,
+    ready() {
+      return new Promise((resolve, reject) => {
+        const onData = (): void => {
+          if (/^worker ready childId=\S+ socket=\S+$/m.test(log)) {
+            resolve(log.split("\n").find((l) => l.startsWith("worker ready")) ?? "");
+          }
+        };
+        child.stdout?.on("data", onData);
+        child.once("exit", (code) =>
+          reject(new Error(`worker exited early (${String(code)}): ${log}`)),
+        );
+        onData();
+      });
+    },
+  };
+}
+
+function assignEnvelopeFor(
+  commandId: string,
+  workId: string,
+  assignmentId: string,
+  objective: string,
+): Record<string, unknown> {
+  return {
+    specversion: "1.0",
+    id: `e2e-${commandId}`,
+    source: "urn:facilitator:instance:e2e",
+    type: "org.facilitator.command.work.assign.v1",
+    subject: `work/${workId}/assignment/${assignmentId}`,
+    time: new Date().toISOString(),
+    datacontenttype: "application/json",
+    dataschema: "https://schemas.openfacilitator.org/v1/command.work.assign.v1.json",
+    data: {
+      commandId,
+      actorEvidenceRef: "identity-evidence:e2e",
+      workId,
+      targetId: "e2e",
+      capabilityId: "coding.omp",
+      expectedContextVersion: 1,
+      executionGeneration: 1,
+      inputs: { objective, sourceRefs: [] },
+      expectedDeliverables: [{ kind: "analysis.report", mediaType: "text/markdown" }],
+      deadline: "2036-10-23T18:00:00Z",
+      assignmentId,
+    },
+  };
+}
+
+function steerEnvelopeFor(
+  workId: string,
+  assignmentId: string,
+  directive: string,
+): Record<string, unknown> {
+  return {
+    specversion: "1.0",
+    id: `e2e-steer-${assignmentId}`,
+    source: "urn:facilitator:instance:e2e",
+    type: "org.facilitator.command.work.steer.v1",
+    subject: `work/${workId}/assignment/${assignmentId}`,
+    time: new Date().toISOString(),
+    datacontenttype: "application/json",
+    dataschema: "https://schemas.openfacilitator.org/v1/command.work.steer.v1.json",
+    data: {
+      commandId: `steer-${assignmentId}`,
+      workId,
+      assignmentId,
+      targetId: "e2e",
+      actorEvidenceRef: "identity-evidence:e2e",
+      deadline: "2036-10-23T18:00:00Z",
+      directive,
+      expectedContextVersion: 1,
+      executionGeneration: 1,
+    },
+  };
+}
+
+function inputAnswerEnvelope(
+  requestId: string,
+  workId: string,
+  assignmentId: string,
+  answer: string,
+): Record<string, unknown> {
+  return {
+    specversion: "1.0",
+    id: `e2e-answer-${requestId}`,
+    source: "urn:facilitator:instance:e2e",
+    type: "org.facilitator.command.assignment.input.v1",
+    subject: `work/${workId}/assignment/${assignmentId}`,
+    time: new Date().toISOString(),
+    datacontenttype: "application/json",
+    dataschema: "https://schemas.openfacilitator.org/v1/command.assignment.input.v1.json",
+    data: {
+      commandId: `answer-${requestId}`,
+      requestId,
+      answer,
+      actorEvidenceRef: "identity-evidence:e2e",
+    },
+  };
+}
+
+describe.skipIf(!E2E)("omp worker e2e", () => {
+  const harness: Harness = useFacilitator();
+
+  it("register → completed+digest → ask_user loop → steer → kill → lost", async () => {
+    const gw = await gatewayConfig({
+      facilitatorUrl: harness.baseUrl,
+      fleet: [],
+      gatewayMode: "standalone",
+      heartbeatSeconds: 2,
+    });
+    const workDir = mkdtempSync(join(tmpdir(), "omp-e2e-work-"));
+    const dump = (label: string): string =>
+      `${label}\nGATEWAY LOG:\n${gateway.log()}\nWORKER LOG:\n${worker?.log() ?? "(worker not spawned yet)"}\n`;
+    const withDump = <T>(p: Promise<T>, label: string): Promise<T> => {
+      let timer: NodeJS.Timeout;
+      const guard = new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`stalled: ${label}\n${dump(label)}`)), 25_000);
+      });
+      return Promise.race([p, guard]).finally(() => clearTimeout(timer!));
+    };
+    // Same verbatim-token law as the deterministic e2e: a child enrollment,
+    // the link token rides the child wire AND the kernel artifact plane.
+    const childToken = await (async () => {
+      const r = await linkPost(harness.baseUrl, "/api/link/v1/enroll", "enroll-dev", {
+        token: "enroll-dev",
+        endpointId: "omp-e2e-child",
+        instanceId: "e2e-omp-worker",
+        trustMode: "isolated-executor",
+        team: "team-alpha",
+        role: "child",
+      });
+      if (r.status !== 201) throw new Error(`child enroll failed: ${r.status}`);
+      return String((r.body as { linkToken: string }).linkToken);
+    })();
+    const projectRows = await psql(
+      harness.dbUrl,
+      `INSERT INTO facilitator.projects (project_id, team_id, name, config, created_at)
+       VALUES (gen_random_uuid(), (SELECT team_id FROM facilitator.teams WHERE slug = 'team-alpha'),
+               'e2e-omp-proj', '{}', now())
+       RETURNING project_id`,
+    );
+    const projectId = projectRows[0]!;
+    const workIdOf = async (objective: string): Promise<string> => {
+      const r = await linkPost(harness.baseUrl, "/api/works", await kernelToken(), {
+        objective,
+        capabilityId: "research.analyze",
+        projectId,
+      });
+      if (r.status !== 201) throw new Error(`work create failed: ${r.status}`);
+      return String((r.body as { workId: string }).workId);
+    };
+    const fetchContent = async (path: string, token: string): Promise<Buffer> => {
+      const r = await fetch(`${harness.baseUrl}${path}`, {
+        headers: { authorization: `Bearer ${token}` },
+      });
+      if (!r.ok) throw new Error(`GET ${path} -> ${r.status}`);
+      return Buffer.from(await r.arrayBuffer());
+    };
+    const servedFinal = async (rowPayload: string): Promise<string> => {
+      const data = (JSON.parse(rowPayload) as { data: Record<string, unknown> }).data;
+      const ref = String(data["resultManifestRef"]);
+      const docBytes = await fetchContent(`/api/artifacts/${ref.split("/").pop()}/content`, alice);
+      const doc = JSON.parse(docBytes.toString("utf8")) as Record<string, unknown>;
+      if (computeManifestDigest(doc) !== String(data["resultDigest"])) {
+        throw new Error("digest mismatch on re-hash");
+      }
+      const output = (doc["outputs"] as Record<string, unknown>[])[0]!;
+      return (
+        await fetchContent(`/api/artifacts/${String(output["artifactId"])}/content`, alice)
+      ).toString("utf8");
+    };
+    const alice = await userToken("alice", "alice");
+    const workA = await workIdOf("omp e2e plain run");
+    const workM = await workIdOf("omp e2e ask_user run");
+    const workB = await workIdOf("omp e2e steered run");
+    const asgA = randomUUID();
+    const asgM = randomUUID();
+    const asgB = randomUUID();
+    const gateway = startGateway(gw.configPath);
+    let worker: WorkerHandle | undefined;
+    try {
+      // ── 1. boot + register + capability union (ownerTeam rewritten) ──
+      const ready = await withDump(gateway.ready(), "awaiting gateway ready line");
+      expect(ready.children).toBe(0); // spawned AFTER the ready line (race law)
+      worker = startWorker({
+        childWorkspaceId: `${gw.gatewayId}/omp`,
+        socket: gw.socketPath ?? "",
+        workDir,
+        kernelUrl: harness.baseUrl,
+        token: childToken,
+      });
+      await withDump(worker.ready(), "awaiting worker ready line");
+      const caps = await waitFor("capability union POST", async () => {
+        const r = await linkGet(
+          harness.baseUrl,
+          "/api/link/v1/capabilities",
+          gatewayToken(gw.stateDir),
+        );
+        if (r.status !== 200) return false;
+        const m = r.body as { capabilities: { id: string }[]; ownerTeam: string };
+        return m.capabilities.some((c) => c.id === "coding.omp") ? m : false;
+      });
+      expect(caps.ownerTeam).toBe("team-alpha");
+      const online = await waitFor("worker connected", async () => {
+        const s = await gatewayStatus(gw.diagnosticsPort);
+        return s.children?.some((c) => c.state === "connected") ? s : false;
+      });
+      expect(online.mode).toBe("standalone");
+
+      // ── 2. plain assign: progress + completed, manifest re-hashes ──
+      await seedDelivery(
+        harness.baseUrl,
+        gw.gatewayId,
+        assignEnvelopeFor("e2e-omp-1", workA, asgA, "e2e plain"),
+      );
+      await waitFor("progress rows", async () => {
+        const rows = await inboxRowsByType(harness.dbUrl, "org.facilitator.event.work.progress.v1");
+        return rows.filter((r) => r.payload.includes(asgA)).length >= 2 ? true : false;
+      });
+      const completed = await waitFor("completed row lands", async () => {
+        const rows = await inboxRowsByType(
+          harness.dbUrl,
+          "org.facilitator.event.assignment.completed.v1",
+        );
+        return rows.find((r) => r.payload.includes(asgA)) ?? false;
+      }).catch((e: unknown) => {
+        throw new Error(`${String(e)}\n${dump("no completed row")}`, { cause: e });
+      });
+      const envelope = JSON.parse(completed.payload) as { data: Record<string, unknown> };
+      expect(
+        validateAgainstSchemaId(
+          "https://schemas.openfacilitator.org/v1/event.assignment.completed.v1.json",
+          envelope.data,
+        ).ok,
+      ).toBe(true);
+      const ref = String(envelope.data["resultManifestRef"]);
+      expect(ref.startsWith("artifact://")).toBe(true);
+      expect(String(envelope.data["resultDigest"])).toMatch(/^sha256:[0-9a-f]{64}$/);
+      expect(await servedFinal(completed.payload)).toContain("Done.");
+
+      // ── 3. the interactive loop over the real wire ──
+      await seedDelivery(
+        harness.baseUrl,
+        gw.gatewayId,
+        assignEnvelopeFor("e2e-omp-2", workM, asgM, "e2e ask_user ASKME"),
+      );
+      const asked = await waitFor("input.required event row lands", async () => {
+        const rows = await inboxRowsByType(
+          harness.dbUrl,
+          "org.facilitator.event.assignment.input.required.v1",
+        );
+        const row = rows.find((r) => r.payload.includes(asgM));
+        if (row === undefined) return false;
+        return String(
+          (JSON.parse(row.payload) as { data: Record<string, unknown> }).data["requestId"],
+        );
+      });
+      expect(asked).toMatch(/^inp-/);
+      // The run is honestly still running while the question is pending.
+      const pending = await gatewayStatus(gw.diagnosticsPort);
+      expect(pending.bindings.find((b) => b.assignmentId === asgM)?.state).toBe("running");
+      await seedDelivery(
+        harness.baseUrl,
+        gw.gatewayId,
+        inputAnswerEnvelope(asked, workM, asgM, "postgres"),
+      );
+      const answeredRow = await waitFor("answered run completes", async () => {
+        const rows = await inboxRowsByType(
+          harness.dbUrl,
+          "org.facilitator.event.assignment.completed.v1",
+        );
+        return rows.find((r) => r.payload.includes(asgM)) ?? false;
+      });
+      expect(await servedFinal(answeredRow.payload)).toContain("answer: postgres");
+
+      // ── 4. steer mid-run: lands on the RUNNING execution ──
+      await seedDelivery(
+        harness.baseUrl,
+        gw.gatewayId,
+        assignEnvelopeFor("e2e-omp-3", workB, asgB, "e2e steered HOLD"),
+      );
+      await waitFor("steer-run progress", async () => {
+        const rows = await inboxRowsByType(harness.dbUrl, "org.facilitator.event.work.progress.v1");
+        return rows.some((r) => r.payload.includes(asgB)) ? true : false;
+      });
+      await seedDelivery(
+        harness.baseUrl,
+        gw.gatewayId,
+        steerEnvelopeFor(workB, asgB, "focus on costs"),
+      );
+      const steeredRow = await waitFor("steered run completes", async () => {
+        const rows = await inboxRowsByType(
+          harness.dbUrl,
+          "org.facilitator.event.assignment.completed.v1",
+        );
+        return rows.find((r) => r.payload.includes(asgB)) ?? false;
+      });
+      expect(await servedFinal(steeredRow.payload)).toContain("steered: focus on costs");
+
+      // ── 5. crash law: SIGKILL mid-run ⇒ ONE child-lost failed row ──
+      const failedBefore = (
+        await inboxRowsByType(harness.dbUrl, "org.facilitator.event.assignment.failed.v1")
+      ).filter((r) => r.payload.includes("child-lost-execution")).length;
+      expect(failedBefore).toBe(0);
+      await seedDelivery(
+        harness.baseUrl,
+        gw.gatewayId,
+        assignEnvelopeFor("e2e-omp-4", "work-omp-4", "asg-omp-4", "e2e crash HOLD"),
+      );
+      await waitFor("crash-run progress", async () => {
+        const rows = await inboxRowsByType(harness.dbUrl, "org.facilitator.event.work.progress.v1");
+        return rows.some((r) => r.payload.includes("asg-omp-4")) ? true : false;
+      });
+      worker.child.kill("SIGKILL"); // die mid-dwell: no terminal event
+      worker = startWorker({
+        childWorkspaceId: `${gw.gatewayId}/omp`, // SAME id: probe path
+        socket: gw.socketPath ?? "",
+        workDir,
+        kernelUrl: harness.baseUrl,
+        token: childToken,
+      });
+      await worker.ready();
+      const lost = await waitFor("probe settles the row lost", async () => {
+        const s = await gatewayStatus(gw.diagnosticsPort);
+        const binding = s.bindings.find((b) => b.assignmentId === "asg-omp-4");
+        return binding !== undefined && binding.state === "lost" ? s : false;
+      });
+      expect(lost.executions.lost).toBe(1);
+      const failed = await waitFor("exactly one child-lost failed row", async () => {
+        const rows = await inboxRowsByType(
+          harness.dbUrl,
+          "org.facilitator.event.assignment.failed.v1",
+        );
+        const lostRows = rows.filter((r) => r.payload.includes("child-lost-execution"));
+        return lostRows.length === 1 ? lostRows[0]! : false;
+      });
+      const failedData = (JSON.parse(failed.payload) as { data: Record<string, unknown> }).data;
+      expect(failedData["retryable"]).toBe(true);
+      expect(failedData["reason"]).toBe("child-lost-execution");
+    } finally {
+      worker?.child.kill("SIGKILL");
+      await gateway.kill();
+    }
+  }, 150_000);
+});

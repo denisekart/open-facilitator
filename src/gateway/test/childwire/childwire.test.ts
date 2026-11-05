@@ -145,6 +145,40 @@ describe("createFrameParser", () => {
     expect(down.frames).toEqual(gatewayFrames);
   });
 
+  it("respond command frame: round-trips and enforces its full identity", () => {
+    const respond: ChildWireFrame = {
+      v: 1,
+      type: "command",
+      requestId: "ch-9",
+      message: { kind: "respond", executionId: "exec-1", requestId: "inp-1", text: "postgres" },
+    };
+    const down = collector("gateway");
+    down.parser.push(encodeFrame(respond));
+    expect(down.frames).toEqual([respond]);
+    expect(down.errors).toHaveLength(0);
+
+    // Gateway→child respond MUST carry executionId + requestId + text
+    // (adapter.v1.json respondMessage law); a stripped frame is dropped
+    // alone like any malformed line.
+    for (const broken of [
+      '{"v":1,"type":"command","requestId":"ch-a","message":{"kind":"respond","executionId":"exec-1","text":"x"}}\n',
+      '{"v":1,"type":"command","requestId":"ch-b","message":{"kind":"respond","executionId":"exec-1","requestId":"inp-1"}}\n',
+      '{"v":1,"type":"command","requestId":"ch-c","message":{"kind":"respond","executionId":"exec-1","requestId":"","text":"x"}}\n',
+    ]) {
+      down.parser.push(broken);
+    }
+    expect(down.errors).toHaveLength(3);
+    expect(down.errors.every((e) => e.kind === "parse-error")).toBe(true);
+    expect(down.frames).toEqual([respond]);
+
+    // Direction gate stays law: a respond frame rides gateway→child only;
+    // a child-side socket drops it like any wrong-direction frame.
+    const up = collector("child");
+    up.parser.push(encodeFrame(respond));
+    expect(up.errors).toHaveLength(1);
+    expect(up.frames).toHaveLength(0);
+  });
+
   it("oversized line: error once, connection stops emitting", () => {
     const { frames, errors, parser } = collector("child");
     // The gate fires the moment buffered-but-unterminated bytes exceed it —

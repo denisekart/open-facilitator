@@ -1,0 +1,12 @@
+// Typecheck-only config for the test tiers (unit + e2e). The build tsconfig
+// covers `src` alone; vitest transpiles without checking, so tests need this
+// pass — run it from CI's typescript job (`tsc -p tsconfig.test.json`).
+{
+  "extends": "../../../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "lib": ["ES2024", "DOM"],
+    "types": ["node"]
+  },
+  "include": ["src", "test", "vitest.config.ts", "vitest.e2e.config.ts"]
+}

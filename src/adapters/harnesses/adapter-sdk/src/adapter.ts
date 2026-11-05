@@ -34,16 +34,26 @@ export const ADAPTER_PACKAGE = "@ofac/adapter";
 export const DEFAULT_RESTART_BACKOFF_MS: readonly number[] = [100, 250, 500, 1000, 2000, 5000];
 
 const PROGRESS_TYPE = "org.facilitator.event.work.progress.v1";
+const INPUT_REQUIRED_TYPE = "org.facilitator.event.assignment.input.required.v1";
 const FAILED_TYPE = "org.facilitator.event.assignment.failed.v1";
 const CHILD_NAME_RE = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
 const CHILD_ID_MAX = 128;
 
 type AdapterEvent = "connected" | "disconnected" | "goaway";
 
+interface PendingInput {
+  readonly resolve: (answer: { readonly text: string }) => void;
+  readonly reject: (error: Error) => void;
+  readonly detach: () => void;
+}
+
 interface RunRecord {
   readonly entry: RegistryEntry;
   readonly ctx: RunContext;
   readonly controller: AbortController;
+  readonly pendingInputs: Map<string, PendingInput>;
+  /** Per-run request minting: `inp-<executionId>-<seq>`. */
+  inputSeq: number;
   steered: ((directive: string) => void) | undefined;
 }
 
@@ -55,6 +65,11 @@ function validateChildWorkspaceId(id: string): void {
       `invalid childWorkspaceId '${id}': must be '<gatewayId>/<name>' with name matching ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$ (<=${CHILD_ID_MAX})`,
     );
   }
+}
+
+/** The abort rejection for a pending requestInput (AbortError by name). */
+function abortError(): Error {
+  return Object.assign(new Error("The input request was aborted"), { name: "AbortError" });
 }
 
 /** 06's dedupe identity: the assign envelope's commandId (required by its schema). */
@@ -100,6 +115,7 @@ class Adapter implements AdapterHandle {
 
   async close(): Promise<void> {
     this.closedLocally = true;
+    this.rejectAllPendingInputs(new Error("adapter closed"));
     this.woken.resolve();
     await this.connection?.close();
     await this.loop;
@@ -212,6 +228,8 @@ class Adapter implements AdapterHandle {
         const record: RunRecord = {
           entry,
           controller,
+          pendingInputs: new Map(),
+          inputSeq: 0,
           steered: undefined,
           ctx: this.makeContext(entry, command, controller, executionGeneration),
         };
@@ -238,6 +256,26 @@ class Adapter implements AdapterHandle {
         entry.steers.push({ directive, at: Date.now() });
         record.steered?.(directive);
         this.opts.hooks.onSteer?.(directive, record.ctx);
+        return { kind: "accepted", executionId: message.executionId };
+      }
+      case "respond": {
+        const entry = this.registry.find(message.executionId);
+        if (entry === undefined) {
+          return { kind: "unknown", executionId: message.executionId };
+        }
+        const record = this.runs.get(message.executionId);
+        const pending = record?.pendingInputs.get(message.requestId);
+        if (record === undefined || pending === undefined) {
+          // Known execution, no live question under this requestId: an
+          // answer for a question that already settled (or was never asked)
+          // is answered honestly — `unknown`, never a silent swallow.
+          return { kind: "unknown", executionId: message.executionId };
+        }
+        record.pendingInputs.delete(message.requestId);
+        pending.detach();
+        const answer = message.text;
+        record.ctx.publishProgress(`input answered: ${answer.slice(0, 120)}`);
+        pending.resolve({ text: answer });
         return { kind: "accepted", executionId: message.executionId };
       }
       case "stop": {
@@ -322,12 +360,89 @@ class Adapter implements AdapterHandle {
           }),
         );
       },
+      requestInput: (req) =>
+        this.requestInput(entry, controller, workId, assignmentId, traceparent, req),
       setSteered(cb) {
         const record = runs.get(entry.executionId);
         if (record !== undefined) record.steered = cb;
       },
     };
     return ctx;
+  }
+
+  /**
+   * The interaction leg: mint `inp-<executionId>-<seq>`, publish the full
+   * input.required envelope (generation from the assign fence), park the
+   * resolver under the requestId. The `respond` child message resolves it;
+   * an abort while waiting rejects `AbortError`; adapter close rejects the
+   * rest. No timeout — the wire's deadline is display-only.
+   */
+  private requestInput(
+    entry: RegistryEntry,
+    controller: AbortController,
+    workId: string,
+    assignmentId: string,
+    traceparent: string | undefined,
+    req: {
+      readonly question: string;
+      readonly choices?: readonly string[];
+      readonly contextRef?: string;
+    },
+  ): Promise<{ readonly text: string }> {
+    const record = this.runs.get(entry.executionId);
+    if (record === undefined) {
+      return Promise.reject(new Error("adapter closed"));
+    }
+    record.inputSeq += 1;
+    const requestId = `inp-${entry.executionId}-${record.inputSeq}`;
+    this.relay(
+      buildEvent(INPUT_REQUIRED_TYPE, {
+        source: `urn:workspace:${this.opts.childWorkspaceId}`,
+        subject: `work/${workId}/assignment/${assignmentId}`,
+        ...(traceparent !== undefined ? { traceparent } : {}),
+        data: {
+          workId,
+          assignmentId,
+          executionId: entry.executionId,
+          requestId,
+          executionGeneration: record.ctx.executionGeneration,
+          question: req.question,
+          createdAt: new Date().toISOString(),
+          ...(req.choices !== undefined ? { choices: [...req.choices] } : {}),
+          ...(req.contextRef !== undefined ? { contextRef: req.contextRef } : {}),
+        },
+      }),
+    );
+    const { promise, resolve, reject } = Promise.withResolvers<{ readonly text: string }>();
+    if (controller.signal.aborted || this.closedLocally) {
+      reject(controller.signal.aborted ? abortError() : new Error("adapter closed"));
+      return promise;
+    }
+    const onAbort = (): void => {
+      record.pendingInputs.delete(requestId);
+      reject(abortError());
+    };
+    const pending: PendingInput = {
+      resolve,
+      reject,
+      detach: () => controller.signal.removeEventListener("abort", onAbort),
+    };
+    record.pendingInputs.set(requestId, pending);
+    controller.signal.addEventListener("abort", onAbort, { once: true });
+    return promise;
+  }
+
+  /** Every live question dies with the run/adapter — nothing hangs forever. */
+  private rejectAllPendingInputs(error: Error): void {
+    for (const record of this.runs.values()) Adapter.rejectPendingInputs(record, error);
+  }
+
+  private static rejectPendingInputs(record: RunRecord, error: Error): void {
+    for (const [requestId, pending] of record.pendingInputs) {
+      record.pendingInputs.delete(requestId);
+      pending.detach();
+      pending.reject(error);
+    }
   }
 
   private async execute(record: RunRecord): Promise<void> {
@@ -342,6 +457,10 @@ class Adapter implements AdapterHandle {
         reason: error instanceof Error ? error.message : String(error),
       };
     }
+    // A hook that abandoned a requestInput without awaiting it: detach its
+    // abort listener; the parked promise is honestly never resolved (a late
+    // respond answers `unknown` — the run is gone).
+    for (const pending of record.pendingInputs.values()) pending.detach();
     this.runs.delete(entry.executionId);
     if (entry.sessionRef !== undefined) void hooks.sessionStore?.delete(entry.executionId);
     if (controller.signal.aborted) {

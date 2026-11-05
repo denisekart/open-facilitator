@@ -53,6 +53,7 @@ public sealed class LinkIngress(
     Facilitator.Kernel.Work.ArtifactIngress artifacts,
     Facilitator.Kernel.Work.ResultIngress results,
     Facilitator.Kernel.Work.MemoryIngress memory,
+    Facilitator.Kernel.Work.InteractionIngress interactions,
     Facilitator.Kernel.Integrations.ProviderEventStore? providers = null)
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
@@ -127,6 +128,22 @@ public sealed class LinkIngress(
                 return new LinkAdmission(null, "accepted", inboxId);
             }
 
+            if (screen.Type == Facilitator.Kernel.Work.InteractionIngress.InputRequiredType)
+            {
+                // The interactive leg on the link plane: park the assignment,
+                // timeline the question, fan it out to the humans.
+                var arm = await interactions.HandleEventAsync(root, $"endpoint:{workload.EndpointId}", ct);
+                if (arm.Refused)
+                {
+                    await inbox.MarkProcessedAsync(inboxId, arm.Status, ct);
+                    return new LinkAdmission(arm.Problem, null, null);
+                }
+
+                await inbox.MarkProcessedAsync(inboxId, null, ct);
+                metrics.InboxProcessed();
+                return new LinkAdmission(null, arm.Status == "duplicate" ? "duplicate" : "accepted", inboxId);
+            }
+
             if (screen.Type == "org.facilitator.event.artifact.available.v1")
             {
                 var arm = await artifacts.HandleEventAsync(root, ct);
@@ -199,6 +216,24 @@ public sealed class LinkIngress(
             var delegated = screen.Principal?.Delegated;
             var arm = await approvals.HandleRespondAsync(
                 root, delegated?.Subject, delegated?.Groups, null, mintEvidence: false, ct);
+            if (arm.Refused)
+            {
+                await inbox.MarkProcessedAsync(inboxId, arm.Status, ct);
+                return new LinkAdmission(arm.Problem, null, null);
+            }
+
+            await inbox.MarkProcessedAsync(inboxId, null, ct);
+            metrics.InboxProcessed();
+            return new LinkAdmission(null, "accepted", inboxId);
+        }
+
+        if (screen.Type == Facilitator.Kernel.Work.InteractionIngress.InputCommandType)
+        {
+            // A chat reply mapped adapter-side into the answer command: the
+            // gate already evaluated + audited the evidence, so the identity
+            // is the (possibly delegated) endpoint itself.
+            var actor = screen.Principal?.Delegated?.Subject ?? $"endpoint:{workload.EndpointId}";
+            var arm = await interactions.HandleCommandRespondAsync(root, actor, ct);
             if (arm.Refused)
             {
                 await inbox.MarkProcessedAsync(inboxId, arm.Status, ct);

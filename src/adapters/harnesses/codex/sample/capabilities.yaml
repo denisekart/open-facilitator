@@ -1,0 +1,16 @@
+apiVersion: facilitator.framework/v1
+kind: CapabilityManifest
+ownerTeam: team-alpha
+capabilities:
+  - id: coding.codex
+    version: 1
+    execution: asynchronous
+    acceptedContexts: [uri-reference]
+    outputKinds: [coding.report, harness.transcript]
+    outputMediaTypes: [text/markdown, application/x-ndjson]
+    # Honest surface (frozen): codex exec is batch — no mid-run steer;
+    # cancellation SIGTERMs the process group; ask_user relays questions.
+    supportsSteering: false
+    supportsCancellation: true
+    supportsNudge: false
+    supportsInteraction: true

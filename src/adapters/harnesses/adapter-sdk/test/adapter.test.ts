@@ -15,8 +15,9 @@ import {
   type ChildListener,
   type ChildWireFrame,
 } from "@ofac/gateway";
-import type { CapabilityManifestV1, EnvelopeCommand } from "@ofac/protocol";
 import { createConsoleLogger } from "@ofac/workspace-link";
+import { validateAgainstSchemaId } from "@ofac/protocol";
+import type { CapabilityManifestV1, EnvelopeCommand, EnvelopeEvent } from "@ofac/protocol";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -53,6 +54,10 @@ const DESCRIPTOR = {
   invocation: "sdk",
   supports: { steer: true, interrupt: true, resume: "restart-with-context" },
 } as const;
+
+const INPUT_REQUIRED = "org.facilitator.event.assignment.input.required.v1";
+const PROGRESS = "org.facilitator.event.work.progress.v1";
+const FAILED = "org.facilitator.event.assignment.failed.v1";
 
 function assign(commandId: string, workId = "w-1", assignmentId = "a-1"): EnvelopeCommand {
   return {
@@ -385,6 +390,161 @@ describe("adapter lifecycle over the real listener", () => {
     expect(env.data["executionGeneration"]).toBe(2);
     const settled = await rig.link.send({ kind: "status", executionId: "e-fail" });
     expect(settled).toEqual({ kind: "status", executionId: "e-fail", state: "failed" });
+  });
+
+  it("requestInput: publishes a schema-valid input.required; respond resolves + notes; stale id unknown", async () => {
+    const path = socketPath();
+    const asked = Promise.withResolvers<{ readonly text: string }>();
+    const rig = await attached(path, {
+      onExecute: async (ctx) => {
+        const answer = await ctx.requestInput({
+          question: "which framework?",
+          choices: ["postgres", "sqlite"],
+        });
+        asked.resolve(answer);
+        return { kind: "completed" };
+      },
+    });
+    await rig.link.send({
+      kind: "start",
+      executionId: "e-ask",
+      executionGeneration: 6,
+      command: assign("cmd-ask"),
+    });
+    const askedEvent = await vi.waitFor(() => {
+      const found = rig.events.find(
+        (e) => (e as Partial<EnvelopeEvent> | undefined)?.type === INPUT_REQUIRED,
+      ) as { data: Record<string, unknown> } | undefined;
+      expect(found).toBeDefined();
+      return found as { data: Record<string, unknown> };
+    });
+    expect(
+      validateAgainstSchemaId(
+        "https://schemas.openfacilitator.org/v1/event.assignment.input.required.v1.json",
+        askedEvent.data,
+      ).ok,
+    ).toBe(true);
+    expect(askedEvent.data["workId"]).toBe("w-1");
+    expect(askedEvent.data["assignmentId"]).toBe("a-1");
+    expect(askedEvent.data["executionId"]).toBe("e-ask");
+    expect(askedEvent.data["executionGeneration"]).toBe(6);
+    expect(askedEvent.data["question"]).toBe("which framework?");
+    expect(askedEvent.data["choices"]).toEqual(["postgres", "sqlite"]);
+    expect(String(askedEvent.data["requestId"])).toMatch(/^inp-e-ask-\d+$/);
+    const requestId = String(askedEvent.data["requestId"]);
+
+    // Pending: status stays honest; a stale requestId is `unknown`, not swallowed.
+    expect(await rig.link.send({ kind: "status", executionId: "e-ask" })).toEqual({
+      kind: "status",
+      executionId: "e-ask",
+      state: "running",
+    });
+    expect(
+      await rig.link.send({
+        kind: "respond",
+        executionId: "e-ask",
+        requestId: "inp-nope-9",
+        text: "x",
+      }),
+    ).toEqual({ kind: "unknown", executionId: "e-ask" });
+
+    // The answer: accepted, progress note, hook resolves with the text.
+    expect(
+      await rig.link.send({ kind: "respond", executionId: "e-ask", requestId, text: "postgres" }),
+    ).toEqual({ kind: "accepted", executionId: "e-ask" });
+    expect((await asked.promise).text).toBe("postgres");
+    await vi.waitFor(() =>
+      expect(
+        rig.events.some(
+          (e) =>
+            (e as Partial<EnvelopeEvent> | undefined)?.type === PROGRESS &&
+            ((e as EnvelopeEvent).data as Record<string, unknown>)["progressNote"] ===
+              "input answered: postgres",
+        ),
+      ).toBe(true),
+    );
+    // Second respond for the settled question: unknown (the pending entry is gone).
+    expect(
+      await rig.link.send({ kind: "respond", executionId: "e-ask", requestId, text: "again" }),
+    ).toEqual({ kind: "unknown", executionId: "e-ask" });
+  });
+
+  it("requestInput + stop: rejects AbortError, no terminal event (cancel law)", async () => {
+    const path = socketPath();
+    let rejection: unknown;
+    const rig = await attached(path, {
+      onExecute: async (ctx) => {
+        try {
+          await ctx.requestInput({ question: "unanswered?" });
+          return { kind: "completed" };
+        } catch (error) {
+          rejection = error;
+          return { kind: "completed" };
+        }
+      },
+    });
+    await rig.link.send({
+      kind: "start",
+      executionId: "e-askstop",
+      executionGeneration: 1,
+      command: assign("cmd-askstop"),
+    });
+    await vi.waitFor(() => expect(rig.events.length).toBe(1));
+    const stop = await rig.link.send({
+      kind: "stop",
+      executionId: "e-askstop",
+      reason: "user-cancel",
+    });
+    expect(stop).toEqual({ kind: "accepted", executionId: "e-askstop" });
+    await vi.waitFor(() => expect(rejection).toBeDefined());
+    const abort = rejection as Error;
+    expect(abort).toBeInstanceOf(Error);
+    expect(abort.name).toBe("AbortError");
+    // Cancelled run: dropped without a terminal event; a late respond is unknown.
+    await vi.waitFor(async () => {
+      const s = await rig.link.send({ kind: "status", executionId: "e-askstop" });
+      expect(s).toEqual({ kind: "unknown", executionId: "e-askstop" });
+    });
+    expect(
+      rig.events.filter((e) => (e as Partial<EnvelopeEvent> | undefined)?.type === FAILED).length,
+    ).toBe(0);
+    expect(
+      await rig.link.send({
+        kind: "respond",
+        executionId: "e-askstop",
+        requestId: "inp-e-askstop-1",
+        text: "late",
+      }),
+    ).toEqual({ kind: "unknown", executionId: "e-askstop" });
+  });
+
+  it("requestInput + adapter close: rejects 'adapter closed'", async () => {
+    const path = socketPath();
+    let rejection: unknown;
+    const { listener, link } = await listen(path);
+    const handle = await adapter(path, {
+      onExecute: async (ctx) => {
+        try {
+          await ctx.requestInput({ question: "never answered" });
+        } catch (error) {
+          rejection = error;
+        }
+        return { kind: "completed" };
+      },
+    });
+    await handle.ready();
+    const childLink = await link;
+    await childLink.send({
+      kind: "start",
+      executionId: "e-askclose",
+      executionGeneration: 1,
+      command: assign("cmd-askclose"),
+    });
+    await handle.close(); // a pending input must die with the adapter
+    await listener.close();
+    const closed = rejection as Error;
+    expect(closed).toBeInstanceOf(Error);
+    expect(closed.message).toBe("adapter closed");
   });
 
   it("a throwing hook ⇒ the locked rejected literal", async () => {

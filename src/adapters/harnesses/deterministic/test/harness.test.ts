@@ -60,7 +60,12 @@ interface FakeCtx {
   controller: AbortController;
 }
 
-function fakeContext(executionId: string, workId: string, assignmentId: string): FakeCtx {
+function fakeContext(
+  executionId: string,
+  workId: string,
+  assignmentId: string,
+  answer?: string,
+): FakeCtx {
   const controller = new AbortController();
   const events: EnvelopeEvent[] = [];
   const progress: string[] = [];
@@ -77,6 +82,12 @@ function fakeContext(executionId: string, workId: string, assignmentId: string):
       progress.push(note);
     },
     setSteered: () => undefined,
+    // Unset ⇒ these scripts never ask and a question is a bug; set ⇒ the
+    // fake human answers immediately with `answer`.
+    requestInput:
+      answer === undefined
+        ? () => Promise.reject(new Error("unexpected requestInput"))
+        : () => Promise.resolve({ text: answer }),
   };
   return { ctx, events, progress, controller };
 }
@@ -90,6 +101,17 @@ function hooksFor(dir: string, stepMs: number) {
     childWorkspaceId: "gw.t/det",
     workDir: dir,
     stepMs,
+    logger: createMemoryLogger(),
+    fetchImpl: ((...args: Parameters<typeof fetch>) => kernelFetch(...args)) as typeof fetch,
+  });
+}
+
+function askingHooksFor(dir: string, stepMs: number, askQuestion: string) {
+  return createDeterministicHooks({
+    childWorkspaceId: "gw.t/det",
+    workDir: dir,
+    stepMs,
+    askQuestion,
     logger: createMemoryLogger(),
     fetchImpl: ((...args: Parameters<typeof fetch>) => kernelFetch(...args)) as typeof fetch,
   });
@@ -187,6 +209,24 @@ describe("deterministic harness script", () => {
     const lines = section.trim().split("\n");
     expect(lines[0]).toMatch(/^- \+\d+ms: first directive$/);
     expect(lines[1]).toMatch(/^- \+\d+ms: second directive$/);
+  });
+
+  it("askQuestion run: the answer rides the report where directives embed", async () => {
+    const dir = workDir();
+    const hooks = askingHooksFor(dir, 1, "which framework?");
+    const { ctx, progress } = fakeContext("exec-q", "work-q", "asg-q", "postgres");
+    const outcome = await hooks.onExecute(ctx);
+    expect(outcome).toEqual({ kind: "completed" });
+    // The SDK would add "input answered: postgres" between the notes over a
+    // real adapter; the hook itself keeps the two-step cadence.
+    expect(progress).toEqual([
+      "accepted: analyzing research.analyze for work-q",
+      "drafting report",
+    ]);
+    const report = readReport(dir, "exec-q");
+    expect(report).toContain(
+      "## Steering directives\nnone\n- input answered: postgres\n## Conclusion",
+    );
   });
 
   it("cancel before step 2: the run unwinds as cancelled, publishing NOTHING", async () => {

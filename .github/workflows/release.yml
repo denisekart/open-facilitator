@@ -74,7 +74,7 @@ jobs:
       # Major tag (:1) per feature — consumers pin majors, not full versions.
       - name: tag majors
         run: |
-          for name in gateway workspace-link harness-adapter; do
+          for name in gateway workspace-link harness-adapter omp-adapter codex-adapter; do
             docker buildx imagetools create \
               -t ghcr.io/denisekart/open-facilitator/features/$name:1 \
               ghcr.io/denisekart/open-facilitator/features/$name:1.0.0

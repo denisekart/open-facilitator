@@ -59,13 +59,29 @@ export interface AdapterLifecycleContractOptions {
   afterSteer?(directive: string): void | Promise<void>;
   /** Consumer-side proof the stop aborted the run (throw/expect inside). */
   afterCancel?(): void | Promise<void>;
+  /**
+   * Interaction leg (default ON): the kit expects the consumer's hook to
+   * call `ctx.requestInput` on a held-then-released run, observes the
+   * published `input.required` event frame, keeps the run honestly
+   * `running` while pending, answers the question (the answer the hook
+   * resolves with is `interactionAnswer`), and proves the run completes
+   * after answering. Auto-answer also keeps every other leg's run
+   * completing when the hook asks mid-flight. Adapters whose hooks can
+   * never answer a question opt out.
+   */
+  interactionLeg?: boolean;
+  /** What the kit answers a pending question with (default shown in the leg). */
+  interactionAnswer?: string;
 }
 
 const RESULT_MANIFEST_ID = "https://schemas.openfacilitator.org/v1/result-manifest.v1.json";
 const COMPLETED_PAYLOAD_ID =
   "https://schemas.openfacilitator.org/v1/event.assignment.completed.v1.json";
+const INPUT_REQUIRED_ID =
+  "https://schemas.openfacilitator.org/v1/event.assignment.input.required.v1.json";
 const PROGRESS_TYPE = "org.facilitator.event.work.progress.v1";
 const COMPLETED_TYPE = "org.facilitator.event.assignment.completed.v1";
+const INPUT_REQUIRED_TYPE = "org.facilitator.event.assignment.input.required.v1";
 
 let caseCounter = 0;
 
@@ -147,6 +163,31 @@ async function waitFor<T>(
 
 export function runAdapterLifecycleContract(opts: AdapterLifecycleContractOptions): void {
   const steerExpectation = opts.steerReply ?? "accepted";
+  const interactionLeg = opts.interactionLeg ?? true;
+  const interactionAnswer = opts.interactionAnswer ?? "kit-interaction-answer";
+  /** requestIds the kit already answered (never double-answer a question). */
+  const answered = new Set<string>();
+  /** The dedicated leg drives its own respond; auto-answer stands down. */
+  let pauseAutoAnswer = false;
+
+  /** Deliver an answer over the child wire (fire-and-forget safe). */
+  function deliverRespond(link: ChildLink, executionId: string, requestId: string): void {
+    void link
+      .send({ kind: "respond", executionId, requestId, text: interactionAnswer })
+      .catch(() => undefined); // a dead link honest-drops: the run dies with the socket
+  }
+
+  /** The interaction ingress: observe published frames, auto-answer questions. */
+  function observeInteraction(env: EnvelopeEvent): void {
+    if (!interactionLeg || pauseAutoAnswer || env.type !== INPUT_REQUIRED_TYPE) return;
+    const data = env.data as Record<string, unknown>;
+    const requestId = typeof data["requestId"] === "string" ? data["requestId"] : "";
+    const executionId = typeof data["executionId"] === "string" ? data["executionId"] : "";
+    if (requestId === "" || executionId === "" || answered.has(requestId)) return;
+    answered.add(requestId);
+    const link = harness?.link;
+    if (link !== undefined) deliverRespond(link, executionId, requestId);
+  }
 
   interface Harness {
     listener: ChildListener;
@@ -209,8 +250,12 @@ export function runAdapterLifecycleContract(opts: AdapterLifecycleContractOption
     const events: EnvelopeEvent[] = [];
     link.setPublisher(async (env) => {
       events.push(env);
+      observeInteraction(env);
     });
-    for (const env of link.drainEvents()) events.push(env);
+    for (const env of link.drainEvents()) {
+      events.push(env);
+      observeInteraction(env);
+    }
     harness = { listener, link, events };
     return harness;
   }
@@ -218,6 +263,7 @@ export function runAdapterLifecycleContract(opts: AdapterLifecycleContractOption
   beforeEach(() => {
     stops = [];
     heldPrefix = null;
+    pauseAutoAnswer = false;
   });
 
   afterEach(async () => {
@@ -385,6 +431,111 @@ export function runAdapterLifecycleContract(opts: AdapterLifecycleContractOption
       expect(done).toEqual({ kind: "status", executionId, state: "completed" });
       const foreign = await h.link.send({ kind: "status", executionId: "kit-foreign" });
       expect(foreign).toEqual({ kind: "unknown", executionId: "kit-foreign" });
+    });
+
+    it("interaction: requestInput publishes input.required, the respond unlocks the live run", async () => {
+      if (!interactionLeg) return;
+      const h = await attached();
+      caseCounter += 1;
+      const executionId = `kit-ask-${caseCounter}`;
+      const workId = `kit-askwork-${caseCounter}`;
+      const assignmentId = `kit-askassign-${caseCounter}`;
+      holdRuns(executionId);
+      pauseAutoAnswer = true; // this leg drives its own respond, on purpose
+      const reply = await h.link.send({
+        kind: "start",
+        executionId,
+        executionGeneration: 9,
+        command: assignEnvelope(`kit-askcmd-${caseCounter}`, workId, assignmentId) as never,
+      });
+      expect(reply).toEqual({ kind: "accepted", executionId });
+      release(executionId); // the hook proceeds and MAY call ctx.requestInput
+
+      // Wire law, question or not: a respond for a foreign execution is
+      // `unknown`, and one for a live run with no pending question is too.
+      expect(
+        await h.link.send({
+          kind: "respond",
+          executionId: "kit-ask-foreign",
+          requestId: "inp-x-1",
+          text: "x",
+        }),
+      ).toEqual({
+        kind: "unknown",
+        executionId: "kit-ask-foreign",
+      });
+
+      const asked = await waitFor(
+        "input.required event (if this hook asks)",
+        () => {
+          const found = h.events.find(
+            (e) =>
+              e.type === INPUT_REQUIRED_TYPE &&
+              (e.data as Record<string, unknown>)["executionId"] === executionId,
+          );
+          return found ?? false;
+        },
+        2_500,
+      ).catch(() => null);
+      if (asked === null) {
+        // This consumer's hooks never ask: the honest answer for a live run
+        // with no pending question is `unknown`, and nothing else to prove.
+        expect(
+          await h.link.send({ kind: "respond", executionId, requestId: "inp-never", text: "x" }),
+        ).toEqual({
+          kind: "unknown",
+          executionId,
+        });
+        return;
+      }
+
+      // The full interactive loop, asserted.
+      const data = asked.data as Record<string, unknown>;
+      expect(
+        validateAgainstSchemaId(INPUT_REQUIRED_ID, data).ok,
+        "input.required payload validates against event.assignment.input.required.v1",
+      ).toBe(true);
+      expect(data["workId"]).toBe(workId);
+      expect(data["assignmentId"]).toBe(assignmentId);
+      expect(data["executionGeneration"]).toBe(9);
+      const requestId = String(data["requestId"]);
+      // Pending question: the run stays honestly `running`, and a respond
+      // for a requestId the adapter never minted answers `unknown`.
+      expect(await h.link.send({ kind: "status", executionId })).toEqual({
+        kind: "status",
+        executionId,
+        state: "running",
+      });
+      expect(
+        await h.link.send({
+          kind: "respond",
+          executionId,
+          requestId: "inp-never-asked",
+          text: "stale",
+        }),
+      ).toEqual({
+        kind: "unknown",
+        executionId,
+      });
+      // The answer unlocks the live run.
+      expect(
+        await h.link.send({ kind: "respond", executionId, requestId, text: interactionAnswer }),
+      ).toEqual({
+        kind: "accepted",
+        executionId,
+      });
+      await waitFor("answer progress note", () =>
+        h.events.some(
+          (e) =>
+            e.type === PROGRESS_TYPE &&
+            String((e.data as Record<string, unknown>)["progressNote"]).includes(
+              `input answered: ${interactionAnswer}`,
+            ),
+        ),
+      );
+      await waitFor("run completes after answering", () =>
+        h.events.some((e) => e.type === COMPLETED_TYPE),
+      );
     });
 
     it("restart law: a dead listener mid-run reconnects; the probe gets running", async () => {

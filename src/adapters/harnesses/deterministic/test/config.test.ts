@@ -54,6 +54,14 @@ describe("worker config law", () => {
     expect(config.heartbeatSeconds).toBe(30);
     expect(config.restartBackoffMs).toEqual([100, 250, 500, 1000, 2000, 5000]);
     expect(config.logLevel).toBe("info");
+    expect(config.askQuestion).toBeUndefined();
+  });
+
+  it("askQuestion: optional string; non-empty or it names the key", () => {
+    expect(parse(`${BASE}askQuestion: which framework?\n`).askQuestion).toBe("which framework?");
+    expectFail(`${BASE}askQuestion: 7\n`, "askQuestion");
+    expectFail(`${BASE}askQuestion: ""\n`, "askQuestion");
+    expectFail(`${BASE}askQuestion:\n  nested: true\n`, "askQuestion");
   });
 
   it("rejects unknown keys, naming them", () => {

@@ -49,11 +49,12 @@ const CHILD_ID = "gw.kit/deterministic";
 // adapter booted here needs a kernel surface — the stub stands in.
 const stubKernel: StubKernel = await startStubKernel();
 
-function baseHooks(workDir: string): HarnessHooks {
+function baseHooks(workDir: string, askQuestion?: string): HarnessHooks {
   return createDeterministicHooks({
     childWorkspaceId: CHILD_ID,
     workDir,
     stepMs: 0,
+    ...(askQuestion !== undefined ? { askQuestion } : {}),
     logger: createConsoleLogger({ level: "error" }),
   });
 }
@@ -97,14 +98,20 @@ function start(
 const socketPath = join(mkdtempSync(join(tmpdir(), "ofac-det-kit-")), "child.sock");
 const workDir = mkdtempSync(join(tmpdir(), "ofac-det-kit-work-"));
 
+// Main instantiation: the askQuestion hook exercises the kit's interaction
+// leg (input.required observed, respond unlocks the live run) and the
+// auto-answer keeps every other leg's run completing.
 runAdapterLifecycleContract({
   socketPath,
   gatewayId: "gw.kit",
-  startAdapter: async (gate) => start(socketPath, gated(baseHooks(workDir), gate)),
+  interactionAnswer: "kit says: postgres",
+  startAdapter: async (gate) =>
+    start(socketPath, gated(baseHooks(workDir, "which framework?"), gate)),
 });
 
 // Second instantiation: a no-steer adapter (onSteer absent, setSteered
-// never called) must answer the locked `unsupported` — the kit asserts.
+// never called) must answer the locked `unsupported`, AND a consumer whose
+// hooks can never answer proves the interaction-leg opt-out passes.
 const noSteerPath = join(mkdtempSync(join(tmpdir(), "ofac-det-kit2-")), "child.sock");
 const noSteerWork = mkdtempSync(join(tmpdir(), "ofac-det-kit2-work-"));
 
@@ -112,6 +119,7 @@ runAdapterLifecycleContract({
   socketPath: noSteerPath,
   gatewayId: "gw.kit",
   steerReply: "unsupported",
+  interactionLeg: false,
   startAdapter: async (gate) => {
     const { onSteer, ...noSteer } = baseHooks(noSteerWork);
     void onSteer;

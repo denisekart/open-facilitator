@@ -48,6 +48,7 @@ export async function bootWorker(config: WorkerConfig, log: LinkLogger): Promise
       childWorkspaceId: config.childWorkspaceId,
       workDir: config.workDir,
       stepMs: config.stepMs,
+      ...(config.askQuestion !== undefined ? { askQuestion: config.askQuestion } : {}),
       logger: log,
     }),
     heartbeatSeconds: config.heartbeatSeconds,

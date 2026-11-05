@@ -11,6 +11,13 @@ skill). Shipped:
   `ofac-deterministic-worker`): the zero-randomness worked example — two-step
   run, progress events, on-disk report with `sha256:` digest,
   `file://` external refs. Third-party implementers copy this package.
+- `omp/` — `@ofac/harness-omp` (bin `ofac-omp-worker`): full TUI stand-in for
+  the oh-my-pi CLI (`omp --mode rpc`), live steer, resume-aware, `ask_user`
+  MCP relay. Shipped as the `ofac-omp-adapter` Dev Container Feature.
+- `codex/` — `@ofac/harness-codex` (bin `ofac-codex-worker`): OpenAI `codex
+  exec --json` stand-in, JSONL event relay, resume-aware, no live steer
+  (`supportsSteering: false`), `ask_user` MCP relay. Shipped as the
+  `ofac-codex-adapter` Dev Container Feature.
 
 Provider harnesses (Pi et al.) land with their provider plans as sibling
 packages built on `@ofac/adapter`.

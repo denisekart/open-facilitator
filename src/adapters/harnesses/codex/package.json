@@ -1,0 +1,47 @@
+{
+  "name": "@ofac/harness-codex",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "ofac-codex-worker": "./dist/bin/worker.js"
+  },
+  "files": [
+    "dist",
+    "sample"
+  ],
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/denisekart/open-facilitator.git",
+    "directory": "src/adapters/harnesses/codex"
+  },
+  "scripts": {
+    "build": "tsup src/index.ts src/bin/worker.ts src/bin/mcp-shim.ts --format esm --dts --target node22 --silent",
+    "test": "vitest run",
+    "test:e2e": "vitest run --config vitest.e2e.config.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.test.json"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "catalog:",
+    "@ofac/adapter": "workspace:*",
+    "@ofac/gateway": "workspace:*",
+    "@ofac/protocol": "workspace:*",
+    "@ofac/workspace-link": "workspace:*",
+    "yaml": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "tsup": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

@@ -143,7 +143,7 @@ redefined:
 |---|---|---|
 |`hello`|adapter → Gateway|`childWorkspaceId`, `token`, capability manifest|
 |`register-ack`|Gateway → adapter|`accepted`, optional denial `reason`|
-|`command` (`start`/`steer`/`status`/`stop`)|Gateway → adapter|`requestId` + the command message|
+|`command` (`start`/`steer`/`status`/`stop`/`respond`)|Gateway → adapter|`requestId` + the command message|
 |`reply`|adapter → Gateway|`accepted` / `rejected` / `unsupported` / `status` / `unknown`|
 |`event`|adapter → Gateway|`requestId` + the FULL CloudEvent envelope (relay law: Gateway forwards bytes unmodified)|
 |`heartbeat`|adapter → Gateway|`childWorkspaceId` (lease keepalive)|
@@ -158,6 +158,35 @@ harness's own publish — the SDK publishes only `assignment.failed.v1`
 `unsupported` (report, don't reinterpret); an unknown execution answers
 `unknown` so the Gateway's reconcile probe can declare it lost, exactly
 once.
+
+### Interactivity (input.required → respond)
+
+A harness that can ask a human: the capability manifest sets
+`supportsInteraction: true`, and a hook calls
+`ctx.requestInput({ question, choices?, contextRef? })`. The SDK mints a
+`requestId`, publishes the full
+`org.facilitator.event.assignment.input.required.v1` envelope, and **blocks**
+(no timeout; `deadline` is display-only). The kernel parks the assignment
+`running → input_required` (timeline `input.required`) and fans the question
+out in frozen order: the work's originating integration as a
+`command.communication.reply.v1` on the bound thread → the team's
+`OFAC:InteractionDefaultEndpoint` → a registered decision provider picking
+among live communication-capable sessions → timeline-only + a progress note.
+Every leg rides the outbox; nothing addresses an endpoint directly.
+
+The answer arrives as `org.facilitator.command.assignment.input.v1` (HTTP
+`POST /api/works/{workId}/interactions/{requestId}/respond`, a chat reply
+mapped adapter-side, or a provider-message auto-answer on a bound thread —
+oldest pending request only). The kernel settles
+`input_required → running` (timeline `input.answered`) and routes the
+command to the bound Gateway, which sends the `respond` child frame; the
+blocked `requestInput` resolves with `{ text }` and the live run continues.
+Abort while pending rejects `AbortError`; a respond for an unknown or
+aborted request is dropped silently. Harnesses MUST run autonomously
+(no per-tool-call approvals) — the only sanctioned human channel is this
+relay: omp forces `--auto-approve`, codex exec runs
+`-s workspace-write -c approval_policy="never"`; both are injected a stdio
+MCP server exposing `ask_user`, so a blocked agent asks instead of stopping.
 
 ### Artifacts: verified external refs (interim)
 

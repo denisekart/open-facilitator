@@ -38,6 +38,10 @@ export interface WorkerConfig {
   /** Absolute: artifacts land under <workDir>/artifacts/. */
   workDir: string;
   stepMs: number;
+  /** Optional: when set, the run asks the human this question mid-flight
+   * (ctx.requestInput) and embeds the answer in the report where steering
+   * directives are embedded today. */
+  askQuestion?: string | undefined;
   heartbeatSeconds: number;
   restartBackoffMs: readonly number[];
   logLevel: string;
@@ -58,7 +62,7 @@ const TOP_KEYS: Record<string, true> = {
   manifestFile: true,
   workDir: true,
   stepMs: true,
-  heartbeatSeconds: true,
+  askQuestion: true,
   restartBackoffMs: true,
 };
 const TRANSPORT_KEYS: Record<string, true> = { socket: true, tcp: true };
@@ -199,6 +203,9 @@ export function parseWorkerConfig(
     manifest,
     workDir,
     stepMs,
+    ...(optionalString(root, "askQuestion") !== undefined
+      ? { askQuestion: optionalString(root, "askQuestion") }
+      : {}),
     heartbeatSeconds,
     restartBackoffMs,
     logLevel: env["OFAC_ADAPTER_LOG"] ?? "info",

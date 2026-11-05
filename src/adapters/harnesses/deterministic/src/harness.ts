@@ -26,6 +26,9 @@ export interface DeterministicRunOptions {
   childWorkspaceId: string;
   workDir: string;
   stepMs: number;
+  /** Optional: when set, the run asks the human this question between the
+   * analyzing and drafting steps and embeds the answer in the report. */
+  askQuestion?: string | undefined;
   logger: LinkLogger;
   /** Injectable fetch for the artifact upload path (tests); default global. */
   fetchImpl?: typeof fetch;
@@ -62,7 +65,7 @@ function cancellableSleep(ms: number, signal: AbortSignal): Promise<boolean> {
 }
 
 export function createDeterministicHooks(options: DeterministicRunOptions): DeterministicHooks {
-  const { childWorkspaceId, workDir, stepMs, logger } = options;
+  const { childWorkspaceId, workDir, stepMs, logger, askQuestion } = options;
   const steers = new Map<string, SteerRecord[]>();
   const startedAt = new Map<string, number>();
 
@@ -86,6 +89,13 @@ export function createDeterministicHooks(options: DeterministicRunOptions): Dete
     if (!(await cancellableSleep(stepMs, ctx.signal))) return cancelled(ctx);
     const step1At = Date.now() - t0;
 
+    // The interactive leg: between analyzing and drafting, ask the human
+    // through the Facilitator and carry the answer into the report.
+    const answer =
+      askQuestion !== undefined
+        ? (await ctx.requestInput({ question: askQuestion })).text
+        : undefined;
+
     ctx.publishProgress("drafting report");
     logger.info("worker-step", { executionId: ctx.executionId, step: 2 });
     if (!(await cancellableSleep(stepMs, ctx.signal))) return cancelled(ctx);
@@ -96,6 +106,8 @@ export function createDeterministicHooks(options: DeterministicRunOptions): Dete
     mkdirSync(dirname(reportPath), { recursive: true, mode: 0o700 });
     const directiveLines =
       seen.length === 0 ? "none" : seen.map((s) => `- +${s.atMs}ms: ${s.directive}`).join("\n");
+    // The human's answer rides the same section as the steering directives.
+    const answerLine = answer === undefined ? "" : `\n- input answered: ${answer}`;
     const report = `# Research report ${workId}
 Objective: ${objective}
 Assignment: ${assignmentId} (execution ${ctx.executionId})
@@ -103,7 +115,7 @@ Assignment: ${assignmentId} (execution ${ctx.executionId})
 - step 1 complete at +${step1At}ms
 - step 2 complete at +${step2At}ms
 ## Steering directives
-${directiveLines}
+${directiveLines}${answerLine}
 ## Conclusion
 Deterministic ${publishing ? "publish" : "analysis"} complete.
 `;

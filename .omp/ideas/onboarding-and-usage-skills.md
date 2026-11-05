@@ -2,11 +2,11 @@
 
 **Original intent (kept):** a self-sufficient set of AI-harness skills (SKILL.md +
 resources) covering installing, operating, and developing against Open
-Facilitator, for admins and teams. The repo landing page gets a clear
+Facilitator, for admins and teams. The repo landing page (once built) gets a clear
 instruction set, and the repo gets a structure so an AI can "install" these
-skills into a client's harness. The user of a skill has NO access to this
+skills into a client's harness (sort of like "getting started in codex/pi/opencode/claude/etc...). The user of a skill has NO access to this
 repository — the system is a black box. These skills are completely separate
-from the repo-development skills in `.omp/skills/`.
+from the repo-development skills in `.omp/skills/` - consider them a public "semantic" contract of sorts.
 
 ---
 
@@ -217,3 +217,15 @@ explicitly so future agents don't merge the two skill trees: *`.omp/skills/`
   skill teach "your distributor handed you a rendered bundle" (bundle-
   agnostic, my recommendation) or bless the local example as THE install
   path?
+
+
+Make sure that any artifacts (skills etc.) have a system of progressive disclosure (links to subresources instead of everything in a flat file).
+
+Secondly, think of building an MCP for the kernel/admin plane. This could be useful to allow semi-agentic driven configuration, monitoring, and maintainance.
+MCP needs to adhere to the same security principles of course.
+
+This is a very rough outline. Let's plan it together and refine it before making an actual plan for implementation. Ask as many questions as needed - do not assume anything - ask the question.
+
+Prefer asking more questions than less - more rounds of questions are expected, not just a single round. Let's nail down the functionality before we implement it
+
+Let's refine and build up a proper plan together.T

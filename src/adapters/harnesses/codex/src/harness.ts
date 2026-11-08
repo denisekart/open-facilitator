@@ -58,6 +58,12 @@ export interface CodexRunOptions {
   fetchImpl?: typeof fetch;
   /** Env base for the codex spawn + clone inputs; default process.env. */
   env?: Readonly<Record<string, string | undefined>> | undefined;
+  /**
+   * Progress-note throttle window in ms; default PROGRESS_THROTTLE_MS.
+   * 0 disables coalescing (every note publishes at once) — the deterministic
+   * seam tests use so note law never rides wall-clock speed.
+   */
+  progressThrottleMs?: number | undefined;
 }
 
 export interface CodexHooks {
@@ -262,8 +268,9 @@ export function createCodexHooks(options: CodexRunOptions): CodexHooks {
     let finalAnswer: string | undefined;
     let lastProgressAt = 0;
     let pendingNote: string | null = null;
+    const throttleMs = options.progressThrottleMs ?? PROGRESS_THROTTLE_MS;
     const note = (text: string): void => {
-      if (Date.now() - lastProgressAt >= PROGRESS_THROTTLE_MS) {
+      if (Date.now() - lastProgressAt >= throttleMs) {
         if (pendingNote !== null) {
           ctx.publishProgress(pendingNote);
           pendingNote = null;

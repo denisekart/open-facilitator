@@ -274,6 +274,10 @@ describe("codex harness execution", () => {
       promptTemplate: "work on: {objective} ASK(which framework?)",
       mcpShimEntry: SHIM,
       env: { ...process.env, OFAC_FAKE_ARGV_OUT: argvPath },
+      // Note law asserts an intermediate item note; the 2s coalescing window
+      // would swallow it whenever the MCP round-trip is fast (CI). Zero the
+      // window so every note publishes at once, at any machine speed.
+      progressThrottleMs: 0,
     });
     const { ctx, progress } = fakeContext("exec-m", "work-m", "asg-m", { answer: "postgres" });
     const outcome = await hooks.onExecute(ctx);

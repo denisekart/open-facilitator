@@ -1,6 +1,39 @@
 {
   "$schema": "https://raw.githubusercontent.com/can1357/oh-my-pi/main/packages/coding-agent/src/config/mcp-schema.json",
   "mcpServers": {
+    "context-mode": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "/home/vscode/.omp/plugins/node_modules/context-mode/cli.mjs",
+        "server"
+      ],
+      "timeout": 600000
+    },
+    "docker": {
+      "command": "mcp-server-docker"
+    },
+    "fetch": {
+      "command": "mcp-server-fetch"
+    },
+    "git": {
+      "command": "mcp-server-git",
+      "enabled": false
+    },
+    "puppeteer": {
+      "command": "mcp-server-puppeteer",
+      "enabled": false,
+      "env": {
+        "PUPPETEER_LAUNCH_OPTIONS": "{\"headless\": true}",
+        "ALLOW_DANGEROUS": "true",
+        "PUPPETEER_EXECUTABLE_PATH": "/usr/local/puppeteer-chromium",
+        "DOCKER_CONTAINER": "true"
+      }
+    },
+    "time": {
+      "command": "mcp-server-time",
+      "enabled": false
+    },
     "postgres": {
       "type": "stdio",
       "command": "npx",

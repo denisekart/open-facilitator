@@ -1,7 +1,7 @@
 {
   "name": "@ofac/provider-core",
   "version": "0.1.0",
-  "private": true,
+  "private": false,
   "type": "module",
   "description": "Provider-agnostic scaffolding for forge/provider integrations: the adapter link-plane run loop with a webhook fan-out receiver, and the connector config/ledger/manifest/hooks face. Single way to integrate: every provider adapter/connector rides this package.",
   "exports": {
@@ -18,7 +18,7 @@
     "dist"
   ],
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
+    "registry": "https://registry.npmjs.org"
   },
   "repository": {
     "type": "git",

@@ -1,7 +1,7 @@
 {
   "name": "@ofac/github-adapter",
   "version": "0.0.0",
-  "private": true,
+  "private": false,
   "type": "module",
   "description": "GitHub provider adapter: inbound webhook fan-out consumer on the @ofac/provider-core adapter face (HMAC-SHA256 law, vendor->domain normalizer, bot-identity replies).",
   "exports": {
@@ -17,7 +17,7 @@
     "dist"
   ],
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
+    "registry": "https://registry.npmjs.org"
   },
   "repository": {
     "type": "git",

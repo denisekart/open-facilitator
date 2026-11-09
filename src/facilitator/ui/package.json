@@ -1,8 +1,14 @@
 {
   "name": "@ofac/ui",
-  "private": true,
+  "private": false,
   "version": "0.0.0",
   "type": "module",
+  "files": [
+    "src"
+  ],
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",

@@ -1,7 +1,7 @@
 {
   "name": "@ofac/github-connector",
   "version": "0.0.0",
-  "private": true,
+  "private": false,
   "type": "module",
   "description": "GitHub connector: gateway fleet child executing privileged GitHub operations.",
   "main": "./dist/index.js",
@@ -14,6 +14,12 @@
   },
   "bin": {
     "github-connector": "./dist/bin/connector.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org"
   },
   "scripts": {
     "build": "tsup src/index.ts src/bin/connector.ts --format esm --dts --target node22 --silent",

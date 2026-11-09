@@ -1,6 +1,7 @@
 {
   "name": "@ofac/forgejo-connector",
   "version": "0.1.0",
+  "license": "AGPL-3.0-or-later",
   "private": false,
   "type": "module",
   "description": "Forgejo connector: gateway fleet child executing privileged forge operations.",

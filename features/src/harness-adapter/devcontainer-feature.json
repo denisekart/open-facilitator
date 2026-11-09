@@ -1,6 +1,7 @@
 {
   "id": "harness-adapter",
   "version": "1.0.0",
+  "licenseURL": "https://github.com/denisekart/open-facilitator/blob/main/LICENSE",
   "name": "Open Facilitator Harness Adapter",
   "documentationURL": "https://github.com/denisekart/open-facilitator/tree/main/features/src/harness-adapter",
   "description": "Installs a harness worker (deterministic reference adapter) as a self-contained Node bundle plus a supervisor unit that attaches it to the team Gateway's child socket. Install order is irrelevant: units carry numeric prefixes and every Feature writes distinct files.",

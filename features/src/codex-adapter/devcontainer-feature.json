@@ -1,6 +1,7 @@
 {
   "id": "codex-adapter",
   "version": "1.0.0",
+  "licenseURL": "https://github.com/denisekart/open-facilitator/blob/main/LICENSE",
   "name": "Open Facilitator Codex Harness Adapter",
   "documentationURL": "https://github.com/denisekart/open-facilitator/tree/main/features/src/codex-adapter",
   "description": "Installs the Codex harness worker (OpenAI codex CLI stand-in) as a self-contained Node bundle plus a supervisor unit that attaches it to the team Gateway's child socket. The codex CLI itself is assumed present in the base image (override with requireCli:false). Install order is irrelevant: units carry numeric prefixes and every Feature writes distinct files.",

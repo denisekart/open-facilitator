@@ -97,4 +97,19 @@ The demo entry point is live:
 
 ## License
 
-To be chosen by the maintainers; the target design favors open-source distribution of all framework modules.
+Copyright (C) 2026 Link Three Labs, d.o.o. (VAT SI19669747)
+
+Open Facilitator is dual-licensed:
+
+- **AGPL-3.0-or-later** (see [LICENSE](LICENSE)) — free for everyone,
+  including running a modified version as a service (that's the point).
+- **Commercial license** — for anyone who cannot or does not want to ship
+  under AGPL (embedded/SaaS distribution, internal-mod policy, procurement).
+  Written to the same codebase, no copyleft obligations. Contact
+  [denis.ekart@gmail.com](mailto:denis.ekart@gmail.com).
+
+The license ships with every artifact: `LICENSE` in each npm tarball
+(`@ofac/*`), `licenseURL` in each Dev Container Feature manifest, and
+`/licenses/LICENSE` + `org.opencontainers.image.licenses` in the
+`facilitator` and `node-runtime` container images.
+

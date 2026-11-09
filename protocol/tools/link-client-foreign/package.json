@@ -1,6 +1,7 @@
 {
   "name": "@ofac/link-client-foreign",
   "version": "0.0.0",
+  "license": "AGPL-3.0-or-later",
   "private": true,
   "type": "module",
   "description": "Foreign-shape link client: a hand-rolled WebSocket link client proving the kernel speaks the published wire contract to any conformant implementation. Imports nothing from the workspace — only the surface documented in protocol/openapi/link-v1.yaml and protocol/json-schema.",

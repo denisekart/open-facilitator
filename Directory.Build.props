@@ -12,5 +12,9 @@
          Versions stay centrally pinned in Directory.Packages.props; the lock
          files only freeze the resolved graph (regenerate with dotnet restore). -->
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <!-- Licensing: AGPL-3.0-or-later, commercially dual-licensed by Link Three
+         Labs, d.o.o. Expression here so pack + CycloneDX SBOMs carry it. -->
+    <PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
+    <Copyright>Copyright Link Three Labs, d.o.o.</Copyright>
   </PropertyGroup>
 </Project>

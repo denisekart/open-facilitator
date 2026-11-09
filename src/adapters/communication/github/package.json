@@ -1,6 +1,7 @@
 {
   "name": "@ofac/github-adapter",
   "version": "0.0.0",
+  "license": "AGPL-3.0-or-later",
   "private": false,
   "type": "module",
   "description": "GitHub provider adapter: inbound webhook fan-out consumer on the @ofac/provider-core adapter face (HMAC-SHA256 law, vendor->domain normalizer, bot-identity replies).",

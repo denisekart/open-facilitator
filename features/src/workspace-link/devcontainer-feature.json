@@ -1,6 +1,7 @@
 {
   "id": "workspace-link",
   "version": "1.0.0",
+  "licenseURL": "https://github.com/denisekart/open-facilitator/blob/main/LICENSE",
   "name": "Open Facilitator Workspace Link (linkd)",
   "documentationURL": "https://github.com/denisekart/open-facilitator/tree/main/features/src/workspace-link",
   "description": "Installs the ofac-linkd headless Link runtime (self-contained Node bundle), the headless supervisor entrypoint, and a unit that enrolls + connects the workspace directly to a Facilitator (no Gateway in between). Install order is irrelevant: units carry numeric prefixes and every Feature writes distinct files.",

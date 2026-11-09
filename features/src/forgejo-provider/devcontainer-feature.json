@@ -1,6 +1,7 @@
 {
   "id": "forgejo-provider",
   "version": "1.0.0",
+  "licenseURL": "https://github.com/denisekart/open-facilitator/blob/main/LICENSE",
   "name": "Open Facilitator Forgejo Provider",
   "documentationURL": "https://github.com/denisekart/open-facilitator/tree/main/features/src/forgejo-provider",
   "description": "Installs the forgejo ops connector as a self-contained Node bundle plus supervisor unit 40-forgejo-connector.sh, opt-in via FORGEJO_URL: without it the unit exits 0 and the container behaves exactly as without this Feature. Pairs with ofac-gateway (the connector attaches to the team Gateway's child socket).",

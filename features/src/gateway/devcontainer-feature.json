@@ -1,6 +1,7 @@
 {
   "id": "gateway",
   "version": "1.0.0",
+  "licenseURL": "https://github.com/denisekart/open-facilitator/blob/main/LICENSE",
   "name": "Open Facilitator Gateway",
   "documentationURL": "https://github.com/denisekart/open-facilitator/tree/main/features/src/gateway",
   "description": "Installs the ofac-gateway runtime (self-contained Node bundle), the headless supervisor entrypoint, and a unit that runs a team-owned Gateway against the workspace mount.",

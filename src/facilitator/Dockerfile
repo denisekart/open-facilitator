@@ -27,6 +27,11 @@ RUN dotnet publish src/facilitator/Facilitator.csproj -c Release -o /app --no-re
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
+# AGPL-3.0-or-later (commercial dual-license available); ships with the image
+# per the license's notice obligations.
+COPY LICENSE /licenses/LICENSE
+LABEL org.opencontainers.image.licenses="AGPL-3.0-or-later" \
+      org.opencontainers.image.vendor="Link Three Labs, d.o.o."
 COPY --from=build /app .
 EXPOSE 8080
 ENV ASPNETCORE_URLS=http://0.0.0.0:8080

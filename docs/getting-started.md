@@ -204,7 +204,7 @@ This run is part of every task's acceptance criteria — see
 | Artifact | Registry | Coordinate |
 |---|---|---|
 | OCI images (facilitator) | GHCR | `ghcr.io/denisekart/open-facilitator/<name>` |
-| npm packages `@ofac/*` | GitHub Packages npm | `https://npm.pkg.github.com/denisekart` (see repo `.npmrc`; not yet published — packages remain `private`) |
+| npm packages `@ofac/*` | npmjs.org | `https://registry.npmjs.org` — `@ofac` org, published with OIDC provenance once `ENABLE_NPM_PUBLISH=true`; packages remain `private` until then |
 | Dev Container Features (OCI-published; `gateway`, `workspace-link`, `harness-adapter`) | GHCR | `ghcr.io/denisekart/open-facilitator/features/<name>:1` |
 | NuGet | — (public deps from nuget.org; first internal package → `https://nuget.pkg.github.com/denisekart/index.json`) | — |
 

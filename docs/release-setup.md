@@ -14,7 +14,7 @@ flowchart LR
     TAG --> S[sbom + digest-pin jobs<br/>(pipeline target)]
     C -->|GITHUB_TOKEN packages:write| GHCR1[ghcr.io/denisekart/open-facilitator/facilitator<br/>ghcr.io/denisekart/open-facilitator/node-runtime]
     F -->|GITHUB_TOKEN packages:write| GHCR2[ghcr.io/denisekart/open-facilitator/features/&lt;name&gt;]
-    N -->|NODE_AUTH_TOKEN = GITHUB_TOKEN| NPM[npm.pkg.github.com/denisekart]
+    N -->|OIDC trusted publisher| NPM[registry.npmjs.org @ofac]
     S -->|gh release upload| REL[GitHub Release assets]
     S -->|commit back / PR| VEN[reference/versions.env *_DIGEST]
     GHCR1 -.pinned by.-> VEN
@@ -134,91 +134,62 @@ docker buildx imagetools inspect ghcr.io/denisekart/open-facilitator/features/ga
 ## 3. npm
 
 All workspace packages are scoped `@ofac/*` (`@ofac/protocol`,
-`@ofac/gateway`, `@ofac/workspace-link`, …), every one is `"private": true`
-today, and each carries `publishConfig.registry:
-https://npm.pkg.github.com`. The repo-root `.npmrc` routes the scope:
+`@ofac/gateway`, `@ofac/workspace-link`, …); every one is `"private": true`
+until it is intentionally shipped. The chosen route is **npmjs.org** (the
+old GitHub Packages option died on the scope-vs-owner rule: `@ofac` cannot
+publish from a `denisekart`-owned repo — see the options below). Publishable
+packages carry `publishConfig.registry: https://registry.npmjs.org` and the
+repo-root `.npmrc` routes the scope there:
 
 ```
-@ofac:registry=https://npm.pkg.github.com
-//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}
+@ofac:registry=https://registry.npmjs.org
 ```
 
-The `publish-npm` job is an inert seam: it runs only when the repository
-variable `ENABLE_NPM_PUBLISH` equals `true`, and its body is a placeholder —
-activating it is a three-part change (flip the variable, flip the publishable
-packages to `"private": false` + real versions, fill the job with
-`npm pkg set version` + `npm publish`).
+The `publish-npm` job is filled and gated on the repository variable
+`ENABLE_NPM_PUBLISH=true`: it stamps the tag's version into every package
+that flipped `"private": false`, builds them, and publishes the workspace
+subset with `pnpm publish -r --provenance --access public` (OIDC trusted
+publisher — no registry token). One-time account work is in
+**Route c — npmjs.org** below.
 
-**Scope-vs-owner gotcha (blocks the GitHub Packages option):** GitHub
-Packages npm derives a package's owner from the repository it is published
-from, and the scope must match the owner account/org name.
-`@ofac/*` published from a repo owned by `denisekart` is rejected. Pick one:
+**Route chosen — c: npmjs.org** (the GitHub Packages option is blocked
+here anyway: the scope must match the publishing repo's owner, and
+`@ofac/*` from a `denisekart`-owned repo is rejected — a future switch
+needs an `ofac`-owned repo or a scope rename). One-time account work, in
+order:
 
-- **(a) Keep GitHub Packages:** publish from a repository owned by an
-  organization named `ofac` (GitHub → New organization → `ofac`; link or
-  mirror the publishable packages there). Coordinates become
-  `https://npm.pkg.github.com/ofac`. This diverges from the
-  `…/denisekart` URL the workflow comment and the registry-coordinates table of
-  `docs/getting-started.md`
-  currently state — align all three at flip time.
-- **(b) Rename scope** to `@denisekart/*` (or `@denisekart-open-facilitator/*`)
-  and rewrite `publishConfig`, the repo `.npmrc`, and every cross-package
-  dependency name.
-- **(c) npmjs.org** (see below) — sidesteps the owner rule entirely.
-
-Flip procedure (GitHub Packages route):
-
-1. Create the variable: repo → Settings → Secrets and variables → Actions →
-   Variables tab → New repository variable: name `ENABLE_NPM_PUBLISH`, value
-   `true`. CLI:
+1. Create the organization `ofac` on npmjs.com (Account settings →
+   Organizations → "Create organization"). The org owns the `@ofac` scope;
+   your personal account joins as owner.
+2. Pre-create each scoped package name so it lands under the org: on
+   npmjs.com, the org page → Packages/Add package → "Scoped Package"
+   (e.g. `@ofac/protocol`), visibility Public. (A first
+   `npm publish --access public` also creates it under the publishing
+   identity, but pre-creating avoids a personal-scope squat.)
+3. Register the trusted publisher per package (tokenless OIDC, no
+   long-lived npm token): package page on npmjs.com → "Publishing from
+   GitHub Actions" → Trusted Publisher → provider GitHub Actions;
+   organization `denisekart`, repository `open-facilitator`, workflow
+   name `release.yml`. Repeat per package (or set it org-wide).
+4. Flip the job on:
    `gh api -X PUT repos/denisekart/open-facilitator/actions/variables/ENABLE_NPM_PUBLISH -f name=ENABLE_NPM_PUBLISH -f value=true`
-2. Set `"private": false` and a real `version` on the packages intended for
-   consumption (first: `@ofac/protocol`).
-3. The publish step publishes with `NODE_AUTH_TOKEN` exported from
-   `secrets.GITHUB_TOKEN` (that is what the committed `.npmrc` interpolates):
-   `env: { NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }} }` on the publish
-   step, job `permissions: { packages: write }` (already present).
+5. Flip the packages intended for consumption to `"private": false`
+   (first: `@ofac/protocol`). The job stamps the tag's version at publish
+   time — no version bump in the tree.
 
-Consumer side, GitHub Packages (applies even to public packages — GitHub
-Packages has no anonymous read):
+The job publishes with `id-token: write` +
+`pnpm publish -r --provenance --access public`: provenance attestations
+ride the Actions OIDC token, and consumers see
+`npm audit signatures` evidence. Consumer side is zero-config — public
+scoped packages resolve on the default registry, no `.npmrc` and no PAT
+(unlike GitHub Packages, which has no anonymous read). That consumer ease
+is what route (c) buys.
 
-```
-# consumer .npmrc
-@ofac:registry=https://npm.pkg.github.com
-//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}
-```
-
-`NODE_AUTH_TOKEN` is any account's PAT (fine-grained: the package
-repository, read access; classic: `read:packages`) whose owner has read access
-to the OWNER's packages — for an org-scoped package that generally means a
-token from an `ofac` org member. This auth burden is why the Dev Container
-Features bake runtime tarballs instead of consuming npm at install time
-(`features/AGENTS.md`).
-
-npmjs.org alternative (recommended for public SDK consumption): create
-organization `ofac` on npmjs.com, keep the `@ofac` scope, and publish with
-provenance — no passwords or long-lived tokens:
-
-- Workflow changes: point `publishConfig.registry` (and consumer `.npmrc`, or
-  drop it — scoped public packages resolve on the default registry) at
-  `https://registry.npmjs.org`; add `permissions: { id-token: write,
-  contents: read, packages: write }` to the job; publish with
-  `npm publish --provenance --access public` (npm 9+ attaches provenance
-  from the Actions OIDC token once `id-token: write` is granted; npm 11 with
-  a registered trusted publisher needs no registry token at all); register
-  the repo as the package's trusted publisher on npmjs (Publishing from
-  GitHub Actions → "Trusted Publisher", provider GitHub Actions, workflow
-  `release.yml`).
-- One-time per package: the org must pre-create the scoped name or the first
-  `--provenance` publish creates it under the org.
-
-Verification (after a publish, whichever route):
+Verification (after a publish):
 
 ```sh
-# GitHub Packages (authed)
-npm view @ofac/protocol version --registry=https://npm.pkg.github.com
-# npmjs.org
-npm view @ofac/protocol version   # plus: npm view @ofac/protocol dist.attestations
+npm view @ofac/protocol version                # resolves on the default registry
+npm view @ofac/protocol dist.attestations      # provenance attached
 ```
 
 ## 4. NuGet
@@ -259,8 +230,8 @@ Exhaustive list of what the full pipeline consumes (verified by grepping
 
 | Name | Kind | Where consumed | Purpose | Needed today? |
 |---|---|---|---|---|
-| `GITHUB_TOKEN` | implicit secret | `release.yml` `containers`, `features`, `publish-npm` | GHCR push (`docker/login-action`), GH Packages npm | Yes — job perms `contents: read`, `packages: write` |
-| `ENABLE_NPM_PUBLISH` | repo variable | `release.yml` `publish-npm` `if:` | activates the npm seam | Set to `true` only when section 3's flips land |
+| `GITHUB_TOKEN` | implicit secret | `release.yml` `containers`, `features` | GHCR push (`docker/login-action`) | Yes — job perms `contents: read`, `packages: write` |
+| `ENABLE_NPM_PUBLISH` | repo variable | `release.yml` `publish-npm` `if:` | activates npm publishing | Set to `true` only after section 3's npmjs.org account work (org, names, trusted publisher) lands |
 | `NUGET_API_KEY` | secret (optional) | future `publish-nuget` job | nuget.org push | Only for the nuget.org route |
 | `REPO_ADMIN_PAT` (name at your choice) | secret (optional) | future digest-pin job | fine-grained PAT, single repo, `contents: write` (+ `metadata: read`), to commit `*_DIGEST` updates back when branch protection or PR-triggered re-verification requires non-`GITHUB_TOKEN` authorship | Only if digest-pin commits directly to a protected branch |
 
@@ -377,12 +348,9 @@ npx --yes @devcontainers/cli@^0.79 exec --workspace-folder /tmp/ofac-scratch \
   sh -c 'command -v ofac-gateway'             # PATH shim from the published layer
 npx --yes @devcontainers/cli@^0.79 down --workspace-folder /tmp/ofac-scratch
 
-# 4. npm seam (only if ENABLE_NPM_PUBLISH=true and a package flipped public)
-#    GitHub Packages route (authed read):
-NODE_AUTH_TOKEN=<pat-read-packages> npm view @ofac/protocol version \
-  --registry=https://npm.pkg.github.com
-#    npmjs.org route:
+# 4. npm (only if ENABLE_NPM_PUBLISH=true and a package flipped public):
 npm view @ofac/protocol version
+npm view @ofac/protocol dist.attestations   # provenance ride the OIDC publish
 
 # 5. SBOM + release assets
 gh release view v0.0.0-smoketest --json assets
@@ -403,11 +371,11 @@ setup:
 
 | # | Gap | Fix owner | Section |
 |---|---|---|---|
-| 1 | Feature `id` fields (`ofac-*`) differ from folder names; publish targets `<namespace>/<id>` while consumers and the major-tag step use the folder name | set each `devcontainer-feature.json` `id` to its folder name | 1.5, 2 |
-| 2 | `features publish` line passes the whole path as one `--registry` token with no `--namespace` | split into `--registry ghcr.io --namespace denisekart/open-facilitator/features` | 2 |
-| 3 | `tag majors` loop omits `forgejo-provider` | add it (or publish it deliberately untagged) | 2 |
-| 4 | npm scope `@ofac` cannot publish to GitHub Packages from owner `denisekart` | org `ofac` route, scope rename, or npmjs.org | 3 |
-| 5 | digest-pin needs `contents: write` (and a PAT only under branch protection) — no job declares it yet | sbom/digest-pin job owner | 5, 6 |
+| 1 | ~~Feature `id` fields (`ofac-*`) differ from folder names~~ **closed**: every manifest's `id` now equals its folder name | — | 1.5, 2 |
+| 2 | ~~`features publish` line passed the path as one `--registry` token~~ **closed**: now `--registry ghcr.io --namespace denisekart/open-facilitator/features` | — | 2 |
+| 3 | ~~`tag majors` loop omitted `forgejo-provider`~~ **closed**: loop covers all six features | — | 2 |
+| 4 | ~~npm scope `@ofac` vs GitHub Packages owner rule~~ **closed**: route (c) npmjs.org, org `ofac`, OIDC trusted publisher | — | 3 |
+| 5 | ~~digest-pin lacked `contents: write`~~ **closed**: both `sbom` and `digest-pin` declare `contents: write` (a PAT is only needed if branch protection requires PRs) | — | 5, 6 |
 
 Cross-references: `.github/workflows/README.md` (job-by-job scope),
 `docs/getting-started.md` (registry coordinates table),

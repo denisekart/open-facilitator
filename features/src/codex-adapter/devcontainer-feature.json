@@ -1,5 +1,5 @@
 {
-  "id": "ofac-codex-adapter",
+  "id": "codex-adapter",
   "version": "1.0.0",
   "name": "Open Facilitator Codex Harness Adapter",
   "documentationURL": "https://github.com/denisekart/open-facilitator/tree/main/features/src/codex-adapter",

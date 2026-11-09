@@ -1,5 +1,5 @@
 {
-  "id": "ofac-harness-adapter",
+  "id": "harness-adapter",
   "version": "1.0.0",
   "name": "Open Facilitator Harness Adapter",
   "documentationURL": "https://github.com/denisekart/open-facilitator/tree/main/features/src/harness-adapter",

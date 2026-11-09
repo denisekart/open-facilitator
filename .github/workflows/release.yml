@@ -70,28 +70,50 @@ jobs:
       - name: publish features
         run: |
           npx --yes @devcontainers/cli@^0.79 features publish \
-            --registry ghcr.io/denisekart/open-facilitator/features features/src
+            --registry ghcr.io --namespace denisekart/open-facilitator/features features/src
       # Major tag (:1) per feature — consumers pin majors, not full versions.
       - name: tag majors
         run: |
-          for name in gateway workspace-link harness-adapter omp-adapter codex-adapter; do
+          for name in gateway workspace-link harness-adapter omp-adapter codex-adapter forgejo-provider; do
             docker buildx imagetools create \
               -t ghcr.io/denisekart/open-facilitator/features/$name:1 \
               ghcr.io/denisekart/open-facilitator/features/$name:1.0.0
           done
 
-  # npm publish seam (inert until a consumable @ofac/protocol ships):
-  # packages flip private:false, then `npm pkg set version` + `npm publish` to
-  # https://npm.pkg.github.com/denisekart via GITHUB_TOKEN.
+  # npm publish (npmjs.org, @ofac scope, OIDC trusted publisher — no token):
+  # every package that ships flips private:false + a real version; the tag
+  # stamps its version. Enable with the ENABLE_NPM_PUBLISH repo variable and
+  # register this workflow as the package's trusted publisher on npmjs.
   publish-npm:
-    # Inert seam: set the ENABLE_NPM_PUBLISH repo variable to activate.
     if: ${{ vars.ENABLE_NPM_PUBLISH == 'true' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write
+      id-token: write # npm publish --provenance (trusted publisher, npm 9+)
     steps:
-      - run: echo "inert seam — see comment in job definition"
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+      - run: pnpm install --frozen-lockfile
+      - name: build + publish publishable packages
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME#v}"
+          # Publishables = packages that flipped "private": false. Stamp the
+          # tag's version, build each, then let pnpm publish in topological
+          # order with workspace: deps rewritten to real ranges.
+          mapfile -t dirs < <(grep -rl '"private": false' src --include=package.json \
+            | grep -v node_modules | xargs -n1 dirname | sort)
+          [ "${#dirs[@]}" -gt 0 ] || { echo "nothing marked publishable"; exit 1; }
+          for dir in "${dirs[@]}"; do
+            npm pkg set version="$tag" -C "$dir"
+            pnpm --dir "$dir" build
+          done
+          pnpm --recursive publish --no-git-checks --access public --provenance
 
   # SBOM for every shipped artifact, attached to the GitHub release:
   # dotnet-CycloneDX over the .NET solution + pnpm's native SBOM generator

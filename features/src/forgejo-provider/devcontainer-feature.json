@@ -1,5 +1,5 @@
 {
-  "id": "ofac-forgejo-provider",
+  "id": "forgejo-provider",
   "version": "1.0.0",
   "name": "Open Facilitator Forgejo Provider",
   "documentationURL": "https://github.com/denisekart/open-facilitator/tree/main/features/src/forgejo-provider",

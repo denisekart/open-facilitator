@@ -1,5 +1,5 @@
 {
-  "id": "ofac-workspace-link",
+  "id": "workspace-link",
   "version": "1.0.0",
   "name": "Open Facilitator Workspace Link (linkd)",
   "documentationURL": "https://github.com/denisekart/open-facilitator/tree/main/features/src/workspace-link",

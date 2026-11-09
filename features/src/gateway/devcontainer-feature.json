@@ -1,5 +1,5 @@
 {
-  "id": "ofac-gateway",
+  "id": "gateway",
   "version": "1.0.0",
   "name": "Open Facilitator Gateway",
   "documentationURL": "https://github.com/denisekart/open-facilitator/tree/main/features/src/gateway",

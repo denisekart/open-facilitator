@@ -1,5 +1,5 @@
 {
-  "id": "ofac-omp-adapter",
+  "id": "omp-adapter",
   "version": "1.0.0",
   "name": "Open Facilitator omp Harness Adapter",
   "documentationURL": "https://github.com/denisekart/open-facilitator/tree/main/features/src/omp-adapter",

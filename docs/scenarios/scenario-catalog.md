@@ -910,32 +910,56 @@ than by interview?
 ## 14. Family M — things that must *not* happen
 
 Negative scenarios are the fastest way to find gaps, because an implementation that never considered
-them will answer these with silence or with a surprise.
+them will answer these with silence or with a surprise. The **Family** column points at the positive
+family the failure belongs to, so a partially audited family can be swept for its negatives without
+reading the whole table.
 
-| ID | Must not happen |
-|---|---|
-| N1 | An unrelated conversation creates work, or every message gets a reply. |
-| N2 | The system answers its own message and starts an unbounded exchange with another automation. |
-| N3 | An action runs that nobody permitted, or is permitted by a rule nobody can point at. |
-| N4 | A person's display name is treated as their identity, or a name collision silently picks someone. |
-| N5 | Consent to one thing is accepted as consent to a different thing that merely looks similar. |
-| N6 | An expired or withdrawn consent executes anyway because a slow process got there later. |
-| N7 | A failure looks like a refusal, a refusal looks like silence, or silence looks like completion. |
-| N8 | An outcome is posted where nobody was told the request existed. |
-| N9 | Private material from one team becomes visible to another team by being quoted into a shared conversation. |
-| N10 | A produced thing is visible as an unexplained broken link rather than as something the viewer may not see. |
-| N11 | Two deliveries of one message produce two work items, with no note that a duplicate was seen. |
-| N12 | A restarted system asks a human the same question twice, or applies one answer twice. |
-| N13 | A credential belonging to a person is used by automation in a way that makes it look like that person acted. |
-| N14 | Work is lost because a channel was renamed, a ticket closed, or a person left. |
-| N15 | The audit trail contains the raw credential, or omits the decision that made an action lawful. |
-| N16 | A person cannot find out, from the system, why the system did the thing it just did. |
-| N17 | An unattended automation accumulates waiting-for-humans items that nobody owns. |
-| N18 | A wide authority is granted as a convenience, and never revisited because nobody can see it. |
-| N19 | An automated participant acts with no identity a team member can look up, so a record says only that "something" did it. |
-| N20 | Automated work runs beside the team's process instead of through it — skipping review, checks, or conventions because it is automated. |
-| N21 | Automated volume is invisible to planning: work that got done appears in no load, throughput, or spend figure, so its failure mode is invisible too. |
-| N22 | A contributor is credited as the accountable party for an action, ending the trail at a machine instead of at a person or role. |
+| ID | Must not happen | Family |
+|---|---|---|
+| N1 | An unrelated conversation creates work, or every message gets a reply. | A |
+| N2 | The system answers its own message and starts an unbounded exchange with another automation. | B |
+| N3 | An action runs that nobody permitted, or is permitted by a rule nobody can point at. | C |
+| N4 | A person's display name is treated as their identity, or a name collision silently picks someone. | B |
+| N5 | Consent to one thing is accepted as consent to a different thing that merely looks similar. | C |
+| N6 | An expired or withdrawn consent executes anyway because a slow process got there later. | C |
+| N7 | A failure looks like a refusal, a refusal looks like silence, or silence looks like completion. | F |
+| N8 | An outcome is posted where nobody was told the request existed. | D |
+| N9 | Private material from one team becomes visible to another team by being quoted into a shared conversation. | G |
+| N10 | A produced thing is visible as an unexplained broken link rather than as something the viewer may not see. | E |
+| N11 | Two deliveries of one message produce two work items, with no note that a duplicate was seen. | A |
+| N12 | A restarted system asks a human the same question twice, or applies one answer twice. | F |
+| N13 | A credential belonging to a person is used by automation in a way that makes it look like that person acted. | K |
+| N14 | Work is lost because a channel was renamed, a ticket closed, or a person left. | F |
+| N15 | The audit trail contains the raw credential, or omits the decision that made an action lawful. | H |
+| N16 | A person cannot find out, from the system, why the system did the thing it just did. | I |
+| N17 | An unattended automation accumulates waiting-for-humans items that nobody owns. | C |
+| N18 | A wide authority is granted as a convenience, and never revisited because nobody can see it. | C |
+| N19 | An automated participant acts with no identity a team member can look up, so a record says only that "something" did it. | K |
+| N20 | Automated work runs beside the team's process instead of through it — skipping review, checks, or conventions because it is automated. | K |
+| N21 | Automated volume is invisible to planning: work that got done appears in no load, throughput, or spend figure, so its failure mode is invisible too. | K |
+| N22 | A contributor is credited as the accountable party for an action, ending the trail at a machine instead of at a person or role. | L |
+| N23 | A held action sits with its question never shown to anyone entitled to answer it. | C |
+| N24 | A consent request carries too little to decide on, so approving means approving whatever happens next. | C |
+| N25 | Consent requests arrive at a rate that teaches reflexive approval; nothing throttles, groups, or protects the approver's attention. | C |
+| N26 | A retry repeats a visible side effect: a second comment, a second outward message, a second deployment. | F |
+| N27 | One upstream fault fans out into items, consents, and alerts at every team at once, ungrouped. | F |
+| N28 | A stalled queue is quiet: work waiting for a capacity that never returns tells no one. | F |
+| N29 | The system's own write (comment, change, label) re-enters as new input and triggers work again. | B |
+| N30 | A queued instruction executes after its moment has passed — after a cancellation, a closure, a hand-off — with nothing checking the context still stands. | F |
+| N31 | Two automated participants make overlapping changes and the clash surfaces only after it is visible. | K |
+| N32 | Every automated participant shares one identity, so records separate human from machine but nothing more. | K |
+| N33 | A contributor's self-report ("checks passed", "nothing broken") is recorded as verified evidence rather than as an unverified claim. | K |
+| N34 | A new permission rule silently changes what an older rule used to mean, with no note to anyone whose earlier action relied on the old reading. | C |
+| N35 | A team rename, merge, or disband rewrites history so past decisions belong to a successor that did not exist when they were made. | G |
+| N36 | A handover exposes more of the giving team's material than the receiving task needed. | G |
+| N37 | An item's readable account and its durable trail disagree about the same facts. | F |
+| N38 | "Completed" rests on the executor's word with nothing checkable attached to it. | E |
+| N39 | Silencing one unwanted behaviour requires switching off a large part of the system. | I |
+| N40 | A team's routine action exists only on the operator's surface, so the team needs central help to do its own work. | I |
+| N41 | A forgetting rule is half-honoured: copies survive in summaries, quotes, or caches beyond the rule's reach. | H |
+| N42 | One person becomes two participants across systems, or two become one, and standing, notifications, and history split accordingly. | B |
+| N43 | Work items wait on each other in a cycle, or a wait chain outgrows anyone's ability to follow it, and neither is flagged. | A |
+| N44 | Held-action content reaches an unentitled reader sideways — a shared preview, a notification body — where the item itself would have refused. | G |
 
 ---
 

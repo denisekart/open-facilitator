@@ -564,6 +564,12 @@
       "type": "org.facilitator.event.provider.mention.v1"
     },
     {
+      "file": "valid/event.provider.mention.with-media.json",
+      "expect": "valid",
+      "class": "event",
+      "type": "org.facilitator.event.provider.mention.v1"
+    },
+    {
       "file": "valid/event.provider.reaction.json",
       "expect": "valid",
       "class": "event",
@@ -684,6 +690,12 @@
       "type": "org.facilitator.command.communication.reply.v1"
     },
     {
+      "file": "valid/command.communication.reply.with-artifact.json",
+      "expect": "valid",
+      "class": "command",
+      "type": "org.facilitator.command.communication.reply.v1"
+    },
+    {
       "file": "valid/command.communication.react.json",
       "expect": "valid",
       "class": "command",
@@ -703,6 +715,12 @@
     },
     {
       "file": "invalid/event.provider.mention.no-delivery-id.json",
+      "expect": "invalid",
+      "class": "event",
+      "errorClass": "schema-violation"
+    },
+    {
+      "file": "invalid/event.provider.mention.bad-label-type.json",
       "expect": "invalid",
       "class": "event",
       "errorClass": "schema-violation"

@@ -90,13 +90,20 @@ public sealed class DecodeSink(
             return false;
         }
 
+        // Chat label routing + inbound media (both optional on an internal
+        // row): the row's own `labels` go through the exact matcher the
+        // synchronous arms use (AppendDecodeRow writes both fields; a row
+        // without them behaves exactly as before — no rule, "[]" refs).
+        var chatRule = ProviderEventStore.MatchChatLabelRule(options, data);
+        var media = ProviderEventStore.PayloadSourceRefs(data);
+
         var now = timeProvider.GetUtcNow().UtcDateTime;
         var policy = await policyStore.LoadAsync(ct);
         if (!policy.Enabled || !aiOptions.HasEndpoints)
         {
             // Policy went inert between enqueue and delivery: honest
             // degradation, today's verbatim behavior + hint.
-            return await FallbackAsync(text, reference, options, actor, teamGuid, deliveryId, ct);
+            return await FallbackAsync(text, reference, options, actor, teamGuid, deliveryId, ct, chatRule, media);
         }
 
         var registry = await MergedRegistryAsync(ct);
@@ -133,7 +140,7 @@ public sealed class DecodeSink(
                     metrics.AiGatewayError("decoder");
                     if (row.Attempts >= FallbackAfterAttempts)
                     {
-                        return await FallbackAsync(text, reference, options, actor, teamGuid, deliveryId, ct);
+                        return await FallbackAsync(text, reference, options, actor, teamGuid, deliveryId, ct, chatRule, media);
                     }
 
                     // Transient: requeue with dispatcher backoff — never a
@@ -146,7 +153,7 @@ public sealed class DecodeSink(
             if (decoded is null)
             {
                 metrics.AiDecode("junk");
-                return await FallbackAsync(text, reference, options, actor, teamGuid, deliveryId, ct);
+                return await FallbackAsync(text, reference, options, actor, teamGuid, deliveryId, ct, chatRule, media);
             }
 
             var (intent, verb, args, reply, confidence) = decoded.Value;
@@ -159,7 +166,7 @@ public sealed class DecodeSink(
             {
                 return await ApplyDecodedAsync(
                     completion, decodedDocument, verb!, args, reply, text, reference, options, actor,
-                    teamGuid, deliveryId, ack, policy, registry, conversationKey, now, ct);
+                    teamGuid, deliveryId, ack, policy, registry, conversationKey, now, ct, chatRule, media);
             }
 
             if (intent == "chat")
@@ -170,7 +177,7 @@ public sealed class DecodeSink(
             }
 
             metrics.AiDecode("unknown");
-            return await FallbackAsync(text, reference, options, actor, teamGuid, deliveryId, ct);
+            return await FallbackAsync(text, reference, options, actor, teamGuid, deliveryId, ct, chatRule, media);
         }
     }
 
@@ -180,7 +187,8 @@ public sealed class DecodeSink(
         AiCompletion completion, JsonElement? decodedDocument, string verb, IReadOnlyDictionary<string, string> args, string? clarification,
         string text, ProviderEventStore.Reference reference, ProviderOptions options, string actor,
         Guid teamGuid, string deliveryId, string ack, AiPolicy policy, CommandRegistry registry,
-        string conversationKey, DateTime now, CancellationToken ct)
+        string conversationKey, DateTime now, CancellationToken ct,
+        AssignRule? rule = null, JsonArray? sourceRefs = null)
     {
         // Crash-replay guard: the reply row of a prior (committed, died-after)
         // pass means the effect already stands.
@@ -194,7 +202,7 @@ public sealed class DecodeSink(
         var cmd = new ParsedCommand(verb, args, clarification ?? text, false);
         var effect = await applier.ApplyAsync(
             db, now, cmd, registry, reference, options, actor, teamGuid, deliveryId, ack, policy, ct,
-            ledgerBasis: "model");
+            ledgerBasis: "model", rule: rule, sourceRefs: sourceRefs);
         StampLedger(db, conversationKey, actor, completion, now, decodedDocument, text);
         await db.SaveChangesAsync(ct);
         await PostgresNotifications.NotifyOutboxAsync(db, effect.WorkId?.ToString(), ct);
@@ -249,7 +257,8 @@ public sealed class DecodeSink(
 
     private async Task<bool> FallbackAsync(
         string text, ProviderEventStore.Reference reference, ProviderOptions options, string actor,
-        Guid teamGuid, string deliveryId, CancellationToken ct)
+        Guid teamGuid, string deliveryId, CancellationToken ct,
+        AssignRule? rule = null, JsonArray? sourceRefs = null)
     {
         await using var db = await contextFactory.CreateDbContextAsync(ct);
         // Replay guard: the ack row of a prior pass means the fallback Work stands.
@@ -262,7 +271,7 @@ public sealed class DecodeSink(
         var now = timeProvider.GetUtcNow().UtcDateTime;
         var effect = await applier.VerbatimWorkAsync(
             db, now, text, reference, options, actor, teamGuid, deliveryId,
-            await ReplyVsReactionAsync(db, ct), ct);
+            await ReplyVsReactionAsync(db, ct), ct, rule, sourceRefs);
         await db.SaveChangesAsync(ct);
         await PostgresNotifications.NotifyOutboxAsync(db, effect.WorkId?.ToString(), ct);
         await tx.CommitAsync(ct);

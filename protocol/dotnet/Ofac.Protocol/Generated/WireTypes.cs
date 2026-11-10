@@ -476,6 +476,14 @@ namespace Ofac.Protocol
 
     public partial class CommunicationReplyCommandV1Data
     {
+        /// <summary>
+        /// Outbound media the adapter should post alongside the reply text (the kernel emits these
+        /// for harness-produced artifacts; the adapter consumes them).
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("artifacts")]
+        public ArtifactRef[]? artifacts { get; set; }
+
         [JsonPropertyName("commandId")]
         [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
         public string commandId { get; set; }
@@ -490,6 +498,51 @@ namespace Ofac.Protocol
         [JsonPropertyName("text")]
         [JsonConverter(typeof(HilariousMinMaxLengthCheckConverter))]
         public string text { get; set; }
+    }
+
+    public partial class ArtifactRef
+    {
+        [JsonPropertyName("artifactId")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string artifactId { get; set; }
+
+        /// <summary>
+        /// Optional handling/classification label (e.g. internal). artifactRef carries it
+        /// additively; opaque to the kernel.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("classification")]
+        [JsonConverter(typeof(IndecentMinMaxLengthCheckConverter))]
+        public string? classification { get; set; }
+
+        [JsonPropertyName("createdAt")]
+        public string createdAt { get; set; }
+
+        [JsonPropertyName("createdBy")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string createdBy { get; set; }
+
+        [JsonPropertyName("digest")]
+        public string digest { get; set; }
+
+        /// <summary>
+        /// Optional producer-owned taxonomy label (e.g. analysis.report). artifactRef carries it
+        /// additively; the kernel treats unknown values as opaque (open extensibility).
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("kind")]
+        [JsonConverter(typeof(IndecentMinMaxLengthCheckConverter))]
+        public string? kind { get; set; }
+
+        [JsonPropertyName("mediaType")]
+        [JsonConverter(typeof(StickyMinMaxLengthCheckConverter))]
+        public string mediaType { get; set; }
+
+        [JsonPropertyName("size")]
+        public long size { get; set; }
+
+        [JsonPropertyName("storageUrl")]
+        public Uri storageUrl { get; set; }
     }
 
     public partial class CommunicationUpdateCommandV1Data
@@ -1311,51 +1364,6 @@ namespace Ofac.Protocol
         public string? workId { get; set; }
     }
 
-    public partial class ArtifactRef
-    {
-        [JsonPropertyName("artifactId")]
-        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
-        public string artifactId { get; set; }
-
-        /// <summary>
-        /// Optional handling/classification label (e.g. internal). artifactRef carries it
-        /// additively; opaque to the kernel.
-        /// </summary>
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        [JsonPropertyName("classification")]
-        [JsonConverter(typeof(IndecentMinMaxLengthCheckConverter))]
-        public string? classification { get; set; }
-
-        [JsonPropertyName("createdAt")]
-        public string createdAt { get; set; }
-
-        [JsonPropertyName("createdBy")]
-        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
-        public string createdBy { get; set; }
-
-        [JsonPropertyName("digest")]
-        public string digest { get; set; }
-
-        /// <summary>
-        /// Optional producer-owned taxonomy label (e.g. analysis.report). artifactRef carries it
-        /// additively; the kernel treats unknown values as opaque (open extensibility).
-        /// </summary>
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        [JsonPropertyName("kind")]
-        [JsonConverter(typeof(IndecentMinMaxLengthCheckConverter))]
-        public string? kind { get; set; }
-
-        [JsonPropertyName("mediaType")]
-        [JsonConverter(typeof(StickyMinMaxLengthCheckConverter))]
-        public string mediaType { get; set; }
-
-        [JsonPropertyName("size")]
-        public long size { get; set; }
-
-        [JsonPropertyName("storageUrl")]
-        public Uri storageUrl { get; set; }
-    }
-
     public partial class AssignmentFailedEventV1Data
     {
         [JsonPropertyName("assignmentId")]
@@ -1664,6 +1672,16 @@ namespace Ofac.Protocol
         public string actorProviderAccountId { get; set; }
 
         /// <summary>
+        /// Adapter-normalized label names on the conversation (providers shape labels differently;
+        /// normalization is the adapter's job). The kernel reads the flag, it never interprets
+        /// labels.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("labels")]
+        [JsonConverter(typeof(HilariousDecodeArrayConverter))]
+        public string[]? labels { get; set; }
+
+        /// <summary>
         /// Verbatim provider event payload as received by the adapter.
         /// </summary>
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -1683,6 +1701,14 @@ namespace Ofac.Protocol
 
         [JsonPropertyName("reference")]
         public ConversationReference reference { get; set; }
+
+        /// <summary>
+        /// Inbound media attached to this message, already stored as kernel artifacts; carried
+        /// verbatim into provider_events.body.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("sourceRefs")]
+        public ArtifactRef[]? sourceRefs { get; set; }
 
         [JsonPropertyName("text")]
         [JsonConverter(typeof(HilariousMinMaxLengthCheckConverter))]
@@ -1696,6 +1722,16 @@ namespace Ofac.Protocol
         public string actorProviderAccountId { get; set; }
 
         /// <summary>
+        /// Adapter-normalized label names on the conversation (providers shape labels differently;
+        /// normalization is the adapter's job). The kernel reads the flag, it never interprets
+        /// labels.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("labels")]
+        [JsonConverter(typeof(HilariousDecodeArrayConverter))]
+        public string[]? labels { get; set; }
+
+        /// <summary>
         /// Verbatim provider event payload as received by the adapter.
         /// </summary>
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -1715,6 +1751,14 @@ namespace Ofac.Protocol
 
         [JsonPropertyName("reference")]
         public ConversationReference reference { get; set; }
+
+        /// <summary>
+        /// Inbound media attached to this message, already stored as kernel artifacts; carried
+        /// verbatim into provider_events.body.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("sourceRefs")]
+        public ArtifactRef[]? sourceRefs { get; set; }
 
         [JsonPropertyName("text")]
         [JsonConverter(typeof(HilariousMinMaxLengthCheckConverter))]
@@ -3528,6 +3572,39 @@ namespace Ofac.Protocol
         }
 
         public static readonly ProviderIssueEventV1DataActionConverter Singleton = new ProviderIssueEventV1DataActionConverter();
+    }
+
+    internal class HilariousDecodeArrayConverter : JsonConverter<string[]>
+    {
+        public override bool CanConvert(Type t) => t == typeof(string[]);
+
+        public override string[] Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            reader.Read();
+            var value = new List<string>();
+            while (reader.TokenType != JsonTokenType.EndArray)
+            {
+                var converter = PurpleMinMaxLengthCheckConverter.Singleton;
+                var arrayItem = (string)converter.Read(ref reader, typeof(string), options);
+                value.Add(arrayItem);
+                reader.Read();
+            }
+            return value.ToArray();
+        }
+
+        public override void Write(Utf8JsonWriter writer, string[] value, JsonSerializerOptions options)
+        {
+            writer.WriteStartArray();
+            foreach (var arrayItem in value)
+            {
+                var converter = PurpleMinMaxLengthCheckConverter.Singleton;
+                converter.Write(writer, arrayItem, options);
+            }
+            writer.WriteEndArray();
+            return;
+        }
+
+        public static readonly HilariousDecodeArrayConverter Singleton = new HilariousDecodeArrayConverter();
     }
 
     internal class ProviderPipelineEventV1DataActionConverter : JsonConverter<ProviderPipelineEventV1DataAction>

@@ -21,7 +21,7 @@
 // in the FileSessionStore keyed `<executionId>:<executionGeneration>` and
 // mirrored under `assign:<assignmentId>`; a retry generation relaunches
 // with `--resume <sessionId>` and a follow-up prompt instead of a fresh one.
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { LinkLogger } from "@ofac/workspace-link";
@@ -145,10 +145,38 @@ export function createOmpHooks(options: OmpRunOptions): OmpHooks {
     const inputs = data["inputs"] as Record<string, unknown> | undefined;
     const objective = typeof inputs?.["objective"] === "string" ? inputs["objective"] : workId;
     const capabilityId = String(data["capabilityId"] ?? "coding.omp");
-    const prompt =
+    let prompt =
       options.promptTemplate !== undefined
         ? options.promptTemplate.replaceAll("{objective}", objective)
         : objective;
+    // Inbound media law: assign `inputs.sourceRefs` are kernel artifacts (a
+    // chat image the communication adapter uploaded). v1 keeps the accepted
+    // behavior of handing the agent a fetchable human-plane URL per
+    // attachment and staging the bytes into the omp workspace — the omp CLI
+    // has no image-path argument today, so the file + the prompt line is the
+    // contract (see README).
+    const attachmentInputs = Array.isArray(inputs?.["sourceRefs"]) ? inputs["sourceRefs"] : [];
+    if (attachmentInputs.length > 0) {
+      const mediaClient = createArtifactClient({
+        baseUrl: ctx.kernel.baseUrl,
+        token: ctx.kernel.token,
+      });
+      const attachmentDir = join(workDir, ctx.executionId, "attachments");
+      mkdirSync(attachmentDir, { recursive: true, mode: 0o700 });
+      for (const [index, ref] of attachmentInputs.entries()) {
+        const item = (ref ?? {}) as Record<string, unknown>;
+        const mediaType = String(item["mediaType"] ?? "application/octet-stream");
+        const size = Number(item["size"] ?? 0);
+        const artifactId = String(item["artifactId"] ?? "");
+        try {
+          const blob = await mediaClient.download(artifactId);
+          writeFileSync(join(attachmentDir, String(index)), blob, { mode: 0o600 });
+          prompt += `\nImage attachment: ${ctx.kernel.baseUrl}/api/artifacts/${artifactId}/content (mediaType ${mediaType}, ${String(size)} bytes, staged at attachments/${String(index)})`;
+        } catch (error) {
+          logger.warn("attachment-unreadable", { artifactId, error: String(error) });
+        }
+      }
+    }
     ctx.publishProgress(`accepted: omp ${capabilityId} for ${workId}`);
     if (ctx.signal.aborted) return { kind: "completed" };
 

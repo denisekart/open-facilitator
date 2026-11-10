@@ -58,6 +58,18 @@ injection; the tool is simply absent).
 `askQuestion: "<question>"` asks a fixed question through the same path on
 every run (deterministic proof of the loop; no LLM needed).
 
+## Inbound attachments (assign `inputs.sourceRefs`)
+
+When the assign carries `inputs.sourceRefs` (inbound media the kernel stored
+as artifacts — e.g. an image pasted into a chat the communication adapter
+uploaded), the harness downloads each ref through the link-plane content GET,
+stages the bytes at `<execDir>/attachments/<n>` inside the omp workspace, and
+appends one prompt line per attachment naming the human-plane content URL,
+mediaType and size. The omp CLI has no image-path argument today, so the
+staged file + the prompt line is the accepted v1 behavior: a model that wants
+the pixels fetches the URL or reads the staged file. Unreadable refs (foreign
+team, missing blob) are logged and skipped — media never fails a run.
+
 ## Resume law
 
 Each run records the native session id (`get_state` → `data.sessionId`) in

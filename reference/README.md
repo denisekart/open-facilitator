@@ -68,6 +68,30 @@ provider-less. Live proof: `make provider-e2e` (six steps: boot, link
 challenge, mention→Work, completion reply, echo suppression,
 reaction-never-consent).
 
+### Telegram leg (opt-in `telegram` profile)
+
+Telegram has no init one-shot — the bot identity is minted outside Docker, so
+two manual steps precede `docker compose --profile telegram ... up`:
+
+1. Create the bot with **@BotFather** (`/newbot`), write the token to the
+   `tg_provision` volume as `/provision/telegram-bot-token`, and set
+   `Providers__Telegram__BotUserId` in
+   `reference/config/facilitator-providers.env` to the bot's numeric id
+   (the committed `000000000` is a placeholder — an explicit id is required
+   because the kernel's identity probe cannot read `getMe`'s nested shape
+   without vendor vocabulary).
+2. Add the bot to each group it should serve and disable its privacy mode
+   (or make it an admin) so it sees ordinary posts; list the admitted chats
+   in `TELEGRAM_CHATS` (`.env`) as `chatId[:label[,label]]`, e.g.
+   `-1001234567890:ofac:coding` — an admitted chat labeled `ofac:coding`
+   routes mentions to the coding lane, any other admitted chat to the
+   global research lane.
+
+Then `tg-adapter` runs the `@ofac/telegram-adapter` (poll mode,
+`GET /healthz` on :8078 loopback). Mention a chat that is *not* in
+`TELEGRAM_CHATS` and the bot answers once with the chat id and the line to
+add — the onboarding path, no kernel involvement.
+
 ## Security profile
 
 `start-dev` Keycloak, non-TLS loopback ports and plaintext local secrets are

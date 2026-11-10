@@ -1,0 +1,66 @@
+{
+  "specversion": "1.0",
+  "id": "01JPROVIDER-telegram-mention-media",
+  "source": "urn:ofac:provider:telegram:api.telegram.org",
+  "type": "org.facilitator.event.provider.mention.v1",
+  "subject": "provider/telegram/4242",
+  "time": "2026-10-29T09:00:00Z",
+  "datacontenttype": "application/json",
+  "dataschema": "https://schemas.openfacilitator.org/v1/event.provider.mention.v1.json",
+  "data": {
+    "reference": {
+      "provider": "telegram",
+      "providerInstanceId": "local-telegram",
+      "tenantOrOrganizationId": "api.telegram.org",
+      "channelOrResourceId": "-1001234567890",
+      "rootThreadId": "4242",
+      "parentMessageId": "4242",
+      "messageId": "4242",
+      "conversationKind": "thread",
+      "authorProviderAccountId": "555000111"
+    },
+    "provider": "telegram",
+    "providerDeliveryId": "9001",
+    "actorProviderAccountId": "555000111",
+    "text": "@facilitator look at this screenshot",
+    "labels": ["ofac:coding"],
+    "sourceRefs": [
+      {
+        "artifactId": "01JB0X9Z3KQ8W7M5N2P4R6S8TA",
+        "mediaType": "image/png",
+        "size": 20480,
+        "digest": "sha256:9f2c1d4e5b6a708394a5b6c7d8e9f0123456789abcdef0123456789abcdef012",
+        "storageUrl": "artifact://provider/FILEUNIQUE01/01JB0X9Z3KQ8W7M5N2P4R6S8TA",
+        "createdBy": "link.tg-adapter",
+        "createdAt": "2026-10-29T09:00:00Z",
+        "kind": "chat.attachment"
+      }
+    ],
+    "payload": {
+      "update_id": 9001,
+      "message": {
+        "message_id": 4242,
+        "date": 1793264400,
+        "chat": {
+          "id": -1001234567890,
+          "type": "supergroup"
+        },
+        "from": {
+          "id": 555000111,
+          "is_bot": false,
+          "first_name": "Ada"
+        },
+        "text": "@facilitator look at this screenshot",
+        "photo": [
+          {
+            "file_id": "AgACAgQAAx",
+            "file_unique_id": "FILEUNIQUE01",
+            "file_size": 20480,
+            "width": 1600,
+            "height": 900
+          }
+        ]
+      }
+    }
+  }
+}

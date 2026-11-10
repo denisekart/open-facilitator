@@ -110,6 +110,39 @@ services:
     # not kill the service permanently (healthy gate + bounded restart).
     restart: on-failure:5
 
+  # Telegram leg: opt-in behind the `telegram` compose profile (a real
+  # @BotFather token is a manual prerequisite — see reference/README.md;
+  # TELEGRAM_CHATS lists the admitted group ids with their routing labels).
+  # One poll-mode instance per bot token: two replicas would fight over
+  # getUpdates. No port except /healthz in poll mode.
+  tg-adapter:
+    profiles: ["telegram"]
+    image: ${OCI_REGISTRY:?set in versions.env}/node-runtime:${FRAMEWORK_TAG:?set in versions.env}
+    command: ["node", "/app/telegram-adapter/dist/bin/adapter.js", "run"]
+    environment:
+      OFAC_KERNEL_URL: http://facilitator:8080
+      OFAC_ENROLL_SECRET: ${DEMO_ENROLLMENT_TOKEN:?set in .env}
+      OFAC_ENDPOINT_ID: tg-adapter
+      OFAC_TEAM: team-alpha
+      TELEGRAM_BOT_TOKEN_FILE: /provision/telegram-bot-token
+      # No `:?`: compose interpolates profile-inactive services too, and a
+      # plain full up must not fail because an opt-in leg lacks its vars —
+      # the adapter itself fails closed (exit 2) when a telegram profile up
+      # comes without TELEGRAM_CHATS.
+      TELEGRAM_CHATS: ${TELEGRAM_CHATS:-}
+      TELEGRAM_MODE: poll
+      OFAC_STATE_PATH: /var/lib/ofac/tg-adapter.sqlite3
+      PORT: "8078"
+    volumes:
+      - tg_provision:/provision:ro
+      - tg_adapter_state:/var/lib/ofac
+    ports:
+      - "127.0.0.1:8078:8078"
+    depends_on:
+      facilitator:
+        condition: service_healthy
+    restart: on-failure:5
+
   # Kernel provider wiring (Plan 22, decision 2): env-scoped to the full
   # profile so the slim stack boots provider-less from the shared
   # facilitator.json. The bot id is resolved lazily via the configured probe
@@ -307,6 +340,10 @@ volumes:
   # the adapter's sqlite delivery ledger.
   forgejo_provision: {}
   forgejo_adapter_state: {}
+  # Telegram: the bot-token handoff (written by the operator after
+  # @BotFather) and the adapter's sqlite ledgers (chat state + media dedupe).
+  tg_provision: {}
+  tg_adapter_state: {}
   ollama_models: {}
   # Coding fleet's state: gateway ledger, worker workdirs, the second
   # connector's sqlite ledger.

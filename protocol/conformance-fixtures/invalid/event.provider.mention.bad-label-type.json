@@ -1,0 +1,25 @@
+{
+  "specversion": "1.0",
+  "id": "01JPROVIDER-telegram-mention-badlabel",
+  "source": "urn:ofac:provider:telegram:api.telegram.org",
+  "type": "org.facilitator.event.provider.mention.v1",
+  "subject": "provider/telegram/4242",
+  "time": "2026-10-29T09:00:00Z",
+  "datacontenttype": "application/json",
+  "dataschema": "https://schemas.openfacilitator.org/v1/event.provider.mention.v1.json",
+  "data": {
+    "reference": {
+      "provider": "telegram",
+      "providerInstanceId": "local-telegram",
+      "tenantOrOrganizationId": "api.telegram.org",
+      "channelOrResourceId": "-1001234567890",
+      "conversationKind": "thread",
+      "authorProviderAccountId": "555000111"
+    },
+    "provider": "telegram",
+    "providerDeliveryId": "9002",
+    "actorProviderAccountId": "555000111",
+    "text": "@facilitator labels must be an array",
+    "labels": "coding"
+  }
+}

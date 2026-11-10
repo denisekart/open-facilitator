@@ -627,7 +627,10 @@ export async function startStubKernel(opts?: {
   rejectDigest?: boolean;
   presign?: boolean;
 }): Promise<StubKernel> {
-  const artifacts = new Map<string, { bytes: Buffer; mediaType: string; digest: string }>();
+  const artifacts = new Map<
+    string,
+    { bytes: Buffer; mediaType: string; digest: string; stored?: true }
+  >();
   // commandId → allocated artifactId (the pending slot).
   const pending = new Map<string, string>();
   // presigned direct uploads: artifactId → bytes awaiting confirm_upload.
@@ -699,7 +702,12 @@ export async function startStubKernel(opts?: {
             });
             return;
           }
-          artifacts.set(id, { bytes: direct, mediaType: row.mediaType, digest });
+          artifacts.set(id, {
+            bytes: direct,
+            mediaType: row.mediaType,
+            digest,
+            stored: true,
+          });
           send(202, {
             deliveryId: randomUUID(),
             status: "confirmed",
@@ -785,8 +793,30 @@ export async function startStubKernel(opts?: {
           send(422, { status: 422, detail: "stub configured to reject" });
           return;
         }
-        artifacts.set(id, { bytes: body, mediaType: row.mediaType, digest });
+        artifacts.set(id, {
+          bytes: body,
+          // The upload's declared content-type (a Blob body carries it);
+          // the link-plane GET later serves exactly this, like the kernel.
+          mediaType:
+            String(request.headers["content-type"] ?? row.mediaType).split(";")[0] ?? row.mediaType,
+          digest,
+          stored: true,
+        });
         send(200, { artifactId: id, digest, size: body.byteLength, state: "stored" });
+        return;
+      }
+      const get = /^\/api\/link\/v1\/artifacts\/([0-9a-f]+)\/content$/.exec(url);
+      if (request.method === "GET" && get !== null) {
+        // The link-plane content read (the mirror of the kernel's workload
+        // GET): only rows whose bytes actually landed stream, everything
+        // else — never-seen ids and pending allocations alike — 404s.
+        const row = artifacts.get(get[1]!);
+        if (row === undefined || row.stored !== true) {
+          send(404, { status: 404, detail: "no such artifact" });
+          return;
+        }
+        response.writeHead(200, { "content-type": row.mediaType });
+        response.end(row.bytes);
         return;
       }
       send(404, { status: 404, detail: `stub: ${request.method} ${url}` });

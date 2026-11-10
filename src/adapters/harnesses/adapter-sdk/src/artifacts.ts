@@ -59,6 +59,14 @@ export interface ArtifactClient {
    * re-delivery, so an interrupted upload resumes by calling again).
    */
   upload(bytes: Uint8Array, opts: UploadOptions): Promise<{ artifactId: string; digest: string }>;
+  /**
+   * Read one artifact's bytes back through the link-plane content GET
+   * (`GET /api/link/v1/artifacts/{id}/content`, bearer link token, redirects
+   * followed). The guard is team scoping in the ledger: a foreign-team or
+   * missing row answers 404 ⇒ this throws. This is what lets a harness
+   * dereference the `sourceRefs` an assign carries.
+   */
+  download(artifactId: string): Promise<Uint8Array>;
 }
 
 export function createArtifactClient(opts: KernelHttpOptions): ArtifactClient {
@@ -161,6 +169,17 @@ export function createArtifactClient(opts: KernelHttpOptions): ArtifactClient {
         artifactId,
         digest: typeof stored["digest"] === "string" ? stored["digest"] : digest,
       };
+    },
+    async download(artifactId) {
+      // Follows the 302 a presigned-capable store hands out (fetch follows
+      // redirects by default; the presigned URL carries its own authority).
+      const response = await doFetch(`${base}/api/link/v1/artifacts/${artifactId}/content`, {
+        headers: await authHeaders(),
+      });
+      if (!response.ok) {
+        throw new Error(`artifact GET failed: ${response.status} ${await safeBody(response)}`);
+      }
+      return new Uint8Array(await response.arrayBuffer());
     },
   };
 }

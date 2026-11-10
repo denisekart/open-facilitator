@@ -19,6 +19,14 @@
     },
     "idempotencyKey": {
       "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "artifacts": {
+      "type": "array",
+      "maxItems": 8,
+      "items": {
+        "$ref": "common.v1.json#/$defs/artifactRef"
+      },
+      "description": "Outbound media the adapter should post alongside the reply text (the kernel emits these for harness-produced artifacts; the adapter consumes them)."
     }
   }
 }

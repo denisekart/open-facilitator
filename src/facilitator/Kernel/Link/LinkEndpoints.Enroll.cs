@@ -225,6 +225,44 @@ public static partial class LinkEndpoints
                     await ledger.StoreAsync(id, request.Body, workload.TeamSlug, workload, ct), id);
             });
 
+    // Workload-plane content READ: the guard is the exact pair the content PUT
+    // uses (link token + row team ownership in the ledger), so a link child
+    // dereferences its own uploads and the refs it was assigned — foreign or
+    // missing rows answer 404 (non-disclosure). Body shape mirrors the
+    // human-plane read: presigned 302 for object-store backends (portable
+    // retrieval), streamed bytes otherwise, 404 when the row says stored but
+    // the blob is gone. Team law: a cross-team row (e.g. a chat image stored
+    // by the communication adapter's team, routed to a Work on another team)
+    // answers 404 to that team's workload — honest, not a leak.
+    private static void MapArtifactRead(RouteGroupBuilder group) =>
+        group.MapGet("/artifacts/{id:guid}/content",
+            async (Guid id, IArtifactLedger ledger, IArtifactStore store, HttpContext http, CancellationToken ct) =>
+            {
+                var workload = LinkAuthMiddleware.RequirePrincipal(http);
+                var scoped = await ledger.GetForWorkloadAsync(workload, id, ct);
+                if (scoped is not { State: "stored" } || !store.Owns(scoped.StorageUri))
+                {
+                    return Results.Problem(ProblemErrors.ArtifactNotFound(id.ToString()));
+                }
+
+                if (store is IStoreSignedUrlSource source
+                    && await source.PresignDownloadAsync(
+                        ArtifactKeys.StoreKeyOf(scoped.StorageUri), scoped.MediaType, ArtifactTicket.AllocationTtl, ct) is { } url)
+                {
+                    return Results.Redirect(url.ToString(), permanent: false);
+                }
+
+                var stream = await store.GetAsync(ArtifactKeys.StoreKeyOf(scoped.StorageUri), ct);
+                if (stream is null)
+                {
+                    // Row says stored but the blob is gone: absent, like any other 404.
+                    return Results.Problem(ProblemErrors.ArtifactNotFound(id.ToString()));
+                }
+
+                return Results.Stream(stream, scoped.MediaType,
+                    entityTag: new Microsoft.Net.Http.Headers.EntityTagHeaderValue($"\"{scoped.Digest}\""));
+            });
+
     // Direct-upload confirmation on the workload plane: same guard shape as
     // the content PUT (link token + row team ownership in the ledger).
     private static void MapArtifactConfirm(RouteGroupBuilder group) =>

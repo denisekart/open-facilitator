@@ -186,10 +186,35 @@ export interface CommunicationReactCommandV1Data {
 }
 
 export interface CommunicationReplyCommandV1Data {
+  /**
+   * Outbound media the adapter should post alongside the reply text (the kernel emits these
+   * for harness-produced artifacts; the adapter consumes them).
+   */
+  artifacts?: ArtifactRef[];
   commandId: string;
   idempotencyKey: string;
   target: ConversationTarget;
   text: string;
+}
+
+export interface ArtifactRef {
+  artifactId: string;
+  /**
+   * Optional handling/classification label (e.g. internal). artifactRef carries it
+   * additively; opaque to the kernel.
+   */
+  classification?: string;
+  createdAt: string;
+  createdBy: string;
+  digest: string;
+  /**
+   * Optional producer-owned taxonomy label (e.g. analysis.report). artifactRef carries it
+   * additively; the kernel treats unknown values as opaque (open extensibility).
+   */
+  kind?: string;
+  mediaType: string;
+  size: number;
+  storageUrl: string;
 }
 
 export interface CommunicationUpdateCommandV1Data {
@@ -515,26 +540,6 @@ export interface ResultManifestObject {
   [property: string]: unknown;
 }
 
-export interface ArtifactRef {
-  artifactId: string;
-  /**
-   * Optional handling/classification label (e.g. internal). artifactRef carries it
-   * additively; opaque to the kernel.
-   */
-  classification?: string;
-  createdAt: string;
-  createdBy: string;
-  digest: string;
-  /**
-   * Optional producer-owned taxonomy label (e.g. analysis.report). artifactRef carries it
-   * additively; the kernel treats unknown values as opaque (open extensibility).
-   */
-  kind?: string;
-  mediaType: string;
-  size: number;
-  storageUrl: string;
-}
-
 export interface AssignmentFailedEventV1Data {
   assignmentId: string;
   executionGeneration: number;
@@ -675,6 +680,12 @@ export type ProviderIssueEventV1DataAction = "opened" | "labeled" | "commented" 
 export interface ProviderMentionEventV1Data {
   actorProviderAccountId: string;
   /**
+   * Adapter-normalized label names on the conversation (providers shape labels differently;
+   * normalization is the adapter's job). The kernel reads the flag, it never interprets
+   * labels.
+   */
+  labels?: string[];
+  /**
    * Verbatim provider event payload as received by the adapter.
    */
   payload?: { [key: string]: unknown };
@@ -684,12 +695,23 @@ export interface ProviderMentionEventV1Data {
   provider: string;
   providerDeliveryId: string;
   reference: ConversationReference;
+  /**
+   * Inbound media attached to this message, already stored as kernel artifacts; carried
+   * verbatim into provider_events.body.
+   */
+  sourceRefs?: ArtifactRef[];
   text: string;
 }
 
 export interface ProviderMessageEventV1Data {
   actorProviderAccountId: string;
   /**
+   * Adapter-normalized label names on the conversation (providers shape labels differently;
+   * normalization is the adapter's job). The kernel reads the flag, it never interprets
+   * labels.
+   */
+  labels?: string[];
+  /**
    * Verbatim provider event payload as received by the adapter.
    */
   payload?: { [key: string]: unknown };
@@ -699,6 +721,11 @@ export interface ProviderMessageEventV1Data {
   provider: string;
   providerDeliveryId: string;
   reference: ConversationReference;
+  /**
+   * Inbound media attached to this message, already stored as kernel artifacts; carried
+   * verbatim into provider_events.body.
+   */
+  sourceRefs?: ArtifactRef[];
   text: string;
 }
 

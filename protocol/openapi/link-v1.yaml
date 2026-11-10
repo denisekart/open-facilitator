@@ -146,6 +146,38 @@ paths:
           description: Missing or invalid bearer principal
         "404":
           description: Unknown deliveryId
+  /api/link/v1/artifacts/{artifactId}/content:
+    get:
+      operationId: getArtifactContent
+      summary: Read one artifact's content from the workload plane
+      description: |
+        Guard: the link bearer token plus row team ownership in the artifact
+        ledger — a foreign-team or missing row answers 404 (non-disclosure).
+        Object-store backends answer 302 to a presigned GET (portable
+        retrieval); other backends stream the bytes with the declared
+        media type and the digest as the entity tag. A row in `pending` state,
+        or one whose blob is gone, answers 404.
+      parameters:
+        - name: artifactId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Artifact bytes (content-type as declared at upload)
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "302":
+          description: Redirect to the object store's presigned GET URL
+        "401":
+          description: Missing or invalid bearer principal
+        "404":
+          description: Unknown, foreign-team, non-stored, or blobless artifact
   /api/link/v1/capabilities:
     get:
       operationId: getCapabilities

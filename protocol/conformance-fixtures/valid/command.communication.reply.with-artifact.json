@@ -1,0 +1,36 @@
+{
+  "specversion": "1.0",
+  "id": "01JCOMM-reply-artifact",
+  "source": "urn:facilitator:instance:demo",
+  "type": "org.facilitator.command.communication.reply.v1",
+  "subject": "work/work-123",
+  "time": "2026-10-29T09:05:00Z",
+  "datacontenttype": "application/json",
+  "dataschema": "https://schemas.openfacilitator.org/v1/command.communication.reply.v1.json",
+  "data": {
+    "commandId": "transition-2:reply",
+    "target": {
+      "provider": "telegram",
+      "tenantOrOrganizationId": "api.telegram.org",
+      "channelOrResourceId": "-1001234567890",
+      "rootThreadId": "4242",
+      "subjectRef": "work/work-123",
+      "conversationKind": "thread",
+      "actorProviderAccountId": "555000111"
+    },
+    "text": "Work work-123 completed. Screenshot below.",
+    "idempotencyKey": "transition-2:reply",
+    "artifacts": [
+      {
+        "artifactId": "01JB0YA1B2C3D4E5F6G7H8J9K0",
+        "mediaType": "image/png",
+        "size": 40960,
+        "digest": "sha256:0b1c2d3e4f5061728394a5b6c7d8e9f01234567890abcdef0123456789abcdef",
+        "storageUrl": "artifact://reports/r-42",
+        "createdBy": "link.gw-coding",
+        "createdAt": "2026-10-29T09:05:00Z",
+        "kind": "chat.attachment"
+      }
+    ]
+  }
+}

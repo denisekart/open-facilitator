@@ -76,6 +76,36 @@ export function createDeterministicHooks(options: DeterministicRunOptions): Dete
     const inputs = data["inputs"] as Record<string, unknown> | undefined;
     const objective = typeof inputs?.["objective"] === "string" ? inputs["objective"] : workId;
     const capabilityId = String(data["capabilityId"] ?? "research.analyze");
+    // Inbound media law: an assign's `inputs.sourceRefs` are kernel artifacts
+    // (e.g. a chat image the communication adapter uploaded); dereference
+    // them through the link-plane content GET so the run proves it holds the
+    // bytes, not just a pointer. Unreadable refs degrade to a marker line —
+    // media never fails a research run.
+    const client = createArtifactClient({
+      baseUrl: ctx.kernel.baseUrl,
+      token: ctx.kernel.token,
+      ...(options.fetchImpl !== undefined ? { fetchImpl: options.fetchImpl } : {}),
+    });
+    const attachmentLines: string[] = [];
+    const sourceRefs = Array.isArray(inputs?.["sourceRefs"]) ? inputs["sourceRefs"] : [];
+    for (const [index, ref] of sourceRefs.entries()) {
+      const item = (ref ?? {}) as Record<string, unknown>;
+      const mediaType = String(item["mediaType"] ?? "application/octet-stream");
+      const artifactId = String(item["artifactId"] ?? "");
+      try {
+        const blob = await client.download(artifactId);
+        const head = Buffer.from(blob.slice(0, 8)).toString("hex");
+        const digest = String(item["digest"] ?? "");
+        attachmentLines.push(
+          `attachment ${index + 1}: ${mediaType} ${String(blob.byteLength)} ${digest} ${head}`,
+        );
+      } catch (error) {
+        logger.warn("attachment-unreadable", { artifactId, error: String(error) });
+        attachmentLines.push(`attachment ${index + 1}: ${mediaType} unreadable (${artifactId})`);
+      }
+    }
+    const attachmentSection =
+      attachmentLines.length === 0 ? "" : `\n## Attachments\n${attachmentLines.join("\n")}`;
     // The confirm-loop e2e rides research.publish — identical
     // deterministic script, published-flavored artifact + conclusion.
     const publishing = capabilityId === "research.publish";
@@ -115,17 +145,12 @@ Assignment: ${assignmentId} (execution ${ctx.executionId})
 - step 1 complete at +${step1At}ms
 - step 2 complete at +${step2At}ms
 ## Steering directives
-${directiveLines}${answerLine}
+${directiveLines}${answerLine}${attachmentSection}
 ## Conclusion
 Deterministic ${publishing ? "publish" : "analysis"} complete.
 `;
     const bytes = Buffer.from(report, "utf8");
     writeFileSync(reportPath, bytes);
-    const client = createArtifactClient({
-      baseUrl: ctx.kernel.baseUrl,
-      token: ctx.kernel.token,
-      ...(options.fetchImpl !== undefined ? { fetchImpl: options.fetchImpl } : {}),
-    });
     const createdAt = new Date().toISOString();
     // The report's own bytes land first; the manifest declares them with the
     // kernel-verified digest from the upload receipt.

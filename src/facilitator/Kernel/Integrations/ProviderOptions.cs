@@ -88,6 +88,14 @@ public sealed class ProviderOptions
     /// Interim routing until capability routing lands.</summary>
     public List<AssignRule> AssignRules { get; init; } = [];
 
+    /// <summary>Chat-plane label routing: when true, the chat Work-creation
+    /// paths (mention arm, slash plane, decode sink) match
+    /// <see cref="AssignRules"/> against the event's adapter-normalized
+    /// top-level <c>labels</c> exactly as the issue arm does, and an
+    /// unmatched event keeps the global pair. Default false: providers whose
+    /// labels live on issues only (forges) take the unchanged code path.</summary>
+    public bool ChatLabelRouting { get; init; }
+
     /// <summary>The completed-manifest arm of <c>ResultIngress</c> reads
     /// <c>structuredResult.prRequest</c> / <c>commentRequests</c> only when
     /// the completing assignment's capability equals this value (provider-

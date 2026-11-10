@@ -76,7 +76,9 @@ public sealed class CommandApplier(
         string replyVsReaction,
         AiPolicy policy,
         CancellationToken ct,
-        string ledgerBasis = "slash")
+        string ledgerBasis = "slash",
+        AssignRule? rule = null,
+        JsonArray? sourceRefs = null)
     {
         registry.TryGet(cmd.Verb, out var spec);
         metrics.AiDecode(cmd.Unknown ? "cmd-unknown" : $"cmd-{cmd.Verb}");
@@ -102,7 +104,7 @@ public sealed class CommandApplier(
                 "Linking runs through /link — mention /link to get a code.", "cmd:link", ledgerBasis, now),
             // /work and every custom verb: Work creation on the provider plane.
             _ => await CreateWorkAsync(db, reference, options, spec, cmd, actorProviderAccountId,
-                teamGuid, deliveryId, replyVsReaction, ledgerBasis, now, ct),
+                teamGuid, deliveryId, replyVsReaction, ledgerBasis, now, ct, rule, sourceRefs),
         };
     }
 
@@ -123,13 +125,15 @@ public sealed class CommandApplier(
         Guid teamGuid,
         string deliveryId,
         string replyVsReaction,
-        CancellationToken ct)
+        CancellationToken ct,
+        AssignRule? rule = null,
+        JsonArray? sourceRefs = null)
     {
         _ = ct;
         metrics.AiDecode("fallback");
         AppendTurn(db, reference, actor, "in", Trim(text), now, "fallback");
         var workId = await CreateWorkBlockAsync(db, reference, options, capabilityId: null,
-            objective: Trim(text), actor, teamGuid, deliveryId, now, ct);
+            objective: Trim(text), actor, teamGuid, deliveryId, now, ct, rule, sourceRefs);
         var hint = string.Format(SlashPlaneHintFormat, options.BotUserId ?? "here");
         var ack = replyVsReaction == "reply"
             ? ProviderEventStore.ReplyEnvelope(ProviderEventStore.TargetOf(reference),
@@ -149,7 +153,7 @@ public sealed class CommandApplier(
     /// exact same gate.</summary>
     public void AppendCommandRow(
         FacilitatorDbContext db,
-        System.Text.Json.Nodes.JsonObject envelope,
+        JsonObject envelope,
         ProviderOptions? options,
         DateTime now,
         Guid? workId,
@@ -346,12 +350,13 @@ public sealed class CommandApplier(
     private async Task<CommandEffect> CreateWorkAsync(
         FacilitatorDbContext db, ProviderEventStore.Reference reference, ProviderOptions options,
         CommandSpec? spec, ParsedCommand cmd, string actor, Guid teamGuid, string deliveryId,
-        string replyVsReaction, string basis, DateTime now, CancellationToken ct)
+        string replyVsReaction, string basis, DateTime now, CancellationToken ct,
+        AssignRule? rule = null, JsonArray? sourceRefs = null)
     {
         var objective = Trim(Objective(cmd));
         var workId = await CreateWorkBlockAsync(db, reference, options,
             capabilityId: spec?.CapabilityId is { Length: > 0 } cap ? cap : options.AssignCapabilityId,
-            objective, actor, teamGuid, deliveryId, now, ct);
+            objective, actor, teamGuid, deliveryId, now, ct, rule, sourceRefs);
         var ack = replyVsReaction == "reply"
             ? $"On it. Work {Short(workId)} created."
             : "On it.";
@@ -373,17 +378,31 @@ public sealed class CommandApplier(
     private async Task<Guid> CreateWorkBlockAsync(
         FacilitatorDbContext db, ProviderEventStore.Reference reference, ProviderOptions options,
         string? capabilityId, string objective, string actor, Guid teamGuid, string deliveryId,
-        DateTime now, CancellationToken ct)
+        DateTime now, CancellationToken ct,
+        AssignRule? rule = null, JsonArray? sourceRefs = null)
     {
+        // A chat-label rule may name the OWNING team (the endpoint's fleet):
+        // the manifest ledger team-scopes a work's artifacts, so the work
+        // lives on the routed team or its worker could never record a
+        // manifest. Unrostered team ⇒ the workload's own team (fail-open: a
+        // provider config typo must not drop the Work).
+        var teamId = teamGuid;
+        if (rule?.Team is { Length: > 0 } ruleTeamSlug
+            && await db.Teams.AsNoTracking().Where(t => t.Slug == ruleTeamSlug)
+                .Select(t => t.TeamId).FirstOrDefaultAsync(ct) is { } rostered && rostered != default)
+        {
+            teamId = rostered;
+        }
+
         var workId = Guid.NewGuid();
         var project = await db.Projects.FirstOrDefaultAsync(
-            p => p.TeamId == teamGuid && p.Name == ProviderEventStore.ProviderProjectName, ct);
+            p => p.TeamId == teamId && p.Name == ProviderEventStore.ProviderProjectName, ct);
         if (project is null)
         {
             project = new ProjectEntity
             {
                 ProjectId = Guid.NewGuid(),
-                TeamId = teamGuid,
+                TeamId = teamId,
                 Name = ProviderEventStore.ProviderProjectName,
                 Config = "{}",
                 CreatedAt = now,
@@ -425,22 +444,55 @@ public sealed class CommandApplier(
             CreatedAt = now,
         });
 
-        var seedCapability = capabilityId is { Length: > 0 } c ? c : options.AssignCapabilityId;
-        if (seedCapability is { Length: > 0 })
+        if (sourceRefs is { Count: > 0 })
         {
-            var teamSlug = await db.Teams.AsNoTracking().Where(t => t.TeamId == teamGuid)
+            // Inbound media of the creating message: auditable timeline row,
+            // refs verbatim (frozen artifactRef items).
+            db.WorkEvents.Add(new WorkEventEntity
+            {
+                EventId = Guid.NewGuid(),
+                WorkId = workId,
+                WorkVersion = 1,
+                Kind = "provider.attachment",
+                Actor = $"provider:{reference.Provider}",
+                Detail = new JsonObject
+                {
+                    ["sourceRefs"] = (JsonNode)sourceRefs.DeepClone(),
+                }.ToJsonString(),
+                CreatedAt = now,
+            });
+        }
+
+        var seedCapability = capabilityId is { Length: > 0 } c ? c : options.AssignCapabilityId;
+        var routedCapability = rule?.CapabilityId is { Length: > 0 } ruleCapability
+            ? ruleCapability
+            : seedCapability;
+        if (routedCapability is { Length: > 0 })
+        {
+            var teamSlug = await db.Teams.AsNoTracking().Where(t => t.TeamId == teamId)
                 .Select(t => t.Slug).FirstOrDefaultAsync(ct);
+            // A matched chat rule contributes chat-domain re-hydration inputs
+            // (deliberately NOT the forge repo/issue pair — the coding worker
+            // reads those keys for forge coordinates) and rides the coding
+            // command-id base, exactly like the issue arm's routing intent.
+            JsonObject? extraInputs = rule is null
+                ? null
+                : new JsonObject
+                {
+                    ["chat"] = reference.Channel,
+                    ["topic"] = reference.Root,
+                };
             var intent = new RoutingIntent(
                 workId,
-                seedCapability,
+                routedCapability,
                 teamSlug,
-                PreferenceEndpointId: options.AssignEndpointId,
-                TargetId: options.AssignTargetId ?? options.Provider + "-interim",
-                CommandIdBase: "work-assign",
+                PreferenceEndpointId: rule?.EndpointId is { Length: > 0 } ruleEndpoint ? ruleEndpoint : options.AssignEndpointId,
+                TargetId: rule?.TargetId ?? options.AssignTargetId ?? options.Provider + "-interim",
+                CommandIdBase: rule is null ? "work-assign" : "work-assign-coding",
                 EffectKey: workId.ToString("N"),
                 Objective: objective,
-                SourceRefsJson: "[]",
-                ExtraInputsJson: null,
+                SourceRefsJson: sourceRefs?.ToJsonString() ?? "[]",
+                ExtraInputsJson: extraInputs?.ToJsonString(),
                 ActorEvidenceRef: $"kernel:provider-ingest:{workId}");
             db.Outbox.Add(RoutingIntentEnvelope.OutboxRow(intent, now, envelopeValidator));
         }

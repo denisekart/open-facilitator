@@ -447,6 +447,11 @@ public sealed class ProviderEventStore(
     {
         var text = data.GetProperty("text").GetString() ?? string.Empty;
         var actor = data.GetProperty("actorProviderAccountId").GetString() ?? string.Empty;
+        // Chat-plane label routing (opt-in per provider): a labeled chat picks
+        // the rule's capability/endpoint/team; inbound media refs ride down to
+        // Work creation and the timeline. Unlabeled ⇒ today's global pair.
+        var rule = MatchChatLabelRule(options, data);
+        var media = PayloadSourceRefs(data);
 
         if (text.TrimStart().StartsWith("/link", StringComparison.Ordinal))
         {
@@ -487,7 +492,7 @@ public sealed class ProviderEventStore(
                 return new ArmEffect(boundWork, $"input:{answered}:auto-respond");
             }
 
-            await AppendWorkInputAsync(db, reference.Provider, boundWork, InputNote(reference, deliveryId, text), now, ct);
+            await AppendWorkInputAsync(db, reference.Provider, boundWork, InputNote(reference, deliveryId, text, media), now, ct, sourceRefs: media);
             await AckAsync(db, options, reference, deliveryId, replyVsReaction, now, ct);
             return new ArmEffect(boundWork, $"work/{boundWork}:input");
         }
@@ -511,7 +516,7 @@ public sealed class ProviderEventStore(
         {
             var commandEffect = await applier.ApplyAsync(
                 db, now, parsed, commands, reference, options, actor, workload.TeamId,
-                deliveryId, replyVsReaction, policy, ct);
+                deliveryId, replyVsReaction, policy, ct, rule: rule, sourceRefs: media);
             return new ArmEffect(commandEffect.WorkId, commandEffect.Judgment, PostCommit: commandEffect.PostCommit);
         }
 
@@ -523,7 +528,7 @@ public sealed class ProviderEventStore(
         // mention:<delivery>:ack slot.
         if (policy.Enabled && aiOptions.HasEndpoints)
         {
-            AppendDecodeRow(db, text, reference, actor, deliveryId, workload.TeamId, replyVsReaction, now);
+            AppendDecodeRow(db, text, reference, actor, deliveryId, workload.TeamId, replyVsReaction, now, data);
             AppendCommand(db, ReactEnvelope(
                 TargetOf(reference),
                 AckEmoji,
@@ -538,7 +543,8 @@ public sealed class ProviderEventStore(
         // line that the slash plane works without AI — the shared fallback
         // helper the decode sink uses too, ledgered basis=fallback.
         var verbatim = await applier.VerbatimWorkAsync(
-            db, now, text, reference, options, actor, workload.TeamId, deliveryId, replyVsReaction, ct);
+            db, now, text, reference, options, actor, workload.TeamId, deliveryId, replyVsReaction, ct,
+            rule: rule, sourceRefs: media);
         return new ArmEffect(verbatim.WorkId, verbatim.Judgment, PostCommit: verbatim.PostCommit);
     }
 
@@ -596,6 +602,10 @@ public sealed class ProviderEventStore(
         FacilitatorDbContext db, Facilitator.Kernel.Shared.Auth.LinkPrincipal workload, ProviderOptions options, JsonElement data, Reference reference, string deliveryId, DateTime now, CancellationToken ct)
     {
         var text = data.GetProperty("text").GetString() ?? string.Empty;
+        // Inbound media on a chat message rides Work input / creation the same
+        // way the mention arm does; the slash plane here keeps the global
+        // routing pair (rule: null).
+        var media = PayloadSourceRefs(data);
         if (text.TrimStart().StartsWith("/link", StringComparison.Ordinal))
         {
             await MintChallengeAsync(db, options, reference,
@@ -616,7 +626,7 @@ public sealed class ProviderEventStore(
                 var teamGuid = workload.TeamId;
                 var commandEffect = await applier.ApplyAsync(
                     db, now, parsed, commands, reference, options, actor, teamGuid,
-                    deliveryId, "reply", policy, ct);
+                    deliveryId, "reply", policy, ct, sourceRefs: media);
                 return new ArmEffect(commandEffect.WorkId, commandEffect.Judgment, PostCommit: commandEffect.PostCommit);
             }
         }
@@ -635,7 +645,7 @@ public sealed class ProviderEventStore(
             return new ArmEffect(workId, $"input:{answered}:auto-respond");
         }
 
-        await AppendWorkInputAsync(db, reference.Provider, workId, InputNote(reference, deliveryId, text: null), now, ct);
+        await AppendWorkInputAsync(db, reference.Provider, workId, InputNote(reference, deliveryId, text: null, media), now, ct, sourceRefs: media);
         return new ArmEffect(workId, $"work/{workId}:input");
     }
 
@@ -755,6 +765,19 @@ public sealed class ProviderEventStore(
             : null;
     }
 
+    /// <summary>Inbound media of a chat event: the adapter-normalized top-level
+    /// <c>sourceRefs[]</c> (frozen <c>artifactRef</c> items already stored as
+    /// kernel artifacts) — the kernel never inspects item shapes. Null when
+    /// absent or empty; carried verbatim into Work source refs.</summary>
+    internal static JsonArray? PayloadSourceRefs(JsonElement data)
+    {
+        return data.TryGetProperty("sourceRefs", out var normalized)
+            && normalized.ValueKind == JsonValueKind.Array
+            && normalized.GetArrayLength() > 0
+            ? JsonNode.Parse(normalized.GetRawText())!.AsArray()
+            : null;
+    }
+
     private async Task<ArmEffect> PipelineArmAsync(
         FacilitatorDbContext db, JsonElement data, Reference reference, string deliveryId, DateTime now, CancellationToken ct)
     {
@@ -860,10 +883,25 @@ public sealed class ProviderEventStore(
 
     // ---- helpers ------------------------------------------------------------
 
-    private static string InputNote(Reference reference, string deliveryId, string? text) =>
-        text is { Length: > 0 }
+    private static string InputNote(Reference reference, string deliveryId, string? text, JsonArray? sourceRefs = null)
+    {
+        var note = text is { Length: > 0 }
             ? $"provider input ({reference.Provider} post {reference.MessageId ?? deliveryId}): {Trim(text)}"
             : $"provider input ({reference.Provider} post {reference.MessageId ?? deliveryId})";
+        if (sourceRefs is { Count: > 0 })
+        {
+            // One media line per ref, built from the frozen artifactRef item's
+            // mediaType/artifactId only — no vendor shapes.
+            foreach (var item in sourceRefs)
+            {
+                var mediaType = item?["mediaType"]?.GetValue<string>() ?? "application/octet-stream";
+                var artifactId = item?["artifactId"]?.GetValue<string>() ?? "unknown";
+                note += $"\nmedia: {mediaType}@{artifactId}";
+            }
+        }
+
+        return note;
+    }
 
     private Task MintChallengeAsync(FacilitatorDbContext db, ProviderOptions options, Reference reference, string actor, DateTime now, CancellationToken ct)
     {
@@ -899,7 +937,7 @@ public sealed class ProviderEventStore(
         return Task.CompletedTask;
     }
 
-    private async Task AppendWorkInputAsync(FacilitatorDbContext db, string provider, Guid workId, string note, DateTime now, CancellationToken ct)
+    private async Task AppendWorkInputAsync(FacilitatorDbContext db, string provider, Guid workId, string note, DateTime now, CancellationToken ct, JsonArray? sourceRefs = null)
     {
         var version = await db.Works.Where(w => w.WorkId == workId).Select(w => w.Version).FirstOrDefaultAsync(ct);
         db.WorkEvents.Add(new WorkEventEntity
@@ -912,6 +950,27 @@ public sealed class ProviderEventStore(
             Detail = JsonSerializer.Serialize(new Dictionary<string, string> { ["note"] = note }),
             CreatedAt = now,
         });
+        if (sourceRefs is { Count: > 0 })
+        {
+            // Auditable media row: the refs ride the timeline, not just the
+            // note text, so a later reader dereferences them without parsing
+            // the note.
+            db.WorkEvents.Add(new WorkEventEntity
+            {
+                EventId = Guid.NewGuid(),
+                WorkId = workId,
+                WorkVersion = version,
+                Kind = "provider.attachment",
+                Actor = $"provider:{provider}",
+                Detail = new JsonObject
+                {
+                    ["note"] = note,
+                    ["sourceRefs"] = (JsonNode)sourceRefs.DeepClone(),
+                }.ToJsonString(),
+                CreatedAt = now,
+            });
+        }
+
         AppendProgressRow(db, registry.Find(provider), workId, Trim(note), now);
     }
 
@@ -962,6 +1021,14 @@ public sealed class ProviderEventStore(
             ActorEvidenceRef: $"kernel:provider-ingest:{workId}");
         db.Outbox.Add(Facilitator.Kernel.Work.RoutingIntentEnvelope.OutboxRow(intent, now, envelopeValidator));
     }
+
+    /// <summary>Chat-plane rule match: the issue-arm matcher gated on the
+    /// provider's <see cref="ProviderOptions.ChatLabelRouting"/> opt-in — the
+    /// chat Work-creation seams call only this, so a forge provider (flag
+    /// false) keeps a byte-identical code path. Null when the flag is off or
+    /// no rule matches.</summary>
+    internal static AssignRule? MatchChatLabelRule(ProviderOptions options, JsonElement? triggerEvent)
+        => options.ChatLabelRouting ? MatchAssignRule(options, triggerEvent) : null;
 
     /// <summary>First assign rule whose label appears (case-insensitive) in the
     /// event payload's label set, else null.</summary>
@@ -1064,13 +1131,31 @@ public sealed class ProviderEventStore(
     /// <summary>Queue one async decode: an internal-channel outbox row
     /// (recipient <c>decode.kernel</c> — like <c>kernel.log</c>, an internal
     /// payload with no wire schema, so it bypasses the command-envelope
-    /// validator; every row the sink emits back IS validator-gated). The
-    /// deterministic <c>decode:&lt;deliveryId&gt;</c> command id makes a
-    /// crash-replayed arm idempotent on the outbox unique constraint.</summary>
+    /// validator; every row the sink emits back IS validator-gated). The row
+    /// is internal-channel, not wire-validated: it may carry fields no schema
+    /// knows about. The deterministic <c>decode:&lt;deliveryId&gt;</c> command
+    /// id makes a crash-replayed arm idempotent on the outbox unique
+    /// constraint. <c>labels</c>/<c>sourceRefs</c> ride along so the sink's
+    /// Work creation routes by chat labels and attaches inbound media exactly
+    /// like the synchronous arms.</summary>
     private static void AppendDecodeRow(
         FacilitatorDbContext db, string text, Reference reference, string actor,
-        string deliveryId, Guid teamId, string replyVsReaction, DateTime now)
+        string deliveryId, Guid teamId, string replyVsReaction, DateTime now, JsonElement? triggerEvent = null)
     {
+        JsonArray labels = new(), sourceRefs = new();
+        if (triggerEvent is { } data)
+        {
+            if (data.TryGetProperty("labels", out var labelsNode) && labelsNode.ValueKind == JsonValueKind.Array)
+            {
+                labels = (JsonArray)JsonNode.Parse(labelsNode.GetRawText())!;
+            }
+
+            if (PayloadSourceRefs(data) is { } refs)
+            {
+                sourceRefs = refs;
+            }
+        }
+
         var envelope = new JsonObject
         {
             ["specversion"] = "1.0",
@@ -1089,6 +1174,8 @@ public sealed class ProviderEventStore(
                 ["teamId"] = teamId.ToString(),
                 ["replyVsReaction"] = replyVsReaction,
                 ["workId"] = null,
+                ["labels"] = labels,
+                ["sourceRefs"] = sourceRefs,
             },
         };
         db.Outbox.Add(new OutboxEntity

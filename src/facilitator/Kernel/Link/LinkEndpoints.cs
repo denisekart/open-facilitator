@@ -34,6 +34,7 @@ public static partial class LinkEndpoints
         MapEnroll(group);
         MapEvents(group);
         MapArtifactContent(group);
+        MapArtifactRead(group);
         MapArtifactConfirm(group);
         MapDeliveries(group);
         MapReceipt(group);

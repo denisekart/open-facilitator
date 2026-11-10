@@ -8,7 +8,7 @@ current code does. The catalog is the yardstick: each scenario is later run agai
 given a verdict, which produces the gap list.
 
 **How to audit.** For each scenario fill in the `Audit:` line. Use the verdict vocabulary in
-§ 14. Record the *observable* you checked, not your belief. Where a scenario's `Probe:` line names a
+§ 16. Record the *observable* you checked, not your belief. Where a scenario's `Probe:` line names a
 sharp edge, that edge is the interesting part — a scenario that "works" while its probe edge does
 not is a partial, not a covered.
 
@@ -31,7 +31,8 @@ business, not the scenario's.
 | **Channel** | One addressable place inside a communication platform, including its threads as sub-conversations. |
 | **Ticket** | A record in a ticketing system. A ticket may host a conversation. |
 | **Change request** | A proposed change to tracked content awaiting review (pull request, merge request, review request — all the same thing here). |
-| **Participant** | A person whose message is relevant to a work item. |
+| **Participant** | A person or a non-human contributor whose activity is relevant to a work item. |
+| **Non-human contributor** | An automated participant with a declared identity, a declared set of capabilities, and a place in a team's process. Not a person: it has no standing it did not bring, no authority beyond what its team granted, and no judgment the record treats as a decision. |
 | **Owner** | The person accountable for a work item's outcome. Not necessarily the requester, not necessarily the executor. |
 | **Approver** | A person entitled to consent to a specific action. Entitlement, not job title. |
 | **Watcher** | A person or team that receives updates but has no standing to decide. |
@@ -53,6 +54,7 @@ Every scenario is a point in this space. A gap in any cell is a hole in the prod
 
 | Axis | Values |
 |---|---|
+| **Contributor kind** | a person · an automated worker · an AI worker · a pipeline · another team's contributor — each with a declared identity and a declared capability set, so responsibility is always traceable to a team |
 | **Who initiates** | a person in a conversation · a person on a ticket · a person in an operator view · an API caller · another work item · a schedule · an external event (pipeline, alert) · an executor itself · a person who has no standing |
 | **Conversation shape** | open channel · private channel · thread under a post · forum topic · ticket comment · direct message · a conversation the system has never seen · a conversation that is later renamed, moved, split, or archived |
 | **Content of the ask** | plain sentence · mention with no context · command with arguments · attachment (image, log, document, recording) · forwarded content · quoted reply · a reply to the system's own message · the same content posted twice · content in another language |
@@ -728,7 +730,184 @@ enthusiastic project cannot starve the rest.
 
 ---
 
-## 12. Family J — things that must *not* happen
+## 12. Family K — a non-human contributor inside the team's process
+
+These scenarios ask one question: when an automated participant takes part in a team's ordinary
+process, does it do so **as a declared, bounded, traceable member of that team's process**, or as an
+outside script that happens to write into it? Nothing here assumes the contributor is anything like a
+person; what it assumes is that the team's process has a slot for it, and the slot is explicit.
+
+### K1 — A contributor with a name the team can point at
+**Actors:** team owner, any participant. **Trigger:** an automated participant first takes part in a
+team's work.
+**Expected:** it has a stable identity the team created, a stated capability set, a stated owner (a
+person or role accountable for its behaviour), and a stated home team. Other participants can look it
+up the way they would look up a colleague's entry: what is this, whose is it, what may it do.
+**Probe:** does it appear in the same directory/list a person is looked up in, or is it a magic
+string in a config file? can a new team member discover its capabilities without reading
+infrastructure? is the accountable person recorded or assumed?
+**Audit:**
+
+### K2 — A contributor takes an ordinary task from the team's queue
+**Actors:** contributor, team. **Trigger:** a task of a kind the team has agreed it handles is
+assigned to it.
+**Expected:** it is a legitimate assignee in the team's normal flow — it appears in who-is-what lists,
+holds the task, moves it through the team's states, and hands it on or reports it. Being automated
+changes the mechanics, not the accounting.
+**Probe:** can a task be assigned to it from the same surface a person is assigned from? does its
+work count in the team's throughput and load figures, or does it produce a shadow workload invisible
+to planning? if it stalls, does it show up in the team's normal stalled view?
+**Audit:**
+
+### K3 — It contributes where the team's process is actually followed
+**Actors:** contributor, reviewers. **Trigger:** the team's lifecycle runs on tracked content —
+branching, change requests, review, checks, merges — and the contributor produces a change.
+**Expected:** its contribution enters that lifecycle in its ordinary shape: a change proposal of the
+team's usual kind, targeted at the right reviewers, carrying the context a reviewer needs, responding
+to review comments, and waiting for the same gates everyone else waits for. It does not bypass a
+review stage because it is fast, and it does not get a private channel of one.
+**Probe:** does a change request authored by it look like everyone else's in structure (description,
+tests, linked work item, review requests), or like a machine dump? does it get the team's default
+reviewers or an empty review lane? do the team's required checks apply to it, and can it be made to
+fail them like anyone's?
+**Audit:**
+
+### K4 — Review of its output, by whoever the rules name
+**Actors:** reviewer, contributor. **Trigger:** a human reviews what the contributor produced.
+**Expected:** review of automated work is normal review with one addition — the reviewer can see
+enough of how the result was produced to judge it (what was changed, what was assumed, what was not
+attempted). The contributor answers factual follow-up about its own output; disagreement ends at a
+human's decision.
+**Probe:** is the reviewer told which of the change is machine-generated? is there a limit on what the
+contributor may answer to ("I did not check X") rather than a confident blank? does the system record
+that a human, not the contributor, accepted the objection or the fix?
+**Audit:**
+
+### K5 — Following the team's written conventions
+**Actors:** contributor, team. **Trigger:** the team has conventions — branch and commit shape,
+comment style, label discipline, ticket workflow, ownership trailers, who must be told about what.
+**Expected:** the contributor conforms, and conformance is treated as part of the task's definition of
+done rather than as a nicety. Where it cannot conform, it says which convention it skipped and why.
+**Probe:** are conventions configuration the contributor reads, or prose a human repeats to it? does a
+missed convention surface as a reviewable defect, or as drift nobody notices? can a team add a
+convention without changing the contributor's code?
+**Audit:**
+
+### K6 — Its identity is used honestly
+**Actors:** contributor, auditors, other participants. **Trigger:** the contributor writes into
+someone else's system.
+**Expected:** its writing is attributable to itself, not to a human whose credential happened to be
+at hand; if a team chooses to write under a shared account, the record says so plainly and the
+consequence (a human looks like the author) is visible rather than buried.
+**Probe:** does any visible artefact credit a human with something a machine did? can the team
+distinguish "the contributor did this" from "the contributor did this while acting for this named
+person"? is that distinction auditable a year later?
+**Audit:**
+
+### K7 — A contributor's authority changes with the team, not with the weather
+**Actors:** team owner, contributor. **Trigger:** the team's process matures — it starts letting the
+contributor do more, or retracts something.
+**Expected:** an explicit, reviewable change to the contributor's remit: what it may act on, where it
+may speak, what needs consent, what is out of bounds. The change has a date, an author, and a reason,
+and it does not require rewiring infrastructure.
+**Probe:** can a team widen or narrow a contributor's remit without an operator? is the current remit
+readable by an ordinary team member? does anything prompt a periodic look at what was once granted?
+**Audit:**
+
+### K8 — It reports facts about its own limits
+**Actors:** contributor, owner. **Trigger:** a task exceeds what the contributor can actually do with
+the access or information it has.
+**Expected:** it says so early and specifically — what it could not reach or verify, and what a human
+must do — rather than producing a confident partial result or stopping silently. Its self-report is
+part of the record, and is trusted only as much as any unverified claim.
+**Probe:** is "I could not run the tests" reachable as an outcome, or does the system only model
+success and crash? does the partial result carry its caveat into the outcome state, or only into
+prose? does anyone get told that the gap needs a human?
+**Audit:**
+
+### K9 — Several automated participants on one team
+**Actors:** two or more contributors, team. **Trigger:** a team has more than one automated participant
+doing different parts of its lifecycle.
+**Expected:** each has its own identity and remit, the team can tell them apart in its own records,
+and their work does not collide: two contributors touching the same thing is detected as a conflict,
+not discovered as a surprise. Their traffic is budgeted so a team's shared spaces stay readable.
+**Probe:** is a shared catch-all identity used for everything, making attribution meaningless? is a
+contributor-versus-contributor collision detectable before merge? is per-contributor volume capped?
+**Audit:**
+
+### K10 — Onboarding and offboarding a contributor
+**Actors:** team owner. **Trigger:** the team retires a contributor, or replaces it with a different
+one doing the same job.
+**Expected:** retiring is a deliberate act with an effect on open work (its tasks go somewhere) and a
+readable afterlife (its history stays legible with its identity intact). Replacing it does not rewrite
+who did what.
+**Probe:** do its held actions and open tasks follow a defined retirement path? does a retired
+contributor's past work become ambiguous once its identity is gone?
+**Audit:**
+
+---
+
+## 13. Family L — the contributor as part of a company's working practice
+
+Where K is about one team's process, L is about the wider company: the contributor's activity has to
+sit inside rules written for people, for good reason, without pretending to be a person.
+
+### L1 — Its work is inside the company's rules, not beside them
+**Actors:** compliance, security, team. **Trigger:** company policy governs who may change what, how
+releases happen, what needs sign-off, what must be logged.
+**Expected:** an automated participant is subject to those rules through its owning team — same
+sign-off gates, same records, same retention, same review cadence. There is no class of company action
+that only humans are governed by because a machine was involved.
+**Probe:** does an automated action appear in the same compliance reports a human action appears in?
+does any rule silently apply only to people, leaving automated work ungoverned or over-governed?
+**Audit:**
+
+### L2 — Accountability is a person, always
+**Actors:** team owner, auditor. **Trigger:** an automated participant's action causes harm — a bad
+release, a lost change, an outward message a customer did not deserve.
+**Expected:** the trail answers, in order: which contributor acted, under which grant, on whose work
+item, in whose team, with which human's consent, and who owns that contributor. A machine is never the
+accountable party; the accountable party is never a mystery.
+**Probe:** can the chain be produced without a person's help? does a shared team credential anywhere
+break the chain? if consent came from a group rather than a person, is an individual still
+identifiable?
+**Audit:**
+
+### L3 — Company-wide visibility, team-level privacy
+**Actors:** management, several teams. **Trigger:** the company wants a view of what automated
+participants are doing across teams — volume, kinds of action, failure rates, spend.
+**Expected:** aggregate visibility exists without forcing any team's private content into the open,
+and it is the same visibility a team gets about its own contributors.
+**Probe:** can the company count automated actions per team without reading the actions' contents? is
+a team able to see how it compares? are blind spots (a contributor nobody can account for) visible as
+blind spots?
+**Audit:**
+
+### L4 — A contributor's remit reflects role, not ubiquity
+**Actors:** team owner, security. **Trigger:** a contributor present in many systems needs least
+privilege — enough to do its task, nothing else.
+**Expected:** each contribution is made with the narrowest standing that completes it, and that
+standing is stated per capability rather than once for the whole contributor. A contributor that only
+reads tickets does not carry a credential that can deploy.
+**Probe:** is there a single powerful credential behind many behaviours? can two capabilities of one
+contributor have different standing? is escalation possible with a record (read → write, just this
+once)?
+**Audit:**
+
+### L5 — Behaviour the company would not want inherited by the next contributor
+**Actors:** team owner, operator. **Trigger:** the company standardises practice across teams using
+several automated participants.
+**Expected:** a team's decisions about what is acceptable automated behaviour are expressible and
+comparable — so a good arrangement can be adopted elsewhere and a bad one is visible as an outlier,
+rather than each team having an undocumented arrangement.
+**Probe:** is a team's arrangement inspectable as data, or tribal knowledge? is there a shape of
+"standard team arrangement" a new team can start from? can an unusual grant be found by search rather
+than by interview?
+**Audit:**
+
+---
+
+## 14. Family M — things that must *not* happen
 
 Negative scenarios are the fastest way to find gaps, because an implementation that never considered
 them will answer these with silence or with a surprise.
@@ -753,10 +932,14 @@ them will answer these with silence or with a surprise.
 | N16 | A person cannot find out, from the system, why the system did the thing it just did. |
 | N17 | An unattended automation accumulates waiting-for-humans items that nobody owns. |
 | N18 | A wide authority is granted as a convenience, and never revisited because nobody can see it. |
+| N19 | An automated participant acts with no identity a team member can look up, so a record says only that "something" did it. |
+| N20 | Automated work runs beside the team's process instead of through it — skipping review, checks, or conventions because it is automated. |
+| N21 | Automated volume is invisible to planning: work that got done appears in no load, throughput, or spend figure, so its failure mode is invisible too. |
+| N22 | A contributor is credited as the accountable party for an action, ending the trail at a machine instead of at a person or role. |
 
 ---
 
-## 13. Coverage checklist for the audit
+## 15. Coverage checklist for the audit
 
 Use this as the completeness check after the scenarios. Each cell should be answerable by running
 something, not by reading a document.
@@ -784,7 +967,7 @@ Cross-cutting questions that no single scenario covers:
 
 ---
 
-## 14. Verdict vocabulary
+## 16. Verdict vocabulary
 
 When auditing, record exactly one verdict per scenario plus the observable:
 

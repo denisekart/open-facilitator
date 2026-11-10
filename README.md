@@ -43,6 +43,7 @@ Key properties, normatively defined in the specs:
 | [`docs/protocol.md`](docs/protocol.md) | As-built v1 wire contract: envelope, type registry, namespacing/versioning rules, conformance fixtures, payload limits, kernel ingress endpoints and error contract, Link transport (handshake, Deliver/receipt, HTTP fallback table, error URIs, config keys) |
 | [`docs/security.md`](docs/security.md) | Trust vs data-plane split, interim bootstrap-token auth, Plan 07 OIDC cutover seam, ingress hard limits |
 | [`docs/getting-started.md`](docs/getting-started.md) | Contributor loop: build/test, running the Facilitator against Postgres 17, CLI examples |
+| [`docs/scenarios/scenario-catalog.md`](docs/scenarios/scenario-catalog.md) | Vendor-neutral scenario catalog: the interaction flows the system is expected to carry, from the concept and industry practice rather than the current code — the yardstick each audit run scores against |
 
 ## Repository layout
 

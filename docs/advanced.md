@@ -232,15 +232,26 @@ provider's events into the central domain types
 the provider — the adapter owns the provider→purpose mapping) and
 executes `org.facilitator.command.communication.*` deliveries over the
 provider's API. Worked examples: `@ofac/mattermost-adapter`
-(`src/adapters/communication/mattermost/`, facilitator-owned chat leg) and
-`@ofac/forgejo-adapter` (`src/adapters/communication/forgejo/`, team-owned
+(`src/adapters/communication/mattermost/`, facilitator-owned chat leg),
+`@ofac/telegram-adapter` (`src/adapters/communication/telegram/`,
+multi-group chat leg with inbound/outbound media: chat uploads become kernel
+artifacts whose refs ride the event and the assign; two provider-law
+deviations documented in its README — the bot cannot DM a human before they
+`/start`, so an unknown-DM reply is an honest `rejected`, and Telegram's
+reaction allowlist is closed, so kernel emoji names map through a fixed
+table), and `@ofac/forgejo-adapter`
+(`src/adapters/communication/forgejo/`, team-owned
 forge leg) — their READMEs carry the config law; the stable seams are
 `normalize` (pure classification), the provider client (interface = test
 seam), the transport listener, and the command handler — the same seams a
 future adapter-SDK extraction would formalize.
 
 **Ownership model**: the kernel facilitates, it is not a security boundary,
-and it is never team-operated. Chat is a facilitator-owned integration in
+and it is never team-operated. The normative ownership, endpoint-exposure and
+runtime-role cut is spec §3.4 of
+`docs/specs/open_facilitator_framework_architecture.md` (zone diagram + who
+exposes what + four exposure laws); this section is the as-built form of that
+cut. Chat is a facilitator-owned integration in
 the reference system; VCS/issues/CI are **team-owned** — their adapters live
 in the team's domain, near the forge, under the team's Gateway (a Gateway
 child, like `@ofac/forgejo-connector`, or a dedicated workspace; the seam is

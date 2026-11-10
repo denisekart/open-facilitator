@@ -186,6 +186,65 @@ Privilege placement is a **team decision**. Co-location is supported with no fra
 
 **Transaction truth:** Project/Work/Assignment, identity bindings, verified references, immutable policy versions, approval records and delivery state in the Facilitator database. **Memory:** lower-trust, searchable knowledge with provenance and scoped access; never an authorization source. **Artifacts:** durable typed outputs and verified external references. **Harness context:** native prompts, tools, skills and reasoning sessions under team control. An LLM may propose a command, but neither LLM text nor memory can issue authoritative grants.
 
+### 3.4 Ownership, exposure and runtime view
+
+Section 2.1 assigns *concerns*, section 3.1 defines *roles* and section 3.2 lists *topologies*. This section combines them along the one axis an operator actually plans against: **who runs each runtime, what it exposes, and what it dials out to.** Placement below is normative in kind, not in count — a role is a set of responsibilities with one credential locus, and where its process runs is a deployment decision.
+
+```mermaid
+flowchart TB
+  subgraph CLOUD[External systems - never Facilitator runtimes]
+    MSG[Chat or messaging service]
+    SCM[Source hosting plus CI]
+    IDP[OIDC identity provider]
+    MODEL[Model provider]
+    BLOB[Object store]
+  end
+  subgraph CENTRAL[Facilitator-operated - deploy once]
+    KERNEL[Kernel - one runtime - owns work state admission routing memory broker artifact registry link hub admin SPA]
+    CHAT[Communication adapter - link role child - provider vocabulary lives here]
+  end
+  subgraph TEAMDOM[Team-owned - deployed wherever the team holds its credentials]
+    GATEWAY[Gateway - link role gateway - owns privileged-write policy and child ledger]
+    WORKSPACE[Workspace plus harness adapter - owns execution and model choice]
+    CONNECTOR[Team connector - holds forge credentials]
+    LAUNCHER[Provisioner launcher - owns worker start and stop]
+  end
+  OPERATOR[Operator or engineer at a browser]
+  KERNEL -.OIDC redirect and bearer.-> IDP
+  OPERATOR -->|human plane - OIDC bearer| KERNEL
+  MSG <-->|provider API - poll or stream| CHAT
+  CHAT -->|outbound enroll - capabilities - hub - events| KERNEL
+  GATEWAY -->|outbound enroll - capabilities - hub - events| KERNEL
+  CONNECTOR -->|outbound link| KERNEL
+  LAUNCHER -->|outbound link| KERNEL
+  CONNECTOR -.authorized effects.-> SCM
+  GATEWAY <-->|child plane - loopback only| WORKSPACE
+  WORKSPACE -.native tools and model calls.-> MODEL
+  LAUNCHER -.executes.-> WORKSPACE
+  KERNEL -.artifact blobs.-> BLOB
+  MSG -.optional webhook to the provider sink.-> KERNEL
+  KERNEL -.relay as one typed command.-> CHAT
+```
+
+**Arrows leaving a box toward the Kernel are always connection establishment from that side**, exactly as in section 3. The diagram has no inbound edge into a team-owned runtime except the child plane, and exactly one dashed edge from an external system into the central zone — which is optional by construction.
+
+| Runtime | Operated by | Exposes | Dials out to | Credential it holds |
+|---|---|---|---|---|
+| Kernel | Facilitator operator | human plane `/api/*` + admin SPA behind OIDC; link plane `/api/link/v1*` and the Link hub behind a per-endpoint link token; `POST /api/ingress/webhooks/{provider}` and `/health` — see section 24 for auth, and the exposure table in `docs/security.md` for the full matrix | Postgres, the artifact object store, the IdP's JWKS, optional model endpoints, optional telemetry export | OIDC issuer trust plus enrollment secrets it issued |
+| Communication adapter | Facilitator operator **as a placement, not as law** | nothing when it polls or streams; optionally one provider-facing listen port for webhook mode | Kernel link plane; the provider's own API | Provider bot or app credential — the only place that credential exists |
+| Team connector | Team | nothing | Kernel link plane; the forge's API | Forge token issued to the team by a forge admin |
+| Gateway | Team | a child-plane listener on a unix socket or loopback TCP, plus optional loopback diagnostics | Kernel link plane | Enrollment secret for its team, and the team's policy file |
+| Workspace and harness adapter | Team | nothing | Gateway child plane; optionally the kernel link plane directly when it is a direct worker | Child hello secret, or its own enrollment secret |
+| Provisioner launcher | Team or facilitator operator, whichever owns capacity | nothing | Kernel link plane; the container or VM platform API | Platform API credential |
+| Shared infrastructure (database, object store, IdP) | Whoever runs the kernel | private to that deployment | — | — |
+
+Four exposure laws follow from this cut, and an implementation MUST hold all four:
+
+1. **A team-owned runtime never needs an inbound port from the cloud.** Gateway, connector, workspace and launcher connect outward, so any of them may sit behind NAT, in a private subnet, or on a developer's machine. A deployment that requires the kernel to reach into a team network has broken the model.
+2. **The kernel has exactly one surface an external system may be pointed at** — the provider webhook sink, mounted only when a provider section is enabled, and even that is optional because a provider can be polled or streamed by an adapter instead. It authenticates nothing about the sender: it fans the raw body out to the named adapter as one typed command, and **the adapter verifies the provider signature before normalize**. The kernel holds no provider secret to verify with.
+3. **Credential loci do not cross the ownership line.** The kernel holds no provider credential and no forge token; a team holds no link enrollment secret belonging to another team; the human plane is authenticated only by the federation configured in section 11. This is why a role can move between zones — a team-run communication adapter takes the bot credential with it, and nothing in the kernel notices the difference beyond `Providers:<name>:EndpointId`.
+4. **The ownership line is the data boundary on the link plane.** Artifact content reads are team-scoped on both directions of the artifact route, so a workload asked to dereference a reference owned by another team receives a `404`, not a `403`: honest non-disclosure across an ownership edge rather than a leak or an existence oracle. The cross-team case is normal, not exceptional — a chat-owned inbound attachment routed to a differently-scoped Work is the ordinary instance.
+
 <a id="chapter-4"></a>
 ## 4. Domain model and lifecycle semantics
 

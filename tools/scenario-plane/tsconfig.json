@@ -1,0 +1,10 @@
+// Single noEmit config for src + tests (the package ships as source + mjs).
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "lib": ["ES2024"],
+    "types": ["node"]
+  },
+  "include": ["src", "test"]
+}

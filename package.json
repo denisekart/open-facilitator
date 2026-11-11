@@ -10,8 +10,8 @@
     "protocol:codegen": "node protocol/tools/codegen.mjs",
     "test": "pnpm -r test",
     "docs-check": "node protocol/tools/agents-docs-check.mjs",
-    "lint": "eslint --max-warnings 0 . && prettier --check \"src/**/*.ts\" \"examples/**/*.ts\" \"*.{json,mjs,yaml,yml}\"",
-    "format": "prettier --write \"src/**/*.ts\" \"examples/**/*.ts\" \"*.{json,mjs,yaml,yml}\""
+    "lint": "eslint --max-warnings 0 . && prettier --check \"src/**/*.ts\" \"examples/**/*.ts\" \"tools/**/*.{ts,mjs}\" \"tools/scenario-plane/package.json\" \"docs/scenarios/scenario-bindings.json\" \"*.{json,mjs,yaml,yml}\"",
+    "format": "prettier --write \"src/**/*.ts\" \"examples/**/*.ts\" \"tools/**/*.{ts,mjs}\" \"tools/scenario-plane/package.json\" \"docs/scenarios/scenario-bindings.json\" \"*.{json,mjs,yaml,yml}\""
   },
   "devDependencies": {
     "@apidevtools/swagger-cli": "4.0.4",

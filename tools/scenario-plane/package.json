@@ -1,0 +1,30 @@
+{
+  "name": "@ofac/scenario-plane",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The scenario gate's deterministic plane: a fake provider with a personality (one HTTP host serving the tracker/chat shapes the comms adapters talk to, drivable per scenario) plus the scenario runner that turns the bindings manifest plus real test results into the audit record.",
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./runner": "./src/runner.mjs"
+  },
+  "bin": {
+    "scenario-runner": "src/runner.mjs"
+  },
+  "scripts": {
+    "build": "echo 'source package: no build artifacts'",
+    "test": "vitest run --exclude 'test/**/*.e2e.test.ts'",
+    "typecheck": "tsc --noEmit",
+    "test:e2e": "vitest run test/provider-legs.e2e.test.ts"
+  },
+  "devDependencies": {
+    "@ofac/github-adapter": "workspace:*",
+    "@ofac/gitlab-adapter": "workspace:*",
+    "@ofac/mattermost-adapter": "workspace:*",
+    "@ofac/telegram-adapter": "workspace:*",
+    "@types/node": "^26.6.5",
+    "typescript": "^6.0.3",
+    "vitest": "^5.0.5"
+  }
+}

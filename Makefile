@@ -1,4 +1,4 @@
-.PHONY: restore build test lint format protocol db-update compose-slim compose-full compose-down clean link-e2e gateway-e2e worker-e2e admin-e2e example-slim-up docs-check provider-e2e gitlab-up gitlab-down example-local-smoke
+.PHONY: restore build test lint format protocol db-update compose-slim compose-full compose-down clean link-e2e gateway-e2e worker-e2e admin-e2e example-slim-up docs-check provider-e2e gitlab-up gitlab-down example-local-smoke scenario-gate scenario-plane-up scenario-gate-e2e ref-env
 
 restore:
 	dotnet restore OpenFacilitator.slnx
@@ -104,6 +104,42 @@ provider-e2e:
 	@echo "Provider E2E tier: needs the FULL stack (make compose-full) — mattermost :8065, adapter :8066, kernel :8088."
 	REF="$(CURDIR)/reference" bash reference/checks/verify-full.sh $(ARGS)
 	@echo "GitLab is on-demand, not in this set: make gitlab-up && ./reference/checks/verify-gitlab.sh"
+
+# --- Scenario gate (docs/scenarios/approved-scenarios.md) --------------------
+# The audit record's cross-check source: point TRX at a fuller run's trx to
+# cross-check more of the manifest (the full-suite `make test` writes one).
+TRX ?= tests/Facilitator.Tests/TestResults/scenario-gate.trx
+# The T1+T3 lane: the xUnit wall proves the reviewed bindings manifest
+# (evidence ids, catalog coverage). `--dotnet-trx` cross-checks verdicts
+# against the tests a run actually observed (point it at the full-suite trx
+# for the audit record's full cross-check; a filtered run proves only its
+# slice), and the runner writes the audit rows.
+scenario-gate: build
+	dotnet test tests/Facilitator.Tests/Facilitator.Tests.csproj -c Release --no-build \
+	  --filter "FullyQualifiedName~ScenarioGate" \
+	  --logger "trx;LogFileName=scenario-gate.trx" \
+	&& node tools/scenario-plane/src/runner.mjs \
+	   --dotnet-trx $(TRX) --md \
+	   > docs/scenarios/audit-results.md
+
+# The plane alone: a fake provider with a personality on :8791 (control
+# surface /__plane/*), for driving adapter legs by hand.
+scenario-plane-up:
+	node tools/scenario-plane/src/serve.mjs
+
+# The T2 lane: adapter outbound legs over real HTTP against the plane.
+scenario-gate-e2e: build
+	pnpm -C tools/scenario-plane test:e2e
+
+# The demoted infra legs (compose slim/full + referencectl verify): manual,
+# recorded in docs/runbooks/manual-infra-plan.md - this target only prints
+# what a run must cover and the commands.
+ref-env:
+	@echo "Manual infra plan (see docs/runbooks/manual-infra-plan.md):"
+	@echo "  1. make compose-slim && reference/checks/verify.sh legs"
+	@echo "  2. make compose-full && provider-e2e legs (verify-full.sh, verify-gitlab.sh)"
+	@echo "  3. link-e2e + worker-e2e + admin-e2e browser/container tiers"
+	@echo "  4. clean tree: up slim --no-seed && referencectl verify"
 
 # --- On-demand GitLab CE (arm64-capable omnibus image, off by default) --------
 # Boots GitLab CE loopback on :8929 with a minimal omnibus profile

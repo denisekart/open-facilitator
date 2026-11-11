@@ -978,6 +978,30 @@ importers:
         specifier: 'catalog:'
         version: 5.0.5(@types/node@26.6.5)(jsdom@30.1.3)(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
+  tools/scenario-plane:
+    devDependencies:
+      '@ofac/github-adapter':
+        specifier: workspace:*
+        version: link:../../src/adapters/communication/github
+      '@ofac/gitlab-adapter':
+        specifier: workspace:*
+        version: link:../../src/adapters/communication/gitlab
+      '@ofac/mattermost-adapter':
+        specifier: workspace:*
+        version: link:../../src/adapters/communication/mattermost
+      '@ofac/telegram-adapter':
+        specifier: workspace:*
+        version: link:../../src/adapters/communication/telegram
+      '@types/node':
+        specifier: ^26.6.5
+        version: 26.6.5
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^5.0.5
+        version: 5.0.5(@types/node@26.6.5)(jsdom@30.1.3)(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
+
 packages:
 
   '@apidevtools/json-schema-ref-parser@11.7.2':

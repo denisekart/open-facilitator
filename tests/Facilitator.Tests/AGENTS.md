@@ -15,6 +15,11 @@ internals.
   feature and its test folder change together.
 - Wire assertions reuse `@ofac/protocol` fixtures/conformance verdicts rather
   than re-deriving them.
+- `ScenarioGate/` — the scenario gate theory: proves
+  `docs/scenarios/scenario-bindings.json` (evidence ids resolve to tests in
+  this assembly, catalog coverage, lane law). Renaming a bound test or a
+  scenario here turns `make scenario-gate` red on purpose; regenerate the
+  manifest with `tools/scenario-plane/gen-bindings.py` and review the diff.
 
 ## Develop here
 - Run one slice: `dotnet test --filter "FullyQualifiedName~<Folder>"`.

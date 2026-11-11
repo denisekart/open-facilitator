@@ -22,6 +22,7 @@ packages:
   - "examples/full/coding-worker"
   - "examples/local/tools/localctl"
   - "protocol/tools/link-client-foreign"
+  - "tools/scenario-plane"
 
 allowBuilds:
   better-sqlite3: false

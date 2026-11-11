@@ -755,6 +755,66 @@ namespace Facilitator.Migrations
                     b.ToTable("communication_bindings", "facilitator");
                 });
 
+            modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.ContributorEntity", b =>
+                {
+                    b.Property<Guid>("ContributorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("contributor_id");
+
+                    b.Property<string>("ChangeReason")
+                        .HasColumnType("text")
+                        .HasColumnName("change_reason");
+
+                    b.Property<string>("ChangedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("changed_by");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DisplayName")
+                        .HasColumnType("text")
+                        .HasColumnName("display_name");
+
+                    b.Property<string>("Handle")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("handle");
+
+                    b.Property<string>("Remit")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("remit");
+
+                    b.Property<DateTime?>("RetiredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("retired_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("TeamId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("team_id");
+
+                    b.HasKey("ContributorId");
+
+                    b.HasIndex("Handle")
+                        .IsUnique()
+                        .HasDatabaseName("contributors_handle_key");
+
+                    b.HasIndex("TeamId")
+                        .HasDatabaseName("contributors_team_id_idx");
+
+                    b.ToTable("contributors", "facilitator", t =>
+                        {
+                            t.HasCheckConstraint("contributors_status_check", "status IN ('active', 'retired')");
+                        });
+                });
+
             modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.DeadLetterEntity", b =>
                 {
                     b.Property<Guid>("DeadLetterId")
@@ -1189,6 +1249,10 @@ namespace Facilitator.Migrations
                         .HasColumnType("jsonb")
                         .HasColumnName("capability_manifest");
 
+                    b.Property<Guid?>("ContributorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("contributor_id");
+
                     b.Property<string>("EndpointId")
                         .IsRequired()
                         .HasColumnType("text")
@@ -1538,6 +1602,88 @@ namespace Facilitator.Migrations
                         .HasDatabaseName("ix_memory_usage_entry");
 
                     b.ToTable("memory_usage", "facilitator");
+                });
+
+            modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.NotificationEntity", b =>
+                {
+                    b.Property<Guid>("NotificationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("notification_id");
+
+                    b.Property<string>("Actor")
+                        .HasColumnType("text")
+                        .HasColumnName("actor");
+
+                    b.Property<string>("Audience")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("audience");
+
+                    b.Property<DateTime?>("CorrectionWindowEndsAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("correction_window_ends_at");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Fallback")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("fallback");
+
+                    b.Property<string>("Level")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("level");
+
+                    b.Property<string>("Reason")
+                        .HasColumnType("text")
+                        .HasColumnName("reason");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("state");
+
+                    b.Property<string>("Target")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("target");
+
+                    b.Property<Guid?>("TeamId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("team_id");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("text");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("WorkId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("work_id");
+
+                    b.HasKey("NotificationId");
+
+                    b.HasIndex("WorkId")
+                        .HasDatabaseName("notifications_work_id_idx");
+
+                    b.HasIndex("State", "CreatedAt")
+                        .HasDatabaseName("notifications_state_idx");
+
+                    b.ToTable("notifications", "facilitator", t =>
+                        {
+                            t.HasCheckConstraint("notifications_audience_check", "audience IN ('actor', 'team', 'operators')");
+
+                            t.HasCheckConstraint("notifications_level_check", "level IN ('info', 'notice', 'warning', 'critical')");
+
+                            t.HasCheckConstraint("notifications_state_check", "state IN ('pending', 'sent', 'fell-back', 'undeliverable', 'obsolete')");
+                        });
                 });
 
             modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.NudgeLedgerEntity", b =>
@@ -2090,6 +2236,65 @@ namespace Facilitator.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.ScheduleEntity", b =>
+                {
+                    b.Property<Guid>("ScheduleId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("schedule_id");
+
+                    b.Property<string>("Cadence")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("cadence");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("enabled");
+
+                    b.Property<DateTime?>("LastRunAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_run_at");
+
+                    b.Property<DateTime>("NextRunAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_run_at");
+
+                    b.Property<string>("Objective")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("objective");
+
+                    b.Property<string>("OwnerActor")
+                        .HasColumnType("text")
+                        .HasColumnName("owner_actor");
+
+                    b.Property<Guid>("TeamId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("team_id");
+
+                    b.Property<string>("Timezone")
+                        .HasColumnType("text")
+                        .HasColumnName("timezone");
+
+                    b.HasKey("ScheduleId");
+
+                    b.HasIndex("TeamId");
+
+                    b.HasIndex("Enabled", "NextRunAt")
+                        .HasDatabaseName("schedules_due_idx");
+
+                    b.ToTable("schedules", "facilitator");
+                });
+
             modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.TeamEntity", b =>
                 {
                     b.Property<Guid>("TeamId")
@@ -2331,7 +2536,7 @@ namespace Facilitator.Migrations
 
                     b.ToTable("work_events", "facilitator", t =>
                         {
-                            t.HasCheckConstraint("work_events_kind_check", "kind IN ('created', 'state.transition', 'steer', 'command.accepted', 'assignment.transition', 'approval.decided', 'artifact.stored', 'artifact.registered', 'artifact.available', 'artifact.gc', 'manifest.recorded', 'manifest.superseded', 'memory.candidate', 'memory.promoted', 'provider.input', 'provider.attachment', 'provider.reaction', 'input.required', 'input.answered', 'provider.duplicate', 'work.linked', 'work.triaged', 'approval.nudged', 'work.consent-expired')");
+                            t.HasCheckConstraint("work_events_kind_check", "kind IN ('created', 'state.transition', 'steer', 'command.accepted', 'assignment.transition', 'approval.decided', 'artifact.stored', 'artifact.registered', 'artifact.available', 'artifact.gc', 'manifest.recorded', 'manifest.superseded', 'memory.candidate', 'memory.promoted', 'provider.input', 'provider.attachment', 'provider.reaction', 'input.required', 'input.answered', 'provider.duplicate', 'work.linked', 'work.triaged', 'approval.nudged', 'work.consent-expired', 'address.obsolete', 'review.decision')");
                         });
                 });
 
@@ -2420,6 +2625,18 @@ namespace Facilitator.Migrations
                         .HasConstraintName("chat_messages_session_id_fkey");
 
                     b.Navigation("Session");
+                });
+
+            modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.ContributorEntity", b =>
+                {
+                    b.HasOne("Facilitator.Kernel.Shared.Persistence.TeamEntity", "Team")
+                        .WithMany()
+                        .HasForeignKey("TeamId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("contributors_team_id_fkey");
+
+                    b.Navigation("Team");
                 });
 
             modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.ExecutionAttemptEntity", b =>
@@ -2531,6 +2748,18 @@ namespace Facilitator.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("routing_decisions_work_id_fkey");
+                });
+
+            modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.ScheduleEntity", b =>
+                {
+                    b.HasOne("Facilitator.Kernel.Shared.Persistence.TeamEntity", "Team")
+                        .WithMany()
+                        .HasForeignKey("TeamId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("schedules_team_id_fkey");
+
+                    b.Navigation("Team");
                 });
 
             modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.TeamMemberEntity", b =>

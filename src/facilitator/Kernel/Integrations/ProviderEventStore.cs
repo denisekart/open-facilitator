@@ -803,6 +803,37 @@ public sealed class ProviderEventStore(
             // LinkIngress steer-arm precedent). Judgment recorded pre-commit.
             var version = await db.Works.Where(w => w.WorkId == workId).Select(w => w.Version).FirstOrDefaultAsync(ct);
             var directive = Trim(text ?? $"{provider} {action} on change request #{reference.Root}");
+
+            // K4/K6: a review on the change request is a timeline decision, and
+            // the kernel says what it is worth. A reviewer whose provider
+            // account is linked to a human identity is a HUMAN decision on the
+            // item; anyone else (the contributor's own "checks passed", an
+            // unlinked bot) is recorded as an unverified claim. Either way the
+            // accountable person is the work owner, named on the row (L2).
+            var reviewer = data.TryGetProperty("actorProviderAccountId", out var acct)
+                && acct.ValueKind == JsonValueKind.String ? acct.GetString() ?? string.Empty : string.Empty;
+            var humanSubject = await db.ProviderIdentities.AsNoTracking()
+                .Where(i => i.Provider == provider && i.AccountId == reviewer)
+                .Select(i => $"{i.OidcIssuer}|{i.OidcSubject}").FirstOrDefaultAsync(ct);
+            var ownerActor = await db.Works.AsNoTracking()
+                .Where(w => w.WorkId == workId).Select(w => w.OwnerActor).FirstOrDefaultAsync(ct);
+            db.WorkEvents.Add(new WorkEventEntity
+            {
+                EventId = Guid.NewGuid(),
+                WorkId = workId,
+                WorkVersion = version,
+                Kind = "review.decision",
+                Actor = humanSubject is { Length: > 0 } subject ? $"oidc:{subject}" : $"provider:{provider}:{reviewer}",
+                Detail = JsonSerializer.Serialize(new Dictionary<string, string?>
+                {
+                    ["changeRequest"] = $"{reference.Provider}/{reference.Root}",
+                    ["action"] = action,
+                    ["verdict"] = Trim(text ?? string.Empty),
+                    ["verified"] = humanSubject is { Length: > 0 } ? "human" : "unverified-claim",
+                    ["accountable"] = ownerActor,
+                }),
+                CreatedAt = now,
+            });
             return new ArmEffect(workId, $"steered:{workId}", (workId, directive, version));
         }
 

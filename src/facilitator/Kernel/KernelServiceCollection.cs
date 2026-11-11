@@ -118,6 +118,7 @@ public static class KernelServiceCollection
         builder.Services.AddSingleton<Facilitator.Kernel.Teams.TeamSettingsStore>();
         builder.Services.AddSingleton<Facilitator.Kernel.Teams.TeamDirectory>();
         builder.Services.AddSingleton<Facilitator.Kernel.Teams.TeamScope>();
+        builder.Services.AddSingleton<Facilitator.Kernel.Teams.ContributorStore>();
         builder.Services.AddSingleton<Facilitator.Kernel.Teams.EffectiveConfigResolver>();
         builder.Services.AddSingleton<IdentityStartupCheck>();
         builder.Services.AddHostedService(sp => sp.GetRequiredService<IdentityStartupCheck>());
@@ -208,6 +209,12 @@ public static class KernelServiceCollection
             ?? new Work.NudgeSweeper.NudgeOptions());
         builder.Services.AddSingleton<Work.NudgeSweeper>();
         builder.Services.AddHostedService(sp => sp.GetRequiredService<Work.NudgeSweeper>());
+
+        // A10: recurring cadences fire work + a team-visible notice.
+        builder.Services.AddOptions<Work.ScheduleSweeper.ScheduleOptions>()
+            .Bind(builder.Configuration.GetSection(Work.ScheduleSweeper.ScheduleOptions.SectionName));
+        builder.Services.AddSingleton<Work.ScheduleSweeper>();
+        builder.Services.AddHostedService(sp => sp.GetRequiredService<Work.ScheduleSweeper>());
 
         // The session-loss law: per-replica loop; per-execution
         // hysteresis keeps a blip from failing anything, the inbox unique

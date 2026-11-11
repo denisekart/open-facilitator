@@ -332,7 +332,8 @@ public sealed class ApprovalLedger(
         if (row.NotRequester && decision == "approved" && await RequesterSideAsync(db, row, actorActor, actorGroups, ct))
         {
             audit.Append(db, DenyAudit(row, actorActor, ApprovalDecisionOutcome.Ineligible)
-                with { Reason = "not-requester" });
+                with
+            { Reason = "not-requester" });
             await db.SaveChangesAsync(ct);
             await tx.CommitAsync(ct);
             return new ApprovalDecision(ApprovalDecisionOutcome.Ineligible, Map(row));

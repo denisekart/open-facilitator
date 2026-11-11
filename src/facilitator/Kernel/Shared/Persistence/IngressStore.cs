@@ -111,7 +111,16 @@ public sealed class IngressStore(IDbContextFactory<FacilitatorDbContext> context
     }
 
     /// <summary>Newest 50 works, newest first; when <paramref name="teamSlugs"/> is non-null, only works of those teams.</summary>
-    public async Task<IReadOnlyList<WorkView>> ListRecentAsync(IReadOnlyList<string>? teamSlugs, CancellationToken ct)
+    public async Task<IReadOnlyList<WorkView>> ListRecentAsync(
+        IReadOnlyList<string>? teamSlugs, CancellationToken ct) =>
+        await ListRecentAsync(teamSlugs, state: null, team: null, limit: 50, offset: 0, ct);
+
+    /// <summary>The queue-shaped list (D2/N28): filterable by state and one
+    /// team, paged (limit capped at 200), newest first. <c>team</c> narrows
+    /// within the visible set — a team outside visibility still answers empty,
+    /// never another team's works.</summary>
+    public async Task<IReadOnlyList<WorkView>> ListRecentAsync(
+        IReadOnlyList<string>? teamSlugs, string? state, string? team, int limit, int offset, CancellationToken ct)
     {
         await using var db = await contextFactory.CreateDbContextAsync(ct);
         var query = db.Works.AsNoTracking();
@@ -121,11 +130,53 @@ public sealed class IngressStore(IDbContextFactory<FacilitatorDbContext> context
                 || (w.Team == null && w.Project != null && teamSlugs.Contains(w.Project.Team!.Slug)));
         }
 
+        if (state is { Length: > 0 })
+        {
+            query = query.Where(w => w.State == state);
+        }
+
+        if (team is { Length: > 0 })
+        {
+            query = query.Where(w => (w.Team != null && w.Team.Slug == team)
+                || (w.Team == null && w.Project != null && w.Project.Team!.Slug == team));
+        }
+
         return await query
             .OrderByDescending(w => w.CreatedAt)
-            .Take(50)
+            .Skip(Math.Max(0, offset))
+            .Take(Math.Clamp(limit <= 0 ? 50 : limit, 1, 200))
             .Select(WorkProjection.View)
             .ToListAsync(ct);
+    }
+
+    /// <summary>Open routing intents with age (D2: "waiting long" is a query,
+    /// not a guess): pending outbox rows on the routing channel, oldest first.</summary>
+    public async Task<IReadOnlyList<PendingIntentRow>> PendingIntentsAsync(
+        IReadOnlyList<string>? teamSlugs, CancellationToken ct)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(ct);
+        return await db.Outbox.AsNoTracking()
+            .Where(o => o.Status == "pending" && o.RecipientEndpointId == Facilitator.Kernel.Work.RoutingIntent.Recipient)
+            .OrderBy(o => o.AvailableAt)
+            .Select(o => new PendingIntentRow(o.OutboxId, o.CommandId, o.Envelope, o.Attempts, o.AvailableAt, o.CreatedAt))
+            .Take(500)
+            .ToListAsync(ct);
+    }
+
+    /// <summary>One pending routing intent as the queue read renders it.</summary>
+public sealed record PendingIntentRow(
+    Guid OutboxId, string CommandId, string Envelope, int Attempts, DateTime AvailableAt, DateTime CreatedAt);
+
+/// <summary>The oldest live routing-intent age in seconds (0 when nothing
+    /// waits) — the starvation gauge (I5/N28).</summary>
+    public async Task<double> OldestPendingIntentAgeSecondsAsync(CancellationToken ct)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(ct);
+        var oldest = await db.Outbox.AsNoTracking()
+            .Where(o => o.Status == "pending" && o.RecipientEndpointId == Facilitator.Kernel.Work.RoutingIntent.Recipient)
+            .Select(o => (DateTime?)o.CreatedAt)
+            .MinAsync(ct);
+        return oldest is { } at ? Math.Max(0, (timeProvider.GetUtcNow().UtcDateTime - at).TotalSeconds) : 0;
     }
 
     private static void Add(System.Data.Common.DbCommand command, string name, object value)

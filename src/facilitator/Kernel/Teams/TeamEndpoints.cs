@@ -15,7 +15,7 @@ namespace Facilitator.Kernel.Teams;
 /// touches anything; a team-operator (a roster row of capacity
 /// <c>operator</c> — a code-declared built-in role) touches only its own team.
 /// </summary>
-public static class TeamEndpoints
+public static partial class TeamEndpoints
 {
     /// <summary>Map the team-API group.</summary>
     public static IEndpointRouteBuilder MapTeamsApi(this IEndpointRouteBuilder app)
@@ -102,6 +102,9 @@ public static class TeamEndpoints
         });
 
         // Per-team / per-channel switch rows (the team + channel layers of effective config).
+        MapContributors(group);
+        MapSchedules(group);
+
         group.MapGet("/teams/{slug}/settings", async (string slug, TeamRosterStore roster, TeamSettingsStore settings, HttpContext http, CancellationToken ct) =>
             await ReadAuthorityAsync(http, slug, roster, ct) is { } denial
                 ? denial

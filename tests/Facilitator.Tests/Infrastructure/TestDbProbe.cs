@@ -438,6 +438,37 @@ public sealed class TestDbProbe : IAsyncDisposable
                 cmd.Parameters.AddWithValue(subject);
             });
 
+    /// <summary>A work owned by an actor (retirement tests need a named owner).</summary>
+    public async Task<Guid> SeedWorkOwned(Guid projectId, string ownerActor, string state)
+    {
+        var workId = Guid.NewGuid();
+        await NonQuery(
+            "INSERT INTO facilitator.works (work_id, project_id, objective, state, version, owner_actor, created_at, updated_at) "
+            + "VALUES ($1, $2, 'owned seed', $3, 1, $4, now(), now())",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(workId);
+                cmd.Parameters.AddWithValue(projectId);
+                cmd.Parameters.AddWithValue(state);
+                cmd.Parameters.AddWithValue(ownerActor);
+            });
+        return workId;
+    }
+
+    /// <summary>The current owner actor of a work (null when unowned).</summary>
+    public async Task<string?> WorkOwnerActor(Guid workId) =>
+        await ScalarStringOrNull(
+            "SELECT coalesce(owner_actor, '') FROM facilitator.works WHERE work_id = $1",
+            cmd => cmd.Parameters.AddWithValue(workId)) is { Length: > 0 } s ? s : null;
+
+    /// <summary>The contributor handle bound to an enrollment (K9), null when unbound.</summary>
+    public async Task<string?> EnrollmentContributorHandle(string endpointId) =>
+        await ScalarStringOrNull(
+            "SELECT coalesce(c.handle, '') FROM facilitator.link_enrollments e "
+            + "LEFT JOIN facilitator.contributors c ON c.contributor_id = e.contributor_id "
+            + "WHERE e.endpoint_id = $1",
+            cmd => cmd.Parameters.AddWithValue(endpointId)) is { Length: > 0 } s ? s : null;
+
     /// <summary>Seed a team-scope or channel-scope switch row (notifications
     /// cadence layers are what tests need here).</summary>
     public Task SeedTeamSetting(string teamSlug, string scopeKind, string scopeId, string resource, string payload) =>
@@ -1423,6 +1454,15 @@ public sealed class TestDbProbe : IAsyncDisposable
 
     private async Task<bool> ScalarBool(string sql, Action<NpgsqlCommand> bind) =>
         await ScalarLong(sql, bind) == 1;
+
+    private async Task<string?> ScalarStringOrNull(string sql, Action<NpgsqlCommand> bind)
+    {
+        await using var connection = await _dataSource.OpenConnectionAsync();
+        await using var command = new NpgsqlCommand(sql, connection);
+        bind(command);
+        var value = await command.ExecuteScalarAsync();
+        return value is string s && s.Length > 0 ? s : null;
+    }
 
     private async Task<long> ScalarLong(string sql, Action<NpgsqlCommand> bind)
     {

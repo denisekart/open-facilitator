@@ -29,6 +29,7 @@ public sealed class WorkEventEntityConfiguration : IEntityTypeConfiguration<Work
                     "artifact.stored", "artifact.registered", "artifact.available", "artifact.gc",
                     "manifest.recorded", "manifest.superseded", "memory.candidate", "memory.promoted",
                     "provider.input", "provider.attachment", "provider.reaction", "input.required", "input.answered",
-                    "provider.duplicate", "work.linked", "work.triaged", "approval.nudged", "work.consent-expired"])));
+                    "provider.duplicate", "work.linked", "work.triaged", "approval.nudged", "work.consent-expired",
+                    "address.obsolete", "review.decision"])));
     }
 }

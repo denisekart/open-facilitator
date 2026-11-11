@@ -98,6 +98,20 @@ public sealed class RoutingSink(
             d => d.IntentCommandId == intent.IntentCommandId, ct);
         if (candidates.Count == 0)
         {
+            // N13/P9: a human-subject evidence against a contributor-only
+            // capability is REFUSED, not silently downgraded — the funnel
+            // records the refusal (never retried: no evidence change short of
+            // a new intent fixes it) and the triage leg discloses it once.
+            if (!advertisedSlot && await ContributorOnlyAgainstHumanAsync(db, intent, workTeamSlug, ct))
+            {
+                var refusedAudit = UpsertAudit(db, audit, intent, work.WorkId, allowedJson, chosen: null,
+                    "abandoned", "human-against-contributor-only", providerRef: null, now);
+                await TriageOnceAsync(db, refusedAudit, intent, work.WorkId, now, ct);
+                await db.SaveChangesAsync(ct);
+                await tx.CommitAsync(ct);
+                return true;
+            }
+
             var pendingBasis = advertisedSlot ? "no-capacity" : "no-candidate";
             var pendingAudit = UpsertAudit(db, audit, intent, work.WorkId, allowedJson, chosen: null, "pending", pendingBasis, providerRef: null, now);
 
@@ -422,6 +436,56 @@ public sealed class RoutingSink(
         {
             return null;
         }
+    }
+
+    /// <summary>N13/P9: true when the intent's actor evidence names a human
+    /// subject (delegated oidc JWT, or a kernel-minted row whose subject is an
+    /// oidc human) while the capability lives only in some active
+    /// contributor's remit — an assignment of a human to a contributor-only
+    /// capability. Workload pointers (provider:, contributor:) are not humans.</summary>
+    private static async Task<bool> ContributorOnlyAgainstHumanAsync(
+        FacilitatorDbContext db, RoutingIntent intent, string? workTeamSlug, CancellationToken ct)
+    {
+        var ref_ = intent.ActorEvidenceRef;
+        var namesHuman = ref_.StartsWith("oidc:", StringComparison.Ordinal);
+        if (!namesHuman && ref_.StartsWith("kernel:", StringComparison.Ordinal))
+        {
+            var evidenceId = ref_[7..];
+            var subject = await db.Evidence.AsNoTracking()
+                .Where(e => e.EvidenceId == evidenceId)
+                .Select(e => e.Subject).FirstOrDefaultAsync(ct);
+            namesHuman = subject is { Length: > 0 } s && s.StartsWith("oidc:", StringComparison.Ordinal);
+        }
+
+        if (!namesHuman)
+        {
+            return false;
+        }
+
+        var remits = db.Contributors.AsNoTracking().Where(c => c.Status == "active");
+        if (workTeamSlug is not null)
+        {
+            remits = remits.Where(c => c.Team!.Slug == workTeamSlug);
+        }
+
+        foreach (var remit in await remits.Select(c => c.Remit).ToListAsync(ct))
+        {
+            try
+            {
+                if (JsonDocument.Parse(remit).RootElement
+                        .TryGetProperty("capabilityIds", out var ids)
+                    && ids.EnumerateArray().Any(e => e.GetString() == intent.CapabilityId))
+                {
+                    return true;
+                }
+            }
+            catch (JsonException)
+            {
+                // An unparseable remit claims nothing.
+            }
+        }
+
+        return false;
     }
 
     /// <summary>Move a no-candidate ask to blocked/triage ONCE (the triage

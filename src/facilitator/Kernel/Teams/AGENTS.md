@@ -22,6 +22,20 @@ human/team layer every other area resolves authority and cadence against.
 - Config bootstraps both planes at startup (`../Shared/Identity/TeamRosterSeeder.cs`);
   the DB is truth after the first write.
 
+## Contributors (`ContributorStore.cs`, `ContributorEndpoints.cs`)
+- A non-human process member is a named, team-owned row in `contributors`;
+  the canonical actor is `contributor:<handle>` and registration seats the
+  same actor on the roster (kind `contributor`) — never silently a human.
+- Remit (`{"capabilityIds": [], "operations": []}`) changes are operator
+  actions with a mandatory reason, audited with author + date (K7).
+- Retirement keeps the row (history names its actors) and hands the
+  contributor's open works to the team (`owner_actor = null`); an enrollment
+  can bind to a contributor (K9) so a workload speaks AS the named actor.
+- A capability named only in an active contributor's remit is contributor-
+  only: a human-subject `work.assign` against it is refused by the routing
+  funnel (`abandoned`/`human-against-contributor-only`) and triaged once,
+  never silently routed to a human.
+
 ## Invariants
 - The roster is the only source of team standing; a display name never enters
   an actor string.

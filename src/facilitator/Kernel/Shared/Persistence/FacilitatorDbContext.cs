@@ -52,6 +52,8 @@ public class FacilitatorDbContext(DbContextOptions<FacilitatorDbContext> options
 
     public DbSet<HeldActionEntity> HeldActions => Set<HeldActionEntity>();
 
+    public DbSet<NotificationEntity> Notifications => Set<NotificationEntity>();
+
     public DbSet<CommunicationBindingEntity> CommunicationBindings => Set<CommunicationBindingEntity>();
 
     public DbSet<ProviderIdentityEntity> ProviderIdentities => Set<ProviderIdentityEntity>();
@@ -97,6 +99,10 @@ public class FacilitatorDbContext(DbContextOptions<FacilitatorDbContext> options
     public DbSet<ChatActionEntity> ChatActions => Set<ChatActionEntity>();
 
     public DbSet<TeamMemberEntity> TeamMembers => Set<TeamMemberEntity>();
+
+    public DbSet<ContributorEntity> Contributors => Set<ContributorEntity>();
+
+    public DbSet<ScheduleEntity> Schedules => Set<ScheduleEntity>();
 
     public DbSet<TeamSettingEntity> TeamSettings => Set<TeamSettingEntity>();
 

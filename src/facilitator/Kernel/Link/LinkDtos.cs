@@ -21,7 +21,10 @@ public sealed record DeliveryDto(Guid DeliveryId, JsonElement Envelope, DateTime
 /// <param name="TrustMode">Declared trust mode (immutable for the session).</param>
 /// <param name="Role">gateway | child (mode (a) hint; must not contradict a mode-(b) binding).</param>
 /// <param name="Team">Team roster slug to bind (mode (b): binding wins).</param>
-public sealed record EnrollRequestDto(string Token, string EndpointId, string InstanceId, string TrustMode, string? Role, string? Team);
+/// <param name="Contributor">Bind the enrollment to this contributor handle (K9):
+/// the workload then speaks AS the named non-human actor; several enrollments
+/// may share one contributor. The contributor must exist on the bound team.</param>
+public sealed record EnrollRequestDto(string Token, string EndpointId, string InstanceId, string TrustMode, string? Role, string? Team, string? Contributor);
 
 /// <summary>
 /// Wire shape of the 201 enroll response (enroll-response.v1.json; the token

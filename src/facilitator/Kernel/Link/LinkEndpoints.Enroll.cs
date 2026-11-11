@@ -17,7 +17,7 @@ public static partial class LinkEndpoints
     // a JWKS-verified OIDC client-credentials JWT bound to a Link:WorkloadIdentities
     // pre-registration. Both mint the same rotating opaque link token.
     private static void MapEnroll(RouteGroupBuilder group) =>
-        group.MapPost("/enroll", async (HttpRequest request, LinkEnrollmentStore store, EnrollmentTokenStore tokens, LinkEnrollmentSecret secret, OidcJwks jwks, LinkOptions options, CancellationToken ct) =>
+        group.MapPost("/enroll", async (HttpRequest request, LinkEnrollmentStore store, EnrollmentTokenStore tokens, LinkEnrollmentSecret secret, OidcJwks jwks, LinkOptions options, Facilitator.Kernel.Teams.ContributorStore contributors, CancellationToken ct) =>
         {
             var body = await RequestBodies.ReadAsync(request, ct);
             if (body.TooLarge)
@@ -186,6 +186,23 @@ public static partial class LinkEndpoints
                 // Concurrent first use won the consume fence: the token is
                 // that endpoint's standing secret now, not this one's.
                 return Results.Problem(ProblemErrors.EnrollmentSecretInvalid());
+            }
+
+            // K9: an enrollment may speak AS a named contributor of its team.
+            // The binding lands after the enrollment row (rotation keeps it);
+            // an unknown or foreign-team handle refuses the whole enroll.
+            if (dto.Contributor is { Length: > 0 } contributor)
+            {
+                var view = await contributors.FindAsync(contributor, ct);
+                if (view is null || !string.Equals(view.TeamSlug, team, StringComparison.Ordinal)
+                    || view.Status != "active")
+                {
+                    return Results.Problem(ProblemErrors.Create(
+                        "contributor-unknown", "Bad request", StatusCodes.Status404NotFound,
+                        $"contributor '{contributor}' is not an active contributor of team '{team}'"));
+                }
+
+                await store.BindContributorAsync(result.EnrollmentId, view.Handle, ct);
             }
 
             return Results.Created($"/api/link/v1/capabilities",

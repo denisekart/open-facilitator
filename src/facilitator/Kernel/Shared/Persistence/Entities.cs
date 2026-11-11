@@ -70,6 +70,74 @@ public sealed class TeamSettingEntity
     public TeamEntity? Team { get; set; }
 }
 
+/// <summary>facilitator.contributors — named non-human process members (K-family):
+/// a bot, worker or agent a team owns. The canonical actor is
+/// <c>contributor:&lt;handle&gt;</c>; a roster row of kind <c>contributor</c> is kept
+/// alongside so the contributor is a first-class actor in one place.</summary>
+public sealed class ContributorEntity
+{
+    public Guid ContributorId { get; set; }
+
+    public Guid TeamId { get; set; }
+
+    /// <summary>Globally unique handle (the actor suffix).</summary>
+    public required string Handle { get; set; }
+
+    public string? DisplayName { get; set; }
+
+    /// <summary>jsonb <c>{"capabilityIds": [], "operations": []}</c> — what this
+    /// contributor is currently entrusted to do (remit changes are operator actions).</summary>
+    public required string Remit { get; set; }
+
+    /// <summary>active | retired (CHECK-constrained).</summary>
+    public required string Status { get; set; }
+
+    public DateTime CreatedAt { get; set; }
+
+    public DateTime? RetiredAt { get; set; }
+
+    /// <summary>Canonical actor of the last register/retire/remit writer.</summary>
+    public string? ChangedBy { get; set; }
+
+    /// <summary>Reason of the last change (mandatory on remit writes).</summary>
+    public string? ChangeReason { get; set; }
+
+    public TeamEntity? Team { get; set; }
+}
+
+/// <summary>facilitator.schedules — a recurring "create this work" cadence a
+/// team owns (A10). Each firing creates a work AND a team-visible notification
+/// naming the accountable owner — never a silent item.</summary>
+public sealed class ScheduleEntity
+{
+    public Guid ScheduleId { get; set; }
+
+    public Guid TeamId { get; set; }
+
+    public required string Objective { get; set; }
+
+    /// <summary>Wire cadence: <c>interval:&lt;n&gt;m</c> | <c>daily:HH:mm</c> | <c>cron:&lt;expr&gt;</c> (cron is a stored plan the sweeper parses itself: a five-field minute-level expression).</summary>
+    public required string Cadence { get; set; }
+
+    /// <summary>IANA zone for <c>daily</c>/<c>cron</c> wall-clock math (nullable = UTC).</summary>
+    public string? Timezone { get; set; }
+
+    public DateTime NextRunAt { get; set; }
+
+    public DateTime? LastRunAt { get; set; }
+
+    public bool Enabled { get; set; }
+
+    /// <summary>Accountable owner of everything the schedule creates.</summary>
+    public string? OwnerActor { get; set; }
+
+    public required string CreatedBy { get; set; }
+
+    public DateTime CreatedAt { get; set; }
+
+    public TeamEntity? Team { get; set; }
+}
+
 /// <summary>facilitator.projects — work container within a team.</summary>
 public sealed class ProjectEntity
 {
@@ -458,6 +526,10 @@ public sealed class LinkEnrollmentEntity
 
     /// <summary>Mode (b): subject (client id / service account) of the workload token.</summary>
     public string? WorkloadSubject { get; set; }
+
+    /// <summary>Non-human actor binding (K9): when set, this enrollment speaks AS
+    /// this contributor; several enrollments may share one contributor id.</summary>
+    public Guid? ContributorId { get; set; }
 }
 
 /// <summary>facilitator.enrollment_tokens — mintable, revocable enrollment tokens (admin-minted; consumed on first enroll).</summary>
@@ -571,6 +643,50 @@ public sealed class ApprovalEntity
 
     /// <summary>When the expiry nudge fired (one per approval), null while none.</summary>
     public DateTime? NudgedAt { get; set; }
+}
+
+/// <summary>facilitator.notifications — one addressed human notice, whatever
+/// channel reaches it. Every human-visible emission from the kernel lands here
+/// first (the ledger is the promise), then rides an outbox row to the adapter:
+/// the EgressResolver picks the rung (bound conversation → team channel →
+/// anonymized public post), a vanished address marks the row obsolete, and an
+/// abandonment carries its reason visibly (P5).</summary>
+public sealed class NotificationEntity
+{
+    public Guid NotificationId { get; set; }
+
+    public Guid? WorkId { get; set; }
+
+    /// <summary>actor | team | operators (CHECK-constrained).</summary>
+    public required string Audience { get; set; }
+
+    public Guid? TeamId { get; set; }
+
+    /// <summary>Canonical actor for an <c>actor</c> audience.</summary>
+    public string? Actor { get; set; }
+
+    /// <summary>info | notice | warning | critical.</summary>
+    public string Level { get; set; } = "notice";
+
+    public required string Text { get; set; }
+
+    /// <summary>jsonb <c>conversationTarget</c> (the rung the resolver chose).</summary>
+    public string Target { get; set; } = "{}";
+
+    /// <summary>jsonb ordered fallback ladder (rungs the resolver may take).</summary>
+    public string Fallback { get; set; } = "[]";
+
+    /// <summary>pending | sent | fell-back | undeliverable | obsolete.</summary>
+    public string State { get; set; } = "pending";
+
+    /// <summary>P5: a visible abandonment/obsolescence reason.</summary>
+    public string? Reason { get; set; }
+
+    public DateTime? CorrectionWindowEndsAt { get; set; }
+
+    public DateTime CreatedAt { get; set; }
+
+    public DateTime UpdatedAt { get; set; }
 }
 
 /// <summary>facilitator.held_actions — the command consent holds, stored by the

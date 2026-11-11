@@ -27,6 +27,7 @@ public sealed class LinkEnrollmentEntityConfiguration : IEntityTypeConfiguration
         e.Property(x => x.AcceptsDelegatedClaims).HasColumnName("accepts_delegated_claims").IsRequired();
         e.Property(x => x.WorkloadIssuer).HasColumnName("workload_issuer");
         e.Property(x => x.WorkloadSubject).HasColumnName("workload_subject");
+        e.Property(x => x.ContributorId).HasColumnName("contributor_id");
         e.HasIndex(x => x.EndpointId).IsUnique().HasDatabaseName("link_enrollments_endpoint_id_key");
         e.HasOne<TeamEntity>().WithMany().HasForeignKey(x => x.TeamId).HasConstraintName("link_enrollments_team_id_fkey");
         e.ToTable(t => t.HasCheckConstraint("link_enrollments_trust_mode_check",

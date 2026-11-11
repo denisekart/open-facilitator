@@ -57,6 +57,28 @@ public sealed class LinkEnrollmentStore(
     /// <param name="acceptsDelegatedClaims">Delegation acceptance (mode (b) binding; false for mode (a)).</param>
     /// <param name="workload">Mode-(b) workload identity (issuer+subject); null for mode (a).</param>
     /// <param name="ct">Cancellation.</param>
+    /// <summary>K9: bind an enrollment to a contributor (the workload speaks AS
+    /// that named actor). Several enrollments may share one contributor id.</summary>
+    public async Task BindContributorAsync(Guid enrollmentId, string handle, CancellationToken ct)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(ct);
+        var contributor = await db.Contributors.FirstOrDefaultAsync(c => c.Handle == handle, ct);
+        if (contributor is null)
+        {
+            throw new ArgumentException($"contributor '{handle}' is not registered");
+        }
+
+        var enrollment = await db.LinkEnrollments.FirstOrDefaultAsync(e => e.EnrollmentId == enrollmentId, ct)
+            ?? throw new ArgumentException("enrollment not found");
+        if (enrollment.TeamId != contributor.TeamId)
+        {
+            throw new ArgumentException($"contributor '{handle}' belongs to another team");
+        }
+
+        enrollment.ContributorId = contributor.ContributorId;
+        await db.SaveChangesAsync(ct);
+    }
+
     public async Task<EnrollmentResult?> EnrollAsync(
         string endpointId, string instanceId, string trustMode, string? requestSecret,
         string teamSlug, string role, bool acceptsDelegatedClaims,

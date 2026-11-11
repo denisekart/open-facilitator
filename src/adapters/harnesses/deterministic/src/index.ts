@@ -2,6 +2,8 @@
 // loader + deterministic two-step research script + `ofac-deterministic-worker`.
 // Third-party implementers copy this package (src/harness.ts especially)
 // as the reference shape of harness hooks over @ofac/adapter.
+export { DETERMINISTIC_CAPABILITIES } from "./capabilities.js";
+export type { HarnessCapabilities } from "@ofac/adapter";
 export {
   DEFAULT_RESTART_BACKOFF_MS,
   WorkerConfigError,

@@ -93,11 +93,37 @@ probe answers `running`. Call it in your `test/lifecycle.test.ts` — the
 deterministic harness instantiates it twice (steering + no-steer variants)
 to prove the kit asserts, not just runs.
 
+## The functionality list
+
+`src/capabilities.ts` is the single authoritative list of what a harness may
+be asked to do and what it may answer with — the harness-plane twin of the
+comms plane's command family:
+
+- `HARNESS_COMMANDS` — what may ARRIVE (assign, steer, cancel,
+  assignment.input, nudge, status.request).
+- `HARNESS_EVENTS` — what a harness may PUBLISH (progress, input.required,
+  completed, failed, artifact.available, memory candidate/used).
+- `HARNESS_OUTBOUND_COMMANDS` — what a harness SENDS (artifact
+  request/confirm_upload via the artifact client, memory retain/recall +
+  context.fetch via the memory client).
+- `HARNESS_FRAMES` — the adapter.v1 lifecycle frames (mechanics, not
+  capability).
+
+`fullHarnessCapabilities(omissions)` derives a `HarnessCapabilities` from
+the full list; an omission MUST carry its reason, and
+`unsupportedFor(cmd, caps)` is the answer owed for anything outside the
+list — never silence, never a timeout. `omp`, `codex` and `deterministic`
+each export their honest declaration (`OMP_CAPABILITIES`,
+`CODEX_CAPABILITIES`, `DETERMINISTIC_CAPABILITIES`); the as-built gap
+(nudge has no child-wire frame — the Gateway answers on the child's
+behalf) is recorded there, not hidden.
+
 ## Package layout
 
 |File|Role|
 |---|---|
 |`src/types.ts`|the public surface above (documentation-grade; wire shapes are imported, never redefined)|
+|`src/capabilities.ts`|the harness-facing functionality list + the honest-omission law|
 |`src/registry.ts`|execution registry: dedupe, `status` truth, `TERMINAL_TTL_MS`|
 |`src/adapter.ts`|`createAdapter` = `connectChild` + the lifecycle law + restart loop|
 |`src/testing.ts`|the lifecycle conformance kit|

@@ -4,6 +4,8 @@
 // this package (src/harness.ts especially) as the reference shape of
 // harness hooks over @ofac/adapter for a batch CLI harness with
 // mid-run-interaction but NO mid-run steering.
+export { CODEX_CAPABILITIES } from "./capabilities.js";
+export type { HarnessCapabilities } from "@ofac/adapter";
 export { DEFAULT_RESTART_BACKOFF_MS } from "./config.js";
 export { WorkerConfigError, parseWorkerConfig, loadWorkerConfigFile } from "./config.js";
 export type {

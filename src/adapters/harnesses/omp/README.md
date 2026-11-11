@@ -104,6 +104,14 @@ Result Manifest rides the completed event as `resultManifestRef` +
 `assignment.failed` (`omp exit <code>: <stderr tail>`) — the error leg to
 humans.
 
+## Functionality list
+
+This harness exports `OMP_CAPABILITIES` (see `@ofac/adapter` README, "The
+functionality list"): the full harness command/event list minus the
+omissions this runtime genuinely lives with, each with its reason. It
+steers and answers `unsupported` (never silence) for anything outside
+the list.
+
 ## Tests
 
 - `pnpm test` — config law, the fake-omp RPC suite (probe-shaped stream,

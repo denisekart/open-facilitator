@@ -91,6 +91,14 @@ artifact store; an immutable Result Manifest rides the completed event as
 honest `assignment.failed` (`codex exit <code>: <stderr tail>`) — the error
 leg to humans.
 
+## Functionality list
+
+This harness exports `CODEX_CAPABILITIES` (see `@ofac/adapter` README, "The
+functionality list"): the full harness command/event list minus the
+omissions this runtime genuinely lives with, each with its reason. It
+does NOT steer and answers `unsupported` (never silence) for anything outside
+the list.
+
 ## Tests
 
 - `pnpm test` — config law, the fake-CLI harness suite (probe-shaped

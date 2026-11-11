@@ -32,16 +32,34 @@ export {
   OpError,
   connectorManifest,
   payloadSha256,
+  degradationFrom,
   replayFrom,
   required,
   requiredNumber,
   stampedBody,
+  type OpDegradation,
   type OpDeps,
   type OpResult,
   type OpRunner,
   type OpTable,
 } from "./ops-core.js";
 export { createConnectorHooks, type ConnectorHooks } from "./hooks-core.js";
+export {
+  HttpError,
+  httpErrorFrom,
+  parseRetryAfter,
+  withRetry,
+  type RetryAttempt,
+  type WithRetryOptions,
+} from "./http-core.js";
+export { createLoopBudget, withLoopBudget, type LoopBudget } from "./loop-budget.js";
+export {
+  ensureWebhook,
+  replaceWebhook,
+  type WebhookEnsureOutcome,
+  type WebhookRegistrationApi,
+  type WebhookSpec,
+} from "./webhook-registration.js";
 export {
   ConnectorConfigError,
   DEFAULT_BACKOFF,

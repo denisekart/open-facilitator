@@ -9,7 +9,8 @@ import type { EnvelopeCommand } from "@ofac/protocol";
 import { buildEvent, dataschemaFor } from "@ofac/workspace-link";
 import type { LinkLogger } from "@ofac/workspace-link";
 import type { RunContext, RunOutcome } from "@ofac/adapter";
-import type { OpTable } from "./ops-core.js";
+import type { OpResult, OpTable } from "./ops-core.js";
+import { HttpError } from "./http-core.js";
 
 const COMPLETED_TYPE = "org.facilitator.event.assignment.completed.v1";
 
@@ -41,7 +42,19 @@ export function createConnectorHooks(opts: {
     const inputs = (data["inputs"] ?? {}) as Record<string, unknown>;
     const commandId = typeof data["commandId"] === "string" ? data["commandId"] : ctx.executionId;
 
-    const result = await run(commandId, inputs);
+    let result: OpResult;
+    try {
+      result = await run(commandId, inputs);
+    } catch (error) {
+      // N7/F6: a provider wall or a throttle is named on the failure, never
+      // a bare "the op threw" - the operator reads 403 and 429 apart.
+      if (error instanceof HttpError) {
+        return { kind: "failed", reason: `provider-http-${error.status}` };
+      }
+
+      throw error;
+    }
+
     ctx.publishProgress(`${capabilityId} -> ${result.providerObjectId}`);
     ctx.publishEvent(
       buildEvent(COMPLETED_TYPE, {
@@ -59,7 +72,10 @@ export function createConnectorHooks(opts: {
             outputs: [],
             capability: capabilityId,
             summary: `${capabilityId} -> ${result.providerObjectId}`,
-            structuredResult: result.structured,
+            structuredResult:
+              result.degraded === undefined
+                ? result.structured
+                : { ...result.structured, degraded: result.degraded },
             createdAt: new Date().toISOString(),
           },
         },

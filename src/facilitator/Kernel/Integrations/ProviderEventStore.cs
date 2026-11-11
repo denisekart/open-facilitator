@@ -355,6 +355,26 @@ public sealed class ProviderEventStore(
         };
         db.Inbox.Add(inbox);
 
+        // B6/N2 (system-side half): a conversation that has already heard the
+        // facilitator `maxExchangesPerConversation` times this window stops
+        // - before any arm can post again. State-change classes are exempt:
+        // they carry no reply and the echo law already exempts the bot's own.
+        if (type is ProviderEventClass.Message or ProviderEventClass.Mention or ProviderEventClass.Reaction
+            && await LoopBudgetSpentAsync(db, options, reference, now, ct) is { } spent)
+        {
+            // The stop settles on the ledger row (echo-law precedent): a
+            // redelivered event reads the judgment and stays a duplicate -
+            // a silent rollback would let the connector re-drive forever.
+            var stopJudgment = $"loop-budget:stop:{spent}";
+            await db.SaveChangesAsync(ct);
+            await db.ProviderEvents.Where(e => e.ProviderEventId == providerEventId)
+                .ExecuteUpdateAsync(s => s.SetProperty(e => e.VerifiedReference, stopJudgment), ct);
+            await tx.CommitAsync(ct);
+            metrics.LinkReceived();
+            metrics.InboxProcessed();
+            return new ProviderIngressOutcome("accepted", providerEventId, null, new { judgment = stopJudgment });
+        }
+
         // D1: cadence resolves channel -> team -> system, one truth (the
         // slash plane and the decode sink read the same resolver).
         var ack = await Facilitator.Kernel.Notifications.NotificationLedger.CadenceAsync(
@@ -1458,6 +1478,59 @@ public sealed class ProviderEventStore(
         text.Length <= 2000 ? text : text[..2000];
 
     public sealed record Reference(string Provider, string Tenant, string Channel, string Root, string? MessageId, string Kind);
+
+    /// <summary>The system-side loop budget (B6, N2), consumed in the
+    /// provider-ingress arms: the <c>loop-budget</c> admin_config row caps
+    /// how many replies the facilitator itself posts into one conversation
+    /// per window - the echo-law ledger rows ARE that count (no second
+    /// state). Over the cap the conversation arm STOPS (judgment
+    /// <c>loop-budget:stop</c>): two bots answering each other go silent at
+    /// the cap instead of looping, and the judgment on the ledger row makes
+    /// the silence auditable. No row, or a state-change event (load-bearing,
+    /// echo-exempt): never gated. The window itself is the human reset: a
+    /// quiet period clears the exchange count.</summary>
+    internal async Task<string?> LoopBudgetSpentAsync(
+        FacilitatorDbContext db, ProviderOptions options, Reference reference, DateTime now, CancellationToken ct)
+    {
+        if (options.BotUserId is not { Length: > 0 })
+        {
+            return null;
+        }
+
+        var policy = await db.AdminConfig.AsNoTracking()
+            .FirstOrDefaultAsync(c => c.Resource == "loop-budget", ct);
+        if (policy is null)
+        {
+            return null;
+        }
+
+        int max;
+        int windowMinutes;
+        try
+        {
+            using var doc = JsonDocument.Parse(policy.Payload);
+            max = doc.RootElement.TryGetProperty("maxExchangesPerConversation", out var m) ? m.GetInt32() : 8;
+            windowMinutes = doc.RootElement.TryGetProperty("windowMinutes", out var w) ? w.GetInt32() : 30;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+
+        var cutoff = now.AddMinutes(-windowMinutes);
+        // Conversation-scoped through the body jsonb (cast to text - PG has
+        // no LIKE on jsonb): a plain provider+window count would let one
+        // busy channel mute another.
+        var ownPosts = await db.ProviderEvents
+            .FromSql($"""
+             SELECT * FROM facilitator.provider_events
+             WHERE provider = {reference.Provider} AND received_at >= {cutoff}
+               AND verified_reference = 'echo:post-ledger'
+               AND body -> 'reference' ->> 'channelOrResourceId' = {reference.Channel}
+             """)
+            .CountAsync(ct);
+        return ownPosts >= max ? reference.Provider : null;
+    }
 
     internal static Reference ReferenceOf(JsonElement data, string provider)
     {

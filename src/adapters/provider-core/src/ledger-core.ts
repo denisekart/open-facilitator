@@ -116,6 +116,22 @@ export class ActionLedger {
       .run(providerObjectId, new Date().toISOString(), commandId);
   }
 
+  /** Bounded compaction (the connector's GC): settled intents older than
+   *  `maxAgeDays` stop mattering — a replayed command that old is a routing
+   *  bug, not a retry — and are deleted, at most `limit` rows per pass so a
+   *  first sweep after an upgrade can't lock the ledger. `pending` rows are
+   *  NEVER touched: an unsettled intent is still the reconcile law's truth. */
+  compact(maxAgeDays = 90, limit = 5000): number {
+    const cutoff = new Date(Date.now() - maxAgeDays * 86_400_000).toISOString();
+    const info = this.db
+      .prepare(
+        "DELETE FROM connector_actions WHERE rowid IN "
+        + "(SELECT rowid FROM connector_actions WHERE state = 'executed' AND updated_at < ? LIMIT ?)",
+      )
+      .run(cutoff, limit);
+    return info.changes;
+  }
+
   /** Widen for tests/reconcile introspection. */
   all(): ActionRow[] {
     return this.db

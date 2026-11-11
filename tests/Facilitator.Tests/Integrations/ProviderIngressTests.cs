@@ -405,6 +405,39 @@ public sealed class ProviderIngressTests(DispatchDbFixture fixture) : IAsyncLife
     /// <summary>A provider event for ONE native message at a chosen delivery id
     /// (the builder's default keys the native id to the delivery, which hides
     /// re-delivery renumbering).</summary>
+    // B6/N2: the system-side loop budget - the kernel counts its own posts
+    // (echo-law ledger rows) per conversation and stops the arm at the cap.
+    [Fact]
+    public async Task LoopBudgetStopsTheConversationAtTheCap()
+    {
+        var bot = "bot-" + Guid.NewGuid().ToString("N");
+        var (_, link, tenant, _) = await EnabledPlane(botUserId: bot);
+        await fixture.Db.SeedProviderIdentity("mattermost", tenant, "acct-1", "subject-1");
+        var channel = $"chan-{Guid.NewGuid():N}";
+        var root = $"root-{Guid.NewGuid():N}";
+        await link.PostAsync("/api/link/v1/events", Content(ProviderEvent(
+            "valid/event.provider.mention.json", $"post-{Guid.NewGuid():N}", channel, root, "acct-1", text: "bind me")));
+        await BoundWork(channel, root);
+        await fixture.Db.SeedAdminConfig("loop-budget", """{"maxExchangesPerConversation": 1, "windowMinutes": 30}""");
+
+        // The bot's own post: the echo law records it - that IS the exchange count.
+        await link.PostAsync("/api/link/v1/events", Content(ProviderEvent(
+            "valid/event.provider.mention.json", $"post-{Guid.NewGuid():N}", channel, root, bot, text: "bot talk 1")));
+
+        // Cap reached: the next human reply stops at the budget - the arm
+        // never runs, so the Work hears nothing more until the window clears.
+        var stoppedDelivery = $"post-{Guid.NewGuid():N}";
+        using var stopped = await link.PostAsync("/api/link/v1/events", Content(ProviderEvent(
+            "valid/event.provider.mention.json", stoppedDelivery, channel, root, "acct-1", text: "wake up")));
+        Assert.Equal(HttpStatusCode.Accepted, stopped.StatusCode);
+        var stop = await stopped.Content.ReadJsonAsync();
+        Assert.Equal("loop-budget:stop:mattermost", stop.GetProperty("data").GetProperty("judgment").GetString());
+
+        // The stop settles on the ledger row (the echo-law precedent): the
+        // silence is auditable, and a redelivery stays a duplicate.
+        Assert.Equal("loop-budget:stop:mattermost", await fixture.Db.ProviderEventJudgment(stoppedDelivery));
+    }
+
     private static string Redelivered(
         string fixtureName, string deliveryId, string nativeMessageId, string channel, string root, string actor, string text)
     {

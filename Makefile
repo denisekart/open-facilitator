@@ -1,4 +1,4 @@
-.PHONY: restore build test lint format protocol db-update compose-slim compose-full compose-down clean link-e2e gateway-e2e worker-e2e admin-e2e example-slim-up docs-check provider-e2e gitlab-up gitlab-down example-local-smoke scenario-gate scenario-walks scenario-golden scenario-plane-up scenario-gate-e2e ref-env
+.PHONY: restore build test lint format protocol db-update compose-slim compose-full compose-down clean link-e2e gateway-e2e worker-e2e admin-e2e example-slim-up docs-check provider-e2e gitlab-up gitlab-down example-local-smoke scenario-gate scenario-walks scenario-golden scenario-plane-up scenario-gate-e2e ref-env release release-npm
 
 restore:
 	dotnet restore OpenFacilitator.slnx
@@ -199,3 +199,65 @@ compose-down:
 clean:
 	dotnet clean OpenFacilitator.slnx
 	rm -rf src/*/dist node_modules
+
+# --- Local release --------------------------------------------------------------
+# A release is a v-tag: the pushed tag drives the Release workflow (container
+# images, GitHub release + SBOM attachments, digest pins — and the npm publish
+# when the ENABLE_NPM_PUBLISH repo variable is on).
+#
+# `make release` runs the npm half on this machine over the SAME publishable
+# closure the workflow uses (tools/npm/publishable-packages.mjs, dependency
+# order first): stamp every package to VERSION, build, publish, then restore
+# the stamps — the tag points at an unstamped commit, exactly what CI checks
+# out. Secrets: an npm login (~/.npmrc) or NPM_TOKEN (one-off root .npmrc);
+# provenance stays a CI/OIDC artifact — the local half is a plain token
+# publish. Registry versions that already exist are skipped, so a half-failed
+# run resumes, and CI's publish-npm (if the gate is on) won't fight a local
+# release.
+#
+#   VERSION=x.y.z make release       # npm publish + tag + push the tag
+#   VERSION=x.y.z make release-npm   # the npm half only
+#   DRY_RUN=1 …                      # rehearse: no publish, no tag
+VERSION ?=
+DRY_RUN ?=
+NPM_PUBLISH_FLAGS = --no-git-checks --access public $(if $(DRY_RUN),--dry-run,)
+
+release-npm:
+	@test -n "$(VERSION)" || { echo "usage: make release-npm VERSION=x.y.z [DRY_RUN=1]"; exit 2; }
+	@set -eu; \
+	dirs=$$(node tools/npm/publishable-packages.mjs); \
+	npmrc=""; \
+	if [ -n "$${NPM_TOKEN:-}" ] && [ ! -f .npmrc ]; then \
+	  npmrc=.npmrc; printf '//registry.npmjs.org/:_authToken=%s\n' "$$NPM_TOKEN" > .npmrc; \
+	fi; \
+	restore() { \
+	  for d in $$dirs; do git restore -- "$$d/package.json" 2>/dev/null || true; done; \
+	  [ -z "$$npmrc" ] || rm -f "$$npmrc"; \
+	}; \
+	trap restore EXIT; \
+	for d in $$dirs; do npm pkg set version="$(VERSION)" -C "$$d"; done; \
+	for d in $$dirs; do \
+	  name=$$(node -p "require('./$$d/package.json').name"); \
+	  if [ -z "$(DRY_RUN)" ] && [ "$$(npm view "$$name@$(VERSION)" version 2>/dev/null || true)" = "$(VERSION)" ]; then \
+	    echo "skip $$name@$(VERSION): already on the registry"; \
+	    continue; \
+	  fi; \
+	  pnpm --dir "$$d" build; \
+	  echo "publish $$name@$(VERSION)"; \
+	  pnpm --dir "$$d" publish $(NPM_PUBLISH_FLAGS); \
+	done
+
+release:
+	@test -n "$(VERSION)" || { echo "usage: make release VERSION=x.y.z [DRY_RUN=1]"; exit 2; }
+	@echo "$(VERSION)" | grep -Eq '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$$' || { echo "VERSION must be semver (x.y.z)"; exit 2; }
+	@test -z "$$(git status --porcelain)" || { echo "release from a clean working tree"; exit 2; }
+	@test "$$(git rev-parse --abbrev-ref HEAD)" = main || { echo "release from main"; exit 2; }
+	@test -z "$$(git ls-remote origin refs/tags/v$(VERSION))" || { echo "v$(VERSION) is already pushed"; exit 2; }
+	$(MAKE) --no-print-directory release-npm VERSION=$(VERSION) $(if $(DRY_RUN),DRY_RUN=1,)
+	@if [ -z "$(DRY_RUN)" ]; then \
+	  git tag -a "v$(VERSION)" -m "open-facilitator v$(VERSION)"; \
+	  git push origin "v$(VERSION)"; \
+	  echo "v$(VERSION) pushed — the Release workflow now builds containers, SBOMs and digest pins"; \
+	else \
+	  echo "DRY_RUN: skipped tagging/pushing v$(VERSION)"; \
+	fi

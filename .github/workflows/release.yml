@@ -84,6 +84,11 @@ jobs:
   # every package that ships flips private:false + a real version; the tag
   # stamps its version. Enable with the ENABLE_NPM_PUBLISH repo variable and
   # register this workflow as the package's trusted publisher on npmjs.
+  # The publish set is a CLOSURE (tools/npm/publishable-packages.mjs): a
+  # workspace dep of a published package MUST itself be published, or the
+  # released tarball resolves to nothing — the tool derives the set from the
+  # dependency graph (deps before dependents) and fails loudly when a dep
+  # falls outside it, instead of trusting a flag scan to stay complete.
   publish-npm:
     if: ${{ vars.ENABLE_NPM_PUBLISH == 'true' }}
     runs-on: ubuntu-latest
@@ -103,17 +108,18 @@ jobs:
         run: |
           set -euo pipefail
           tag="${GITHUB_REF_NAME#v}"
-          # Publishables = packages that flipped "private": false. Stamp the
-          # tag's version, build each, then let pnpm publish in topological
-          # order with workspace: deps rewritten to real ranges.
-          mapfile -t dirs < <(grep -rl '"private": false' src --include=package.json \
-            | grep -v node_modules | xargs -n1 dirname | sort)
-          [ "${#dirs[@]}" -gt 0 ] || { echo "nothing marked publishable"; exit 1; }
+          # Dependency-ordered publishable set (deps before dependents).
+          # Stamp the tag's version + build, then publish package by package
+          # (a bulk `pnpm -r publish` also visits private packages whose
+          # version never moved, and one already-published version fails the
+          # whole batch).
+          mapfile -t dirs < <(node tools/npm/publishable-packages.mjs)
+          [ "${#dirs[@]}" -gt 0 ] || { echo "nothing publishable"; exit 1; }
           for dir in "${dirs[@]}"; do
             npm pkg set version="$tag" -C "$dir"
             pnpm --dir "$dir" build
+            pnpm --dir "$dir" publish --no-git-checks --access public --provenance
           done
-          pnpm --recursive publish --no-git-checks --access public --provenance
 
   # SBOM for every shipped artifact, attached to the GitHub release:
   # dotnet-CycloneDX over the .NET solution + pnpm's native SBOM generator

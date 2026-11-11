@@ -4,8 +4,10 @@ on:
   push:
     branches: [main]
   pull_request:
-  schedule:
-    - cron: '30 2 * * *'
+  # No schedule trigger: hosted runner minutes are the scarce resource
+  # (owner ruling 2026-11-11). Everything a nightly would sweep already
+  # runs on push to main; a periodic pass is a manual `gh workflow run
+  # ci.yml` when wanted.
   workflow_dispatch:
 
 jobs:

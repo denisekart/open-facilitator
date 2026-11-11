@@ -1,6 +1,7 @@
 # Operational runbooks
 
-Eight operational scenes, expanded into operator-runnable form
+Twelve operational scenes (plus the manual infra plan), expanded into
+operator-runnable form
 against the reference environment: each scene carries a symptom, exact
 diagnosis queries (psql, curl, admin surfaces), the action, and a dated
 drill section where one has been executed.
@@ -33,6 +34,11 @@ before a shared deployment is production-eligible.
 | Provider API rejecting writes: backoff, budgets, dead-letter + replay | [provider-api-rate-limit.md](provider-api-rate-limit.md) |
 | Token accepted but permissions wrong: claim pointers, role rules | [identity-claim-mapper-error.md](identity-claim-mapper-error.md) |
 | Two+ replicas behaving oddly: epochs, SKIP LOCKED leases, fleet view | [horizontal-scale-anomalies.md](horizontal-scale-anomalies.md) |
+| Held action denied `expired`: lazy flip, response window, re-ask law | [consent-expired.md](consent-expired.md) |
+| Notice ended `undeliverable`: the egress ladder and its named reason | [notification-undeliverable.md](notification-undeliverable.md) |
+| An automation left the roster: name reserved, work with the team, audit trail | [contributor-retired.md](contributor-retired.md) |
+| A work id 303s: merge law, loser history stands, no unmerge | [work-merged.md](work-merged.md) |
+| The legs demoted from CI: compose tiers and the clean-tree verify law | [manual-infra-plan.md](manual-infra-plan.md) |
 
 Drill sections are dated **2026-11-01** (the operator date of the drill
 session). The stack clock is UTC and the session ran past UTC midnight, so

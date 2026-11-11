@@ -44,6 +44,12 @@ Key properties, normatively defined in the specs:
 | [`docs/security.md`](docs/security.md) | Trust vs data-plane split, interim bootstrap-token auth, Plan 07 OIDC cutover seam, ingress hard limits |
 | [`docs/getting-started.md`](docs/getting-started.md) | Contributor loop: build/test, running the Facilitator against Postgres 17, CLI examples |
 | [`docs/scenarios/scenario-catalog.md`](docs/scenarios/scenario-catalog.md) | Vendor-neutral scenario catalog: the interaction flows the system is expected to carry, from the concept and industry practice rather than the current code — the yardstick each audit run scores against |
+| [`docs/scenarios/approved-scenarios.md`](docs/scenarios/approved-scenarios.md) | The post-audit working yardstick: the surviving positive and negative scenarios with their checks and tiers — what the gate scores |
+| [`docs/scenarios/scenario-bindings.json`](docs/scenarios/scenario-bindings.json) | The reviewed gate manifest: one verdict + codified-test evidence per scenario (the ScenarioGate theory fails when a binding rots) |
+| [`docs/scenarios/audit-results.md`](docs/scenarios/audit-results.md) | The audit record: generated rows from the last gate run (`make scenario-gate`) |
+| [`docs/scenarios/domain-concept-index.md`](docs/scenarios/domain-concept-index.md) | Domain-concept index: scenario term → owning code → governing spec section |
+| [`docs/scenarios/manual-rubric.md`](docs/scenarios/manual-rubric.md) | The T4 lane: manual scenarios, scored by hand, recorded only — never a gate |
+| [`docs/runbooks/manual-infra-plan.md`](docs/runbooks/manual-infra-plan.md) | The legs demoted from CI (compose tiers, clean-tree verify) and the law that still binds them |
 
 ## Repository layout
 

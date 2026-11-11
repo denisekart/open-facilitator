@@ -216,3 +216,53 @@ The funnel (`Kernel/Routing/RoutingSink.cs`, dispatcher channel `routing`) is th
   name). Compose overlay `reference/compose.provisioning.yaml` pins
   `Link__HeartbeatSeconds=5`: lease 15 s + two 5-s sweeps fail a dead
   gateway's execution ~25 s after the kill.
+
+
+## Scenario-gap-closure laws (2026-11)
+
+- **Team layer** (`Kernel/Teams/`): `team_members` (humans + contributors;
+  an EMPTY roster means unconfigured, a populated one gates),
+  `team_settings` (version-fenced, reasoned switches at team/channel
+  scope), `EffectiveConfigResolver` (the ONE cross-scope precedence:
+  channel > team > system, never a side read). Built-in `operator` (global)
+  and `operator:<team>` roles always exist and cannot be removed by config.
+  Foreign-team reads answer 404, not 403.
+- **Consent authority** (`ConsentTicketService.cs`): a held action rides
+  the approval row (digest over the KERNEL-STORED envelope), consume
+  re-authorization is lazy-expiry-correct, and the requester-side may not
+  be the sole consent. Expiry flips approval + held action + parks the
+  work in one transaction.
+- **Notifications** (`Kernel/Notifications/`): emission writes
+  `notifications` + outbox ATOMICALLY; `EgressResolver` walks the ladder
+  bound-conversation → team channel → anonymized public post →
+  undeliverable-WITH-REASON (never silence); a vanished conversation flips
+  the row `address-obsolete` and the work endures.
+- **Contributors** (`ContributorStore.cs`): automations as process members;
+  handle unique across teams, every write needs a reason + audit;
+  retirement reserves the name and moves open work to the team (accountability
+  terminates at people); contributor-only capabilities refuse human evidence.
+- **Review-event family** (`org.facilitator.event.provider.review.v1` +
+  the `communication.post.v1` command + reply `buttons`): a review verdict
+  is a decision with accountability (forks completed work, notes running
+  work); the shared normalizer lives in `provider-core/normalize-shared.ts`
+  (`reviewEvent`/`reviewStateFor` — anything not a formal verdict is never
+  a fake review). `command.communication.post.v1` posts to a CHANNEL
+  (the reply command stays thread-bound). Approval buttons ride replies;
+  the callback rides `communication.reply.v1` with `buttonId`.
+- **Loop budget** (`provider-core/loop-budget.ts`, telegram `loop-guard.ts`):
+  per-conversation exchange cap shared by the chat adapters; over-cap
+  messages drop before publish with ONE loud notice; a human reply resets.
+- **Harness functionality list** (`adapter-sdk/src/capabilities.ts`):
+  `fullHarnessCapabilities(omissions)` is the harness-plane twin of the
+  comms command family — an omission MUST carry a reason; each harness
+  exports its honest declaration (`OMP_CAPABILITIES` et al.); an
+  unsupported command answers `unsupported` with a reason, never silence.
+- **Scenario gate** (`tools/scenario-plane` + `tests/Facilitator.Tests/
+  ScenarioGate/` + `docs/scenarios/scenario-bindings.json`): verdicts are
+  review artifacts; the xUnit theory fails closed on evidence rot (a bound
+  test renamed) or catalog drift; `make scenario-gate` regenerates
+  `docs/scenarios/audit-results.md` and only DOWNGRADES verdicts a run
+  observed failing (a filtered run proves nothing). The T4 lane
+  (`docs/scenarios/manual-rubric.md`) records, never gates. The compose
+  legs live in `docs/runbooks/manual-infra-plan.md` — manual, and the law
+  still binds changes to reference-env inputs.

@@ -6,6 +6,21 @@
 
 This standalone specification defines the framework's purpose, runtime responsibilities, security model, communication contract, durable coordination, memory, artifacts, lifecycle, extensibility, and two reproducible local reference environments. Provider examples are replaceable reference implementations; protocol behavior and component responsibilities are implementation requirements. Examples under `example` namespaces are specification illustrations until built and published. The document is self-contained and intended to support independent implementation and review.
 
+> **As-built pointers** (newly implemented surfaces; the text below remains
+> the target design). Team roster, scoped switches and the built-in
+> operator roles: §12/§8.4 → `src/facilitator/Kernel/Teams/`. Held-action
+> consent authority (§12.1): `Kernel/Work/ConsentTicketService.cs` +
+> `ApprovalLedger.cs`. Notifications + egress ladder (§13.1):
+> `Kernel/Notifications/`. Contributors as process members (§11.1):
+> `Kernel/Teams/ContributorStore.cs`. Review-event family + channel posting
+> (§15.5/§13.2): `protocol/json-schema/event.provider.review.v1.json` +
+> `command.communication.post.v1.json`, law in
+> `src/adapters/provider-core/src/normalize-shared.ts`. Bot-echo loop
+> budget (§13.4): `src/adapters/provider-core/src/loop-budget.ts`.
+> Harness functionality list (§10): `src/adapters/harnesses/adapter-sdk/
+> src/capabilities.ts`. The scenario gate's own verdicts:
+> `docs/scenarios/`.
+
 ---
 
 ## Contents

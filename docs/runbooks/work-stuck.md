@@ -41,7 +41,19 @@ WHERE work_id = '<work-id>' ORDER BY created_at;
 # timeline (also the SPA Work inspector)
 curl -s -H "Authorization: Bearer $HUMANTOK" \
   http://localhost:8089/api/admin/work/<work-id>/timeline | jq '.[-8:]'
+# queue age: pending intents age visibly (D2/N28 - a quiet queue is the bug)
+curl -s -H "Authorization: Bearer $HUMANTOK" \
+  http://localhost:8089/api/admin/queue | jq '.[] | {workId, ageSeconds, reason}'
+# executor disclosure: addressed endpoint + liveness + queue reason (F1)
+curl -s -H "Authorization: Bearer $HUMANTOK" \
+  http://localhost:8089/api/admin/executions | jq '.[] | {assignmentId, endpointId, online, queueReason}'
 ```
+
+The reads answer the disclosure law: an offline owning endpoint shows
+`online: false` (nudge skips it WITHOUT burning the budget -
+`OfflineOwner_SkippedWithoutBurningBudget`), a gateway window-full pause
+shows its `queueReason` on the execution read, and queue rows age-count so
+work waiting on capacity that never returns tells someone.
 
 ## Action
 

@@ -34,6 +34,7 @@ you touch — the nearest file wins.
 |Workspace Link SDK/runtime|`src/workspace-link/AGENTS.md`|
 |Protocol package + contract tree|`src/protocol/AGENTS.md`|
 |.NET test suite|`tests/Facilitator.Tests/AGENTS.md`|
+|Scenario gate (plane + runner + manifest generator)|`tools/scenario-plane/README.md`|
 |Reference environment inputs|`reference/AGENTS.md`|
 |Dev Container Features|`features/AGENTS.md`|
 |Communication/harness adapters (forgejo/github/gitlab pairs on provider-core)|`src/adapters/AGENTS.md`|

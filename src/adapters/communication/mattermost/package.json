@@ -34,7 +34,7 @@
     "@ofac/provider-core": "workspace:*",
     "@ofac/workspace-link": "workspace:*",
     "better-sqlite3": "catalog:",
-    "ws": "^8.18.0"
+    "ws": "^8.22.1"
   },
   "devDependencies": {
     "@types/better-sqlite3": "catalog:",

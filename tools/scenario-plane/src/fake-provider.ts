@@ -7,8 +7,10 @@
 //       webhook/hook format onto the registered sink URL (the adapter's
 //       receiving leg), counting deliveries so a scenario can re-deliver one.
 //   POST /__plane/mode      {family, mode}          -> "ok" | "403" | "429" |
-//       "vanished": every subsequent API call of that family answers the
-//       injected failure (403 is a wall, 429 carries Retry-After, vanished
+//       "429-now" | "vanished": every subsequent API call of that family
+//       answers the injected failure (403 is a wall, 429 carries
+//       Retry-After: 2, 429-now the same body with Retry-After: 0 so a retry
+//       path is provable without a wall-clock wait, vanished
 //       answers the conversation-not-found shape of that family).
 //   GET  /__plane/state                             -> everything received
 //       and sent, for the scenario's assertions.
@@ -20,7 +22,7 @@
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from "node:http";
 
 export type Family = "github" | "gitlab" | "mattermost" | "telegram";
-export type Mode = "ok" | "403" | "429" | "vanished";
+export type Mode = "ok" | "403" | "429" | "429-now" | "vanished";
 
 export interface PlaneState {
   sinks: Partial<Record<Family, string>>;
@@ -167,8 +169,10 @@ export async function startFakeProvider(port = 0): Promise<FakePlane> {
           documentation_url: "https://docs.openfacilitator.org/plane",
         });
       }
-      if (mode === "429") {
-        res.setHeader("retry-after", "2");
+      if (mode === "429" || mode === "429-now") {
+        // "429-now" is the deterministic retry proof: a zero wait means the
+        // adapter's retry path must re-issue within the same test window.
+        res.setHeader("retry-after", mode === "429" ? "2" : "0");
         return json(res, 429, { message: "429: the plane says so" });
       }
       if (mode === "vanished") {
@@ -202,7 +206,7 @@ function isFamily(v: unknown): v is Family {
   return typeof v === "string" && (FAMILIES as string[]).includes(v);
 }
 function isMode(v: unknown): v is Mode {
-  return v === "ok" || v === "403" || v === "429" || v === "vanished";
+  return v === "ok" || v === "403" || v === "429" || v === "429-now" || v === "vanished";
 }
 
 function safeParse(raw: string): unknown {

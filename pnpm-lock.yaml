@@ -989,6 +989,9 @@ importers:
       '@ofac/mattermost-adapter':
         specifier: workspace:*
         version: link:../../src/adapters/communication/mattermost
+      '@ofac/provider-core':
+        specifier: workspace:*
+        version: link:../../src/adapters/provider-core
       '@ofac/telegram-adapter':
         specifier: workspace:*
         version: link:../../src/adapters/communication/telegram

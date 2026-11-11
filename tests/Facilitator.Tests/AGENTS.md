@@ -16,9 +16,12 @@ internals.
 - Wire assertions reuse `@ofac/protocol` fixtures/conformance verdicts rather
   than re-deriving them.
 - `ScenarioGate/` — the scenario gate theory: proves
-  `docs/scenarios/scenario-bindings.json` (evidence ids resolve to tests in
-  this assembly, catalog coverage, lane law). Renaming a bound test or a
-  scenario here turns `make scenario-gate` red on purpose; regenerate the
+  `docs/scenarios/scenario-bindings.json` (evidence ids resolve, catalog
+  coverage, lane law). Evidence ids resolve PER-ASSEMBLY via the shared
+  `ScenarioEvidenceResolutionTestsBase`: a bare `Class.Method` resolves
+  against this assembly, a `ScenarioWalks:`-prefixed id against
+  `tests/Facilitator.ScenarioWalks`. Renaming a bound test or a scenario
+  here turns `make scenario-gate` red on purpose; regenerate the
   manifest with `tools/scenario-plane/gen-bindings.py` and review the diff.
 
 ## Develop here

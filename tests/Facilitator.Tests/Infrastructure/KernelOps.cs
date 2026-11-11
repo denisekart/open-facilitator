@@ -7,12 +7,12 @@ using Ofac.Protocol.Validation;
 namespace Facilitator.Tests.Infrastructure;
 
 /// <summary>Shared HTTP + polling helpers for the kernel suites.</summary>
-internal static class KernelOps
+public static class KernelOps
 {
-    internal static readonly JsonSerializerOptions Web = new(JsonSerializerDefaults.Web);
+    public static readonly JsonSerializerOptions Web = new(JsonSerializerDefaults.Web);
 
     /// <summary>POST JSON and assert the status, returning the parsed body.</summary>
-    internal static async Task<JsonElement> PostJsonAsync(HttpClient client, string path, string payload, HttpStatusCode expected)
+    public static async Task<JsonElement> PostJsonAsync(HttpClient client, string path, string payload, HttpStatusCode expected)
     {
         using var response = await client.PostAsync(path, new StringContent(payload, Encoding.UTF8, "application/json"));
         var body = await JsonWire.ReadJsonAsync(response.Content);
@@ -21,7 +21,7 @@ internal static class KernelOps
     }
 
     /// <summary>GET and assert the status, returning the parsed body.</summary>
-    internal static async Task<JsonElement> GetJsonAsync(HttpClient client, string path, HttpStatusCode expected)
+    public static async Task<JsonElement> GetJsonAsync(HttpClient client, string path, HttpStatusCode expected)
     {
         using var response = await client.GetAsync(path);
         var body = await JsonWire.ReadJsonAsync(response.Content);
@@ -30,7 +30,7 @@ internal static class KernelOps
     }
 
     /// <summary>Create a Work via the API (optionally under a project, for team-scoped works); returns (workId, version).</summary>
-    internal static async Task<(Guid WorkId, long Version)> CreateWorkAsync(HttpClient client, string objective, Guid? projectId = null)
+    public static async Task<(Guid WorkId, long Version)> CreateWorkAsync(HttpClient client, string objective, Guid? projectId = null)
     {
         var body = projectId is null
             ? JsonSerializer.Serialize(new { objective })
@@ -40,7 +40,7 @@ internal static class KernelOps
     }
 
     /// <summary>POST /transitions with an explicit fence.</summary>
-    internal static async Task<JsonElement> TransitionAsync(HttpClient client, Guid workId, string to, long expectedVersion, HttpStatusCode expected = HttpStatusCode.OK, string? reason = null)
+    public static async Task<JsonElement> TransitionAsync(HttpClient client, Guid workId, string to, long expectedVersion, HttpStatusCode expected = HttpStatusCode.OK, string? reason = null)
     {
         var payload = reason is null
             ? JsonSerializer.Serialize(new { to, expectedVersion })
@@ -49,7 +49,7 @@ internal static class KernelOps
     }
 
     /// <summary>Walk a fresh work open→planning→active→review→completed (4 transitions, +1 version each).</summary>
-    internal static async Task WalkToCompletedAsync(HttpClient client, Guid workId, long currentVersion)
+    public static async Task WalkToCompletedAsync(HttpClient client, Guid workId, long currentVersion)
     {
         foreach (var to in new[] { "planning", "active", "review", "completed" })
         {
@@ -62,7 +62,7 @@ internal static class KernelOps
     }
 
     /// <summary>Poll a predicate until true or the timeout elapses.</summary>
-    internal static async Task PollUntilAsync(Func<Task<bool>> condition, string because, int timeoutMs = 10_000)
+    public static async Task PollUntilAsync(Func<Task<bool>> condition, string because, int timeoutMs = 10_000)
     {
         var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
         while (DateTime.UtcNow < deadline)
@@ -79,7 +79,7 @@ internal static class KernelOps
     }
 
     /// <summary>Every kernel-emitted outbox envelope must pass the shared validator.</summary>
-    internal static void AssertEnvelopesValid(IEnumerable<string> envelopes)
+    public static void AssertEnvelopesValid(IEnumerable<string> envelopes)
     {
         var validator = EnvelopeValidator.CreateDefault();
         foreach (var envelope in envelopes)

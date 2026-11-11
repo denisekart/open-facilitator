@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <!-- Direct pin so the transitive graph resolves the CPM version (the
+         transitive floor from Npgsql alone would pick 10.0.4 and collide
+         with Facilitator.Tests' compile-time 10.0.13 — MSB3277). -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+
+  <!-- Public infrastructure only: KernelTestFactory, PostgresFixture,
+       KeycloakFixture, TestDbProbe, KernelOps are public; the internals of
+       Facilitator.Tests (FakeTimeProvider, JsonWire) stay invisible here. -->
+  <ItemGroup>
+    <ProjectReference Include="../Facilitator.Tests/Facilitator.Tests.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+</Project>

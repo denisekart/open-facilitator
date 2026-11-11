@@ -31,6 +31,35 @@ jobs:
       - name: conformance fixtures (.NET harness)
         run: dotnet run --project protocol/tools/Validate.Fixtures -c Release
 
+  # The composed scenario walks + the manifest gate: its own required-check
+  # name so a red walk is attributable. One shared container pair (the walk
+  # collection), a driven clock, no fixed sleeps — the family fits a 12-min
+  # budget with room. Testcontainers use the runner's Docker (no services
+  # block, as `admin-e2e` does).
+  scenarios:
+    needs: [dotnet, typescript]
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          cache: true
+          cache-dependency-path: "**/packages.lock.json"
+      - run: dotnet restore OpenFacilitator.slnx --locked-mode
+      - run: dotnet build OpenFacilitator.slnx -c Release --no-restore
+      - run: make scenario-walks
+      - run: make scenario-gate
+      - name: audit record has no regressed verdict
+        run: |
+          # make scenario-gate already rewrote the working-tree record, so the
+          # committed baseline must come from HEAD, not the file on disk.
+          git show HEAD:docs/scenarios/audit-results.md > committed-audit.md
+          node tools/scenario-plane/src/runner.mjs \
+            --dotnet-trx tests/Facilitator.Tests/TestResults/scenario-gate.trx \
+            --dotnet-trx tests/Facilitator.ScenarioWalks/TestResults/scenario-walks.trx \
+            --md | node tools/scenario-plane/src/audit-diff.mjs committed-audit.md
+
   typescript:
     runs-on: ubuntu-latest
     steps:

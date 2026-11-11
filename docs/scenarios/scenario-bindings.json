@@ -140,9 +140,10 @@
    "lane": "T1-gate",
    "evidence": [
     "WebhookSinkTests.RawDeliveryQueuesWebhookCommandOnceAndReplayDedupes",
-    "WorkRecordTests.Merge_KeepsLoserHistory_RedirectsToSurvivor_ExposesLink"
+    "WorkRecordTests.Merge_KeepsLoserHistory_RedirectsToSurvivor_ExposesLink",
+    "ScenarioWalks:MergeDuringFollowupWalkTests.SteerAfterMergeLandsOnSurvivor_LoserTrailIntact"
    ],
-   "note": ""
+   "note": "steer-after-merge lands on the survivor with the loser's trail intact"
   },
   {
    "id": "A12",
@@ -342,9 +343,10 @@
    "verdict": "covered",
    "lane": "T1-gate",
    "evidence": [
-    "ConsentAuthorityTests.ExpiryFlipsApprovalAndHeldActionAndParksTheWork"
+    "ConsentAuthorityTests.ExpiryFlipsApprovalAndHeldActionAndParksTheWork",
+    "ScenarioWalks:HeldActionChainWalkTests.HeldActionNudgedThenDecidedOnce"
    ],
-   "note": "fake-clock expiry; the slow-consume race rides the same lazy-expiry law"
+   "note": "fake-clock expiry; the slow-consume race rides the same lazy-expiry law; the held-action chain (hold\u2192nudge\u2192decide\u2192consume) walks end-to-end"
   },
   {
    "id": "C6",
@@ -369,9 +371,10 @@
    "evidence": [
     "ConsentAuthorityTests.ChatDecisionDispatchesTrackerRecordAndCarrierWork",
     "ConsentAuthorityTests.NudgeRepliesInTheBoundConversation",
-    "js:src/adapters/communication/telegram/test/handler.test.ts"
+    "js:src/adapters/communication/telegram/test/handler.test.ts",
+    "ScenarioWalks:HeldActionChainWalkTests.HeldActionNudgedThenDecidedOnce"
    ],
-   "note": "buttons ride the reply command's optional buttons; a lapsing consent nudges with them in the bound conversation"
+   "note": "buttons ride the reply command's optional buttons; a lapsing consent nudges with them in the bound conversation; the one-decision + loser-visibility leg walks"
   },
   {
    "id": "C9",
@@ -434,9 +437,10 @@
    "evidence": [
     "NudgeSweeperTests.BudgetSpentAtCap_ThenSilent_AndAdminSeesStalled",
     "FlowControlTests.WindowFullPausesAndReceiptResumesAndDeliversNext",
-    "OpsSurfaceTests.GatewayQueueReasonRendersOnTheExecutionRead"
+    "OpsSurfaceTests.GatewayQueueReasonRendersOnTheExecutionRead",
+    "ScenarioWalks:CapacityNudgeSagaWalkTests.StaleLaneReasonNudgedOnceThenAdminSeesStalled"
    ],
-   "note": ""
+   "note": "the capacity leg and the nudge leg walk together: reason \u2192 driven stale \u2192 one sweep \u2192 admin stall"
   },
   {
    "id": "D4",
@@ -524,9 +528,10 @@
    "evidence": [
     "ProviderIngressTests.ReviewVerdictIsADecisionWithAccountability",
     "ProviderIngressTests.ReviewOnCompletedWorkForksSuccessor",
-    "PrDispatchTests.PrRequestDispatchesCreateAndParksBranchMarker"
+    "PrDispatchTests.PrRequestDispatchesCreateAndParksBranchMarker",
+    "ScenarioWalks:ReviewForkWalkTests.SinkReviewYieldsDecisionRowAndForkedSuccessor"
    ],
-   "note": ""
+   "note": "sink \u2192 normalized review \u2192 decision row \u2192 forked successor walked as one chain"
   },
   {
    "id": "E5",
@@ -952,9 +957,10 @@
    "evidence": [
     "ProviderIngressTests.BotEchoUpdatesBindingLedgerOnly",
     "ProviderIngressTests.LoopBudgetStopsTheConversationAtTheCap",
-    "js:src/adapters/provider-core/test/http-loop-webhook.test.ts"
+    "js:src/adapters/provider-core/test/http-loop-webhook.test.ts",
+    "ScenarioWalks:AutomationDialogueWalkTests.DialogueBudgetTripsAsOneStopEvent"
    ],
-   "note": "shared loop budget stops the dialogue",
+   "note": "shared loop budget stops the dialogue (walked: two link-enrolled voices, one stop event)",
    "negative": true
   },
   {
@@ -1007,9 +1013,10 @@
    "verdict": "covered",
    "lane": "T1-gate",
    "evidence": [
-    "ConsentAuthorityTests.ExpiryFlipsApprovalAndHeldActionAndParksTheWork"
+    "ConsentAuthorityTests.ExpiryFlipsApprovalAndHeldActionAndParksTheWork",
+    "ScenarioWalks:HeldActionChainWalkTests.HeldActionNudgedThenDecidedOnce"
    ],
-   "note": "lazy expiry at consume: a slow consume on an expired row is denied",
+   "note": "lazy expiry at consume: a slow consume on an expired row is denied (walked with the C5 chain)",
    "negative": true
   },
   {
@@ -1087,13 +1094,14 @@
    "family": "F",
    "tier": "T1",
    "title": "A restarted system asks a human the same question twice, or applies one answer twice.",
-   "verdict": "partial",
+   "verdict": "covered",
    "lane": "T1-gate",
    "evidence": [
     "RestartSurvivalTests.RestartAfterAcceptedEvents_NoLossNoDuplicate",
-    "ConsentAuthorityTests.NudgeBeforeExpiryWritesTimelineAndStampsOnce"
+    "ConsentAuthorityTests.NudgeBeforeExpiryWritesTimelineAndStampsOnce",
+    "ScenarioWalks:RestartNoDoubleAskWalkTests.PendingAskReAsksOnceAcrossRestart_SettledStaysSettled"
    ],
-   "note": "no double-ask for deliveries; settled questions stay settled via the approval ledger",
+   "note": "no double-ask across a restart: the nudge stamp is the row's, settled questions stay settled",
    "negative": true
   },
   {
@@ -1145,9 +1153,10 @@
    "lane": "T1-gate",
    "evidence": [
     "OpsSurfaceTests.CancelDisclosesIrreversibleEffects",
-    "ConsentAuthorityTests.NudgeBeforeExpiryWritesTimelineAndStampsOnce"
+    "ConsentAuthorityTests.NudgeBeforeExpiryWritesTimelineAndStampsOnce",
+    "ScenarioWalks:CapacityNudgeSagaWalkTests.StaleLaneReasonNudgedOnceThenAdminSeesStalled"
    ],
-   "note": "why-legs per surface; the completeness rubric rides I3 (T4)",
+   "note": "why-legs per surface (the nudge+sweep leg walks); the completeness rubric rides I3 (T4)",
    "negative": true
   },
   {
@@ -1307,9 +1316,10 @@
    "lane": "T1-gate",
    "evidence": [
     "ProviderIngressTests.BotEchoUpdatesBindingLedgerOnly",
-    "ProviderIngressTests.LoopBudgetStopsTheConversationAtTheCap"
+    "ProviderIngressTests.LoopBudgetStopsTheConversationAtTheCap",
+    "ScenarioWalks:SelfWriteTwoAdaptersWalkTests.SameEventTwoAdaptersCaughtOnceCappedAcrossLegs"
    ],
-   "note": "self-write detection + shared exchange cap",
+   "note": "self-write detection + shared exchange cap (walked across a raw sink leg and the echo leg)",
    "negative": true
   },
   {
@@ -1321,9 +1331,10 @@
    "lane": "T1-gate",
    "evidence": [
     "GenerationFenceTests.StaleGenerationCompletedEvent_Refused422_WithFailedInbox_AndUntouchedLedger",
-    "ConsentAuthorityTests.ExpiryFlipsApprovalAndHeldActionAndParksTheWork"
+    "ConsentAuthorityTests.ExpiryFlipsApprovalAndHeldActionAndParksTheWork",
+    "ScenarioWalks:StaleMomentWalkTests.ReconnectBumpsGeneration_StaleRefused_FreshAcceptedOnce"
    ],
-   "note": "generation fences + consume-time authorization refuse stale moments",
+   "note": "generation fences + consume-time authorization refuse stale moments (walked: stale 422 \u2192 reconnect bumps \u2192 fresh lands once)",
    "negative": true
   },
   {

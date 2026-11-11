@@ -1,4 +1,4 @@
-.PHONY: restore build test lint format protocol db-update compose-slim compose-full compose-down clean link-e2e gateway-e2e worker-e2e admin-e2e example-slim-up docs-check provider-e2e gitlab-up gitlab-down example-local-smoke scenario-gate scenario-plane-up scenario-gate-e2e ref-env
+.PHONY: restore build test lint format protocol db-update compose-slim compose-full compose-down clean link-e2e gateway-e2e worker-e2e admin-e2e example-slim-up docs-check provider-e2e gitlab-up gitlab-down example-local-smoke scenario-gate scenario-walks scenario-golden scenario-plane-up scenario-gate-e2e ref-env
 
 restore:
 	dotnet restore OpenFacilitator.slnx
@@ -109,17 +109,27 @@ provider-e2e:
 # The audit record's cross-check source: point TRX at a fuller run's trx to
 # cross-check more of the manifest (the full-suite `make test` writes one).
 TRX ?= tests/Facilitator.Tests/TestResults/scenario-gate.trx
+WALK_TRX ?= tests/Facilitator.ScenarioWalks/TestResults/scenario-walks.trx
+
+# The composed scenario walks: cross-feature sequences over their own
+# collection (one container pair, driven clock, no fixed sleeps).
+scenario-walks: build
+	dotnet test tests/Facilitator.ScenarioWalks/Facilitator.ScenarioWalks.csproj -c Release --no-build \
+	  --blame-hang-timeout 2m --logger "trx;LogFileName=scenario-walks.trx"
+
 # The T1+T3 lane: the xUnit wall proves the reviewed bindings manifest
 # (evidence ids, catalog coverage). `--dotnet-trx` cross-checks verdicts
 # against the tests a run actually observed (point it at the full-suite trx
 # for the audit record's full cross-check; a filtered run proves only its
-# slice), and the runner writes the audit rows.
+# slice), and the runner writes the audit rows. When a walk run's trx exists
+# it folds in as a second cross-check source, so walk-bound rows are judged
+# on what the walk run actually observed.
 scenario-gate: build
 	dotnet test tests/Facilitator.Tests/Facilitator.Tests.csproj -c Release --no-build \
 	  --filter "FullyQualifiedName~ScenarioGate" \
 	  --logger "trx;LogFileName=scenario-gate.trx" \
 	&& node tools/scenario-plane/src/runner.mjs \
-	   --dotnet-trx $(TRX) --md \
+	   --dotnet-trx $(TRX) $(if $(wildcard $(WALK_TRX)),--dotnet-trx $(WALK_TRX),) --md \
 	   > docs/scenarios/audit-results.md
 
 # The plane alone: a fake provider with a personality on :8791 (control
@@ -130,6 +140,12 @@ scenario-plane-up:
 # The T2 lane: adapter outbound legs over real HTTP against the plane.
 scenario-gate-e2e: build
 	pnpm -C tools/scenario-plane test:e2e
+
+# The manual golden thread (owner ruling: not CI-wired): the acceptance
+# chain against a developer-running kernel (`make compose-slim`), plus the
+# in-process fake provider. Fails loud when :8088 is down.
+scenario-golden:
+	pnpm -C tools/scenario-plane test:golden
 
 # The demoted infra legs (compose slim/full + referencectl verify): manual,
 # recorded in docs/runbooks/manual-infra-plan.md - this target only prints

@@ -14,14 +14,16 @@
   },
   "scripts": {
     "build": "echo 'source package: no build artifacts'",
-    "test": "vitest run --exclude 'test/**/*.e2e.test.ts'",
+    "test": "vitest run --exclude 'test/**/*.e2e.test.ts' --exclude 'test/**/*.golden.test.ts'",
     "typecheck": "tsc --noEmit",
-    "test:e2e": "vitest run test/provider-legs.e2e.test.ts"
+    "test:e2e": "vitest run test/provider-legs.e2e.test.ts",
+    "test:golden": "vitest run test/chain.golden.test.ts"
   },
   "devDependencies": {
     "@ofac/github-adapter": "workspace:*",
     "@ofac/gitlab-adapter": "workspace:*",
     "@ofac/mattermost-adapter": "workspace:*",
+    "@ofac/provider-core": "workspace:*",
     "@ofac/telegram-adapter": "workspace:*",
     "@types/node": "^26.6.5",
     "typescript": "^6.0.3",

@@ -63,6 +63,13 @@ public sealed class KernelTestFactory : WebApplicationFactory<Program>
 
     internal FakeTimeProvider? Clock { get; }
 
+    /// <summary>Advance the fake clock (factory built with fakeClock:true); throws when no fake clock is installed.</summary>
+    public void AdvanceClock(TimeSpan by) =>
+        (Clock ?? throw new InvalidOperationException("factory created without fakeClock:true")).Advance(by);
+
+    /// <summary>Current fake-clock instant (wall clock when no fake clock is installed).</summary>
+    public DateTimeOffset ClockUtcNow => Clock?.GetUtcNow() ?? DateTimeOffset.UtcNow;
+
     /// <summary>Base address of the Kestrel server (starts the server).</summary>
     public string ServerAddress
     {

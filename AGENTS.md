@@ -34,18 +34,16 @@ you touch — the nearest file wins.
 |Workspace Link SDK/runtime|`src/workspace-link/AGENTS.md`|
 |Protocol package + contract tree|`src/protocol/AGENTS.md`|
 |.NET test suite|`tests/Facilitator.Tests/AGENTS.md`|
-|Scenario gate (plane + runner + manifest generator)|`tools/scenario-plane/README.md`|
+|Scenario gate (plane + runner + manifest generator + walk assembly)|`tools/scenario-plane/README.md`|
 |Reference environment inputs|`reference/AGENTS.md`|
 |Dev Container Features|`features/AGENTS.md`|
 |Communication/harness adapters (forgejo/github/gitlab pairs on provider-core)|`src/adapters/AGENTS.md`|
 |AWS reference deployment (CDK, non-prod launcher)|`examples/aws/AGENTS.md`|
 
 ## Follow the truth
-- Work request path: `src/facilitator/Kernel/Work/WorkEndpoints.cs` route
-  table (`/works`, `/works/{id}/steer|transitions`, `/works/{id}/timeline`) →
-  `src/facilitator/Kernel/Work/IngressProcessor.cs` →
-  `src/facilitator/Kernel/Work/EfCoordinationStore.cs` → `facilitator.outbox`
-  → `src/facilitator/Kernel/Shared/Dispatch/DbEventDispatcher.cs` + sinks.
+- Work request path: `src/facilitator/Kernel/Work/WorkEndpoints.cs` route table (`/works`, `/works/{id}/steer|transitions`, `/works/{id}/timeline`) →
+  `src/facilitator/Kernel/Work/IngressProcessor.cs` → `src/facilitator/Kernel/Work/EfCoordinationStore.cs` → `facilitator.outbox` →
+  `src/facilitator/Kernel/Shared/Dispatch/DbEventDispatcher.cs` + sinks.
 - Message path (workspace↔kernel): `src/workspace-link/src/core/client.ts` →
   `src/facilitator/Kernel/Link/LinkHub.cs` (`/hubs/link`) or `/events` +
   `/deliveries` HTTP fallback → `src/facilitator/Kernel/Link/AdmissionGate.cs`
@@ -53,6 +51,7 @@ you touch — the nearest file wins.
   `src/facilitator/Kernel/Link/LinkDeliveryPump.cs`; receipts from both
   transports converge on `src/facilitator/Kernel/Link/LinkReceipts.cs`.
 - Provider webhook path: kernel sink `POST /api/ingress/webhooks/{provider}` (`src/facilitator/Kernel/Integrations/WebhookIngressEndpoints.cs`) → outbox `command.provider.webhook.v1` → the adapter's `@ofac/provider-core` webhook-receiver seam.
+- Scenario law: changing behavior a manifest row covers (`docs/scenarios/scenario-bindings.json`) obliges updating its binding + rerunning `make scenario-gate`; walks live in `tests/Facilitator.ScenarioWalks/`.
 - New endpoint: the feature's `*Endpoints.cs`. New table: entity in
   `src/facilitator/Kernel/Shared/Persistence/Entities.cs` + configuration
   under `Configurations/` + migration. New wire message type: schema in

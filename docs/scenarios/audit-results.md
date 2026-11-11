@@ -28,7 +28,7 @@
 | C4 | covered | T1-gate | ConsentAuthorityTests.TwoRespondersOneDecidedAndTheLoserSeesWhoDecided | — |
 | C5 | covered | T1-gate | ConsentAuthorityTests.ExpiryFlipsApprovalAndHeldActionAndParksTheWork | fake-clock expiry; the slow-consume race rides the same lazy-expiry law |
 | C6 | covered | T1-gate | ConsentAuthorityTests.NotRequesterRuleDeniesTheRequestingSideAsSoleConsent · ConsentAuthorityTests.ConsumeReturnsTheKernelStoredEnvelope | — |
-| C7 | covered | T1-gate | ConsentAuthorityTests.ChatDecisionDispatchesTrackerRecordAndCarrierWork · js:src/adapters/communication/telegram/test/handler.test.ts | buttons ride the reply command's optional buttons |
+| C7 | covered | T1-gate | ConsentAuthorityTests.ChatDecisionDispatchesTrackerRecordAndCarrierWork · ConsentAuthorityTests.NudgeRepliesInTheBoundConversation · js:src/adapters/communication/telegram/test/handler.test.ts | buttons ride the reply command's optional buttons; a lapsing consent nudges with them in the bound conversation |
 | C9 | covered | T1-gate | ConsentAuthorityTests.NotRequesterRuleDeniesTheRequestingSideAsSoleConsent | — |
 | C10 | partial | T1-gate | TeamRosterTests.TeamSwitchOverridesTheSystemDefaultAndIsVersioned · TeamRosterTests.OperatorSeatsAndRemovesAMemberWithAuditedProvenance | writes versioned+audited; the consent-rule backdating leg is untested |
 | C11 | partial | T2-adapter | LinkIngressTests.UnknownCommandFailsClosedWithAuditRow · MemoryQuotaGcTests.DailyBudgetRefusesThirdRetainWithTypedProblem | typed-problem refusals per surface; prose legibility is a manual rubric |

@@ -36,8 +36,10 @@ export const HARNESS_COMMAND_WORK_CANCEL =
 export const HARNESS_COMMAND_ASSIGNMENT_INPUT =
   "org.facilitator.command.assignment.input.v1";
 /** A nudge for progress on a running execution (capability
- *  `supportsNudge`; the NudgeSweeper posts it to the assigned endpoint;
- *  an adapter without one answers `unsupported`). */
+ *  `supportsNudge`; the NudgeSweeper posts it to the assigned endpoint).
+ *  As-built the child wire carries no nudge frame, so the Gateway answers
+ *  `unsupported` on the fleet's behalf — the contract holds, the answer
+ *  is honest, and a wire leg may land later without changing this law. */
 export const HARNESS_COMMAND_WORK_NUDGE =
   "org.facilitator.command.work.nudge.v1";
 /** The human asks where a run stands (contract-declared; no kernel

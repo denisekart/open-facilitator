@@ -93,6 +93,7 @@ const ASSIGN = "org.facilitator.command.work.assign.v1";
 const STEER = "org.facilitator.command.work.steer.v1";
 const CANCEL = "org.facilitator.command.work.cancel.v1";
 const ASSIGNMENT_INPUT = "org.facilitator.command.assignment.input.v1";
+const NUDGE = "org.facilitator.command.work.nudge.v1";
 const COMPLETED = "org.facilitator.event.assignment.completed.v1";
 const FAILED = "org.facilitator.event.assignment.failed.v1";
 const HEARTBEAT = "org.facilitator.event.workspace.heartbeat.v1";
@@ -652,6 +653,25 @@ export class GatewayRuntime {
             return this.onInteraction(cmd, cmd.type === STEER ? "steer" : "cancel");
           case ASSIGNMENT_INPUT:
             return this.onAssignmentInput(cmd);
+          case NUDGE: {
+            // The NudgeSweeper posts to the owning endpoint; the child wire
+            // vocabulary has no nudge frame, so the honest answer is the
+            // child's own capability answer — `unsupported` — never a
+            // misleading passthrough no-binding. A nudge never fails work:
+            // the sweeper just keeps the stall episode open.
+            const data = cmd.data as unknown as { assignmentId?: string };
+            const row =
+              data.assignmentId === undefined
+                ? null
+                : this.paths.execution.byAssignment(data.assignmentId);
+            return {
+              kind: "unsupported",
+              reason:
+                row === null
+                  ? "no-execution"
+                  : "harness-plane: the child wire carries no nudge frame",
+            };
+          }
           default:
             return this.passthrough(cmd);
         }

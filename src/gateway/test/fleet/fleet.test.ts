@@ -158,6 +158,34 @@ function assign(commandId: string, capabilityId: string, deliveryId?: string): L
   };
 }
 
+/** A NudgeSweeper nudge for a command never assigned here. */
+function nudge(commandId: string): LinkDeliveryV1 {
+  return {
+    deliveryId: `del-${commandId}`,
+    deliveredAt: new Date().toISOString(),
+    envelope: {
+      specversion: "1.0",
+      id: `env-${commandId}`,
+      source: "urn:facilitator:instance:unit",
+      type: "org.facilitator.command.work.nudge.v1",
+      subject: `work/work-${commandId}`,
+      time: new Date().toISOString(),
+      datacontenttype: "application/json",
+      dataschema: "https://schemas.openfacilitator.org/v1/command.work.nudge.v1.json",
+      data: {
+        commandId,
+        workId: `work-${commandId}`,
+        targetId: "unit",
+        actorEvidenceRef: "identity-evidence:unit",
+        deadline: "2036-10-23T18:00:00Z",
+        assignmentId: `asg-${commandId}`,
+        stallEpisode: "episode-1",
+        executionGeneration: 1,
+      },
+    },
+  };
+}
+
 async function waitFor<T>(
   what: string,
   probe: () => T | false | null | Promise<T | false | null>,
@@ -376,6 +404,17 @@ describe("shared-mode fleet routing", () => {
     const receipt = await waitFor("receipt", () => f.mock.receipts[0] ?? false);
     expect(receipt.status).toBe("unsupported");
     expect(receipt.reason).toBe("no-child-advertises: never.advertised");
+    expect(f.paths.execution.all()).toHaveLength(0);
+    await a.conn.close();
+  });
+
+  it("a nudge answers unsupported (the wire has no nudge frame), terminal", async () => {
+    const f = await fleetBoot(TWO_CHILDREN, TRANSPORT);
+    const a = await f.attach("alpha", manifestAdvert(["research.analyze"], "alpha"));
+    f.mock.pushDeliver(nudge("cmd-nudge"));
+    const receipt = await waitFor("receipt", () => f.mock.receipts[0] ?? false);
+    expect(receipt.status).toBe("unsupported");
+    expect(receipt.reason).toBe("no-execution");
     expect(f.paths.execution.all()).toHaveLength(0);
     await a.conn.close();
   });

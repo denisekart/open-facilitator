@@ -858,6 +858,32 @@
       "class": "event",
       "type": "org.facilitator.event.provider.review.v1",
       "errorClass": "schema-violation"
+    },
+    {
+      "file": "valid/command.communication.post.json",
+      "expect": "valid",
+      "class": "command",
+      "type": "org.facilitator.command.communication.post.v1"
+    },
+    {
+      "file": "invalid/command.communication.post.bad-target-kind.json",
+      "expect": "invalid",
+      "class": "command",
+      "type": "org.facilitator.command.communication.post.v1",
+      "errorClass": "schema-violation"
+    },
+    {
+      "file": "valid/command.communication.post.with-buttons.json",
+      "expect": "valid",
+      "class": "command",
+      "type": "org.facilitator.command.communication.post.v1"
+    },
+    {
+      "file": "invalid/command.communication.post.button-no-action.json",
+      "expect": "invalid",
+      "class": "command",
+      "type": "org.facilitator.command.communication.post.v1",
+      "errorClass": "schema-violation"
     }
   ]
 }

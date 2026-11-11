@@ -28,6 +28,7 @@ import {
   customEmojiReactionUpdate,
   dmUpdate,
   echoUpdate,
+  callbackUpdate,
   emptyReactionUpdate,
   forumTopicUpdate,
   mediaOnlyUpdate,
@@ -76,6 +77,35 @@ function events(result: NormalizeResult): Extract<NormalizeResult, { kind: "even
   if (result.kind !== "events") throw new Error(`expected events, got ${result.kind}`);
   return result.events;
 }
+
+describe("the C7 callback law", () => {
+  it("an inline-button press becomes a message.v1 authored by the presser", () => {
+    const [event] = events(normalizeUpdate(callbackUpdate, ctx()));
+    expect(event?.type).toBe(MESSAGE_EVENT);
+    const data = event?.type === MESSAGE_EVENT ? event.data : undefined;
+    expect(data?.providerDeliveryId).toBe("callback:cb-1");
+    expect(data?.actorProviderAccountId).toBe(String(HUMAN_ID));
+    expect(data?.text).toBe("/approve 6f1a accept");
+    expect(data?.reference.messageId).toBe("callback:cb-1");
+    expect(data?.reference.authorProviderAccountId).toBe(String(HUMAN_ID));
+    // The press rides the ordinary envelope law.
+    expect(
+      validateEnvelope(
+        buildEvent(MESSAGE_EVENT, {
+          source: "urn:ofac:provider:telegram:api.telegram.org",
+          subject: "callback:cb-1",
+          data: data as unknown as Record<string, unknown>,
+        }),
+      ).ok,
+    ).toBe(true);
+  });
+
+  it("a callback in an unadmitted chat is ignored", () => {
+    const foreign = structuredClone(callbackUpdate) as typeof callbackUpdate;
+    (foreign.callback_query as { message: { chat: { id: number } } }).message.chat.id = -9999999999999;
+    expect(normalizeUpdate(foreign, ctx()).kind).toBe("ignored");
+  });
+});
 
 describe("normalizeUpdate classification", () => {
   it("mention: @bot at a word boundary → mention.v1 with full reference", () => {

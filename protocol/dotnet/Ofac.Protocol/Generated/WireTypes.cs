@@ -456,34 +456,23 @@ namespace Ofac.Protocol
         public string? tenantOrOrganizationId { get; set; }
     }
 
-    public partial class CommunicationReactCommandV1Data
-    {
-        [JsonPropertyName("commandId")]
-        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
-        public string commandId { get; set; }
-
-        [JsonPropertyName("emojiName")]
-        [JsonConverter(typeof(IndecentMinMaxLengthCheckConverter))]
-        public string emojiName { get; set; }
-
-        [JsonPropertyName("idempotencyKey")]
-        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
-        public string idempotencyKey { get; set; }
-
-        [JsonPropertyName("target")]
-        public ConversationTarget target { get; set; }
-    }
-
-    public partial class CommunicationReplyCommandV1Data
+    public partial class CommunicationPostCommandV1Data
     {
         /// <summary>
-        /// Outbound media the adapter should post alongside the reply text (the kernel emits these
-        /// for harness-produced artifacts; the adapter consumes them).
+        /// Outbound media posted alongside the notice (same law as the reply command).
         /// </summary>
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("artifacts")]
         public ArtifactRef[]? artifacts { get; set; }
 
+        /// <summary>
+        /// Interactive affordances (C7). Every button carries the EXACT command text a decision
+        /// rides; a surface without buttons renders nothing extra - the text always stands alone.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("buttons")]
+        public CommunicationPostCommandV1DataButtons? buttons { get; set; }
+
         [JsonPropertyName("commandId")]
         [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
         public string commandId { get; set; }
@@ -492,8 +481,12 @@ namespace Ofac.Protocol
         [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
         public string idempotencyKey { get; set; }
 
+        /// <summary>
+        /// A conversation a reply cannot address: a top-level post into a dm or a channel (a team
+        /// notice is a channel post, not a thread reply wearing a costume - B4).
+        /// </summary>
         [JsonPropertyName("target")]
-        public ConversationTarget target { get; set; }
+        public PostConversationTarget target { get; set; }
 
         [JsonPropertyName("text")]
         [JsonConverter(typeof(HilariousMinMaxLengthCheckConverter))]
@@ -543,6 +536,160 @@ namespace Ofac.Protocol
 
         [JsonPropertyName("storageUrl")]
         public Uri storageUrl { get; set; }
+    }
+
+    /// <summary>
+    /// Interactive affordances (C7). Every button carries the EXACT command text a decision
+    /// rides; a surface without buttons renders nothing extra - the text always stands alone.
+    /// </summary>
+    public partial class CommunicationPostCommandV1DataButtons
+    {
+        [JsonPropertyName("label")]
+        [JsonConverter(typeof(IndecentMinMaxLengthCheckConverter))]
+        public string label { get; set; }
+
+        /// <summary>
+        /// Exact text offered to the presser to send as their own message (Telegram reply keyboard,
+        /// Slack button copy): the human sends it, so the message carries the presser's proven
+        /// authorship on the existing authority plane (C7).
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("prefill")]
+        [JsonConverter(typeof(StickyMinMaxLengthCheckConverter))]
+        public string? prefill { get; set; }
+
+        /// <summary>
+        /// Exact text to submit as the presser's message.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("value")]
+        [JsonConverter(typeof(StickyMinMaxLengthCheckConverter))]
+        public string? value { get; set; }
+    }
+
+    /// <summary>
+    /// A conversation a reply cannot address: a top-level post into a dm or a channel (a team
+    /// notice is a channel post, not a thread reply wearing a costume - B4).
+    /// </summary>
+    public partial class PostConversationTarget
+    {
+        [JsonPropertyName("conversationKind")]
+        public PostConversationKind conversationKind { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("actorProviderAccountId")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string? actorProviderAccountId { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("channelOrResourceId")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string? channelOrResourceId { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("parentMessageId")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string? parentMessageId { get; set; }
+
+        [JsonPropertyName("provider")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string provider { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("rootThreadId")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string? rootThreadId { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("subjectRef")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string? subjectRef { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("tenantOrOrganizationId")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string? tenantOrOrganizationId { get; set; }
+    }
+
+    public partial class CommunicationReactCommandV1Data
+    {
+        [JsonPropertyName("commandId")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string commandId { get; set; }
+
+        [JsonPropertyName("emojiName")]
+        [JsonConverter(typeof(IndecentMinMaxLengthCheckConverter))]
+        public string emojiName { get; set; }
+
+        [JsonPropertyName("idempotencyKey")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string idempotencyKey { get; set; }
+
+        [JsonPropertyName("target")]
+        public ConversationTarget target { get; set; }
+    }
+
+    public partial class CommunicationReplyCommandV1Data
+    {
+        /// <summary>
+        /// Outbound media the adapter should post alongside the reply text (the kernel emits these
+        /// for harness-produced artifacts; the adapter consumes them).
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("artifacts")]
+        public ArtifactRef[]? artifacts { get; set; }
+
+        /// <summary>
+        /// Interactive affordances (C7). Every button carries the EXACT command text a decision
+        /// rides; a surface without buttons renders nothing extra - the text always stands alone.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("buttons")]
+        public CommunicationReplyCommandV1DataButtons? buttons { get; set; }
+
+        [JsonPropertyName("commandId")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string commandId { get; set; }
+
+        [JsonPropertyName("idempotencyKey")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string idempotencyKey { get; set; }
+
+        [JsonPropertyName("target")]
+        public ConversationTarget target { get; set; }
+
+        [JsonPropertyName("text")]
+        [JsonConverter(typeof(HilariousMinMaxLengthCheckConverter))]
+        public string text { get; set; }
+    }
+
+    /// <summary>
+    /// Interactive affordances (C7). Every button carries the EXACT command text a decision
+    /// rides; a surface without buttons renders nothing extra - the text always stands alone.
+    /// </summary>
+    public partial class CommunicationReplyCommandV1DataButtons
+    {
+        [JsonPropertyName("label")]
+        [JsonConverter(typeof(IndecentMinMaxLengthCheckConverter))]
+        public string label { get; set; }
+
+        /// <summary>
+        /// Exact text offered to the presser to send as their own message (Telegram reply keyboard,
+        /// Slack button copy): the human sends it, so the message carries the presser's proven
+        /// authorship on the existing authority plane (C7).
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("prefill")]
+        [JsonConverter(typeof(StickyMinMaxLengthCheckConverter))]
+        public string? prefill { get; set; }
+
+        /// <summary>
+        /// Exact text to submit as the presser's message.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("value")]
+        [JsonConverter(typeof(StickyMinMaxLengthCheckConverter))]
+        public string? value { get; set; }
     }
 
     public partial class CommunicationUpdateCommandV1Data
@@ -2236,6 +2383,8 @@ namespace Ofac.Protocol
 
     public enum ConversationKind { Channel, Comment, Dm, Thread };
 
+    public enum PostConversationKind { Channel, Dm };
+
     public enum Purpose { AssignmentContext, ReportSynthesis, RequirementsClarification };
 
     public enum Classification { Internal, Public };
@@ -2294,6 +2443,7 @@ namespace Ofac.Protocol
                 CapabilityManifestV1KindConverter.Singleton,
                 ApprovalRespondCommandV1DataDecisionConverter.Singleton,
                 ConversationKindConverter.Singleton,
+                PostConversationKindConverter.Singleton,
                 PurposeConverter.Singleton,
                 ClassificationConverter.Singleton,
                 PolicyLabelConverter.Singleton,
@@ -2737,6 +2887,40 @@ namespace Ofac.Protocol
         }
 
         public static readonly IndecentMinMaxLengthCheckConverter Singleton = new IndecentMinMaxLengthCheckConverter();
+    }
+
+    internal class PostConversationKindConverter : JsonConverter<PostConversationKind>
+    {
+        public override bool CanConvert(Type t) => t == typeof(PostConversationKind);
+
+        public override PostConversationKind Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            var value = reader.GetString();
+            switch (value)
+            {
+                case "channel":
+                    return PostConversationKind.Channel;
+                case "dm":
+                    return PostConversationKind.Dm;
+            }
+            throw new Exception("Cannot unmarshal type PostConversationKind");
+        }
+
+        public override void Write(Utf8JsonWriter writer, PostConversationKind value, JsonSerializerOptions options)
+        {
+            switch (value)
+            {
+                case PostConversationKind.Channel:
+                    JsonSerializer.Serialize(writer, "channel", options);
+                    return;
+                case PostConversationKind.Dm:
+                    JsonSerializer.Serialize(writer, "dm", options);
+                    return;
+            }
+            throw new Exception("Cannot marshal type PostConversationKind");
+        }
+
+        public static readonly PostConversationKindConverter Singleton = new PostConversationKindConverter();
     }
 
     internal class HilariousMinMaxLengthCheckConverter : JsonConverter<string>

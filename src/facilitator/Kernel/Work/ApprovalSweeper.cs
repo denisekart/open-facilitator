@@ -137,7 +137,7 @@ public sealed class ApprovalSweeper(
             .Select(a => a.WorkId!.Value).Distinct().ToListAsync(ct);
         foreach (var workId in workIds)
         {
-            await AppendNudgeNoticeAsync(db, workId, due.Count, now, ct);
+            await AppendNudgeNoticeAsync(db, workId, due, now, ct);
             var version = await db.Works.Where(w => w.WorkId == workId).Select(w => w.Version).FirstOrDefaultAsync(ct);
             db.WorkEvents.Add(new WorkEventEntity
             {
@@ -161,8 +161,10 @@ public sealed class ApprovalSweeper(
     /// <summary>The nudge notice (step 4: through the notification ledger —
     /// a reply in the work's bound conversation with the team channel as its
     /// fallback rung; unbound works carry the timeline row alone).</summary>
-    private async Task AppendNudgeNoticeAsync(FacilitatorDbContext db, Guid workId, int count, DateTime now, CancellationToken ct)
+    private async Task AppendNudgeNoticeAsync(
+        FacilitatorDbContext db, Guid workId, List<Guid> due, DateTime now, CancellationToken ct)
     {
+        var count = due.Count;
         if (notifications is null)
         {
             return;
@@ -177,6 +179,17 @@ public sealed class ApprovalSweeper(
             : new Facilitator.Kernel.Integrations.ConversationTarget(
                 binding.Provider, null, binding.Channel, binding.RootMessageId, binding.ParentMessageId,
                 null, "thread", null);
+        // C7: a one-approval nudge carries its decision as buttons - the
+        // press rides the slash plane, so it carries the presser's identity.
+        // Several approvals awaiting on one work is too many buttons for one
+        // message: the text names /approve.
+        IReadOnlyList<(string Label, string Value)>? buttons = count == 1
+            ? new (string, string)[]
+            {
+                ("Approve", $"/approve {due[0]:N} accept"),
+                ("Reject", $"/approve {due[0]:N} reject"),
+            }
+            : null;
         await notifications.EmitAsync(db, new Facilitator.Kernel.Notifications.NotificationRequest(
             Audience: "team",
             Text: count == 1
@@ -185,7 +198,8 @@ public sealed class ApprovalSweeper(
             WorkId: workId,
             TeamSlug: teamSlug,
             Target: target,
-            CommandId: $"consent-nudge:{notice}"), ct);
+            CommandId: $"consent-nudge:{notice}",
+            Buttons: buttons), ct);
     }
 
     private async Task<int> ExpireOnceAsync(FacilitatorDbContext db, DateTime now, CancellationToken ct)

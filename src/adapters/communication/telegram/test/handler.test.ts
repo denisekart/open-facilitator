@@ -19,8 +19,10 @@ import { validateEnvelope } from "@ofac/protocol";
 import type { ArtifactRef, EnvelopeCommand, EnvelopeEvent } from "@ofac/protocol";
 import { ChatLedger, parseObjectIds } from "../src/chat-ledger.js";
 import {
+  CMD_POST,
   CMD_REACT,
   CMD_REPLY,
+  COMMUNICATION_COMMANDS,
   chunkText,
   communicationManifest,
   createAdapterHandler,
@@ -52,6 +54,7 @@ interface Sent {
 
 function fakeApi(options: { reject413OnDocument?: boolean } = {}): TelegramApi & Sent {
   const sent: Sent = { messages: [], photos: [], documents: [], reactions: [], edits: [] };
+  const answer = async (): Promise<void> => undefined;
   let nextId = 5000;
   const message = (): TgMessage => ({
     message_id: nextId++,
@@ -90,6 +93,7 @@ function fakeApi(options: { reject413OnDocument?: boolean } = {}): TelegramApi &
     setMessageReaction: async (params) => {
       sent.reactions.push(params);
     },
+    answerCallbackQuery: answer,
   };
 }
 
@@ -117,6 +121,7 @@ function artifact(overrides: Partial<ArtifactRef> = {}): ArtifactRef {
 }
 
 function command(type: string, data: Record<string, unknown>): EnvelopeCommand {
+  const file = `command.${type.split(".").slice(2).join(".")}.json`;
   return {
     specversion: "1.0",
     id: "env-1",
@@ -125,7 +130,7 @@ function command(type: string, data: Record<string, unknown>): EnvelopeCommand {
     subject: "cmd-1",
     time: new Date().toISOString(),
     datacontenttype: "application/json",
-    dataschema: "https://schemas.openfacilitator.org/v1/command.communication.reply.v1.json",
+    dataschema: `https://schemas.openfacilitator.org/v1/${file}`,
     data: {
       commandId: "cmd-1",
       idempotencyKey: "idem-1",
@@ -500,11 +505,194 @@ describe("echo envelope", () => {
   });
 });
 
+describe("post + buttons (B4, C7)", () => {
+  const postTarget = {
+    provider: "telegram",
+    channelOrResourceId: "-1001",
+    conversationKind: "channel",
+  };
+
+  it("a channel post is a top-level send: no threading on the message", async () => {
+    const api = fakeApi();
+    const handler = createAdapterHandler({
+      api,
+      state: freshState(),
+      identity: IDENTITY,
+      media: source(),
+      logger: createMemoryLogger(),
+    });
+    const published: EnvelopeEvent[] = [];
+    const outcome = await handler.onCommand(
+      command(CMD_POST, { text: "Team notice.", target: postTarget }),
+      fakeCtx(published),
+    );
+    expect(outcome).toEqual({ kind: "accepted" });
+    expect(api.messages).toHaveLength(1);
+    expect(api.messages[0]).not.toHaveProperty("reply_parameters");
+    expect(api.messages[0]).not.toHaveProperty("message_thread_id");
+    // the echo names the channel kind
+    const data = published[0]!.data as { reference: { conversationKind: string } };
+    expect(data.reference.conversationKind).toBe("channel");
+  });
+
+  it("a thread target is refused: a post is dm|channel only", async () => {
+    const api = fakeApi();
+    const handler = createAdapterHandler({
+      api,
+      state: freshState(),
+      identity: IDENTITY,
+      media: source(),
+      logger: createMemoryLogger(),
+    });
+    expect(await handler.onCommand(command(CMD_POST, { text: "x" }), fakeCtx([]))).toEqual({
+      kind: "rejected",
+      reason: "unsupported-conversation-kind",
+    });
+    expect(api.messages).toHaveLength(0);
+  });
+
+  it("prefill buttons ride the last chunk as a one-time reply keyboard", async () => {
+    const api = fakeApi();
+    const handler = createAdapterHandler({
+      api,
+      state: freshState(),
+      identity: IDENTITY,
+      media: source(),
+      logger: createMemoryLogger(),
+    });
+    await handler.onCommand(
+      command(CMD_POST, {
+        text: "Consent lapses soon.",
+        target: postTarget,
+        buttons: [
+          { label: "Approve", prefill: "/approve abc accept" },
+          { label: "Reject", prefill: "/approve abc reject" },
+        ],
+      }),
+      fakeCtx([]),
+    );
+    expect(api.messages).toHaveLength(1);
+    expect(api.messages[0]!.reply_markup).toEqual({
+      keyboard: [[{ text: "/approve abc accept" }], [{ text: "/approve abc reject" }]],
+      resize_keyboard: true,
+      one_time_keyboard: true,
+    });
+  });
+
+  it("value buttons become inline callback rows (64-byte law)", async () => {
+    const api = fakeApi();
+    const handler = createAdapterHandler({
+      api,
+      state: freshState(),
+      identity: IDENTITY,
+      media: source(),
+      logger: createMemoryLogger(),
+    });
+    await handler.onCommand(
+      command(CMD_POST, {
+        text: "Consent lapses soon.",
+        target: postTarget,
+        buttons: [
+          { label: "Approve", value: "/approve abc accept" },
+          { label: "Reject", value: "/approve abc reject" },
+        ],
+      }),
+      fakeCtx([]),
+    );
+    const markup = api.messages[0]!.reply_markup;
+    expect(markup?.inline_keyboard).toEqual([
+      [{ text: "Approve", callback_data: "/approve abc accept" }],
+      [{ text: "Reject", callback_data: "/approve abc reject" }],
+    ]);
+  });
+
+  it("an over-64-byte callback payload ships NO markup (never half a decision row)", async () => {
+    const api = fakeApi();
+    const handler = createAdapterHandler({
+      api,
+      state: freshState(),
+      identity: IDENTITY,
+      media: source(),
+      logger: createMemoryLogger(),
+    });
+    await handler.onCommand(
+      command(CMD_POST, {
+        text: "x",
+        target: postTarget,
+        buttons: [{ label: "Go", value: `/approve ${"a".repeat(64)} accept` }],
+      }),
+      fakeCtx([]),
+    );
+    expect(api.messages[0]!.reply_markup).toBeUndefined();
+  });
+
+  it("mixed prefill/value buttons ship no markup", async () => {
+    const api = fakeApi();
+    const handler = createAdapterHandler({
+      api,
+      state: freshState(),
+      identity: IDENTITY,
+      media: source(),
+      logger: createMemoryLogger(),
+    });
+    await handler.onCommand(
+      command(CMD_POST, {
+        text: "x",
+        target: postTarget,
+        buttons: [
+          { label: "A", prefill: "/a" },
+          { label: "B", value: "/b" },
+        ],
+      }),
+      fakeCtx([]),
+    );
+    expect(api.messages[0]!.reply_markup).toBeUndefined();
+  });
+
+  it("a post replays on the idempotency key with zero provider calls", async () => {
+    const api = fakeApi();
+    const handler = createAdapterHandler({
+      api,
+      state: freshState(),
+      identity: IDENTITY,
+      media: source(),
+      logger: createMemoryLogger(),
+    });
+    const cmd = command(CMD_POST, { text: "notice", target: postTarget });
+    await handler.onCommand(cmd, fakeCtx([]));
+    await handler.onCommand(cmd, fakeCtx([]));
+    expect(api.messages).toHaveLength(1);
+  });
+
+  it("a reply carrying buttons puts the markup on the last chunk of a chunked text", async () => {
+    const api = fakeApi();
+    const handler = createAdapterHandler({
+      api,
+      state: freshState(),
+      identity: IDENTITY,
+      media: source(),
+      logger: createMemoryLogger(),
+    });
+    await handler.onCommand(
+      command(CMD_REPLY, {
+        text: "x".repeat(5000),
+        buttons: [{ label: "Approve", prefill: "/approve a accept" }],
+      }),
+      fakeCtx([]),
+    );
+    expect(api.messages.length).toBeGreaterThanOrEqual(2);
+    expect(api.messages[0]!.reply_markup).toBeUndefined();
+    expect(api.messages[api.messages.length - 1]!.reply_markup).toBeDefined();
+  });
+});
+
 describe("manifest", () => {
-  it("four synchronous capabilities, dataschema-per-id, owned by the team", () => {
+  it("the full communication family, synchronous, dataschema-per-id, team-owned", () => {
     const manifest = communicationManifest("team-alpha");
     expect(manifest.ownerTeam).toBe("team-alpha");
-    expect(manifest.capabilities).toHaveLength(4);
+    expect(manifest.capabilities.map((c) => c.id).sort()).toEqual(
+      [...COMMUNICATION_COMMANDS].sort(),
+    );
     for (const capability of manifest.capabilities) {
       expect(capability.execution).toBe("synchronous");
       expect(capability.inputSchema).toBe(

@@ -51,6 +51,7 @@ function fakeApi(options: { declaredSize?: number } = {}): TelegramApi {
     sendDocument: noop,
     editMessageText: noop,
     setMessageReaction: async () => undefined,
+    answerCallbackQuery: async () => undefined,
     ...(options.declaredSize === undefined
       ? {}
       : {

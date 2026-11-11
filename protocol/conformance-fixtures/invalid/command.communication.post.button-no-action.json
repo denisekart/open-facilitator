@@ -1,0 +1,28 @@
+{
+  "specversion": "1.0",
+  "id": "01JCOMM-post-buttons-bad",
+  "source": "urn:facilitator:instance:demo",
+  "type": "org.facilitator.command.communication.post.v1",
+  "subject": "work/work-123",
+  "time": "2026-10-29T09:05:00Z",
+  "datacontenttype": "application/json",
+  "dataschema": "https://schemas.openfacilitator.org/v1/command.communication.post.v1.json",
+  "data": {
+    "commandId": "notice-2:post",
+    "target": {
+      "provider": "telegram",
+      "tenantOrOrganizationId": "demo-team",
+      "channelOrResourceId": "-1001234567890",
+      "subjectRef": "work/work-123",
+      "conversationKind": "channel",
+      "actorProviderAccountId": "account-001"
+    },
+    "text": "Consent for this work lapses soon - it needs a decision.",
+    "idempotencyKey": "notice-2:post",
+    "buttons": [
+      {
+        "label": "Approve"
+      }
+    ]
+  }
+}

@@ -24,6 +24,7 @@ import { ChatLedger } from "./chat-ledger.js";
 import { MediaPipeline, fetchArtifactContent } from "./media.js";
 import { TelegramClient, type TelegramApi } from "./tg-client.js";
 import { UpdatesListener } from "./updates-listener.js";
+import { createInboundLoopGuard } from "./loop-guard.js";
 import { communicationManifest, createAdapterHandler, type AdapterIdentity } from "./handler.js";
 import { SECRET_HEADER, createWebhookNormalizer, decodeUpdate, ingest } from "./webhook.js";
 import { verifyTokenToken } from "@ofac/provider-core/node";
@@ -263,7 +264,24 @@ export async function run(
    *  private-chat ledger entry (`dm:<userId> → chatId`) is recorded here so
    *  the handler can resolve a DmTarget once the human has said /start. */
   const publishUpdate = async (update: TgUpdate): Promise<NormalizeResult> => {
+    // The adapter-side loop guard (B6): a foreign bot's messages past the
+    // exchange budget never reach the kernel; the stop says so once.
+    if (loopGuard.decide(update) === "drop") {
+      return { kind: "ignored" };
+    }
     const result = await ingest(update, { state, context: normalizeCtx, media, onUnconfigured });
+    // The spinner law (C7): a button press is answered once its event was
+    // published (or consciously dropped); the text rides as receipt.
+    if (update.callback_query !== undefined) {
+      try {
+        await api.answerCallbackQuery({
+          callback_query_id: update.callback_query.id,
+          text: "Recorded",
+        });
+      } catch (error) {
+        logger.warn("answerCallbackQuery failed (continuing)", { error: String(error) });
+      }
+    }
     const message = update.message ?? update.edited_message;
     if (message !== undefined) {
       if (message.chat.type === "private" && message.from !== undefined) {
@@ -277,6 +295,8 @@ export async function run(
     }
     return result;
   };
+
+  const loopGuard = createInboundLoopGuard(config.loopBudgetExchanges, logger);
 
   const listener = new UpdatesListener({
     api,
@@ -308,7 +328,7 @@ export async function run(
         url: config.webhookUrl ?? "",
         secret_token: config.webhookSecret ?? "",
         max_connections: 8,
-        allowed_updates: ["message", "edited_message", "message_reaction"],
+        allowed_updates: ["message", "edited_message", "message_reaction", "callback_query"],
       });
       webhook = createServer((req, res) => {
         const chunks: Buffer[] = [];

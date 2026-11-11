@@ -28,6 +28,7 @@ import commandCommunicationReply from "../schemas/command.communication.reply.v1
 import commandCommunicationReact from "../schemas/command.communication.react.v1.json" with { type: "json" };
 import commandCommunicationUpdate from "../schemas/command.communication.update.v1.json" with { type: "json" };
 import commandCommunicationAcknowledge from "../schemas/command.communication.acknowledge.v1.json" with { type: "json" };
+import commandCommunicationPost from "../schemas/command.communication.post.v1.json" with { type: "json" };
 import commandProviderWebhook from "../schemas/command.provider.webhook.v1.json" with { type: "json" };
 import eventWorkAccepted from "../schemas/event.work.accepted.v1.json" with { type: "json" };
 import eventWorkProgress from "../schemas/event.work.progress.v1.json" with { type: "json" };
@@ -88,6 +89,7 @@ const all: JsonSchema[] = [
   commandCommunicationReact,
   commandCommunicationUpdate,
   commandCommunicationAcknowledge,
+  commandCommunicationPost,
   commandProviderWebhook,
   eventWorkAccepted,
   eventWorkProgress,

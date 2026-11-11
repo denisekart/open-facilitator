@@ -23,7 +23,11 @@ public sealed record NotificationRequest(
     ConversationTarget? Target = null,
     IReadOnlyList<ConversationTarget>? Ladder = null,
     string? CommandId = null,
-    int CorrectionWindowMinutes = 0);
+    int CorrectionWindowMinutes = 0,
+    /// <summary>Interactive affordances (C7): exact-text buttons the
+    /// receiving surface may render; a surface without them posts plain
+    /// text.</summary>
+    IReadOnlyList<(string Label, string Value)>? Buttons = null);
 
 /// <summary>
 /// The single human-egress path (A6, B4, B5, D5): every notice the kernel sends a
@@ -128,9 +132,15 @@ public sealed class NotificationLedger(
         var commandId = request.CommandId is { Length: > 0 } provided
             ? provided
             : $"{CommandPrefix}{row.NotificationId:N}";
-        var envelope = ProviderEventStore.ReplyEnvelope(
-            answer.Rung.Target, request.Text, commandId,
-            request.WorkId is { } w ? $"work/{w}" : $"notification/{row.NotificationId}", now);
+        // One path per surface (B4): a notice landing on a dm or a channel
+        // posts (command.communication.post.v1); a thread/comment rung keeps
+        // replying where the conversation lives.
+        var subject = request.WorkId is { } w ? $"work/{w}" : $"notification/{row.NotificationId}";
+        var envelope = answer.Rung.Target.ConversationKind is "channel" or "dm"
+            ? ProviderEventStore.PostEnvelope(
+                answer.Rung.Target, request.Text, commandId, subject, now, request.Buttons)
+            : ProviderEventStore.ReplyEnvelope(
+                answer.Rung.Target, request.Text, commandId, subject, now, request.Buttons);
         var json = envelope.ToJsonString();
         var verdict = envelopeValidator.Validate(json);
         if (!verdict.Ok)

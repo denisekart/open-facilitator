@@ -498,7 +498,7 @@ public sealed class ProviderEventStore(
         // addressing); a provider deregistered since the mint simply gets no reply.
         if (registry.Find(challenge.Provider) is { } challengeProvider)
         {
-            AppendCommand(db, ReplyEnvelope(
+            AppendCommand(db, PostEnvelope(
                 DmTarget(challenge.Provider, challenge.DeliverToAccountId),
                 $"Account {challenge.AccountId} linked to a Facilitator identity.",
                 $"link:{challenge.ChallengeId}:confirm",
@@ -1151,7 +1151,7 @@ public sealed class ProviderEventStore(
             CreatedAt = now,
             ExpiresAt = now.Add(ChallengeTtl),
         });
-        AppendCommand(db, ReplyEnvelope(
+        AppendCommand(db, PostEnvelope(
             DmTarget(reference.Provider, actor),
             $"Your Facilitator link code: {code} (single use, {ChallengeTtl.TotalMinutes:0} minutes). Redeem it via POST /api/link-identities/redeem.",
             $"link:{reference.MessageId ?? actor}:dm",
@@ -1609,9 +1609,35 @@ public sealed class ProviderEventStore(
     internal static ConversationTarget DmTarget(string provider, string accountId) => new(
         provider, null, null, null, null, null, "dm", accountId);
 
-    internal static JsonObject ReplyEnvelope(ConversationTarget target, string text, string idempotencyKey, string subject, DateTime now) =>
+    internal static JsonObject ReplyEnvelope(
+        ConversationTarget target, string text, string idempotencyKey, string subject, DateTime now,
+        IReadOnlyList<(string Label, string Value)>? buttons = null) =>
         CommunicationEnvelope("org.facilitator.command.communication.reply.v1", "command.communication.reply.v1.json", target, subject, now, idempotencyKey,
-            new JsonObject { ["text"] = text });
+            TextTail(text, buttons));
+
+    /// <summary>The B4 law: a top-level team notice is a POST (dm|channel
+    /// target), not a reply wearing a thread costume. The rung kind decides.</summary>
+    internal static JsonObject PostEnvelope(
+        ConversationTarget target, string text, string idempotencyKey, string subject, DateTime now,
+        IReadOnlyList<(string Label, string Value)>? buttons = null) =>
+        CommunicationEnvelope("org.facilitator.command.communication.post.v1", "command.communication.post.v1.json", target, subject, now, idempotencyKey,
+            TextTail(text, buttons));
+
+    /// <summary>The C7 buttons: each carries the EXACT text the surface
+    /// re-submits as the pressing user's own message (a slash command rides
+    /// the existing authority plane, so the press carries proven identity).
+    /// A surface without buttons renders none — the text always stands alone.</summary>
+    internal static JsonObject TextTail(string text, IReadOnlyList<(string Label, string Value)>? buttons)
+    {
+        var tail = new JsonObject { ["text"] = text };
+        if (buttons is { Count: > 0 })
+        {
+            tail["buttons"] = new JsonArray(
+                buttons.Select(b => (JsonNode)new JsonObject { ["label"] = b.Label, ["value"] = b.Value }).ToArray());
+        }
+
+        return tail;
+    }
 
     internal static JsonObject ReactEnvelope(ConversationTarget target, string emoji, string idempotencyKey, string subject, DateTime now) =>
         CommunicationEnvelope("org.facilitator.command.communication.react.v1", "command.communication.react.v1.json", target, subject, now, idempotencyKey,

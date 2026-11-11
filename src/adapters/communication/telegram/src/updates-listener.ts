@@ -1,5 +1,6 @@
 // The long-poll loop (the mattermost ws-listener analogue): getUpdates with
-// timeout=30 / limit=100 / allowed_updates message+edited_message+message_reaction,
+// timeout=30 / limit=100 / allowed_updates message+edited_message+message_reaction
+// +callback_query (the C7 inline-button press),
 // the update offset checkpointed in the chat-ledger kv (`update_offset`) so a
 // restart never re-reads the whole queue window, and the backoff ladder
 // [250,500,1000,2000,5000,10000] on transport failures (a long-poll HTTP
@@ -24,7 +25,7 @@ export interface UpdatesListenerOptions {
 
 const DEFAULT_BACKOFF_MS = [250, 500, 1000, 2000, 5000, 10000];
 
-const ALLOWED_UPDATES = ["message", "edited_message", "message_reaction"];
+const ALLOWED_UPDATES = ["message", "edited_message", "message_reaction", "callback_query"];
 
 function sleep(ms: number): Promise<void> {
   const { promise, resolve } = Promise.withResolvers<void>();

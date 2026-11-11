@@ -38,11 +38,29 @@ export interface GetUpdatesParams {
   allowed_updates?: string[];
 }
 
+/** One interactive button (Telegram provider law): an inline callback
+ *  button or a reply-keyboard button (the prefill law). */
+export type InlineKeyboardButton =
+  | { text: string; callback_data: string }
+  | { text: string };
+
+/** The wire markup: exactly one of the two families is set. */
+export interface ReplyMarkup {
+  inline_keyboard?: InlineKeyboardButton[][];
+  keyboard?: { text: string }[][];
+  resize_keyboard?: boolean;
+  one_time_keyboard?: boolean;
+}
+
 export interface SendMessageParams {
   chat_id: string | number;
   text: string;
   message_thread_id?: number;
   reply_parameters?: { message_id: number; allow_sending_without_reply?: boolean };
+  /** Interactive affordances (C7): rows of inline buttons; the client
+   *  serializes the markup (a bot cannot author AS the presser, so buttons
+   *  carry the prefill law). */
+  reply_markup?: ReplyMarkup;
 }
 
 export interface SendMediaParams {
@@ -52,6 +70,7 @@ export interface SendMediaParams {
   caption?: string;
   message_thread_id?: number;
   reply_parameters?: { message_id: number; allow_sending_without_reply?: boolean };
+  reply_markup?: ReplyMarkup;
 }
 
 export interface SetMessageReactionParams {
@@ -81,6 +100,9 @@ export interface TelegramApi {
   sendMessage(params: SendMessageParams): Promise<TgMessage>;
   sendPhoto(params: SendMediaParams): Promise<TgMessage>;
   sendDocument(params: SendMediaParams): Promise<TgMessage>;
+  /** Settle a button press (the spinner law: an unanswered callback spins
+   *  client-side until timeout). */
+  answerCallbackQuery(params: { callback_query_id: string; text?: string }): Promise<void>;
   editMessageText(params: {
     chat_id: string | number;
     message_id: number;
@@ -184,9 +206,16 @@ export class TelegramClient implements TelegramApi {
     return new Uint8Array(await response.arrayBuffer());
   }
 
+  async answerCallbackQuery(params: { callback_query_id: string; text?: string }): Promise<void> {
+    await this.call<boolean>("answerCallbackQuery", prune({ ...params }));
+  }
+
   async sendMessage(params: SendMessageParams): Promise<TgMessage> {
     // sendMessage text law: ≤ 4096 — the HANDLER chunks; the client fails
     // closed rather than letting Telegram truncate silently.
+    // JSON-body law: reply_markup rides as the nested object Telegram's
+    // application/json mode takes (multipart would need JSON.stringify -
+    // sendMedia does that for its form fields).
     return await this.call<TgMessage>("sendMessage", prune({ ...params }));
   }
 
@@ -201,6 +230,9 @@ export class TelegramClient implements TelegramApi {
   private async sendMedia(method: string, params: SendMediaParams): Promise<TgMessage> {
     const fields: Record<string, string> = {
       chat_id: String(params.chat_id),
+      ...(params.reply_markup === undefined
+        ? {}
+        : { reply_markup: JSON.stringify(params.reply_markup) }),
       ...(params.caption === undefined ? {} : { caption: params.caption }),
       ...(params.message_thread_id === undefined
         ? {}

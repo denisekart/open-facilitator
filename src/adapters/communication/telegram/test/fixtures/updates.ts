@@ -171,6 +171,17 @@ export const reactionUpdate: TgUpdate = {
   },
 };
 
+/** The C7 inline-button press: a callback_query carrying the button data. */
+export const callbackUpdate: TgUpdate = {
+  update_id: 9020,
+  callback_query: {
+    id: "cb-1",
+    from: human,
+    message: { chat: groupChat, date: 1730000020 },
+    data: "/approve 6f1a accept",
+  },
+};
+
 /** Un-react: empty new_reaction set ⇒ ignored. */
 export const emptyReactionUpdate: TgUpdate = {
   update_id: 9011,

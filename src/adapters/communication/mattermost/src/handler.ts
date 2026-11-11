@@ -34,12 +34,14 @@ export const CMD_REPLY = "org.facilitator.command.communication.reply.v1";
 export const CMD_REACT = "org.facilitator.command.communication.react.v1";
 export const CMD_UPDATE = "org.facilitator.command.communication.update.v1";
 export const CMD_ACK = "org.facilitator.command.communication.acknowledge.v1";
+export const CMD_POST = "org.facilitator.command.communication.post.v1";
 
 export const COMMUNICATION_COMMANDS: readonly string[] = [
   CMD_REPLY,
   CMD_REACT,
   CMD_UPDATE,
   CMD_ACK,
+  CMD_POST,
 ];
 
 /** The provider-side identity the echo events are authored under. */
@@ -181,6 +183,35 @@ export function createAdapterHandler(deps: HandlerDeps): LinkHandler {
             data.target.conversationKind,
           );
           logger.info("reply posted", { postId, channelId, commandId: data.commandId });
+          return { kind: "accepted" };
+        }
+        case CMD_POST: {
+          // The B4 law: a team notice is a TOP-LEVEL post (a team-channel
+          // post or a DM), never a thread reply wearing a costume.
+          const data = dataOf<CommunicationReplyCommandV1Data>(cmd);
+          if (data === undefined) return { kind: "rejected", reason: "malformed-post-data" };
+          if (data.target.conversationKind !== "channel" && data.target.conversationKind !== "dm") {
+            return { kind: "rejected", reason: "unsupported-conversation-kind" };
+          }
+
+          if (state.findPost(data.idempotencyKey) !== undefined) {
+            return { kind: "accepted" };
+          }
+          const channelId = await resolveChannel(api, data.target);
+          if (channelId === undefined) {
+            return { kind: "rejected", reason: "target-missing-channel" };
+          }
+          const postId = await api.createPost(channelId, data.text, undefined);
+          state.recordPost({
+            idempotencyKey: data.idempotencyKey,
+            providerObjectId: postId,
+            channelId,
+            rootId: "",
+            kind: "post",
+            createdAt: Date.now(),
+          });
+          await publishEcho(ctx, channelId, postId, undefined, data.text, data.target.conversationKind);
+          logger.info("notice posted", { postId, channelId, commandId: data.commandId });
           return { kind: "accepted" };
         }
         case CMD_REACT: {

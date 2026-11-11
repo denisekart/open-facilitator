@@ -178,22 +178,23 @@ export interface ConversationTarget {
 
 export type ConversationKind = "thread" | "channel" | "dm" | "comment";
 
-export interface CommunicationReactCommandV1Data {
-  commandId: string;
-  emojiName: string;
-  idempotencyKey: string;
-  target: ConversationTarget;
-}
-
-export interface CommunicationReplyCommandV1Data {
+export interface CommunicationPostCommandV1Data {
   /**
-   * Outbound media the adapter should post alongside the reply text (the kernel emits these
-   * for harness-produced artifacts; the adapter consumes them).
+   * Outbound media posted alongside the notice (same law as the reply command).
    */
   artifacts?: ArtifactRef[];
+  /**
+   * Interactive affordances (C7). Every button carries the EXACT command text a decision
+   * rides; a surface without buttons renders nothing extra - the text always stands alone.
+   */
+  buttons?: CommunicationPostCommandV1DataButtons;
   commandId: string;
   idempotencyKey: string;
-  target: ConversationTarget;
+  /**
+   * A conversation a reply cannot address: a top-level post into a dm or a channel (a team
+   * notice is a channel post, not a thread reply wearing a costume - B4).
+   */
+  target: PostConversationTarget;
   text: string;
 }
 
@@ -215,6 +216,83 @@ export interface ArtifactRef {
   mediaType: string;
   size: number;
   storageUrl: string;
+}
+
+/**
+ * Interactive affordances (C7). Every button carries the EXACT command text a decision
+ * rides; a surface without buttons renders nothing extra - the text always stands alone.
+ */
+export interface CommunicationPostCommandV1DataButtons {
+  label: string;
+  /**
+   * Exact text offered to the presser to send as their own message (Telegram reply keyboard,
+   * Slack button copy): the human sends it, so the message carries the presser's proven
+   * authorship on the existing authority plane (C7).
+   */
+  prefill?: string;
+  /**
+   * Exact text to submit as the presser's message.
+   */
+  value?: string;
+}
+
+/**
+ * A conversation a reply cannot address: a top-level post into a dm or a channel (a team
+ * notice is a channel post, not a thread reply wearing a costume - B4).
+ */
+export interface PostConversationTarget {
+  actorProviderAccountId?: string;
+  channelOrResourceId?: string;
+  conversationKind: PostConversationKind;
+  parentMessageId?: string;
+  provider: string;
+  rootThreadId?: string;
+  subjectRef?: string;
+  tenantOrOrganizationId?: string;
+}
+
+export type PostConversationKind = "dm" | "channel";
+
+export interface CommunicationReactCommandV1Data {
+  commandId: string;
+  emojiName: string;
+  idempotencyKey: string;
+  target: ConversationTarget;
+}
+
+export interface CommunicationReplyCommandV1Data {
+  /**
+   * Outbound media the adapter should post alongside the reply text (the kernel emits these
+   * for harness-produced artifacts; the adapter consumes them).
+   */
+  artifacts?: ArtifactRef[];
+  /**
+   * Interactive affordances (C7). Every button carries the EXACT command text a decision
+   * rides; a surface without buttons renders nothing extra - the text always stands alone.
+   */
+  buttons?: CommunicationReplyCommandV1DataButtons;
+  commandId: string;
+  idempotencyKey: string;
+  target: ConversationTarget;
+  text: string;
+}
+
+/**
+ * Interactive affordances (C7). Every button carries the EXACT command text a decision
+ * rides; a surface without buttons renders nothing extra - the text always stands alone.
+ */
+export interface CommunicationReplyCommandV1DataButtons {
+  label: string;
+  /**
+   * Exact text offered to the presser to send as their own message (Telegram reply keyboard,
+   * Slack button copy): the human sends it, so the message carries the presser's proven
+   * authorship on the existing authority plane (C7).
+   */
+  prefill?: string;
+  /**
+   * Exact text to submit as the presser's message.
+   */
+  value?: string;
 }
 
 export interface CommunicationUpdateCommandV1Data {

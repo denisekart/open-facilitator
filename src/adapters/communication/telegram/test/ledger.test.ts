@@ -70,6 +70,7 @@ function normalizer(state: ChatLedger) {
       throw new Error("unused");
     },
     setMessageReaction: async () => undefined,
+    answerCallbackQuery: async () => undefined,
   } as const;
   const media = new MediaPipeline({
     api,

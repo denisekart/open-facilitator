@@ -63,6 +63,11 @@ export interface AdapterConfig {
   mediaEnabled: boolean;
   /** Bot API base (fake-server seam). */
   apiBase: string;
+  /** The adapter-side loop budget (B6, N2): how many bot-authored exchanges
+   *  one conversation may drive before the adapter goes quiet (0 disables;
+   *  the kernel's own `loop-budget` row remains the authority — this is the
+   *  cheap early stop that never leaves the chat). Default 8. */
+  loopBudgetExchanges: number;
   /** Optional GET /healthz server port. */
   healthPort?: number;
   logLevel: "debug" | "info" | "warn" | "error";
@@ -248,6 +253,19 @@ export function parseEnvConfig(env: Record<string, string | undefined>): Adapter
     }
     mediaMaxBytes = n;
   }
+  let loopBudgetExchanges = 8;
+  const loopRaw = env["TELEGRAM_LOOP_BUDGET_EXCHANGES"]?.trim();
+  if (loopRaw !== undefined && loopRaw !== "") {
+    const n = Number(loopRaw);
+    if (!Number.isInteger(n) || n < 0) {
+      throw new AdapterConfigError(
+        "TELEGRAM_LOOP_BUDGET_EXCHANGES",
+        `'${loopRaw}' is not a non-negative integer`,
+      );
+    }
+
+    loopBudgetExchanges = n;
+  }
   const config: AdapterConfig = {
     kernelUrl: required(env, "OFAC_KERNEL_URL"),
     enrollSecret: required(env, "OFAC_ENROLL_SECRET"),
@@ -262,6 +280,7 @@ export function parseEnvConfig(env: Record<string, string | undefined>): Adapter
     statePath: env["TELEGRAM_STATE_PATH"]?.trim() || "./ofac-tg-adapter.sqlite3",
     mediaMaxBytes,
     mediaEnabled: (env["TELEGRAM_MEDIA_ENABLED"]?.trim() || "true") !== "false",
+    loopBudgetExchanges,
     apiBase: env["TELEGRAM_API_BASE"]?.trim() || "https://api.telegram.org",
     logLevel: (LEVELS[level] === true ? level : "info") as AdapterConfig["logLevel"],
     ...(webhookUrl === undefined || webhookUrl === "" ? {} : { webhookUrl }),

@@ -24,7 +24,9 @@ import type {
   CapabilityManifestV1,
   CommunicationAcknowledgeCommandV1Data,
   CommunicationReactCommandV1Data,
+  CommunicationPostCommandV1Data,
   CommunicationReplyCommandV1Data,
+  CommunicationReplyCommandV1DataButton,
   CommunicationUpdateCommandV1Data,
   ConversationKind,
   ConversationReference,
@@ -41,18 +43,26 @@ import {
 } from "@ofac/workspace-link";
 import { MESSAGE_EVENT } from "./normalize.js";
 import { type ChatLedger } from "./chat-ledger.js";
-import { TgError, type SendMessageParams, type TelegramApi } from "./tg-client.js";
+import {
+  TgError,
+  type InlineKeyboardButton,
+  type ReplyMarkup,
+  type SendMessageParams,
+  type TelegramApi,
+} from "./tg-client.js";
 
 export const CMD_REPLY = "org.facilitator.command.communication.reply.v1";
 export const CMD_REACT = "org.facilitator.command.communication.react.v1";
 export const CMD_UPDATE = "org.facilitator.command.communication.update.v1";
 export const CMD_ACK = "org.facilitator.command.communication.acknowledge.v1";
+export const CMD_POST = "org.facilitator.command.communication.post.v1";
 
 export const COMMUNICATION_COMMANDS: readonly string[] = [
   CMD_REPLY,
   CMD_REACT,
   CMD_UPDATE,
   CMD_ACK,
+  CMD_POST,
 ];
 
 /** The provider-side identity the echo events are authored under. */
@@ -267,6 +277,108 @@ export function createAdapterHandler(deps: HandlerDeps): LinkHandler {
     };
   };
 
+  /**
+   * The C7 button law. Telegram cannot author a message AS the presser, so
+   * every button routes the decision through a message the human sends:
+   * - `prefill` -> a REPLY-keyboard button: the press sends the exact text
+   *   as the human's own message (proven authorship, zero extra surface).
+   * - `value` -> an inline callback button (64-byte provider law): the
+   *   callback_query carries the presser's proven identity; the adapter
+   *   re-submits the data as that user's message (normalize.ts).
+   * Mixed or oversized => no markup at all: the text always stands alone,
+   * a half-rendered decision row is worse than none.
+   */
+  function markupFor(
+    buttons: CommunicationReplyCommandV1DataButton[] | undefined,
+  ): ReplyMarkup | undefined {
+    if (buttons === undefined || buttons.length === 0 || buttons.length > 3) return undefined;
+    const prefills = buttons.flatMap((b) => (b.prefill !== undefined ? [b.prefill] : []));
+    const values = buttons.flatMap((b) => (b.value !== undefined ? [b.value] : []));
+    if (prefills.length + values.length !== buttons.length) return undefined;
+    if (prefills.length > 0 && values.length > 0) return undefined;
+    if (prefills.length > 0) {
+      return {
+        keyboard: prefills.map((text) => [{ text }]),
+        resize_keyboard: true,
+        one_time_keyboard: true,
+      };
+    }
+
+    const rows: InlineKeyboardButton[][] = [];
+    for (const data of values) {
+      if (new TextEncoder().encode(data).length > 64) return undefined;
+      rows.push([{ text: String(buttons[rows.length]?.label ?? data), callback_data: data }]);
+    }
+
+    return { inline_keyboard: rows };
+  }
+
+  /** The shared send core of reply + post: text chunks and media, the
+   *  4096/1024/50MB laws, every download BEFORE any post, markup on the
+   *  LAST text chunk. Returns the sent message ids or a rejection reason. */
+  async function deliver(
+    chatId: string,
+    text: string,
+    artifacts: ArtifactRef[],
+    threading: Pick<SendMessageParams, "message_thread_id" | "reply_parameters">,
+    markup: SendMessageParams["reply_markup"],
+  ): Promise<{ sentIds: number[] } | { reason: string }> {
+    const sentIds: number[] = [];
+    try {
+      if (artifacts.length === 0) {
+        const chunks = chunkText(text);
+        for (const [index, chunk] of chunks.entries()) {
+          const sent = await api.sendMessage({
+            chat_id: chatId,
+            text: chunk,
+            ...threading,
+            ...(index === chunks.length - 1 && markup !== undefined ? { reply_markup: markup } : {}),
+          } as SendMessageParams);
+          sentIds.push(sent.message_id);
+        }
+      } else {
+        const payloads: { ref: ArtifactRef; bytes: Uint8Array }[] = [];
+        for (const ref of artifacts) {
+          try {
+            payloads.push({ ref, bytes: await media.download(ref.artifactId) });
+          } catch {
+            return { reason: "artifact-unavailable" };
+          }
+        }
+
+        for (const [index, { ref, bytes }] of payloads.entries()) {
+          const asPhoto = ref.mediaType.startsWith("image/") && ref.size <= PHOTO_MAX_BYTES;
+          if (!asPhoto && ref.size > DOCUMENT_MAX_BYTES) {
+            return { reason: "artifact-too-large" };
+          }
+          const params = {
+            chat_id: chatId,
+            media: { bytes, fileName: fileNameFor(ref) },
+            ...(index === 0 && text !== "" ? { caption: clampCaption(text) } : {}),
+            ...(index === payloads.length - 1 && markup !== undefined ? { reply_markup: markup } : {}),
+            ...threading,
+          };
+          try {
+            const sent = asPhoto ? await api.sendPhoto(params) : await api.sendDocument(params);
+            sentIds.push(sent.message_id);
+          } catch (error) {
+            if (error instanceof TgError && error.status === 413) {
+              return { reason: "artifact-too-large" };
+            }
+            throw error;
+          }
+        }
+      }
+      return { sentIds };
+    } catch (error) {
+      if (error instanceof TgError && error.status === 413) {
+        return { reason: "artifact-too-large" };
+      }
+      logger.error("send failed", { error: String(error) });
+      return { reason: "telegram-send-failed" };
+    }
+  }
+
   return {
     async onCommand(cmd: EnvelopeCommand, ctx: CommandContext): Promise<CommandOutcome> {
       switch (cmd.type) {
@@ -280,59 +392,16 @@ export function createAdapterHandler(deps: HandlerDeps): LinkHandler {
           const threading = threadingFor(chatId, data.target);
           const rootId = data.target.rootThreadId ?? data.target.parentMessageId ?? "";
           const artifacts = data.artifacts ?? [];
-          const sentIds: number[] = [];
-          try {
-            if (artifacts.length === 0) {
-              // Text-only: the 4096 chunk law — sequential sends, only the
-              // LAST chunk's id is recorded (a JSON array when >1).
-              for (const chunk of chunkText(data.text)) {
-                const sent = await api.sendMessage({
-                  chat_id: chatId,
-                  text: chunk,
-                  ...threading,
-                });
-                sentIds.push(sent.message_id);
-              }
-            } else {
-              // Media: every ref downloads FIRST — a failure is a clean
-              // `artifact-unavailable`, never a partial silent post.
-              const payloads: { ref: ArtifactRef; bytes: Uint8Array }[] = [];
-              for (const ref of artifacts) {
-                try {
-                  payloads.push({ ref, bytes: await media.download(ref.artifactId) });
-                } catch {
-                  return { kind: "rejected", reason: "artifact-unavailable" };
-                }
-              }
-              for (const [index, { ref, bytes }] of payloads.entries()) {
-                const asPhoto = ref.mediaType.startsWith("image/") && ref.size <= PHOTO_MAX_BYTES;
-                // The sendDocument ceiling is provider law: beyond 50 MB
-                // Telegram can only 413 us — reject before any post so the
-                // command stays replayable.
-                if (!asPhoto && ref.size > DOCUMENT_MAX_BYTES) {
-                  return { kind: "rejected", reason: "artifact-too-large" };
-                }
-                const params = {
-                  chat_id: chatId,
-                  media: { bytes, fileName: fileNameFor(ref) },
-                  // The first send carries the text as caption (≤ 1024);
-                  // the rest carry none.
-                  ...(index === 0 && data.text !== "" ? { caption: clampCaption(data.text) } : {}),
-                  ...threading,
-                };
-                try {
-                  const sent = asPhoto
-                    ? await api.sendPhoto(params)
-                    : await api.sendDocument(params);
-                  sentIds.push(sent.message_id);
-                } catch (error) {
-                  if (error instanceof TgError && error.status === 413) {
-                    return { kind: "rejected", reason: "artifact-too-large" };
-                  }
-                  throw error;
-                }
-              }
-            }
+          const outcome = await deliver(
+            chatId,
+            data.text,
+            artifacts,
+            threading,
+            markupFor(data.buttons),
+          );
+          if ("reason" in outcome) return { kind: "rejected", reason: outcome.reason };
+          {
+            const sentIds = outcome.sentIds;
             if (sentIds.length === 0) return { kind: "rejected", reason: "empty-reply" };
             // Ledger BEFORE the receipt: the provider object id rides the
             // idempotency key; >1 sent object ⇒ a JSON array of ids.
@@ -356,13 +425,52 @@ export function createAdapterHandler(deps: HandlerDeps): LinkHandler {
             );
             logger.info("reply sent", { chatId, commandId: data.commandId });
             return { kind: "accepted" };
-          } catch (error) {
-            if (error instanceof TgError && error.status === 413) {
-              return { kind: "rejected", reason: "artifact-too-large" };
-            }
-            logger.error("reply failed", { error: String(error), commandId: data.commandId });
-            return { kind: "rejected", reason: "telegram-send-failed" };
           }
+        }
+        case CMD_POST: {
+          // The B4 law: a team notice posts top-level in a dm or a channel —
+          // no thread costume. The same send core, no threading, the C7
+          // buttons riding the last chunk.
+          const data = dataOf<CommunicationPostCommandV1Data>(cmd);
+          if (data === undefined) return { kind: "rejected", reason: "malformed-post-data" };
+          if (data.target.conversationKind !== "dm" && data.target.conversationKind !== "channel") {
+            return { kind: "rejected", reason: "unsupported-conversation-kind" };
+          }
+          if (state.findCommand(data.idempotencyKey) !== undefined) {
+            return { kind: "accepted" };
+          }
+          const chatId = resolveChat(state, data.target);
+          if (chatId === undefined) return { kind: "rejected", reason: "no-dm-channel" };
+          const outcome = await deliver(
+            chatId,
+            data.text,
+            data.artifacts ?? [],
+            {},
+            markupFor(data.buttons),
+          );
+          if ("reason" in outcome) return { kind: "rejected", reason: outcome.reason };
+          const sentIds = outcome.sentIds;
+          if (sentIds.length === 0) return { kind: "rejected", reason: "empty-post" };
+          const lastMessageId = sentIds[sentIds.length - 1]!;
+          state.recordCommand({
+            idempotencyKey: data.idempotencyKey,
+            providerObjectId:
+              sentIds.length > 1 ? JSON.stringify(sentIds.map(String)) : String(lastMessageId),
+            chatId,
+            rootId: "",
+            kind: (data.artifacts ?? []).length === 0 ? "message" : "photo",
+            createdAt: Date.now(),
+          });
+          await publishEcho(
+            ctx,
+            chatId,
+            lastMessageId,
+            undefined,
+            data.text,
+            data.target.conversationKind,
+          );
+          logger.info("post sent", { chatId, commandId: data.commandId });
+          return { kind: "accepted" };
         }
         case CMD_REACT: {
           const data = dataOf<CommunicationReactCommandV1Data>(cmd);

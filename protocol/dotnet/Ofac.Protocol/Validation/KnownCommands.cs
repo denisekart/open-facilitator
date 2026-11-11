@@ -1,7 +1,7 @@
 namespace Ofac.Protocol.Validation;
 
 /// <summary>
-/// Fail-closed command table: the exact twenty <c>org.facilitator.command.*.v1</c>
+/// Fail-closed command table: the exact twenty-one <c>org.facilitator.command.*.v1</c>
 /// types the v1 contract accepts. Mirrors KNOWN_COMMAND_TYPES in
 /// <c>src/protocol/src/validate.ts</c> and the schema-derived set in
 /// <c>protocol/tools/Validate.Fixtures</c>; a command type outside this set is
@@ -31,6 +31,7 @@ public static class KnownCommands
         "org.facilitator.command.communication.react.v1",
         "org.facilitator.command.communication.update.v1",
         "org.facilitator.command.communication.acknowledge.v1",
+        "org.facilitator.command.communication.post.v1",
         "org.facilitator.command.provider.webhook.v1",
     };
 }

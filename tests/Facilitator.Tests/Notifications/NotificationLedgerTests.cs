@@ -87,6 +87,12 @@ public sealed class NotificationLedgerTests(PostgresFixture fixture)
                 (await fixture.Db.NotificationsFor(workId)).Single().Target)
             .RootElement.GetProperty("channelOrResourceId").GetString());
         Assert.Contains("team channel", row.Value.Reason);
+
+        // B4: a channel rung POSTS (one path per surface) — the attempt row
+        // rides command.communication.post.v1, never a thread-costume reply.
+        var outbox = await fixture.Db.OutboxEnvelopeByCommand($"notify:{notificationId:N}");
+        Assert.NotNull(outbox);
+        Assert.Contains("command.communication.post.v1", outbox);
     }
 
     [Fact]

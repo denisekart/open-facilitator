@@ -111,7 +111,17 @@ export interface TgUpdate {
   message?: TgMessage;
   edited_message?: TgMessage;
   message_reaction?: TgMessageReactionUpdated;
+  callback_query?: TgCallbackQuery;
   [key: string]: unknown;
+}
+
+/** An inline-button press (the C7 callback law). */
+export interface TgCallbackQuery {
+  id: string;
+  from?: TgUser;
+  /** The message carrying the button (chat identity + timestamp). */
+  message?: { chat?: { id: number; type?: ChatType }; date?: number };
+  data?: string;
 }
 
 export type ChatType = TgChat["type"];
@@ -318,8 +328,42 @@ export function normalizeUpdate(update: TgUpdate, ctx: NormalizeContext): Normal
     const event = normalizeReactionUpdate(reaction, update, ctx);
     return event === null ? { kind: "ignored" } : { kind: "events", events: [event] };
   }
-  // message_reaction_count, chat_member, callback queries, …: ignored.
+  const callback = update.callback_query;
+  if (callback !== undefined) {
+    // The C7 callback law: an inline-button press becomes the presser's own
+    // message carrying the button data verbatim - the slash plane and the
+    // identity gate then run their ordinary law, and the press carries the
+    // presser's proven identity. The `data` is the whole text: an
+    // unrecognized payload is an unbound free-text message, never a crash.
+    const event = normalizeCallbackQuery(callback, update, ctx);
+    return event === null ? { kind: "ignored" } : { kind: "events", events: [event] };
+  }
+  // message_reaction_count, chat_member, …: ignored.
   return { kind: "ignored" };
+}
+
+/** The C7 inline-button press -> a message.v1 from the presser. */
+export function normalizeCallbackQuery(
+  callback: TgCallbackQuery,
+  update: TgUpdate,
+  ctx: NormalizeContext,
+): NormalizedEvent | null {
+  const chatId = String(callback.message?.chat?.id ?? "");
+  if (chatId === "" || callback.from === undefined) return null;
+  if (ctx.admissionFor(chatId) === null) return null;
+  const kind = kindFor(callback.message?.chat?.type ?? ctx.chatTypeFor(chatId), false);
+  const messageId = `callback:${callback.id}`;
+  return {
+    type: MESSAGE_EVENT,
+    data: {
+      reference: reference(ctx, String(callback.from.id), chatId, kind, messageId, undefined),
+      provider: "telegram",
+      providerDeliveryId: messageId,
+      actorProviderAccountId: String(callback.from.id),
+      text: clamp(callback.data ?? ""),
+      payload: update as unknown as Record<string, unknown>,
+    },
+  };
 }
 
 function normalizeMessage(

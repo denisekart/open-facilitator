@@ -43,7 +43,7 @@ B = {
 "C4": ("covered", ["ConsentAuthorityTests.TwoRespondersOneDecidedAndTheLoserSeesWhoDecided"], ""),
 "C5": ("covered", ["ConsentAuthorityTests.ExpiryFlipsApprovalAndHeldActionAndParksTheWork"], "fake-clock expiry; the slow-consume race rides the same lazy-expiry law"),
 "C6": ("covered", ["ConsentAuthorityTests.NotRequesterRuleDeniesTheRequestingSideAsSoleConsent", "ConsentAuthorityTests.ConsumeReturnsTheKernelStoredEnvelope"], ""),
-"C7": ("covered", ["ConsentAuthorityTests.ChatDecisionDispatchesTrackerRecordAndCarrierWork", "js:src/adapters/communication/telegram/test/handler.test.ts"], "buttons ride the reply command's optional buttons"),
+"C7": ("covered", ["ConsentAuthorityTests.ChatDecisionDispatchesTrackerRecordAndCarrierWork", "ConsentAuthorityTests.NudgeRepliesInTheBoundConversation", "js:src/adapters/communication/telegram/test/handler.test.ts"], "buttons ride the reply command's optional buttons; a lapsing consent nudges with them in the bound conversation"),
 "C9": ("covered", ["ConsentAuthorityTests.NotRequesterRuleDeniesTheRequestingSideAsSoleConsent"], ""),
 "C10": ("partial", ["TeamRosterTests.TeamSwitchOverridesTheSystemDefaultAndIsVersioned", "TeamRosterTests.OperatorSeatsAndRemovesAMemberWithAuditedProvenance"], "writes versioned+audited; the consent-rule backdating leg is untested"),
 "C11": ("partial", ["LinkIngressTests.UnknownCommandFailsClosedWithAuditRow", "MemoryQuotaGcTests.DailyBudgetRefusesThirdRetainWithTypedProblem"], "typed-problem refusals per surface; prose legibility is a manual rubric"),

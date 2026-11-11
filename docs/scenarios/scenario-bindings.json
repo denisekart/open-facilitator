@@ -368,9 +368,10 @@
    "lane": "T1-gate",
    "evidence": [
     "ConsentAuthorityTests.ChatDecisionDispatchesTrackerRecordAndCarrierWork",
+    "ConsentAuthorityTests.NudgeRepliesInTheBoundConversation",
     "js:src/adapters/communication/telegram/test/handler.test.ts"
    ],
-   "note": "buttons ride the reply command's optional buttons"
+   "note": "buttons ride the reply command's optional buttons; a lapsing consent nudges with them in the bound conversation"
   },
   {
    "id": "C9",

@@ -153,7 +153,8 @@ public sealed class IdentityOptions
 
             foreach (var role in operation.RolesAnyOf)
             {
-                if (!Roles.ContainsKey(role))
+                // Code-declared names are always available; config declares the rest.
+                if (!Roles.ContainsKey(role) && !BuiltInRoles.IsBuiltIn(role))
                 {
                     errors.Add($"identity:authorization:operations:{operation.Id} requires unknown role '{role}'.");
                 }

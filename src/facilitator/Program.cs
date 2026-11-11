@@ -7,6 +7,7 @@ using Facilitator.Kernel.Shared.Auth;
 using Facilitator.Kernel.Shared.Cli;
 using Facilitator.Kernel.Shared.Identity;
 using Facilitator.Kernel.Shared.Persistence;
+using Facilitator.Kernel.Teams;
 using Facilitator.Kernel.Work;
 
 if (args.Length > 0 && args[0] == "cli")
@@ -35,6 +36,7 @@ app.UseAuthorization();
 app.UseMiddleware<IngressRoleGateMiddleware>();
 app.UseRateLimiter();
 app.MapWorkApi();
+app.MapTeamsApi();
 app.MapApprovalsApi();
 app.MapInteractionsApi();
 app.MapArtifactsApi();

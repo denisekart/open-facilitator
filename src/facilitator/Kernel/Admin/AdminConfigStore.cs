@@ -78,6 +78,10 @@ public sealed class AdminConfigStore(
         "routing-defaults",
         "llm",
         "commands",
+        "team-behavior",
+        "consent-policy",
+        "loop-budget",
+        "escalation",
     ];
 
     /// <summary>Stored view, or null when the resource was never written.</summary>
@@ -249,6 +253,28 @@ public sealed class AdminConfigStore(
         // ^ Slash/decode command registry — CommandRegistry.Merge reads the
         // stored payload; malformed entries degrade there, this gate keeps
         // garbage off the wire (array shape + verb charset + dup verbs).
+        ["team-behavior"] = payload => FirstError(
+            UnknownFields(payload, "replyVsReaction", "progressVerbosity", "quiet"),
+            EnumField(payload, "replyVsReaction", ["reply", "reaction"]),
+            EnumField(payload, "progressVerbosity", ["minimal", "normal", "verbose"]),
+            BoolField(payload, "quiet")),
+        // ^ Behavior switches a team or a channel may override; every layer is
+        // read through the one effective-config resolver, so a switch that is
+        // only meaningful per-team still has one system-wide default here.
+        ["consent-policy"] = payload => FirstError(
+            UnknownFields(payload, "expiresAfterMinutes", "nudgeBeforeMinutes", "maxInFlightPerActor", "groupWindowSeconds"),
+            IntField(payload, "expiresAfterMinutes", 1, 10080),
+            IntField(payload, "nudgeBeforeMinutes", 1, 10080),
+            IntField(payload, "maxInFlightPerActor", 1, 100),
+            IntField(payload, "groupWindowSeconds", 0, 3600)),
+        ["loop-budget"] = payload => FirstError(
+            UnknownFields(payload, "maxExchangesPerConversation", "windowMinutes"),
+            IntField(payload, "maxExchangesPerConversation", 1, 1000),
+            IntField(payload, "windowMinutes", 1, 1440)),
+        ["escalation"] = payload => FirstError(
+            UnknownFields(payload, "notifyAfterMinutes", "audience"),
+            IntField(payload, "notifyAfterMinutes", 1, 10080),
+            EnumField(payload, "audience", ["owner", "team", "operators"])),
     };
 
     private static string? FirstError(params string?[] errors) => errors.FirstOrDefault(static e => e is not null);

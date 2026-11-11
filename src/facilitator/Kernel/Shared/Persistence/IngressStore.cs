@@ -110,11 +110,17 @@ public sealed class IngressStore(IDbContextFactory<FacilitatorDbContext> context
         await db.SaveChangesAsync(ct);
     }
 
-    /// <summary>Newest 50 works, newest first.</summary>
-    public async Task<IReadOnlyList<WorkView>> ListRecentAsync(CancellationToken ct)
+    /// <summary>Newest 50 works, newest first; when <paramref name="teamSlugs"/> is non-null, only works of those teams.</summary>
+    public async Task<IReadOnlyList<WorkView>> ListRecentAsync(IReadOnlyList<string>? teamSlugs, CancellationToken ct)
     {
         await using var db = await contextFactory.CreateDbContextAsync(ct);
-        return await db.Works.AsNoTracking()
+        var query = db.Works.AsNoTracking();
+        if (teamSlugs is not null)
+        {
+            query = query.Where(w => w.Project != null && teamSlugs.Contains(w.Project!.Team!.Slug));
+        }
+
+        return await query
             .OrderByDescending(w => w.CreatedAt)
             .Take(50)
             .Select(w => new WorkView(w.WorkId, w.ProjectId, w.Objective, w.State, w.Version, w.CreatedAt, w.UpdatedAt))

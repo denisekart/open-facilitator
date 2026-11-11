@@ -45,7 +45,11 @@ public sealed class AdminConfigStoreTests(PostgresFixture fixture) : IAsyncLifet
         var resources = list.EnumerateArray()
             .ToDictionary(r => r.GetProperty("resource").GetString()!, r => r);
         Assert.Equal(
-            new HashSet<string>(new[] { "notifications", "retry-policy", "nudge-policy", "workload-scale", "routing-defaults", "llm", "commands" }, StringComparer.Ordinal),
+            new HashSet<string>(new[]
+            {
+                "notifications", "retry-policy", "nudge-policy", "workload-scale", "routing-defaults", "llm",
+                "commands", "team-behavior", "consent-policy", "loop-budget", "escalation",
+            }, StringComparer.Ordinal),
             resources.Keys.ToHashSet(StringComparer.Ordinal));
         Assert.False(resources["retry-policy"].GetProperty("exists").GetBoolean(), "purged before the test run");
         Assert.Equal(0, resources["retry-policy"].GetProperty("rowVersion").GetInt64());

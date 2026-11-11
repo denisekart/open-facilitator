@@ -33,7 +33,12 @@ public interface IEventDispatcher
 public sealed class DbEventDispatcher : IEventDispatcher
 {
     private const int MaxAttempts = 5;
+    private const int DefaultBackoffCapSeconds = 300;
+    private const string RetryPolicyResource = "retry-policy";
+    private static readonly TimeSpan PolicyCache = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan GaugeCache = TimeSpan.FromSeconds(5);
+    private (int MaxAttempts, int BackoffCapSeconds)? _retryPolicy;
+    private DateTime _lastRetryPolicyRead = DateTime.MinValue;
 
     private readonly IDbContextFactory<Persistence.FacilitatorDbContext> _contextFactory;
     private readonly OutboxRepository _outbox;
@@ -163,16 +168,61 @@ public sealed class DbEventDispatcher : IEventDispatcher
 
     private async Task HandleFailureAsync(OutboxRow row, string error, bool noRoute, CancellationToken ct)
     {
+        var policy = await RetryPolicyAsync(ct);
         // "No route" (link.* with no live session) requeues forever
         // with backoff — never dead-letters (locked decision).
-        if (row.Attempts >= MaxAttempts && !noRoute)
+        if (row.Attempts >= policy.MaxAttempts && !noRoute)
         {
             await _outbox.DeadLetterAsync(row.OutboxId, error, row.Envelope, ct);
             _logger.LogWarning("dead-lettered outbox row {OutboxId} after {Attempts} attempts: {Error}", row.OutboxId, row.Attempts, error);
             return;
         }
 
-        await _outbox.RequeueAsync(row.OutboxId, error, ct);
+        await _outbox.RequeueAsync(row.OutboxId, error, policy.BackoffCapSeconds, ct);
+    }
+
+    /// <summary>
+    /// The stored <c>retry-policy</c> row (maxAttempts / backoffCapSeconds),
+    /// cached 5 s; an absent or malformed row is the standing default (five
+    /// charged attempts, a 300 s cap). This is that resource's only reader: no
+    /// other behavior moves when an operator edits it.
+    /// </summary>
+    private async Task<(int MaxAttempts, int BackoffCapSeconds)> RetryPolicyAsync(CancellationToken ct)
+    {
+        if (_retryPolicy is { } cached && DateTime.UtcNow - _lastRetryPolicyRead < PolicyCache)
+        {
+            return cached;
+        }
+
+        var fallback = (MaxAttempts, DefaultBackoffCapSeconds);
+        try
+        {
+            await using var db = await _contextFactory.CreateDbContextAsync(ct);
+            var payload = await db.AdminConfig.AsNoTracking()
+                .Where(c => c.Resource == RetryPolicyResource)
+                .Select(c => c.Payload)
+                .FirstOrDefaultAsync(ct);
+            if (payload is not null)
+            {
+                using var document = JsonDocument.Parse(payload);
+                var root = document.RootElement;
+                var attempts = root.TryGetProperty("maxAttempts", out var a) && a.TryGetInt32(out var parsedAttempts)
+                    ? Math.Clamp(parsedAttempts, 1, 20)
+                    : MaxAttempts;
+                var cap = root.TryGetProperty("backoffCapSeconds", out var b) && b.TryGetInt32(out var parsedCap)
+                    ? Math.Clamp(parsedCap, 1, 3600)
+                    : DefaultBackoffCapSeconds;
+                fallback = (attempts, cap);
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // A policy read never blocks delivery: the default stands.
+        }
+
+        _retryPolicy = fallback;
+        _lastRetryPolicyRead = DateTime.UtcNow;
+        return fallback;
     }
 
     private async Task RefreshGaugesAsync(CancellationToken ct)

@@ -33,6 +33,7 @@ public sealed class IngressRoleGateMiddleware(
     RequestDelegate next,
     IOptions<IdentityOptions> options,
     RoleStore roles,
+    Facilitator.Kernel.Teams.TeamRosterStore roster,
     AuditWriter audit,
     KernelMetrics metrics)
 {
@@ -69,7 +70,9 @@ public sealed class IngressRoleGateMiddleware(
         var iss = result.Principal.FindFirst("iss")?.Value ?? options.Value.Oidc.Authority;
         var ruleSets = await roles.CurrentRulesAsync(context.RequestAborted);
         var evaluation = RoleEvaluator.Evaluate(payload, ruleSets);
-        var principal = PrincipalMapper.Map(payload, iss, options.Value).WithRoles(evaluation.Granted);
+        var mapped = PrincipalMapper.Map(payload, iss, options.Value);
+        var principal = mapped.WithRoles(await BuiltInRoles.EffectiveAsync(
+            mapped, evaluation.Granted, roster, context.RequestAborted));
         context.Items[IdentityAuthentication.PrincipalItem] = principal;
 
         var binding = MatchBinding(options.Value.Authorization.Operations, context, path);

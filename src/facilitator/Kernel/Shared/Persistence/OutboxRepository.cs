@@ -123,15 +123,19 @@ public sealed class OutboxRepository(
               WHERE outbox_id = {outboxId}
              """, ct);
 
+    /// <summary>Requeue with the standing 300 s cap (callers outside the retry-policy path).</summary>
+    public Task RequeueAsync(Guid outboxId, string error, CancellationToken ct) =>
+        RequeueAsync(outboxId, error, 300, ct);
+
     /// <summary>Requeue a failed row with capped exponential backoff (charged attempts stay).</summary>
-    public async Task RequeueAsync(Guid outboxId, string error, CancellationToken ct)
+    public async Task RequeueAsync(Guid outboxId, string error, int backoffCapSeconds, CancellationToken ct)
     {
         await using var db = await contextFactory.CreateDbContextAsync(ct);
         await db.Database.ExecuteSqlInterpolatedAsync(
             $"""
              UPDATE facilitator.outbox
                 SET status = 'pending',
-                    available_at = now() + make_interval(secs => LEAST(power(2, attempts) * 2, 300)),
+                    available_at = now() + make_interval(secs => LEAST(power(2, attempts) * 2, {backoffCapSeconds})),
                     last_error = {error},
                     lease_owner = NULL,
                     leased_until = NULL

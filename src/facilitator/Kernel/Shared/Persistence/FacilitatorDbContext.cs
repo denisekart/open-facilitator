@@ -92,6 +92,10 @@ public class FacilitatorDbContext(DbContextOptions<FacilitatorDbContext> options
 
     public DbSet<ChatActionEntity> ChatActions => Set<ChatActionEntity>();
 
+    public DbSet<TeamMemberEntity> TeamMembers => Set<TeamMemberEntity>();
+
+    public DbSet<TeamSettingEntity> TeamSettings => Set<TeamSettingEntity>();
+
 
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder model)

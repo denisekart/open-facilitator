@@ -1154,6 +1154,74 @@ public sealed class TestDbProbe : IAsyncDisposable
         return rows;
     }
 
+    /// <summary>facilitator.team_members rows of a team (the roster window).</summary>
+    public async Task<List<TeamMemberRow>> TeamRosterRows(string teamSlug)
+    {
+        const string sql = "SELECT m.actor, m.kind, m.capacity, coalesce(m.added_by, '') "
+            + "FROM facilitator.team_members m JOIN facilitator.teams t ON t.team_id = m.team_id "
+            + "WHERE t.slug = $1 ORDER BY m.actor";
+        await using var connection = await _dataSource.OpenConnectionAsync();
+        await using var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.AddWithValue(teamSlug);
+        await using var reader = await command.ExecuteReaderAsync();
+        var rows = new List<TeamMemberRow>();
+        while (await reader.ReadAsync())
+        {
+            rows.Add(new TeamMemberRow(reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3)));
+        }
+
+        return rows;
+    }
+
+    /// <summary>One roster row (null when absent).</summary>
+    public async Task<TeamMemberRow?> TeamRosterRow(string teamSlug, string actor) =>
+        (await TeamRosterRows(teamSlug)).FirstOrDefault(r => r.Actor == actor);
+
+    /// <summary>Drop every roster row of a team (test isolation on the shared DB).</summary>
+    public Task PurgeTeamRoster(string teamSlug) =>
+        NonQuery(
+            "DELETE FROM facilitator.team_members m USING facilitator.teams t "
+            + "WHERE m.team_id = t.team_id AND t.slug = $1",
+            cmd => cmd.Parameters.AddWithValue(teamSlug));
+
+    /// <summary>Drop every per-team switch row of a team (test isolation).</summary>
+    public Task PurgeTeamSettings(string teamSlug) =>
+        NonQuery(
+            "DELETE FROM facilitator.team_settings s USING facilitator.teams t "
+            + "WHERE s.team_id = t.team_id AND t.slug = $1",
+            cmd => cmd.Parameters.AddWithValue(teamSlug));
+
+    /// <summary>One per-team switch row (null when absent).</summary>
+    public async Task<TeamSettingRow?> TeamSetting(string teamSlug, string scopeKind, string scopeId, string resource)
+    {
+        const string sql = "SELECT s.payload::text, s.row_version, s.author, s.reason "
+            + "FROM facilitator.team_settings s JOIN facilitator.teams t ON t.team_id = s.team_id "
+            + "WHERE t.slug = $1 AND s.scope_kind = $2 AND s.scope_id = $3 AND s.resource = $4";
+        await using var connection = await _dataSource.OpenConnectionAsync();
+        await using var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.AddWithValue(teamSlug);
+        command.Parameters.AddWithValue(scopeKind);
+        command.Parameters.AddWithValue(scopeId);
+        command.Parameters.AddWithValue(resource);
+        await using var reader = await command.ExecuteReaderAsync();
+        return await reader.ReadAsync()
+            ? new TeamSettingRow(reader.GetString(0), reader.GetInt64(1), reader.GetString(2), reader.GetString(3))
+            : null;
+    }
+
+    /// <summary>facilitator.audit rows for one action, newest first.</summary>
+    public async Task<List<AuditRow>> AuditRowsFor(string action)
+    {
+        var rows = await AuditRows();
+        return rows.Where(r => r.Action == action).ToList();
+    }
+
+    /// <summary>One roster row (typed window over facilitator.team_members).</summary>
+    public sealed record TeamMemberRow(string Actor, string Kind, string Capacity, string AddedBy);
+
+    /// <summary>One per-team switch row (typed window over facilitator.team_settings).</summary>
+    public sealed record TeamSettingRow(string Payload, long RowVersion, string Author, string Reason);
+
     /// <inheritdoc />
     public async ValueTask DisposeAsync() => await _dataSource.DisposeAsync();
 

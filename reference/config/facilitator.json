@@ -181,6 +181,19 @@
           "rolesAnyOf": ["kernel-operator", "framework-admin"]
         },
         {
+          "id": "teams.read",
+          "methods": ["GET"],
+          "paths": ["/api/teams", "/api/teams/{slug}/members/{actor}", "/api/teams/{slug}/settings",
+            "/api/teams/{slug}/effective/{resource}"],
+          "rolesAnyOf": ["kernel-operator", "framework-admin", "team-member"]
+        },
+        {
+          "id": "teams.roster.write",
+          "methods": ["PUT", "DELETE"],
+          "paths": ["/api/teams/{slug}/members/{actor}", "/api/teams/{slug}/settings/{resource}"],
+          "rolesAnyOf": ["kernel-operator", "framework-admin", "team-operator"]
+        },
+        {
           "id": "enrollment-tokens.manage",
           "methods": ["POST", "GET", "DELETE"],
           "paths": ["/api/admin/enroll-tokens", "/api/admin/enroll-tokens/{id}"],

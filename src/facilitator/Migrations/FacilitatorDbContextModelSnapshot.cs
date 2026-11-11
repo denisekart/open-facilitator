@@ -2020,6 +2020,99 @@ namespace Facilitator.Migrations
                     b.ToTable("teams", "facilitator");
                 });
 
+            modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.TeamMemberEntity", b =>
+                {
+                    b.Property<Guid>("TeamId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("team_id");
+
+                    b.Property<string>("Actor")
+                        .HasColumnType("text")
+                        .HasColumnName("actor");
+
+                    b.Property<string>("AddedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("added_by");
+
+                    b.Property<string>("Capacity")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("capacity");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("kind");
+
+                    b.HasKey("TeamId", "Actor");
+
+                    b.HasIndex("Actor")
+                        .HasDatabaseName("team_members_actor_idx");
+
+                    b.ToTable("team_members", "facilitator", t =>
+                        {
+                            t.HasCheckConstraint("team_members_capacity_check", "capacity IN ('member', 'operator')");
+
+                            t.HasCheckConstraint("team_members_kind_check", "kind IN ('human', 'contributor')");
+                        });
+                });
+
+            modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.TeamSettingEntity", b =>
+                {
+                    b.Property<Guid>("TeamId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("team_id");
+
+                    b.Property<string>("ScopeKind")
+                        .HasColumnType("text")
+                        .HasColumnName("scope_kind");
+
+                    b.Property<string>("ScopeId")
+                        .HasColumnType("text")
+                        .HasColumnName("scope_id");
+
+                    b.Property<string>("Resource")
+                        .HasColumnType("text")
+                        .HasColumnName("resource");
+
+                    b.Property<string>("Author")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("author");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("payload");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("reason");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("TeamId", "ScopeKind", "ScopeId", "Resource");
+
+                    b.HasIndex("Resource", "ScopeKind", "ScopeId")
+                        .HasDatabaseName("team_settings_lookup_idx");
+
+                    b.ToTable("team_settings", "facilitator", t =>
+                        {
+                            t.HasCheckConstraint("team_settings_scope_kind_check", "scope_kind IN ('team', 'channel')");
+                        });
+                });
+
             modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.WorkEntity", b =>
                 {
                     b.Property<Guid>("WorkId")
@@ -2258,6 +2351,30 @@ namespace Facilitator.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("routing_decisions_work_id_fkey");
+                });
+
+            modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.TeamMemberEntity", b =>
+                {
+                    b.HasOne("Facilitator.Kernel.Shared.Persistence.TeamEntity", "Team")
+                        .WithMany()
+                        .HasForeignKey("TeamId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("team_members_team_id_fkey");
+
+                    b.Navigation("Team");
+                });
+
+            modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.TeamSettingEntity", b =>
+                {
+                    b.HasOne("Facilitator.Kernel.Shared.Persistence.TeamEntity", "Team")
+                        .WithMany()
+                        .HasForeignKey("TeamId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("team_settings_team_id_fkey");
+
+                    b.Navigation("Team");
                 });
 
             modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.WorkEntity", b =>

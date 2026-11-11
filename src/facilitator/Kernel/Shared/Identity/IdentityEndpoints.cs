@@ -61,6 +61,13 @@ public static class IdentityEndpoints
 
         group.MapDelete("/roles/{name}", async (string name, RoleStore store, HttpContext http, CancellationToken ct) =>
         {
+            if (BuiltInRoles.IsBuiltIn(name))
+            {
+                return Results.Problem(ProblemErrors.Create(
+                    "role-builtin", "Role is code-declared", StatusCodes.Status409Conflict,
+                    $"'{name}' is declared by the kernel — config cannot remove it"));
+            }
+
             var outcome = await store.RemoveAsync(name, null, http.GetFacilitatorPrincipal()?.Actor, ct);
             return outcome.Stored ? Results.NoContent() : Conflict(name);
         });

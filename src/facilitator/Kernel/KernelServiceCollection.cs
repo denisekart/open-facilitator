@@ -114,6 +114,11 @@ public static class KernelServiceCollection
         builder.Services.AddSingleton<AuditWriter>();
         builder.Services.AddSingleton<OidcJwks>();
         builder.Services.AddSingleton<RoleStore>();
+        builder.Services.AddSingleton<Facilitator.Kernel.Teams.TeamRosterStore>();
+        builder.Services.AddSingleton<Facilitator.Kernel.Teams.TeamSettingsStore>();
+        builder.Services.AddSingleton<Facilitator.Kernel.Teams.TeamDirectory>();
+        builder.Services.AddSingleton<Facilitator.Kernel.Teams.TeamScope>();
+        builder.Services.AddSingleton<Facilitator.Kernel.Teams.EffectiveConfigResolver>();
         builder.Services.AddSingleton<IdentityStartupCheck>();
         builder.Services.AddHostedService(sp => sp.GetRequiredService<IdentityStartupCheck>());
         builder.Services.AddAuthentication(IdentityAuthentication.Scheme)

@@ -100,6 +100,18 @@ public sealed class KeycloakFixture : IAsyncLifetime
             ["password"] = password,
         })).Token;
 
+    /// <summary>
+    /// The canonical actor string (<c>oidc:&lt;iss&gt;|&lt;sub&gt;</c>) a user's own token
+    /// authenticates as — the form the roster and audit rows store.
+    /// </summary>
+    public static async Task<string> ActorOfAsync(string user, string password)
+    {
+        var token = await TokenForUserAsync(user, password);
+        var payload = token.Split('.')[1].PadRight(token.Split('.')[1].Length + (4 - token.Split('.')[1].Length % 4) % 4, '=');
+        using var document = System.Text.Json.JsonDocument.Parse(System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(payload)));
+        return $"oidc:{Issuer}|{document.RootElement.GetProperty("sub").GetString()}";
+    }
+
     /// <summary>Direct grant against a confidential client (evidence issuers carry mappers the public client lacks).</summary>
     public static async Task<string> TokenForUserAsync(string user, string password, string clientId, string clientSecret) =>
         (await MintAsync(new Dictionary<string, string>

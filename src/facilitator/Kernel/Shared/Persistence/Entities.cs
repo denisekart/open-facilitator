@@ -14,6 +14,62 @@ public sealed class TeamEntity
     public DateTime CreatedAt { get; set; }
 }
 
+/// <summary>facilitator.team_members — the team roster: who belongs to a team
+/// and in what capacity. Config seeds it at startup when a row is absent (DB is
+/// truth after the first write); the roster API mutates it thereafter.</summary>
+public sealed class TeamMemberEntity
+{
+    public Guid TeamId { get; set; }
+
+    /// <summary>Canonical actor: <c>oidc:&lt;iss&gt;|&lt;sub&gt;</c> or <c>contributor:&lt;handle&gt;</c>.</summary>
+    public required string Actor { get; set; }
+
+    /// <summary>human | contributor (CHECK-constrained).</summary>
+    public required string Kind { get; set; }
+
+    /// <summary>member | operator (CHECK-constrained); operator grants the built-in team-operator role.</summary>
+    public required string Capacity { get; set; }
+
+    /// <summary>Canonical actor of whoever added the row ("config" when seeded).</summary>
+    public string? AddedBy { get; set; }
+
+    public DateTime CreatedAt { get; set; }
+
+    public TeamEntity? Team { get; set; }
+}
+
+/// <summary>facilitator.team_settings — per-scope switch rows (team or channel
+/// scope) for one resource; the team/channel layer of effective config.</summary>
+public sealed class TeamSettingEntity
+{
+    public Guid TeamId { get; set; }
+
+    /// <summary>team | channel (CHECK-constrained).</summary>
+    public required string ScopeKind { get; set; }
+
+    /// <summary>Team slug for <c>team</c>; <c>&lt;provider&gt;/&lt;channel&gt;</c> for <c>channel</c>.</summary>
+    public required string ScopeId { get; set; }
+
+    /// <summary>Resource name (the admin-config registry namespace).</summary>
+    public required string Resource { get; set; }
+
+    /// <summary>jsonb document.</summary>
+    public required string Payload { get; set; }
+
+    /// <summary>Optimistic fencing version (the If-Match ETag).</summary>
+    public long RowVersion { get; set; }
+
+    /// <summary>Canonical actor of the last writer.</summary>
+    public required string Author { get; set; }
+
+    /// <summary>Change reason of the last write.</summary>
+    public required string Reason { get; set; }
+
+    public DateTime UpdatedAt { get; set; }
+
+    public TeamEntity? Team { get; set; }
+}
+
 /// <summary>facilitator.projects — work container within a team.</summary>
 public sealed class ProjectEntity
 {

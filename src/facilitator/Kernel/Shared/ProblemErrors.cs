@@ -135,6 +135,11 @@ public static class ProblemErrors
         Create("team-unknown", "Team unknown", StatusCodes.Status403Forbidden,
             $"team '{team}' is not in the configured roster (Link:Teams)");
 
+    /// <summary>404 a team the caller has no standing in (existence not confirmed).</summary>
+    public static ProblemDetails TeamNotVisible(string team) =>
+        Create("team-not-found", "Team not found", StatusCodes.Status404NotFound,
+            $"no team '{team}' visible to this caller");
+
     /// <summary>404 unknown admin-minted enrollment token id.</summary>
     public static ProblemDetails EnrollmentTokenNotFound(Guid id) =>
         Create("enrollment-token-not-found", "Enrollment token not found", StatusCodes.Status404NotFound,

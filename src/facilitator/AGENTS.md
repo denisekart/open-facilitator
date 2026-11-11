@@ -33,6 +33,9 @@ plus the read-mostly Admin surface.
   boot error); the `llm` admin_config row is the hot policy (absent ⇒ inert).
   Chat plane (`/api/chat/**`): actions are proposals executed under the
   confirming admin's own bearer via loopback (audit `aiInitiated`).
+- `Kernel/Teams/` — team roster + per-scope switches (`team_members`,
+  `team_settings`), team-scoped read authority, the built-in operator roles,
+  and the one system→team→channel switch resolver. Signpost: `Kernel/Teams/AGENTS.md`.
 - `Kernel/Admin/` — `/api/admin` operator surface (read stores, config store
   with the If-Match/`X-Change-Reason` law, replay + re-mark mutations);
   authorization is config bindings only (`admin.read`/`admin.mutate`).

@@ -70,7 +70,12 @@ describe("github handler", () => {
   it("advertises the full communication command family", () => {
     const manifest = githubAdapterManifest("team-alpha");
     expect(manifest.ownerTeam).toBe("team-alpha");
-    expect(manifest.capabilities.map((c) => c.id)).toEqual([CMD_REPLY, CMD_REACT, CMD_UPDATE, CMD_ACK]);
+    expect(manifest.capabilities.map((c) => c.id)).toEqual([
+      CMD_REPLY,
+      CMD_REACT,
+      CMD_UPDATE,
+      CMD_ACK,
+    ]);
   });
 
   it("posts the comment and accepts", async () => {
@@ -187,7 +192,11 @@ describe("github handler", () => {
       data: {
         commandId: "cmd-a",
         idempotencyKey: "a1",
-        target: { provider: "github", providerInstanceId: "github-com", conversationKind: "comment" },
+        target: {
+          provider: "github",
+          providerInstanceId: "github-com",
+          conversationKind: "comment",
+        },
       },
     } as unknown as EnvelopeCommand;
     expect(await handler.onCommand(ack, ctx)).toEqual({ kind: "accepted" });

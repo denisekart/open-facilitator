@@ -201,7 +201,8 @@ describe("normalizeReview", () => {
       "d13b",
       ctx,
     );
-    const data = events.find((e) => e.type === CHANGE_REQUEST)?.data as ProviderChangeRequestEventV1Data;
+    const data = events.find((e) => e.type === CHANGE_REQUEST)
+      ?.data as ProviderChangeRequestEventV1Data;
     expect(data?.action).toBe("reviewed");
   });
 

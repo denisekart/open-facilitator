@@ -332,7 +332,9 @@ export function createAdapterHandler(deps: HandlerDeps): LinkHandler {
             chat_id: chatId,
             text: chunk,
             ...threading,
-            ...(index === chunks.length - 1 && markup !== undefined ? { reply_markup: markup } : {}),
+            ...(index === chunks.length - 1 && markup !== undefined
+              ? { reply_markup: markup }
+              : {}),
           } as SendMessageParams);
           sentIds.push(sent.message_id);
         }
@@ -355,7 +357,9 @@ export function createAdapterHandler(deps: HandlerDeps): LinkHandler {
             chat_id: chatId,
             media: { bytes, fileName: fileNameFor(ref) },
             ...(index === 0 && text !== "" ? { caption: clampCaption(text) } : {}),
-            ...(index === payloads.length - 1 && markup !== undefined ? { reply_markup: markup } : {}),
+            ...(index === payloads.length - 1 && markup !== undefined
+              ? { reply_markup: markup }
+              : {}),
             ...threading,
           };
           try {

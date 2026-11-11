@@ -34,10 +34,7 @@ describe("the harness functionality list", () => {
     const nudge = "org.facilitator.command.work.nudge.v1";
     const caps = fullHarnessCapabilities([{ command: nudge, reason: "no side channel" }]);
     expect(caps.commands).not.toContain(nudge);
-    const answer = unsupportedFor(
-      { type: nudge } as Parameters<typeof unsupportedFor>[0],
-      caps,
-    );
+    const answer = unsupportedFor({ type: nudge } as Parameters<typeof unsupportedFor>[0], caps);
     expect(answer).toEqual({ kind: "unsupported", reason: "no side channel" });
     expect(
       unsupportedFor({ type: "org.facilitator.command.work.assign.v1" } as never, caps),

@@ -32,7 +32,10 @@ export class HttpError extends Error {
 
 /** `Retry-After` in both legal shapes (delta-seconds, HTTP-date); undefined
  *  when absent or unparseable (the caller then falls back to its backoff). */
-export function parseRetryAfter(header: string | null | undefined, nowMs: number): number | undefined {
+export function parseRetryAfter(
+  header: string | null | undefined,
+  nowMs: number,
+): number | undefined {
   if (header === undefined || header === null) return undefined;
   const trimmed = header.trim();
   if (trimmed === "") return undefined;

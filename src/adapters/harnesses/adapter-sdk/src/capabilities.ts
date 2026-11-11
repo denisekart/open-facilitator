@@ -24,28 +24,22 @@ import type { EnvelopeCommand } from "@ofac/protocol";
 // ── inbound: what may ARRIVE at a harness ──────────────────────────────────
 
 /** The run begins (the envelope is the work.assign verbatim; `start`). */
-export const HARNESS_COMMAND_WORK_ASSIGN =
-  "org.facilitator.command.work.assign.v1";
+export const HARNESS_COMMAND_WORK_ASSIGN = "org.facilitator.command.work.assign.v1";
 /** Steer a running execution (`steer` frame). */
-export const HARNESS_COMMAND_WORK_STEER =
-  "org.facilitator.command.work.steer.v1";
+export const HARNESS_COMMAND_WORK_STEER = "org.facilitator.command.work.steer.v1";
 /** Cancel a running execution (`stop` frame). */
-export const HARNESS_COMMAND_WORK_CANCEL =
-  "org.facilitator.command.work.cancel.v1";
+export const HARNESS_COMMAND_WORK_CANCEL = "org.facilitator.command.work.cancel.v1";
 /** The human's answer to an open `assignment.input.required` (`respond`). */
-export const HARNESS_COMMAND_ASSIGNMENT_INPUT =
-  "org.facilitator.command.assignment.input.v1";
+export const HARNESS_COMMAND_ASSIGNMENT_INPUT = "org.facilitator.command.assignment.input.v1";
 /** A nudge for progress on a running execution (capability
  *  `supportsNudge`; the NudgeSweeper posts it to the assigned endpoint).
  *  As-built the child wire carries no nudge frame, so the Gateway answers
  *  `unsupported` on the fleet's behalf — the contract holds, the answer
  *  is honest, and a wire leg may land later without changing this law. */
-export const HARNESS_COMMAND_WORK_NUDGE =
-  "org.facilitator.command.work.nudge.v1";
+export const HARNESS_COMMAND_WORK_NUDGE = "org.facilitator.command.work.nudge.v1";
 /** The human asks where a run stands (contract-declared; no kernel
  *  producer yet — a harness still answers, never hangs). */
-export const HARNESS_COMMAND_WORK_STATUS_REQUEST =
-  "org.facilitator.command.work.status.request.v1";
+export const HARNESS_COMMAND_WORK_STATUS_REQUEST = "org.facilitator.command.work.status.request.v1";
 
 /** Every command class that may arrive at a harness. An adapter's manifest
  *  law: this full list, minus honest omissions. */
@@ -61,26 +55,20 @@ export const HARNESS_COMMANDS: readonly string[] = Object.freeze([
 // ── emitted: what a harness PUBLISHES ───────────────────────────────────────
 
 /** Lifecycle progress of a run. */
-export const HARNESS_EVENT_WORK_PROGRESS =
-  "org.facilitator.event.work.progress.v1";
+export const HARNESS_EVENT_WORK_PROGRESS = "org.facilitator.event.work.progress.v1";
 /** The run needs the human (the respond frame settles it). */
 export const HARNESS_EVENT_ASSIGNMENT_INPUT_REQUIRED =
   "org.facilitator.event.assignment.input.required.v1";
 /** The run finished, with its result manifest. */
-export const HARNESS_EVENT_ASSIGNMENT_COMPLETED =
-  "org.facilitator.event.assignment.completed.v1";
+export const HARNESS_EVENT_ASSIGNMENT_COMPLETED = "org.facilitator.event.assignment.completed.v1";
 /** The run failed, with its reason. */
-export const HARNESS_EVENT_ASSIGNMENT_FAILED =
-  "org.facilitator.event.assignment.failed.v1";
+export const HARNESS_EVENT_ASSIGNMENT_FAILED = "org.facilitator.event.assignment.failed.v1";
 /** The run stored an artifact. */
-export const HARNESS_EVENT_ARTIFACT_AVAILABLE =
-  "org.facilitator.event.artifact.available.v1";
+export const HARNESS_EVENT_ARTIFACT_AVAILABLE = "org.facilitator.event.artifact.available.v1";
 /** The run proposes a memory (kernel policy decides retention). */
-export const HARNESS_EVENT_MEMORY_CANDIDATE =
-  "org.facilitator.event.memory.candidate.v1";
+export const HARNESS_EVENT_MEMORY_CANDIDATE = "org.facilitator.event.memory.candidate.v1";
 /** The run consumed memory (provenance of what it read). */
-export const HARNESS_EVENT_MEMORY_USED =
-  "org.facilitator.event.memory.used.v1";
+export const HARNESS_EVENT_MEMORY_USED = "org.facilitator.event.memory.used.v1";
 
 /** Every event class a harness may publish. */
 export const HARNESS_EVENTS: readonly string[] = Object.freeze([
@@ -103,14 +91,11 @@ export const HARNESS_COMMAND_ARTIFACT_REQUEST_UPLOAD =
 export const HARNESS_COMMAND_ARTIFACT_CONFIRM_UPLOAD =
   "org.facilitator.command.artifact.confirm_upload.v1";
 /** Retain a memory the run earned (kernel policy decides). */
-export const HARNESS_COMMAND_MEMORY_RETAIN =
-  "org.facilitator.command.memory.retain.v1";
+export const HARNESS_COMMAND_MEMORY_RETAIN = "org.facilitator.command.memory.retain.v1";
 /** A memory recall the run wants. */
-export const HARNESS_COMMAND_MEMORY_RECALL =
-  "org.facilitator.command.memory.recall.v1";
+export const HARNESS_COMMAND_MEMORY_RECALL = "org.facilitator.command.memory.recall.v1";
 /** Fetch context the kernel holds (artifacts, memory, work state). */
-export const HARNESS_COMMAND_CONTEXT_FETCH =
-  "org.facilitator.command.context.fetch.v1";
+export const HARNESS_COMMAND_CONTEXT_FETCH = "org.facilitator.command.context.fetch.v1";
 
 /** Every command class a harness may send. */
 export const HARNESS_OUTBOUND_COMMANDS: readonly string[] = Object.freeze([
@@ -169,9 +154,7 @@ export function fullHarnessCapabilities(
  *  derived from ONE source — this list. Each inbound command becomes a
  *  synchronous descriptor (the reply law answers per frame); the run
  *  itself is the async capability the deployment manifest names. */
-export function harnessCapabilityDescriptors(
-  caps: HarnessCapabilities,
-): {
+export function harnessCapabilityDescriptors(caps: HarnessCapabilities): {
   id: string;
   version: number;
   execution: "synchronous";

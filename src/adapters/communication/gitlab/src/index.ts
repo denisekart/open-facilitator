@@ -114,7 +114,12 @@ export function gitlabAdapterManifest(team: string): CapabilityManifestV1 {
     apiVersion: "facilitator.framework/v1",
     kind: "CapabilityManifest",
     ownerTeam: team,
-    capabilities: [descriptor(CMD_REPLY), descriptor(CMD_REACT), descriptor(CMD_UPDATE), descriptor(CMD_ACK)],
+    capabilities: [
+      descriptor(CMD_REPLY),
+      descriptor(CMD_REACT),
+      descriptor(CMD_UPDATE),
+      descriptor(CMD_ACK),
+    ],
   };
 }
 
@@ -210,7 +215,10 @@ async function nonReplyCommand(deps: HandlerDeps, cmd: EnvelopeCommand): Promise
         Partial<CommunicationAcknowledgeCommandV1Data>)
     | undefined;
   if (typeof data !== "object" || data === null || data.idempotencyKey === undefined) {
-    return { kind: "rejected", reason: `malformed-${cmd.type.includes("react") ? "react" : cmd.type.includes("update") ? "update" : "acknowledge"}-data` };
+    return {
+      kind: "rejected",
+      reason: `malformed-${cmd.type.includes("react") ? "react" : cmd.type.includes("update") ? "update" : "acknowledge"}-data`,
+    };
   }
   if (cmd.type === CMD_ACK) {
     // No provider side effect exists for an acknowledgement on a code host;

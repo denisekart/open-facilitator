@@ -125,8 +125,8 @@ export class ActionLedger {
     const cutoff = new Date(Date.now() - maxAgeDays * 86_400_000).toISOString();
     const info = this.db
       .prepare(
-        "DELETE FROM connector_actions WHERE rowid IN "
-        + "(SELECT rowid FROM connector_actions WHERE state = 'executed' AND updated_at < ? LIMIT ?)",
+        "DELETE FROM connector_actions WHERE rowid IN " +
+          "(SELECT rowid FROM connector_actions WHERE state = 'executed' AND updated_at < ? LIMIT ?)",
       )
       .run(cutoff, limit);
     return info.changes;

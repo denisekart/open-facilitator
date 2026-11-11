@@ -210,7 +210,14 @@ export function createAdapterHandler(deps: HandlerDeps): LinkHandler {
             kind: "post",
             createdAt: Date.now(),
           });
-          await publishEcho(ctx, channelId, postId, undefined, data.text, data.target.conversationKind);
+          await publishEcho(
+            ctx,
+            channelId,
+            postId,
+            undefined,
+            data.text,
+            data.target.conversationKind,
+          );
           logger.info("notice posted", { postId, channelId, commandId: data.commandId });
           return { kind: "accepted" };
         }

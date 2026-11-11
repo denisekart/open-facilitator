@@ -202,22 +202,18 @@ export class GitHubClient implements GitHubApi {
   }
 
   async createIssue(repo: string, title: string, body: string, assignee?: string): Promise<number> {
-    const dto = await this.request<IssueDto>(
-      "createIssue",
-      "POST",
-      `/repos/${repo}/issues`,
-      { title, body, ...(assignee === undefined ? {} : { assignee }) },
-    );
+    const dto = await this.request<IssueDto>("createIssue", "POST", `/repos/${repo}/issues`, {
+      title,
+      body,
+      ...(assignee === undefined ? {} : { assignee }),
+    });
     return dto.number;
   }
 
   async closeIssue(repo: string, number: number): Promise<void> {
-    await this.request<void>(
-      "closeIssue",
-      "PATCH",
-      `/repos/${repo}/issues/${String(number)}`,
-      { state: "closed" },
-    );
+    await this.request<void>("closeIssue", "PATCH", `/repos/${repo}/issues/${String(number)}`, {
+      state: "closed",
+    });
   }
 
   async mergePr(repo: string, number: number, method: string): Promise<boolean> {

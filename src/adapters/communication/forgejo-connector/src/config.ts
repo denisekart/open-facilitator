@@ -67,7 +67,13 @@ const ROOT_KEYS = [
  *  `in_reply_to` on CreatePullReviewCommentOptions) — verified against the
  *  release source, so the forge declares no op it cannot execute. */
 export const FLAG_DOMAINS: Readonly<Record<keyof ConnectorFlags, readonly string[]>> = {
-  issues: ["vcs.issue.read", "vcs.issue.comment", "vcs.issue.label", "vcs.issue.create", "vcs.issue.close"],
+  issues: [
+    "vcs.issue.read",
+    "vcs.issue.comment",
+    "vcs.issue.label",
+    "vcs.issue.create",
+    "vcs.issue.close",
+  ],
   vcs: ["vcs.branch.push"],
   mrs: [
     "vcs.change_request.create",

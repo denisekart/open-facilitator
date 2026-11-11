@@ -32,7 +32,10 @@ library), and `harnesses/deterministic` (the worked-example worker).
   `communication/forgejo{,-connector}`); register it in `pnpm-workspace.yaml`
   and, when it ships in the node image, in `Dockerfile.node`'s deploy list.
 - New harness adapter: copy `harnesses/deterministic` and run the conformance
-  kit (`@ofac/adapter/testing`).
+  kit (`@ofac/adapter/testing`), and declare your functionality list (the
+  `fullHarnessCapabilities` omission law in
+  `harnesses/adapter-sdk/src/capabilities.ts` — every capability the plane
+  cannot deliver must carry its reason).
 
 ## Invariants
 - Adapters translate between an external system and the frozen wire contract

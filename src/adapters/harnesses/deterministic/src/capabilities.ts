@@ -10,7 +10,8 @@ import {
 export const DETERMINISTIC_CAPABILITIES: HarnessCapabilities = fullHarnessCapabilities([
   {
     command: HARNESS_COMMAND_WORK_NUDGE,
-    reason: "no nudge frame on the adapter.v1 child wire (the Gateway answers on the child's behalf)",
+    reason:
+      "no nudge frame on the adapter.v1 child wire (the Gateway answers on the child's behalf)",
   },
   {
     command: HARNESS_COMMAND_WORK_STATUS_REQUEST,

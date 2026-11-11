@@ -40,9 +40,7 @@ export interface GetUpdatesParams {
 
 /** One interactive button (Telegram provider law): an inline callback
  *  button or a reply-keyboard button (the prefill law). */
-export type InlineKeyboardButton =
-  | { text: string; callback_data: string }
-  | { text: string };
+export type InlineKeyboardButton = { text: string; callback_data: string } | { text: string };
 
 /** The wire markup: exactly one of the two families is set. */
 export interface ReplyMarkup {

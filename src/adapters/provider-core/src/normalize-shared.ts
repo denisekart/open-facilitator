@@ -88,7 +88,9 @@ export function mentionsBot(body: string | undefined, botUser: string): boolean 
 /** The review verdict map (E1): every forge names its formal verdicts
  *  differently, the wire speaks two. Anything that is not a verdict (a plain
  *  review comment) normalizes elsewhere - never as a fake review. */
-export function reviewStateFor(vendorState: string | undefined): "approved" | "changes-requested" | undefined {
+export function reviewStateFor(
+  vendorState: string | undefined,
+): "approved" | "changes-requested" | undefined {
   switch (vendorState) {
     case "approved":
     case "approve":

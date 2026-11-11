@@ -56,7 +56,12 @@ export function githubAdapterManifest(team: string): CapabilityManifestV1 {
     apiVersion: "facilitator.framework/v1",
     kind: "CapabilityManifest",
     ownerTeam: team,
-    capabilities: [descriptor(CMD_REPLY), descriptor(CMD_REACT), descriptor(CMD_UPDATE), descriptor(CMD_ACK)],
+    capabilities: [
+      descriptor(CMD_REPLY),
+      descriptor(CMD_REACT),
+      descriptor(CMD_UPDATE),
+      descriptor(CMD_ACK),
+    ],
   };
 }
 
@@ -78,7 +83,11 @@ function replyData(cmd: EnvelopeCommand): CommunicationReplyCommandV1Data | unde
   return data as unknown as CommunicationReplyCommandV1Data;
 }
 
-function targetIssue(target: { channelOrResourceId?: string; rootThreadId?: string; subjectRef?: string }) {
+function targetIssue(target: {
+  channelOrResourceId?: string;
+  rootThreadId?: string;
+  subjectRef?: string;
+}) {
   const repo = target.channelOrResourceId;
   const number = target.rootThreadId ?? target.subjectRef;
   return repo === undefined || number === undefined ? undefined : { repo, number };
@@ -88,14 +97,20 @@ export function createGitHubHandler(deps: HandlerDeps): LinkHandler {
   const { state, logger } = deps;
   return {
     async onCommand(cmd: EnvelopeCommand): Promise<CommandOutcome> {
-      if (cmd.type !== CMD_REPLY && cmd.type !== CMD_REACT && cmd.type !== CMD_UPDATE && cmd.type !== CMD_ACK) {
+      if (
+        cmd.type !== CMD_REPLY &&
+        cmd.type !== CMD_REACT &&
+        cmd.type !== CMD_UPDATE &&
+        cmd.type !== CMD_ACK
+      ) {
         return { kind: "unsupported" };
       }
       if (cmd.type === CMD_ACK) {
         // No provider-side effect exists for an acknowledgement on a code
         // host, so no token is needed: the ledger check IS the law (a
         // replayed ack is a no-op accepted, exactly like the first pass).
-        const ack = cmd.data as unknown as Partial<CommunicationAcknowledgeCommandV1Data> | undefined;
+        const ack = cmd.data as unknown as
+          Partial<CommunicationAcknowledgeCommandV1Data> | undefined;
         if (ack?.idempotencyKey === undefined) {
           return { kind: "rejected", reason: "malformed-acknowledge-data" };
         }
@@ -111,7 +126,10 @@ export function createGitHubHandler(deps: HandlerDeps): LinkHandler {
       if (cmd.type === CMD_REPLY) {
         const data = replyData(cmd);
         if (data === undefined) return { kind: "rejected", reason: "malformed-reply-data" };
-        if (data.target.conversationKind !== "comment" && data.target.conversationKind !== "thread") {
+        if (
+          data.target.conversationKind !== "comment" &&
+          data.target.conversationKind !== "thread"
+        ) {
           return { kind: "rejected", reason: "unsupported-conversation-kind" };
         }
 
@@ -142,7 +160,11 @@ export function createGitHubHandler(deps: HandlerDeps): LinkHandler {
 
       if (cmd.type === CMD_REACT) {
         const data = cmd.data as unknown as Partial<CommunicationReactCommandV1Data> | undefined;
-        if (data?.idempotencyKey === undefined || data.target === undefined || data.emojiName === undefined) {
+        if (
+          data?.idempotencyKey === undefined ||
+          data.target === undefined ||
+          data.emojiName === undefined
+        ) {
           return { kind: "rejected", reason: "malformed-react-data" };
         }
         if (state.findComment(data.idempotencyKey) !== undefined) {
@@ -175,7 +197,11 @@ export function createGitHubHandler(deps: HandlerDeps): LinkHandler {
 
       if (cmd.type === CMD_UPDATE) {
         const data = cmd.data as unknown as Partial<CommunicationUpdateCommandV1Data> | undefined;
-        if (data?.idempotencyKey === undefined || data.target === undefined || data.text === undefined) {
+        if (
+          data?.idempotencyKey === undefined ||
+          data.target === undefined ||
+          data.text === undefined
+        ) {
           return { kind: "rejected", reason: "malformed-update-data" };
         }
         if (state.findComment(data.idempotencyKey) !== undefined) {

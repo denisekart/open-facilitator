@@ -102,7 +102,8 @@ describe("the C7 callback law", () => {
 
   it("a callback in an unadmitted chat is ignored", () => {
     const foreign = structuredClone(callbackUpdate) as typeof callbackUpdate;
-    (foreign.callback_query as { message: { chat: { id: number } } }).message.chat.id = -9999999999999;
+    (foreign.callback_query as { message: { chat: { id: number } } }).message.chat.id =
+      -9999999999999;
     expect(normalizeUpdate(foreign, ctx()).kind).toBe("ignored");
   });
 });

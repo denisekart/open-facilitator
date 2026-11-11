@@ -119,22 +119,26 @@ describe("loop budget", () => {
   it("stops at the cap, says so once, and a human resets the exchange", () => {
     const budget = createLoopBudget({ maxExchangesPerConversation: 2 });
     const conv = "chan-1";
-    expect(withLoopBudget(budget, { conversationId: conv, actorProviderAccountId: "bot" }, "bot").drop).toBe(
-      false,
-    );
-    expect(withLoopBudget(budget, { conversationId: conv, actorProviderAccountId: "bot" }, "bot").drop).toBe(
-      false,
-    );
+    expect(
+      withLoopBudget(budget, { conversationId: conv, actorProviderAccountId: "bot" }, "bot").drop,
+    ).toBe(false);
+    expect(
+      withLoopBudget(budget, { conversationId: conv, actorProviderAccountId: "bot" }, "bot").drop,
+    ).toBe(false);
     // third bot exchange: over the cap, and the drop itself carries the
     // one-time notice (the caller that stops must be the one that speaks)
-    const stopped = withLoopBudget(budget, { conversationId: conv, actorProviderAccountId: "bot" }, "bot");
+    const stopped = withLoopBudget(
+      budget,
+      { conversationId: conv, actorProviderAccountId: "bot" },
+      "bot",
+    );
     expect(stopped.drop).toBe(true);
     expect(stopped.notice).toContain("Loop budget reached");
     expect(budget.notice(conv)).toBeUndefined(); // exactly once
     // a human reply restarts the clock
-    expect(withLoopBudget(budget, { conversationId: conv, actorProviderAccountId: "alice" }, "bot").drop).toBe(
-      false,
-    );
+    expect(
+      withLoopBudget(budget, { conversationId: conv, actorProviderAccountId: "alice" }, "bot").drop,
+    ).toBe(false);
     expect(budget.exhausted(conv)).toBe(false);
   });
 
@@ -187,7 +191,10 @@ describe("webhook registration", () => {
     expect(api.created).toHaveLength(1);
 
     const byHand = fakeApi([{ id: "human-1", url: spec.url }]);
-    expect(await ensureWebhook(byHand, spec)).toEqual({ action: "already-registered", id: "human-1" });
+    expect(await ensureWebhook(byHand, spec)).toEqual({
+      action: "already-registered",
+      id: "human-1",
+    });
     expect(byHand.created).toHaveLength(0);
   });
 
@@ -217,7 +224,9 @@ describe("ledger GC", () => {
     // the same file (WAL allows it - the ledger itself keeps no test hook).
     const raw = new Database(join(dir, "actions.sqlite3"));
     raw
-      .prepare("UPDATE connector_actions SET updated_at = '2000-01-01T00:00:00.000Z' WHERE command_id = ?")
+      .prepare(
+        "UPDATE connector_actions SET updated_at = '2000-01-01T00:00:00.000Z' WHERE command_id = ?",
+      )
       .run("cmd-old");
     raw.close();
     expect(ledger.compact(90, 100)).toBe(1);

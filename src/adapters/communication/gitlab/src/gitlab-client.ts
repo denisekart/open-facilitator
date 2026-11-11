@@ -211,7 +211,12 @@ export class GitLabClient implements GitLabApi {
     return { id: dto.id, web_url: dto.web_url };
   }
 
-  async createIssue(repo: string, title: string, description: string, assignee: string): Promise<number> {
+  async createIssue(
+    repo: string,
+    title: string,
+    description: string,
+    assignee: string,
+  ): Promise<number> {
     const dto = await this.request<IssueDto>(
       "createIssue",
       "POST",
@@ -222,12 +227,9 @@ export class GitLabClient implements GitLabApi {
   }
 
   async closeIssue(repo: string, iid: number): Promise<void> {
-    await this.request<void>(
-      "closeIssue",
-      "PUT",
-      `/projects/${this.project(repo)}/issues/${iid}`,
-      { state_event: "close" },
-    );
+    await this.request<void>("closeIssue", "PUT", `/projects/${this.project(repo)}/issues/${iid}`, {
+      state_event: "close",
+    });
   }
 
   async findIssueByMarker(repo: string, marker: string): Promise<number | undefined> {
@@ -252,7 +254,12 @@ export class GitLabClient implements GitLabApi {
     return dto.merged === true || dto.merge_status === "can_be_merged" || dto.sha !== undefined;
   }
 
-  async awardIssueNoteEmoji(repo: string, iid: number, noteId: number, emoji: string): Promise<void> {
+  async awardIssueNoteEmoji(
+    repo: string,
+    iid: number,
+    noteId: number,
+    emoji: string,
+  ): Promise<void> {
     await this.request<void>(
       "awardIssueNoteEmoji",
       "POST",

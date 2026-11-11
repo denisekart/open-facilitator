@@ -23,8 +23,7 @@ export interface WebhookRegistrationApi {
 }
 
 export type WebhookEnsureOutcome =
-  | { action: "already-registered"; id: string }
-  | { action: "registered"; id: string };
+  { action: "already-registered"; id: string } | { action: "registered"; id: string };
 
 /** Idempotent ensure: exact-URL match decides; a same-URL hook made by hand
  *  counts (the events list may differ - a human's choice is respected, the

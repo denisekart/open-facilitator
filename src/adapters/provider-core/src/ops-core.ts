@@ -121,7 +121,9 @@ export function degradationFrom(error: {
   return {
     status: error.status,
     reason: error.status === 429 ? "throttled" : error.status === 403 ? "forbidden" : "http-error",
-    ...(error.retryAfterSeconds !== undefined ? { retryAfterSeconds: error.retryAfterSeconds } : {}),
+    ...(error.retryAfterSeconds !== undefined
+      ? { retryAfterSeconds: error.retryAfterSeconds }
+      : {}),
   };
 }
 

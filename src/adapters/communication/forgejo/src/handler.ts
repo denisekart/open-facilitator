@@ -52,7 +52,12 @@ export function forgejoAdapterManifest(team: string): CapabilityManifestV1 {
     apiVersion: "facilitator.framework/v1",
     kind: "CapabilityManifest",
     ownerTeam: team,
-    capabilities: [descriptor(CMD_REPLY), descriptor(CMD_REACT), descriptor(CMD_UPDATE), descriptor(CMD_ACK)],
+    capabilities: [
+      descriptor(CMD_REPLY),
+      descriptor(CMD_REACT),
+      descriptor(CMD_UPDATE),
+      descriptor(CMD_ACK),
+    ],
   };
 }
 
@@ -142,7 +147,8 @@ export function createForgejoHandler(deps: HandlerDeps): LinkHandler {
       if (cmd.type === CMD_ACK) {
         // No provider-side effect for an acknowledgement on a code host, so
         // no token is needed: the ledger check IS the law.
-        const ack = cmd.data as unknown as Partial<CommunicationAcknowledgeCommandV1Data> | undefined;
+        const ack = cmd.data as unknown as
+          Partial<CommunicationAcknowledgeCommandV1Data> | undefined;
         if (ack?.idempotencyKey === undefined) {
           return { kind: "rejected", reason: "malformed-acknowledge-data" };
         }

@@ -182,12 +182,9 @@ export class ForgejoClient implements ForgejoApi {
   }
 
   async closeIssue(repo: string, number: number): Promise<void> {
-    await this.request<void>(
-      "closeIssue",
-      "PATCH",
-      `/repos/${repo}/issues/${number}`,
-      { state: "closed" },
-    );
+    await this.request<void>("closeIssue", "PATCH", `/repos/${repo}/issues/${number}`, {
+      state: "closed",
+    });
   }
 
   async findIssueByMarker(repo: string, marker: string): Promise<number | undefined> {

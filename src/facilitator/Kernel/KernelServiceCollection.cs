@@ -220,6 +220,8 @@ public static class KernelServiceCollection
         builder.Services.AddSingleton(sp =>
             builder.Configuration.GetSection(Work.ApprovalSweeper.ApprovalOptions.SectionName).Get<Work.ApprovalSweeper.ApprovalOptions>()
             ?? new Work.ApprovalSweeper.ApprovalOptions());
+        builder.Services.AddSingleton<Notifications.EgressResolver>();
+        builder.Services.AddSingleton<Notifications.NotificationLedger>();
         builder.Services.AddSingleton<Work.ConsentTicketService>();
         builder.Services.AddSingleton<Work.ApprovalSweeper>();
         builder.Services.AddHostedService(sp => sp.GetRequiredService<Work.ApprovalSweeper>());

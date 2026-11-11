@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openfacilitator.org/v1/event.provider.degraded.v1.json",
+  "title": "ProviderDegradedEventV1Data",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "provider",
+    "status",
+    "observedAt",
+    "retryable"
+  ],
+  "properties": {
+    "provider": {
+      "$ref": "common.v1.json#/$defs/idToken",
+      "description": "Provider token of the integration reporting its own trouble."
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "description": "Adapter-chosen reason token (permission-denied, rate-limited, ...)."
+    },
+    "status": {
+      "type": "integer",
+      "minimum": 100,
+      "maximum": 599,
+      "description": "The provider status code observed (403 discloses to team operators; 429 to system operators)."
+    },
+    "endpointId": {
+      "$ref": "common.v1.json#/$defs/idToken",
+      "description": "The link endpoint whose deliveries stall (429: only THAT endpoint's queue backs off)."
+    },
+    "observedAt": {
+      "$ref": "common.v1.json#/$defs/rfc3339DateTime"
+    },
+    "retryable": {
+      "type": "boolean",
+      "description": "True when a later attempt may succeed (429 backoff); false when a human must fix something (403)."
+    },
+    "team": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "Team slug whose operators the disclosure addresses (optional; the kernel routes to that team's channel when set)."
+    }
+  }
+}

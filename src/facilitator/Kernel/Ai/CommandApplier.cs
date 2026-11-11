@@ -203,12 +203,23 @@ public sealed class CommandApplier(
         }
 
         var (workId, state, version) = resolved.Value;
+        // One current-state answer (D1): state + what is held on it + how it
+        // is linked + what it has cost — one message, not a crawl.
         var last = await db.WorkEvents.AsNoTracking()
             .Where(e => e.WorkId == workId)
             .OrderByDescending(e => e.WorkVersion).ThenByDescending(e => e.CreatedAt)
             .Select(e => new { e.Kind, e.CreatedAt })
             .FirstOrDefaultAsync(ct);
+        var held = await db.HeldActions.AsNoTracking()
+            .CountAsync(h => h.WorkId == workId && h.State == "pending", ct);
+        var links = await db.WorkLinks.AsNoTracking()
+            .CountAsync(l => l.WorkId == workId, ct);
+        var hasCost = await db.Works.AsNoTracking()
+            .AnyAsync(w => w.WorkId == workId && w.Cost != null, ct);
         var text = $"Work {Short(workId)}: state {state}, version {version}"
+            + (held > 0 ? $", {held} action(s) awaiting consent" : string.Empty)
+            + (links > 0 ? $", {links} link(s)" : string.Empty)
+            + (hasCost ? ", cost reported" : string.Empty)
             + (last is null ? "." : $", last event {last.Kind} at {last.CreatedAt:yyyy-MM-dd HH:mm} UTC.");
         return await ReplyAsync(db, reference, options, key, subject, text, $"cmd:status:work/{workId}", basis, now);
     }

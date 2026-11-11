@@ -216,9 +216,18 @@ public sealed class AdminConfigStore(
     private static readonly Dictionary<string, Func<JsonElement, string?>> Validators = new(StringComparer.Ordinal)
     {
         ["notifications"] = payload => FirstError(
-            UnknownFields(payload, "replyVsReaction", "progressVerbosity"),
+            // Cross-scope shape (D1): the flat switch set stays legal (it IS
+            // the system level); `default` carries the same fields for a
+            // scope-layered document.
+            UnknownFields(payload, "replyVsReaction", "progressVerbosity", "default"),
             EnumField(payload, "replyVsReaction", ["reply", "reaction"]),
-            EnumField(payload, "progressVerbosity", ["minimal", "normal", "verbose"])),
+            EnumField(payload, "progressVerbosity", ["minimal", "normal", "verbose"]),
+            payload.TryGetProperty("default", out var d) && d.ValueKind == JsonValueKind.Object
+                ? FirstError(
+                    UnknownFields(d, "replyVsReaction", "progressVerbosity"),
+                    EnumField(d, "replyVsReaction", ["reply", "reaction"]),
+                    EnumField(d, "progressVerbosity", ["minimal", "normal", "verbose"]))
+                : null),
         ["retry-policy"] = payload => FirstError(
             UnknownFields(payload, "maxAttempts", "backoffCapSeconds"),
             IntField(payload, "maxAttempts", 1, 20),

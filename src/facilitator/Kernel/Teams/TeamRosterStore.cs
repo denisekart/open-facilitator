@@ -194,6 +194,14 @@ public sealed class EffectiveConfigResolver(IDbContextFactory<FacilitatorDbConte
         string? teamSlug, string? channel, string resource, CancellationToken ct)
     {
         await using var db = await contextFactory.CreateDbContextAsync(ct);
+        return await ResolveInTransactionAsync(db, teamSlug, channel, resource, ct);
+    }
+
+    /// <summary>The same resolution inside a caller's transaction/context —
+    /// the one truth every cadence reader uses (D1).</summary>
+    public static async Task<EffectiveConfigAnswer?> ResolveInTransactionAsync(
+        FacilitatorDbContext db, string? teamSlug, string? channel, string resource, CancellationToken ct)
+    {
         if (channel is not null && teamSlug is not null)
         {
             var channelRow = await db.TeamSettings.AsNoTracking().FirstOrDefaultAsync(

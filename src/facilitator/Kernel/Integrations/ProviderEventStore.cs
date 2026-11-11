@@ -355,7 +355,10 @@ public sealed class ProviderEventStore(
         };
         db.Inbox.Add(inbox);
 
-        var ack = await NotificationPreferenceAsync(db, ct);
+        // D1: cadence resolves channel -> team -> system, one truth (the
+        // slash plane and the decode sink read the same resolver).
+        var ack = await Facilitator.Kernel.Notifications.NotificationLedger.CadenceAsync(
+            db, workload.TeamSlug, $"{reference.Provider}/{reference.Channel}", "reaction", ct);
         var effect = type switch
         {
             ProviderEventClass.Mention => await MentionArmAsync(db, workload, options, data, reference, providerDeliveryId, ack, now, ct),
@@ -1406,30 +1409,6 @@ public sealed class ProviderEventStore(
             Attempts = 0,
             CreatedAt = now,
         });
-    }
-
-    private static async Task<string> NotificationPreferenceAsync(FacilitatorDbContext db, CancellationToken ct)
-    {
-        var row = await db.AdminConfig.AsNoTracking().FirstOrDefaultAsync(c => c.Resource == "notifications", ct);
-        if (row is null)
-        {
-            return "reaction";
-        }
-
-        try
-        {
-            using var doc = JsonDocument.Parse(row.Payload);
-            if (doc.RootElement.TryGetProperty("replyVsReaction", out var v) && v.GetString() is "reply" or "reaction")
-            {
-                return v.GetString()!;
-            }
-        }
-        catch (JsonException)
-        {
-            // fall through to the default
-        }
-
-        return "reaction";
     }
 
     private static string RandomCode()

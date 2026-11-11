@@ -270,6 +270,11 @@ public sealed class LinkLedger(
             // proof of execution start — open the attempt row (execution id =
             // delivery id) and walk the assignment to running, in this tx.
             await Facilitator.Kernel.Work.ExecutionLedger.OpenAttemptOnAckAsync(db, deliveryId, now, ct);
+            // Vanished address (F5): a permanent rejection naming an unmappable
+            // conversation retires the notification's address (obsolete + a
+            // timeline row), in the same tx as the receipt — the item endures.
+            await Facilitator.Kernel.Notifications.NotificationLedger
+                .ApplyObsoleteOnRejectAsync(db, deliveryId, receiptJson, now, ct);
         }
 
         await tx.CommitAsync(ct);

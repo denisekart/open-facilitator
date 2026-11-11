@@ -54,7 +54,8 @@ public sealed class LinkIngress(
     Facilitator.Kernel.Work.ResultIngress results,
     Facilitator.Kernel.Work.MemoryIngress memory,
     Facilitator.Kernel.Work.InteractionIngress interactions,
-    Facilitator.Kernel.Integrations.ProviderEventStore? providers = null)
+    Facilitator.Kernel.Integrations.ProviderEventStore? providers = null,
+    Facilitator.Kernel.Notifications.NotificationLedger? notifications = null)
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
@@ -65,6 +66,51 @@ public sealed class LinkIngress(
         if (screen.Problem is not null)
         {
             return new LinkAdmission(screen.Problem, null, null);
+        }
+
+        if (screen.Type == "org.facilitator.event.provider.degraded.v1" && notifications is not null)
+        {
+            // Provider unhappy (F6): the adapter that observed the trouble
+            // reports it as itself - a 403 discloses to the team operators
+            // who can grant the permission, a 429 to the system operators
+            // (only that endpoint's deliveries stall, on the outbox's own
+            // backoff). The event settles processed either way: disclosure
+            // is a side effect, never a re-delivery demand.
+            var degradedNow = timeProvider.GetUtcNow().UtcDateTime;
+            var (degradedInbox, degradedDuplicate) = await inbox.InsertInboxAsync(
+                Guid.NewGuid(), EnvelopeReader.SourceOf(screen.Root), EnvelopeReader.EventIdOf(screen.Root),
+                screen.CommandId, rawBody, null, "processed", degradedNow, ct);
+            if (!degradedDuplicate)
+            {
+                var data = screen.Root.GetProperty("data");
+                var provider = data.GetProperty("provider").GetString() ?? "provider";
+                var status = data.TryGetProperty("status", out var st) && st.ValueKind == JsonValueKind.Number ? st.GetInt32() : 0;
+                var reason = data.TryGetProperty("reason", out var rs) && rs.ValueKind == JsonValueKind.String ? rs.GetString() : null;
+                var endpoint = data.TryGetProperty("endpointId", out var ep) && ep.ValueKind == JsonValueKind.String
+                    ? ep.GetString()
+                    : workload.EndpointId;
+                var teamSlug = data.TryGetProperty("team", out var tm) && tm.ValueKind == JsonValueKind.String
+                    ? tm.GetString()
+                    : null;
+                var ask = status == 403
+                    ? new Facilitator.Kernel.Notifications.NotificationRequest(
+                        Audience: "team",
+                        Level: "warning",
+                        Text: $"Provider '{provider}' was refused permission (403{(reason is null ? string.Empty : $": {reason}")}) "
+                            + $"- a team operator can grant it; deliveries through '{endpoint}' may fail until then.",
+                        TeamSlug: teamSlug)
+                    : new Facilitator.Kernel.Notifications.NotificationRequest(
+                        Audience: "operators",
+                        Level: "notice",
+                        Text: $"Provider '{provider}' is rate limited (status {status}"
+                            + (reason is null ? string.Empty : $": {reason}")
+                            + $") - endpoint '{endpoint}' backs off; other integrations continue.");
+                await notifications.EmitAsync(ask, ct);
+            }
+
+            metrics.LinkReceived();
+            metrics.InboxProcessed();
+            return new LinkAdmission(null, degradedDuplicate ? "duplicate" : "accepted", degradedInbox);
         }
 
         if (ProviderEventClass.IsProviderClass(screen.Type))

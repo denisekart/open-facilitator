@@ -112,7 +112,11 @@ public sealed class AdmissionGate(
             && cid.ValueKind == JsonValueKind.String
             ? cid.GetString()
             : null;
-        var isProviderEvent = ProviderEventClass.IsProviderClass(type);
+        // The degraded notice is provider-class BY NAME but names no
+        // conversation (it reports the integration's own health), so it takes
+        // the plain-event admission path; LinkIngress owns the arm.
+        var isProviderEvent = ProviderEventClass.IsProviderClass(type)
+            && type != "org.facilitator.event.provider.degraded.v1";
         if (isProviderEvent)
         {
             // Fail-closed (provider path): the class is on the wire, but a

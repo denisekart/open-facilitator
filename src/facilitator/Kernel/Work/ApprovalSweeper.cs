@@ -24,8 +24,7 @@ public sealed class ApprovalSweeper(
     TimeProvider timeProvider,
     ILogger<ApprovalSweeper> logger,
     ApprovalSweeper.ApprovalOptions options,
-    Facilitator.Kernel.Integrations.ProviderRegistry? providers = null,
-    Ofac.Protocol.Validation.EnvelopeValidator? envelopeValidator = null) : BackgroundService
+    Facilitator.Kernel.Notifications.NotificationLedger? notifications = null) : BackgroundService
 {
     /// <summary>Admin-config resource carrying the consent knobs.</summary>
     public const string PolicyResource = "consent-policy";
@@ -159,53 +158,34 @@ public sealed class ApprovalSweeper(
         return due.Count;
     }
 
-    /// <summary>The nudge notice: a reply in the work's bound conversation
-    /// (unbound works carry the timeline row alone).</summary>
+    /// <summary>The nudge notice (step 4: through the notification ledger —
+    /// a reply in the work's bound conversation with the team channel as its
+    /// fallback rung; unbound works carry the timeline row alone).</summary>
     private async Task AppendNudgeNoticeAsync(FacilitatorDbContext db, Guid workId, int count, DateTime now, CancellationToken ct)
     {
-        if (providers is null || envelopeValidator is null)
+        if (notifications is null)
         {
             return;
         }
 
         var binding = await db.CommunicationBindings.AsNoTracking().FirstOrDefaultAsync(b => b.WorkId == workId, ct);
-        if (binding is null || providers.Find(binding.Provider) is not { EndpointId: { Length: > 0 } endpoint })
-        {
-            return;
-        }
-
-        var target = new Facilitator.Kernel.Integrations.ConversationTarget(
-            binding.Provider, null, binding.Channel, binding.RootMessageId, binding.ParentMessageId,
-            null, "thread", null);
+        var teamSlug = await db.Works.AsNoTracking()
+            .Where(w => w.WorkId == workId).Select(w => w.Team!.Slug).FirstOrDefaultAsync(ct);
         var notice = Guid.NewGuid();
-        var envelope = Facilitator.Kernel.Integrations.ProviderEventStore.ReplyEnvelope(
-            target,
-            count == 1
+        var target = binding is null
+            ? null
+            : new Facilitator.Kernel.Integrations.ConversationTarget(
+                binding.Provider, null, binding.Channel, binding.RootMessageId, binding.ParentMessageId,
+                null, "thread", null);
+        await notifications.EmitAsync(db, new Facilitator.Kernel.Notifications.NotificationRequest(
+            Audience: "team",
+            Text: count == 1
                 ? "Consent for this work lapses soon - it needs a decision."
                 : $"Consent for this work lapses soon - {count} approvals await a decision.",
-            $"consent-nudge:{notice}", $"work/{workId}", now);
-        var json = envelope.ToJsonString();
-        var verdict = envelopeValidator.Validate(json);
-        if (!verdict.Ok)
-        {
-            throw new InvalidOperationException($"kernel envelope rejected by the validator: {verdict.ErrorClass}: {verdict.Message}");
-        }
-
-        db.Outbox.Add(new OutboxEntity
-        {
-            OutboxId = Guid.NewGuid(),
-            RecipientEndpointId = $"link.{endpoint}",
-            AggregateType = "work",
-            AggregateId = workId,
-            EventType = envelope["type"]!.GetValue<string>(),
-            CommandId = $"consent-nudge:{notice}",
-            Envelope = json,
-            WorkId = workId,
-            Status = "pending",
-            AvailableAt = now,
-            Attempts = 0,
-            CreatedAt = now,
-        });
+            WorkId: workId,
+            TeamSlug: teamSlug,
+            Target: target,
+            CommandId: $"consent-nudge:{notice}"), ct);
     }
 
     private async Task<int> ExpireOnceAsync(FacilitatorDbContext db, DateTime now, CancellationToken ct)

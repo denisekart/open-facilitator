@@ -1631,6 +1631,58 @@ namespace Ofac.Protocol
         public string tenantOrOrganizationId { get; set; }
     }
 
+    public partial class ProviderDegradedEventV1Data
+    {
+        /// <summary>
+        /// The link endpoint whose deliveries stall (429: only THAT endpoint's queue backs off).
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("endpointId")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string? endpointId { get; set; }
+
+        [JsonPropertyName("observedAt")]
+        public string observedAt { get; set; }
+
+        /// <summary>
+        /// Provider token of the integration reporting its own trouble.
+        /// </summary>
+        [JsonPropertyName("provider")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string provider { get; set; }
+
+        /// <summary>
+        /// Adapter-chosen reason token (permission-denied, rate-limited, ...).
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("reason")]
+        [JsonConverter(typeof(MagentaMinMaxLengthCheckConverter))]
+        public string? reason { get; set; }
+
+        /// <summary>
+        /// True when a later attempt may succeed (429 backoff); false when a human must fix
+        /// something (403).
+        /// </summary>
+        [JsonPropertyName("retryable")]
+        public bool retryable { get; set; }
+
+        /// <summary>
+        /// The provider status code observed (403 discloses to team operators; 429 to system
+        /// operators).
+        /// </summary>
+        [JsonPropertyName("status")]
+        public long status { get; set; }
+
+        /// <summary>
+        /// Team slug whose operators the disclosure addresses (optional; the kernel routes to that
+        /// team's channel when set).
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("team")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string? team { get; set; }
+    }
+
     public partial class ProviderIssueEventV1Data
     {
         [JsonPropertyName("action")]

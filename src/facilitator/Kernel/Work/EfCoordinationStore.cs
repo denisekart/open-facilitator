@@ -22,7 +22,8 @@ public sealed class EfCoordinationStore(
     TimeProvider timeProvider,
     Facilitator.Kernel.Integrations.ProviderRegistry? providers = null,
     AiPolicyStore? aiPolicies = null,
-    CommunicationDecision? communication = null) : ICoordinationStore
+    CommunicationDecision? communication = null,
+    Facilitator.Kernel.Notifications.NotificationLedger? notifications = null) : ICoordinationStore
 {
     private const string KernelLogChannel = "kernel.log";
 
@@ -680,27 +681,90 @@ public sealed class EfCoordinationStore(
             return;
         }
 
-        var binding = db.CommunicationBindings.AsNoTracking().FirstOrDefault(b => b.WorkId == workId);
-        // Per-provider addressing: the reply rides the binding's own provider.
-        if (binding is null || providers?.Find(binding.Provider) is not { EndpointId: { Length: > 0 } endpoint })
+        // Outcome where the request came from (D5): EVERY binding of the work
+        // hears the outcome — the tracker that originated the work gets the
+        // comment, the chat thread the courtesy — both naming the same item.
+        // The first binding keeps the historical command id; the rest are
+        // suffixed (single-shot per binding against replays).
+        var bindings = db.CommunicationBindings.AsNoTracking()
+            .Where(b => b.WorkId == workId)
+            .OrderBy(b => b.CreatedAt)
+            .ToList();
+        var index = 0;
+        foreach (var binding in bindings)
         {
-            return;
+            var outcome = await EmitBindingOutcomeAsync(
+                db, workId, to, fromState, transitionEventId, binding, index, ct);
+            if (outcome == BindingOutcome.Handled)
+            {
+                index++;
+            }
+            else if (outcome == BindingOutcome.Silent)
+            {
+                return; // a policy silence on the primary binding silences the fan-out
+            }
+        }
+    }
+
+    private enum BindingOutcome
+    {
+        Handled,
+        Silent,
+        NoEndpoint,
+    }
+
+    private async Task<BindingOutcome> EmitBindingOutcomeAsync(
+        FacilitatorDbContext db,
+        Guid workId,
+        WorkState to,
+        string fromState,
+        Guid transitionEventId,
+        CommunicationBindingEntity binding,
+        int index,
+        CancellationToken ct)
+    {
+        var now = timeProvider.GetUtcNow().UtcDateTime;
+        if (providers?.Find(binding.Provider) is not { EndpointId: { Length: > 0 } endpoint })
+        {
+            return BindingOutcome.NoEndpoint;
         }
 
         var action = await CommunicationActionAsync(db, binding, to, fromState, ct);
         if (action == "silent")
         {
-            return;
+            return BindingOutcome.Silent;
         }
 
         var target = new Facilitator.Kernel.Integrations.ConversationTarget(
             binding.Provider, null, binding.Channel, binding.RootMessageId, binding.ParentMessageId,
             null, "thread", null);
+        var commandId = index == 0
+            ? $"communication-reply:{transitionEventId}"
+            : $"communication-reply:{transitionEventId}:b{index}";
+
+        // Ledger path (step 4): the notice is recorded with its ladder, so a
+        // vanished address becomes a retired address (F5), not a lost word.
+        if (notifications is not null && action != "react")
+        {
+            var teamSlug = await db.Works.AsNoTracking()
+                .Where(w => w.WorkId == workId).Select(w => w.Team!.Slug).FirstOrDefaultAsync(ct);
+            var ladder = new List<Facilitator.Kernel.Integrations.ConversationTarget> { target };
+            await notifications.EmitAsync(db, new Facilitator.Kernel.Notifications.NotificationRequest(
+                Audience: "team",
+                Text: $"Work reached {to.Wire()}.",
+                WorkId: workId,
+                TeamSlug: teamSlug,
+                Target: target,
+                Ladder: ladder,
+                CommandId: commandId), ct);
+            return BindingOutcome.Handled;
+        }
+
         var envelope = action == "react"
             ? Facilitator.Kernel.Integrations.ProviderEventStore.ReactEnvelope(
-                target, Facilitator.Kernel.Integrations.ProviderEventStore.ReactionAckEmoji, $"communication-reply:{transitionEventId}", $"work/{workId}", now)
+                target, Facilitator.Kernel.Integrations.ProviderEventStore.ReactionAckEmoji, commandId, $"work/{workId}", now)
             : Facilitator.Kernel.Integrations.ProviderEventStore.ReplyEnvelope(
-                target, $"Work reached {to.Wire()}.", $"communication-reply:{transitionEventId}", $"work/{workId}", now);
+                target, $"Work reached {to.Wire()}.", commandId, $"work/{workId}", now);
         var json = envelope.ToJsonString();
         var verdict = envelopeValidator.Validate(json);
         if (!verdict.Ok)
@@ -715,7 +779,7 @@ public sealed class EfCoordinationStore(
             AggregateType = "work",
             AggregateId = workId,
             EventType = envelope["type"]!.GetValue<string>(),
-            CommandId = $"communication-reply:{transitionEventId}",
+            CommandId = commandId,
             Envelope = json,
             WorkId = workId,
             Status = "pending",
@@ -723,6 +787,7 @@ public sealed class EfCoordinationStore(
             Attempts = 0,
             CreatedAt = now,
         });
+        return BindingOutcome.Handled;
     }
 
     /// <summary>The advisory communication answer for this completion ("reply"

@@ -271,7 +271,8 @@ public sealed class DecodeSink(
         var now = timeProvider.GetUtcNow().UtcDateTime;
         var effect = await applier.VerbatimWorkAsync(
             db, now, text, reference, options, actor, teamGuid, deliveryId,
-            await ReplyVsReactionAsync(db, ct), ct, rule, sourceRefs);
+            await ReplyVsReactionAsync(
+                db, teamGuid, $"{reference.Provider}/{reference.Channel}", ct), ct, rule, sourceRefs);
         await db.SaveChangesAsync(ct);
         await PostgresNotifications.NotifyOutboxAsync(db, effect.WorkId?.ToString(), ct);
         await tx.CommitAsync(ct);
@@ -301,29 +302,15 @@ public sealed class DecodeSink(
             CommandRegistry.BuiltIns, await ProviderEventStore.CommandsPayloadAsync(db, ct));
     }
 
-    private static async Task<string> ReplyVsReactionAsync(FacilitatorDbContext db, CancellationToken ct)
+    // D1: cadence resolves channel -> team -> system, the one truth (the
+    // decode row carries its team + the conversation it answers).
+    private static async Task<string> ReplyVsReactionAsync(
+        FacilitatorDbContext db, Guid teamId, string channelScopeId, CancellationToken ct)
     {
-        var payload = await db.AdminConfig.AsNoTracking()
-            .Where(c => c.Resource == "notifications")
-            .Select(c => c.Payload)
-            .FirstOrDefaultAsync(ct);
-        if (payload is { Length: > 0 } text)
-        {
-            try
-            {
-                using var doc = JsonDocument.Parse(text);
-                if (doc.RootElement.TryGetProperty("replyVsReaction", out var v) && v.GetString() is "reply" or "reaction")
-                {
-                    return v.GetString()!;
-                }
-            }
-            catch (JsonException)
-            {
-                // fall through to the default
-            }
-        }
-
-        return "reaction";
+        var teamSlug = await db.Teams.AsNoTracking()
+            .Where(t => t.TeamId == teamId).Select(t => t.Slug).FirstOrDefaultAsync(ct);
+        return await Facilitator.Kernel.Notifications.NotificationLedger
+            .CadenceAsync(db, teamSlug, channelScopeId, "reaction", ct);
     }
 
     /// <summary>Strict contract parse: tolerate a fenced code block by

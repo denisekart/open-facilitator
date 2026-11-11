@@ -364,6 +364,112 @@ public sealed class TestDbProbe : IAsyncDisposable
         return rows;
     }
 
+    /// <summary>Notification ledger rows for one work (state, audience, reason,
+    /// command id) — the emission truth (A6/B4/F5/D5).</summary>
+    public async Task<List<(string State, string Audience, string Reason, string CommandId, string Target)>> NotificationsFor(
+        Guid workId)
+    {
+        await using var connection = await _dataSource.OpenConnectionAsync();
+        await using var cmd = new NpgsqlCommand(
+            "SELECT state, audience, coalesce(reason, ''), coalesce(o.command_id, ''), target::text "
+            + "FROM facilitator.notifications n "
+            + "LEFT JOIN facilitator.outbox o ON o.command_id = 'notify:' || replace(n.notification_id::text, '-', '') "
+            + "WHERE n.work_id = $1 ORDER BY n.created_at", connection);
+        cmd.Parameters.AddWithValue(workId);
+        await using var reader = await cmd.ExecuteReaderAsync();
+        var rows = new List<(string, string, string, string, string)>();
+        while (await reader.ReadAsync())
+        {
+            rows.Add((reader.GetString(0), reader.GetString(1), reader.GetString(2),
+                reader.IsDBNull(3) ? string.Empty : reader.GetString(3), reader.GetString(4)));
+        }
+
+        return rows;
+    }
+
+    /// <summary>Notification ledger row by id (state, audience, level, reason, text).</summary>
+    public async Task<(string State, string Audience, string Level, string Reason, string Text)?> Notification(
+        Guid notificationId)
+    {
+        await using var connection = await _dataSource.OpenConnectionAsync();
+        await using var cmd = new NpgsqlCommand(
+            "SELECT state, audience, level, coalesce(reason, ''), text "
+            + "FROM facilitator.notifications WHERE notification_id = $1", connection);
+        cmd.Parameters.AddWithValue(notificationId);
+        await using var reader = await cmd.ExecuteReaderAsync();
+        return await reader.ReadAsync()
+            ? (reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetString(4))
+            : null;
+    }
+
+    /// <summary>Any notification row with a reason fragment (name-by-fragment
+    /// keeps the ledger assertion readable without minting ids in tests).</summary>
+    public Task<bool> NotificationWithReason(string reasonFragment) =>
+        ScalarBool(
+            "SELECT count(*) FROM facilitator.notifications WHERE text LIKE '%' || $1 || '%' OR reason LIKE '%' || $1 || '%'",
+            cmd => cmd.Parameters.AddWithValue(reasonFragment));
+
+    /// <summary>Seed a roster row (team member, capacity member/operator).</summary>
+    public Task SeedRosterMember(string teamSlug, string actor, string kind, string capacity) =>
+        NonQuery(
+            "INSERT INTO facilitator.team_members (team_id, actor, kind, capacity, added_by, created_at) "
+            + "SELECT t.team_id, $2, $3, $4, 'test', now() FROM facilitator.teams t WHERE t.slug = $1 "
+            + "ON CONFLICT (team_id, actor) DO NOTHING",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(teamSlug);
+                cmd.Parameters.AddWithValue(actor);
+                cmd.Parameters.AddWithValue(kind);
+                cmd.Parameters.AddWithValue(capacity);
+            });
+
+    /// <summary>Seed a provider-identity link (account id ↔ oidc subject).</summary>
+    public Task SeedProviderIdentity(string provider, string tenant, string accountId, string issuer, string subject) =>
+        NonQuery(
+            "INSERT INTO facilitator.provider_identities "
+            + "(identity_id, provider, tenant, account_id, oidc_issuer, oidc_subject, challenge_id, created_at, updated_at) "
+            + "VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, NULL, now(), now())",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(provider);
+                cmd.Parameters.AddWithValue(tenant);
+                cmd.Parameters.AddWithValue(accountId);
+                cmd.Parameters.AddWithValue(issuer);
+                cmd.Parameters.AddWithValue(subject);
+            });
+
+    /// <summary>Seed a team-scope or channel-scope switch row (notifications
+    /// cadence layers are what tests need here).</summary>
+    public Task SeedTeamSetting(string teamSlug, string scopeKind, string scopeId, string resource, string payload) =>
+        NonQuery(
+            "INSERT INTO facilitator.team_settings "
+            + "(team_id, scope_kind, scope_id, resource, payload, row_version, author, reason, updated_at) "
+            + "SELECT t.team_id, $2, $3, $4, $5::jsonb, 1, 'test', 'test', now() FROM facilitator.teams t WHERE t.slug = $1 "
+            + "ON CONFLICT (team_id, scope_kind, scope_id, resource) DO UPDATE SET payload = EXCLUDED.payload",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(teamSlug);
+                cmd.Parameters.AddWithValue(scopeKind);
+                cmd.Parameters.AddWithValue(scopeId);
+                cmd.Parameters.AddWithValue(resource);
+                cmd.Parameters.AddWithValue(payload);
+            });
+
+    /// <summary>Run the delivery materializer (the pump leg a receipt test needs
+    /// without a live session claim cycle).</summary>
+    public Task MaterializeLinkDeliveries() =>
+        NonQuery(
+            "INSERT INTO facilitator.link_deliveries "
+            + "(delivery_id, endpoint_id, session_epoch, state, delivered_at, acked_at, receipt, attempts, redeliver_after) "
+            + "SELECT o.outbox_id, substring(o.recipient_endpoint_id from 6), s.session_epoch, 'pending', "
+            + "now(), NULL, NULL, 0, NULL "
+            + "FROM facilitator.outbox o "
+            + "JOIN facilitator.link_sessions s ON s.logical_endpoint_id = substring(o.recipient_endpoint_id from 6) "
+            + "WHERE o.recipient_endpoint_id LIKE 'link.%' "
+            + "AND o.status NOT IN ('delivered', 'dead_letter') "
+            + "ON CONFLICT (delivery_id) DO NOTHING",
+            _ => { });
+
     /// <summary>The held-action row for one approval:
     /// state, endpoint, capability, envelope jsonb, updated_at (null = never held).</summary>
     public async Task<HeldActionRow?> HeldAction(Guid approvalId)

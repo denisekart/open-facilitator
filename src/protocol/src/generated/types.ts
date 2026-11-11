@@ -659,6 +659,37 @@ export interface ConversationReference {
   tenantOrOrganizationId: string;
 }
 
+export interface ProviderDegradedEventV1Data {
+  /**
+   * The link endpoint whose deliveries stall (429: only THAT endpoint's queue backs off).
+   */
+  endpointId?: string;
+  observedAt: string;
+  /**
+   * Provider token of the integration reporting its own trouble.
+   */
+  provider: string;
+  /**
+   * Adapter-chosen reason token (permission-denied, rate-limited, ...).
+   */
+  reason?: string;
+  /**
+   * True when a later attempt may succeed (429 backoff); false when a human must fix
+   * something (403).
+   */
+  retryable: boolean;
+  /**
+   * The provider status code observed (403 discloses to team operators; 429 to system
+   * operators).
+   */
+  status: number;
+  /**
+   * Team slug whose operators the disclosure addresses (optional; the kernel routes to that
+   * team's channel when set).
+   */
+  team?: string;
+}
+
 export interface ProviderIssueEventV1Data {
   action: ProviderIssueEventV1DataAction;
   actorProviderAccountId: string;

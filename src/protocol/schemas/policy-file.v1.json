@@ -25,6 +25,10 @@
       "additionalProperties": false,
       "required": ["capability", "resources", "actorAnyOf", "effect"],
       "properties": {
+        "id": {
+          "$ref": "common.v1.json#/$defs/idToken",
+          "description": "Rule name: the locator a consent decision cites, so permission is attributable to a rule a human can point at. Absent = positional locator \"row:<index>\"."
+        },
         "capability": {
           "$ref": "common.v1.json#/$defs/idToken",
           "description": "Capability id this row gates; exact match."

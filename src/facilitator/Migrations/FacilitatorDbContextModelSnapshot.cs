@@ -264,9 +264,25 @@ namespace Facilitator.Migrations
                         .HasColumnType("text")
                         .HasColumnName("nonce");
 
+                    b.Property<bool>("NotRequester")
+                        .HasColumnType("boolean")
+                        .HasColumnName("not_requester");
+
+                    b.Property<DateTime?>("NudgedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("nudged_at");
+
+                    b.Property<string>("RequestedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("requested_by");
+
                     b.Property<string>("RequestedByEndpointId")
                         .HasColumnType("text")
                         .HasColumnName("requested_by_endpoint_id");
+
+                    b.Property<string>("RuleId")
+                        .HasColumnType("text")
+                        .HasColumnName("rule_id");
 
                     b.Property<string>("State")
                         .IsRequired()
@@ -901,6 +917,80 @@ namespace Facilitator.Migrations
                     b.ToTable("execution_attempts", "facilitator", t =>
                         {
                             t.HasCheckConstraint("execution_attempts_status_check", "status IN ('starting', 'ready', 'working', 'stopping', 'stopped', 'failed', 'lost')");
+                        });
+                });
+
+            modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.HeldActionEntity", b =>
+                {
+                    b.Property<Guid>("HeldActionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("held_action_id");
+
+                    b.Property<string>("ActionDigest")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("action_digest");
+
+                    b.Property<Guid>("ApprovalId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("approval_id");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempts");
+
+                    b.Property<string>("CapabilityId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("capability_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DecidedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("decided_by");
+
+                    b.Property<string>("EndpointId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("endpoint_id");
+
+                    b.Property<string>("Envelope")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("envelope");
+
+                    b.Property<DateTime?>("NudgeAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("nudge_at");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("state");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("WorkId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("work_id");
+
+                    b.HasKey("HeldActionId");
+
+                    b.HasIndex("ApprovalId")
+                        .IsUnique()
+                        .HasDatabaseName("held_actions_approval_id_key");
+
+                    b.HasIndex("State", "NudgeAt")
+                        .HasDatabaseName("held_actions_sweep_idx");
+
+                    b.ToTable("held_actions", "facilitator", t =>
+                        {
+                            t.HasCheckConstraint("held_actions_state_check", "state IN ('pending', 'approved', 'denied', 'expired', 'revoked', 'delivered')");
                         });
                 });
 
@@ -2241,7 +2331,7 @@ namespace Facilitator.Migrations
 
                     b.ToTable("work_events", "facilitator", t =>
                         {
-                            t.HasCheckConstraint("work_events_kind_check", "kind IN ('created', 'state.transition', 'steer', 'command.accepted', 'assignment.transition', 'approval.decided', 'artifact.stored', 'artifact.registered', 'artifact.available', 'artifact.gc', 'manifest.recorded', 'manifest.superseded', 'memory.candidate', 'memory.promoted', 'provider.input', 'provider.attachment', 'provider.reaction', 'input.required', 'input.answered', 'provider.duplicate', 'work.linked', 'work.triaged')");
+                            t.HasCheckConstraint("work_events_kind_check", "kind IN ('created', 'state.transition', 'steer', 'command.accepted', 'assignment.transition', 'approval.decided', 'artifact.stored', 'artifact.registered', 'artifact.available', 'artifact.gc', 'manifest.recorded', 'manifest.superseded', 'memory.candidate', 'memory.promoted', 'provider.input', 'provider.attachment', 'provider.reaction', 'input.required', 'input.answered', 'provider.duplicate', 'work.linked', 'work.triaged', 'approval.nudged', 'work.consent-expired')");
                         });
                 });
 
@@ -2342,6 +2432,16 @@ namespace Facilitator.Migrations
                         .HasConstraintName("execution_attempts_assignment_id_fkey");
 
                     b.Navigation("Assignment");
+                });
+
+            modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.HeldActionEntity", b =>
+                {
+                    b.HasOne("Facilitator.Kernel.Shared.Persistence.ApprovalEntity", null)
+                        .WithOne()
+                        .HasForeignKey("Facilitator.Kernel.Shared.Persistence.HeldActionEntity", "ApprovalId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("held_actions_approval_id_fkey");
                 });
 
             modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.LinkDeliveryEntity", b =>

@@ -260,7 +260,10 @@ public sealed class LinkIngress(
 
             await inbox.MarkProcessedAsync(inboxId, null, ct);
             metrics.InboxProcessed();
-            return new LinkAdmission(null, "consumed", inboxId);
+            return new LinkAdmission(null, "consumed", inboxId,
+                arm.HeldEnvelope is { Length: > 0 } held
+                    ? new { envelope = System.Text.Json.JsonDocument.Parse(held).RootElement.Clone() }
+                    : null);
         }
 
         if (screen.Type == "org.facilitator.command.artifact.request_upload.v1")

@@ -96,6 +96,18 @@ public sealed class ProviderOptions
     /// labels live on issues only (forges) take the unchanged code path.</summary>
     public bool ChatLabelRouting { get; init; }
 
+    /// <summary>Chat-consent tracker opt-in (C7): when set, an entitled chat
+    /// consent decision dispatches the tracker record through the provider
+    /// plane with this capability (<c>vcs.issue.create</c> plus a
+    /// <c>vcs.issue.comment</c> carrying decision, decider, digest). Null ⇒ no
+    /// tracker is bound: the decision records with the person's proven
+    /// identity plus a timeline row naming the missing tracker.</summary>
+    public string? IssueRequestCapability { get; init; }
+
+    /// <summary>Link endpoint executing <see cref="IssueRequestCapability"/>;
+    /// null ⇒ <c>&lt;provider&gt;-connector</c> (the connector convention).</summary>
+    public string? IssueRequestEndpointId { get; init; }
+
     /// <summary>The completed-manifest arm of <c>ResultIngress</c> reads
     /// <c>structuredResult.prRequest</c> / <c>commentRequests</c> only when
     /// the completing assignment's capability equals this value (provider-

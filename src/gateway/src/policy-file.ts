@@ -13,6 +13,8 @@ export const POLICY_FILE_SCHEMA_ID = "https://schemas.openfacilitator.org/v1/pol
 export type PolicyEffect = "allow" | "deny" | "confirm";
 
 export interface PolicyRow {
+  /** Rule name cited by consent records; absent = positional "row:<index>". */
+  readonly id?: string | undefined;
   readonly capability: string;
   readonly resources: readonly string[];
   readonly actorAnyOf: readonly string[];

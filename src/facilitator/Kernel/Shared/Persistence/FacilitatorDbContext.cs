@@ -50,6 +50,8 @@ public class FacilitatorDbContext(DbContextOptions<FacilitatorDbContext> options
 
     public DbSet<ApprovalEntity> Approvals => Set<ApprovalEntity>();
 
+    public DbSet<HeldActionEntity> HeldActions => Set<HeldActionEntity>();
+
     public DbSet<CommunicationBindingEntity> CommunicationBindings => Set<CommunicationBindingEntity>();
 
     public DbSet<ProviderIdentityEntity> ProviderIdentities => Set<ProviderIdentityEntity>();

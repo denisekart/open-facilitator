@@ -364,6 +364,96 @@ public sealed class TestDbProbe : IAsyncDisposable
         return rows;
     }
 
+    /// <summary>The held-action row for one approval:
+    /// state, endpoint, capability, envelope jsonb, updated_at (null = never held).</summary>
+    public async Task<HeldActionRow?> HeldAction(Guid approvalId)
+    {
+        await using var connection = await _dataSource.OpenConnectionAsync();
+        await using var cmd = new NpgsqlCommand(
+            "SELECT state, endpoint_id, capability_id, envelope::text, updated_at "
+            + "FROM facilitator.held_actions WHERE approval_id = $1", connection);
+        cmd.Parameters.AddWithValue(approvalId);
+        await using var reader = await cmd.ExecuteReaderAsync();
+        return await reader.ReadAsync()
+            ? new HeldActionRow(reader.GetString(0), reader.GetString(1), reader.GetString(2),
+                reader.GetString(3), reader.GetFieldValue<DateTime>(4))
+            : null;
+    }
+
+    /// <summary>One held-action assertion row (step 3: persist-first law D3).</summary>
+    public sealed record HeldActionRow(
+        string State, string EndpointId, string CapabilityId, string Envelope, DateTime UpdatedAt);
+
+    /// <summary>Insert a communication binding row (chat/forges address by provider+channel+root).</summary>
+    public Task SeedBinding(string provider, string channel, string root, Guid? workId, string idempotencyKey) =>
+        NonQuery(
+            "INSERT INTO facilitator.communication_bindings "
+            + "(binding_id, provider, channel, root_message_id, work_id, idempotency_key, created_at) "
+            + "VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, now())",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(provider);
+                cmd.Parameters.AddWithValue(channel);
+                cmd.Parameters.AddWithValue(root);
+                cmd.Parameters.AddWithValue((object?)workId ?? System.DBNull.Value);
+                cmd.Parameters.AddWithValue(idempotencyKey);
+            });
+
+    /// <summary>Rewrite a held envelope (the mutate-then-approve leg: whatever
+    /// happens to the stored bytes, consume hands back the stored copy).</summary>
+    public Task MutateHeldEnvelope(Guid approvalId, string inputsJson) =>
+        NonQuery(
+            "UPDATE facilitator.held_actions SET envelope = jsonb_set(envelope, '{data,inputs}', $2::jsonb) WHERE approval_id = $1",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(approvalId);
+                cmd.Parameters.AddWithValue(inputsJson);
+            });
+
+    /// <summary>True when the approval's nudge stamp exists.</summary>
+    public Task<bool> ApprovalNudged(Guid approvalId) =>
+        ScalarBool(
+            "SELECT count(*) FROM facilitator.approvals WHERE approval_id = $1 AND nudged_at IS NOT NULL",
+            cmd => cmd.Parameters.AddWithValue(approvalId));
+
+    /// <summary>Work id whose objective contains a fragment (null when none).</summary>
+    public async Task<Guid?> WorkIdByObjectiveFragment(string fragment)
+    {
+        await using var connection = await _dataSource.OpenConnectionAsync();
+        await using var cmd = new NpgsqlCommand(
+            "SELECT work_id FROM facilitator.works WHERE objective LIKE '%' || $1 || '%' LIMIT 2", connection);
+        cmd.Parameters.AddWithValue(fragment);
+        await using var reader = await cmd.ExecuteReaderAsync();
+        Guid? found = null;
+        while (await reader.ReadAsync())
+        {
+            found = reader.GetGuid(0);
+        }
+
+        return found;
+    }
+
+    /// <summary>Put an approval past a moment (sweeper legs run against the clock).</summary>
+    public Task SetApprovalExpires(Guid approvalId, DateTime expiresAt) =>
+        NonQuery(
+            "UPDATE facilitator.approvals SET expires_at = $2 WHERE approval_id = $1",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(approvalId);
+                cmd.Parameters.AddWithValue(expiresAt);
+            });
+
+    /// <summary>The work row's state + version (timeline assertions pair with this).</summary>
+    public async Task<(string State, long Version)?> WorkStateRow(Guid workId)
+    {
+        await using var connection = await _dataSource.OpenConnectionAsync();
+        await using var cmd = new NpgsqlCommand(
+            "SELECT state, version FROM facilitator.works WHERE work_id = $1", connection);
+        cmd.Parameters.AddWithValue(workId);
+        await using var reader = await cmd.ExecuteReaderAsync();
+        return await reader.ReadAsync() ? (reader.GetString(0), reader.GetInt64(1)) : null;
+    }
+
     /// <summary>True when the facilitator.evidence row exists and is already consumed.</summary>
     public Task<bool> EvidenceConsumed(string evidenceId) =>
         ScalarBool(

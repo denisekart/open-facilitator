@@ -14,7 +14,12 @@ namespace Facilitator.Kernel.Work;
 /// <param name="Status">Outcome status wire value when handled (recorded/decided/accepted/no-op).</param>
 /// <param name="ApprovalId">The approval the arm acted on (echoed in bodies).</param>
 /// <param name="EvidenceRef">Minted <c>kernel:</c> receipt for a consumed approve respond (law D5).</param>
-public sealed record ApprovalArm(ProblemDetails? Problem, string Status, string? ApprovalId = null, string? EvidenceRef = null)
+public sealed record ApprovalArm(
+    ProblemDetails? Problem,
+    string Status,
+    string? ApprovalId = null,
+    string? EvidenceRef = null,
+    string? HeldEnvelope = null)
 {
     /// <summary>True when the arm refused — the caller must NOT settle the inbox as processed.</summary>
     public bool Refused => Problem is not null;
@@ -96,7 +101,9 @@ public sealed class ApprovalIngress(
             null, ct);
         return result.Outcome switch
         {
-            ApprovalDecisionOutcome.Decided => new ApprovalArm(null, "consumed", approvalId),
+            // The consume answer carries the kernel-stored envelope: the
+            // gateway executes what consent covered, not its own recollection.
+            ApprovalDecisionOutcome.Decided => new ApprovalArm(null, "consumed", approvalId, HeldEnvelope: result.HeldEnvelope),
             ApprovalDecisionOutcome.NotFound => new ApprovalArm(ProblemErrors.ApprovalNotFound(approvalId), "failed"),
             ApprovalDecisionOutcome.Revoked => new ApprovalArm(ProblemErrors.ApprovalRevoked(approvalId), "failed"),
             ApprovalDecisionOutcome.Expired => new ApprovalArm(ProblemErrors.ApprovalExpired(approvalId), "failed"),

@@ -1201,6 +1201,14 @@ namespace Ofac.Protocol
         [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
         public string approvalId { get; set; }
 
+        /// <summary>
+        /// The command envelope held until consent (persist-first law D3): the kernel stores it and
+        /// hands it back on consume, so execution runs exactly what consent covered.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("command")]
+        public Dictionary<string, object>? command { get; set; }
+
         [JsonPropertyName("createdAt")]
         public string createdAt { get; set; }
 
@@ -1214,6 +1222,29 @@ namespace Ofac.Protocol
         [JsonPropertyName("nonce")]
         [JsonConverter(typeof(MinMaxLengthCheckConverter2))]
         public string nonce { get; set; }
+
+        /// <summary>
+        /// Rule flag: the requester side (the recording workload's team) may not give sole consent.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("notRequester")]
+        public bool? notRequester { get; set; }
+
+        /// <summary>
+        /// Canonical actor behind the request (the verified human subject, or the workload when
+        /// unverified): the consent-authority rules evaluate against it.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("requestedBy")]
+        public string? requestedBy { get; set; }
+
+        /// <summary>
+        /// The policy rule that made this consent necessary (name or locator): consent must be
+        /// attributable to a rule a human can point at.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("ruleId")]
+        public string? ruleId { get; set; }
 
         /// <summary>
         /// Work the approval belongs to, when one exists.

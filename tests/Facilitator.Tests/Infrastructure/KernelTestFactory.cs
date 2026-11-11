@@ -95,6 +95,7 @@ public sealed class KernelTestFactory : WebApplicationFactory<Program>
         // suites drive passes explicitly via RunOnceAsync; override per test).
         builder.UseSetting("Storage:Gc:IntervalSeconds", "3600");
         builder.UseSetting("SessionLoss:SweepIntervalSeconds", "3600");
+        builder.UseSetting("Consent:SweepIntervalSeconds", "3600");
         // A fake advance is that host's fiction: sweeping leases on a fake
         // clock deletes FOREIGN hosts' live sessions in the shared DB. Fake
         // hosts skip the sweep unless a test opts in explicitly.

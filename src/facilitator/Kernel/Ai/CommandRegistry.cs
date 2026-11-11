@@ -51,6 +51,7 @@ public sealed class CommandRegistry
         new CommandSpec("status", "Show the state of the Work bound to this conversation (or the given work-id).", null, [new CommandArg("work-id", false)], true),
         new CommandSpec("cancel", "Cancel the Work bound to this conversation (or the given work-id).", null, [new CommandArg("work-id", false)], true),
         new CommandSpec("approve", "Accept or reject an approval: /approve &lt;approval-id&gt; &lt;accept|reject&gt;.", null, [new CommandArg("approval-id", true), new CommandArg("decision", true)], true),
+        new CommandSpec("deny", "Reject an approval (alias of /approve <id> reject): /deny <approval-id>.", null, [new CommandArg("approval-id", true)], true),
         new CommandSpec("link", "Link this conversation to a Work item (behavior is provider-plane code, not the parser).", null, [], true),
     ]);
 

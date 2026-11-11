@@ -100,6 +100,8 @@ public sealed class CommandApplier(
             "status" => await StatusAsync(db, reference, options, cmd, key, subject, ledgerBasis, now, ct),
             "cancel" => await CancelAsync(db, reference, options, cmd, actorProviderAccountId, key, subject, ledgerBasis, now, ct),
             "approve" => await ApproveAsync(db, reference, options, cmd, actorProviderAccountId, key, subject, deliveryId, ledgerBasis, now, ct),
+            // /deny <id> == /approve <id> reject: same authority, same ticket leg.
+            "deny" => await ApproveAsync(db, reference, options, WithDecision(cmd, "reject"), actorProviderAccountId, key, subject, deliveryId, ledgerBasis, now, ct),
             "link" => await ReplyAsync(db, reference, options, key, subject,
                 "Linking runs through /link — mention /link to get a code.", "cmd:link", ledgerBasis, now),
             // /work and every custom verb: Work creation on the provider plane.
@@ -277,6 +279,10 @@ public sealed class CommandApplier(
             $"Work {Short(workId)} cancelled.", $"cmd:cancel:work/{workId}", basis, now);
     }
 
+    /// <summary>Alias support: the same command with a forced argument.</summary>
+    private static ParsedCommand WithDecision(ParsedCommand cmd, string decision) =>
+        cmd with { Args = new Dictionary<string, string>(cmd.Args) { ["decision"] = decision } };
+
     private async Task<CommandEffect> ApproveAsync(
         FacilitatorDbContext db, ProviderEventStore.Reference reference, ProviderOptions options,
         ParsedCommand cmd, string actor, string key, string subject, string deliveryId, string basis,
@@ -332,6 +338,14 @@ public sealed class CommandApplier(
         };
         using var doc = JsonDocument.Parse(root.ToJsonString());
         var arm = await ingress.HandleRespondAsync(doc.RootElement, delegatedActor, null, null, mintEvidence: false, ct);
+        if (!arm.Refused)
+        {
+            // Chat consent leaves a paper trail (C7): the tracker record (or
+            // the named-missing-tracker disclosure) rides the decision.
+            await sp.GetRequiredService<Facilitator.Kernel.Work.ConsentTicketService>()
+                .RecordAsync(approvalId, decision, delegatedActor, ct);
+        }
+
         var text = arm.Refused
             ? $"Approval {Short(approvalId)}: could not be recorded ({arm.Problem?.Detail ?? arm.Status})."
             : $"Approval {Short(approvalId)}: {decision}.";

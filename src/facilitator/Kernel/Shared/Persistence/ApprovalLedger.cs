@@ -77,7 +77,14 @@ public enum ApprovalDecisionOutcome
 /// <param name="Outcome">Machine outcome (feeds the typed ProblemDetails).</param>
 /// <param name="Row">The row's state after the attempt (null when not found).</param>
 /// <param name="EvidenceRef">Minted <c>kernel:&lt;id&gt;</c> receipt (consumed approve responds, law D5).</param>
-public sealed record ApprovalDecision(ApprovalDecisionOutcome Outcome, ApprovalView? Row = null, string? EvidenceRef = null);
+/// <param name="HeldEnvelope">The stored command envelope a successful consume
+/// must deliver (persist-first law D3): the kernel, not the gateway's local
+/// queue, is the authority on what consent covered.</param>
+public sealed record ApprovalDecision(
+    ApprovalDecisionOutcome Outcome,
+    ApprovalView? Row = null,
+    string? EvidenceRef = null,
+    string? HeldEnvelope = null);
 
 /// <summary>
 /// The approvals ledger: the only
@@ -155,6 +162,7 @@ public sealed class ApprovalLedger(
         var actors = data.GetProperty("eligibleActors").EnumerateArray().Select(x => x.GetString()!).ToArray();
         var expiresAt = ParseTimestamp(data.GetProperty("expiresAt").GetString()!);
         var createdAt = ParseTimestamp(data.GetProperty("createdAt").GetString()!);
+        var now = timeProvider.GetUtcNow().UtcDateTime;
         var hasAction = data.TryGetProperty("action", out var action) && action.ValueKind == JsonValueKind.Object;
         var verification = "recomputed";
         if (hasAction)
@@ -176,6 +184,16 @@ public sealed class ApprovalLedger(
             && Guid.TryParse(wid.GetString(), out var parsedWork)
             ? parsedWork
             : null;
+        var requestedBy = data.TryGetProperty("requestedBy", out var rb) && rb.ValueKind == JsonValueKind.String
+            ? rb.GetString()
+            : null;
+        var ruleId = data.TryGetProperty("ruleId", out var ri) && ri.ValueKind == JsonValueKind.String
+            ? ri.GetString()
+            : null;
+        var notRequester = data.TryGetProperty("notRequester", out var nr) && nr.ValueKind == JsonValueKind.True;
+        var command = data.TryGetProperty("command", out var cmd) && cmd.ValueKind == JsonValueKind.Object
+            ? cmd
+            : (JsonElement?)null;
 
         await using var db = await contextFactory.CreateDbContextAsync(ct);
         await using var tx = await db.Database.BeginTransactionAsync(ct);
@@ -191,7 +209,38 @@ public sealed class ApprovalLedger(
             CreatedAt = createdAt,
             DigestVerification = verification,
             RequestedByEndpointId = requestedByEndpointId,
+            RequestedBy = requestedBy,
+            RuleId = ruleId,
+            NotRequester = notRequester,
         });
+
+        // Persist-first (law D3): the held command row lands in THIS
+        // transaction — before any notice can reach a human, the exact thing
+        // consent covers is already stored. A sender without a command
+        // payload (1.0 gateway) records the approval only, nothing to deliver.
+        if (command is { } held && requestedByEndpointId is { Length: > 0 } recorder)
+        {
+            var heldCapability = held.TryGetProperty("data", out var heldData)
+                && heldData.TryGetProperty("capabilityId", out var cap) && cap.ValueKind == JsonValueKind.String
+                ? cap.GetString() ?? string.Empty
+                : data.TryGetProperty("action", out var act)
+                    && act.TryGetProperty("capabilityId", out var actCap) && actCap.ValueKind == JsonValueKind.String
+                    ? actCap.GetString() ?? string.Empty
+                    : string.Empty;
+            db.HeldActions.Add(new HeldActionEntity
+            {
+                HeldActionId = Guid.NewGuid(),
+                ApprovalId = approvalId,
+                WorkId = workId,
+                CapabilityId = heldCapability,
+                EndpointId = recorder,
+                Envelope = held.GetRawText(),
+                ActionDigest = declared,
+                State = "pending",
+                CreatedAt = createdAt,
+                UpdatedAt = now,
+            });
+        }
         if (verification == "digest-unverified")
         {
             audit.Append(db, new Identity.AuditRecord(
@@ -275,6 +324,20 @@ public sealed class ApprovalLedger(
             return new ApprovalDecision(ApprovalDecisionOutcome.Ineligible, Map(row));
         }
 
+        // Consent authority (C9): a rule flagged not-requester denies the
+        // requesting side as SOLE consent - the requester's own team may hold
+        // the approval open, never spend it. The row stays pending: an outsider
+        // still can decide. An outsider's refusal (Ineligible above) discloses
+        // the approval exists (P6) without consuming anything (C3).
+        if (row.NotRequester && decision == "approved" && await RequesterSideAsync(db, row, actorActor, actorGroups, ct))
+        {
+            audit.Append(db, DenyAudit(row, actorActor, ApprovalDecisionOutcome.Ineligible)
+                with { Reason = "not-requester" });
+            await db.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
+            return new ApprovalDecision(ApprovalDecisionOutcome.Ineligible, Map(row));
+        }
+
         var rows = await db.Approvals
             .Where(a => a.ApprovalId == approvalId && a.State == "pending")
             .ExecuteUpdateAsync(s => s
@@ -284,6 +347,17 @@ public sealed class ApprovalLedger(
                 .SetProperty(a => a.ActorEvidenceRef, evidenceRef)
                 .SetProperty(a => a.Comment, comment)
                 .SetProperty(a => a.DecidedAt, now), ct);
+        if (rows == 1)
+        {
+            // The held action follows the decision in the same tx: consent
+            // releases it, a denial kills it - a deny can never consume.
+            await db.HeldActions
+                .Where(h => h.ApprovalId == approvalId && h.State == "pending")
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(h => h.State, decision == "approved" ? "approved" : "denied")
+                    .SetProperty(h => h.DecidedBy, actorActor)
+                    .SetProperty(h => h.UpdatedAt, now), ct);
+        }
         if (rows == 0)
         {
             // Race loser: re-read and report the winner's terminal state.
@@ -377,6 +451,7 @@ public sealed class ApprovalLedger(
             return new ApprovalDecision(ApprovalDecisionOutcome.NotFound);
         }
 
+        string? heldEnvelope = null;
         if (callerEndpointId is not null &&
             !string.Equals(row.RequestedByEndpointId, callerEndpointId, StringComparison.Ordinal))
         {
@@ -390,6 +465,18 @@ public sealed class ApprovalLedger(
             .ExecuteUpdateAsync(s => s.SetProperty(a => a.State, "consumed"), ct);
         if (rows == 1)
         {
+            // Exactly-once delivery: the held row flips delivered here, and the
+            // consume answer carries the stored envelope — the gateway delivers
+            // what the kernel's row says, never its own recollection.
+            heldEnvelope = await db.HeldActions.AsNoTracking()
+                .Where(h => h.ApprovalId == approvalId)
+                .Select(h => h.Envelope).FirstOrDefaultAsync(ct);
+            await db.HeldActions
+                .Where(h => h.ApprovalId == approvalId && h.State == "approved")
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(h => h.State, "delivered")
+                    .SetProperty(h => h.Attempts, h => h.Attempts + 1)
+                    .SetProperty(h => h.UpdatedAt, timeProvider.GetUtcNow().UtcDateTime), ct);
             audit.Append(db, new Identity.AuditRecord(
                 Actor: workloadActor,
                 Action: "authorization.evaluated:approval",
@@ -405,7 +492,8 @@ public sealed class ApprovalLedger(
                     ["consumedBy"] = workloadActor,
                 })));
             await db.SaveChangesAsync(ct);
-            return new ApprovalDecision(ApprovalDecisionOutcome.Decided, await FindViewAsync(db, approvalId, ct));
+            return new ApprovalDecision(ApprovalDecisionOutcome.Decided, await FindViewAsync(db, approvalId, ct),
+                HeldEnvelope: heldEnvelope);
         }
 
         return new ApprovalDecision(row.State switch
@@ -437,6 +525,12 @@ public sealed class ApprovalLedger(
             .Where(a => a.ApprovalId == approvalId && a.State == "pending")
             .ExecuteUpdateAsync(s => s.SetProperty(a => a.State, "revoked"), ct);
         var noOp = rows == 0;
+        if (!noOp)
+        {
+            await db.HeldActions
+                .Where(h => h.ApprovalId == approvalId && h.State == "pending")
+                .ExecuteUpdateAsync(s => s.SetProperty(h => h.State, "revoked"), ct);
+        }
         audit.Append(db, new Identity.AuditRecord(
             Actor: revokedBy,
             Action: "authorization.evaluated:approval",
@@ -523,6 +617,9 @@ public sealed class ApprovalLedger(
         await db.Approvals
             .Where(a => a.ApprovalId == approvalId && a.State == "pending")
             .ExecuteUpdateAsync(s => s.SetProperty(a => a.State, "expired"), ct);
+        await db.HeldActions
+            .Where(h => h.ApprovalId == approvalId && h.State == "pending")
+            .ExecuteUpdateAsync(s => s.SetProperty(h => h.State, "expired"), ct);
         audit.Append(db, ExpiredAudit(approvalId));
         // Decided-push (lazy expiry, decidedBy ""): same-tx as the flip.
         await AppendDecidedAsync(db, entity, "expired", decidedBy: string.Empty, evidenceRef: string.Empty, ct);
@@ -619,6 +716,32 @@ public sealed class ApprovalLedger(
         "approved" or "consumed" or "denied" => new ApprovalDecision(ApprovalDecisionOutcome.AlreadyConsumed),
         _ => null,
     };
+
+    /// <summary>Is the decider on the REQUESTING side of this approval? That
+    /// is: the exact requesting actor, or a member of the recording
+    /// endpoint's team (the enrollment's team is the requester's team — an
+    /// endpoint-to-team lookup, never a name guess).</summary>
+    private static async Task<bool> RequesterSideAsync(
+        FacilitatorDbContext db, ApprovalEntity row, string actorActor, IReadOnlyList<string> actorGroups, CancellationToken ct)
+    {
+        if (row.RequestedBy is { Length: > 0 } && string.Equals(row.RequestedBy, actorActor, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        if (row.RequestedByEndpointId is not { Length: > 0 } endpoint)
+        {
+            return false;
+        }
+
+        var teamSlug = await (from e in db.LinkEnrollments.AsNoTracking()
+                              join t in db.Teams.AsNoTracking() on e.TeamId equals t.TeamId
+                              where e.EndpointId == endpoint
+                              select t.Slug).FirstOrDefaultAsync(ct);
+        return teamSlug is { Length: > 0 }
+            && actorGroups.Any(g => string.Equals(g, teamSlug, StringComparison.Ordinal)
+                || string.Equals(g, "/teams/" + teamSlug, StringComparison.Ordinal));
+    }
 
     private Identity.AuditRecord DenyAudit(ApprovalEntity row, string actor, ApprovalDecisionOutcome outcome) => new(
         Actor: actor,

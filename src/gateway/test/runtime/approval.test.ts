@@ -115,7 +115,8 @@ policy:
   inline: |
     owner: team-alpha
     policies:
-      - capability: research.analyze
+      - id: needs-consent
+        capability: research.analyze
         resources: ["*"]
         actorAnyOf: []
         effect: confirm
@@ -338,6 +339,12 @@ describe("confirm hold", () => {
     expect(String(data["actionDigest"])).toMatch(/^sha256:[0-9a-f]{64}$/);
     expect(data["eligibleActors"]).toEqual(["workload:gw.unit-test"]);
     expect(String(data["nonce"])).toMatch(/^n-/);
+    // Consent authority inputs ride the hold: the held command (persist-first:
+    // the kernel stores it and hands it back on consume), the requesting
+    // side, and the named rule that made consent necessary.
+    expect((data["command"] as Record<string, unknown>)["id"]).toBe("env-cmd-a");
+    expect(data["requestedBy"]).toBe("workload:gw.unit-test");
+    expect(data["ruleId"]).toBe("needs-consent");
     expect(env["dataschema"]).toBe(
       "https://schemas.openfacilitator.org/v1/event.approval.required.v1.json",
     );

@@ -558,6 +558,55 @@ public sealed class ApprovalEntity
     /// <summary>The Link endpoint (Gateway) that recorded this approval;
     /// decided-push addressing + consume authorization. Null for non-Link recorders.</summary>
     public string? RequestedByEndpointId { get; set; }
+
+    /// <summary>Canonical actor behind the request (verified human subject, else the
+    /// workload): the consent-authority rules evaluate against it.</summary>
+    public string? RequestedBy { get; set; }
+
+    /// <summary>The policy rule that made this consent necessary (name or locator).</summary>
+    public string? RuleId { get; set; }
+
+    /// <summary>Rule flag: the requester side may not give sole consent.</summary>
+    public bool NotRequester { get; set; }
+
+    /// <summary>When the expiry nudge fired (one per approval), null while none.</summary>
+    public DateTime? NudgedAt { get; set; }
+}
+
+/// <summary>facilitator.held_actions — the command consent holds, stored by the
+/// kernel BEFORE any notice goes out (persist-first law D3). One row per
+/// approval; consume hands the stored envelope back and flips it delivered,
+/// so execution runs exactly what consent covered, exactly once.</summary>
+public sealed class HeldActionEntity
+{
+    public Guid HeldActionId { get; set; }
+
+    public Guid ApprovalId { get; set; }
+
+    public Guid? WorkId { get; set; }
+
+    public required string CapabilityId { get; set; }
+
+    /// <summary>The endpoint the held command targets (the recording gateway).</summary>
+    public required string EndpointId { get; set; }
+
+    /// <summary>jsonb: the command envelope to deliver after consume.</summary>
+    public required string Envelope { get; set; }
+
+    public required string ActionDigest { get; set; }
+
+    /// <summary>pending | approved | denied | expired | revoked | delivered</summary>
+    public string State { get; set; } = "pending";
+
+    public int Attempts { get; set; }
+
+    public string? DecidedBy { get; set; }
+
+    public DateTime? NudgeAt { get; set; }
+
+    public DateTime CreatedAt { get; set; }
+
+    public DateTime UpdatedAt { get; set; }
 }
 
 /// <summary>facilitator.communication_bindings — canonical conversation →

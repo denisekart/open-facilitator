@@ -486,10 +486,29 @@ export interface ApprovalRequiredEventV1Data {
   action?: { [key: string]: unknown };
   actionDigest: string;
   approvalId: string;
+  /**
+   * The command envelope held until consent (persist-first law D3): the kernel stores it and
+   * hands it back on consume, so execution runs exactly what consent covered.
+   */
+  command?: { [key: string]: unknown };
   createdAt: string;
   eligibleActors: [string, ...string[]];
   expiresAt: string;
   nonce: string;
+  /**
+   * Rule flag: the requester side (the recording workload's team) may not give sole consent.
+   */
+  notRequester?: boolean;
+  /**
+   * Canonical actor behind the request (the verified human subject, or the workload when
+   * unverified): the consent-authority rules evaluate against it.
+   */
+  requestedBy?: string;
+  /**
+   * The policy rule that made this consent necessary (name or locator): consent must be
+   * attributable to a rule a human can point at.
+   */
+  ruleId?: string;
   /**
    * Work the approval belongs to, when one exists.
    */

@@ -217,6 +217,12 @@ public static class KernelServiceCollection
             ?? new Work.SessionLossSweeper.SessionLossOptions());
         builder.Services.AddSingleton<Work.SessionLossSweeper>();
         builder.Services.AddHostedService(sp => sp.GetRequiredService<Work.SessionLossSweeper>());
+        builder.Services.AddSingleton(sp =>
+            builder.Configuration.GetSection(Work.ApprovalSweeper.ApprovalOptions.SectionName).Get<Work.ApprovalSweeper.ApprovalOptions>()
+            ?? new Work.ApprovalSweeper.ApprovalOptions());
+        builder.Services.AddSingleton<Work.ConsentTicketService>();
+        builder.Services.AddSingleton<Work.ApprovalSweeper>();
+        builder.Services.AddHostedService(sp => sp.GetRequiredService<Work.ApprovalSweeper>());
 
         var heartbeat = TimeSpan.FromSeconds(linkOptions.HeartbeatSeconds);
         builder.Services.AddSignalR(options =>

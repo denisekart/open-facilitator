@@ -17,6 +17,22 @@
       "type": "object",
       "description": "The exact action payload covered by actionDigest; the kernel digests its canonical form."
     },
+    "command": {
+      "type": "object",
+      "description": "The command envelope held until consent (persist-first law D3): the kernel stores it and hands it back on consume, so execution runs exactly what consent covered."
+    },
+    "requestedBy": {
+      "type": "string",
+      "description": "Canonical actor behind the request (the verified human subject, or the workload when unverified): the consent-authority rules evaluate against it."
+    },
+    "ruleId": {
+      "type": "string",
+      "description": "The policy rule that made this consent necessary (name or locator): consent must be attributable to a rule a human can point at."
+    },
+    "notRequester": {
+      "type": "boolean",
+      "description": "Rule flag: the requester side (the recording workload's team) may not give sole consent."
+    },
     "workId": {
       "$ref": "common.v1.json#/$defs/idToken",
       "description": "Work the approval belongs to, when one exists."

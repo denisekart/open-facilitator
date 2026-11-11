@@ -1012,6 +1012,14 @@ export class GatewayRuntime {
       matched !== null && matched.actorAnyOf.length > 0
         ? [...matched.actorAnyOf]
         : [decision.ctx.claims.subject];
+    // The rule a consent decision must be attributable to: its name, or a
+    // positional locator when the file left it unnamed. `not-requester` is the
+    // rule flag that denies the requesting side as sole consent.
+    const ruleId =
+      matched === null
+        ? undefined
+        : (matched.id ?? `row:${this.loadedPolicy?.file.policies.indexOf(matched) ?? -1}`);
+    const notRequester = matched?.conditions?.["not-requester"] === true;
     const approvalId = randomUUID();
     const nonce = `n-${randomBytes(24).toString("base64url")}`;
     const timeout = this.config.policy?.confirmTimeoutSeconds ?? 900;
@@ -1055,6 +1063,14 @@ export class GatewayRuntime {
         expiresAt,
         createdAt,
         action,
+        // Persist-first (law D3): the held command rides to the kernel, which
+        // stores it before any notice goes out and hands it back on consume.
+        command: cmd,
+        // Consent authority inputs: who requested (verified human subject or
+        // this workload), and the rule that made consent necessary.
+        requestedBy: decision.ctx.claims.subject,
+        ...(ruleId !== undefined ? { ruleId } : {}),
+        ...(notRequester ? { notRequester: true } : {}),
         ...(data.workId !== undefined ? { workId: data.workId } : {}),
       },
       ...(cmd.traceparent !== undefined ? { traceparent: cmd.traceparent } : {}),
@@ -1132,8 +1148,8 @@ export class GatewayRuntime {
    */
   private async consumeAndExecute(pending: PendingRow, decidedBy: string): Promise<void> {
     const approvalId = pending.approvalId;
-    const cmd = JSON.parse(pending.envelope) as EnvelopeCommand;
-    const data = cmd.data as unknown as WorkAssignCommandV1Data;
+    let cmd = JSON.parse(pending.envelope) as EnvelopeCommand;
+    let data = cmd.data as unknown as WorkAssignCommandV1Data;
     const member = this.fleet.member(pending.childId);
     const deny = async (reason: string): Promise<void> => {
       this.paths.execution.markPending(approvalId, "failed");
@@ -1181,6 +1197,18 @@ export class GatewayRuntime {
       const ack = await this.client?.sendCommand(consume);
       if (ack !== undefined && ack.status === "rejected") {
         rejectedProblem = String(ack.problem?.type ?? "consume-rejected").replace(ERROR_BASE, "");
+      }
+      // Persist-first read-back: when the kernel holds the command, what it
+      // hands back IS what consent covered — it replaces the local
+      // recollection (a divergence is logged, never silently mixed).
+      const held = ack?.data?.["envelope"];
+      if (held !== undefined && held !== null) {
+        const adopted = held as EnvelopeCommand;
+        if (JSON.stringify(adopted) !== JSON.stringify(cmd)) {
+          this.logger.warn("kernel held envelope diverges from local pending", { approvalId });
+          cmd = adopted;
+          data = cmd.data as unknown as WorkAssignCommandV1Data;
+        }
       }
     } catch (error) {
       // Transport-dead on the synchronous consume: leave the row awaiting;

@@ -114,7 +114,18 @@ public sealed record AdminProjectDetail(
     IReadOnlyList<AdminWorkRow> Works);
 
 /// <summary>One work row inside a detail/list payload.</summary>
-public sealed record AdminWorkRow(Guid WorkId, string Objective, string State, long Version, DateTime CreatedAt, DateTime UpdatedAt);
+public sealed record AdminWorkRow(
+    Guid WorkId,
+    string Objective,
+    string State,
+    long Version,
+    DateTime CreatedAt,
+    DateTime UpdatedAt,
+    string? TeamSlug = null,
+    string? OwnerActor = null,
+    string? Origin = null,
+    Guid? MergedInto = null,
+    string? CloseReason = null);
 
 /// <summary>GET /api/admin/work/{id} detail: aggregate + assignments/attempts + approvals + manifests.</summary>
 public sealed record AdminWorkDetail(
@@ -285,7 +296,9 @@ public sealed class AdminReadStores(
             .Where(w => w.ProjectId == projectId)
             .OrderByDescending(w => w.CreatedAt)
             .Take(50)
-            .Select(w => new AdminWorkRow(w.WorkId, w.Objective, w.State, w.Version, w.CreatedAt, w.UpdatedAt))
+            .Select(w => new AdminWorkRow(w.WorkId, w.Objective, w.State, w.Version, w.CreatedAt, w.UpdatedAt,
+                w.Team != null ? w.Team.Slug : (w.Project == null ? null : w.Project.Team!.Slug),
+                w.OwnerActor, w.Origin, w.MergedInto, w.CloseReason))
             .ToListAsync(ct);
         return new AdminProjectDetail(project.ProjectId, project.Name, project.TeamSlug,
             JsonDocument.Parse(project.Config).RootElement.Clone(), project.CreatedAt, works);
@@ -297,7 +310,21 @@ public sealed class AdminReadStores(
         await using var db = await contextFactory.CreateDbContextAsync(ct);
         var work = await db.Works.AsNoTracking()
             .Where(w => w.WorkId == workId)
-            .Select(w => new { w.WorkId, w.Objective, w.State, w.Version, w.CreatedAt, w.UpdatedAt, ProjectId = w.ProjectId == null ? null : w.ProjectId.Value.ToString() })
+            .Select(w => new
+            {
+                w.WorkId,
+                w.Objective,
+                w.State,
+                w.Version,
+                w.CreatedAt,
+                w.UpdatedAt,
+                ProjectId = w.ProjectId == null ? null : w.ProjectId.Value.ToString(),
+                TeamSlug = w.Team != null ? w.Team.Slug : (w.Project == null ? null : w.Project.Team!.Slug),
+                w.OwnerActor,
+                w.Origin,
+                w.MergedInto,
+                w.CloseReason,
+            })
             .FirstOrDefaultAsync(ct);
         if (work is null)
         {
@@ -345,7 +372,8 @@ public sealed class AdminReadStores(
             .Select(m => new AdminManifestRow(m.ManifestId, m.Revision, m.RevisionOf, m.ResultState, m.State, m.ArtifactId, m.OutputArtifactIds, m.RecordedAt))
             .ToListAsync(ct);
         return new AdminWorkDetail(
-            new AdminWorkRow(work.WorkId, work.Objective, work.State, work.Version, work.CreatedAt, work.UpdatedAt),
+            new AdminWorkRow(work.WorkId, work.Objective, work.State, work.Version, work.CreatedAt, work.UpdatedAt,
+                work.TeamSlug, work.OwnerActor, work.Origin, work.MergedInto, work.CloseReason),
             work.ProjectId,
             assignments,
             approvals,

@@ -166,6 +166,81 @@ public sealed class RoutingFunnelTests(DispatchDbFixture fixture) : IAsyncLifeti
     }
 
     [Fact]
+    public async Task NoCandidateTriagesTheWorkOnce_AndStillRequeues()
+    {
+        using var factory = new KernelTestFactory(fixture, noDispatcher: true);
+        using var kernel = factory.CreateAuthedClient();
+        var (team, _) = await FreshTeamAsync();
+        var (workId, _) = await CreateWorkAsync(kernel, team, "research.ghost");
+
+        var audit = await RoutingHarness.DrainUntilAsync(
+            factory,
+            async () =>
+            {
+                await fixture.Db.ExpireOutboxBackoff(workId);
+                var row = await fixture.Db.RoutingDecision($"routing:work-assign:{workId:N}");
+                return row is { AttemptCount: >= 4 } && await fixture.Db.TimelineEventCount(workId, "work.triaged") >= 1
+                    ? row
+                    : null;
+            },
+            "four pending routing passes with a triage note");
+        Assert.Equal("triage", audit!.Triage);
+
+        // Loud, not silent: the work sits blocked FOR A HUMAN...
+        var work = await KernelOps.GetJsonAsync(kernel, $"/api/works/{workId}", HttpStatusCode.OK);
+        Assert.Equal("blocked", work.GetProperty("state").GetString());
+
+        // ...exactly once: six passes later the disclosure was written one time,
+        // and the no-route law stands untouched (still a live pending requeue).
+        await fixture.Db.ExpireOutboxBackoff(workId);
+        await RoutingHarness.DrainUntilAsync(
+            factory,
+            async () =>
+            {
+                await fixture.Db.ExpireOutboxBackoff(workId);
+                var row = await fixture.Db.RoutingDecision($"routing:work-assign:{workId:N}");
+                return row is { AttemptCount: >= 6 } ? row : null;
+            },
+            "six pending routing passes");
+        Assert.Equal(1, await fixture.Db.TimelineEventCount(workId, "work.triaged"));
+        Assert.Equal(1, await fixture.Db.OutboxCountBy(workId, "pending"));
+        Assert.Equal(0, await fixture.Db.DeadLetterCount(workId, "no-candidate"));
+    }
+
+    [Fact]
+    public async Task TriageBlockLiftsWhenACandidateAppears()
+    {
+        using var factory = new KernelTestFactory(fixture, noDispatcher: true);
+        using var kernel = factory.CreateAuthedClient();
+        var (team, _) = await FreshTeamAsync();
+        var (workId, _) = await CreateWorkAsync(kernel, team, "research.analyze");
+
+        await RoutingHarness.DrainUntilAsync(
+            factory,
+            async () =>
+            {
+                await fixture.Db.ExpireOutboxBackoff(workId);
+                return await fixture.Db.TimelineEventCount(workId, "work.triaged") >= 1
+                    ? await fixture.Db.RoutingDecision($"routing:work-assign:{workId:N}")
+                    : null;
+            },
+            "triage of an unadvertised ask");
+        var blocked = await KernelOps.GetJsonAsync(kernel, $"/api/works/{workId}", HttpStatusCode.OK);
+        Assert.Equal("blocked", blocked.GetProperty("state").GetString());
+
+        // The fleet wakes up: once someone advertises, the funnel routes and
+        // the triage block lifts (the disclosure stays on the timeline).
+        var beta = $"rt.wake{Leaf()}";
+        await AdvertiseAsync(kernel, beta, team, Manifest(Analyse("research.analyze")));
+        var audit = await DrainAuditAsync(factory, $"routing:work-assign:{workId:N}");
+        Assert.Equal("routed", audit.Status);
+
+        var work = await KernelOps.GetJsonAsync(kernel, $"/api/works/{workId}", HttpStatusCode.OK);
+        Assert.NotEqual("blocked", work.GetProperty("state").GetString());
+        Assert.Equal(1, await fixture.Db.TimelineEventCount(workId, "work.triaged"));
+    }
+
+    [Fact]
     public async Task AdvertisedButOfflinePendsWithNoCapacity()
     {
         using var factory = new KernelTestFactory(fixture, noDispatcher: true);

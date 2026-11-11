@@ -804,8 +804,8 @@ public sealed class TestDbProbe : IAsyncDisposable
         await using var connection = await _dataSource.OpenConnectionAsync();
         await using var cmd = new NpgsqlCommand(
             "SELECT allowed_candidates::text, coalesce(chosen_endpoint_id, ''), status, basis, "
-            + "coalesce(provider_ref, ''), attempt_count FROM facilitator.routing_decisions "
-            + "WHERE intent_command_id = $1", connection);
+            + "coalesce(provider_ref, ''), attempt_count, coalesce(routing_triage, '') "
+            + "FROM facilitator.routing_decisions WHERE intent_command_id = $1", connection);
         cmd.Parameters.AddWithValue(intentCommandId);
         await using var reader = await cmd.ExecuteReaderAsync();
         if (!await reader.ReadAsync())
@@ -815,14 +815,14 @@ public sealed class TestDbProbe : IAsyncDisposable
 
         return new RoutingDecisionRow(
             reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3),
-            reader.GetString(4), reader.GetInt32(5));
+            reader.GetString(4), reader.GetInt32(5), reader.GetString(6));
     }
 
 
     /// <summary>One routing-decision audit row (typed window, no raw SQL in tests).</summary>
     public sealed record RoutingDecisionRow(
         string AllowedCandidates, string ChosenEndpointId, string Status, string Basis,
-        string ProviderRef, int AttemptCount);
+        string ProviderRef, int AttemptCount, string Triage = "");
 
     /// <summary>Hand-mint an assignment row for a team in a given status (link views seed affected assignments).</summary>
     public Task SeedAssignmentForTeam(Guid workId, string teamSlug, string status) =>

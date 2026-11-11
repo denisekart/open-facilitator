@@ -18,6 +18,16 @@ public static class ProblemErrors
         Detail = detail,
     };
 
+    /// <summary>422 a partial completion without a successor work.</summary>
+    public static ProblemDetails SuccessorRequired() =>
+        Create("successor-required", "Successor work required", StatusCodes.Status422UnprocessableEntity,
+            "a partially-complete closure must name the follow-up work carrying the remainder");
+
+    /// <summary>422 a completion backed by nothing: no artifact, manifest, work-link or close reason.</summary>
+    public static ProblemDetails UnevidencedCompletion() =>
+        Create("completion-unevidenced", "Completion without evidence", StatusCodes.Status422UnprocessableEntity,
+            "a completion must point at an artifact, a manifest, a work link, or state a close reason");
+
     /// <summary>422 illegal state transition (message names the edge).</summary>
     public static ProblemDetails InvalidTransition(string edge) =>
         Create("invalid-state-transition", "Invalid state transition", StatusCodes.Status422UnprocessableEntity,

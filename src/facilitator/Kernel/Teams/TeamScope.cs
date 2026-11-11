@@ -58,13 +58,13 @@ public sealed class TeamScope(
         return !await roster.IsConfiguredAsync(teamSlug, ct) || await roster.IsMemberAsync(teamSlug, principal.Actor, ct);
     }
 
-    /// <summary>Team slug of a work: its project's team (null for an unprojected work).</summary>
+    /// <summary>Team slug of a work: its own <c>team_id</c> when set, else its project's team.</summary>
     public async Task<string?[]> TeamOfWorkAsync(Guid workId, CancellationToken ct)
     {
         await using var db = await contextFactory.CreateDbContextAsync(ct);
         return await db.Works.AsNoTracking()
             .Where(w => w.WorkId == workId)
-            .Select(w => new[] { w.Project == null ? null : w.Project.Team!.Slug })
+            .Select(w => new[] { w.Team != null ? w.Team.Slug : (w.Project == null ? null : w.Project.Team!.Slug) })
             .FirstOrDefaultAsync(ct) ?? [];
     }
 }

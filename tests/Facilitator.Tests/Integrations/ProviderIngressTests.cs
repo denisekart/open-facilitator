@@ -101,6 +101,81 @@ public sealed class ProviderIngressTests(DispatchDbFixture fixture) : IAsyncLife
     }
 
     [Fact]
+    public async Task RenumberedRedeliveryNotesTheWork_NeverDoublesTheAsk()
+    {
+        // N11: a re-delivery of ONE native message with a fresh delivery id is
+        // still one message: no second Work, and the existing work carries a
+        // visible "duplicate seen" note.
+        var (factory, link, tenant, _) = await EnabledPlane();
+        await fixture.Db.SeedProviderIdentity("mattermost", tenant, "acct-1", "subject-1");
+        var channel = $"chan-{Guid.NewGuid():N}";
+        var root = $"root-{Guid.NewGuid():N}";
+        var text = "the same sentence sent twice";
+        // ONE native message: the native message id stands, the delivery id
+        // is re-minted per attempt (that is exactly what the delivery-id
+        // spine alone cannot see).
+        var native = $"msg-{Guid.NewGuid():N}";
+
+        var first = await link.PostAsync("/api/link/v1/events", Content(Redelivered(
+            "valid/event.provider.mention.json", $"post-{Guid.NewGuid():N}", native, channel, root, "acct-1", text)));
+        Assert.Equal(HttpStatusCode.Accepted, first.StatusCode);
+        var workId = await BoundWork(channel, root);
+
+        var second = await link.PostAsync("/api/link/v1/events", Content(Redelivered(
+            "valid/event.provider.mention.json", $"post-{Guid.NewGuid():N}", native, channel, root, "acct-1", text)));
+        Assert.Equal(HttpStatusCode.OK, second.StatusCode);
+        var dup = await second.Content.ReadJsonAsync();
+        Assert.Equal("duplicate", dup.GetProperty("status").GetString());
+
+        Assert.Equal(1, await fixture.Db.TimelineEventCount(workId, "created"));
+        Assert.Equal(1, await fixture.Db.TimelineEventCount(workId, "provider.duplicate"));
+    }
+
+    [Fact]
+    public async Task InputOnCompletedWork_ForksSuccessor_AndNamesIt()
+    {
+        // A7: a reply in a CLOSED conversation never reopens the work. It
+        // creates a successor, links it, moves the binding, and says so.
+        var (factory, link, tenant, _) = await EnabledPlane();
+        await fixture.Db.SeedProviderIdentity("mattermost", tenant, "acct-1", "subject-1");
+        var channel = $"chan-{Guid.NewGuid():N}";
+        var root = $"root-{Guid.NewGuid():N}";
+
+        var first = await link.PostAsync("/api/link/v1/events", Content(ProviderEvent(
+            "valid/event.provider.mention.json", $"post-{Guid.NewGuid():N}", channel, root, "acct-1",
+            text: "close this out please")));
+        Assert.Equal(HttpStatusCode.Accepted, first.StatusCode);
+        var workId = await BoundWork(channel, root);
+
+        // Close it out over the API (open→...→completed).
+        await KernelOps.WalkToCompletedAsync(factory.CreateAuthedClient(), workId, 1);
+
+        var later = await link.PostAsync("/api/link/v1/events", Content(ProviderEvent(
+            "valid/event.provider.mention.json", $"post-{Guid.NewGuid():N}", channel, root, "acct-1",
+            text: "one more thing")));
+        Assert.Equal(HttpStatusCode.Accepted, later.StatusCode);
+
+        // The old work stands completed; the conversation now points at a live
+        // successor, which carries the new input.
+        var original = await KernelOps.GetJsonAsync(factory.CreateAuthedClient(), $"/api/works/{workId}", HttpStatusCode.OK);
+        Assert.Equal("completed", original.GetProperty("state").GetString());
+
+        var successorId = await BoundWork(channel, root);
+        Assert.NotEqual(workId, successorId);
+        var successor = await KernelOps.GetJsonAsync(factory.CreateAuthedClient(), $"/api/works/{successorId}", HttpStatusCode.OK);
+        Assert.Equal("open", successor.GetProperty("state").GetString());
+        Assert.Equal(1, await fixture.Db.TimelineEventCount(successorId, "provider.input"));
+
+        // The link is first-class on the predecessor, and the thread was told.
+        var links = await KernelOps.GetJsonAsync(factory.CreateAuthedClient(), $"/api/works/{workId}/links", HttpStatusCode.OK);
+        var linkRow = Assert.Single(links.EnumerateArray());
+        Assert.Equal("successor", linkRow.GetProperty("kind").GetString());
+        Assert.Equal(successorId, linkRow.GetProperty("refWorkId").GetGuid());
+        var named = await fixture.Db.OutboxEnvelopes(successorId);
+        Assert.Contains(named, e => e.Contains($"work {successorId.ToString("N")[..8]}"));
+    }
+
+    [Fact]
     public async Task UnlinkedMentionRepliesWithoutWork()
     {
         var (_, link, _, _) = await EnabledPlane();
@@ -326,6 +401,18 @@ public sealed class ProviderIngressTests(DispatchDbFixture fixture) : IAsyncLife
     }
 
     private static StringContent Content(string envelope) => new(envelope, Encoding.UTF8, "application/json");
+
+    /// <summary>A provider event for ONE native message at a chosen delivery id
+    /// (the builder's default keys the native id to the delivery, which hides
+    /// re-delivery renumbering).</summary>
+    private static string Redelivered(
+        string fixtureName, string deliveryId, string nativeMessageId, string channel, string root, string actor, string text)
+    {
+        var envelope = ProviderEvent(fixtureName, deliveryId, channel, root, actor, text: text);
+        var doc = JsonNode.Parse(envelope)!.AsObject();
+        doc["data"]!["reference"]!["messageId"] = nativeMessageId;
+        return doc.ToJsonString();
+    }
 
     private static string ProviderEvent(
         string fixtureName, string deliveryId, string channel, string root, string actor, string? text = null, string? emoji = null)

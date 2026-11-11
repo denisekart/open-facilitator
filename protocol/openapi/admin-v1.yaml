@@ -614,6 +614,11 @@ components:
         version: { type: integer, format: int64 }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+        teamSlug: { type: [string, "null"] }
+        ownerActor: { type: [string, "null"] }
+        origin: { type: [string, "null"] }
+        mergedInto: { type: [string, "null"], format: uuid }
+        closeReason: { type: [string, "null"] }
     AdminWorkDetail:
       type: object
       additionalProperties: false

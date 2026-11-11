@@ -417,6 +417,8 @@ public sealed class CommandApplier(
             Objective = objective,
             State = "open",
             Version = 1,
+            TeamId = teamId,
+            ActiveWhere = ProviderEventStore.ActiveWhereOf(reference),
             CreatedAt = now,
             UpdatedAt = now,
         });

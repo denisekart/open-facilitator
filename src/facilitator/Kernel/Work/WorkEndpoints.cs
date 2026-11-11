@@ -50,10 +50,62 @@ public static class WorkEndpoints
                 return Results.Problem(ProblemErrors.WorkNotFound(id));
             }
 
+            // A merged work still resolves: its history stands, and the read
+            // redirects to the survivor (303, never a rewritten id).
+            if (work.MergedInto is { } into)
+            {
+                return new RedirectSeeOther($"/api/works/{into}");
+            }
+
             var team = (await scope.TeamOfWorkAsync(id, ct)).FirstOrDefault();
             return await scope.MayReadAsync(http.GetFacilitatorPrincipal(), team, ct)
                 ? Results.Ok(WorkDtoMapper.ToDto(work))
                 : Results.Problem(ProblemErrors.WorkNotFound(id));
+        });
+
+        group.MapPost("/works/{id:guid}/merge", async (Guid id, HttpRequest request, IngressProcessor processor, HttpContext http, CancellationToken ct) =>
+        {
+            var body = await RequestBodies.ReadAsync(request, ct);
+            if (body.TooLarge)
+            {
+                return Results.Problem(ProblemErrors.PayloadTooLarge(body.Bytes));
+            }
+
+            return await RequestBodyJson.ParseAsync(body, document => processor.MergeAsync(id, document.RootElement.Clone(), ActorOf(http), ct));
+        });
+
+        group.MapPost("/works/{id:guid}/cost", async (Guid id, HttpRequest request, ICoordinationStore store, TeamScope scope, HttpContext http, CancellationToken ct) =>
+        {
+            var team = (await scope.TeamOfWorkAsync(id, ct)).FirstOrDefault();
+            if (!await scope.MayReadAsync(http.GetFacilitatorPrincipal(), team, ct))
+            {
+                return Results.Problem(ProblemErrors.WorkNotFound(id));
+            }
+
+            var body = await RequestBodies.ReadAsync(request, ct);
+            if (body.TooLarge)
+            {
+                return Results.Problem(ProblemErrors.PayloadTooLarge(body.Bytes));
+            }
+
+            // The executor-reported cost: {tokens,units,currency,source,at}
+            // stored verbatim - the kernel never interprets money.
+            return await RequestBodyJson.ParseAsync(body, async document =>
+            {
+                await store.SetCostAsync(id, document.RootElement.GetRawText(), ct);
+                return Results.NoContent();
+            });
+        });
+
+        group.MapGet("/works/{id:guid}/links", async (Guid id, ICoordinationStore store, TeamScope scope, HttpContext http, CancellationToken ct) =>
+        {
+            var team = (await scope.TeamOfWorkAsync(id, ct)).FirstOrDefault();
+            if (!await scope.MayReadAsync(http.GetFacilitatorPrincipal(), team, ct))
+            {
+                return Results.Problem(ProblemErrors.WorkNotFound(id));
+            }
+
+            return Results.Ok((await store.LinksAsync(id, ct)).ToArray());
         });
 
         group.MapPost("/works/{id:guid}/steer", async (Guid id, HttpRequest request, IngressProcessor processor, HttpContext http, CancellationToken ct) =>
@@ -114,6 +166,17 @@ public static class WorkEndpoints
 
 
         return app;
+    }
+
+    /// <summary>303 See Other: the answer lives at the survivor's URL.</summary>
+    private sealed class RedirectSeeOther(string location) : IResult
+    {
+        public Task ExecuteAsync(HttpContext http)
+        {
+            http.Response.StatusCode = StatusCodes.Status303SeeOther;
+            http.Response.Headers.Location = location;
+            return Task.CompletedTask;
+        }
     }
 
     private static string ActorOf(HttpContext http) =>

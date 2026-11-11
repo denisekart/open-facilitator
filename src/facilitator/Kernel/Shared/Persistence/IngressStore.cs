@@ -117,13 +117,14 @@ public sealed class IngressStore(IDbContextFactory<FacilitatorDbContext> context
         var query = db.Works.AsNoTracking();
         if (teamSlugs is not null)
         {
-            query = query.Where(w => w.Project != null && teamSlugs.Contains(w.Project!.Team!.Slug));
+            query = query.Where(w => (w.Team != null && teamSlugs.Contains(w.Team.Slug))
+                || (w.Team == null && w.Project != null && teamSlugs.Contains(w.Project.Team!.Slug)));
         }
 
         return await query
             .OrderByDescending(w => w.CreatedAt)
             .Take(50)
-            .Select(w => new WorkView(w.WorkId, w.ProjectId, w.Objective, w.State, w.Version, w.CreatedAt, w.UpdatedAt))
+            .Select(WorkProjection.View)
             .ToListAsync(ct);
     }
 

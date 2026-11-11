@@ -40,9 +40,11 @@ internal static class KernelOps
     }
 
     /// <summary>POST /transitions with an explicit fence.</summary>
-    internal static async Task<JsonElement> TransitionAsync(HttpClient client, Guid workId, string to, long expectedVersion, HttpStatusCode expected = HttpStatusCode.OK)
+    internal static async Task<JsonElement> TransitionAsync(HttpClient client, Guid workId, string to, long expectedVersion, HttpStatusCode expected = HttpStatusCode.OK, string? reason = null)
     {
-        var payload = JsonSerializer.Serialize(new { to, expectedVersion });
+        var payload = reason is null
+            ? JsonSerializer.Serialize(new { to, expectedVersion })
+            : JsonSerializer.Serialize(new { to, expectedVersion, reason });
         return await PostJsonAsync(client, $"/api/works/{workId}/transitions", payload, expected);
     }
 
@@ -52,7 +54,8 @@ internal static class KernelOps
         foreach (var to in new[] { "planning", "active", "review", "completed" })
         {
             currentVersion++;
-            var result = await TransitionAsync(client, workId, to, currentVersion - 1);
+            // A bare completion is refused (closure evidence law): the walk states its basis.
+            var result = await TransitionAsync(client, workId, to, currentVersion - 1, reason: to == "completed" ? "walked to completion" : null);
             Assert.Equal(to, result.GetProperty("state").GetString());
             Assert.Equal(currentVersion, result.GetProperty("version").GetInt64());
         }

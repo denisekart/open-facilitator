@@ -105,11 +105,55 @@ public sealed class WorkEntity
     /// <summary>Inbox row that created this Work (lineage).</summary>
     public Guid? SourceEventId { get; set; }
 
+    /// <summary>Owning team (set directly for new rows; backfilled from the project for old ones).</summary>
+    public Guid? TeamId { get; set; }
+
+    /// <summary>Canonical accountable actor: <c>oidc:iss|sub</c> or <c>contributor:handle</c>; null = team attention.</summary>
+    public string? OwnerActor { get; set; }
+
+    /// <summary>The first wire type that delivered this work (origin disclosure, never inferred).</summary>
+    public string? Origin { get; set; }
+
+    /// <summary>jsonb <c>{provider,channel,root,kind}</c>: where the work currently lives.</summary>
+    public string? ActiveWhere { get; set; }
+
+    /// <summary>jsonb <c>{tokens,units,currency,source,at}</c>: cost as reported by the executor.</summary>
+    public string? Cost { get; set; }
+
+    /// <summary>Set by a merge: this work's history stays, reads redirect to the survivor.</summary>
+    public Guid? MergedInto { get; set; }
+
+    /// <summary>Why a work closed without artifacts/manifest/external links (closure evidence).</summary>
+    public string? CloseReason { get; set; }
+
     public DateTime CreatedAt { get; set; }
 
     public DateTime UpdatedAt { get; set; }
 
     public ProjectEntity? Project { get; set; }
+
+    public TeamEntity? Team { get; set; }
+}
+
+/// <summary>facilitator.work_links — typed relations between works (successors,
+/// merges, hierarchy, shared context). A link is the durable statement that two
+/// works relate; the history of each side stays intact.</summary>
+public sealed class WorkLinkEntity
+{
+    public Guid LinkId { get; set; }
+
+    public Guid WorkId { get; set; }
+
+    public Guid RefWorkId { get; set; }
+
+    /// <summary>successor | parent | child | merged-duplicate | context (CHECK-constrained).</summary>
+    public required string Kind { get; set; }
+
+    public string? Note { get; set; }
+
+    public DateTime CreatedAt { get; set; }
+
+    public WorkEntity? Work { get; set; }
 }
 
 /// <summary>facilitator.assignments — Assignment aggregate.</summary>
@@ -369,6 +413,9 @@ public sealed class RoutingDecisionEntity
     public DateTime LastRoutingAttemptAt { get; set; }
 
     public int AttemptCount { get; set; }
+
+    /// <summary>Why the ask waits for a human (e.g. "triage"): the work sits blocked until one picks it up.</summary>
+    public string? RoutingTriage { get; set; }
 
     public DateTime CreatedAt { get; set; }
 

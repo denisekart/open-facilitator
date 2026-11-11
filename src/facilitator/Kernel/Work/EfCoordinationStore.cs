@@ -27,7 +27,7 @@ public sealed class EfCoordinationStore(
     private const string KernelLogChannel = "kernel.log";
 
     /// <inheritdoc />
-    public async Task<WorkView> CreateWorkAsync(string objective, Guid? projectId, string actor, CancellationToken ct, IReadOnlyList<RoutingIntentSeed>? assignments = null)
+    public async Task<WorkView> CreateWorkAsync(string objective, Guid? projectId, string actor, CancellationToken ct, IReadOnlyList<RoutingIntentSeed>? assignments = null, WorkOrigin? origin = null)
     {
         var workId = Guid.NewGuid();
         var now = timeProvider.GetUtcNow().UtcDateTime;
@@ -43,6 +43,10 @@ public sealed class EfCoordinationStore(
             Objective = objective,
             State = WorkState.Open.Wire(),
             Version = 1,
+            TeamId = origin?.TeamId ?? ProjectTeamId(db, projectId),
+            OwnerActor = origin?.OwnerActor,
+            Origin = origin?.WireType,
+            ActiveWhere = origin?.ActiveWhere,
             CreatedAt = now,
             UpdatedAt = now,
         });
@@ -151,7 +155,7 @@ public sealed class EfCoordinationStore(
     }
 
     /// <inheritdoc />
-    public async Task<TransitionResult> ApplyTransitionAsync(Guid workId, WorkState to, long expectedVersion, string actor, string? reason, CancellationToken ct)
+    public async Task<TransitionResult> ApplyTransitionAsync(Guid workId, WorkState to, long expectedVersion, string actor, string? reason, CancellationToken ct, TransitionOptions? options = null)
     {
         await using var db = await contextFactory.CreateDbContextAsync(ct);
         await using var tx = await db.Database.BeginTransactionAsync(ct);
@@ -169,6 +173,23 @@ public sealed class EfCoordinationStore(
         {
             await tx.RollbackAsync(ct);
             return new TransitionResult.Illegal($"{current.State}→{to.Wire()}");
+        }
+
+        var basis = options?.Basis ?? "complete";
+        if (to == WorkState.Completed && basis == "partially-complete" && options?.SuccessorWorkId is null)
+        {
+            // Partial success without a successor has no evidence trail: the
+            // remainder of the ask would silently vanish.
+            await tx.RollbackAsync(ct);
+            return new TransitionResult.SuccessorRequired();
+        }
+
+        if (to == WorkState.Completed && !await HasClosureEvidenceAsync(db, workId, options, reason, ct))
+        {
+            // A completion with nothing to point at is a claim, not a record:
+            // refuse until the completer names a basis (close_reason).
+            await tx.RollbackAsync(ct);
+            return new TransitionResult.Unevidenced();
         }
 
         var bumped = await BumpVersionAsync(db, workId, to.Wire(), expectedVersion, ct);
@@ -195,9 +216,30 @@ public sealed class EfCoordinationStore(
                 ["from"] = current.State,
                 ["to"] = to.Wire(),
                 ["reason"] = reason,
+                ["basis"] = options is null || basis == "complete" ? null : basis,
             }),
             CreatedAt = now,
         });
+
+        if (options?.SuccessorWorkId is { } successorId)
+        {
+            // The successor link is a first-class row, and the follow-up work
+            // must exist: a dangling successor id would be the evidence the
+            // closure is missing.
+            await AddWorkLinkAsync(db, workId, successorId, "successor", options.Note, now, ct);
+        }
+
+        if (to == WorkState.Completed)
+        {
+            // The closure basis lands in its own column, never only in event
+            // detail: an artifact, a manifest, a work-link, or this reason is
+            // what makes a completion a record instead of a claim.
+            var closeReason = options?.CloseReason is { Length: > 0 } cr
+                ? cr
+                : reason is { Length: > 0 } ? reason : "completed";
+            await db.Works.Where(w => w.WorkId == workId)
+                .ExecuteUpdateAsync(s => s.SetProperty(w => w.CloseReason, closeReason), ct);
+        }
 
         AppendWorkProgress(db, workId, $"work {current.State}→{to.Wire()}", causationId: null, createdAt: now);
         await AppendProviderCompletionReplyAsync(db, workId, to, current.State, transitionEventId, now, ct);
@@ -206,6 +248,83 @@ public sealed class EfCoordinationStore(
         await tx.CommitAsync(ct);
 
         return new TransitionResult.Ok((await LoadAsync(db, workId, ct))!);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<WorkLinkRow>> LinksAsync(Guid workId, CancellationToken ct)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(ct);
+        return await db.WorkLinks.AsNoTracking()
+            .Where(l => l.WorkId == workId)
+            .OrderBy(l => l.CreatedAt)
+            .Select(l => new WorkLinkRow(l.LinkId, l.WorkId, l.RefWorkId, l.Kind, l.Note, l.CreatedAt))
+            .ToListAsync(ct);
+    }
+
+    /// <inheritdoc />
+    public async Task<MergeResult> MergeAsync(Guid workId, Guid intoWorkId, string? reason, string actor, CancellationToken ct)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(ct);
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        await WorkLockAsync(db, workId, ct);
+
+        var loser = await LoadAsync(db, workId, ct);
+        var survivor = await LoadAsync(db, intoWorkId, ct);
+        if (loser is null || survivor is null)
+        {
+            await tx.RollbackAsync(ct);
+            return new MergeResult.NotFound();
+        }
+
+        if (workId == intoWorkId || loser.MergedInto == intoWorkId)
+        {
+            await tx.RollbackAsync(ct);
+            return new MergeResult.Loop();
+        }
+
+        var now = timeProvider.GetUtcNow().UtcDateTime;
+        await db.WorkLinks.AddAsync(new WorkLinkEntity
+        {
+            LinkId = Guid.NewGuid(),
+            WorkId = workId,
+            RefWorkId = intoWorkId,
+            Kind = "merged-duplicate",
+            Note = reason,
+            CreatedAt = now,
+        }, ct);
+        await db.Works.Where(w => w.WorkId == workId)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(w => w.MergedInto, intoWorkId)
+                .SetProperty(w => w.UpdatedAt, now), ct);
+        db.WorkEvents.Add(new WorkEventEntity
+        {
+            EventId = Guid.NewGuid(),
+            WorkId = workId,
+            WorkVersion = loser.Version,
+            Kind = "work.linked",
+            Actor = actor,
+            Detail = JsonSerializer.Serialize(new Dictionary<string, string?>
+            {
+                ["refWorkId"] = intoWorkId.ToString(),
+                ["kind"] = "merged-duplicate",
+                ["note"] = reason,
+            }),
+            CreatedAt = now,
+        });
+        await db.SaveChangesAsync(ct);
+        await NotifyAsync(db, workId, ct);
+        await tx.CommitAsync(ct);
+        return new MergeResult.Merged((await LoadAsync(db, intoWorkId, ct))!);
+    }
+
+    /// <inheritdoc />
+    public async Task SetCostAsync(Guid workId, string costJson, CancellationToken ct)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(ct);
+        await db.Works.Where(w => w.WorkId == workId)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(w => w.Cost, costJson)
+                .SetProperty(w => w.UpdatedAt, timeProvider.GetUtcNow().UtcDateTime), ct);
     }
 
     /// <inheritdoc />
@@ -451,10 +570,64 @@ public sealed class EfCoordinationStore(
              """, ct);
     }
 
+    /// <summary>Closure evidence: an artifact, a recorded manifest, an
+    /// external work-link, or an explicit close basis. Anything else and a
+    /// completion is an unevidenced claim.</summary>
+    private static async Task<bool> HasClosureEvidenceAsync(
+        FacilitatorDbContext db, Guid workId, TransitionOptions? options, string? reason, CancellationToken ct) =>
+        options?.CloseReason is { Length: > 0 } || reason is { Length: > 0 }
+        || options?.SuccessorWorkId is not null
+        || await db.Artifacts.AsNoTracking().AnyAsync(a => a.WorkId == workId, ct)
+        || await db.ResultManifests.AsNoTracking().AnyAsync(m => m.WorkId == workId, ct)
+        || await db.WorkLinks.AsNoTracking().AnyAsync(l => l.WorkId == workId, ct);
+
+    private static async Task AddWorkLinkAsync(
+        FacilitatorDbContext db, Guid workId, Guid refWorkId, string kind, string? note, DateTime now, CancellationToken ct)
+    {
+        if (!await db.Works.AsNoTracking().AnyAsync(w => w.WorkId == refWorkId, ct))
+        {
+            throw new InvalidOperationException($"work link to unknown work {refWorkId}");
+        }
+
+        if (!await db.WorkLinks.AnyAsync(
+                l => l.WorkId == workId && l.RefWorkId == refWorkId && l.Kind == kind, ct))
+        {
+            db.WorkLinks.Add(new WorkLinkEntity
+            {
+                LinkId = Guid.NewGuid(),
+                WorkId = workId,
+                RefWorkId = refWorkId,
+                Kind = kind,
+                Note = note,
+                CreatedAt = now,
+            });
+            db.WorkEvents.Add(new WorkEventEntity
+            {
+                EventId = Guid.NewGuid(),
+                WorkId = workId,
+                WorkVersion = await db.Works.Where(w => w.WorkId == workId).Select(w => w.Version).FirstAsync(ct),
+                Kind = "work.linked",
+                Actor = "kernel",
+                Detail = JsonSerializer.Serialize(new Dictionary<string, string?>
+                {
+                    ["refWorkId"] = refWorkId.ToString(),
+                    ["kind"] = kind,
+                    ["note"] = note,
+                }),
+                CreatedAt = now,
+            });
+        }
+    }
+
+    private static Guid? ProjectTeamId(FacilitatorDbContext db, Guid? projectId) =>
+        projectId is { } id
+            ? db.Projects.AsNoTracking().Where(p => p.ProjectId == id).Select(p => p.TeamId).FirstOrDefault()
+            : null;
+
     private static async Task<WorkView?> LoadAsync(FacilitatorDbContext db, Guid workId, CancellationToken ct) =>
         await db.Works.AsNoTracking()
             .Where(w => w.WorkId == workId)
-            .Select(w => new WorkView(w.WorkId, w.ProjectId, w.Objective, w.State, w.Version, w.CreatedAt, w.UpdatedAt))
+            .Select(WorkProjection.View)
             .FirstOrDefaultAsync(ct);
 
     private OutboxEntity AppendWorkProgress(FacilitatorDbContext db, Guid workId, string note, string? causationId, DateTime createdAt)

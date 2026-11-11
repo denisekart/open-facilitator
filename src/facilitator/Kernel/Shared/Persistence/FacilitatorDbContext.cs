@@ -30,6 +30,8 @@ public class FacilitatorDbContext(DbContextOptions<FacilitatorDbContext> options
 
     public DbSet<WorkEventEntity> WorkEvents => Set<WorkEventEntity>();
 
+    public DbSet<WorkLinkEntity> WorkLinks => Set<WorkLinkEntity>();
+
     public DbSet<InboxEntity> Inbox => Set<InboxEntity>();
 
     public DbSet<OutboxEntity> Outbox => Set<OutboxEntity>();

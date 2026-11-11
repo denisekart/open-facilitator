@@ -37,7 +37,8 @@ public sealed class RoutingSink(
     IDbContextFactory<FacilitatorDbContext> contextFactory,
     EnvelopeValidator envelopeValidator,
     IEnumerable<IDecisionProvider> providers,
-    TimeProvider timeProvider) : ISink
+    TimeProvider timeProvider,
+    Facilitator.Kernel.Integrations.ProviderRegistry? providerRegistry = null) : ISink
 {
     /// <inheritdoc />
     public string Channel => "routing";
@@ -62,7 +63,7 @@ public sealed class RoutingSink(
 
         var work = await db.Works.AsNoTracking()
             .Where(w => w.WorkId == intent.WorkId)
-            .Select(w => new { w.WorkId, w.ProjectId, TeamId = w.Project != null ? (Guid?)w.Project.TeamId : null })
+            .Select(w => new { w.WorkId, w.ProjectId, TeamId = w.TeamId ?? (w.Project != null ? w.Project.TeamId : null) })
             .FirstOrDefaultAsync(ct)
             ?? throw new InvalidOperationException($"routing intent for unknown work {intent.WorkId}");
 
@@ -98,7 +99,20 @@ public sealed class RoutingSink(
         if (candidates.Count == 0)
         {
             var pendingBasis = advertisedSlot ? "no-capacity" : "no-candidate";
-            UpsertAudit(db, audit, intent, work.WorkId, allowedJson, chosen: null, "pending", pendingBasis, providerRef: null, now);
+            var pendingAudit = UpsertAudit(db, audit, intent, work.WorkId, allowedJson, chosen: null, "pending", pendingBasis, providerRef: null, now);
+
+            // Misrouted ask (no-candidate = nobody in the fleet ever
+            // advertised this capability): the work goes blocked for a human
+            // ONCE and the bound conversation is told a human will pick it
+            // up — loud, not a silent requeue. The no-route law stands
+            // untouched: the intent keeps requeuing (a fleet that later
+            // advertises the capability still routes normally, the wake law
+            // intact); triage is the disclosure, not a new terminal state.
+            if (!advertisedSlot)
+            {
+                await TriageOnceAsync(db, pendingAudit, intent, work.WorkId, now, ct);
+            }
+
             await db.SaveChangesAsync(ct);
             await tx.CommitAsync(ct);
             // No-route law: requeue with backoff, never dead-letter.
@@ -106,6 +120,11 @@ public sealed class RoutingSink(
         }
 
         var (chosen, basis, providerRef) = await ChooseAsync(db, intent, candidates, workTeamSlug, ct);
+
+        // The triage resume law: a work a prior pass parked for a human
+        // un-blocks the moment a candidate turns up (blocked→planning, the
+        // triage disclosure stays on the timeline).
+        await UntriageAsync(db, audit, work.WorkId, now, ct);
 
         // Crash-replay idempotency: the effect row's command id is the
         // ledger. An already-present effect row ⇒ the prior pass committed
@@ -405,7 +424,127 @@ public sealed class RoutingSink(
         }
     }
 
-    private static void UpsertAudit(
+    /// <summary>Move a no-candidate ask to blocked/triage ONCE (the triage
+    /// column is the ledger: a requeue never re-triages or re-notices): the
+    /// work goes blocked, the decision row carries the triage reason, and the
+    /// bound conversation gets a reply naming the human handoff.</summary>
+    private async Task TriageOnceAsync(
+        FacilitatorDbContext db, RoutingDecisionEntity audit, RoutingIntent intent, Guid workId, DateTime now, CancellationToken ct)
+    {
+        if (audit.RoutingTriage is { Length: > 0 })
+        {
+            return;
+        }
+
+        var current = await db.Works.FirstOrDefaultAsync(w => w.WorkId == workId, ct);
+        if (current is null
+            || !StateGuard.TryParseWork(current.State, out var from)
+            || !StateGuard.CanTransition(from, WorkState.Blocked))
+        {
+            // Terminal work: the ask is gone; leave the pending audit as-is.
+            return;
+        }
+
+        current.State = WorkState.Blocked.Wire();
+        current.Version += 1;
+        current.UpdatedAt = now;
+        audit.RoutingTriage = "triage";
+
+        db.WorkEvents.Add(new WorkEventEntity
+        {
+            EventId = Guid.NewGuid(),
+            WorkId = workId,
+            WorkVersion = current.Version,
+            Kind = "work.triaged",
+            Actor = "routing",
+            Detail = JsonSerializer.Serialize(new Dictionary<string, string?>
+            {
+                ["capability"] = intent.CapabilityId,
+                ["reason"] = "no endpoint in the fleet advertises this capability - a human picks it up",
+            }),
+            CreatedAt = now,
+        });
+
+        await AppendTriageNoticeAsync(db, workId, now, ct);
+    }
+
+    /// <summary>Lift a triage block on a successful route (see the resume law).</summary>
+    private static async Task UntriageAsync(
+        FacilitatorDbContext db, RoutingDecisionEntity? audit, Guid workId, DateTime now, CancellationToken ct)
+    {
+        if (audit?.RoutingTriage is not { Length: > 0 })
+        {
+            return;
+        }
+
+        var current = await db.Works.FirstOrDefaultAsync(w => w.WorkId == workId, ct);
+        if (current is not null && StateGuard.TryParseWork(current.State, out var from) && from == WorkState.Blocked)
+        {
+            current.State = WorkState.Planning.Wire();
+            current.Version += 1;
+            current.UpdatedAt = now;
+            db.WorkEvents.Add(new WorkEventEntity
+            {
+                EventId = Guid.NewGuid(),
+                WorkId = workId,
+                WorkVersion = current.Version,
+                Kind = "state.transition",
+                Actor = "routing",
+                Detail = JsonSerializer.Serialize(new Dictionary<string, string?>
+                {
+                    ["from"] = "blocked",
+                    ["to"] = "planning",
+                    ["reason"] = "a candidate advertised the capability - the triage block lifts",
+                }),
+                CreatedAt = now,
+            });
+        }
+    }
+
+    /// <summary>The loud handoff: a reply in the bound conversation saying a
+    /// human will take over (the same binding addressing as completion
+    /// replies; unbound works are triaged silently - nobody to tell).</summary>
+    private async Task AppendTriageNoticeAsync(FacilitatorDbContext db, Guid workId, DateTime now, CancellationToken ct)
+    {
+        var binding = await db.CommunicationBindings.AsNoTracking().FirstOrDefaultAsync(b => b.WorkId == workId, ct);
+        if (binding is null || providerRegistry?.Find(binding.Provider) is not { EndpointId: { Length: > 0 } endpoint })
+        {
+            return;
+        }
+
+        var notice = Guid.NewGuid();
+        var target = new Facilitator.Kernel.Integrations.ConversationTarget(
+            binding.Provider, null, binding.Channel, binding.RootMessageId, binding.ParentMessageId,
+            null, "thread", null);
+        var envelope = Facilitator.Kernel.Integrations.ProviderEventStore.ReplyEnvelope(
+            target,
+            "No automation in the fleet can take this ask yet - it is blocked for a human to pick up.",
+            $"routing-triage:{notice}", $"work/{workId}", now);
+        var json = envelope.ToJsonString();
+        var verdict = envelopeValidator.Validate(json);
+        if (!verdict.Ok)
+        {
+            throw new InvalidOperationException($"kernel envelope rejected by the validator: {verdict.ErrorClass}: {verdict.Message}");
+        }
+
+        db.Outbox.Add(new OutboxEntity
+        {
+            OutboxId = Guid.NewGuid(),
+            RecipientEndpointId = $"link.{endpoint}",
+            AggregateType = "work",
+            AggregateId = workId,
+            EventType = envelope["type"]!.GetValue<string>(),
+            CommandId = $"routing-triage:{notice}",
+            Envelope = json,
+            WorkId = workId,
+            Status = "pending",
+            AvailableAt = now,
+            Attempts = 0,
+            CreatedAt = now,
+        });
+    }
+
+    private static RoutingDecisionEntity UpsertAudit(
         FacilitatorDbContext db,
         RoutingDecisionEntity? audit,
         RoutingIntent intent,
@@ -419,7 +558,7 @@ public sealed class RoutingSink(
     {
         if (audit is null)
         {
-            db.RoutingDecisions.Add(new RoutingDecisionEntity
+            var created = new RoutingDecisionEntity
             {
                 DecisionId = Guid.NewGuid(),
                 WorkId = workId,
@@ -435,8 +574,9 @@ public sealed class RoutingSink(
                 AttemptCount = 1,
                 CreatedAt = now,
                 UpdatedAt = now,
-            });
-            return;
+            };
+            db.RoutingDecisions.Add(created);
+            return created;
         }
 
         audit.AllowedCandidates = allowedJson;
@@ -447,6 +587,7 @@ public sealed class RoutingSink(
         audit.LastRoutingAttemptAt = now;
         audit.AttemptCount += 1;
         audit.UpdatedAt = now;
+        return audit;
     }
 
     internal static RoutingIntent ParseIntent(JsonElement envelope)

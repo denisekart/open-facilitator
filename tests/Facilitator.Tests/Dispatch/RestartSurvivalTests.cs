@@ -40,7 +40,7 @@ public class RestartSurvivalTests(DispatchDbFixture fixture)
 
             await KernelOps.TransitionAsync(clientA, workId, "active", 3);
             await KernelOps.TransitionAsync(clientA, workId, "review", 4);
-            await KernelOps.TransitionAsync(clientA, workId, "completed", 5);
+            await KernelOps.TransitionAsync(clientA, workId, "completed", 5, reason: "worker finished");
 
             // All six writes are durable before the restart. A dispatcher
             // from another feature's parallel collection may already have

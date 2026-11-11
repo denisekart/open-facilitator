@@ -25,6 +25,7 @@ public sealed class RoutingDecisionEntityConfiguration : IEntityTypeConfiguratio
         e.Property(x => x.ProviderRef).HasColumnName("provider_ref");
         e.Property(x => x.LastRoutingAttemptAt).HasColumnName("last_routing_attempt_at").IsRequired();
         e.Property(x => x.AttemptCount).HasColumnName("attempt_count").IsRequired();
+        e.Property(x => x.RoutingTriage).HasColumnName("routing_triage");
         e.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
         e.Property(x => x.UpdatedAt).HasColumnName("updated_at").IsRequired();
         e.HasIndex(x => x.IntentCommandId).IsUnique().HasDatabaseName("routing_decisions_intent_unique");

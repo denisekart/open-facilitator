@@ -1961,6 +1961,10 @@ namespace Facilitator.Migrations
                         .HasColumnType("text")
                         .HasColumnName("provider_ref");
 
+                    b.Property<string>("RoutingTriage")
+                        .HasColumnType("text")
+                        .HasColumnName("routing_triage");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("text")
@@ -2119,14 +2123,38 @@ namespace Facilitator.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("work_id");
 
+                    b.Property<string>("ActiveWhere")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("active_where");
+
+                    b.Property<string>("CloseReason")
+                        .HasColumnType("text")
+                        .HasColumnName("close_reason");
+
+                    b.Property<string>("Cost")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("cost");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
+
+                    b.Property<Guid?>("MergedInto")
+                        .HasColumnType("uuid")
+                        .HasColumnName("merged_into");
 
                     b.Property<string>("Objective")
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("objective");
+
+                    b.Property<string>("Origin")
+                        .HasColumnType("text")
+                        .HasColumnName("origin");
+
+                    b.Property<string>("OwnerActor")
+                        .HasColumnType("text")
+                        .HasColumnName("owner_actor");
 
                     b.Property<Guid?>("ProjectId")
                         .HasColumnType("uuid")
@@ -2141,6 +2169,10 @@ namespace Facilitator.Migrations
                         .HasColumnType("text")
                         .HasColumnName("state");
 
+                    b.Property<Guid?>("TeamId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("team_id");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
@@ -2151,7 +2183,13 @@ namespace Facilitator.Migrations
 
                     b.HasKey("WorkId");
 
+                    b.HasIndex("MergedInto")
+                        .HasDatabaseName("works_merged_into_idx");
+
                     b.HasIndex("ProjectId");
+
+                    b.HasIndex("TeamId")
+                        .HasDatabaseName("works_team_id_idx");
 
                     b.ToTable("works", "facilitator", t =>
                         {
@@ -2203,7 +2241,49 @@ namespace Facilitator.Migrations
 
                     b.ToTable("work_events", "facilitator", t =>
                         {
-                            t.HasCheckConstraint("work_events_kind_check", "kind IN ('created', 'state.transition', 'steer', 'command.accepted', 'assignment.transition', 'approval.decided', 'artifact.stored', 'artifact.registered', 'artifact.available', 'artifact.gc', 'manifest.recorded', 'manifest.superseded', 'memory.candidate', 'memory.promoted', 'provider.input', 'provider.attachment', 'provider.reaction', 'input.required', 'input.answered')");
+                            t.HasCheckConstraint("work_events_kind_check", "kind IN ('created', 'state.transition', 'steer', 'command.accepted', 'assignment.transition', 'approval.decided', 'artifact.stored', 'artifact.registered', 'artifact.available', 'artifact.gc', 'manifest.recorded', 'manifest.superseded', 'memory.candidate', 'memory.promoted', 'provider.input', 'provider.attachment', 'provider.reaction', 'input.required', 'input.answered', 'provider.duplicate', 'work.linked', 'work.triaged')");
+                        });
+                });
+
+            modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.WorkLinkEntity", b =>
+                {
+                    b.Property<Guid>("LinkId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("link_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("Note")
+                        .HasColumnType("text")
+                        .HasColumnName("note");
+
+                    b.Property<Guid>("RefWorkId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("ref_work_id");
+
+                    b.Property<Guid>("WorkId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("work_id");
+
+                    b.HasKey("LinkId");
+
+                    b.HasIndex("RefWorkId")
+                        .HasDatabaseName("work_links_ref_idx");
+
+                    b.HasIndex("WorkId", "RefWorkId", "Kind")
+                        .IsUnique()
+                        .HasDatabaseName("work_links_unique");
+
+                    b.ToTable("work_links", "facilitator", t =>
+                        {
+                            t.HasCheckConstraint("work_links_kind_check", "kind IN ('successor', 'parent', 'child', 'merged-duplicate', 'context')");
                         });
                 });
 
@@ -2384,7 +2464,14 @@ namespace Facilitator.Migrations
                         .HasForeignKey("ProjectId")
                         .HasConstraintName("works_project_id_fkey");
 
+                    b.HasOne("Facilitator.Kernel.Shared.Persistence.TeamEntity", "Team")
+                        .WithMany()
+                        .HasForeignKey("TeamId")
+                        .HasConstraintName("works_team_id_fkey");
+
                     b.Navigation("Project");
+
+                    b.Navigation("Team");
                 });
 
             modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.WorkEventEntity", b =>
@@ -2395,6 +2482,25 @@ namespace Facilitator.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("work_events_work_id_fkey");
+
+                    b.Navigation("Work");
+                });
+
+            modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.WorkLinkEntity", b =>
+                {
+                    b.HasOne("Facilitator.Kernel.Shared.Persistence.WorkEntity", null)
+                        .WithMany()
+                        .HasForeignKey("RefWorkId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("work_links_ref_work_id_fkey");
+
+                    b.HasOne("Facilitator.Kernel.Shared.Persistence.WorkEntity", "Work")
+                        .WithMany()
+                        .HasForeignKey("WorkId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("work_links_work_id_fkey");
 
                     b.Navigation("Work");
                 });

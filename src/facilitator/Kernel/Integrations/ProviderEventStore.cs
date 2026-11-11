@@ -251,7 +251,64 @@ public sealed class ProviderEventStore(
                 saved?.VerifiedReference is null ? null : new { judgment = saved.VerifiedReference });
         }
 
-        // 2. Echo law: a bot-authored event is the outbound-post ledger
+        // 2. Duplicate law (N11): a re-delivery of ONE message can carry a
+        // fresh delivery id, so the (provider, delivery-id) spine alone would
+        // process it twice. The wire body itself is the message identity: a
+        // prior accepted row with the SAME body marks this delivery a
+        // duplicate. The ledger row stands (the delivery happened), the
+        // judgment records the duplicate, and the work the first delivery
+        // landed on gets a visible note - never a silent second work.
+        // The business identity of one message: the arm data WITHOUT the
+        // delivery id — adapters may mint a fresh delivery id per attempt, but
+        // the native reference (channel, thread, message id) and the payload
+        // are the message itself, so only a genuine re-delivery of one native
+        // message can match. Same provider, same identity, 24h window.
+        var canonical = CanonicalizeBody(data);
+        var priorEvent = (await db.ProviderEvents.AsNoTracking()
+                .Where(e => e.Provider == provider && e.ProviderEventId != providerEventId
+                            && e.ReceivedAt >= now.AddDays(-1))
+                .OrderByDescending(e => e.ReceivedAt)
+                .Select(e => new { e.ProviderEventId, e.Body, e.VerifiedReference })
+                .Take(DuplicateWindowCandidates)
+                .ToListAsync(ct))
+            // Only a prior delivery that actually LANDED a work can note the
+            // duplicate: an unbound first pass (e.g. an unlinked mention) is
+            // not an ask, and a later linked one must create normally.
+            .FirstOrDefault(e => SameMessage(e.Body, canonical) && JudgmentWorkId(e.VerifiedReference) is not null);
+        var priorJudgment = priorEvent?.VerifiedReference;
+        if (priorEvent is not null)
+        {
+            var priorWork = JudgmentWorkId(priorJudgment);
+            if (priorWork is { } notedWork)
+            {
+                var priorVersion = await db.Works.Where(w => w.WorkId == notedWork)
+                    .Select(w => w.Version).FirstOrDefaultAsync(ct);
+                db.WorkEvents.Add(new WorkEventEntity
+                {
+                    EventId = Guid.NewGuid(),
+                    WorkId = notedWork,
+                    WorkVersion = priorVersion,
+                    Kind = "provider.duplicate",
+                    Actor = $"provider:{provider}",
+                    Detail = JsonSerializer.Serialize(new Dictionary<string, string?>
+                    {
+                        ["note"] = "a second delivery of this message was seen - the ask was NOT duplicated",
+                        ["deliveryId"] = providerDeliveryId,
+                    }),
+                    CreatedAt = now,
+                });
+            }
+
+            await db.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
+            metrics.LinkReceived();
+            metrics.InboxProcessed();
+            return new ProviderIngressOutcome(
+                "duplicate", providerEventId, null,
+                new { judgment = $"duplicate-seen:{priorJudgment ?? "unbound"}" });
+        }
+
+        // 3. Echo law: a bot-authored event is the outbound-post ledger
         // write — suppress before the inbox, persist to the binding. One
         // exemption (mirrored in the adapter's normalizer): a bot's own
         // change_request opened/reopened is a load-bearing state change — the
@@ -280,7 +337,7 @@ public sealed class ProviderEventStore(
             return new ProviderIngressOutcome("accepted", providerEventId, null, new { judgment = "echo:post-ledger" });
         }
 
-        // 3. Inbox row (provider path): provider fields populated, settled.
+        // 4. Inbox row (provider path): provider fields populated, settled.
         var inbox = new InboxEntity
         {
             InboxId = Guid.NewGuid(),
@@ -303,7 +360,7 @@ public sealed class ProviderEventStore(
         {
             ProviderEventClass.Mention => await MentionArmAsync(db, workload, options, data, reference, providerDeliveryId, ack, now, ct),
             ProviderEventClass.Reaction => await ReactionArmAsync(db, options, data, reference, providerDeliveryId, ack, now, ct),
-            ProviderEventClass.Issue => await IssueArmAsync(db, workload, options, data, reference, providerDeliveryId, now, ct),
+            ProviderEventClass.Issue => await IssueArmAsync(db, workload, options, data, reference, providerDeliveryId, now, ct, type),
             ProviderEventClass.ChangeRequest => await ChangeRequestArmAsync(db, provider, options, data, reference, providerDeliveryId, now, ct),
             ProviderEventClass.Pipeline => await PipelineArmAsync(db, data, reference, providerDeliveryId, now, ct),
             ProviderEventClass.Message => await MessageArmAsync(db, workload, options, data, reference, providerDeliveryId, now, ct),
@@ -492,7 +549,7 @@ public sealed class ProviderEventStore(
                 return new ArmEffect(boundWork, $"input:{answered}:auto-respond");
             }
 
-            await AppendWorkInputAsync(db, reference.Provider, boundWork, InputNote(reference, deliveryId, text, media), now, ct, sourceRefs: media);
+            boundWork = await AppendWorkInputAsync(db, reference.Provider, boundWork, InputNote(reference, deliveryId, text, media), now, ct, sourceRefs: media);
             await AckAsync(db, options, reference, deliveryId, replyVsReaction, now, ct);
             return new ArmEffect(boundWork, $"work/{boundWork}:input");
         }
@@ -645,7 +702,7 @@ public sealed class ProviderEventStore(
             return new ArmEffect(workId, $"input:{answered}:auto-respond");
         }
 
-        await AppendWorkInputAsync(db, reference.Provider, workId, InputNote(reference, deliveryId, text: null, media), now, ct, sourceRefs: media);
+        workId = await AppendWorkInputAsync(db, reference.Provider, workId, InputNote(reference, deliveryId, text: null, media), now, ct, sourceRefs: media);
         return new ArmEffect(workId, $"work/{workId}:input");
     }
 
@@ -657,7 +714,7 @@ public sealed class ProviderEventStore(
     // linking stays chat-first, so no provider_identities gate on these arms.
 
     private async Task<ArmEffect> IssueArmAsync(
-        FacilitatorDbContext db, Facilitator.Kernel.Shared.Auth.LinkPrincipal workload, ProviderOptions options, JsonElement data, Reference reference, string deliveryId, DateTime now, CancellationToken ct)
+        FacilitatorDbContext db, Facilitator.Kernel.Shared.Auth.LinkPrincipal workload, ProviderOptions options, JsonElement data, Reference reference, string deliveryId, DateTime now, CancellationToken ct, string? wireType = null)
     {
         var action = data.GetProperty("action").GetString() ?? string.Empty;
         var workTrigger = data.TryGetProperty("workTrigger", out var t) && t.ValueKind == JsonValueKind.True;
@@ -667,7 +724,7 @@ public sealed class ProviderEventStore(
 
         if (binding?.WorkId is { } boundWork && action is "opened" or "labeled" or "commented" or "closed")
         {
-            await AppendWorkInputAsync(db, reference.Provider, boundWork, InputNote(reference, deliveryId, text), now, ct);
+            boundWork = await AppendWorkInputAsync(db, reference.Provider, boundWork, InputNote(reference, deliveryId, text), now, ct);
             return new ArmEffect(boundWork, $"work/{boundWork}:input");
         }
 
@@ -676,7 +733,10 @@ public sealed class ProviderEventStore(
             var objective = Trim(text ?? $"Issue {reference.Channel}#{reference.Root}");
             var rule = MatchAssignRule(options, data);
             var workId = await CreateWorkFromProviderAsync(db, workload, options, reference, objective, deliveryId,
-                $"work created (issue #{reference.Root})", rule, now, ct);
+                $"work created (issue #{reference.Root})", rule, now, ct, wireType: wireType,
+                ownerActor: data.TryGetProperty("actorProviderAccountId", out var acct) && acct.ValueKind == JsonValueKind.String
+                    ? $"provider:{reference.Provider}:{acct.GetString()}"
+                    : null);
             // Ack comment effect (decision 4): the adapter posts it as a bot
             // comment; kind rides the reference ("comment").
             AppendCommand(db, ReplyEnvelope(TargetOf(reference), "On it.", $"issue:{deliveryId}:ack",
@@ -745,7 +805,7 @@ public sealed class ProviderEventStore(
 
         if (action is "merged" or "closed")
         {
-            await AppendWorkInputAsync(db, reference.Provider, workId,
+            workId = await AppendWorkInputAsync(db, reference.Provider, workId,
                 InputNote(reference, deliveryId, $"Change request #{reference.Root} {action}"), now, ct);
             return new ArmEffect(workId, $"work/{workId}:input");
         }
@@ -778,6 +838,61 @@ public sealed class ProviderEventStore(
             : null;
     }
 
+    /// <summary>The canonical jsonb text of one message's business identity:
+    /// the arm data minus delivery bookkeeping. Key order is jsonb-normalized
+    /// in the database, so a semantic match is exact.</summary>
+    /// <summary>Ceiling of ledger rows scanned for a business-identity match.</summary>
+    private const int DuplicateWindowCandidates = 50;
+
+    internal static string CanonicalizeBody(JsonElement data)
+    {
+        var node = StripBookkeeping(JsonNode.Parse(data.GetRawText())!.AsObject());
+        return node.ToJsonString();
+    }
+
+    private static JsonObject StripBookkeeping(JsonObject data)
+    {
+        data.Remove("providerDeliveryId");
+        data.Remove("actorProviderAccountId");
+        if (data["reference"]?.AsObject() is { } reference)
+        {
+            reference.Remove("authorProviderAccountId");
+        }
+
+        return data;
+    }
+
+    /// <summary>Business identity match: two stored bodies agree once delivery
+    /// bookkeeping is stripped (jsonb deep equality, key order irrelevant).</summary>
+    internal static bool SameMessage(string storedBody, string canonical)
+    {
+        try
+        {
+            // The ledger body IS the arm data document.
+            return JsonNode.DeepEquals(JsonNode.Parse(canonical), StripBookkeeping(JsonNode.Parse(storedBody)!.AsObject()));
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>The work a ledger judgment points at ("work/{id}..."), null when it points at none.</summary>
+    internal static Guid? JudgmentWorkId(string? judgment) =>
+        judgment is { Length: > 5 } && judgment.StartsWith("work/", StringComparison.Ordinal)
+        && Guid.TryParse(judgment[5..].Split(':', '/')[0], out var id) ? id : null;
+
+    /// <summary>The jsonb residence document of a reference: where the work
+    /// currently lives, as observed on the wire (never inferred).</summary>
+    internal static string ActiveWhereOf(Reference reference) =>
+        new System.Text.Json.Nodes.JsonObject
+        {
+            ["provider"] = reference.Provider,
+            ["channel"] = reference.Channel,
+            ["root"] = reference.Root,
+            ["kind"] = reference.Kind,
+        }.ToJsonString();
+
     private async Task<ArmEffect> PipelineArmAsync(
         FacilitatorDbContext db, JsonElement data, Reference reference, string deliveryId, DateTime now, CancellationToken ct)
     {
@@ -794,7 +909,7 @@ public sealed class ProviderEventStore(
         // verdict token verbatim ("failure" etc.).
         var note = $"provider input ({reference.Provider} status {deliveryId}): {action}" +
                    (description is { Length: > 0 } ? $" — {description}" : string.Empty);
-        await AppendWorkInputAsync(db, reference.Provider, workId, note, now, ct);
+        workId = await AppendWorkInputAsync(db, reference.Provider, workId, note, now, ct);
         return new ArmEffect(workId, $"work/{workId}:input");
     }
 
@@ -802,7 +917,7 @@ public sealed class ProviderEventStore(
     // Work + created event + binding + interim assign, all in the arm's open
     // transaction.
     private async Task<Guid> CreateWorkFromProviderAsync(
-        FacilitatorDbContext db, Facilitator.Kernel.Shared.Auth.LinkPrincipal workload, ProviderOptions options, Reference reference, string objective, string deliveryId, string progressNote, AssignRule? rule, DateTime now, CancellationToken ct)
+        FacilitatorDbContext db, Facilitator.Kernel.Shared.Auth.LinkPrincipal workload, ProviderOptions options, Reference reference, string objective, string deliveryId, string progressNote, AssignRule? rule, DateTime now, CancellationToken ct, string? wireType = null, string? ownerActor = null)
     {
         // A rule-matched lane may name the OWNING team (the endpoint's
         // fleet): the manifest ledger team-scopes a work's artifacts, so
@@ -842,6 +957,10 @@ public sealed class ProviderEventStore(
             Objective = objective,
             State = "open",
             Version = 1,
+            TeamId = teamId,
+            Origin = wireType,
+            OwnerActor = ownerActor,
+            ActiveWhere = ActiveWhereOf(reference),
             CreatedAt = now,
             UpdatedAt = now,
         });
@@ -937,8 +1056,13 @@ public sealed class ProviderEventStore(
         return Task.CompletedTask;
     }
 
-    private async Task AppendWorkInputAsync(FacilitatorDbContext db, string provider, Guid workId, string note, DateTime now, CancellationToken ct, JsonArray? sourceRefs = null)
+    private async Task<Guid> AppendWorkInputAsync(FacilitatorDbContext db, string provider, Guid workId, string note, DateTime now, CancellationToken ct, JsonArray? sourceRefs = null)
     {
+        // Terminal means terminal (A7): input arriving on a finished work
+        // never reopens it. It forks a successor work, links it, moves the
+        // conversation binding onto it, and says so in the thread - the
+        // follow-up is a new item with its own history, not a resurrected one.
+        workId = await ForkTerminalAsync(db, provider, workId, note, now, ct);
         var version = await db.Works.Where(w => w.WorkId == workId).Select(w => w.Version).FirstOrDefaultAsync(ct);
         db.WorkEvents.Add(new WorkEventEntity
         {
@@ -972,6 +1096,95 @@ public sealed class ProviderEventStore(
         }
 
         AppendProgressRow(db, registry.Find(provider), workId, Trim(note), now);
+        return workId;
+    }
+
+    /// <summary>The successor fork: a terminal target becomes the predecessor.
+    /// Returns the work the input actually lands on (the successor when the
+    /// target was terminal, the target otherwise).</summary>
+    private async Task<Guid> ForkTerminalAsync(FacilitatorDbContext db, string provider, Guid workId, string note, DateTime now, CancellationToken ct)
+    {
+        var target = await db.Works.FirstOrDefaultAsync(w => w.WorkId == workId, ct);
+        if (target is null || target.State is not ("completed" or "cancelled" or "failed"))
+        {
+            return workId;
+        }
+
+        var successor = new WorkEntity
+        {
+            WorkId = Guid.NewGuid(),
+            ProjectId = target.ProjectId,
+            Objective = $"Follow-up to {target.WorkId.ToString("N")[..8]}: {note.Split('\n')[0]}",
+            State = "open",
+            Version = 1,
+            TeamId = target.TeamId,
+            OwnerActor = target.OwnerActor,
+            Origin = target.Origin,
+            ActiveWhere = target.ActiveWhere,
+            CreatedAt = now,
+            UpdatedAt = now,
+        };
+        db.Works.Add(successor);
+        db.WorkEvents.Add(new WorkEventEntity
+        {
+            EventId = Guid.NewGuid(),
+            WorkId = successor.WorkId,
+            WorkVersion = 1,
+            Kind = "created",
+            Actor = $"provider:{provider}",
+            Detail = JsonSerializer.Serialize(new Dictionary<string, string?>
+            {
+                ["objective"] = successor.Objective,
+                ["successorOf"] = target.WorkId.ToString(),
+            }),
+            CreatedAt = now,
+        });
+        db.WorkLinks.Add(new WorkLinkEntity
+        {
+            LinkId = Guid.NewGuid(),
+            WorkId = target.WorkId,
+            RefWorkId = successor.WorkId,
+            Kind = "successor",
+            Note = "input arrived after the work closed",
+            CreatedAt = now,
+        });
+        db.WorkEvents.Add(new WorkEventEntity
+        {
+            EventId = Guid.NewGuid(),
+            WorkId = target.WorkId,
+            WorkVersion = target.Version,
+            Kind = "work.linked",
+            Actor = $"provider:{provider}",
+            Detail = JsonSerializer.Serialize(new Dictionary<string, string?>
+            {
+                ["refWorkId"] = successor.WorkId.ToString(),
+                ["kind"] = "successor",
+                ["note"] = "input arrived after the work closed",
+            }),
+            CreatedAt = now,
+        });
+
+        // The conversation follows the live work: the binding (and any
+        // per-message children) repoint to the successor.
+        await db.CommunicationBindings
+            .Where(b => b.WorkId == workId)
+            .ExecuteUpdateAsync(s => s.SetProperty(b => b.WorkId, successor.WorkId), ct);
+
+        // Say so, in the place the input came from (name the new item).
+        var binding = await db.CommunicationBindings.AsNoTracking().FirstOrDefaultAsync(
+            b => b.WorkId == successor.WorkId, ct);
+        if (binding is not null && registry.Find(provider) is { EndpointId: { Length: > 0 } })
+        {
+            var target0 = new ConversationTarget(
+                binding.Provider, null, binding.Channel, binding.RootMessageId, binding.ParentMessageId,
+                null, "thread", null);
+            AppendCommand(db, ReplyEnvelope(target0,
+                $"Work {target.WorkId.ToString("N")[..8]} is closed - this continues as work {successor.WorkId.ToString("N")[..8]}.",
+                $"successor:{successor.WorkId:N}", $"work/{successor.WorkId}", now),
+                registry.Find(provider), now, successor.WorkId);
+        }
+
+        return successor.WorkId;
     }
 
     private void AppendProgressRow(FacilitatorDbContext db, ProviderOptions? options, Guid workId, string note, DateTime now)

@@ -127,13 +127,64 @@ public sealed class IngressProcessor(
 
         var reason = body.TryGetProperty("reason", out var r) && r.ValueKind == JsonValueKind.String ? r.GetString() : null;
 
+        // Transition companions (all optional): the partial-success basis names
+        // the successor carrying the remainder; closeReason is the first-class
+        // closure basis. A completed transition with nothing to point at — no
+        // artifact, manifest, work-link or reason — is refused, not recorded.
+        TransitionOptions? options = null;
+        if (body.TryGetProperty("successorWorkId", out var succ) && succ.ValueKind == JsonValueKind.String
+            && Guid.TryParse(succ.GetString(), out var successorId))
+        {
+            options = new TransitionOptions(SuccessorWorkId: successorId,
+                Basis: Str(body, "basis") ?? "complete",
+                Note: Str(body, "note"),
+                CloseReason: Str(body, "closeReason"));
+        }
+        else if (Str(body, "basis") is { } || Str(body, "closeReason") is { } || Str(body, "note") is { })
+        {
+            options = new TransitionOptions(
+                Basis: Str(body, "basis") ?? "complete",
+                Note: Str(body, "note"),
+                CloseReason: Str(body, "closeReason"));
+        }
+        else if (reason is { Length: > 0 })
+        {
+            // The plain `reason` of a transition doubles as the closure basis
+            // for a completion - a stated why is evidence of a different kind.
+            options = new TransitionOptions(CloseReason: reason);
+        }
+
         var result = await pipeline.WithSpanAsync("ingress.process", async () =>
-            await store.ApplyTransitionAsync(workId, to, expected, actor, reason, ct));
+            await store.ApplyTransitionAsync(workId, to, expected, actor, reason, ct, options));
         return result switch
         {
             TransitionResult.Ok ok => Results.Ok(WorkDtoMapper.ToDto(ok.Work)),
             TransitionResult.Conflict conflict => IngressPipeline.Problem(ProblemErrors.VersionConflict(conflict.CurrentVersion)),
             TransitionResult.Illegal illegal => IngressPipeline.Problem(ProblemErrors.InvalidTransition(illegal.Edge)),
+            TransitionResult.SuccessorRequired => IngressPipeline.Problem(ProblemErrors.SuccessorRequired()),
+            TransitionResult.Unevidenced => IngressPipeline.Problem(ProblemErrors.UnevidencedCompletion()),
+            _ => IngressPipeline.Problem(ProblemErrors.WorkNotFound(workId)),
+        };
+    }
+
+    /// <summary>Merge a duplicate work into its survivor (loser keeps history;
+    /// reads of the loser answer 303 to the survivor).</summary>
+    public async Task<IResult> MergeAsync(Guid workId, JsonElement body, string actor, CancellationToken ct)
+    {
+        var into = body.TryGetProperty("intoWorkId", out var i) && i.ValueKind == JsonValueKind.String
+            ? Guid.TryParse(i.GetString(), out var parsed) ? parsed : Guid.Empty
+            : Guid.Empty;
+        if (into == Guid.Empty)
+        {
+            return IngressPipeline.Problem(ProblemErrors.SchemaViolation("intoWorkId (uuid) is required"));
+        }
+
+        var reason = body.TryGetProperty("reason", out var r) && r.ValueKind == JsonValueKind.String ? r.GetString() : null;
+        return await pipeline.WithSpanAsync("ingress.process", async () =>
+            await store.MergeAsync(workId, into, reason, actor, ct)) switch
+        {
+            MergeResult.Merged merged => Results.Ok(WorkDtoMapper.ToDto(merged.Into)),
+            MergeResult.Loop => IngressPipeline.Problem(ProblemErrors.SchemaViolation("a work cannot merge into itself")),
             _ => IngressPipeline.Problem(ProblemErrors.WorkNotFound(workId)),
         };
     }

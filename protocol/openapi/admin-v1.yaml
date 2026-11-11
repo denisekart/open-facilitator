@@ -211,6 +211,41 @@ paths:
               schema: { $ref: "#/components/schemas/AdminMetrics" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
+  /api/admin/audit/export:
+    get:
+      operationId: getAuditExport
+      summary: Audit-trail export (H3/N15)
+      description: >
+        A closed window of the audit trail, credential-free by construction
+        (no trace ids, no secrets). JSON (default) or CSV (`format=csv`);
+        `team` narrows to rows whose resource names that team's work.
+        Retention: `admin_config/audit-policy` (`retentionDays`) prunes
+        aged rows via `POST /api/admin/sweeps/audit-retention`.
+      parameters:
+        - { in: query, name: from, schema: { type: string, format: date-time } }
+        - { in: query, name: to, schema: { type: string, format: date-time } }
+        - { in: query, name: team, schema: { type: string } }
+        - { in: query, name: format, schema: { type: string, enum: [json, csv] } }
+      responses:
+        "200": { description: The export (application/json or text/csv). }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/admin/sweeps/{name}:
+    post:
+      operationId: runSweep
+      summary: Force one sweeper pass (I2)
+      description: >
+        `nudge` | `approvals` | `schedules` | `session-loss` |
+        `audit-retention`: runs the sweep now instead of waiting for the
+        hosted loop. Answers the effect count (a pass a peer replica holds
+        answers 0).
+      parameters:
+        - { in: path, name: name, required: true, schema: { type: string } }
+      responses:
+        "200": { description: "{ sweep, effects }" }
+        "400": { description: Unknown sweep name. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
   /api/admin/config:
     get:
       operationId: listConfig
@@ -581,12 +616,13 @@ components:
     AdminMetrics:
       type: object
       additionalProperties: false
-      required: [outboxPending, inboxPending, deadLetters, linkSessions, deadLettersPerHour, auditDeniesPerHour, artifactsStoredPerHour, artifactsRejectedPerHour, counters]
+      required: [outboxPending, inboxPending, deadLetters, linkSessions, queueOldestWaitSeconds, deadLettersPerHour, auditDeniesPerHour, artifactsStoredPerHour, artifactsRejectedPerHour, counters]
       properties:
         outboxPending: { type: integer, format: int64 }
         inboxPending: { type: integer, format: int64 }
         deadLetters: { type: integer, format: int64 }
         linkSessions: { type: integer, format: int64 }
+        queueOldestWaitSeconds: { type: number, format: double, description: "Age of the oldest pending routing intent - the starvation gauge (seconds, 0 when the queue is empty)." }
         deadLettersPerHour: { type: array, items: { $ref: "#/components/schemas/AdminHourBucket" } }
         auditDeniesPerHour: { type: array, items: { $ref: "#/components/schemas/AdminHourBucket" } }
         artifactsStoredPerHour: { type: array, items: { $ref: "#/components/schemas/AdminHourBucket" } }

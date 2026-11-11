@@ -49,6 +49,7 @@ public sealed class KernelMetrics
     private long _linkSessions;
     private long _gcLastPassAgeSeconds;
     private long _aiPendingActions;
+    private long _queueOldestWaitSeconds;
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, long> _counterTotals = new(StringComparer.Ordinal);
     private readonly System.Diagnostics.Metrics.MeterListener _counterListener;
 
@@ -81,6 +82,7 @@ public sealed class KernelMetrics
         meter.CreateObservableGauge("facilitator.inbox.queue_depth", () => Volatile.Read(ref _inboxDepth), description: "Pending inbox rows");
         meter.CreateObservableGauge("facilitator.delivery.dead_letter_count", () => Volatile.Read(ref _deadLetters), description: "Dead-lettered rows");
         meter.CreateObservableGauge("facilitator.link.sessions", () => Volatile.Read(ref _linkSessions), description: "Live link sessions");
+        meter.CreateObservableGauge("facilitator.queue.oldest_wait_seconds", () => Volatile.Read(ref _queueOldestWaitSeconds), description: "Age of the oldest pending routing intent (starvation, I5/N28)");
         _linkReceived = meter.CreateCounter<long>("facilitator.link.received", description: "Envelopes admitted over the link surface");
         _identityDecisions = meter.CreateCounter<long>("facilitator.identity.decisions", description: "Authorization-gate decisions (tag: decision)");
         _linkEvidence = meter.CreateCounter<long>("facilitator.link.evidence", description: "actorEvidenceRef evaluations on link admission (tags: scheme, outcome)");
@@ -138,6 +140,11 @@ public sealed class KernelMetrics
 
     /// <summary>Refresh the cached live-link-session gauge (served without hitting the DB).</summary>
     public void SetLinkSessions(long live) => Volatile.Write(ref _linkSessions, live);
+
+    /// <summary>Refresh the oldest-wait starvation gauge (seconds; 0 when the
+    /// queue is empty). Metrics, not a new table (the plan's law).</summary>
+    public void SetQueueOldestWaitSeconds(double seconds) =>
+        Volatile.Write(ref _queueOldestWaitSeconds, (long)seconds);
 
     /// <summary>Record inline ingress processing latency in milliseconds.</summary>
     public void IngressLatency(double ms) => _ingressLatency.Record(ms);

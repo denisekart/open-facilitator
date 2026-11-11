@@ -46,7 +46,13 @@ public sealed class DbEventDispatcher : IEventDispatcher
     private readonly KernelMetrics _metrics;
     private readonly ILogger<DbEventDispatcher> _logger;
     private readonly string _replicaId;
+    private readonly Facilitator.Kernel.Notifications.NotificationLedger? _notifications;
     private long _lastGaugeRefreshTicks = -1;
+
+    /// <summary>F3: the failed-attempt count that earns one human-facing
+    /// notice per delivery row (the deterministic command id is the
+    /// once-per-episode law; the standing default, never a new policy).</summary>
+    public const int FailureNoticeThreshold = 3;
 
     /// <summary>Create the dispatcher.</summary>
     public DbEventDispatcher(
@@ -55,8 +61,10 @@ public sealed class DbEventDispatcher : IEventDispatcher
         IEnumerable<ISink> sinks,
         KernelMetrics metrics,
         IConfiguration configuration,
-        ILogger<DbEventDispatcher> logger)
+        ILogger<DbEventDispatcher> logger,
+        Facilitator.Kernel.Notifications.NotificationLedger? notifications = null)
     {
+        _notifications = notifications;
         _contextFactory = contextFactory;
         _outbox = outbox;
         // Last registration per channel wins so tests can replace a sink.
@@ -179,6 +187,44 @@ public sealed class DbEventDispatcher : IEventDispatcher
         }
 
         await _outbox.RequeueAsync(row.OutboxId, error, policy.BackoffCapSeconds, ct);
+
+        // F3: the third failed attempt says so, once. The command id names the
+        // row and the threshold, so the ledger's unique key makes it exactly
+        // one notice however many replicas (or passes) reach this line.
+        if (_notifications is { } ledger && row.Attempts == FailureNoticeThreshold)
+        {
+            await NotifyRepeatedFailureAsync(ledger, row, error, ct);
+        }
+    }
+
+    private async Task NotifyRepeatedFailureAsync(
+        Facilitator.Kernel.Notifications.NotificationLedger ledger, OutboxRow row, string error, CancellationToken ct)
+    {
+        await using var db = await _contextFactory.CreateDbContextAsync(ct);
+        var workId = await db.Outbox.AsNoTracking()
+            .Where(o => o.OutboxId == row.OutboxId).Select(o => o.WorkId).FirstOrDefaultAsync(ct);
+        string? workTeam = null;
+        if (workId is { } id)
+        {
+            // Same law as WorkProjection: the work's own team, else its
+            // project's team.
+            workTeam = await db.Works.AsNoTracking()
+                .Where(w => w.WorkId == id)
+                .Select(w => w.Team != null ? w.Team.Slug : (w.Project == null ? null : w.Project.Team!.Slug))
+                .FirstOrDefaultAsync(ct);
+        }
+        await ledger.EmitAsync(db, new Facilitator.Kernel.Notifications.NotificationRequest(
+            // A row with no work has no team to tell: operators carry it.
+            Audience: workTeam is { Length: > 0 } ? "team" : "operators",
+            Level: "warning",
+            Text: $"Delivery of {row.EventType} to {row.RecipientEndpointId} has now failed "
+                + $"{FailureNoticeThreshold} times ({error}) - it keeps retrying, but someone should look.",
+            WorkId: workId,
+            TeamSlug: workTeam,
+            CommandId: $"delivery-attempts:{row.OutboxId:N}:{FailureNoticeThreshold}"), ct);
+
+        // The ledger's context-overload stages rows; this path owns the save.
+        await db.SaveChangesAsync(ct);
     }
 
     /// <summary>
@@ -240,5 +286,14 @@ public sealed class DbEventDispatcher : IEventDispatcher
         var inboxDepth = await db.Inbox.CountAsync(i => i.State == "pending", ct);
         var deadLetters = await db.DeadLetters.CountAsync(ct);
         _metrics.SetGauges(outboxDepth, inboxDepth, deadLetters);
+
+        // I5/N28: the starvation gauge - how long the oldest pending routing
+        // intent has waited. The dispatcher already wakes on every pass, so
+        // this is the cheapest honest place to compute it.
+        var oldestIntent = await db.Outbox.AsNoTracking()
+            .Where(o => o.Status == "pending" && o.RecipientEndpointId == Facilitator.Kernel.Work.RoutingIntent.Recipient)
+            .Select(o => (DateTime?)o.CreatedAt)
+            .MinAsync(ct);
+        _metrics.SetQueueOldestWaitSeconds(oldestIntent is { } at ? Math.Max(0, (now - at).TotalSeconds) : 0);
     }
 }

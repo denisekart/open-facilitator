@@ -82,6 +82,7 @@ public sealed class AdminConfigStore(
         "consent-policy",
         "loop-budget",
         "escalation",
+        "audit-policy",
     ];
 
     /// <summary>Stored view, or null when the resource was never written.</summary>

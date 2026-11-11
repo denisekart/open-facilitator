@@ -36,9 +36,14 @@ plus the read-mostly Admin surface.
 - `Kernel/Teams/` — team roster + per-scope switches (`team_members`,
   `team_settings`), team-scoped read authority, the built-in operator roles,
   and the one system→team→channel switch resolver. Signpost: `Kernel/Teams/AGENTS.md`.
+- `Kernel/Notifications/` — the single notice path: `facilitator.notifications`
+  + the egress ladder (reply target → binding → linked DM → team channel →
+  undeliverable-with-reason), the one cadence resolver, the receipt-side
+  address retirement. Signpost: `Kernel/Notifications/AGENTS.md`.
 - `Kernel/Admin/` — `/api/admin` operator surface (read stores, config store
-  with the If-Match/`X-Change-Reason` law, replay + re-mark mutations);
-  authorization is config bindings only (`admin.read`/`admin.mutate`).
+  with the If-Match/`X-Change-Reason` law, replay + re-mark mutations, the
+  audit export + `audit-policy` retention, `POST /sweeps/{name}` forcing any
+  sweeper); authorization is config bindings only (`admin.read`/`admin.mutate`).
 - `ui/` — the embedded operator SPA (Svelte 5 + vite, `@ofac/ui`): `pnpm -r
   build` stages hashed assets into `wwwroot/` (git-ignored output), served by
   the static pipeline + `GET /ui-config`; browser tier in `tests/Facilitator.E2E`.

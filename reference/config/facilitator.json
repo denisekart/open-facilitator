@@ -166,7 +166,8 @@
             "/api/admin/replicas",
             "/api/admin/config",
             "/api/admin/config/{resource}",
-            "/api/admin/config/{resource}/history"
+            "/api/admin/config/{resource}/history",
+            "/api/admin/audit/export"
           ],
           "rolesAnyOf": ["kernel-operator", "framework-admin"]
         },
@@ -176,7 +177,8 @@
           "paths": [
             "/api/admin/dead-letters/{deadLetterId}/replay",
             "/api/admin/manifests/{manifestId}/re-mark",
-            "/api/admin/config/{resource}"
+            "/api/admin/config/{resource}",
+            "/api/admin/sweeps/{name}"
           ],
           "rolesAnyOf": ["kernel-operator", "framework-admin"]
         },
@@ -184,13 +186,17 @@
           "id": "teams.read",
           "methods": ["GET"],
           "paths": ["/api/teams", "/api/teams/{slug}/members/{actor}", "/api/teams/{slug}/settings",
-            "/api/teams/{slug}/effective/{resource}"],
+            "/api/teams/{slug}/effective/{resource}", "/api/teams/{slug}/contributors",
+            "/api/teams/{slug}/schedules", "/api/contributors/{handle}/history", "/api/queue"],
           "rolesAnyOf": ["kernel-operator", "framework-admin", "team-member"]
         },
         {
           "id": "teams.roster.write",
           "methods": ["PUT", "DELETE"],
-          "paths": ["/api/teams/{slug}/members/{actor}", "/api/teams/{slug}/settings/{resource}"],
+          "paths": ["/api/teams/{slug}/members/{actor}", "/api/teams/{slug}/settings/{resource}",
+            "/api/teams/{slug}/contributors/{handle}", "/api/teams/{slug}/schedules/{id}",
+            "/api/teams/{slug}/schedules/{id}/disable", "/api/contributors/{handle}/remit",
+            "/api/contributors/{handle}/retire"],
           "rolesAnyOf": ["kernel-operator", "framework-admin", "team-operator"]
         },
         {

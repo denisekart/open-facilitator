@@ -438,8 +438,8 @@ public sealed class TestDbProbe : IAsyncDisposable
                 cmd.Parameters.AddWithValue(subject);
             });
 
-    /// <summary>A work owned by an actor (retirement tests need a named owner).</summary>
-    public async Task<Guid> SeedWorkOwned(Guid projectId, string ownerActor, string state)
+    /// <summary>A work row on a team's project (ops reads need team scope).</summary>
+    public async Task<Guid> SeedWorkOwned(Guid projectId, string? ownerActor, string state)
     {
         var workId = Guid.NewGuid();
         await NonQuery(
@@ -450,9 +450,99 @@ public sealed class TestDbProbe : IAsyncDisposable
                 cmd.Parameters.AddWithValue(workId);
                 cmd.Parameters.AddWithValue(projectId);
                 cmd.Parameters.AddWithValue(state);
-                cmd.Parameters.AddWithValue(ownerActor);
+                cmd.Parameters.AddWithValue((object?)ownerActor ?? DBNull.Value);
             });
         return workId;
+    }
+
+    /// <summary>A work link of a kind (the effects disclosure reads links).</summary>
+    public Task SeedWorkLink(Guid workId, Guid refWorkId, string kind) =>
+        NonQuery(
+            "INSERT INTO facilitator.work_links (link_id, work_id, ref_work_id, kind, note, created_at) "
+            + "VALUES (gen_random_uuid(), $1, $2, $3, 'seed', now())",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(workId);
+                cmd.Parameters.AddWithValue(refWorkId);
+                cmd.Parameters.AddWithValue(kind);
+            });
+
+    /// <summary>A pending outbox row owned by a work (dispatcher-path tests).</summary>
+    public async Task<Guid> SeedOutboxRow(Guid workId, string recipient, string eventType, string commandId, string envelope)
+    {
+        var outboxId = Guid.NewGuid();
+        await NonQuery(
+            "INSERT INTO facilitator.outbox (outbox_id, recipient_endpoint_id, aggregate_type, aggregate_id, "
+            + "event_type, command_id, envelope, work_id, status, available_at, attempts, created_at) "
+            + "VALUES ($1, $2, 'work', $3, $4, $5, $6::jsonb, $3, 'pending', now(), 0, now())",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(outboxId);
+                cmd.Parameters.AddWithValue(recipient);
+                cmd.Parameters.AddWithValue(workId);
+                cmd.Parameters.AddWithValue(eventType);
+                cmd.Parameters.AddWithValue(commandId);
+                cmd.Parameters.AddWithValue(envelope);
+            });
+        return outboxId;
+    }
+
+    /// <summary>A hand-minted audit row of a test-only action (retention
+    /// tests must not age actions other suites read).</summary>
+    public Task SeedAuditRow(string action, int ageDays = 0) =>
+        NonQuery(
+            "INSERT INTO facilitator.audit (audit_id, occurred_at, actor, action, resource, decision, "
+            + "reason, detail) VALUES (gen_random_uuid(), now() - make_interval(days => $2), 'test', $1, "
+            + "'test/resource', 'allow', 'seed', '{}')",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(action);
+                cmd.Parameters.AddWithValue(ageDays);
+            });
+
+    /// <summary>True when no audit row of an action remains (pruned).</summary>
+    public Task<bool> AuditActionMissing(string action) =>
+        ScalarBool("SELECT count(*) = 0 FROM facilitator.audit WHERE action = $1",
+            cmd => cmd.Parameters.AddWithValue(action));
+
+    /// <summary>Age an audit row of an action to N days ago (retention tests).</summary>
+    public Task AgeAudit(string action, int days) =>
+        NonQuery(
+            "UPDATE facilitator.audit SET occurred_at = now() - make_interval(days => $2) WHERE action = $1",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(action);
+                cmd.Parameters.AddWithValue(days);
+            });
+
+    /// <summary>Backoff expiry for one row (deterministic immediate retry).</summary>
+    public Task ExpireOutboxBackoffById(Guid outboxId) =>
+        NonQuery("UPDATE facilitator.outbox SET available_at = now() - interval '1 hour' WHERE outbox_id = $1",
+            cmd => cmd.Parameters.AddWithValue(outboxId));
+
+    /// <summary>Notification rows whose text matches a fragment (audience, level, text).</summary>
+    public Task<List<(string Audience, string Level, string Text)>> NotificationsWithText(string textFragment) =>
+        NotificationsWithText(textFragment, workId: null);
+
+    /// <summary>Notifications matching a text fragment, optionally scoped to
+    /// ONE work - the cross-suite-safe form (the shared DB runs parallel
+    /// suites whose poison lanes emit the same fixed warnings).</summary>
+    public async Task<List<(string Audience, string Level, string Text)>> NotificationsWithText(string textFragment, Guid? workId)
+    {
+        await using var connection = await _dataSource.OpenConnectionAsync();
+        await using var cmd = new NpgsqlCommand(
+            "SELECT audience, level, text FROM facilitator.notifications "
+            + "WHERE text LIKE '%' || $1 || '%' AND ($2::uuid IS NULL OR work_id = $2)", connection);
+        cmd.Parameters.AddWithValue("%" + textFragment + "%");
+        cmd.Parameters.AddWithValue((object?)workId ?? DBNull.Value);
+        var rows = new List<(string, string, string)>();
+        await using var reader = await cmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            rows.Add((reader.GetString(0), reader.GetString(1), reader.GetString(2)));
+        }
+
+        return rows;
     }
 
     /// <summary>The current owner actor of a work (null when unowned).</summary>
@@ -1063,6 +1153,25 @@ public sealed class TestDbProbe : IAsyncDisposable
                 cmd.Parameters.AddWithValue(teamSlug);
                 cmd.Parameters.AddWithValue(status);
             });
+
+    /// <summary>A team-owned assignment row (the gateway's team law needs
+    /// team_id): returns the id.</summary>
+    public async Task<Guid> SeedTeamAssignment(Guid workId, string teamSlug, string status)
+    {
+        var id = Guid.NewGuid();
+        await NonQuery(
+            "INSERT INTO facilitator.assignments (assignment_id, work_id, team_id, status, "
+            + "current_execution_generation, created_at, updated_at) "
+            + "VALUES ($1, $2, (SELECT team_id FROM facilitator.teams WHERE slug = $3), $4, 1, now(), now())",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(id);
+                cmd.Parameters.AddWithValue(workId);
+                cmd.Parameters.AddWithValue(teamSlug);
+                cmd.Parameters.AddWithValue(status);
+            });
+        return id;
+    }
 
     /// <summary>Hand-mint an assignment ledger row (optionally with a pinned
     /// identity/generation — the DAG tests pin the deterministic UUID the

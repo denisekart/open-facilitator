@@ -7,6 +7,8 @@ using Facilitator.Kernel.Shared.Persistence;
 
 using Microsoft.AspNetCore.Mvc;
 
+using Microsoft.EntityFrameworkCore;
+
 namespace Facilitator.Kernel.Admin;
 
 /// <summary>
@@ -79,6 +81,56 @@ public static class AdminEndpoints
         group.MapGet("/audit", async (string? action, string? actor, DateTime? since, int? limit, AdminReadStores stores, CancellationToken ct) =>
             Results.Ok(await stores.AuditAsync(action, actor, since, limit ?? 50, ct)));
 
+        // H3/N15: the export leg - a bounded window, no raw credentials, and
+        // a retention policy the operator can read (admin_config 'audit-policy').
+        group.MapGet("/audit/export", async (
+            DateTime? from, DateTime? to, string? team, string? format, AdminReadStores stores, CancellationToken ct) =>
+        {
+            var rows = await stores.AuditExportAsync(from, to, team, ct);
+            if (string.Equals(format, "csv", StringComparison.OrdinalIgnoreCase))
+            {
+                var csv = new StringBuilder("occurred_at,actor,action,resource,decision,reason\n");
+                foreach (var row in rows)
+                {
+                    csv.Append(string.Join(',', new[]
+                    {
+                        row.OccurredAt.ToString("O"), row.Actor, row.Action, row.Resource, row.Decision, row.Reason,
+                    }.Select(CsvField))).Append('\n');
+                }
+
+                return Results.Text(csv.ToString(), "text/csv");
+            }
+
+            return Results.Ok(rows);
+        });
+
+        // I2: force a sweeper pass without waiting for the loop.
+        group.MapPost("/sweeps/{name}", async (
+            string name,
+            Work.NudgeSweeper nudge,
+            Work.ApprovalSweeper approvals,
+            Work.ScheduleSweeper schedules,
+            Work.SessionLossSweeper sessionLoss,
+            IDbContextFactory<FacilitatorDbContext> contextFactory,
+            TimeProvider timeProvider,
+            CancellationToken ct) =>
+        {
+            var fired = name switch
+            {
+                "nudge" => await nudge.SweepOnceAsync(ct),
+                "approvals" => await approvals.SweepOnceAsync(ct),
+                "schedules" => await schedules.SweepOnceAsync(ct),
+                "session-loss" => await sessionLoss.SweepOnceAsync(ct),
+                "audit-retention" => await AuditRetentionSweep.PruneAsync(contextFactory, timeProvider, ct),
+                _ => -1,
+            };
+            return fired < 0
+                ? Results.Problem(ProblemErrors.Create(
+                    "unknown-sweep", "Bad request", StatusCodes.Status400BadRequest,
+                    "sweep name must be nudge|approvals|schedules|session-loss|audit-retention"))
+                : Results.Ok(new { sweep = name, effects = fired });
+        });
+
         MapConfig(group);
         MapMutations(group);
 
@@ -86,6 +138,15 @@ public static class AdminEndpoints
     }
 
     // ---- config surface (true If-Match optimistic revision) ----
+
+    // CSV field law: quote everything that could carry a delimiter, newline
+    // or quote; no raw credential ever enters an audit row in the first place.
+    private static string CsvField(string? value) =>
+        value is null
+            ? string.Empty
+            : value.Any(c => c is ',' or '"' or '\n' or '\r')
+                ? '"' + value.Replace("\"", "\"\"") + '"'
+                : value;
 
     private static void MapConfig(RouteGroupBuilder group)
     {

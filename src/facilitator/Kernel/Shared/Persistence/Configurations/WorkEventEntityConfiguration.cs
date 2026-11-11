@@ -30,6 +30,6 @@ public sealed class WorkEventEntityConfiguration : IEntityTypeConfiguration<Work
                     "manifest.recorded", "manifest.superseded", "memory.candidate", "memory.promoted",
                     "provider.input", "provider.attachment", "provider.reaction", "input.required", "input.answered",
                     "provider.duplicate", "work.linked", "work.triaged", "approval.nudged", "work.consent-expired",
-                    "address.obsolete", "review.decision"])));
+                    "address.obsolete", "review.decision", "effects-disclosed", "assignment.queue-reason"])));
     }
 }

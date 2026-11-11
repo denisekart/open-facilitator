@@ -95,11 +95,16 @@ public sealed record AdminMetrics(
     long InboxPending,
     long DeadLetters,
     long LinkSessions,
+    double QueueOldestWaitSeconds,
     IReadOnlyList<AdminHourBucket> DeadLettersPerHour,
     IReadOnlyList<AdminHourBucket> AuditDeniesPerHour,
     IReadOnlyList<AdminHourBucket> ArtifactsStoredPerHour,
     IReadOnlyList<AdminHourBucket> ArtifactsRejectedPerHour,
     IReadOnlyDictionary<string, long> Counters);
+
+/// <summary>GET /api/admin/audit/export row (H3: credential-free).</summary>
+public sealed record AdminAuditExportRow(
+    DateTime OccurredAt, string? Actor, string Action, string? Resource, string Decision, string? Reason);
 
 /// <summary>One UTC-hour bucket of a windowed counter.</summary>
 public sealed record AdminHourBucket(DateTime Hour, long Count);
@@ -569,13 +574,57 @@ public sealed class AdminReadStores(
         var inboxPending = await db.Inbox.CountAsync(i => i.State == "pending", ct);
         var deadLetters = await db.DeadLetters.CountAsync(ct);
         var linkSessions = await db.LinkSessions.CountAsync(s => s.LeaseUntil > now, ct);
+
+        // I5/N28: "waiting long" is a query — the queue's age, not a guess.
+        var oldestIntent = await db.Outbox.AsNoTracking()
+            .Where(o => o.Status == "pending" && o.RecipientEndpointId == Work.RoutingIntent.Recipient)
+            .Select(o => (DateTime?)o.CreatedAt)
+            .MinAsync(ct);
+        var queueOldestWaitSeconds = oldestIntent is { } at ? Math.Max(0, (now - at).TotalSeconds) : 0;
         return new AdminMetrics(
-            outboxPending, inboxPending, deadLetters, linkSessions,
+            outboxPending, inboxPending, deadLetters, linkSessions, queueOldestWaitSeconds,
             await HourBucketsAsync(db.DeadLetters.Where(d => d.CreatedAt >= since).Select(d => d.CreatedAt), ct),
             await HourBucketsAsync(db.Audit.Where(a => a.Decision == "deny" && a.OccurredAt >= since).Select(a => a.OccurredAt), ct),
             await HourBucketsAsync(db.Artifacts.Where(a => a.StoredAt != null && a.StoredAt >= since).Select(a => a.StoredAt!.Value), ct),
             await HourBucketsAsync(db.Artifacts.Where(a => a.State == "rejected" && a.CreatedAt >= since).Select(a => a.CreatedAt), ct),
             metrics.CounterTotals());
+    }
+
+    /// <summary>GET /api/admin/audit/export (H3/N15): a closed time window
+    /// (default: the last 24h), capped at 50 000 rows, no raw credentials —
+    /// the detail column is structured audit data, never a secret, but the
+    /// export drops the trace ids so a paste never leaks a session.</summary>
+    public async Task<IReadOnlyList<AdminAuditExportRow>> AuditExportAsync(
+        DateTime? from, DateTime? to, string? team, CancellationToken ct)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(ct);
+        var now = timeProvider.GetUtcNow().UtcDateTime;
+        var floor = from ?? now.AddHours(-24);
+        var ceiling = to ?? now;
+        var query = db.Audit.AsNoTracking()
+            .Where(a => a.OccurredAt >= floor && a.OccurredAt <= ceiling);
+        if (team is { Length: > 0 })
+        {
+            // Team-scoped export: rows whose resource names a work of that
+            // team (work/<guid> resources join works -> team/project team).
+            // The id set is materialized first: a window can hold non-guid
+            // resources and server-side Guid parsing would abort the query.
+            var resources = (await db.Works.AsNoTracking()
+                .Where(w => (w.Team != null && w.Team.Slug == team)
+                    || (w.Team == null && w.Project != null && w.Project.Team!.Slug == team))
+                .Select(w => w.WorkId)
+                .ToListAsync(ct))
+                .Select(id => $"work/{id}")
+                .ToList();
+            query = query.Where(a => a.Resource != null && resources.Contains(a.Resource));
+        }
+
+        return await query
+            .OrderBy(a => a.OccurredAt)
+            .Take(50_000)
+            .Select(a => new AdminAuditExportRow(
+                a.OccurredAt, a.Actor, a.Action, a.Resource, a.Decision, a.Reason))
+            .ToListAsync(ct);
     }
 
     private static async Task<Dictionary<string, int>> GroupByAsync(IQueryable<string> states, CancellationToken ct) =>

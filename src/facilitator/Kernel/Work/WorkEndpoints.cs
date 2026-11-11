@@ -36,10 +36,41 @@ public static class WorkEndpoints
             return await RequestBodyJson.ParseAsync(body, document => processor.CreateWorkAsync(document.RootElement.Clone(), ActorOf(http), ct));
         });
 
-        group.MapGet("/works", async (IngressStore store, TeamScope scope, HttpContext http, CancellationToken ct) =>
+        // D2/N28: the list is a queue view - filterable by state and one
+        // team, paged (a fixed recent list hides exactly the starvation an
+        // operator looks for).
+        group.MapGet("/works", async (
+            IngressStore store, TeamScope scope, HttpContext http, string? state, string? team, int? limit, int? offset,
+            CancellationToken ct) =>
         {
-            var works = await store.ListRecentAsync(VisibleTeamsOf(http, scope), ct);
+            var works = await store.ListRecentAsync(
+                VisibleTeamsOf(http, scope), state, team, limit ?? 50, offset ?? 0, ct);
             return Results.Ok(works.Select(WorkDtoMapper.ToDto).ToArray());
+        });
+
+        // The pending-intent queue with age (I5/N28): "waiting long" is a
+        // query. Arrival order is the delivery pump's (available_at FIFO);
+        // this read never reorders or gates.
+        group.MapGet("/queue", async (
+            IngressStore store, TeamScope scope, TimeProvider time, HttpContext http, string? team, CancellationToken ct) =>
+        {
+            var visible = VisibleTeamsOf(http, scope);
+            var now = time.GetUtcNow().UtcDateTime;
+            var rows = await store.PendingIntentsAsync(visible, team, ct);
+            var oldest = await store.OldestPendingIntentAgeSecondsAsync(ct);
+            return Results.Ok(new
+            {
+                oldestWaitSeconds = oldest,
+                items = rows
+                    .Select(r => new
+                    {
+                        commandId = r.CommandId,
+                        workId = ParseWorkId(r.Envelope),
+                        attempts = r.Attempts,
+                        ageSeconds = Math.Round((now - r.CreatedAt).TotalSeconds),
+                    })
+                    .ToArray(),
+            });
         });
 
         group.MapGet("/works/{id:guid}", async (Guid id, ICoordinationStore store, TeamScope scope, HttpContext http, CancellationToken ct) =>
@@ -61,6 +92,22 @@ public static class WorkEndpoints
             return await scope.MayReadAsync(http.GetFacilitatorPrincipal(), team, ct)
                 ? Results.Ok(WorkDtoMapper.ToDto(work))
                 : Results.Problem(ProblemErrors.WorkNotFound(id));
+        });
+
+        // F1: the execution view of one work - assignment lines, attempts,
+        // the endpoint each took, and whether that endpoint is online.
+        group.MapGet("/works/{id:guid}/executions", async (
+            Guid id, ICoordinationStore store, TeamScope scope, HttpContext http,
+            Microsoft.EntityFrameworkCore.IDbContextFactory<FacilitatorDbContext> contextFactory,
+            CancellationToken ct) =>
+        {
+            var team = (await scope.TeamOfWorkAsync(id, ct)).FirstOrDefault();
+            if (!await scope.MayReadAsync(http.GetFacilitatorPrincipal(), team, ct))
+            {
+                return Results.Problem(ProblemErrors.WorkNotFound(id));
+            }
+
+            return Results.Ok(await ExecutionReads.LinesAsync(contextFactory, id, ct));
         });
 
         group.MapPost("/works/{id:guid}/merge", async (Guid id, HttpRequest request, IngressProcessor processor, HttpContext http, CancellationToken ct) =>
@@ -186,6 +233,25 @@ public static class WorkEndpoints
     /// Team slugs a read is filtered to: null (unfiltered) for a privileged or
     /// team-less caller, otherwise exactly the caller's teams.
     /// </summary>
+    // The queue item's subject: the routing intent envelope carries the work
+    // id in data.workId (the envelope is validated on write, so the read digs
+    // without re-validating).
+    private static Guid? ParseWorkId(string envelope)
+    {
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(envelope);
+            return doc.RootElement.GetProperty("data").TryGetProperty("workId", out var w)
+                && Guid.TryParse(w.GetString(), out var parsed)
+                ? parsed
+                : null;
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return null;
+        }
+    }
+
     private static IReadOnlyList<string>? VisibleTeamsOf(HttpContext http, TeamScope scope)
     {
         var principal = http.GetFacilitatorPrincipal();

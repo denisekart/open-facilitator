@@ -3,6 +3,8 @@ using System.Text.Json;
 using Facilitator.Kernel.Shared;
 using Facilitator.Kernel.Shared.Persistence;
 
+using Microsoft.EntityFrameworkCore;
+
 using Ofac.Protocol.Validation;
 
 namespace Facilitator.Kernel.Link;
@@ -39,10 +41,71 @@ public static partial class LinkEndpoints
         MapDeliveries(group);
         MapReceipt(group);
         MapCapabilities(group);
+        MapQueueReason(group);
         MapDevAffordances(app, environment);
 
         return app;
     }
+
+    // D2/P13: a gateway observes capacity and says so - an advisory reason on
+    // one of its team's assignment lines (`waiting-for-capacity` is the law's
+    // name). Observational only: no state moves, and the reason rides the
+    // assignment's timeline (`assignment.queue-reason`), rendered distinctly
+    // from `running` by the work's execution read.
+    private static void MapQueueReason(RouteGroupBuilder group) =>
+        group.MapPost("/assignments/{assignmentId:guid}/queue-reason",
+            async (Guid assignmentId, HttpRequest request, HttpContext http, TimeProvider time, CancellationToken ct) =>
+            {
+                var principal = LinkAuthMiddleware.RequirePrincipal(http);
+                if (!string.Equals(principal.Role, "gateway", StringComparison.Ordinal))
+                {
+                    return Results.Problem(ProblemErrors.Create(
+                        "gateway-only", "Forbidden", StatusCodes.Status403Forbidden,
+                        "only a gateway reports queue reasons"));
+                }
+
+                var body = await RequestBodies.ReadAsync(request, ct);
+                if (body.TooLarge)
+                {
+                    return Results.Problem(ProblemErrors.PayloadTooLarge(body.Bytes));
+                }
+
+                return await RequestBodyJson.ParseAsync(body, async document =>
+                {
+                    var reason = document.RootElement.TryGetProperty("queueReason", out var q)
+                        && q.ValueKind == JsonValueKind.String ? q.GetString() : null;
+                    await using var db = await http.RequestServices
+                        .GetRequiredService<Microsoft.EntityFrameworkCore.IDbContextFactory<Facilitator.Kernel.Shared.Persistence.FacilitatorDbContext>>()
+                        .CreateDbContextAsync(ct);
+                    var assignment = await db.Assignments.AsNoTracking()
+                        .FirstOrDefaultAsync(a => a.AssignmentId == assignmentId, ct);
+                    if (assignment is null || assignment.TeamId != principal.TeamId)
+                    {
+                        return Results.Problem(ProblemErrors.Create(
+                            "assignment-unknown", "Not found", StatusCodes.Status404NotFound, "no such assignment for this gateway's team"));
+                    }
+
+                    var workId = assignment.WorkId;
+                    var version = await db.Works.Where(w => w.WorkId == workId)
+                        .Select(w => w.Version).FirstAsync(ct);
+                    db.WorkEvents.Add(new Facilitator.Kernel.Shared.Persistence.WorkEventEntity
+                    {
+                        EventId = Guid.NewGuid(),
+                        WorkId = workId,
+                        WorkVersion = version,
+                        Kind = "assignment.queue-reason",
+                        Actor = $"link:{principal.EndpointId}",
+                        Detail = System.Text.Json.JsonSerializer.Serialize(new
+                        {
+                            assignmentId = assignmentId.ToString(),
+                            queueReason = reason,
+                        }),
+                        CreatedAt = time.GetUtcNow().UtcDateTime,
+                    });
+                    await db.SaveChangesAsync(ct);
+                    return Results.NoContent();
+                });
+            });
 
     // Dev-only test affordance: seed a link-addressed outbox row so link
     // delivery flows are provable end-to-end without a full assignment slice.

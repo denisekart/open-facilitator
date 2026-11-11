@@ -152,22 +152,36 @@ public sealed class IngressStore(IDbContextFactory<FacilitatorDbContext> context
     /// <summary>Open routing intents with age (D2: "waiting long" is a query,
     /// not a guess): pending outbox rows on the routing channel, oldest first.</summary>
     public async Task<IReadOnlyList<PendingIntentRow>> PendingIntentsAsync(
-        IReadOnlyList<string>? teamSlugs, CancellationToken ct)
+        IReadOnlyList<string>? teamSlugs, string? team, CancellationToken ct)
     {
         await using var db = await contextFactory.CreateDbContextAsync(ct);
-        return await db.Outbox.AsNoTracking()
-            .Where(o => o.Status == "pending" && o.RecipientEndpointId == Facilitator.Kernel.Work.RoutingIntent.Recipient)
-            .OrderBy(o => o.AvailableAt)
-            .Select(o => new PendingIntentRow(o.OutboxId, o.CommandId, o.Envelope, o.Attempts, o.AvailableAt, o.CreatedAt))
+        var query =
+            from o in db.Outbox.AsNoTracking()
+            join w in db.Works.AsNoTracking() on o.WorkId equals (Guid?)w.WorkId
+            where o.Status == "pending" && o.RecipientEndpointId == Facilitator.Kernel.Work.RoutingIntent.Recipient
+                  && o.WorkId != null
+            select new { Row = o, Work = w };
+        if (teamSlugs is not null)
+        {
+            query = query.Where(x => (x.Work.Team != null && teamSlugs.Contains(x.Work.Team.Slug))
+                || (x.Work.Team == null && x.Work.Project != null && teamSlugs.Contains(x.Work.Project.Team!.Slug)));
+        }
+
+        if (team is { Length: > 0 })
+        {
+            query = query.Where(x => (x.Work.Team != null && x.Work.Team.Slug == team)
+                || (x.Work.Team == null && x.Work.Project != null && x.Work.Project.Team!.Slug == team));
+        }
+
+        return await query
+            .OrderBy(x => x.Row.AvailableAt)
+            .Select(x => new PendingIntentRow(
+                x.Row.OutboxId, x.Row.CommandId, x.Row.Envelope, x.Row.Attempts, x.Row.AvailableAt, x.Row.CreatedAt))
             .Take(500)
             .ToListAsync(ct);
     }
 
-    /// <summary>One pending routing intent as the queue read renders it.</summary>
-public sealed record PendingIntentRow(
-    Guid OutboxId, string CommandId, string Envelope, int Attempts, DateTime AvailableAt, DateTime CreatedAt);
-
-/// <summary>The oldest live routing-intent age in seconds (0 when nothing
+    /// <summary>The oldest live routing-intent age in seconds (0 when nothing
     /// waits) — the starvation gauge (I5/N28).</summary>
     public async Task<double> OldestPendingIntentAgeSecondsAsync(CancellationToken ct)
     {
@@ -187,3 +201,7 @@ public sealed record PendingIntentRow(
         command.Parameters.Add(parameter);
     }
 }
+
+/// <summary>One pending routing intent as the queue read renders it.</summary>
+public sealed record PendingIntentRow(
+    Guid OutboxId, string CommandId, string Envelope, int Attempts, DateTime AvailableAt, DateTime CreatedAt);

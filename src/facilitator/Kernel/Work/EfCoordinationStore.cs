@@ -243,6 +243,16 @@ public sealed class EfCoordinationStore(
         }
 
         AppendWorkProgress(db, workId, $"work {current.State}→{to.Wire()}", causationId: null, createdAt: now);
+
+        // F4: cancellation discloses what already happened. The irreversible
+        // effects a running work may have produced (recorded outputs, links)
+        // are named on the timeline exactly when they exist - an operator
+        // reading the cancelled work sees what the cancel does NOT undo.
+        if (to == WorkState.Cancelled)
+        {
+            await AppendEffectsDisclosureAsync(db, workId, actor, now, ct);
+        }
+
         await AppendProviderCompletionReplyAsync(db, workId, to, current.State, transitionEventId, now, ct);
         await db.SaveChangesAsync(ct);
         await NotifyAsync(db, workId, ct);
@@ -618,6 +628,44 @@ public sealed class EfCoordinationStore(
                 CreatedAt = now,
             });
         }
+    }
+
+    /// <summary>F4: the `effects-disclosed` row of a cancel - manifest ids
+    /// and work links recorded while the work ran. Empty effects append
+    /// nothing (an honest cancel of a work that never acted).</summary>
+    private static async Task AppendEffectsDisclosureAsync(
+        FacilitatorDbContext db, Guid workId, string actor, DateTime now, CancellationToken ct)
+    {
+        var manifests = await db.ResultManifests.AsNoTracking()
+            .Where(m => m.WorkId == workId)
+            .OrderBy(m => m.RecordedAt)
+            .Select(m => m.ManifestId)
+            .ToListAsync(ct);
+        var links = await db.WorkLinks.AsNoTracking()
+            .Where(l => l.WorkId == workId || l.RefWorkId == workId)
+            .OrderBy(l => l.CreatedAt)
+            .Select(l => new { l.Kind, Other = l.WorkId == workId ? l.RefWorkId : l.WorkId })
+            .ToListAsync(ct);
+        if (manifests.Count == 0 && links.Count == 0)
+        {
+            return;
+        }
+
+        db.WorkEvents.Add(new WorkEventEntity
+        {
+            EventId = Guid.NewGuid(),
+            WorkId = workId,
+            WorkVersion = await db.Works.Where(w => w.WorkId == workId).Select(w => w.Version).FirstAsync(ct),
+            Kind = "effects-disclosed",
+            Actor = actor,
+            Detail = JsonSerializer.Serialize(new
+            {
+                manifests,
+                links = links.Select(l => new { kind = l.Kind, work = l.Other.ToString() }).ToArray(),
+                note = "recorded outputs and relations survive the cancellation",
+            }),
+            CreatedAt = now,
+        });
     }
 
     private static Guid? ProjectTeamId(FacilitatorDbContext db, Guid? projectId) =>

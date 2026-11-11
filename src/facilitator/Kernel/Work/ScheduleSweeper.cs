@@ -1,8 +1,8 @@
 using System.Text.Json;
 
 using Facilitator.Kernel.Shared;
-using Facilitator.Kernel.Shared.Persistence;
 using Facilitator.Kernel.Shared.Identity;
+using Facilitator.Kernel.Shared.Persistence;
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;

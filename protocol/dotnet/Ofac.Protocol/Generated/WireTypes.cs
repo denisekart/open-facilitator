@@ -1922,6 +1922,71 @@ namespace Ofac.Protocol
         public ConversationReference reference { get; set; }
     }
 
+    public partial class ProviderReviewEventV1Data
+    {
+        /// <summary>
+        /// What happened to the review itself: submitted the verdict, edited it, or dismissed it.
+        /// </summary>
+        [JsonPropertyName("action")]
+        public ProviderReviewEventV1DataAction action { get; set; }
+
+        [JsonPropertyName("actorProviderAccountId")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string actorProviderAccountId { get; set; }
+
+        /// <summary>
+        /// Provider review id, when the provider exposes one (GitHub review id, GitLab discussion
+        /// id).
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("commentId")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string? commentId { get; set; }
+
+        /// <summary>
+        /// Head branch of the reviewed change request, when the provider carries it.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("headRef")]
+        [JsonConverter(typeof(MinMaxLengthCheckConverter4))]
+        public string? headRef { get; set; }
+
+        /// <summary>
+        /// Verbatim provider event payload as received (audit + reconcile evidence).
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("payload")]
+        public Dictionary<string, object>? payload { get; set; }
+
+        /// <summary>
+        /// Provider token owning this event; MUST equal reference.provider.
+        /// </summary>
+        [JsonPropertyName("provider")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string provider { get; set; }
+
+        [JsonPropertyName("providerDeliveryId")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string providerDeliveryId { get; set; }
+
+        [JsonPropertyName("reference")]
+        public ConversationReference reference { get; set; }
+
+        /// <summary>
+        /// The review verdict. A comment is not a review (it normalizes to mention/change_request);
+        /// only a formal review carries a state.
+        /// </summary>
+        [JsonPropertyName("state")]
+        public State state { get; set; }
+
+        /// <summary>
+        /// The review body ('' when the reviewer submitted no comment).
+        /// </summary>
+        [JsonPropertyName("text")]
+        [JsonConverter(typeof(MinMaxLengthCheckConverter5))]
+        public string text { get; set; }
+    }
+
     /// <summary>
     /// Kernel-internal routing intent: a Work needs an assignment for a capability. Emitted by
     /// every Work-creating arm (REST ingress and provider ingest); consumed by the kernel
@@ -1946,7 +2011,7 @@ namespace Ofac.Protocol
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("dependsOnJson")]
-        [JsonConverter(typeof(MinMaxLengthCheckConverter4))]
+        [JsonConverter(typeof(MinMaxLengthCheckConverter6))]
         public string? dependsOnJson { get; set; }
 
         /// <summary>
@@ -2200,6 +2265,17 @@ namespace Ofac.Protocol
     /// </summary>
     public enum ProviderPipelineEventV1DataAction { Error, Failure, Pending, Success };
 
+    /// <summary>
+    /// What happened to the review itself: submitted the verdict, edited it, or dismissed it.
+    /// </summary>
+    public enum ProviderReviewEventV1DataAction { Changed, Dismissed, Submitted };
+
+    /// <summary>
+    /// The review verdict. A comment is not a review (it normalizes to mention/change_request);
+    /// only a formal review carries a state.
+    /// </summary>
+    public enum State { Approved, ChangesRequested };
+
     public enum WorkspaceHeartbeatEventV1DataStatus { Busy, Draining, Error, Idle };
 
     public enum ReceiptV1Status { Accepted, Duplicate, Rejected, Unsupported };
@@ -2231,6 +2307,8 @@ namespace Ofac.Protocol
                 ProviderChangeRequestEventV1DataActionConverter.Singleton,
                 ProviderIssueEventV1DataActionConverter.Singleton,
                 ProviderPipelineEventV1DataActionConverter.Singleton,
+                ProviderReviewEventV1DataActionConverter.Singleton,
+                StateConverter.Singleton,
                 WorkspaceHeartbeatEventV1DataStatusConverter.Singleton,
                 ReceiptV1StatusConverter.Singleton,
                 new DateOnlyConverter(),
@@ -3734,6 +3812,45 @@ namespace Ofac.Protocol
         public static readonly ProviderPipelineEventV1DataActionConverter Singleton = new ProviderPipelineEventV1DataActionConverter();
     }
 
+    internal class ProviderReviewEventV1DataActionConverter : JsonConverter<ProviderReviewEventV1DataAction>
+    {
+        public override bool CanConvert(Type t) => t == typeof(ProviderReviewEventV1DataAction);
+
+        public override ProviderReviewEventV1DataAction Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            var value = reader.GetString();
+            switch (value)
+            {
+                case "changed":
+                    return ProviderReviewEventV1DataAction.Changed;
+                case "dismissed":
+                    return ProviderReviewEventV1DataAction.Dismissed;
+                case "submitted":
+                    return ProviderReviewEventV1DataAction.Submitted;
+            }
+            throw new Exception("Cannot unmarshal type ProviderReviewEventV1DataAction");
+        }
+
+        public override void Write(Utf8JsonWriter writer, ProviderReviewEventV1DataAction value, JsonSerializerOptions options)
+        {
+            switch (value)
+            {
+                case ProviderReviewEventV1DataAction.Changed:
+                    JsonSerializer.Serialize(writer, "changed", options);
+                    return;
+                case ProviderReviewEventV1DataAction.Dismissed:
+                    JsonSerializer.Serialize(writer, "dismissed", options);
+                    return;
+                case ProviderReviewEventV1DataAction.Submitted:
+                    JsonSerializer.Serialize(writer, "submitted", options);
+                    return;
+            }
+            throw new Exception("Cannot marshal type ProviderReviewEventV1DataAction");
+        }
+
+        public static readonly ProviderReviewEventV1DataActionConverter Singleton = new ProviderReviewEventV1DataActionConverter();
+    }
+
     internal class MinMaxLengthCheckConverter4 : JsonConverter<string>
     {
         public override bool CanConvert(Type t) => t == typeof(string);
@@ -3741,7 +3858,7 @@ namespace Ofac.Protocol
         public override string Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             var value = reader.GetString();
-            if (value.Length >= 2 && value.Length <= 8192)
+            if (value.Length <= 255)
             {
                 return value;
             }
@@ -3750,7 +3867,7 @@ namespace Ofac.Protocol
 
         public override void Write(Utf8JsonWriter writer, string value, JsonSerializerOptions options)
         {
-            if (value.Length >= 2 && value.Length <= 8192)
+            if (value.Length <= 255)
             {
                 JsonSerializer.Serialize(writer, value, options);
                 return;
@@ -3759,6 +3876,40 @@ namespace Ofac.Protocol
         }
 
         public static readonly MinMaxLengthCheckConverter4 Singleton = new MinMaxLengthCheckConverter4();
+    }
+
+    internal class StateConverter : JsonConverter<State>
+    {
+        public override bool CanConvert(Type t) => t == typeof(State);
+
+        public override State Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            var value = reader.GetString();
+            switch (value)
+            {
+                case "approved":
+                    return State.Approved;
+                case "changes-requested":
+                    return State.ChangesRequested;
+            }
+            throw new Exception("Cannot unmarshal type State");
+        }
+
+        public override void Write(Utf8JsonWriter writer, State value, JsonSerializerOptions options)
+        {
+            switch (value)
+            {
+                case State.Approved:
+                    JsonSerializer.Serialize(writer, "approved", options);
+                    return;
+                case State.ChangesRequested:
+                    JsonSerializer.Serialize(writer, "changes-requested", options);
+                    return;
+            }
+            throw new Exception("Cannot marshal type State");
+        }
+
+        public static readonly StateConverter Singleton = new StateConverter();
     }
 
     internal class MinMaxLengthCheckConverter5 : JsonConverter<string>
@@ -3786,6 +3937,33 @@ namespace Ofac.Protocol
         }
 
         public static readonly MinMaxLengthCheckConverter5 Singleton = new MinMaxLengthCheckConverter5();
+    }
+
+    internal class MinMaxLengthCheckConverter6 : JsonConverter<string>
+    {
+        public override bool CanConvert(Type t) => t == typeof(string);
+
+        public override string Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            var value = reader.GetString();
+            if (value.Length >= 2 && value.Length <= 8192)
+            {
+                return value;
+            }
+            throw new Exception("Cannot unmarshal type string");
+        }
+
+        public override void Write(Utf8JsonWriter writer, string value, JsonSerializerOptions options)
+        {
+            if (value.Length >= 2 && value.Length <= 8192)
+            {
+                JsonSerializer.Serialize(writer, value, options);
+                return;
+            }
+            throw new Exception("Cannot marshal type string");
+        }
+
+        public static readonly MinMaxLengthCheckConverter6 Singleton = new MinMaxLengthCheckConverter6();
     }
 
     internal class WorkspaceHeartbeatEventV1DataStatusConverter : JsonConverter<WorkspaceHeartbeatEventV1DataStatus>

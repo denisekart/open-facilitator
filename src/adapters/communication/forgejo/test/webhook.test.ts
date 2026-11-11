@@ -31,6 +31,8 @@ const silent: LinkLogger = {
 };
 
 class FakeApi implements ForgejoApi {
+  reactToComment = async (): Promise<void> => undefined;
+  updateComment = async (): Promise<void> => undefined;
   constructor(private readonly prs: number[] = [7]) {}
   shaLookups: { repo: string; sha: string }[] = [];
 

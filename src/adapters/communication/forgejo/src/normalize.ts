@@ -38,6 +38,8 @@ import {
   PIPELINE_EVENT_TYPE,
   id,
   mentionsBot,
+  reviewEvent,
+  reviewStateFor,
   normalizeLabels,
   num,
   obj,
@@ -291,8 +293,40 @@ export function normalizeReview(
   const text = reviewText(payload);
   const headRef = str(obj(pr?.["head"])?.["ref"]);
   const commentId = id(obj(payload["review"])?.["id"]);
+  // Forgejo names the verdict on the review directive (`review.type`:
+  // approve / reject / comment, verified live); a comment carries no state.
+  const state = reviewStateFor(str(obj(payload["review"])?.["type"]));
+  const companion = mentionCompanion(
+    payload,
+    `${deliveryId}:review`,
+    ctx,
+    repo,
+    number,
+    author,
+    commentId,
+    text,
+  );
+  const ref = reference(ctx, repo, number, author);
+  if (state !== undefined) {
+    return [
+      reviewEvent({
+        reference: ref,
+        provider: "forgejo",
+        providerDeliveryId: deliveryId,
+        actorProviderAccountId: author,
+        action: "submitted",
+        state,
+        text: text ?? "",
+        ...(commentId === undefined ? {} : { commentId }),
+        ...(headRef === undefined ? {} : { headRef }),
+        payload,
+      }),
+      ...companion,
+    ];
+  }
+
   const data: ProviderChangeRequestEventV1Data = {
-    reference: reference(ctx, repo, number, author),
+    reference: ref,
     provider: "forgejo",
     providerDeliveryId: deliveryId,
     actorProviderAccountId: author,
@@ -302,17 +336,42 @@ export function normalizeReview(
     ...(commentId === undefined ? {} : { commentId }),
     payload,
   };
-  const companion = mentionCompanion(
-    payload,
-    deliveryId,
-    ctx,
-    repo,
-    number,
-    author,
-    commentId,
-    text,
-  );
   return [{ type: CHANGE_REQUEST_EVENT_TYPE, data }, ...companion];
+}
+
+/** `pull_request_review_comment` (a comment ON the diff): forge-neutral as a
+ *  change_request `commented` event with the comment id - the review-comment
+ *  shape GitHub already emitted and the kernel's review arm reads (E1). */
+export function normalizeReviewComment(
+  payload: Payload,
+  deliveryId: string,
+  ctx: NormalizeContext,
+): NormalizedEvent[] {
+  if (senderDropped(payload, ctx)) return [];
+  const repo = repoOf(payload);
+  const pr = obj(payload["pull_request"]);
+  const number = num(pr?.["number"]) ?? "";
+  if (repo === undefined || number === "") return [];
+  const author = str(obj(payload["sender"])?.["login"]) ?? "";
+  const comment = obj(payload["comment"]);
+  const text = str(comment?.["body"]);
+  const commentId = id(comment?.["id"]);
+  const headRef = str(obj(pr?.["head"])?.["ref"]);
+  const data: ProviderChangeRequestEventV1Data = {
+    reference: reference(ctx, repo, number, author, commentId),
+    provider: "forgejo",
+    providerDeliveryId: deliveryId,
+    actorProviderAccountId: author,
+    action: "commented",
+    ...(text === undefined ? {} : { text }),
+    ...(headRef === undefined ? {} : { headRef }),
+    ...(commentId === undefined ? {} : { commentId }),
+    payload,
+  };
+  return [
+    { type: CHANGE_REQUEST_EVENT_TYPE, data },
+    ...mentionCompanion(payload, deliveryId, ctx, repo, number, author, commentId, text),
+  ];
 }
 
 const CI_STATES: Record<string, true> = {

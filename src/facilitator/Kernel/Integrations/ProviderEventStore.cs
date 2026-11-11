@@ -386,6 +386,7 @@ public sealed class ProviderEventStore(
             ProviderEventClass.Issue => await IssueArmAsync(db, workload, options, data, reference, providerDeliveryId, now, ct, type),
             ProviderEventClass.ChangeRequest => await ChangeRequestArmAsync(db, provider, options, data, reference, providerDeliveryId, now, ct),
             ProviderEventClass.Pipeline => await PipelineArmAsync(db, data, reference, providerDeliveryId, now, ct),
+            ProviderEventClass.Review => await ReviewArmAsync(db, provider, data, reference, providerDeliveryId, now, ct),
             ProviderEventClass.Message => await MessageArmAsync(db, workload, options, data, reference, providerDeliveryId, now, ct),
             _ => new ArmEffect(null, "observe:unhandled"),
         };
@@ -824,36 +825,8 @@ public sealed class ProviderEventStore(
             var version = await db.Works.Where(w => w.WorkId == workId).Select(w => w.Version).FirstOrDefaultAsync(ct);
             var directive = Trim(text ?? $"{provider} {action} on change request #{reference.Root}");
 
-            // K4/K6: a review on the change request is a timeline decision, and
-            // the kernel says what it is worth. A reviewer whose provider
-            // account is linked to a human identity is a HUMAN decision on the
-            // item; anyone else (the contributor's own "checks passed", an
-            // unlinked bot) is recorded as an unverified claim. Either way the
-            // accountable person is the work owner, named on the row (L2).
-            var reviewer = data.TryGetProperty("actorProviderAccountId", out var acct)
-                && acct.ValueKind == JsonValueKind.String ? acct.GetString() ?? string.Empty : string.Empty;
-            var humanSubject = await db.ProviderIdentities.AsNoTracking()
-                .Where(i => i.Provider == provider && i.AccountId == reviewer)
-                .Select(i => $"{i.OidcIssuer}|{i.OidcSubject}").FirstOrDefaultAsync(ct);
-            var ownerActor = await db.Works.AsNoTracking()
-                .Where(w => w.WorkId == workId).Select(w => w.OwnerActor).FirstOrDefaultAsync(ct);
-            db.WorkEvents.Add(new WorkEventEntity
-            {
-                EventId = Guid.NewGuid(),
-                WorkId = workId,
-                WorkVersion = version,
-                Kind = "review.decision",
-                Actor = humanSubject is { Length: > 0 } subject ? $"oidc:{subject}" : $"provider:{provider}:{reviewer}",
-                Detail = JsonSerializer.Serialize(new Dictionary<string, string?>
-                {
-                    ["changeRequest"] = $"{reference.Provider}/{reference.Root}",
-                    ["action"] = action,
-                    ["verdict"] = Trim(text ?? string.Empty),
-                    ["verified"] = humanSubject is { Length: > 0 } ? "human" : "unverified-claim",
-                    ["accountable"] = ownerActor,
-                }),
-                CreatedAt = now,
-            });
+            // K4/K6: a review on the change request is a timeline decision.
+            await AppendReviewDecisionAsync(db, provider, workId, version, data, reference, action, text, now, ct);
             return new ArmEffect(workId, $"steered:{workId}", (workId, directive, version));
         }
 
@@ -865,6 +838,93 @@ public sealed class ProviderEventStore(
         }
 
         return new ArmEffect(null, $"observe:{action}");
+    }
+
+    // Review (E1/E4): a formal verdict on the change request - the decision
+    // class the forge-native `reviewed` action was too weak to carry. Same
+    // decision row as the reviewed action, plus the steer; a review on a
+    // COMPLETED item forks through AppendWorkInputAsync's terminal law (the
+    // original is untouched, the successor carries the review as input).
+    private async Task<ArmEffect> ReviewArmAsync(
+        FacilitatorDbContext db, string provider, JsonElement data, Reference reference, string deliveryId, DateTime now, CancellationToken ct)
+    {
+        var action = data.GetProperty("action").GetString() ?? string.Empty;
+        var state = data.GetProperty("state").GetString() ?? string.Empty;
+        var text = data.TryGetProperty("text", out var t_) && t_.ValueKind == JsonValueKind.String
+            ? t_.GetString()
+            : string.Empty;
+        var binding = await db.CommunicationBindings.FirstOrDefaultAsync(b =>
+            b.Provider == reference.Provider && b.Channel == reference.Channel && b.RootMessageId == reference.Root, ct);
+        if (binding?.WorkId is not { } boundWork)
+        {
+            return new ArmEffect(null, "review:unbound");
+        }
+
+        var workId = boundWork;
+        var work = await db.Works.Where(w => w.WorkId == workId)
+            .Select(w => new { w.Version, w.State }).FirstAsync(ct);
+
+        // E4: a review on a TERMINAL item never reopens it - it forks a
+        // successor with the review as input (AppendWorkInputAsync's terminal
+        // law), the original keeps its history and just records the decision.
+        if (work.State is "completed" or "cancelled" or "failed")
+        {
+            await AppendReviewDecisionAsync(
+                db, provider, workId, work.Version, data, reference, $"{action}:{state}", text, now, ct);
+            var forked = await AppendWorkInputAsync(db, provider, workId,
+                InputNote(reference, deliveryId, $"{state} review on change request #{reference.Root}: {text}"), now, ct);
+            return new ArmEffect(forked, $"work/{forked}:input");
+        }
+
+        await AppendReviewDecisionAsync(
+            db, provider, workId, work.Version, data, reference,
+            action == "submitted" ? $"submitted:{state}" : action, text, now, ct);
+        if (action == "submitted")
+        {
+            var directive = Trim($"{state} review on change request #{reference.Root}: {text}");
+            return new ArmEffect(workId, $"steered:{workId}", (workId, directive, work.Version));
+        }
+
+        // changed/dismissed on a live item: the timeline row above is the
+        // record; no steer - the verdict did not change.
+        return new ArmEffect(workId, $"review:{action}");
+    }
+
+    /// <summary>The K4/K6 law, one writer for both review shapes: the kernel
+    /// says what a review is worth. A reviewer whose provider account is
+    /// linked to a human identity is a HUMAN decision on the item; anyone else
+    /// (the contributor's own "checks passed", an unlinked bot) is recorded as
+    /// an unverified claim. Either way the accountable person is the work
+    /// owner, named on the row (L2).</summary>
+    private static async Task AppendReviewDecisionAsync(
+        FacilitatorDbContext db, string provider, Guid workId, long workVersion, JsonElement data,
+        Reference reference, string action, string? text, DateTime now, CancellationToken ct)
+    {
+        var _ = ct;
+        var reviewer = data.TryGetProperty("actorProviderAccountId", out var acct)
+            && acct.ValueKind == JsonValueKind.String ? acct.GetString() ?? string.Empty : string.Empty;
+        var humanSubject = await db.ProviderIdentities.AsNoTracking()
+            .Where(i => i.Provider == provider && i.AccountId == reviewer)
+            .Select(i => $"{i.OidcIssuer}|{i.OidcSubject}").FirstOrDefaultAsync(ct);
+        var ownerActor = await db.Works.AsNoTracking()
+            .Where(w => w.WorkId == workId).Select(w => w.OwnerActor).FirstOrDefaultAsync(ct);
+        db.WorkEvents.Add(new WorkEventEntity
+        {
+            EventId = Guid.NewGuid(),
+            WorkId = workId,
+            WorkVersion = workVersion,
+            Kind = "review.decision",
+            Actor = humanSubject is { Length: > 0 } subject ? $"oidc:{subject}" : $"provider:{provider}:{reviewer}",
+            Detail = JsonSerializer.Serialize(new Dictionary<string, string?>
+            {
+                ["changeRequest"] = $"{reference.Provider}/{reference.Root}",
+                ["action"] = action,
+                ["verdict"] = Trim(text ?? string.Empty),
+                ["verified"] = humanSubject is { Length: > 0 } ? "human" : "unverified-claim",
+                ["accountable"] = ownerActor,
+            }),
+            CreatedAt = now,
+        });
     }
 
     /// <summary>The PR head branch of a change-request event: the adapter-

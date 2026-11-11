@@ -1,0 +1,30 @@
+{
+  "specversion": "1.0",
+  "id": "01JGITHUB-review-submitted",
+  "source": "urn:ofac:provider:forgejo:team-alpha",
+  "type": "org.facilitator.event.provider.review.v1",
+  "subject": "provider/forgejo/pr-2",
+  "time": "2026-10-29T09:00:00Z",
+  "datacontenttype": "application/json",
+  "dataschema": "https://schemas.openfacilitator.org/v1/event.provider.review.v1.json",
+  "data": {
+    "reference": {
+      "provider": "forgejo",
+      "providerInstanceId": "local-git",
+      "tenantOrOrganizationId": "demo",
+      "channelOrResourceId": "demo/widgets",
+      "rootThreadId": "2",
+      "subjectRef": "2",
+      "conversationKind": "comment",
+      "authorProviderAccountId": "reviewer"
+    },
+    "provider": "forgejo",
+    "providerDeliveryId": "b1b2c3d4-0000-4000-8000-000000000004",
+    "actorProviderAccountId": "reviewer",
+    "text": "Approved - the retry clause reads right now.",
+    "action": "submitted",
+    "state": "approved",
+    "commentId": "review-99",
+    "headRef": "feature/retry"
+  }
+}

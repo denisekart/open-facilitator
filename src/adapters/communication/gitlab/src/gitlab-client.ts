@@ -50,6 +50,13 @@ export interface GitLabApi {
    *  the domain. Returns the created note id. */
   postIssueNote(repo: string, iid: number, body: string): Promise<GitLabNote>;
   postMrNote(repo: string, iid: number, body: string): Promise<GitLabNote>;
+  /** Award emoji on a note (the resource is resolved caller-side like every
+   *  other two-domain GitLab verb). */
+  awardIssueNoteEmoji(repo: string, iid: number, noteId: number, emoji: string): Promise<void>;
+  awardMrNoteEmoji(repo: string, iid: number, noteId: number, emoji: string): Promise<void>;
+  /** Edit OUR note (the update law: callers check the ledger first). */
+  editIssueNote(repo: string, iid: number, noteId: number, body: string): Promise<void>;
+  editMrNote(repo: string, iid: number, noteId: number, body: string): Promise<void>;
   /** Open an MR (connector-side privileged write; the adapter never calls
    *  it but the client module is shared). */
   openMr(
@@ -74,6 +81,16 @@ export interface GitLabApi {
   ): Promise<GitLabNote | undefined>;
   /** Read an issue (connector `vcs.issue.read`). */
   getIssue(repo: string, iid: number): Promise<GitLabIssue>;
+  /** Open an issue (C9: assigned to the HUMAN owner, never the bot alone). */
+  createIssue(repo: string, title: string, description: string, assignee: string): Promise<number>;
+  /** Close an issue (the state field is the whole mutation). */
+  closeIssue(repo: string, iid: number): Promise<void>;
+  /** First bot-created issue whose description carries the marker (the
+   *  `vcs.issue.create` reconcile read). */
+  findIssueByMarker(repo: string, marker: string): Promise<number | undefined>;
+  /** Accept (merge) an MR (connector `vcs.change_request.merge`; GitLab
+   *  merges asynchronously - true means the accept was accepted). */
+  mergeMr(repo: string, iid: number, method: string): Promise<boolean>;
   /** Upsert label titles on an issue (connector `vcs.issue.label`; GitLab
    *  `PUT issues` with `add_labels` is a set-union upsert). */
   addLabels(repo: string, iid: number, labels: readonly string[]): Promise<void>;
@@ -192,6 +209,83 @@ export class GitLabClient implements GitLabApi {
       { body },
     );
     return { id: dto.id, web_url: dto.web_url };
+  }
+
+  async createIssue(repo: string, title: string, description: string, assignee: string): Promise<number> {
+    const dto = await this.request<IssueDto>(
+      "createIssue",
+      "POST",
+      `/projects/${this.project(repo)}/issues`,
+      { title, description, assignee_username: assignee },
+    );
+    return dto.iid;
+  }
+
+  async closeIssue(repo: string, iid: number): Promise<void> {
+    await this.request<void>(
+      "closeIssue",
+      "PUT",
+      `/projects/${this.project(repo)}/issues/${iid}`,
+      { state_event: "close" },
+    );
+  }
+
+  async findIssueByMarker(repo: string, marker: string): Promise<number | undefined> {
+    const dtos = await this.request<Array<{ iid: number; description: string | null }>>(
+      "findIssueByMarker",
+      "GET",
+      `/projects/${this.project(repo)}/issues?author_username=@me&state=all&per_page=100`,
+    );
+    const hit = dtos.find((dto) => (dto.description ?? "").includes(marker));
+    return hit?.iid;
+  }
+
+  async mergeMr(repo: string, iid: number, method: string): Promise<boolean> {
+    // GitLab merges asynchronously; when_sha is the strictest read-back the
+    // accept response gives. `method` rides squash when the caller asked.
+    const dto = await this.request<{ merged?: boolean; merge_status?: string; sha?: string }>(
+      "mergeMr",
+      "PUT",
+      `/projects/${this.project(repo)}/merge_requests/${iid}/merge`,
+      { squash: method === "squash", should_remove_source_branch: false },
+    );
+    return dto.merged === true || dto.merge_status === "can_be_merged" || dto.sha !== undefined;
+  }
+
+  async awardIssueNoteEmoji(repo: string, iid: number, noteId: number, emoji: string): Promise<void> {
+    await this.request<void>(
+      "awardIssueNoteEmoji",
+      "POST",
+      `/projects/${this.project(repo)}/issues/${iid}/notes/${noteId}/award_emoji`,
+      { name: emoji },
+    );
+  }
+
+  async awardMrNoteEmoji(repo: string, iid: number, noteId: number, emoji: string): Promise<void> {
+    await this.request<void>(
+      "awardMrNoteEmoji",
+      "POST",
+      `/projects/${this.project(repo)}/merge_requests/${iid}/notes/${noteId}/award_emoji`,
+      { name: emoji },
+    );
+  }
+
+  async editIssueNote(repo: string, iid: number, noteId: number, body: string): Promise<void> {
+    await this.request<void>(
+      "editIssueNote",
+      "PUT",
+      `/projects/${this.project(repo)}/issues/${iid}/notes/${noteId}`,
+      { body },
+    );
+  }
+
+  async editMrNote(repo: string, iid: number, noteId: number, body: string): Promise<void> {
+    await this.request<void>(
+      "editMrNote",
+      "PUT",
+      `/projects/${this.project(repo)}/merge_requests/${iid}/notes/${noteId}`,
+      { body },
+    );
   }
 
   async openMr(

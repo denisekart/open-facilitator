@@ -15,6 +15,7 @@ import type { CommandContext, LinkLogger } from "@ofac/workspace-link";
 import type { WebhookDelivery } from "@ofac/provider-core/node";
 import {
   CHANGE_REQUEST_EVENT,
+  REVIEW_EVENT,
   ISSUE_EVENT,
   MENTION_EVENT,
   AdapterState,
@@ -71,6 +72,22 @@ class FakeApi implements GitLabApi {
     const note = { repo, iid, body, id: this.next++ };
     this.mrNotes.push(note);
     return { id: note.id, web_url: "" };
+  };
+  awards: { repo: string; iid: number; noteId: number; name: string; domain: string }[] = [];
+  edits: { repo: string; iid: number; noteId: number; body: string; domain: string }[] = [];
+  awardIssueNoteEmoji = async (repo: string, iid: number, noteId: number, name: string) => {
+    if (this.failIssueNotes) throw new GitLabError("awardIssueNoteEmoji", 404, "not an issue");
+    this.awards.push({ repo, iid, noteId, name, domain: "issue" });
+  };
+  awardMrNoteEmoji = async (repo: string, iid: number, noteId: number, name: string) => {
+    this.awards.push({ repo, iid, noteId, name, domain: "mr" });
+  };
+  editIssueNote = async (repo: string, iid: number, noteId: number, body: string) => {
+    if (this.failIssueNotes) throw new GitLabError("editIssueNote", 404, "not an issue");
+    this.edits.push({ repo, iid, noteId, body, domain: "issue" });
+  };
+  editMrNote = async (repo: string, iid: number, noteId: number, body: string) => {
+    this.edits.push({ repo, iid, noteId, body, domain: "mr" });
   };
   openMr = async () => ({ iid: 1, source_branch: "" });
   openMrsForSource = async () => [] as number[];
@@ -269,7 +286,7 @@ describe("fixture classification through the seam", () => {
     expect(steer.events.map((e) => e.type)).toEqual([CHANGE_REQUEST_EVENT, MENTION_EVENT]);
   });
 
-  it("Merge Request Hook open/approve → opened/reviewed with headRef", async () => {
+  it("Merge Request Hook open/approve → opened + an approved review.v1 verdict", async () => {
     const n = normalizer(new FakeApi());
     const opened = await n(
       delivery(json(mrOpened), {
@@ -293,7 +310,13 @@ describe("fixture classification through the seam", () => {
     );
     expect(approved.kind).toBe("normalized");
     if (approved.kind !== "normalized") return;
-    expect((approved.events[0]!.data as { action: string }).action).toBe("reviewed");
+    // E1: the approve hook IS the verdict - it normalizes to the decision
+    // class, not the change_request reviewed stand-in.
+    expect(approved.events[0]!.type).toBe(REVIEW_EVENT);
+    expect(approved.events[0]!.data as { action: string; state: string }).toMatchObject({
+      action: "submitted",
+      state: "approved",
+    });
   });
 
   it("echo law: a bot-authored delivery drops", async () => {

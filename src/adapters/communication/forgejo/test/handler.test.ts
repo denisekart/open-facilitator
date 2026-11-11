@@ -21,6 +21,8 @@ const silent: LinkLogger = {
 };
 
 class FakeApi implements ForgejoApi {
+  reactToComment = async (): Promise<void> => undefined;
+  updateComment = async (): Promise<void> => undefined;
   posts: { repo: string; number: number; body: string }[] = [];
   nextId = 100;
 
@@ -128,17 +130,17 @@ describe("forgejo handler", () => {
     }
   });
 
-  it("react/update/acknowledge answer unsupported (receipt, no throw)", async () => {
+  it("react/update/acknowledge are real arms - malformed data answers a typed receipt", async () => {
     const { handler, state, dir } = harness();
     try {
-      for (const type of [
-        "org.facilitator.command.communication.react.v1",
-        "org.facilitator.command.communication.update.v1",
-        "org.facilitator.command.communication.acknowledge.v1",
+      for (const [type, reason] of [
+        ["org.facilitator.command.communication.react.v1", "malformed-react-data"],
+        ["org.facilitator.command.communication.update.v1", "malformed-update-data"],
+        ["org.facilitator.command.communication.acknowledge.v1", "malformed-acknowledge-data"],
       ]) {
         expect(
           await handler.onCommand({ type, data: {} } as unknown as EnvelopeCommand, ctx),
-        ).toEqual({ kind: "unsupported" });
+        ).toEqual({ kind: "rejected", reason });
       }
     } finally {
       state.close();
@@ -183,9 +185,14 @@ describe("forgejo handler", () => {
     }
   });
 
-  it("advertises exactly the reply capability", () => {
+  it("advertises the full communication command family", () => {
     const manifest = forgejoAdapterManifest("team-alpha");
-    expect(manifest.capabilities.map((c) => c.id)).toEqual([CMD_REPLY]);
+    expect(manifest.capabilities.map((c) => c.id)).toEqual([
+      CMD_REPLY,
+      "org.facilitator.command.communication.react.v1",
+      "org.facilitator.command.communication.update.v1",
+      "org.facilitator.command.communication.acknowledge.v1",
+    ]);
     expect(manifest.ownerTeam).toBe("team-alpha");
   });
 });

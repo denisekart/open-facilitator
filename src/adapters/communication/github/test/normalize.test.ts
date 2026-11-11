@@ -8,8 +8,9 @@ import type {
   ProviderChangeRequestEventV1Data,
   ProviderIssueEventV1Data,
   ProviderPipelineEventV1Data,
+  ProviderReviewEventV1Data,
 } from "@ofac/protocol";
-import { CHANGE_REQUEST, ISSUE, MENTION, ctx, eventsOfType } from "./helpers.js";
+import { CHANGE_REQUEST, ISSUE, MENTION, REVIEW, ctx, eventsOfType } from "./helpers.js";
 import {
   normalizeCheckSuite,
   normalizeIssueComment,
@@ -176,13 +177,32 @@ describe("normalizePullRequest", () => {
 });
 
 describe("normalizeReview", () => {
-  it("submitted maps to reviewed with the body and the review id as commentId", () => {
+  it("a submitted verdict is a review.v1 decision with body, id and head", () => {
     const events = normalizeReview(pullRequestReviewSubmitted as never, "d13", ctx);
-    const data = events[0]?.data as ProviderChangeRequestEventV1Data;
-    expect(data.action).toBe("reviewed");
+    const review = events.find((e) => e.type === REVIEW);
+    expect(review).toBeDefined();
+    const data = review?.data as ProviderReviewEventV1Data;
+    expect(data.action).toBe("submitted");
+    expect(data.state).toBe("changes-requested");
     expect(data.text).toContain("Please sort the table");
     expect(data.commentId).toBe("3671");
     expect(data.headRef).toBe("ofac/feature-branch");
+    // A verdict that is not the CR state-change family anymore: the decision
+    // rides review.v1 alone.
+    expect(eventsOfType(events, CHANGE_REQUEST)).toHaveLength(0);
+  });
+
+  it("a comment-verdict (no formal state) still rides change_request reviewed", () => {
+    const events = normalizeReview(
+      {
+        ...pullRequestReviewSubmitted,
+        review: { ...(pullRequestReviewSubmitted as { review: object }).review, state: "comment" },
+      } as never,
+      "d13b",
+      ctx,
+    );
+    const data = events.find((e) => e.type === CHANGE_REQUEST)?.data as ProviderChangeRequestEventV1Data;
+    expect(data?.action).toBe("reviewed");
   });
 
   it("a review mentioning the bot rides the mention companion", () => {

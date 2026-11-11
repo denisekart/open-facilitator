@@ -52,6 +52,18 @@ export interface GitHubApi {
   /** POST issue/PR comment (issue comments and PR review-conversation
    *  comments share the issues route on GitHub). Returns the created id. */
   postComment(repo: string, number: number, body: string): Promise<GitHubComment>;
+  /** Open an issue (C9: the human owner is assigned, never the bot alone).
+   *  Returns the created number. */
+  createIssue(repo: string, title: string, body: string, assignee?: string): Promise<number>;
+  /** Close an issue or PR (the issues route serves both). */
+  closeIssue(repo: string, number: number): Promise<void>;
+  /** Merge a PR (the method the provider needs; squash/merge/rebase). */
+  mergePr(repo: string, number: number, method: string): Promise<boolean>;
+  /** React to an issue/PR comment (the comment-level route: a body-level
+   *  reaction needs GraphQL, the kernel only ever reacts to a post). */
+  reactToComment(repo: string, commentId: number, content: string): Promise<void>;
+  /** Edit OUR comment (the update law: callers check the ledger first). */
+  updateComment(repo: string, commentId: number, body: string): Promise<void>;
   /** Open a PR (connector-side privileged write; the adapter never calls it
    *  but the client module is shared). */
   openPr(
@@ -74,6 +86,11 @@ export interface GitHubApi {
   ): Promise<GitHubComment | undefined>;
   /** Read an issue (connector `vcs.issue.read`). */
   getIssue(repo: string, number: number): Promise<GitHubIssue>;
+  /** First BOT-created issue whose body carries the marker (the
+   *  `vcs.issue.create` reconcile read: the creator list is strongly
+   *  consistent, the search API is not, and a lost response must never
+   *  mint a second ticket). */
+  findIssueByMarker(repo: string, marker: string): Promise<number | undefined>;
   /** Read a PR (connector `vcs.change_request.read`). */
   getPullRequest(repo: string, number: number): Promise<GitHubPullRequestDetail>;
   /** Attach label NAMES to an issue (connector `vcs.issue.label`). */
@@ -184,6 +201,55 @@ export class GitHubClient implements GitHubApi {
     return { id: dto.id, html_url: dto.html_url };
   }
 
+  async createIssue(repo: string, title: string, body: string, assignee?: string): Promise<number> {
+    const dto = await this.request<IssueDto>(
+      "createIssue",
+      "POST",
+      `/repos/${repo}/issues`,
+      { title, body, ...(assignee === undefined ? {} : { assignee }) },
+    );
+    return dto.number;
+  }
+
+  async closeIssue(repo: string, number: number): Promise<void> {
+    await this.request<void>(
+      "closeIssue",
+      "PATCH",
+      `/repos/${repo}/issues/${String(number)}`,
+      { state: "closed" },
+    );
+  }
+
+  async mergePr(repo: string, number: number, method: string): Promise<boolean> {
+    // GitHub answers a successful merge with 204 or 201 + {merged:true};
+    // request<> tolerates the empty body, so either shape settles true.
+    await this.request<{ merged?: boolean } | undefined>(
+      "mergePr",
+      "PUT",
+      `/repos/${repo}/pulls/${String(number)}/merge`,
+      { merge_method: method },
+    );
+    return true;
+  }
+
+  async reactToComment(repo: string, commentId: number, content: string): Promise<void> {
+    await this.request<void>(
+      "reactToComment",
+      "POST",
+      `/repos/${repo}/issues/comments/${String(commentId)}/reactions`,
+      { content },
+    );
+  }
+
+  async updateComment(repo: string, commentId: number, body: string): Promise<void> {
+    await this.request<void>(
+      "updateComment",
+      "PATCH",
+      `/repos/${repo}/issues/comments/${String(commentId)}`,
+      { body },
+    );
+  }
+
   async openPr(
     repo: string,
     head: string,
@@ -230,6 +296,16 @@ export class GitHubClient implements GitHubApi {
     );
     const hit = dtos.find((dto) => dto.body.includes(marker));
     return hit === undefined ? undefined : { id: hit.id, html_url: hit.html_url };
+  }
+
+  async findIssueByMarker(repo: string, marker: string): Promise<number | undefined> {
+    const dtos = await this.request<Array<{ number: number; body: string | null }>>(
+      "findIssueByMarker",
+      "GET",
+      `/repos/${repo}/issues?creator=@me&state=all&per_page=100`,
+    );
+    const hit = dtos.find((dto) => (dto.body ?? "").includes(marker));
+    return hit?.number;
   }
 
   async getIssue(repo: string, number: number): Promise<GitHubIssue> {

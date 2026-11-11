@@ -832,6 +832,32 @@
       "expect": "valid",
       "class": "command",
       "type": "org.facilitator.command.provider.webhook.v1"
+    },
+    {
+      "file": "valid/event.provider.review.submitted.json",
+      "expect": "valid",
+      "class": "event",
+      "type": "org.facilitator.event.provider.review.v1"
+    },
+    {
+      "file": "valid/event.provider.review.dismissed.json",
+      "expect": "valid",
+      "class": "event",
+      "type": "org.facilitator.event.provider.review.v1"
+    },
+    {
+      "file": "invalid/event.provider.review.bad-state.json",
+      "expect": "invalid",
+      "class": "event",
+      "type": "org.facilitator.event.provider.review.v1",
+      "errorClass": "schema-violation"
+    },
+    {
+      "file": "invalid/event.provider.review.no-state.json",
+      "expect": "invalid",
+      "class": "event",
+      "type": "org.facilitator.event.provider.review.v1",
+      "errorClass": "schema-violation"
     }
   ]
 }

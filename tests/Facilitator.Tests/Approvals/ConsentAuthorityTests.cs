@@ -349,6 +349,9 @@ public sealed class ConsentAuthorityTests(PostgresFixture fixture)
         var kernel = factory.CreateAuthedClient();
         var (workId, _) = await KernelOps.CreateWorkAsync(kernel, "chat ticket");
         await fixture.Db.SeedBinding("forgejo", "demo/widgets", "42", workId, "consent-s3:" + Guid.NewGuid().ToString("N"));
+        // C9: the decider has a verified account on the tracker.
+        await fixture.Db.SeedProviderIdentity(
+            "forgejo", "git.localhost", "alice-dev", "https://keycloak/realms/ofac", "alice");
         var approvalId = Guid.NewGuid();
         await KernelOps.PostJsonAsync(kernel, "/api/ingress/events",
             RequiredEnvelope(approvalId, workId, ["user:alice"], TimeSpan.FromHours(1)),
@@ -365,6 +368,9 @@ public sealed class ConsentAuthorityTests(PostgresFixture fixture)
             createDoc.RootElement.GetProperty("data").GetProperty("capabilityId").GetString());
         Assert.Equal("demo/widgets",
             createDoc.RootElement.GetProperty("data").GetProperty("inputs").GetProperty("repo").GetString());
+        // C9: the ticket names the human owner-account, never the bot alone.
+        Assert.Equal("alice-dev",
+            createDoc.RootElement.GetProperty("data").GetProperty("inputs").GetProperty("ownerProviderAccountId").GetString());
         Assert.Equal("link.fj-s3", (await fixture.Db.OutboxRecipientsByCommand($"consent-ticket:{approvalId:N}")).Single());
 
         var comment = await fixture.Db.OutboxEnvelopeByCommand($"consent-ticket:{approvalId:N}:comment");
@@ -379,6 +385,41 @@ public sealed class ConsentAuthorityTests(PostgresFixture fixture)
         var carrier = await fixture.Db.WorkIdByObjectiveFragment($"Consent decision ticket {approvalId:N}");
         Assert.NotNull(carrier);
         Assert.NotEqual(workId, carrier!.Value);
+    }
+
+    // C9: a tracker exists but the decider has NO verified account on it -
+    // an ownerless ticket is the accountability hole, so no ticket rides and
+    // the note names why.
+    [Fact]
+    public async Task TrackerWithoutOwnerAccountRecordsTheGap()
+    {
+        using var factory = new KernelTestFactory(fixture, noDispatcher: true, settings: new Dictionary<string, string?>
+        {
+            ["Providers:Forgejo:Enabled"] = "true",
+            ["Providers:Forgejo:EndpointId"] = "fj-s3",
+            ["Providers:Forgejo:Tenant"] = "git.localhost",
+            ["Providers:Forgejo:SiteUrl"] = "http://forgejo:3000",
+            ["Providers:Forgejo:IssueRequestCapability"] = "vcs.issue.create",
+        });
+        var kernel = factory.CreateAuthedClient();
+        var (workId, _) = await KernelOps.CreateWorkAsync(kernel, "unlinked decider");
+        await fixture.Db.SeedBinding(
+            "forgejo", "demo/c9-widgets", "c9-" + Guid.NewGuid().ToString("N")[..8], workId,
+            "consent-c9:" + Guid.NewGuid().ToString("N"));
+        var approvalId = Guid.NewGuid();
+        await KernelOps.PostJsonAsync(kernel, "/api/ingress/events",
+            RequiredEnvelope(approvalId, workId, ["user:carol"], TimeSpan.FromHours(1)),
+            HttpStatusCode.Accepted);
+
+        // carol has NO linked account on any provider, wherever the suite
+        // stands (other tests link alice).
+        await factory.Services.GetRequiredService<ConsentTicketService>()
+            .RecordAsync(approvalId, "approved", "oidc:https://keycloak/realms/ofac|carol", CancellationToken.None);
+
+        var detail = Assert.Single(await fixture.Db.TimelineDetail(workId, "approval.decided"));
+        using var doc = JsonDocument.Parse(detail);
+        Assert.Equal("owner-unlinked", doc.RootElement.GetProperty("tracker").GetString());
+        Assert.Null(await fixture.Db.OutboxEnvelopeByCommand($"consent-ticket:{approvalId:N}"));
     }
 
     [Fact]

@@ -45,6 +45,8 @@ import {
   normalizeLabels,
   num,
   obj,
+  reviewEvent,
+  reviewStateFor,
   str,
   workTriggerFor,
   type NormalizedEvent,
@@ -312,9 +314,14 @@ export function normalizePullRequest(
   return [{ type: CHANGE_REQUEST_EVENT_TYPE, data }];
 }
 
-/** Review-submission state → the wire action: only a submitted review maps
- *  (`edited`/`dismissed` drop); every submitted state rides as `reviewed`,
- *  the directive text carries the review body. */
+/** Review-submission state → the wire review event (E1): a submitted
+ *  VERDICT (approved / changes_requested) is a decision and normalizes to
+ *  review.v1; a plain review comment is conversation, not a decision, and
+ *  rides the change_request family as `reviewed`. `edited`/`dismissed` drop
+ *  (the timeline keeps the submitted decision; GitHub edits carry no new
+ *  verdict). A verdict mentioning the bot ALSO rides a mention companion:
+ *  "approve and run the deploy" is both a decision and an ask, and the two
+ *  arms do different jobs. */
 export function normalizeReview(
   payload: Payload,
   deliveryId: string,
@@ -331,8 +338,38 @@ export function normalizeReview(
   const text = str(review?.["body"]);
   const headRef = str(obj(pr?.["head"])?.["ref"]);
   const commentId = id(review?.["id"]);
+  const state = reviewStateFor(str(review?.["state"]));
+  const companion = mentionCompanion(
+    payload,
+    `${deliveryId}:review`,
+    ctx,
+    repo,
+    number,
+    author,
+    commentId,
+    text,
+  );
+  const ref_ = reference(ctx, repo, number, author);
+  if (state !== undefined) {
+    return [
+      reviewEvent({
+        reference: ref_,
+        provider: "github",
+        providerDeliveryId: deliveryId,
+        actorProviderAccountId: author,
+        action: "submitted",
+        state,
+        text: text ?? "",
+        ...(commentId === undefined ? {} : { commentId }),
+        ...(headRef === undefined ? {} : { headRef }),
+        payload,
+      }),
+      ...companion,
+    ];
+  }
+
   const data: ProviderChangeRequestEventV1Data = {
-    reference: reference(ctx, repo, number, author),
+    reference: ref_,
     provider: "github",
     providerDeliveryId: deliveryId,
     actorProviderAccountId: author,
@@ -342,16 +379,6 @@ export function normalizeReview(
     ...(commentId === undefined ? {} : { commentId }),
     payload,
   };
-  const companion = mentionCompanion(
-    payload,
-    deliveryId,
-    ctx,
-    repo,
-    number,
-    author,
-    commentId,
-    text,
-  );
   return [{ type: CHANGE_REQUEST_EVENT_TYPE, data }, ...companion];
 }
 

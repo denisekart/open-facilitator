@@ -132,6 +132,16 @@ public sealed class TestDbProbe : IAsyncDisposable
                 cmd.Parameters.AddWithValue(kind);
             });
 
+    /// <summary>work_links rows of one kind between two works.</summary>
+    public Task<long> WorkLinkCount(Guid workId, Guid refWorkId, string kind) =>
+        ScalarLong("SELECT count(*) FROM facilitator.work_links WHERE work_id = $1 AND ref_work_id = $2 AND kind = $3",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(workId);
+                cmd.Parameters.AddWithValue(refWorkId);
+                cmd.Parameters.AddWithValue(kind);
+            });
+
     /// <summary>Detail payloads of timeline rows of one kind for a work.</summary>
     public async Task<List<string>> TimelineDetail(Guid workId, string kind)
     {

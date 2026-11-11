@@ -80,10 +80,19 @@ public sealed class ConsentTicketService(
         // derivable: the work's own forge binding (channel IS the repo), or
         // the chat conversation the decision arrived on.
         var options = ResolveTracker(db, approval, workId, ct);
+        // C9: an automation-opened ticket needs a HUMAN owner-account on the
+        // tracker - the decided-by person's own linked account. No linked
+        // account, no ticket: an ownerless ticket is exactly the accountability
+        // hole C9 closes, so the decision records without the tracker leg and
+        // names why.
+        var ownerAccount = options is null
+            ? null
+            : OwnerAccountOn(db, options.Provider, decidedBy);
         if (options?.IssueRequestCapability is { Length: > 0 } capability
+            && ownerAccount is { Length: > 0 } owner
             && RepoOf(db, options, workId, ct) is { Length: > 0 } repo)
         {
-            await DispatchTicketAsync(db, options, capability, repo, approvalId, decision, decidedBy, teamId, ct);
+            await DispatchTicketAsync(db, options, capability, repo, approvalId, decision, decidedBy, owner, teamId, ct);
             return;
         }
 
@@ -96,7 +105,10 @@ public sealed class ConsentTicketService(
             ["decision"] = decision,
             ["decidedBy"] = decidedBy,
             ["actionDigest"] = approval.ActionDigest,
-            ["tracker"] = "missing",
+            ["tracker"] = options?.IssueRequestCapability is { Length: > 0 }
+                && ownerAccount is null
+                ? "owner-unlinked"
+                : "missing",
         };
         if (workId is { } tracked)
         {
@@ -118,7 +130,9 @@ public sealed class ConsentTicketService(
                 Action: "authorization.evaluated:approval",
                 Resource: $"approval/{approvalId}",
                 Decision: "allow",
-                Reason: "consent-recorded-without-tracker",
+                Reason: ownerAccount is null && options?.IssueRequestCapability is { Length: > 0 }
+                    ? "consent-recorded-tracker-owner-unlinked"
+                    : "consent-recorded-without-tracker",
                 EvidenceRef: null,
                 PolicyVersion: "approval-v1",
                 Detail: detail.ToJsonString()), ct);
@@ -169,9 +183,31 @@ public sealed class ConsentTicketService(
             .FirstOrDefault();
     }
 
+    /// <summary>The decider's own account on the tracker provider, from the
+    /// verified link (C9): `oidc:{issuer}|{subject}` is exactly the
+    /// provider_identities key. Never a guess, never the bot.</summary>
+    private static string? OwnerAccountOn(FacilitatorDbContext db, string provider, string decidedBy)
+    {
+        const string Prefix = "oidc:";
+        var bar = decidedBy.IndexOf('|', StringComparison.Ordinal);
+        if (!decidedBy.StartsWith(Prefix, StringComparison.Ordinal)
+            || bar <= Prefix.Length || bar == decidedBy.Length - 1)
+        {
+            return null;
+        }
+
+        var issuer = decidedBy[Prefix.Length..bar];
+        var subject = decidedBy[(bar + 1)..];
+        return db.ProviderIdentities.AsNoTracking()
+            .Where(i => i.Provider == provider && i.OidcIssuer == issuer && i.OidcSubject == subject)
+            .Select(i => i.AccountId)
+            .FirstOrDefault();
+    }
+
     private async Task DispatchTicketAsync(
         FacilitatorDbContext db, ProviderOptions options, string capability, string repo,
-        Guid approvalId, string decision, string decidedBy, Guid? owningTeamId, CancellationToken ct)
+        Guid approvalId, string decision, string decidedBy, string ownerProviderAccountId,
+        Guid? owningTeamId, CancellationToken ct)
     {
         var now = timeProvider.GetUtcNow().UtcDateTime;
 
@@ -244,6 +280,7 @@ public sealed class ConsentTicketService(
                 ["repo"] = repo,
                 ["title"] = objective,
                 ["body"] = $"Recorded by Facilitator chat consent.\n\n- Approval: `{approvalId}`\n- Decision: {decision}\n- Decider: {decidedBy}",
+                ["ownerProviderAccountId"] = ownerProviderAccountId,
                 ["labels"] = new JsonArray("facilitator-consent"),
             },
             "vcs.issue",

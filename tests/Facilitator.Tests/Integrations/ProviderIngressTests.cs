@@ -438,6 +438,88 @@ public sealed class ProviderIngressTests(DispatchDbFixture fixture) : IAsyncLife
         Assert.Equal("loop-budget:stop:mattermost", await fixture.Db.ProviderEventJudgment(stoppedDelivery));
     }
 
+    // E1/E4/K4: a formal review verdict - the decision class. Linked
+    // reviewer = human decision; unlinked = unverified claim; a review on a
+    // terminal item forks a successor instead of reopening.
+    [Fact]
+    public async Task ReviewVerdictIsADecisionWithAccountability()
+    {
+        var (factory, link, tenant, _) = await EnabledPlane();
+        await fixture.Db.SeedProviderIdentity("mattermost", tenant, "acct-1", "subject-1");
+        await fixture.Db.SeedProviderIdentity("mattermost", tenant, "reviewer-1", "rev-1");
+        var channel = $"repo-{Guid.NewGuid():N}";
+        var root = $"pr-{Guid.NewGuid():N}";
+        await link.PostAsync("/api/link/v1/events", Content(ProviderEvent(
+            "valid/event.provider.mention.json", $"post-{Guid.NewGuid():N}", channel, root, "acct-1", text: "bind me")));
+        var workId = await BoundWork(channel, root);
+
+        using var submitted = await link.PostAsync("/api/link/v1/events",
+            Content(ReviewEvent($"rev-{Guid.NewGuid():N}", channel, root, "reviewer-1")));
+        Assert.Equal(HttpStatusCode.Accepted, submitted.StatusCode);
+        var receipt = await submitted.Content.ReadJsonAsync();
+        Assert.Equal($"steered:{workId}", receipt.GetProperty("data").GetProperty("judgment").GetString());
+
+        var details = await fixture.Db.TimelineDetail(workId, "review.decision");
+        var row = Assert.Single(details);
+        Assert.Equal("human", System.Text.Json.JsonSerializer.Deserialize<
+            System.Text.Json.JsonElement>(row).GetProperty("verified").GetString());
+        Assert.Contains("approved", System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(row)
+            .GetProperty("action").GetString());
+
+        // Unlinked reviewer: the same arm, an unverified claim instead.
+        using var claim = await link.PostAsync("/api/link/v1/events",
+            Content(ReviewEvent($"rev-{Guid.NewGuid():N}", channel, root, "ghost-bot")));
+        Assert.Equal(HttpStatusCode.Accepted, claim.StatusCode);
+        var claimRow = Assert.Single(await fixture.Db.TimelineDetail(workId, "review.decision"),
+            d => d.Contains("ghost-bot") || d.Contains("unverified-claim"));
+        Assert.Contains("unverified-claim", claimRow);
+        _ = factory;
+    }
+
+    [Fact]
+    public async Task ReviewOnCompletedWorkForksSuccessor()
+    {
+        var (factory, link, tenant, _) = await EnabledPlane();
+        await fixture.Db.SeedProviderIdentity("mattermost", tenant, "acct-1", "subject-1");
+        var channel = $"repo-{Guid.NewGuid():N}";
+        var root = $"pr-{Guid.NewGuid():N}";
+        await link.PostAsync("/api/link/v1/events", Content(ProviderEvent(
+            "valid/event.provider.mention.json", $"post-{Guid.NewGuid():N}", channel, root, "acct-1", text: "bind me")));
+        var workId = await BoundWork(channel, root);
+        await KernelOps.TransitionAsync(factory.CreateAuthedClient(), workId, "planning", 1);
+        await KernelOps.TransitionAsync(factory.CreateAuthedClient(), workId, "cancelled", 2);
+
+        using var submitted = await link.PostAsync("/api/link/v1/events",
+            Content(ReviewEvent($"rev-{Guid.NewGuid():N}", channel, root, "acct-1")));
+        Assert.Equal(HttpStatusCode.Accepted, submitted.StatusCode);
+        var receipt = await submitted.Content.ReadJsonAsync();
+        var judgment = receipt.GetProperty("data").GetProperty("judgment").GetString()!;
+        Assert.StartsWith("work/", judgment);
+        var successor = Guid.Parse(judgment.AsSpan("work/".Length, 36));
+        Assert.NotEqual(workId, successor);
+
+        // The original keeps its history (the decision row + the link); the
+        // conversation binding follows the live successor (terminal law).
+        Assert.Equal(1L, await fixture.Db.TimelineEventCount(workId, "review.decision"));
+        Assert.Equal(1, await fixture.Db.WorkLinkCount(workId, successor, "successor"));
+        var (bound, _) = await fixture.Db.BindingFor(channel, root);
+        Assert.Equal(successor, bound);
+    }
+
+    /// <summary>A review event on the mattermost plane (the canonical
+    /// review fixture is forgejo-flavored; provider is data, the test rewrites
+    /// it like every other coordinate).</summary>
+    private static string ReviewEvent(string deliveryId, string channel, string root, string actor)
+    {
+        var envelope = ProviderEvent(
+            "valid/event.provider.review.submitted.json", deliveryId, channel, root, actor);
+        var doc = JsonNode.Parse(envelope)!.AsObject();
+        var data = doc["data"]!.AsObject();
+        data["provider"] = "mattermost";
+        data["reference"]!["provider"] = "mattermost";
+        return doc.ToJsonString();
+    }
+
     private static string Redelivered(
         string fixtureName, string deliveryId, string nativeMessageId, string channel, string root, string actor, string text)
     {

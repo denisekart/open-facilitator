@@ -341,6 +341,17 @@ No feature work. The full build fails otherwise.
   test so it is at least buildable.
 - `@ofac/adapter` (harness SDK) + `codex`/`omp`/`deterministic`: only what the new
   completion/event law and the artifact-upload error taxonomy require.
+- **Harness-facing functionality list (user amendment).** The harness plane gets the same
+  treatment the comms plane got: one authoritative list of everything a harness may be asked to do
+  (the full command/event surface the kernel can send a harness: `work.assign`, `assignment.input`
+  respond, `work.steer`, `work.status.request`, `work.nudge`, `work.cancel`, `artifact.request_upload`
+  /`confirm_upload`, `memory.recall`/`retain`, `context.fetch`, and the events a harness may emit:
+  `work.progress`, `assignment.input.required`, `assignment.completed`/`failed`,
+  `artifact.available`, memory used/candidate) — the `HARNESS_CAPABILITIES` law + `HarnessCapabilities`
+  type in `@ofac/adapter` (adapter-sdk), mirroring provider-core's per-provider law. `omp` + `codex`
+  advertise the complete set truthfully (omit what the native runtime genuinely lacks — e.g. codex
+  live steer — with the omission honest, never a silent gap), and the descriptor/README documents
+  the list.
 - `src/gateway`: the consume-before-apply loop targets the held action from step 3
   (`command.approval.consume.v1` already exists).
 - Dev Container Features (`features/`), `examples/aws`, `examples/local`: untouched unless a gate breaks.

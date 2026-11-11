@@ -238,10 +238,14 @@ public static class ProviderEventClass
     /// <summary>Pipeline domain (CI/commit-status verdicts map in).</summary>
     public const string Pipeline = Prefix + "pipeline.v1";
 
-    /// <summary>The closed set of central domain types the kernel acts on.</summary>
-    static readonly string[] centralTypes = [Message, Mention, Reaction, Issue, ChangeRequest, Pipeline];
+    /// <summary>A formal change-request review verdict (approved /
+    /// changes-requested): a decision on the work item, not a comment.</summary>
+    public const string Review = Prefix + "review.v1";
 
-    /// <summary>True when the type is one of the six central domain types.</summary>
+    /// <summary>The closed set of central domain types the kernel acts on.</summary>
+    static readonly string[] centralTypes = [Message, Mention, Reaction, Issue, ChangeRequest, Pipeline, Review];
+
+    /// <summary>True when the type is one of the seven central domain types.</summary>
     public static bool IsCentralType(string type) =>
         Array.IndexOf(centralTypes, type) >= 0;
 

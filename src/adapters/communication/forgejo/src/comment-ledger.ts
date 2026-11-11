@@ -65,6 +65,24 @@ export class AdapterState {
         };
   }
 
+  /** The update law's check: was THIS provider object created by us? */
+  findCommentByObjectId(providerObjectId: string): CommentLedgerEntry | undefined {
+    const row = this.db
+      .prepare(
+        "SELECT idempotency_key, provider_object_id, repo, number, created_at FROM comments WHERE provider_object_id = ? LIMIT 1",
+      )
+      .get(providerObjectId) as CommentRow | undefined;
+    return row === undefined
+      ? undefined
+      : {
+          idempotencyKey: row.idempotency_key,
+          providerObjectId: row.provider_object_id,
+          repo: row.repo,
+          number: row.number,
+          createdAt: row.created_at,
+        };
+  }
+
   recordComment(entry: CommentLedgerEntry): void {
     this.db
       .prepare(

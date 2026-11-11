@@ -22,6 +22,7 @@ import {
   normalizeIssues,
   normalizePullRequest,
   normalizeReview,
+  normalizeReviewComment,
   normalizeStatus,
   type NormalizeContext,
   type NormalizedEvent,
@@ -85,6 +86,10 @@ async function dispatch(
   if (eventKind === "issues") return normalizeIssues(payload, deliveryId, ctx);
   if (eventKind === "issue_comment") return normalizeIssueComment(payload, deliveryId, ctx);
   if (eventKind === "pull_request") return normalizePullRequest(payload, deliveryId, ctx);
+  if (eventKind === "pull_request_review_comment") {
+    // A comment ON the diff is review conversation, not a verdict (E1).
+    return normalizeReviewComment(payload, deliveryId, ctx);
+  }
   if (
     eventKind === "pull_request_review" ||
     eventKind === "review" ||

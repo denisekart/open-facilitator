@@ -37,6 +37,20 @@ export interface ForgejoApi {
   /** POST issue/PR comment (decision 4: bot-identity comments only).
    *  Returns the created comment id. */
   postComment(repo: string, number: number, body: string): Promise<ForgejoComment>;
+  /** Open an issue (C9: assigned to the HUMAN owner). */
+  createIssue(repo: string, title: string, body: string, assignee: string): Promise<number>;
+  /** Close an issue or PR (the issues route serves both). */
+  closeIssue(repo: string, number: number): Promise<void>;
+  /** First bot-created issue whose body carries the marker (create-reconcile). */
+  findIssueByMarker(repo: string, marker: string): Promise<number | undefined>;
+  /** Merge a PR (connector `vcs.change_request.merge`). */
+  mergePr(repo: string, number: number, method: string): Promise<boolean>;
+  /** Read a PR enough to answer "already merged?" (merge-reconcile). */
+  getPrState(repo: string, number: number): Promise<{ number: number; merged: boolean }>;
+  /** React to an issue/PR comment (Forgejo speaks the GitHub reaction set). */
+  reactToComment(repo: string, commentId: number, content: string): Promise<void>;
+  /** Edit OUR comment (the update law: callers check the ledger first). */
+  updateComment(repo: string, commentId: number, body: string): Promise<void>;
   /** Open a PR (connector-side privileged write; the adapter never calls it
    *  but the client module is shared, decision 6). */
   openPr(
@@ -155,6 +169,72 @@ export class ForgejoClient implements ForgejoApi {
       { body },
     );
     return { id: dto.id, html_url: dto.html_url };
+  }
+
+  async createIssue(repo: string, title: string, body: string, assignee: string): Promise<number> {
+    const dto = await this.request<CommentDto & { number: number }>(
+      "createIssue",
+      "POST",
+      `/repos/${repo}/issues`,
+      { title, body, assignee },
+    );
+    return dto.number;
+  }
+
+  async closeIssue(repo: string, number: number): Promise<void> {
+    await this.request<void>(
+      "closeIssue",
+      "PATCH",
+      `/repos/${repo}/issues/${number}`,
+      { state: "closed" },
+    );
+  }
+
+  async findIssueByMarker(repo: string, marker: string): Promise<number | undefined> {
+    const dtos = await this.request<Array<{ number: number; body: string | null }>>(
+      "findIssueByMarker",
+      "GET",
+      `/repos/${repo}/issues?creator=@me&state=all&limit=100`,
+    );
+    const hit = dtos.find((dto) => (dto.body ?? "").includes(marker));
+    return hit?.number;
+  }
+
+  async mergePr(repo: string, number: number, method: string): Promise<boolean> {
+    await this.request<{ merged?: boolean } | undefined>(
+      "mergePr",
+      "POST",
+      `/repos/${repo}/pulls/${number}/merge`,
+      { Do: method === "squash" ? "squash" : method === "rebase" ? "rebase" : "merge" },
+    );
+    return true;
+  }
+
+  async getPrState(repo: string, number: number): Promise<{ number: number; merged: boolean }> {
+    const dto = await this.request<{ number: number; merged?: boolean; mergeable?: boolean }>(
+      "getPrState",
+      "GET",
+      `/repos/${repo}/pulls/${number}`,
+    );
+    return { number: dto.number, merged: dto.merged === true };
+  }
+
+  async reactToComment(repo: string, commentId: number, content: string): Promise<void> {
+    await this.request<void>(
+      "reactToComment",
+      "POST",
+      `/repos/${repo}/issues/comments/${commentId}/reactions`,
+      { content },
+    );
+  }
+
+  async updateComment(repo: string, commentId: number, body: string): Promise<void> {
+    await this.request<void>(
+      "updateComment",
+      "PATCH",
+      `/repos/${repo}/issues/comments/${commentId}`,
+      { body },
+    );
   }
 
   async openPr(

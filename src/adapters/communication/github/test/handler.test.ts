@@ -8,7 +8,14 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { EnvelopeCommand } from "@ofac/protocol";
 import type { CommandContext, LinkLogger } from "@ofac/workspace-link";
-import { createGitHubHandler, githubAdapterManifest, CMD_REPLY } from "../src/handler.js";
+import {
+  createGitHubHandler,
+  githubAdapterManifest,
+  CMD_ACK,
+  CMD_REACT,
+  CMD_REPLY,
+  CMD_UPDATE,
+} from "../src/handler.js";
 import { AdapterState } from "../src/comment-ledger.js";
 import type { GitHubApi } from "../src/github-client.js";
 
@@ -25,11 +32,17 @@ function freshState(): AdapterState {
 }
 
 let nextId = 100;
-function fakeApi(posted: string[] = []): GitHubApi {
+function fakeApi(posted: string[] = [], reactions: string[] = [], edits: string[] = []): GitHubApi {
   return {
     postComment: async (repo: string, number: number, body: string) => {
       posted.push(`${repo}#${String(number)}:${body}`);
       return { id: nextId++, html_url: "https://github.com/x" };
+    },
+    reactToComment: async (repo: string, commentId: number, content: string) => {
+      reactions.push(`${repo}/${String(commentId)}:${content}`);
+    },
+    updateComment: async (repo: string, commentId: number, body: string) => {
+      edits.push(`${repo}/${String(commentId)}:${body}`);
     },
   } as unknown as GitHubApi;
 }
@@ -54,10 +67,10 @@ function reply(idempotencyKey: string): EnvelopeCommand {
 }
 
 describe("github handler", () => {
-  it("advertises only the reply command", () => {
+  it("advertises the full communication command family", () => {
     const manifest = githubAdapterManifest("team-alpha");
     expect(manifest.ownerTeam).toBe("team-alpha");
-    expect(manifest.capabilities.map((c) => c.id)).toEqual([CMD_REPLY]);
+    expect(manifest.capabilities.map((c) => c.id)).toEqual([CMD_REPLY, CMD_REACT, CMD_UPDATE, CMD_ACK]);
   });
 
   it("posts the comment and accepts", async () => {
@@ -95,6 +108,89 @@ describe("github handler", () => {
       kind: "rejected",
       reason: "target-missing-repo-or-issue",
     });
+  });
+
+  it("reacts to a bot comment with the mapped content, replays ledger-free", async () => {
+    const reactions: string[] = [];
+    const state = freshState();
+    const handler = createGitHubHandler({ api: fakeApi([], reactions), state, logger });
+    const react = (key: string): EnvelopeCommand =>
+      ({
+        id: `cmd-${key}`,
+        type: CMD_REACT,
+        data: {
+          commandId: `cmd-${key}`,
+          idempotencyKey: key,
+          emojiName: "white_check_mark",
+          target: {
+            provider: "github",
+            providerInstanceId: "github-com",
+            channelOrResourceId: "octocat/Hello-World",
+            rootThreadId: "7",
+            parentMessageId: "42",
+            conversationKind: "comment",
+          },
+        },
+      }) as unknown as EnvelopeCommand;
+    expect(await handler.onCommand(react("r1"), ctx)).toEqual({ kind: "accepted" });
+    expect(await handler.onCommand(react("r1"), ctx)).toEqual({ kind: "accepted" });
+    expect(reactions).toEqual(["octocat/Hello-World/42:hooray"]);
+
+    // An unmapped emoji is refused honestly.
+    const bogus = react("r2");
+    (bogus.data as { emojiName: string }).emojiName = "pineapple";
+    expect(await handler.onCommand(bogus, ctx)).toEqual({
+      kind: "rejected",
+      reason: "unsupported-emoji",
+    });
+  });
+
+  it("updates only its own comments (the update law)", async () => {
+    const edits: string[] = [];
+    const state = freshState();
+    const handler = createGitHubHandler({ api: fakeApi([], [], edits), state, logger });
+    const update = (key: string, parentMessageId: string): EnvelopeCommand =>
+      ({
+        id: `cmd-${key}`,
+        type: CMD_UPDATE,
+        data: {
+          commandId: `cmd-${key}`,
+          idempotencyKey: key,
+          text: "corrected",
+          target: {
+            provider: "github",
+            providerInstanceId: "github-com",
+            channelOrResourceId: "octocat/Hello-World",
+            rootThreadId: "7",
+            parentMessageId,
+            conversationKind: "comment",
+          },
+        },
+      }) as unknown as EnvelopeCommand;
+    // Nobody's comment: the first reply records a real object id - edit
+    // the recorded one instead.
+    await handler.onCommand(reply("u0"), ctx); // records provider object id
+    const postedId = String(nextId - 1);
+    expect(await handler.onCommand(update("u1", postedId), ctx)).toEqual({ kind: "accepted" });
+    expect(edits).toEqual([`octocat/Hello-World/${postedId}:corrected`]);
+    expect(await handler.onCommand(update("u2", "999999"), ctx)).toEqual({
+      kind: "rejected",
+      reason: "unknown-comment",
+    });
+  });
+
+  it("acknowledges without a provider call, no token needed", async () => {
+    const handler = createGitHubHandler({ api: undefined, state: freshState(), logger });
+    const ack = {
+      id: "cmd-a",
+      type: CMD_ACK,
+      data: {
+        commandId: "cmd-a",
+        idempotencyKey: "a1",
+        target: { provider: "github", providerInstanceId: "github-com", conversationKind: "comment" },
+      },
+    } as unknown as EnvelopeCommand;
+    expect(await handler.onCommand(ack, ctx)).toEqual({ kind: "accepted" });
   });
 
   it("other commands answer unsupported", async () => {

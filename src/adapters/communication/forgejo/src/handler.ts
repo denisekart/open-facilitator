@@ -11,7 +11,10 @@
 import type {
   CapabilityDescriptor,
   CapabilityManifestV1,
+  CommunicationAcknowledgeCommandV1Data,
+  CommunicationReactCommandV1Data,
   CommunicationReplyCommandV1Data,
+  CommunicationUpdateCommandV1Data,
   EnvelopeCommand,
 } from "@ofac/protocol";
 import { dataschemaFor } from "@ofac/workspace-link";
@@ -20,8 +23,24 @@ import type { ForgejoApi } from "./forgejo-client.js";
 import type { AdapterState } from "./comment-ledger.js";
 
 export const CMD_REPLY = "org.facilitator.command.communication.reply.v1";
+export const CMD_REACT = "org.facilitator.command.communication.react.v1";
+export const CMD_UPDATE = "org.facilitator.command.communication.update.v1";
+export const CMD_ACK = "org.facilitator.command.communication.acknowledge.v1";
 
-/** The capability manifest this adapter advertises (POST /api/link/v1/capabilities). */
+/** Forgejo ships the GitHub reaction set (verified against 16.x). */
+const REACTION_MAP: Record<string, string> = {
+  "+1": "+1",
+  "-1": "-1",
+  laugh: "laugh",
+  confused: "confused",
+  hooray: "hooray",
+  rocket: "rocket",
+  eyes: "eyes",
+  white_check_mark: "hooray",
+};
+
+/** The capability manifest this adapter advertises (POST /api/link/v1/capabilities).
+ *  The full communication command family (E3). */
 export function forgejoAdapterManifest(team: string): CapabilityManifestV1 {
   const descriptor = (id: string): CapabilityDescriptor => ({
     id,
@@ -33,7 +52,7 @@ export function forgejoAdapterManifest(team: string): CapabilityManifestV1 {
     apiVersion: "facilitator.framework/v1",
     kind: "CapabilityManifest",
     ownerTeam: team,
-    capabilities: [descriptor(CMD_REPLY)],
+    capabilities: [descriptor(CMD_REPLY), descriptor(CMD_REACT), descriptor(CMD_UPDATE), descriptor(CMD_ACK)],
   };
 }
 
@@ -55,10 +74,85 @@ function replyData(cmd: EnvelopeCommand): CommunicationReplyCommandV1Data | unde
   return data as unknown as CommunicationReplyCommandV1Data;
 }
 
+async function nonReplyCommand(deps: HandlerDeps, cmd: EnvelopeCommand): Promise<CommandOutcome> {
+  const { state, logger } = deps;
+  if (deps.api === undefined) {
+    return { kind: "unsupported", reason: "no-bot-token" };
+  }
+  const api = deps.api;
+  const data = cmd.data as
+    | (Partial<CommunicationReactCommandV1Data> & Partial<CommunicationUpdateCommandV1Data>)
+    | undefined;
+  if (typeof data !== "object" || data === null || data.idempotencyKey === undefined) {
+    return {
+      kind: "rejected",
+      reason: cmd.type === CMD_REACT ? "malformed-react-data" : "malformed-update-data",
+    };
+  }
+  if (state.findComment(data.idempotencyKey) !== undefined) {
+    return { kind: "accepted" };
+  }
+  const repo = data.target?.channelOrResourceId;
+  const commentId = data.target?.parentMessageId ?? data.target?.subjectRef;
+  if (repo === undefined || commentId === undefined) {
+    return { kind: "rejected", reason: "target-missing-comment" };
+  }
+
+  if (cmd.type === CMD_REACT) {
+    const content = data.emojiName === undefined ? undefined : REACTION_MAP[data.emojiName];
+    if (content === undefined) {
+      return { kind: "rejected", reason: "unsupported-emoji" };
+    }
+    await api.reactToComment(repo, Number(commentId), content);
+    state.recordComment({
+      idempotencyKey: data.idempotencyKey,
+      providerObjectId: `reaction:${commentId}:${content}`,
+      repo,
+      number: data.target?.rootThreadId ?? "",
+      createdAt: Date.now(),
+    });
+    logger.info("reaction added", { repo, commentId, content, commandId: cmd.commandId });
+    return { kind: "accepted" };
+  }
+
+  if (data.text === undefined) {
+    return { kind: "rejected", reason: "malformed-update-data" };
+  }
+  // The update law: only a comment this adapter created may be edited.
+  if (state.findCommentByObjectId(commentId) === undefined) {
+    return { kind: "rejected", reason: "unknown-comment" };
+  }
+
+  await api.updateComment(repo, Number(commentId), data.text);
+  state.recordComment({
+    idempotencyKey: data.idempotencyKey,
+    providerObjectId: commentId,
+    repo,
+    number: data.target?.rootThreadId ?? "",
+    createdAt: Date.now(),
+  });
+  logger.info("comment updated", { repo, commentId, commandId: cmd.commandId });
+  return { kind: "accepted" };
+}
+
 export function createForgejoHandler(deps: HandlerDeps): LinkHandler {
   const { state, logger } = deps;
   return {
     async onCommand(cmd: EnvelopeCommand): Promise<CommandOutcome> {
+      if (cmd.type === CMD_ACK) {
+        // No provider-side effect for an acknowledgement on a code host, so
+        // no token is needed: the ledger check IS the law.
+        const ack = cmd.data as unknown as Partial<CommunicationAcknowledgeCommandV1Data> | undefined;
+        if (ack?.idempotencyKey === undefined) {
+          return { kind: "rejected", reason: "malformed-acknowledge-data" };
+        }
+
+        void state.findComment(ack.idempotencyKey);
+        return { kind: "accepted" };
+      }
+      if (cmd.type === CMD_REACT || cmd.type === CMD_UPDATE) {
+        return await nonReplyCommand(deps, cmd);
+      }
       if (cmd.type !== CMD_REPLY) return { kind: "unsupported" };
       const data = replyData(cmd);
       if (data === undefined) return { kind: "rejected", reason: "malformed-reply-data" };

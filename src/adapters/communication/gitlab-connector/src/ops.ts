@@ -100,6 +100,66 @@ export function createOps(deps: OpDeps): OpTable {
       return { providerObjectId: id, structured: { repo, issue: number, commentId: note.id } };
     };
 
+  // C9: an automation-opened issue carries a HUMAN owner-account; a
+  // missing one is a routing bug, refused loudly.
+  const issueCreate: OpRunner = async (commandId, inputs) => {
+    const op = "vcs.issue.create";
+    const repo = required(inputs, "repo", op);
+    const title = required(inputs, "title", op);
+    const owner = required(inputs, "ownerProviderAccountId", op);
+    const body = typeof inputs["body"] === "string" ? inputs["body"] : "";
+    ledger.insert(commandId, op, payloadSha256({ repo, title, body, owner }));
+    const cached = replay(commandId);
+    if (cached !== undefined) return cached;
+
+    const marker = CMD_MARKER(commandId);
+    const iid =
+      (await api.findIssueByMarker(repo, marker)) ??
+      (await api.createIssue(repo, title, stampedBody(body, commandId), owner));
+    const id = `issue ${repo}#${iid}`;
+    ledger.settle(commandId, id);
+    return { providerObjectId: id, structured: { repo, number: iid, owner } };
+  };
+
+  const issueClose: OpRunner = async (commandId, inputs) => {
+    const op = "vcs.issue.close";
+    const repo = required(inputs, "repo", op);
+    const issue = requiredNumber(inputs, "issue", op);
+    ledger.insert(commandId, op, payloadSha256({ repo, issue }));
+    const cached = replay(commandId);
+    if (cached !== undefined) return cached;
+
+    const current = await api.getIssue(repo, issue);
+    if (current.state !== "closed") {
+      await api.closeIssue(repo, issue);
+    }
+
+    const id = `issue ${repo}#${issue}`;
+    ledger.settle(commandId, id);
+    return { providerObjectId: id, structured: { repo, issue, closed: true } };
+  };
+
+  // The merge evidence path (step 5).
+  const mrMerge: OpRunner = async (commandId, inputs) => {
+    const op = "vcs.change_request.merge";
+    const repo = required(inputs, "repo", op);
+    const number = requiredNumber(inputs, "changeRequest", op);
+    const method = typeof inputs["method"] === "string" ? inputs["method"] : "merge";
+    ledger.insert(commandId, op, payloadSha256({ repo, changeRequest: number, method }));
+    const cached = replay(commandId);
+    if (cached !== undefined) return cached;
+
+    const current = await api.getMergeRequest(repo, number);
+    const merged = current.merged === true || (await api.mergeMr(repo, number, method));
+    if (!merged) {
+      throw new OpError(op, `MR ${repo}#${number} is not mergeable`);
+    }
+
+    const id = `MR ${repo}#${number}`;
+    ledger.settle(commandId, id);
+    return { providerObjectId: id, structured: { repo, number, merged: true, method } };
+  };
+
   const branchPush: OpRunner = async (commandId, inputs) => {
     const op = "vcs.branch.push";
     const repo = required(inputs, "repo", op);
@@ -262,6 +322,9 @@ export function createOps(deps: OpDeps): OpTable {
     "vcs.issue.read": issueRead,
     "vcs.issue.comment": makeComment(false),
     "vcs.issue.label": issueLabel,
+    "vcs.issue.create": issueCreate,
+    "vcs.issue.close": issueClose,
+    "vcs.change_request.merge": mrMerge,
     "vcs.change_request.read": mrRead,
     "vcs.change_request.comment": makeComment(true),
     "vcs.change_request.review": mrReview,

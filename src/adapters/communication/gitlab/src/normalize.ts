@@ -40,6 +40,7 @@ import {
   id,
   isBotAuthored,
   mentionsBot,
+  reviewEvent,
   normalizeLabels,
   num,
   obj,
@@ -55,6 +56,7 @@ export {
   ISSUE_EVENT_TYPE as ISSUE_EVENT,
   MENTION_EVENT_TYPE as MENTION_EVENT,
   PIPELINE_EVENT_TYPE as PIPELINE_EVENT,
+  REVIEW_EVENT_TYPE as REVIEW_EVENT,
 } from "@ofac/provider-core";
 
 export interface NormalizeContext {
@@ -256,6 +258,36 @@ const MR_ACTIONS: Record<string, ProviderChangeRequestEventV1Data["action"]> = {
   close: "closed",
 };
 
+/** The MR approve hook IS the verdict (E1): GitLab carries no separate
+ *  review-state field on it, so an approve maps to review.v1 `approved` -
+ *  the decision class - instead of the change_request `reviewed` stand-in. */
+function reviewFromApprove(
+  payload: Payload,
+  deliveryId: string,
+  ctx: NormalizeContext,
+): NormalizedEvent[] {
+  const object = obj(payload["object_attributes"]);
+  const repo = repoOf(payload);
+  const number = num(object?.["iid"]) ?? "";
+  if (object === undefined || repo === undefined || number === "") return [];
+  const author = authorOf(payload);
+  return [
+    reviewEvent({
+      reference: reference(ctx, repo, number, author),
+      provider: "gitlab",
+      providerDeliveryId: deliveryId,
+      actorProviderAccountId: author,
+      action: "submitted",
+      state: "approved",
+      text: "",
+      ...(str(object["source_branch"]) === undefined
+        ? {}
+        : { headRef: str(object["source_branch"]) }),
+      payload,
+    }),
+  ];
+}
+
 /** `Merge Request Hook`: the plan's action mapping — open/reopen→opened,
  *  update→synchronized, approve→reviewed, merge→merged, close→closed; the
  *  rest drop. `headRef` rides from `object_attributes.source_branch` so the
@@ -271,6 +303,9 @@ export function normalizeMergeRequestHook(
   if (rawAction === undefined) return [];
   const action = MR_ACTIONS[rawAction];
   if (action === undefined) return [];
+  if (rawAction === "approve") {
+    return reviewFromApprove(payload, deliveryId, ctx);
+  }
 
   // Echo law with one exemption: a bot-opened/reopened MR is a load-bearing
   // state change (the head-branch resolver binds the pending marker to the

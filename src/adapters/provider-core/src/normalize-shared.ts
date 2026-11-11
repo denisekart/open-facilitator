@@ -3,7 +3,9 @@
 // payload-reading primitives every vendor normalizer repeats. Vendor→domain
 // mapping itself stays provider-local.
 import type {
+  ConversationReference,
   ProviderChangeRequestEventV1Data,
+  ProviderReviewEventV1Data,
   ProviderIssueEventV1Data,
   ProviderMentionEventV1Data,
   ProviderMessageEventV1Data,
@@ -17,6 +19,7 @@ export const ISSUE_EVENT_TYPE = "org.facilitator.event.provider.issue.v1";
 export const CHANGE_REQUEST_EVENT_TYPE = "org.facilitator.event.provider.change_request.v1";
 export const PIPELINE_EVENT_TYPE = "org.facilitator.event.provider.pipeline.v1";
 export const MENTION_EVENT_TYPE = "org.facilitator.event.provider.mention.v1";
+export const REVIEW_EVENT_TYPE = "org.facilitator.event.provider.review.v1";
 
 export type Payload = Record<string, unknown>;
 
@@ -30,7 +33,8 @@ export type NormalizedEventData =
   | ProviderPipelineEventV1Data
   | ProviderMentionEventV1Data
   | ProviderMessageEventV1Data
-  | ProviderReactionEventV1Data;
+  | ProviderReactionEventV1Data
+  | ProviderReviewEventV1Data;
 
 export interface NormalizedEvent {
   type: string;
@@ -79,6 +83,53 @@ export function mentionsBot(body: string | undefined, botUser: string): boolean 
   if (body === undefined || body === "") return false;
   const escaped = botUser.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return new RegExp(`(^|[^\\w/])@${escaped}(?![\\w-])`, "i").test(body);
+}
+
+/** The review verdict map (E1): every forge names its formal verdicts
+ *  differently, the wire speaks two. Anything that is not a verdict (a plain
+ *  review comment) normalizes elsewhere - never as a fake review. */
+export function reviewStateFor(vendorState: string | undefined): "approved" | "changes-requested" | undefined {
+  switch (vendorState) {
+    case "approved":
+    case "approve":
+      return "approved";
+    case "changes_requested":
+    case "changes-requested":
+    case "request_changes":
+    case "reject":
+      return "changes-requested";
+    default:
+      return undefined;
+  }
+}
+
+/** One review event, identically shaped across vendors (the schema demands
+ *  text, so the empty body is the law's own, not a missing field). */
+export function reviewEvent(opts: {
+  reference: ConversationReference;
+  provider: string;
+  providerDeliveryId: string;
+  actorProviderAccountId: string;
+  action: "submitted" | "changed" | "dismissed";
+  state: "approved" | "changes-requested";
+  text: string;
+  commentId?: string | undefined;
+  headRef?: string | undefined;
+  payload?: Record<string, unknown> | undefined;
+}): NormalizedEvent {
+  const data: ProviderReviewEventV1Data = {
+    reference: opts.reference,
+    provider: opts.provider,
+    providerDeliveryId: opts.providerDeliveryId,
+    actorProviderAccountId: opts.actorProviderAccountId,
+    action: opts.action,
+    state: opts.state,
+    text: opts.text,
+    ...(opts.commentId === undefined ? {} : { commentId: opts.commentId }),
+    ...(opts.headRef === undefined ? {} : { headRef: opts.headRef }),
+    ...(opts.payload === undefined ? {} : { payload: opts.payload }),
+  };
+  return { type: REVIEW_EVENT_TYPE, data };
 }
 
 /** Label policy hook (the adapter decides, the kernel only reads the flag):

@@ -821,6 +821,53 @@ export interface ProviderReactionEventV1Data {
   reference: ConversationReference;
 }
 
+export interface ProviderReviewEventV1Data {
+  /**
+   * What happened to the review itself: submitted the verdict, edited it, or dismissed it.
+   */
+  action: ProviderReviewEventV1DataAction;
+  actorProviderAccountId: string;
+  /**
+   * Provider review id, when the provider exposes one (GitHub review id, GitLab discussion
+   * id).
+   */
+  commentId?: string;
+  /**
+   * Head branch of the reviewed change request, when the provider carries it.
+   */
+  headRef?: string;
+  /**
+   * Verbatim provider event payload as received (audit + reconcile evidence).
+   */
+  payload?: { [key: string]: unknown };
+  /**
+   * Provider token owning this event; MUST equal reference.provider.
+   */
+  provider: string;
+  providerDeliveryId: string;
+  reference: ConversationReference;
+  /**
+   * The review verdict. A comment is not a review (it normalizes to mention/change_request);
+   * only a formal review carries a state.
+   */
+  state: State;
+  /**
+   * The review body ('' when the reviewer submitted no comment).
+   */
+  text: string;
+}
+
+/**
+ * What happened to the review itself: submitted the verdict, edited it, or dismissed it.
+ */
+export type ProviderReviewEventV1DataAction = "submitted" | "changed" | "dismissed";
+
+/**
+ * The review verdict. A comment is not a review (it normalizes to mention/change_request);
+ * only a formal review carries a state.
+ */
+export type State = "approved" | "changes-requested";
+
 /**
  * Kernel-internal routing intent: a Work needs an assignment for a capability. Emitted by
  * every Work-creating arm (REST ingress and provider ingest); consumed by the kernel

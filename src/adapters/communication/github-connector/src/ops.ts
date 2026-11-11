@@ -98,6 +98,75 @@ export function createOps(deps: OpDeps): OpTable {
       return { providerObjectId: id, structured: { repo, issue: number, commentId: comment.id } };
     };
 
+  // C9: an automation-opened issue carries a HUMAN owner-account. The
+  // creator identity is the bot (its credential signs the call) and cannot
+  // be accountable; the input names the human, and a missing one is a
+  // routing bug, refused loudly.
+  const issueCreate: OpRunner = async (commandId, inputs) => {
+    const op = "vcs.issue.create";
+    const repo = required(inputs, "repo", op);
+    const title = required(inputs, "title", op);
+    const owner = required(inputs, "ownerProviderAccountId", op);
+    const body = typeof inputs["body"] === "string" ? inputs["body"] : "";
+    ledger.insert(commandId, op, payloadSha256({ repo, title, body, owner }));
+    const cached = replay(commandId);
+    if (cached !== undefined) return cached;
+
+    // Read-before-fire: the stamped body is the marker (a lost response
+    // reconciles by read, never a second ticket).
+    const marker = CMD_MARKER(commandId);
+    const number =
+      (await api.findIssueByMarker(repo, marker)) ??
+      (await api.createIssue(repo, title, stampedBody(body, commandId), owner));
+    const id = `issue ${repo}#${number}`;
+    ledger.settle(commandId, id);
+    return { providerObjectId: id, structured: { repo, number, owner } };
+  };
+
+  const issueClose: OpRunner = async (commandId, inputs) => {
+    const op = "vcs.issue.close";
+    const repo = required(inputs, "repo", op);
+    const issue = requiredNumber(inputs, "issue", op);
+    ledger.insert(commandId, op, payloadSha256({ repo, issue }));
+    const cached = replay(commandId);
+    if (cached !== undefined) return cached;
+
+    // Read-before-fire: an already-closed issue satisfies the intent (the
+    // mutation is idempotent at the provider, but the READ keeps a replay
+    // free of writes).
+    const current = await api.getIssue(repo, issue);
+    if (current.state !== "closed") {
+      await api.closeIssue(repo, issue);
+    }
+
+    const id = `issue ${repo}#${issue}`;
+    ledger.settle(commandId, id);
+    return { providerObjectId: id, structured: { repo, issue, closed: true } };
+  };
+
+  // The merge evidence path (step 5): the kernel records the merge from the
+  // provider's own answer, never an adapter's say-so.
+  const prMerge: OpRunner = async (commandId, inputs) => {
+    const op = "vcs.change_request.merge";
+    const repo = required(inputs, "repo", op);
+    const number = requiredNumber(inputs, "changeRequest", op);
+    const method = typeof inputs["method"] === "string" ? inputs["method"] : "merge";
+    ledger.insert(commandId, op, payloadSha256({ repo, changeRequest: number, method }));
+    const cached = replay(commandId);
+    if (cached !== undefined) return cached;
+
+    // Read-before-fire: an already-merged PR is the same truth.
+    const current = await api.getPullRequest(repo, number);
+    const merged = current.merged === true || (await api.mergePr(repo, number, method));
+    if (!merged) {
+      throw new OpError(op, `PR ${repo}#${number} is not mergeable`);
+    }
+
+    const id = `PR ${repo}#${number}`;
+    ledger.settle(commandId, id);
+    return { providerObjectId: id, structured: { repo, number, merged: true, method } };
+  };
+
   const branchPush: OpRunner = async (commandId, inputs) => {
     const op = "vcs.branch.push";
     const repo = required(inputs, "repo", op);
@@ -278,6 +347,9 @@ export function createOps(deps: OpDeps): OpTable {
     "vcs.issue.read": issueRead,
     "vcs.issue.comment": makeComment(false),
     "vcs.issue.label": issueLabel,
+    "vcs.issue.create": issueCreate,
+    "vcs.issue.close": issueClose,
+    "vcs.change_request.merge": prMerge,
     "vcs.change_request.read": prRead,
     "vcs.change_request.comment": makeComment(true),
     "vcs.change_request.review": prReview,

@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openfacilitator.org/v1/event.provider.review.v1.json",
+  "title": "ProviderReviewEventV1Data",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "reference",
+    "provider",
+    "providerDeliveryId",
+    "actorProviderAccountId",
+    "action",
+    "state",
+    "text"
+  ],
+  "properties": {
+    "reference": {
+      "$ref": "common.v1.json#/$defs/conversationReference"
+    },
+    "provider": {
+      "$ref": "common.v1.json#/$defs/idToken",
+      "description": "Provider token owning this event; MUST equal reference.provider."
+    },
+    "providerDeliveryId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "actorProviderAccountId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "action": {
+      "type": "string",
+      "enum": ["submitted", "changed", "dismissed"],
+      "description": "What happened to the review itself: submitted the verdict, edited it, or dismissed it."
+    },
+    "state": {
+      "type": "string",
+      "enum": ["approved", "changes-requested"],
+      "description": "The review verdict. A comment is not a review (it normalizes to mention/change_request); only a formal review carries a state."
+    },
+    "text": {
+      "type": "string",
+      "maxLength": 8192,
+      "description": "The review body ('' when the reviewer submitted no comment)."
+    },
+    "commentId": {
+      "$ref": "common.v1.json#/$defs/idToken",
+      "description": "Provider review id, when the provider exposes one (GitHub review id, GitLab discussion id)."
+    },
+    "headRef": {
+      "type": "string",
+      "maxLength": 255,
+      "description": "Head branch of the reviewed change request, when the provider carries it."
+    },
+    "payload": {
+      "type": "object",
+      "description": "Verbatim provider event payload as received (audit + reconcile evidence)."
+    }
+  }
+}

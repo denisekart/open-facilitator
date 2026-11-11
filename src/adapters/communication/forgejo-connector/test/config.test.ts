@@ -88,6 +88,8 @@ describe("parseConnectorConfig", () => {
       "vcs.issue.read",
       "vcs.issue.comment",
       "vcs.issue.label",
+      "vcs.issue.create",
+      "vcs.issue.close",
       "vcs.pipeline.trigger",
     ]);
     expect(() =>
@@ -99,7 +101,7 @@ describe("parseConnectorConfig", () => {
       mrs: true,
       pipeline: true,
     });
-    expect(all.capabilities).toHaveLength(9);
+    expect(all.capabilities).toHaveLength(12);
     expect(all.ownerTeam).toBe("team-alpha");
   });
 });

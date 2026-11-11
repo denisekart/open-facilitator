@@ -14,7 +14,10 @@ import { createServer, type Server } from "node:http";
 import type {
   CapabilityDescriptor,
   CapabilityManifestV1,
+  CommunicationAcknowledgeCommandV1Data,
+  CommunicationReactCommandV1Data,
   CommunicationReplyCommandV1Data,
+  CommunicationUpdateCommandV1Data,
   EnvelopeCommand,
 } from "@ofac/protocol";
 import { dataschemaFor } from "@ofac/workspace-link";
@@ -61,6 +64,7 @@ export {
   ISSUE_EVENT,
   MENTION_EVENT,
   PIPELINE_EVENT,
+  REVIEW_EVENT,
   normalizeIssueHook,
   normalizeMergeRequestHook,
   normalizeNoteHook,
@@ -70,8 +74,35 @@ export {
 } from "./normalize.js";
 
 export const CMD_REPLY = "org.facilitator.command.communication.reply.v1";
+export const CMD_REACT = "org.facilitator.command.communication.react.v1";
+export const CMD_UPDATE = "org.facilitator.command.communication.update.v1";
+export const CMD_ACK = "org.facilitator.command.communication.acknowledge.v1";
 
-/** The capability manifest this adapter advertises (POST /api/link/v1/capabilities). */
+/** GitLab award_emoji names (the bare subset every GitLab ships, no custom
+ *  emojis); the kernel speaks emoji names. Unmapped emoji are refused
+ *  honestly, never silently downgraded to a different face. */
+const AWARD_MAP: Record<string, string> = {
+  "+1": "thumbsup",
+  "-1": "thumbsdown",
+  laugh: "okay_hand",
+  confused: "confused",
+  hooray: "tada",
+  rocket: "rocket",
+  eyes: "eyes",
+  white_check_mark: "white_check_mark",
+};
+
+function isNotFound(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "status" in error &&
+    (error as { status: unknown }).status === 404
+  );
+}
+
+/** The capability manifest this adapter advertises (POST /api/link/v1/capabilities).
+ *  The full communication command family (E3). */
 export function gitlabAdapterManifest(team: string): CapabilityManifestV1 {
   const descriptor = (id: string): CapabilityDescriptor => ({
     id,
@@ -83,7 +114,7 @@ export function gitlabAdapterManifest(team: string): CapabilityManifestV1 {
     apiVersion: "facilitator.framework/v1",
     kind: "CapabilityManifest",
     ownerTeam: team,
-    capabilities: [descriptor(CMD_REPLY)],
+    capabilities: [descriptor(CMD_REPLY), descriptor(CMD_REACT), descriptor(CMD_UPDATE), descriptor(CMD_ACK)],
   };
 }
 
@@ -114,6 +145,9 @@ export function createGitLabHandler(deps: HandlerDeps): LinkHandler {
   const { state, logger } = deps;
   return {
     async onCommand(cmd: EnvelopeCommand): Promise<CommandOutcome> {
+      if (cmd.type === CMD_REACT || cmd.type === CMD_UPDATE || cmd.type === CMD_ACK) {
+        return await nonReplyCommand(deps, cmd);
+      }
       if (cmd.type !== CMD_REPLY) return { kind: "unsupported" };
       const data = replyData(cmd);
       if (data === undefined) return { kind: "rejected", reason: "malformed-reply-data" };
@@ -162,6 +196,93 @@ export function createGitLabHandler(deps: HandlerDeps): LinkHandler {
       return { kind: "accepted" };
     },
   };
+}
+
+/** The react/update/acknowledge arms. GitLab notes live on TWO resources
+ *  with no unified endpoint, so like the reply law the resource is resolved
+ *  provider-side (try the issue, a 404 re-tries the MR); the ledger keeps a
+ *  replay free of provider writes and the update law owns the edit check. */
+async function nonReplyCommand(deps: HandlerDeps, cmd: EnvelopeCommand): Promise<CommandOutcome> {
+  const { state, logger } = deps;
+  const data = cmd.data as
+    | (Partial<CommunicationReactCommandV1Data> &
+        Partial<CommunicationUpdateCommandV1Data> &
+        Partial<CommunicationAcknowledgeCommandV1Data>)
+    | undefined;
+  if (typeof data !== "object" || data === null || data.idempotencyKey === undefined) {
+    return { kind: "rejected", reason: `malformed-${cmd.type.includes("react") ? "react" : cmd.type.includes("update") ? "update" : "acknowledge"}-data` };
+  }
+  if (cmd.type === CMD_ACK) {
+    // No provider side effect exists for an acknowledgement on a code host;
+    // the ledger check IS the law.
+    void state.findComment(data.idempotencyKey);
+    return { kind: "accepted" };
+  }
+
+  if (deps.api === undefined) {
+    return { kind: "unsupported", reason: "no-bot-token" };
+  }
+  const api = deps.api;
+  if (state.findComment(data.idempotencyKey) !== undefined) {
+    return { kind: "accepted" };
+  }
+  const target = data.target;
+  const repo = target?.channelOrResourceId;
+  const iid = target?.rootThreadId ?? target?.subjectRef;
+  const noteId = target?.parentMessageId;
+  if (repo === undefined || iid === undefined || noteId === undefined) {
+    return { kind: "rejected", reason: "target-missing-note" };
+  }
+
+  if (cmd.type === CMD_REACT) {
+    const emoji = data.emojiName;
+    const name = emoji === undefined ? undefined : AWARD_MAP[emoji];
+    if (name === undefined) {
+      return { kind: "rejected", reason: "unsupported-emoji" };
+    }
+    try {
+      await api.awardIssueNoteEmoji(repo, Number(iid), Number(noteId), name);
+    } catch (error) {
+      if (!isNotFound(error)) throw error;
+      await api.awardMrNoteEmoji(repo, Number(iid), Number(noteId), name);
+    }
+
+    state.recordComment({
+      idempotencyKey: data.idempotencyKey,
+      providerObjectId: `award:${noteId}:${name}`,
+      repo,
+      number: iid,
+      createdAt: Date.now(),
+    });
+    logger.info("note awarded", { repo, iid, noteId, name, commandId: cmd.commandId });
+    return { kind: "accepted" };
+  }
+
+  const text = data.text;
+  if (text === undefined) {
+    return { kind: "rejected", reason: "malformed-update-data" };
+  }
+  // The update law: only a note this adapter created may be edited.
+  if (state.findCommentByObjectId(noteId) === undefined) {
+    return { kind: "rejected", reason: "unknown-note" };
+  }
+
+  try {
+    await api.editIssueNote(repo, Number(iid), Number(noteId), text);
+  } catch (error) {
+    if (!isNotFound(error)) throw error;
+    await api.editMrNote(repo, Number(iid), Number(noteId), text);
+  }
+
+  state.recordComment({
+    idempotencyKey: data.idempotencyKey,
+    providerObjectId: noteId,
+    repo,
+    number: iid,
+    createdAt: Date.now(),
+  });
+  logger.info("note updated", { repo, iid, noteId, commandId: cmd.commandId });
+  return { kind: "accepted" };
 }
 
 export interface GitLabNormalizerDeps {

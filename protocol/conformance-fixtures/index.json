@@ -879,10 +879,23 @@
       "type": "org.facilitator.command.communication.post.v1"
     },
     {
+      "file": "valid/command.communication.reply.with-buttons.json",
+      "expect": "valid",
+      "class": "command",
+      "type": "org.facilitator.command.communication.reply.v1"
+    },
+    {
       "file": "invalid/command.communication.post.button-no-action.json",
       "expect": "invalid",
       "class": "command",
       "type": "org.facilitator.command.communication.post.v1",
+      "errorClass": "schema-violation"
+    },
+    {
+      "file": "invalid/command.communication.reply.buttons-too-many.json",
+      "expect": "invalid",
+      "class": "command",
+      "type": "org.facilitator.command.communication.reply.v1",
       "errorClass": "schema-violation"
     }
   ]

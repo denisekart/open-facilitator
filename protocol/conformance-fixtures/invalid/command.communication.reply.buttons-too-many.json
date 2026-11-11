@@ -1,0 +1,30 @@
+{
+  "specversion": "1.0",
+  "id": "01JCOMM-reply-buttons-many",
+  "source": "urn:facilitator:instance:demo",
+  "type": "org.facilitator.command.communication.reply.v1",
+  "subject": "work/work-123",
+  "time": "2026-10-29T09:05:00Z",
+  "datacontenttype": "application/json",
+  "dataschema": "https://schemas.openfacilitator.org/v1/command.communication.reply.v1.json",
+  "data": {
+    "commandId": "consent-nudge:1a2b3c4d5e6f708192a3b4c5d6e7f809",
+    "target": {
+      "provider": "telegram",
+      "tenantOrOrganizationId": "demo-team",
+      "channelOrResourceId": "-1001234567890",
+      "rootThreadId": "21",
+      "subjectRef": "work/work-123",
+      "conversationKind": "thread",
+      "actorProviderAccountId": "account-001"
+    },
+    "text": "Four approvals await a decision.",
+    "idempotencyKey": "consent-nudge:1a2b3c4d5e6f708192a3b4c5d6e7f809",
+    "buttons": [
+      { "label": "Approve A", "prefill": "/approve a accept" },
+      { "label": "Reject A", "prefill": "/approve a reject" },
+      { "label": "Approve B", "prefill": "/approve b accept" },
+      { "label": "Reject B", "prefill": "/approve b reject" }
+    ]
+  }
+}

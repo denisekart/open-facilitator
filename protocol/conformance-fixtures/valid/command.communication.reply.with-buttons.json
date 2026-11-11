@@ -1,0 +1,34 @@
+{
+  "specversion": "1.0",
+  "id": "01JCOMM-reply-buttons",
+  "source": "urn:facilitator:instance:demo",
+  "type": "org.facilitator.command.communication.reply.v1",
+  "subject": "work/work-123",
+  "time": "2026-10-29T09:05:00Z",
+  "datacontenttype": "application/json",
+  "dataschema": "https://schemas.openfacilitator.org/v1/command.communication.reply.v1.json",
+  "data": {
+    "commandId": "consent-nudge:0f1e2d3c4b5a69788796a5b4c3d2e1f0",
+    "target": {
+      "provider": "telegram",
+      "tenantOrOrganizationId": "demo-team",
+      "channelOrResourceId": "-1001234567890",
+      "rootThreadId": "21",
+      "subjectRef": "work/work-123",
+      "conversationKind": "thread",
+      "actorProviderAccountId": "account-001"
+    },
+    "text": "Consent for this work lapses soon - it needs a decision.",
+    "idempotencyKey": "consent-nudge:0f1e2d3c4b5a69788796a5b4c3d2e1f0",
+    "buttons": [
+      {
+        "label": "Approve",
+        "prefill": "/approve 6f1a2b3c4d5e4f608192a3b4c5d6e7f8 accept"
+      },
+      {
+        "label": "Reject",
+        "prefill": "/approve 6f1a2b3c4d5e4f608192a3b4c5d6e7f8 reject"
+      }
+    ]
+  }
+}

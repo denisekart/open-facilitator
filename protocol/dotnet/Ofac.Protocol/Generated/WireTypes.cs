@@ -466,12 +466,12 @@ namespace Ofac.Protocol
         public ArtifactRef[]? artifacts { get; set; }
 
         /// <summary>
-        /// Interactive affordances (C7). Every button carries the EXACT command text a decision
-        /// rides; a surface without buttons renders nothing extra - the text always stands alone.
+        /// Interactive affordances (C7). Every button carries the EXACT command text a decision ;
+        /// 1-3 ride; a surface without buttons renders nothing extra - the text always stands alone.
         /// </summary>
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("buttons")]
-        public CommunicationPostCommandV1DataButtons? buttons { get; set; }
+        public CommunicationPostCommandV1DataButton[]? buttons { get; set; }
 
         [JsonPropertyName("commandId")]
         [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
@@ -538,11 +538,7 @@ namespace Ofac.Protocol
         public Uri storageUrl { get; set; }
     }
 
-    /// <summary>
-    /// Interactive affordances (C7). Every button carries the EXACT command text a decision
-    /// rides; a surface without buttons renders nothing extra - the text always stands alone.
-    /// </summary>
-    public partial class CommunicationPostCommandV1DataButtons
+    public partial class CommunicationPostCommandV1DataButton
     {
         [JsonPropertyName("label")]
         [JsonConverter(typeof(IndecentMinMaxLengthCheckConverter))]
@@ -640,12 +636,12 @@ namespace Ofac.Protocol
         public ArtifactRef[]? artifacts { get; set; }
 
         /// <summary>
-        /// Interactive affordances (C7). Every button carries the EXACT command text a decision
-        /// rides; a surface without buttons renders nothing extra - the text always stands alone.
+        /// Interactive affordances (C7). Every button carries the EXACT command text a decision ;
+        /// 1-3 ride; a surface without buttons renders nothing extra - the text always stands alone.
         /// </summary>
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("buttons")]
-        public CommunicationReplyCommandV1DataButtons? buttons { get; set; }
+        public CommunicationReplyCommandV1DataButton[]? buttons { get; set; }
 
         [JsonPropertyName("commandId")]
         [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
@@ -663,11 +659,7 @@ namespace Ofac.Protocol
         public string text { get; set; }
     }
 
-    /// <summary>
-    /// Interactive affordances (C7). Every button carries the EXACT command text a decision
-    /// rides; a surface without buttons renders nothing extra - the text always stands alone.
-    /// </summary>
-    public partial class CommunicationReplyCommandV1DataButtons
+    public partial class CommunicationReplyCommandV1DataButton
     {
         [JsonPropertyName("label")]
         [JsonConverter(typeof(IndecentMinMaxLengthCheckConverter))]

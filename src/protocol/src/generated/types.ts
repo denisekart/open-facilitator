@@ -184,10 +184,10 @@ export interface CommunicationPostCommandV1Data {
    */
   artifacts?: ArtifactRef[];
   /**
-   * Interactive affordances (C7). Every button carries the EXACT command text a decision
-   * rides; a surface without buttons renders nothing extra - the text always stands alone.
+   * Interactive affordances (C7). Every button carries the EXACT command text a decision ;
+   * 1-3 ride; a surface without buttons renders nothing extra - the text always stands alone.
    */
-  buttons?: CommunicationPostCommandV1DataButtons;
+  buttons?: [CommunicationPostCommandV1DataButton, ...CommunicationPostCommandV1DataButton[]];
   commandId: string;
   idempotencyKey: string;
   /**
@@ -218,11 +218,7 @@ export interface ArtifactRef {
   storageUrl: string;
 }
 
-/**
- * Interactive affordances (C7). Every button carries the EXACT command text a decision
- * rides; a surface without buttons renders nothing extra - the text always stands alone.
- */
-export interface CommunicationPostCommandV1DataButtons {
+export interface CommunicationPostCommandV1DataButton {
   label: string;
   /**
    * Exact text offered to the presser to send as their own message (Telegram reply keyboard,
@@ -267,21 +263,17 @@ export interface CommunicationReplyCommandV1Data {
    */
   artifacts?: ArtifactRef[];
   /**
-   * Interactive affordances (C7). Every button carries the EXACT command text a decision
-   * rides; a surface without buttons renders nothing extra - the text always stands alone.
+   * Interactive affordances (C7). Every button carries the EXACT command text a decision ;
+   * 1-3 ride; a surface without buttons renders nothing extra - the text always stands alone.
    */
-  buttons?: CommunicationReplyCommandV1DataButtons;
+  buttons?: [CommunicationReplyCommandV1DataButton, ...CommunicationReplyCommandV1DataButton[]];
   commandId: string;
   idempotencyKey: string;
   target: ConversationTarget;
   text: string;
 }
 
-/**
- * Interactive affordances (C7). Every button carries the EXACT command text a decision
- * rides; a surface without buttons renders nothing extra - the text always stands alone.
- */
-export interface CommunicationReplyCommandV1DataButtons {
+export interface CommunicationReplyCommandV1DataButton {
   label: string;
   /**
    * Exact text offered to the presser to send as their own message (Telegram reply keyboard,

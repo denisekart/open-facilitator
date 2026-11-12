@@ -29,13 +29,6 @@ Either road ends at the same API: everything below works against both.
 You need PostgreSQL and a container runtime. Everything else is one
 image.
 
-```mermaid title="What you are building — links only point outward"
-flowchart LR
-  ME([Your browser / curl]) -->|"API · console"| K["Kernel<br/>(one container)"]
-  K --- PG[(PostgreSQL)]
-  T["Your team: Gateway<br/>+ agents/scripts"] -->|"outbound link"| K
-```
-
 ```bash
 docker network create ofac
 docker run -d --name ofac-pg --network ofac \

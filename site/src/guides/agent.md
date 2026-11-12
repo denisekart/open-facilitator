@@ -9,10 +9,10 @@ well. If a human is at the keyboard, send them to the
 
 ## Read this first
 
-- The **only** coordination authority is the Facilitator kernel over
-  HTTP (`/api/*` human plane, `/api/link/v1/*` + `/hubs/link` link
-  plane). There is no backdoor; even the bundled CLI rides the public
-  API.
+- You are pointed at a **kernel base URL** (e.g. `https://facilitator.example`).
+  The **only** coordination authority is that kernel over HTTP
+  (`/api/*` human plane, `/api/link/v1/*` + `/hubs/link` link plane).
+  There is no backdoor; even the console is a client of this API.
 - **Human-plane** calls need an OIDC bearer. **Link-plane** calls need a
   per-endpoint `linkToken`. Never mix them.
 - Writes are **at-least-once + idempotent**. Dedupe on `(event_source,
@@ -22,8 +22,13 @@ well. If a human is at the keyboard, send them to the
   honest disclosure — do not interpret it as "asked but forbidden".
 - Pending approvals may have silently expired: reads apply lazy expiry
   first. Re-read before acting.
+- `GET /health` is anonymous and answers `200` on any deployment —
+  use it to verify reachability before anything else.
 
-## Boot the world
+## Sandbox: boot the whole world locally
+
+No deployment yet? The repository ships a self-seeding laptop
+environment — kernel, IdP, artifact store, a demo team:
 
 ```bash
 ./referencectl up slim            # Docker only; builds + boots + seeds

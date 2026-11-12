@@ -1,207 +1,253 @@
-// Landing/404/document template. Pure function: state -> full HTML page.
-import { hero, benefits, components, guides, repo } from "../config.mjs";
+// The landing page, as a template function. All copy lives in src/config.mjs;
+// this file only arranges it.
 
-export const ICON = `<svg class="logo" viewBox="0 0 32 32" fill="none" aria-hidden="true">
-<path d="M2,22 H8 V28 H2 Z" fill="var(--mark-leg)"/><path d="M24,22 H30 V28 H24 Z" fill="var(--mark-leg)"/>
-<path d="M2.00,22.00 A14,14 0 0 1 4.67,13.77 L9.53,17.30 A8,8 0 0 0 8.00,22.00 Z" fill="var(--mark-leg)"/>
-<path d="M4.67,13.77 A14,14 0 0 1 11.67,8.69 L13.53,14.39 A8,8 0 0 0 9.53,17.30 Z" fill="var(--mark-leg)"/>
-<path d="M20.33,8.69 A14,14 0 0 1 27.33,13.77 L22.47,17.30 A8,8 0 0 0 18.47,14.39 Z" fill="var(--mark-leg)"/>
-<path d="M27.33,13.77 A14,14 0 0 1 30.00,22.00 L24.00,22.00 A8,8 0 0 0 22.47,17.30 Z" fill="var(--mark-leg)"/>
-<path d="M10.59,5.36 A17.5,17.5 0 0 1 21.41,5.36 L18.47,14.39 A8,8 0 0 0 13.53,14.39 Z" fill="var(--mark-keystone)"/>
-<circle cx="16" cy="9.4" r="1.9" fill="var(--mark-dot)"/></svg>`;
+import { repo, nav, hero, relay, story, components, benefits, guides, pages, docs } from "../config.mjs";
 
-const ICONS = {
-  shield: `<path d="M12 2 4 5.5V11c0 5.2 3.4 9.6 8 11 4.6-1.4 8-5.8 8-11V5.5Z" fill="none" stroke="currentColor" stroke-width="2"/><path d="m8.5 11.5 2.5 2.5 5-5.5" fill="none" stroke="currentColor" stroke-width="2"/>`,
-  recover: `<path d="M12 4a8 8 0 1 1-7.6 5.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M4 4v6h6" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="2.4" fill="currentColor"/>`,
-  gavel: `<path d="m3 21 7-7M8 6l6 6M11 3l8 8M13 5 9 9M16 2l6 6-2 2-6-6ZM12 9l6 6-2 2-6-6Z" fill="none" stroke="currentColor" stroke-width="2"/>`,
-  wire: `<circle cx="5" cy="12" r="2.2" fill="currentColor"/><circle cx="19" cy="5" r="2.2" fill="currentColor"/><circle cx="19" cy="19" r="2.2" fill="currentColor"/><path d="M7 11.2 17 5.8M7 12.8 17 18.2" stroke="currentColor" stroke-width="2"/>`,
-  layers: `<path d="m12 3 9 5-9 5-9-5Z" fill="none" stroke="currentColor" stroke-width="2"/><path d="m3 13 9 5 9-5M3 17l9 5 9-5" fill="none" stroke="currentColor" stroke-width="2"/>`,
-  feather: `<path d="M20 4c-6 0-13 5-14 14l-2 2M20 4c1 6-2 12-9 13H7M20 4l-9 9" fill="none" stroke="currentColor" stroke-width="2"/>`,
-};
+const ICON = `<svg viewBox="0 0 32 32" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6.49 10.5 A 11 11 0 0 1 25.51 10.5"/><path d="M25.51 21.5 A 11 11 0 0 1 6.49 21.5"/></g><path d="M25.51 10.5 l4.6 0.9 M25.51 10.5 l0.9 4.6 M6.49 21.5 l-4.6 -0.9 M6.49 21.5 l-0.9 -4.6" stroke="currentColor" stroke-width="3" stroke-linecap="round" fill="none"/><circle cx="16" cy="16" r="4.4" fill="currentColor"/><circle cx="20.8" cy="5.6" r="2.8" fill="#D97A22"/></svg>`;
 
-function heroSvg() {
-  // the arch with linked workspaces: big mark + nodes
-  return `<svg viewBox="0 0 560 300" class="arch" role="img" aria-label="A keystone arch holding up connected workspaces over a foundation">
-  <defs>
-    <linearGradient id="archfade" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#12B48F"/><stop offset="1" stop-color="#0B8A70"/>
-    </linearGradient>
-  </defs>
-  <!-- foundation: durable state -->
-  <rect x="40" y="252" width="480" height="14" rx="7" fill="#123B33"/>
-  <text x="280" y="292" text-anchor="middle" class="arch-label" fill="#7FB8AC">PostgreSQL · durable state</text>
-  <!-- arch: 5 voussoirs, keystone lifted -->
-  <g transform="translate(280 250) scale(9.2) translate(-16 -22)">
-    <path d="M2,22 H8 V28 H2 Z" fill="url(#archfade)"/>
-    <path d="M24,22 H30 V28 H24 Z" fill="url(#archfade)"/>
-    <path d="M2.00,22.00 A14,14 0 0 1 4.67,13.77 L9.53,17.30 A8,8 0 0 0 8.00,22.00 Z" fill="url(#archfade)"/>
-    <path d="M4.67,13.77 A14,14 0 0 1 11.67,8.69 L13.53,14.39 A8,8 0 0 0 9.53,17.30 Z" fill="url(#archfade)"/>
-    <path d="M20.33,8.69 A14,14 0 0 1 27.33,13.77 L22.47,17.30 A8,8 0 0 0 18.47,14.39 Z" fill="url(#archfade)"/>
-    <path d="M27.33,13.77 A14,14 0 0 1 30.00,22.00 L24.00,22.00 A8,8 0 0 0 22.47,17.30 Z" fill="url(#archfade)"/>
-    <g class="ks">
-      <path d="M10.59,5.36 A17.5,17.5 0 0 1 21.41,5.36 L18.47,14.39 A8,8 0 0 0 13.53,14.39 Z" fill="#F2A33C"/>
-      <circle cx="16" cy="9.4" r="1.9" fill="#082A25"/>
-    </g>
-  </g>
-  <!-- team nodes hanging on the arch legs -->
-  <g class="node n1"><rect x="6" y="150" width="86" height="34" rx="9"/><text x="49" y="171" text-anchor="middle">Team A</text></g>
-  <g class="node n2"><rect x="468" y="150" width="86" height="34" rx="9"/><text x="511" y="171" text-anchor="middle">Team B</text></g>
-  <g class="node n3"><rect x="237" y="26" width="86" height="30" rx="9"/><text x="280" y="46" text-anchor="middle">Facilitator</text></g>
-  <path class="wire w1" d="M49 150 V120 Q49 104 65 104 H150"/><text x="154" y="108" class="arch-label" fill="#5FA897">outbound link</text>
-  <path class="wire w2" d="M511 150 V120 Q511 104 495 104 H410"/><text x="406" y="108" class="arch-label" fill="#5FA897" text-anchor="end">outbound link</text>
-</svg>`;
+const esc = (s) =>
+  String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+function head(base, notFound) {
+  const P = (s) => (notFound ? base + s : s);
+  return `<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${notFound ? "Not found" : "Open Facilitator — your agents do the work, it remembers it"}${notFound ? "" : ""}</title>
+<meta name="description" content="Open-source orchestration for teams of humans and AI agents: a durable coordination kernel your teams connect to over outbound links. Approvals, evidence, artifacts — survive every crash.">
+<link rel="icon" href="${P("favicon.svg")}" type="image/svg+xml">
+<link rel="stylesheet" href="${P("styles.css")}">
+</head>`;
+}
+
+function header(base, notFound) {
+  // On the 404 page there is no landing content: every hash target lives on
+  // index.html, addressed through the site base.
+  const P = (s) => (notFound ? (s.startsWith("#") ? base + "index.html" + s : base + s) : s);
+  const links = nav
+    .map((n) => {
+      const href = n.href.startsWith("/#/") ? P(n.href.slice(1)) : P(n.href);
+      return `<a href="${href}">${esc(n.label)}</a>`;
+    })
+    .join("");
+  return `<header class="topbar">
+  <a class="brand" href="${P("index.html")}">${ICON}<span>Open&nbsp;Facilitator</span></a>
+  <nav class="topnav" aria-label="Main">${links}
+    <form class="searchbox" action="${P("#/search")}" role="search">
+      <input id="q" type="search" name="q" placeholder="Search…" aria-label="Search the documentation" autocomplete="off">
+      <div class="search-pop" id="search-pop"></div>
+    </form>
+    <a class="ghost" rel="noopener" href="${repo.url}">GitHub</a>
+  </nav>
+</header>`;
+}
+
+function heroHtml() {
+  return `<section class="hero" id="top"><div class="wrap"><div class="hero-grid">
+  <div>
+    <p class="kicker">${esc(hero.kicker)}</p>
+    <h1>${esc(hero.tagline)}</h1>
+    <p class="lede">${esc(hero.oneLiner)}</p>
+    <div class="cta">
+      <a class="btn" href="#start">Get running</a>
+      <a class="btn inverse" href="#/what">What is this, exactly?</a>
+    </div>
+  </div>
+  <div class="scene" id="scene">
+    <p class="scene-title">The loop every Work travels</p>
+    <div class="relay">
+      <svg viewBox="0 0 280 264" role="img" aria-label="Diagram: work travels a loop between teams and the central kernel">
+        <path d="${relay.path}" fill="none" stroke="#e6e3da" stroke-width="2"/>
+        <circle class="relay-hub" cx="140" cy="128" r="26" fill="#0B6B57"/>
+        <circle cx="140" cy="128" r="26" fill="none" stroke="#0B6B57" stroke-opacity="0.25" stroke-width="10"/>
+        <text x="140" y="124" text-anchor="middle" fill="#ffffff" font-size="11" font-weight="600" font-family="system-ui,sans-serif">kernel</text>
+        <text x="140" y="138" text-anchor="middle" fill="#bfe0d6" font-size="9" font-family="system-ui,sans-serif">remembers</text>
+        ${relay.steps.map((s, i) => stationSvg(s, i)).join("")}
+        <circle class="workdot" r="7" fill="#D97A22" style="offset-path: path('${relay.path}'); offset-distance: 0%"/>
+      </svg>
+    </div>
+    <div class="relay-steps" role="tablist" aria-label="Work lifecycle">
+      ${relay.steps.map((s, i) => `<button role="tab" class="relay-step${i === 0 ? " on" : ""}" data-step="${i}" aria-selected="${i === 0}"><b>${esc(s.title)}</b>${esc(s.who)}</button>`).join("")}
+    </div>
+    <div class="relay-detail" id="relay-detail" aria-live="polite"></div>
+  </div>
+</div></div></section>`;
+}
+
+function stationSvg(s, i) {
+  const words = ["create", "route", "execute", "record"];
+  const dy = i === 0 ? 34 : i === 1 ? -24 : i === 2 ? 34 : 40;
+  return `<g class="relay-station" data-station="${i}" transform="translate(${s.x} ${s.y})">
+    <circle r="15" fill="#ffffff" stroke="#0B6B57" stroke-width="1.5"/>
+    <text y="4" text-anchor="middle" fill="#084A3C" font-size="8.5" font-family="system-ui,sans-serif">${i + 1}</text>
+    <text y="${dy}" text-anchor="middle" fill="#7d8883" font-size="9.5" font-family="system-ui,sans-serif">${esc(words[i % 4])}</text>
+  </g>`;
+}
+
+function storyHtml() {
+  return `<section id="how"><div class="wrap">
+  <p class="kicker">How it works</p>
+  <h2>One piece of work, start to finish</h2>
+  <p class="section-lede">Not an abstraction — a Monday. The same sequence runs for a research report, a migration plan, or a dependency update.</p>
+  <div class="story">
+    ${story
+      .map(
+        (s, i) => `<div class="story-num">${i + 1}</div>
+    <div class="story-item">
+      <span class="who">${esc(s.who)}</span>
+      <h3>${esc(s.title)}</h3>
+      <p>${esc(s.body)}</p>
+      ${s.cmd ? `<pre class="cmd">${esc(s.cmd).replace(/^\$/, "<span class=\"c\">$</span>")}</pre>` : ""}
+    </div>`
+      )
+      .join("")}
+  </div>
+</div></section>`;
+}
+
+function whyHtml() {
+  return `<section id="why"><div class="wrap">
+  <p class="kicker">Why teams adopt it</p>
+  <h2>Coordination you can audit, authority you keep</h2>
+  <p class="section-lede">Six claims, each one enforced by the published protocol — checkable in the open, not promised by a vendor.</p>
+  <div class="grid cols-3">
+    ${benefits.map((b) => `<div class="cell"><h3>${esc(b.title)}</h3><p>${esc(b.body)}</p></div>`).join("")}
+  </div>
+</div></section>`;
+}
+
+function componentsHtml() {
+  return `<section id="components"><div class="wrap">
+  <p class="kicker">Components</p>
+  <h2>Small pieces, published artifacts, clear seams</h2>
+  <p class="section-lede">Take the whole kernel, or consume one package and speak the wire directly. Every component below ships versioned and stands on the same contract.</p>
+  <div class="grid cols-3">
+    ${components
+      .map(
+        (c) => `<div class="cell"><span class="tag">${esc(c.tag)}</span><h3>${esc(c.name)}</h3><p>${esc(c.body)}</p><p style="margin-top:12px"><a href="${c.docs.startsWith("/") ? "#" + c.docs : c.docs}">Details →</a></p></div>`
+      )
+      .join("")}
+  </div>
+</div></section>`;
+}
+
+function consoleHtml() {
+  return `<section id="console"><div class="wrap">
+  <p class="kicker">The operator surface</p>
+  <h2>The console is the product, photographed</h2>
+  <p class="section-lede">Every kernel serves an operator console at its own URL: search across every Work, the live fleet, the delivery ledger, the audit trail. It is a client of the same public API your agents use — <a href="#/console">here is what each view shows</a>.</p>
+  <figure class="shot" style="margin:0">
+    <div class="shot-bar"><i></i><i></i><i></i></div>
+    <img src="console-explorer.png" alt="The Open Facilitator console showing Work search results, a fleet summary, and throughput counters" loading="lazy" width="1140" height="760">
+  </figure>
+</div></section>`;
+}
+
+function startHtml() {
+  return `<section id="start"><div class="wrap">
+  <p class="kicker">Get running</p>
+  <h2>Two doors in</h2>
+  <div class="roles">
+    <div class="role">
+      <h3>You are a person</h3>
+      <p style="color:var(--ink-2);font-size:15px">Run the kernel image next to your PostgreSQL, point it at your login provider, connect a team, and drive your first Work from curl and a browser.</p>
+      <a class="btn" style="margin-top:6px" href="#/guide/human">Human guide →</a>
+    </div>
+    <div class="role">
+      <h3>You are an agent</h3>
+      <p style="color:var(--ink-2);font-size:15px">Dense orientation for LLM workers: auth planes, the endpoints you'll actually call, idempotency rules, how to fail well, and the machine-readable contract.</p>
+      <a class="btn inverse" style="margin-top:6px" href="#/guide/agent">Agent guide →</a>
+    </div>
+  </div>
+  <p style="margin-top:26px;color:var(--ink-2)">Want the artifact coordinates first? <a href="#/artifacts">Artifacts &amp; installation</a> · <a href="#/integrations">Supported integrations</a> · <a href="#/extend">Write your own adapter</a></p>
+</div></section>`;
+}
+
+function footerHtml(base, notFound) {
+  const P = (s) => (notFound ? (s.startsWith("#") ? base + "index.html" + s : base + s) : s);
+  return `<footer class="site"><div class="wrap">
+  <span style="display:inline-flex;align-items:center;gap:8px">${ICON}<b>Open Facilitator</b></span>
+  ${pages
+    .flatMap((g) => g.entries)
+    .map((e) => `<a href="${P("#" + e.route)}">${esc(e.title)}</a>`)
+    .join("")}
+  ${docs
+    .flatMap((g) => g.entries)
+    .filter((e) => ["/docs", "/docs/protocol", "/docs/security"].includes(e.route))
+    .map((e) => `<a href="${P("#" + e.route)}">${esc(e.title)}</a>`)
+    .join("")}
+  <a rel="noopener" href="${repo.url}">GitHub</a>
+</div></footer>`;
+}
+
+const RELAY_JS = `
+(function(){
+  var steps = ${JSON.stringify(relay.steps)};
+  var btns = document.querySelectorAll(".relay-step");
+  var detail = document.getElementById("relay-detail");
+  var dot = document.querySelector(".relay .workdot");
+  function show(i){
+    btns.forEach(function(b,j){ b.classList.toggle("on", i===j); b.setAttribute("aria-selected", i===j); });
+    detail.innerHTML = "<b>"+steps[i].title+"</b> — "+steps[i].body;
+    if (dot) { dot.style.animation = "none"; dot.style.offsetDistance = steps[i].at; }
+  }
+  btns.forEach(function(b){
+    b.addEventListener("click", function(){ show(+b.dataset.step); });
+    b.addEventListener("mouseenter", function(){ show(+b.dataset.step); });
+  });
+  show(0);
+  var t, i = 0;
+  function cycle(){ if (!document.hidden) { show(i % steps.length); i++; } t = setTimeout(cycle, 5200); }
+  t = setTimeout(cycle, 5200);
+  document.getElementById("scene").addEventListener("mouseenter", function(){ clearTimeout(t); });
+})();
+`;
+
+const SITE_ROUTES = [
+  "/docs",
+  ...pages.flatMap((g) => g.entries.map((e) => e.route)),
+  ...docs.flatMap((g) => g.entries.map((e) => e.route)),
+  ...guides.map((g) => g.route),
+];
+
+function notFoundBody(base) {
+  const P = (s) => (s.startsWith("#") ? base + "index.html" + s : base + s);
+  return `<section class="hero"><div class="wrap"><div>
+  <p class="kicker">404</p>
+  <h1>Nothing stands here.</h1>
+  <p class="lede">That path is not part of this site. The documentation index is one click away:</p>
+  <div class="cta"><a class="btn" href="${P("#/docs")}">Documentation home</a><a class="btn inverse" href="${P("index.html")}">Landing page</a></div>
+</div></div></section>
+<script>
+(function () {
+  var base = ${JSON.stringify(base)};
+  var routes = ${JSON.stringify(SITE_ROUTES)};
+  var p = decodeURIComponent(location.pathname);
+  if (p.indexOf(base) !== 0) return;
+  var tail = p.slice(base.length).replace(/\\/+$/, "");
+  var cand = "/" + tail;
+  if (routes.indexOf(cand) !== -1) location.replace(base + "index.html#" + cand);
+})();
+</script>`;
 }
 
 export function landingHtml(opts = {}) {
   const { notFound = false, base = "/" } = opts;
-  // The 404 page is served at unknown depth: root every relative link.
-  const P = (s) => (notFound ? base + s : s);
   return `<!DOCTYPE html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${notFound ? "Not found" : "Open Facilitator — durable coordination for human + agent work"}</title>
-<meta name="description" content="Portable, pluggable, multi-workspace orchestration of autonomous, assisted, and deterministic workloads across independently operated execution environments.">
-<link rel="icon" href="${P("favicon.svg")}" type="image/svg+xml">
-<link rel="stylesheet" href="${P("styles.css")}">
-</head>
+${head(base, notFound)}
 <body>
 <a class="skip" href="#main">Skip to content</a>
-<header class="topbar">
-  <a class="brand" href="${P("index.html")}">${ICON}<span>Open&nbsp;Facilitator</span></a>
-  <nav class="topnav" aria-label="Main">
-    <a href="${P("index.html#why")}">Why</a>
-    <a href="${P("index.html#how")}">How it works</a>
-    <a href="${P("index.html#components")}">Components</a>
-    <a href="${P("index.html#start")}">Get started</a>
-    <a href="${P("#/docs")}">Docs</a>
-    <a class="ghost" rel="noopener" href="${repo.url}">GitHub</a>
-    <form class="searchbox" action="${P("#/search")}" role="search">
-      <input id="q" type="search" name="q" placeholder="Search docs…" aria-label="Search documentation" autocomplete="off">
-    </form>
-  </nav>
-</header>
-<main id="main" class="site">
-${notFound ? notFoundBody(base) : homeBody()}
+${header(base, notFound)}
+<main id="main">
+${
+  notFound
+    ? notFoundBody(base)
+    : `<div id="landing">${heroHtml() + storyHtml() + whyHtml() + componentsHtml() + consoleHtml() + startHtml()}</div><div id="app"></div>`
+}
 </main>
-<footer class="foot">
-  <div>${ICON}&nbsp; Open Facilitator — built and maintained by teams that run mixed human/agent workloads.</div>
-  <nav class="footnav" aria-label="Footer">
-    <a rel="noopener" href="${repo.url}">GitHub</a>
-    <a href="${P("#/docs")}">Docs</a>
-    <a href="#/docs/getting-started">Reference environment</a>
-    <a href="#/docs/protocol">Protocol</a>
-  </nav>
-  <div class="fine">Dual-licensed AGPL-3.0-or-later / commercial. Every artifact ships its license.</div>
-</footer>
-<script src="${P("app.js")}"></script>
+${footerHtml(base, notFound)}
+${notFound ? "" : `<script>${RELAY_JS}</script>`}
+<script src="${notFound ? base + "app.js" : "app.js"}"></script>
 </body></html>`;
-}
-
-function homeBody() {
-  return `
-<section class="hero" id="top">
-  <div class="hero-copy">
-    <p class="kicker">Open-source coordination kernel · .NET + TypeScript · AGPL</p>
-    <h1>Coordination that outlives your agents.</h1>
-    <p class="tagline">${hero.tagline}</p>
-    <p class="lede">${hero.oneLiner}</p>
-    <div class="cta">
-      <a class="btn" href="#start">Get started</a>
-      <a class="btn inverse" href="#/docs">Read the docs</a>
-      <a class="btn ghostbtn" rel="noopener" href="${repo.url}">Star on GitHub</a>
-    </div>
-  </div>
-  <div class="hero-art">${heroSvg()}</div>
-</section>
-
-<section class="console-wrap">
-  <div class="console" aria-label="Quick start">
-    <div class="console-bar"><i></i><i></i><i></i><span>${hero.demo.caption}</span></div>
-    <pre><code>git clone ${repo.url}.git && cd open-facilitator
-<span class="cmt"># needs only Docker: Postgres, Keycloak, S3, kernel, demo workspace</span>
-${hero.demo.lines[0]}
-${hero.demo.lines[1]}</code></pre>
-  </div>
-</section>
-
-<section id="why" class="band">
-  <h2>Why teams pick it</h2>
-  <p class="band-sub">Six promises, each enforced by code you can read — not by a hosting agreement.</p>
-  <div class="grid three">
-    ${benefits
-      .map(
-        (b) => `<article class="card">
-      <span class="icon"><svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[b.icon]}</svg></span>
-      <h3>${b.title}</h3><p>${b.body}</p></article>`,
-      )
-      .join("\n")}
-  </div>
-</section>
-
-<section id="how" class="band alt">
-  <h2>How a piece of work flows</h2>
-  <ol class="flow">
-    <li><b>Ingress.</b> A chat mention, issue label, or API call creates a <b>Work</b> — durable, versioned, with an append-only timeline.</li>
-    <li><b>Decision.</b> Deterministic routing matches the work to a capable <b>Workspace</b>; models may propose, only code authorizes.</li>
-    <li><b>Dispatch.</b> The assign command rides the outbox to the team's <b>Gateway</b> over an <em>outbound</em> Link — no inbound ports on your side.</li>
-    <li><b>Execution.</b> Team policy gates it (<code>allow | deny | confirm</code>); <code>confirm</code> parks a durable <b>approval</b> for a human. Otherwise a harness adapter runs it.</li>
-    <li><b>Proof.</b> Progress, content-addressed <b>artifacts</b>, and a canonical result manifest flow back, trace-linked end to end.</li>
-    <li><b>Settle.</b> Exactly-once completion; side effects (PRs, replies) happen team-side under team credentials.</li>
-  </ol>
-</section>
-
-<section id="components" class="band">
-  <h2>The components</h2>
-  <p class="band-sub">One repository, eight pieces, nothing hidden — the same artifacts you can build today.</p>
-  <div class="grid four">
-    ${components
-      .map(
-        (c) => `<article class="card comp">
-      <h3>${c.name}</h3><p class="pkg">${c.pkg}</p><p>${c.body}</p>
-      <p class="path"><a rel="noopener" href="${repo.url}/tree/main/${c.path}">${c.path}</a> · <a href="#${c.docs}">docs</a></p></article>`,
-      )
-      .join("\n")}
-  </div>
-</section>
-
-<section id="start" class="band alt">
-  <h2>Get started</h2>
-  <p class="band-sub">Two doors, same stack. Pick the one that matches who is at the keyboard.</p>
-  <div class="grid two">
-    ${guides
-      .map(
-        (g) => `<article class="card guide">
-      <h3>${g.title}</h3>
-      <p class="pkg">${g.kicker} · ~${g.minutes} min</p>
-      <p>${g.body}</p>
-      <p><a class="btn" href="#${g.route}">Open guide →</a></p></article>`,
-      )
-      .join("\n")}
-  </div>
-  <p class="more">Prefer the terminal? The whole documentation set is in the
-    <a rel="noopener" href="${repo.url}/tree/main/docs">repo's <code>docs/</code></a> and
-    <a href="#/docs">rendered here</a>.</p>
-</section>
-`;
-}
-
-function notFoundBody(base) {
-  const P = (s) => base + s;
-  return `<section class="hero"><div class="hero-copy">
-  <h1>Nothing stands here.</h1>
-  <p class="lede">That page is not in this site. The documentation may know better:</p>
-  <div class="cta"><a class="btn" href="${P("index.html")}#/docs">Docs home</a><a class="btn inverse" href="${P("index.html")}">Landing page</a></div>
-</div></section>
-<script>
-// GitHub Pages serves 404.html for unknown paths (no SPA fallback). When it
-// was loaded for a site route, forward that route to the real index.
-(function () {
-  var base = ${JSON.stringify(base)};
-  var rest = location.pathname.slice(base.length); // "docs/protocol" style
-  if (/^(docs|guide|search)(\\/|$)/.test(rest))
-    location.replace(base + "index.html#/" + rest + location.hash);
-})();
-</script>`;
 }

@@ -1,127 +1,163 @@
-// Site content manifest. `site/` is fully self-contained: it reads the repo's
-// docs tree at build time but shares no code with the facilitator runtime.
-// Every file must live under site/src or docs/.
+// Site content manifest. `site/` is fully self-contained: it renders the
+// repo's docs tree at build time but shares no code with the facilitator.
+// Landing copy lives here; deep content lives in the markdown it references.
 
 export const repo = {
   owner: "denisekart",
   ownerSlug: "denisekart",
   url: "https://github.com/denisekart/open-facilitator",
   npmScope: "@ofac",
+  npmHtml: "https://www.npmjs.com/search?q=scope:ofac",
   ghcr: "ghcr.io/denisekart/open-facilitator",
 };
 
 export const nav = [
-  { label: "Overview", href: "#top" },
+  { label: "How it works", href: "#how" },
   { label: "Components", href: "#components" },
-  { label: "Why", href: "#why" },
+  { label: "Integrations", href: "/#/integrations" },
+  { label: "Console", href: "/#/console" },
   { label: "Get started", href: "#start" },
   { label: "Docs", href: "#/docs" },
 ];
 
-// The four answers the landing hero must give, verbatim.
+// The hero answers one question: what is this product?
 export const hero = {
-  tagline:
-    "Portable, pluggable, multi-workspace orchestration of autonomous, assisted, and deterministic workloads — across independently operated execution environments.",
+  kicker: "Open-source orchestration for human + agent teams",
+  tagline: "Your agents do the work. Open Facilitator remembers it.",
   oneLiner:
-    "One persistent Facilitator coordinates the work; your teams keep execution. The kernel holds durable state, routing, approvals, and evidence — never your credentials, never your runtime.",
-  demo: {
-    caption: "The whole product on one laptop:",
-    lines: [
-      "./referencectl up slim",
-      "./referencectl verify   # 11 acceptance hops, unattended",
-    ],
-  },
+    "A coordination kernel for teams of humans and AI agents. Hand it a piece of work — it tracks who is doing what, waits for the humans who must approve, files the evidence, and survives every crash, restart, and reorg along the way.",
 };
 
-export const benefits = [
+// The interactive hero scene: one loop, four stations.
+export const relay = {
+  path: "M 44 128 A 88 88 0 1 1 236 128 A 88 88 0 1 1 44 128",
+  steps: [
+    {
+      at: "0%",
+      x: 44, y: 128,
+      who: "You or an agent",
+      title: "A Work is created",
+      body: "One POST to the API — or a message in chat. An objective, nothing else required. The kernel records it durably: it now outlives every process involved.",
+    },
+    {
+      at: "25%",
+      x: 140, y: 40,
+      who: "The kernel",
+      title: "Routing decides who acts",
+      body: "Deterministic policy — never a model — picks a team by capability, mints an assignment, and pushes it out over an always-outbound link. If that team is offline, the work simply waits.",
+    },
+    {
+      at: "50%",
+      x: 236, y: 128,
+      who: "A team's workspace",
+      title: "Agents execute, humans approve",
+      body: "Execution happens on the team's own machines with the team's own credentials. The agent proposes; a human gate decides. Neither the kernel nor any other team can reach in.",
+    },
+    {
+      at: "75%",
+      x: 140, y: 216,
+      who: "The record",
+      title: "Evidence is filed",
+      body: "Every output becomes a content-addressed artifact, every decision an audit entry, every lesson a memory candidate. Six months later you can still answer: who did what, when, and why.",
+    },
+  ],
+};
+
+// The landing "how it works" story: one concrete week, in order.
+export const story = [
   {
-    icon: "shield",
-    title: "You keep execution authority",
-    body: "The kernel holds no SCM/issue/deploy credential. Harnesses, models, secrets, and every external write stay team-side — the Facilitator coordinates, it never takes over. No platform lock-in on how work gets done.",
+    who: "Monday, 09:02 — a person",
+    title: "The ask goes in",
+    body: "A team lead opens a ticket that reads “draft the billing migration plan” — or an agent files it from a chat message. It lands as a Work: durable, versioned, searchable.",
+    cmd: "curl -X POST https://facilitator.example/api/works \\\n  -H \"authorization: Bearer $TOKEN\" \\\n  -d '{\"objective\": \"draft the billing migration plan\"}'",
   },
   {
-    icon: "recover",
-    title: "Recoverable by construction",
-    body: "Transactional inbox/outbox, leases, fencing generations, idempotent admission. Crash a kernel mid-approval and the run resumes exactly once — nothing lives only in a socket or an ephemeral container.",
+    who: "Monday, 09:02 — the kernel",
+    title: "Policy routes, never guesses",
+    body: "The kernel matches the work's capability need against what teams advertise, checks who is online, and assigns it. The decision is deterministic and written to the audit trail — a model can propose a route, only policy can take one.",
   },
   {
-    icon: "gavel",
-    title: "Deterministic authority, human gates",
-    body: "Models propose; only deterministic policy and verified identity evidence authorize. Approvals are durable, digest-pinned, single-use records. Every gate decision — allow and deny — is audited.",
+    who: "Monday, 09:04 — a team's machines",
+    title: "An agent picks it up over an outbound link",
+    body: "The team's Gateway dials out to the kernel (nothing is exposed inbound), accepts the assignment, and starts a harness — an LLM agent, a deterministic script, or a human task list. The kernel never holds the team's source credentials, models, or API keys.",
   },
   {
-    icon: "wire",
-    title: "Protocol, not product",
-    body: "CloudEvents 1.0 + versioned JSON Schema + OpenAPI 3.1, with a cross-language conformance suite. SignalR reference transport, plain HTTP fallback — implement any component in any language from the contract alone.",
+    who: "Monday, 11:37 — a human gate",
+    title: "The agent asks; a human decides",
+    body: "The draft is ready, but opening the pull request is a privileged write. The kernel mints a durable approval request and delivers it into the team's chat. The kernel can restart, upgrade, or fall over at this exact moment — the approval survives and fires exactly once.",
   },
   {
-    icon: "layers",
-    title: "Work is not code-shaped",
-    body: "Research reports, datasets, documents, PRs, and test evidence are first-class outputs: content-addressed artifacts, canonical result manifests, governed memory with team-scoped ACLs.",
-  },
-  {
-    icon: "feather",
-    title: "Small honest footprint",
-    body: "Required infrastructure: PostgreSQL + OIDC + an object store. Kafka, Temporal, vector DBs, and LLMs are optional adapters, never load-bearing. The slim reference stack runs on a laptop.",
+    who: "Monday, 13:10 — the record",
+    title: "Everything is filed where it can be found",
+    body: "The report and its manifest are stored as digest-verified artifacts. The timeline holds every event, actor, and decision. Useful lessons can be promoted to shared memory with team-scoped access — so the next agent starts smarter.",
   },
 ];
 
+// What ships, in consumer terms: artifact coordinates, not source paths.
 export const components = [
   {
-    name: "Facilitator kernel",
-    pkg: "OCI · ghcr.io",
-    body: "The .NET 10 service: work lifecycle, identity and policy gates, Link hub, artifact + memory brokers, embedded admin SPA, operator API and CLI.",
-    path: "src/facilitator/",
-    docs: "/docs/overview",
+    name: "The kernel",
+    tag: "container image",
+    body: "One stateless service you run anywhere containers run. Work lifecycle, routing policy, approvals, links, artifacts, memory, admin console. Your PostgreSQL, your OIDC provider, your object store — no proprietary infrastructure.",
+    docs: "/artifacts",
   },
   {
-    name: "Wire contract",
-    pkg: "JSON Schema · OpenAPI",
-    body: "CloudEvents 1.0 envelopes, the full v1 type registry, frozen OpenAPI surfaces, and conformance fixtures two independent language stacks must pass.",
-    path: "protocol/",
-    docs: "/docs/protocol",
-  },
-  {
-    name: "Team Gateway",
-    pkg: "npm · @ofac/gateway",
-    body: "The team-owned Node runtime that multiplexes Workspaces over one outbound Link endpoint, evaluates team policy, and keeps the execution ledger.",
-    path: "src/gateway/",
-    docs: "/docs/advanced",
-  },
-  {
-    name: "Workspace Link SDK",
-    pkg: "npm · @ofac/workspace-link",
-    body: "Link client SDK + ofac-linkd supervisor: enroll, advertise capabilities, connect, buffer, and replay after a crash from a durable state file.",
-    path: "src/workspace-link/",
-    docs: "/docs/protocol",
+    name: "The Gateway",
+    tag: "npm · @ofac/gateway",
+    body: "The team-side runtime. One outbound connection to the kernel, N workspaces behind it, a durable local ledger. Runs as a CLI process, a container, or inside your existing CI fleet.",
+    docs: "/artifacts",
   },
   {
     name: "Harness adapters",
-    pkg: "npm · @ofac/adapter",
-    body: "Thin translators from the Gateway child wire to one execution harness. Reference workers: deterministic, oh-my-pi, and Codex — plus a conformance kit for your own.",
-    path: "src/adapters/harnesses/",
-    docs: "/docs/advanced",
+    tag: "npm · @ofac/adapter",
+    body: "The plug between the Gateway and whatever actually executes: shipped reference harnesses for deterministic runs, oh-my-pi agents, and Codex — plus the SDK and conformance kit for your own.",
+    docs: "/extend",
   },
   {
-    name: "Communication adapters",
-    pkg: "npm · chat + forge legs",
-    body: "Mattermost, Telegram, Forgejo/GitHub/GitLab pairs, Kafka: they normalize provider events into the central domain types and execute outbound commands team-side.",
-    path: "src/adapters/communication/",
-    docs: "/docs/advanced",
+    name: "Provider adapters",
+    tag: "npm · chat + forge",
+    body: "Chat and forge legs for Mattermost, Telegram, GitHub, Forgejo, and GitLab. Inbound events arrive normalized; privileged outbound writes ride approval policies and execute team-side.",
+    docs: "/integrations",
+  },
+  {
+    name: "The wire contract",
+    tag: "open protocol",
+    body: "Every message is a CloudEvents 1.0 envelope with a versioned JSON Schema; every endpoint is specified in OpenAPI 3.1. Two independent runtime stacks pass the same conformance fixtures — you can implement any component in any language.",
+    docs: "/docs/protocol",
   },
   {
     name: "Dev Container Features",
-    pkg: "OCI features · ghcr.io",
-    body: "One-Feature onboarding: add a single feature to any team container and it becomes a linked, headless workspace. Six features ship today.",
-    path: "features/",
-    docs: "/docs/getting-started",
+    tag: "OCI images · ghcr.io",
+    body: "Turn any team container into a linked workspace by adding one feature to devcontainer.json. Enroll, connect, advertise capabilities, stream logs — no bespoke daemon to write.",
+    docs: "/artifacts",
+  },
+];
+
+// Why it exists — one claim per card, each verifiable in the open protocol.
+export const benefits = [
+  {
+    title: "Agents come and go; the work remains",
+    body: "Crash a worker mid-approval and the run resumes exactly once. Nothing important lives only in a socket, a container, or a model's context window. The kernel's store is your PostgreSQL — back it up like anything else you care about.",
   },
   {
-    name: "Reference environment",
-    pkg: "Docker Compose",
-    body: "Slim and full stacks plus referencectl: boot, status, tokens, and the acceptance run that proves every hop — the same run every change must pass.",
-    path: "reference/",
-    docs: "/docs/getting-started",
+    title: "No one loses authority over their machines",
+    body: "Teams dial out, never in. The kernel holds no source credentials, no deploy keys, no model access. Every external write a team makes passes the team's own policy first — enforced by code you can read, not by a hosting agreement.",
+  },
+  {
+    title: "Humans stay in the loop where they chose to be",
+    body: "Privileged actions ride durable, digest-pinned, single-use approvals delivered into your chat. A restart, a failover, or a duplicate delivery cannot approve twice — the ledger refuses.",
+  },
+  {
+    title: "AI without amnesia",
+    body: "Outputs are content-addressed artifacts, decisions are audit entries, and proven lessons become shared memories with team-scoped access. Next quarter's agents can be held to what this quarter's work proved.",
+  },
+  {
+    title: "A protocol, not a platform",
+    body: "CloudEvents + JSON Schema + OpenAPI, with a cross-language conformance suite. Swap harnesses, swap chat providers, write your own adapter in any language — or implement the whole side from the contract alone.",
+  },
+  {
+    title: "Boring, replaceable infrastructure",
+    body: "Required: PostgreSQL, an OIDC provider, an object store. Everything else — message buses, schedulers, vector databases, even the model providers — is optional. Small enough to audit, standard enough to keep.",
   },
 ];
 
@@ -130,28 +166,68 @@ export const guides = [
   {
     id: "human",
     route: "/guide/human",
-    title: "Getting started — Humans",
+    title: "Get running — Humans",
     kicker: "You drive a browser and a terminal",
-    body: "Boot the whole stack, run your first Work through approval to artifact, and tour the admin SPA.",
-    minutes: 10,
+    body: "Run the kernel from its published image, connect a team, and take your Work from create to approval to artifact.",
+    minutes: 12,
     src: "site/src/guides/human.md",
   },
   {
     id: "agent",
     route: "/guide/agent",
-    title: "Getting started — AI agents",
+    title: "Get running — AI agents",
     kicker: "You are an agent reading this programmatically",
-    body: "The dense orientation: auth, the HTTP surface, link enrollment, where the machine-readable contract lives.",
+    body: "Dense orientation: auth, the HTTP surface, link enrollment, the machine-readable contract, where artifacts live.",
     minutes: 6,
     src: "site/src/guides/agent.md",
   },
 ];
 
-// docs/*.md published to the site (path = source of truth, route = site route).
+// Site-authored consumer pages (site/src/pages/*.md).
+export const pages = [
+  {
+    group: "The product",
+    order: 1,
+    entries: [
+      {
+        route: "/what",
+        src: "site/src/pages/what.md",
+        title: "What Open Facilitator is",
+        body: "The whole model from zero: Works, teams, links, approvals, artifacts, memory — in plain language.",
+      },
+      {
+        route: "/integrations",
+        src: "site/src/pages/integrations.md",
+        title: "Supported integrations",
+        body: "Chat, forges, harnesses, provisioning, transports: what works today and what each one does.",
+      },
+      {
+        route: "/console",
+        src: "site/src/pages/console.md",
+        title: "The admin console",
+        body: "The operator surface: search, links, deliveries, config, AiDeck — with screenshots of the real thing.",
+      },
+      {
+        route: "/artifacts",
+        src: "site/src/pages/artifacts.md",
+        title: "Artifacts & installation",
+        body: "Published images, packages, and features — coordinates, versions, and how to consume each.",
+      },
+      {
+        route: "/extend",
+        src: "site/src/pages/extend.md",
+        title: "Extend it yourself",
+        body: "Write your own harness, provider, or whole component: the contract, the SDK, the conformance kit.",
+      },
+    ],
+  },
+];
+
+// docs/*.md published to the site (path = source of truth, site route).
 export const docs = [
   {
     group: "Start here",
-    order: 1,
+    order: 2,
     entries: [
       {
         route: "/docs",
@@ -169,19 +245,19 @@ export const docs = [
   },
   {
     group: "Walkthroughs",
-    order: 2,
+    order: 3,
     entries: [
       {
         route: "/docs/getting-started",
         src: "docs/getting-started.md",
-        title: "Reference environment walkthrough",
-        body: "The full human walkthrough of the reference environment, end to end.",
+        title: "Guided tour (reference environment)",
+        body: "A self-contained laptop tour of the whole system, end to end, with every hop proved.",
       },
       {
         route: "/docs/getting-started-agents",
         src: "docs/getting-started-agents.md",
         title: "Agent orientation (in-repo)",
-        body: "Agent-facing orientation: auth, HTTP surface, enrollment, repo law.",
+        body: "Agent-facing orientation for people working inside the source repository.",
       },
       {
         route: "/docs/contributing",
@@ -199,7 +275,7 @@ export const docs = [
   },
   {
     group: "Reference",
-    order: 3,
+    order: 4,
     entries: [
       {
         route: "/docs/protocol",
@@ -223,7 +299,7 @@ export const docs = [
   },
   {
     group: "Operations",
-    order: 4,
+    order: 5,
     entries: [
       {
         route: "/docs/runbooks",

@@ -1,284 +1,343 @@
-// Open Facilitator site runtime: hash-routed doc viewer + browser search.
-// No dependencies. Routes: #/docs..., #/guide/..., #/search?q=...
-(() => {
+// Open Facilitator site runtime: hash-routed content viewer + live search.
+// No dependencies; works from file:// static hosting and project pages.
+(function () {
   "use strict";
 
-  const state = { manifest: null, index: null, content: new Map() };
+  const landing = document.getElementById("landing");
+  const app = document.getElementById("app");
+  const searchInput = document.getElementById("q");
+  const searchPop = document.getElementById("search-pop");
 
-  const $ = (s, r) => (r || document).querySelector(s);
+  let manifest = null; // { repo, nav, guides }
+  let searchIdx = null; // { pages, tok }
+
   const esc = (s) =>
     String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
+  // ---------------------------------------------------------------- routing
+
   function parseHash() {
     const h = location.hash || "";
-    const m = h.match(/^#(\/[^?]*)(?:\?(.*))?$/);
-    if (!m) return { route: null, anchor: "", query: new URLSearchParams("") };
-    return {
-      route: m[1].replace(/\/+$/, "") || "/",
-      anchor: m[2] || "",
-      query: new URLSearchParams(m[2] || ""),
-    };
+    if (!h.startsWith("#/")) return { route: null, anchor: null, query: null };
+    const raw = h.slice(1); // "/docs/overview?section"
+    const [path, frag] = raw.split("?");
+    const [routePart, queryPart] = path.split("?");
+    void queryPart;
+    if (raw.startsWith("/search")) {
+      const q = (frag || "").replace(/^q=/, "");
+      return { route: "/search", anchor: null, query: decodeURIComponent(q) };
+    }
+    return { route: routePart || "/", anchor: frag || null, query: null };
   }
 
-  const contentFile = (route) =>
-    "content/" + (route === "/docs" ? "docs.html" : route.slice(1) + ".html");
-
-  async function loadContent(route) {
-    if (state.content.has(route)) return state.content.get(route);
-    const r = await fetch(contentFile(route));
-    if (!r.ok) throw new Error(String(r.status));
-    const html = await r.text();
-    state.content.set(route, html);
-    return html;
+  function isKnownRoute(route) {
+    if (!manifest) return false;
+    for (const g of manifest.nav) for (const it of g.items) if (it.r === route) return true;
+    for (const g of manifest.guides) if (g.r === route) return true;
+    return false;
   }
 
-  async function load() {
-    const [mf, ix] = await Promise.all([
-      fetch("site-manifest.json").then((r) => r.json()),
-      fetch("search-index.json").then((r) => r.json()),
-    ]);
-    state.manifest = mf;
-    state.index = ix;
-  }
+  // ---------------------------------------------------------------- chrome
 
-  // ------------------------------------------------------------ doc pages
-
-  function docnavHtml(activeRoute) {
-    const m = state.manifest;
+  function sidebarHtml(activeRoute) {
     const groups = [];
-    for (const gr of m.nav) {
-      let items = gr.items.filter((i) => i.r !== "/docs");
-      if (gr.group === "Start here")
-        items = [{ r: "/docs", t: "Docs home" }, ...items, ...m.guides];
-      if (!items.length) continue;
-      groups.push(
-        `<div class="group"><p>${esc(gr.group)}</p>${items
-          .map((i) => link(i, activeRoute))
-          .join("")}</div>`,
-      );
-    }
-    return `<nav class="docnav" aria-label="Documentation">
-      <div class="crumbs"><a href="index.html">← Home</a></div>
-      ${groups.join("")}</nav>`;
+    groups.push({
+      group: "Guides",
+      items: manifest.guides.map((g) => ({ r: g.r, t: g.t })),
+    });
+    for (const g of manifest.nav) groups.push(g);
+    return groups
+      .map(
+        (g) =>
+          `<div class="grp"><div>${esc(g.group)}</div>` +
+          g.items
+            .map(
+              (it) =>
+                `<a href="#${it.r}" class="${it.r === activeRoute ? "active" : ""}">${esc(it.t)}</a>`
+            )
+            .join("") +
+          `</div>`
+      )
+      .join("");
   }
 
-  const link = (i, active) =>
-    `<a href="#${i.r}" class="${i.r === active ? "active" : ""}">${esc(i.t)}</a>`;
-
-  function tocFor(html) {
-    const host = document.createElement("div");
-    host.innerHTML = html;
-    const hs = [...host.querySelectorAll("h2[id], h3[id]")].filter(
-      (h) => h.tagName === "H2",
+  function buildToc(root) {
+    const hs = root.querySelectorAll("h2[id], h3[id]");
+    if (!hs.length) return "";
+    return (
+      `<div class="grp">On this page</div>` +
+      [...hs]
+        .map(
+          (h) =>
+            `<a href="#${location.hash.split(/[?]/)[0]}?${h.id}" data-anchor="${h.id}">${esc(h.textContent)}</a>`
+        )
+        .join("")
     );
-    if (hs.length < 2) return "";
-    return `<div class="toc"><p>On this page</p>${hs
-      .map((h) => `<a href="#${location.pathname}${location.search}${location.hash.split("?")[0]}?${h.id}" data-anchor="${h.id}">${esc(h.textContent)}</a>`)
-      .join("")}</div>`;
   }
 
-  async function showDoc(route, anchor) {
-    let html;
-    try {
-      html = await loadContent(route);
-    } catch {
-      render("404");
-      $("#main").innerHTML =
-        `<section class="searchpage"><h1>Page not in site</h1><p class="searchhint">This document is not published here — it may live only in the <a href="https://github.com/denisekart/open-facilitator/tree/main/docs">repository docs</a>.</p><p><a class="btn" href="#/docs">Docs home</a></p></section>`;
-      return;
-    }
-    const host = document.createElement("div");
-    host.innerHTML = html;
-    const toc = tocFor(html);
-    // add anchor links to headings
-    for (const h of host.querySelectorAll("h2[id], h3[id]")) {
-      const a = document.createElement("a");
-      a.className = "anchors";
-      a.href = "javascript:void 0";
-      a.textContent = "#";
-      a.dataset.anchor = h.id;
-      h.prepend(a);
-    }
-    const body = host.innerHTML;
-    $("#main").innerHTML = `<div class="docspage">${docnavHtml(route)}
-      <article class="article">${toc}${body}</article></div>`;
-    wireArticle();
-    if (anchor) {
-      const el = document.getElementById(anchor);
-      if (el) el.scrollIntoView();
-    } else {
-      window.scrollTo({ top: 0 });
-    }
-    document.title = ($(".article h1", document).textContent || "Docs") + " · Open Facilitator";
+  function activateAnchor(root, anchor) {
+    if (!anchor) return;
+    const el = root.querySelector(`[id="${CSS.escape(anchor)}"]`);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
-  function wireArticle() {
-    const main = $("#main");
-    main.addEventListener("click", (e) => {
-      const a = e.target.closest("a");
-      if (!a) return;
-      const anchor = a.dataset && a.dataset.anchor;
-      if (anchor) {
-        e.preventDefault();
-        const el = document.getElementById(anchor);
-        if (el) {
-          el.scrollIntoView({ behavior: "smooth" });
-          history.replaceState(null, "", `${location.pathname}${location.search}${currentHashRoute()}?${anchor}`);
+  // --------------------------------------------------------- hover tooltips
+
+  let tipEl = null;
+  function ensureTip() {
+    if (!tipEl) {
+      tipEl = document.createElement("div");
+      tipEl.className = "diagram-tip";
+      document.body.appendChild(tipEl);
+    }
+    return tipEl;
+  }
+  function wireDiagramTips(scope) {
+    for (const fig of scope.querySelectorAll(".diagram")) {
+      fig.addEventListener("mousemove", (e) => {
+        let g = null;
+        for (let el = e.target; el && el !== fig; el = el.parentElement) {
+          if (el.querySelector && el.querySelector(":scope > title")) {
+            g = el;
+            break;
+          }
         }
+        const t = g && g.querySelector(":scope > title");
+        const tip = ensureTip();
+        if (!t || !t.textContent.trim()) {
+          tip.style.display = "none";
+          return;
+        }
+        const label =
+          [...g.childNodes]
+            .filter((n) => !(n instanceof SVGTitleElement) && n.nodeName !== "title")
+            .map((n) => n.textContent || "")
+            .join(" ")
+            .replace(/\s+/g, " ")
+            .trim() || "element";
+        tip.innerHTML = `<b>${esc(label)}</b>${esc(t.textContent)}`;
+        tip.style.display = "block";
+        const w = tip.offsetWidth || 280;
+        const x = Math.min(Math.max(12, e.clientX + 14), innerWidth - w - 12);
+        tip.style.left = x + "px";
+        tip.style.top = Math.min(e.clientY + 18, innerHeight - 90) + "px";
+      });
+      fig.addEventListener("mouseleave", () => {
+        if (tipEl) tipEl.style.display = "none";
+      });
+    }
+  }
+
+  // ---------------------------------------------------------------- search
+
+  const STOP = new Set(
+    ("a an and are as at be by for from has have he if in is it its of on or that the to was were will with you your not but can this").split(" ")
+  );
+
+  function search(q) {
+    if (!searchIdx) return [];
+    const terms = q.toLowerCase().split(/[^a-z0-9]+/).filter((t) => t.length >= 2 && !STOP.has(t));
+    if (!terms.length) return [];
+    const scores = new Map(); // pageIdx -> score
+    const perTerm = [];
+    for (const t of terms) {
+      const postings = searchIdx.tok[t] || [];
+      const hit = new Map();
+      for (const [pi, n] of postings) hit.set(pi, (hit.get(pi) || 0) + n);
+      perTerm.push(hit);
+    }
+    for (const hit of perTerm) for (const [pi, n] of hit) scores.set(pi, (scores.get(pi) || 0) + n);
+    // require at least one term; prefer pages matching most terms
+    const results = [];
+    for (const [pi, score] of scores) {
+      const termsHit = perTerm.filter((h) => h.has(pi)).length;
+      const p = searchIdx.pages[pi];
+      let bestSec = null;
+      for (const s of p.s) {
+        const st = (s[0] + " " + s[2]).toLowerCase();
+        if (terms.some((t) => st.includes(t))) {
+          if (!bestSec || terms.filter((t) => st.includes(t)).length > terms.filter((t) => ((bestSec[0] + " " + bestSec[2]).toLowerCase().includes(t))).length) bestSec = s;
+        }
+      }
+      results.push({ p, score: score * (1 + termsHit), bestSec });
+    }
+    results.sort((a, b) => b.score - a.score);
+    return results.slice(0, 24);
+  }
+
+  function mark(text, q) {
+    const terms = q.toLowerCase().split(/[^a-z0-9]+/).filter((t) => t.length >= 2);
+    let out = esc(text);
+    for (const t of terms) {
+      out = out.replace(new RegExp(`(${t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi"), "<mark>$1</mark>");
+    }
+    return out;
+  }
+
+  function popHtml(q) {
+    const rs = search(q).slice(0, 8);
+    if (!rs.length) return `<div class="sp-none">No matches. Try “artifact”, “approval”, “gateway”.</div>`;
+    return rs
+      .map((r) => {
+        const sec = r.bestSec;
+        const href = sec && sec[1] ? `#${r.p.r}?${sec[1]}` : `#${r.p.r}`;
+        return `<a href="${href}"><div class="sp-sec">${esc(r.p.g)}</div><div class="sp-page">${mark(sec ? sec[0] : r.p.t, q)}</div><div class="sp-x">${mark(sec ? sec[2] : "", q)}</div></a>`;
+      })
+      .join("");
+  }
+
+  function renderSearchPage(q) {
+    app.innerHTML =
+      `<div class="doc-layout"><div class="doc-nav">${sidebarHtml("/search")}</div>` +
+      `<div class="doc-main"><h1 class="doc-title">Search</h1>` +
+      `<p class="search-head">${q ? `Results for “${esc(q)}”` : "Type in the search box above."}</p>` +
+      `<div id="sr-list"></div></div><div class="doc-toc"></div></div>`;
+    const list = app.querySelector("#sr-list");
+    const rs = search(q);
+    list.innerHTML = rs
+      .map((r) => {
+        const sec = r.bestSec;
+        const href = sec && sec[1] ? `#${r.p.r}?${sec[1]}` : `#${r.p.r}`;
+        const crumb = sec ? `${esc(r.p.t)} › ${esc(sec[0])}` : esc(r.p.t);
+        return `<div class="sr"><a href="${href}">${crumb}</a><div class="sr-sec">${esc(r.p.g)}</div><p>${mark(sec ? sec[2] : "", q)}</p></div>`;
+      })
+      .join("");
+    if (q && !rs.length) list.innerHTML = `<p class="search-head">No matches for “${esc(q)}”.</p>`;
+  }
+
+  let popTimer;
+  function onSearchInput() {
+    clearTimeout(popTimer);
+    popTimer = setTimeout(() => {
+      const q = searchInput.value.trim();
+      if (q.length < 2) {
+        searchPop.classList.remove("open");
         return;
       }
-      const href = a.getAttribute("href") || "";
-      // relative #/... links: let the router handle; also strip ?anchor suffix links
-      if (href.startsWith("#/") && href.includes("?")) {
+      searchPop.innerHTML = popHtml(q);
+      searchPop.classList.add("open");
+    }, 120);
+  }
+
+  // ---------------------------------------------------------------- views
+
+  const cache = new Map();
+
+  async function showRoute(route, anchor) {
+    if (landing) landing.hidden = false;
+    let html = cache.get(route);
+    if (!html) {
+      const file =
+        route === "/docs" ? "content/docs.html" : "content" + route + ".html";
+      const r = await fetch(file);
+      if (!r.ok) return showError(route);
+      html = await r.text();
+      cache.set(route, html);
+    }
+    const entry = findEntry(route);
+    if (landing) landing.hidden = true;
+    const titleMatch = html.match(/<h1 class="doc-title">[\s\S]*?<\/h1>/);
+    const titleHtml = titleMatch ? titleMatch[0] : "";
+    const bodyHtml = titleHtml ? html.replace(titleHtml, "") : html;
+    app.innerHTML =
+      `<div class="doc-layout"><nav class="doc-nav">${sidebarHtml(route)}</nav>` +
+      `<div class="doc-main">${titleHtml}<div class="doc-body">${bodyHtml}</div></div>` +
+      `<aside class="doc-toc" id="toc"></aside></div>`;
+    document.getElementById("toc").innerHTML = buildToc(app.querySelector(".doc-main"));
+    app.querySelectorAll(".doc-nav a, #toc a").forEach((a) =>
+      a.addEventListener("click", (e) => {
         e.preventDefault();
-        const [route, anc] = href.slice(2).split("?");
-        navigate(`#${route}?${anc || ""}`);
-      }
+        location.hash = a.getAttribute("href");
+      })
+    );
+    wireDiagramTips(app);
+    setActiveInSidebar(route);
+    requestAnimationFrame(() => activateAnchor(app, anchor));
+    document.title = (entry ? entry.t + " — " : "") + "Open Facilitator";
+    void document.getElementById; // keep lint calm in odd hosts
+  }
+
+  function setActiveInSidebar(route) {
+    app.querySelectorAll(".doc-nav a").forEach((a) => {
+      a.classList.toggle("active", a.getAttribute("href") === "#" + route);
     });
   }
 
-  const currentHashRoute = () => {
-    const { route } = parseHash();
-    return route ? `#${route}` : "#/docs";
-  };
+  function findEntry(route) {
+    for (const g of manifest.nav) for (const it of g.items) if (it.r === route) return it;
+    for (const g of manifest.guides) if (g.r === route) return g;
+    return null;
+  }
 
-  // ------------------------------------------------------------ search
+  function showError(route) {
+    if (landing) landing.hidden = true;
+    app.innerHTML =
+      `<div class="doc-layout"><nav class="doc-nav">${sidebarHtml("")}</nav>` +
+      `<div class="doc-main"><h1 class="doc-title">Not found</h1>` +
+      `<p class="doc-kicker">Nothing is published at <code>${esc(route)}</code>. Try the <a href="#/docs">docs home</a> or search above.</p>` +
+      `</div><aside class="doc-toc"></aside></div>`;
+  }
 
-  function search(q) {
-    const ix = state.index;
-    const terms = q
-      .toLowerCase()
-      .split(/[^a-z0-9]+/)
-      .filter((t) => t.length >= 2 && isNaN(Number(t)));
-    if (!terms.length) return [];
-    const scores = new Map(); // "pageIdx#secIdx" -> score
-    let matchedAll = true;
-    for (const t of terms) {
-      let postings = ix.tok[t];
-      if (!postings) {
-        const pfx = Object.keys(ix.tok).filter((k) => k.startsWith(t)).slice(0, 12);
-        postings = pfx.flatMap((k) => ix.tok[k].map(([p, n]) => [p, n * 0.6]));
+  // ---------------------------------------------------------------- boot
+
+  function render() {
+    const { route, anchor, query } = parseHash();
+    if (route === null) {
+      // landing anchor (#how etc.) or bare load
+      if (landing) {
+        landing.hidden = false;
+        app.innerHTML = "";
+        app.style.display = "none";
+        const el = location.hash ? document.getElementById(location.hash.slice(1)) : null;
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
       }
-      if (!postings.length) matchedAll = false;
-      for (const [p, n] of postings) scores.set(p, (scores.get(p) || 0) + n);
-    }
-    if (!matchedAll && scores.size === 0) return [];
-    // score sections, keep best section per page
-    const best = new Map();
-    for (const [p, n] of scores) {
-      const page = ix.pages[p];
-      if (!page) continue;
-      const cur = best.get(p);
-      if (!cur || n > cur.n) best.set(p, { n, page });
-    }
-    return [...best.values()]
-      .sort((a, b) => b.n - a.n)
-      .slice(0, 20)
-      .map(({ page }) => page);
-  }
-
-  function snippet(page, q) {
-    const terms = q.toLowerCase().split(/[^a-z0-9]+/).filter((t) => t.length >= 2);
-    for (const s of page.s) {
-      const hay = (s[0] + " " + s[2]).toLowerCase();
-      for (const t of terms) {
-        const i = hay.indexOf(t);
-        if (i >= 0) {
-          const src = s[2];
-          const at = s[0].toLowerCase().includes(t) ? 0 : Math.max(0, src.toLowerCase().indexOf(t) - 60);
-          let snip = esc(src.slice(at, at + 200));
-          for (const tt of terms)
-            snip = snip.replace(new RegExp(`(${tt.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "ig"), "<mark>$1</mark>");
-          return { text: (at > 0 ? "…" : "") + snip + "…", anchor: s[1] };
-        }
-      }
-    }
-    return { text: page.s.length ? esc(page.s[0][2].slice(0, 160)) + "…" : "", anchor: "" };
-  }
-
-  function showSearch(q) {
-    const main = $("#main");
-    main.innerHTML = `<section class="searchpage">
-      <h1>Search the documentation</h1>
-      <input class="field" id="sfield" type="search" placeholder="e.g. approval lifecycle, link token, gateway config…" value="${esc(q)}" autocomplete="off">
-      <p class="searchhint" id="scount"></p>
-      <div id="sresults"></div></section>`;
-    const field = $("#sfield");
-    const run = () => {
-      const v = field.value.trim();
-      const hist = history;
-      hist.replaceState(null, "", v ? `#/search?q=${encodeURIComponent(v)}` : "#/search");
-      const hits = v ? search(v) : [];
-      $("#scount").textContent = v
-        ? `${hits.length} page${hits.length === 1 ? "" : "s"} match${hits.length === 1 ? "es" : ""}`
-        : "Type to search — the index is built into this site, nothing leaves your browser.";
-      $("#sresults").innerHTML = hits
-        .map((p) => {
-          const sn = snippet(p, v);
-          const where = p.g === "Guide" ? "Guide" : p.g;
-          const routeHash = sn.anchor ? `#${p.r}?${sn.anchor}` : `#${p.r}`;
-          return `<div class="result">
-            <span class="where">${esc(where)}</span>
-            <a class="title" href="${routeHash}">${esc(p.t)}${p.s.length && sn.anchor ? " › " + esc(p.s.find((s) => s[1] === sn.anchor)[0]) : ""}</a>
-            <p class="snip">${sn.text}</p></div>`;
-        })
-        .join("");
-    };
-    field.addEventListener("input", run);
-    run();
-    field.focus();
-    field.setSelectionRange(field.value.length, field.value.length);
-  }
-
-  // ------------------------------------------------------------ router
-
-  async function render(what) {
-    const { route, query } = parseHash();
-    if (!state.manifest) await load();
-    if (what === "search" || route === "/search") {
-      showSearch(query.get("q") || "");
-      document.title = "Search · Open Facilitator";
       return;
     }
-    if (route && (route.startsWith("/docs") || route.startsWith("/guide"))) {
-      await showDoc(route, parseHash().anchor);
-      return;
+    app.style.display = "block";
+    if (route === "/search") return renderSearchPage(query || searchInput.value.trim());
+    if (!isKnownRoute(route)) return showError(route);
+    showRoute(route, anchor).catch(() => showError(route));
+  }
+
+  async function boot() {
+    try {
+      manifest = await (await fetch("site-manifest.json")).json();
+    } catch {
+      return; // static landing only
     }
-    showHome();
-  }
-
-  function showHome() {
-    document.title = "Open Facilitator — durable coordination for human + agent work";
-    // home body is server-rendered in index.html: nothing to do.
-  }
-
-  function navigate(hash) {
-    if (location.hash === hash) render();
-    else location.hash = hash;
-  }
-
-  window.addEventListener("hashchange", () => render());
-
-  // topbar search: submit jumps to #/search
-  document.addEventListener("submit", (e) => {
-    const f = e.target.closest("form.searchbox");
-    if (!f) return;
-    e.preventDefault();
-    const q = new FormData(f).get("q");
-    navigate(`#/search?q=${encodeURIComponent(q || "")}`);
-  });
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "/" && !/input|textarea/i.test(document.activeElement.tagName)) {
-      e.preventDefault();
-      const q = document.getElementById("q");
-      if (q) q.focus();
+    try {
+      searchIdx = await (await fetch("search-index.json")).json();
+    } catch {
+      searchIdx = { pages: [], tok: {} };
     }
-  });
-
-  // initial route (also serves 404.html: any deep link redirects home+route)
-  const { route } = parseHash();
-  if (route && route !== "/home") render();
-  else if (location.pathname.endsWith("/404.html") && document.referrer === "") {
-    // GitHub Pages deep-link fallback: send to the same route on the real index
+    searchInput.addEventListener("input", onSearchInput);
+    searchInput.addEventListener("focus", onSearchInput);
+    searchInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        location.hash = "#/search?q=" + encodeURIComponent(searchInput.value.trim());
+        searchPop.classList.remove("open");
+      }
+      if (e.key === "Escape") searchPop.classList.remove("open");
+    });
+    document.addEventListener("click", (e) => {
+      if (!e.target.closest(".searchbox")) searchPop.classList.remove("open");
+    });
+    searchPop.addEventListener("click", (e) => {
+      const a = e.target.closest("a");
+      if (a) {
+        e.preventDefault();
+        location.hash = a.getAttribute("href");
+        searchPop.classList.remove("open");
+        searchInput.value = "";
+      }
+    });
+    window.addEventListener("hashchange", render);
+    render();
+    if (!location.hash && location.pathname.replace(/\/$/, "").endsWith("index.html")) {
+      history.replaceState(null, "", location.pathname.replace(/index\.html$/, "") + location.search);
+    }
   }
+
+  boot();
 })();

@@ -13,12 +13,14 @@ site/
 ├── serve.mjs              # dev server: node serve.mjs [port]
 ├── package.json           # npm-managed, private; NOT part of the pnpm workspace
 └── src/
-    ├── config.mjs         # navigation, docs manifest, landing-page copy
-    ├── styles.css         # the "Keystone" theme
-    ├── pages/index.mjs    # landing/404 template
-    ├── js/app.js          # hash router, doc viewer, browser search (no deps)
+    ├── config.mjs         # navigation, content manifest, landing-page copy
+    ├── tooltips.mjs       # hover copy for diagram nodes (keyed by label)
+    ├── styles.css         # the site theme: quiet chrome, one accent
+    ├── pages/index.mjs    # landing/404 template (interactive relay scene)
+    ├── pages/*.md         # site-only product pages (what/integrations/console/artifacts/extend)
+    ├── js/app.js          # hash router, doc viewer, live search (no deps)
     ├── guides/*.md        # site-only getting-started guides
-    └── assets/icon.svg    # the keystone-arch mark
+    └── assets/            # the relay mark + product screenshots
 ```
 
 ## Build & preview
@@ -33,7 +35,11 @@ The build reads the repository's `docs/` tree as the source of truth and
 renders every relative link correctly (site routes for published docs,
 GitHub links for everything else). Mermaid diagrams render to inline SVG
 at build time when a chromium binary is present; without one they degrade
-to visible source blocks instead of failing the build.
+to visible source blocks instead of failing the build. Diagram nodes get
+native `<title>` tooltips injected at build time (from `tooltips.mjs`,
+keyed by the node's visible label); the runtime styles them into hover
+cards. `404.html` forwards deep paths back into the SPA for routes that
+exist, and shows a real not-found page for the rest.
 
 Design constraints (they keep the site deployable anywhere):
 
@@ -41,8 +47,10 @@ Design constraints (they keep the site deployable anywhere):
   inverted index (`search-index.json`) scored in the browser.
 - **No absolute paths.** Every asset reference is relative, so the site
   works at a domain root *or* under a project-page subpath.
-- **Content is never forked.** Site pages link into `docs/`; only the
-  two getting-started guides under `src/guides/` are site-only prose.
+- **Consumer content lives here, operator content in `docs/`.** Site
+  pages (`src/pages/*.md`, `src/guides/*.md`) are written for consumers
+  and never point at repo files; `docs/` (protocol, runbooks, security)
+  renders through unchanged as the deep reference.
 
 ## Deploying to GitHub Pages
 
@@ -64,8 +72,8 @@ subfolders) can host `site/dist` verbatim — it is a plain folder.
 
 ## The mark
 
-A **keystone arch**: team-owned workspaces are the voussoirs, the
-Facilitator is the lifted keystone that lets the arch stand — it holds
-everything up but carries no ground itself (the foundation is your
-PostgreSQL). Pine green + keystone amber on warm paper; the wordless
-mark works at 16 px and in monochrome.
+A **relay**: the center dot is the kernel — persistent, it remembers —
+and the arrows are work passing around it between teams. The amber dot
+on the path is the work-item in flight. Ink black + work amber on warm
+paper: the mark carries no green of its own, works at 16 px, and is
+monochrome-safe (drop the amber circle for single-color contexts).

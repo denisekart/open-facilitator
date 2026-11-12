@@ -1,3 +1,3 @@
 # Example: research worker (full)
 
-Full-profile workspace example with artifact/memory integration. Lands with Plan 15.
+Full-profile workspace example with artifact/memory integration.

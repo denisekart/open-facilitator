@@ -1,14 +1,44 @@
-# Open Facilitator Framework
+# Open Facilitator
 
-**Portable, pluggable, multi-workspace orchestration of autonomous, assisted, and deterministic workloads across independently operated execution environments.**
+**Portable, pluggable, multi-workspace orchestration of autonomous, assisted, and deterministic workloads — across independently operated execution environments.**
 
-> **Status: slim reference environment runs end-to-end.** Plans 00–16 are real: buildable monorepo, frozen v1 wire contract (`protocol/`), the transactional kernel (`src/facilitator`), the Link hub, Gateway + deterministic worker, identity/policy/approvals, artifacts + memory. `./referencectl up slim` boots the whole slim stack (kernel, Postgres, Keycloak, SeaweedFS, Aspire dashboard, a linked demo workspace) and `./referencectl verify` proves every acceptance hop unattended. Everything else named in the target design (admin SPA, full providers, multi-work provisioning) remains a target, not a reality.
+Deploy one persistent **Facilitator**: a durable coordination kernel, not a
+privileged super-agent. Teams register a **Project**, connect their existing
+tools, and attach **Gateways**/**Workspaces** that dial *out* to the
+Facilitator. The Facilitator owns external communication (chat threads,
+issues), durable work state, breakdown, routing, human approvals, governed
+memory, and artifact references. Teams keep execution authority: their
+harnesses, models, credentials, and every SCM/issue/deployment write stay
+team-side. Work is not code-shaped by default — research reports, datasets,
+documents, and test evidence are first-class outputs.
 
-## The idea in one paragraph
+> The slim and full reference environments run end-to-end:
+> `./referencectl up slim` boots the whole stack and
+> `./referencectl verify` proves every hop unattended.
+> All documentation lives in [`docs/`](docs/README.md).
 
-Deploy one persistent **Facilitator** — a durable coordination kernel, not a privileged super-agent. Teams register a **Project**, connect their existing tools, and optionally attach **Gateways** or **Workspaces** that dial *out* to the Facilitator. The Facilitator handles external communication (chat threads, issues), durable work state, breakdown, routing, human approvals, governed memory, and artifact references. Teams keep execution authority: their harnesses (Pi, OpenCode, Codex, custom, deterministic), models, credentials, and every SCM/issue/deployment write stay team-side. Work is not code-shaped by default — research reports, datasets, documents, and test evidence are first-class outputs.
+## Why
 
-## Architecture at a glance
+- **Your execution stays yours.** No vendor lock-in, no credential
+  surrender: the kernel coordinates, team-side harnesses run.
+- **Recoverable by construction.** Transactional inbox/outbox, leases,
+  fencing generations, at-least-once delivery with idempotent admission —
+  nothing lives only in a socket or an ephemeral container. A kernel
+  restart mid-approval resumes exactly.
+- **Deterministic authority.** Models and memory propose; only deterministic
+  policy and verified identity evidence authorize. Every gate decision —
+  allow and deny — is audited.
+- **Protocol, not product.** CloudEvents 1.0 + versioned JSON Schema +
+  OpenAPI 3.1. SignalR is the reference transport; a plain HTTP fallback
+  keeps every language first-class. A conformance suite with cross-language
+  fixtures gates the wire.
+- **Human-in-the-loop is a first-class citizen.** Approvals are durable,
+  digest-pinned, single-use records with lazy expiry — not a chat poll.
+- **Minimal footprint.** The slim reference is Facilitator + PostgreSQL +
+  Keycloak + an S3 store + a dashboard on one laptop. Kafka, Temporal,
+  vector DBs, and LLMs are optional adapters, never requirements.
+
+## How it works
 
 ```mermaid
 flowchart TB
@@ -27,96 +57,89 @@ flowchart TB
   GW -->|team-owned credentials| SCM[Git / issues / deploys]
 ```
 
-Key properties, normatively defined in the specs:
+1. An event (chat mention, issue label, API call) creates a **Work** — a
+   durable objective with a lifecycle, timeline, and approvals.
+2. The kernel routes it to a capable **Workspace**, reached over an
+   *outbound* Link: the team's Gateway authenticates, advertises its
+   children's capabilities, and receives assignments.
+3. A harness adapter (deterministic, oh-my-pi, Codex, or your own via
+   `@ofac/adapter`) executes team-side; progress, artifacts, and results
+   flow back as signed protocol events.
+4. Policy held by the *team* decides what needs a human **approval** before
+   anything privileged happens. Memory and artifacts are brokered, scoped,
+   and ACL'd — but content stays owned by the team that produced it.
 
-- **Protocol, not product**: CloudEvents 1.0 + versioned JSON Schema + OpenAPI 3.1; SignalR is the reference transport, a plain HTTP long-poll fallback keeps every language first-class.
-- **Recoverable by construction**: transactional inbox/outbox, leases, fencing generations, at-least-once + idempotent admission — nothing lives only in a socket or an ephemeral container.
-- **Deterministic authority**: models and memory propose; only deterministic policy and verified identity evidence authorize.
-- **Minimal footprint**: the slim reference is Facilitator + PostgreSQL + Keycloak + SeaweedFS + Aspire dashboard on a laptop. Kafka, Temporal, vector DBs, and models are optional adapters.
+## Quick start
 
-## Where to read more
+```bash
+./referencectl up slim      # build + boot + seed the demo path
+./referencectl verify       # acceptance run: every hop, 11 steps
+open http://localhost:8088  # admin SPA (Keycloak login: alice/alice)
+./referencectl down -v
+```
 
-| Document | Contents |
+Needs only Docker (+ Compose v2, ~4 GiB free RAM). The full walkthrough —
+tokens, Works, approvals, artifacts, traces:
+[Getting started (humans)](docs/getting-started.md) ·
+[Getting started (AI agents)](docs/getting-started-agents.md)
+
+## Components
+
+| Piece | What it is | Where |
+|---|---|---|
+| **Facilitator kernel** | .NET 10 service: work lifecycle, identity/policy gates, Link hub, artifact + memory brokers, admin SPA, operator API + CLI | `src/facilitator/` |
+| **Wire contract** | CloudEvents 1.0 envelopes, versioned JSON Schemas, OpenAPI, conformance fixtures | `protocol/` |
+| **Gateway** | Team-owned Node runtime multiplexing Workspaces over one Link endpoint | `src/gateway/` (`@ofac/gateway`) |
+| **Workspace Link SDK** | Client SDK + `ofac-linkd` supervisor (enroll, connect, replay) | `src/workspace-link/` (`@ofac/workspace-link`) |
+| **Harness adapters** | Thin translators from Gateway child wire to one execution harness; `@ofac/adapter` SDK + deterministic / oh-my-pi / Codex reference workers | `src/adapters/harnesses/` |
+| **Communication adapters** | Chat/forge legs (Mattermost, Telegram, Forgejo/GitHub/GitLab pairs, Kafka) normalizing into provider domain events | `src/adapters/communication/` |
+| **Dev Container Features** | One-Feature onboarding: any team container becomes a linked workspace by adding a single feature | `features/` |
+| **Reference environment** | Compose slim/full stacks, `referencectl` lifecycle + acceptance scripts | `reference/` |
+
+## Documentation
+
+| If you want to… | Read |
 |---|---|
-| [`docs/specs/open_facilitator_framework_architecture.md`](docs/specs/open_facilitator_framework_architecture.md) | Normative architecture: domain model, wire contract, scaling, packaging, identity, policy, adapters, memory, artifacts, data model, reference Compose, delivery slices, conformance suite |
-| [`docs/specs/open-facilitator-appendix.md`](docs/specs/open-facilitator-appendix.md) | Normative clarifications: trust modes, evidence validation, approval canonicalization (RFC 8785), outbox/inbox patterns, memory ACLs, acceptance checklist |
-| [`docs/protocol.md`](docs/protocol.md) | As-built v1 wire contract: envelope, type registry, namespacing/versioning rules, conformance fixtures, payload limits, kernel ingress endpoints and error contract, Link transport (handshake, Deliver/receipt, HTTP fallback table, error URIs, config keys) |
-| [`docs/security.md`](docs/security.md) | Trust vs data-plane split, interim bootstrap-token auth, Plan 07 OIDC cutover seam, ingress hard limits |
-| [`docs/getting-started.md`](docs/getting-started.md) | Contributor loop: build/test, running the Facilitator against Postgres 17, CLI examples |
-| [`docs/scenarios/scenario-catalog.md`](docs/scenarios/scenario-catalog.md) | Vendor-neutral scenario catalog: the interaction flows the system is expected to carry, from the concept and industry practice rather than the current code — the yardstick each audit run scores against |
-| [`docs/scenarios/approved-scenarios.md`](docs/scenarios/approved-scenarios.md) | The post-audit working yardstick: the surviving positive and negative scenarios with their checks and tiers — what the gate scores |
-| [`docs/scenarios/scenario-bindings.json`](docs/scenarios/scenario-bindings.json) | The reviewed gate manifest: one verdict + codified-test evidence per scenario (the ScenarioGate theory fails when a binding rots) |
-| [`docs/scenarios/audit-results.md`](docs/scenarios/audit-results.md) | The audit record: generated rows from the last gate run (`make scenario-gate`) |
-| [`docs/scenarios/domain-concept-index.md`](docs/scenarios/domain-concept-index.md) | Domain-concept index: scenario term → owning code → governing spec section |
-| [`docs/scenarios/manual-rubric.md`](docs/scenarios/manual-rubric.md) | The T4 lane: manual scenarios, scored by hand, recorded only — never a gate |
-| [`docs/runbooks/manual-infra-plan.md`](docs/runbooks/manual-infra-plan.md) | The legs demoted from CI (compose tiers, clean-tree verify) and the law that still binds them |
+| Understand the model and vocabulary from zero | [docs/overview.md](docs/overview.md) |
+| Run the whole demo stack yourself | [docs/getting-started.md](docs/getting-started.md) |
+| Drive the kernel as an agent (API, tokens, links) | [docs/getting-started-agents.md](docs/getting-started-agents.md) |
+| Implement a client, adapter, or service on the wire | [docs/protocol.md](docs/protocol.md) |
+| Know who can do what, and how it's enforced | [docs/security.md](docs/security.md) |
+| Deploy, connect a team, add a harness/provider | [docs/advanced.md](docs/advanced.md) |
+| Operate it (when things go wrong) | [docs/runbooks/index.md](docs/runbooks/index.md) |
+| Contribute | [docs/contributing.md](docs/contributing.md) |
 
 ## Repository layout
 
-Repo root **is** the `framework/` tree (Plan 00). Every directory carries a README stating what lands there and in which plan:
-
 ```text
 ├── src/
-│   ├── facilitator/       # .NET 10: transactional kernel (schema, state machines, inbox/outbox, /api ingress + CLI, outbox dispatcher); SignalR Link hub (Plan 03); admin SPA wwwroot embed (Plan 12)
-│   ├── gateway/           # @ofac/gateway: team Gateway runtime (one endpoint, embedded child, reconcile); connectors, provisioner ports later
-│   ├── workspace-link/    # @ofac/workspace-link: Link SDK + ofac-linkd supervisor (Plan 04)
-│   └── adapters/          # mattermost (13) / forgejo (14) / kafka (15) + harnesses/ (06+)
-├── protocol/              # CloudEvents schemas, JSON Schema, OpenAPI, conformance fixtures (Plan 01)
-├── features/              # Dev Container Features: gateway, workspace-link, harness-adapter (Plan 06)
-├── examples/              # slim/deterministic-research-worker (06); full/coding-worker (14), research-worker + seed-repositories (14/15)
-├── reference/             # versions.env + .env.example, Compose, referencectl, seeds, checks/verify.sh
-├── docs/specs/            # normative architecture (single source of truth)
-├── .github/workflows/     # CI + release spine (see workflows/README.md)
-└── Makefile               # restore/build/test/lint/format + compose placeholders
+│   ├── facilitator/       # .NET 10 kernel: ingress, work lifecycle, Link hub,
+│   │                      #   artifact/memory brokers, admin SPA, CLI
+│   ├── gateway/           # @ofac/gateway — team Gateway runtime
+│   ├── workspace-link/    # @ofac/workspace-link — Link SDK + ofac-linkd
+│   └── adapters/          # harness adapters + communication/provisioning adapters
+├── protocol/              # JSON Schemas, CloudEvents schemas, OpenAPI, conformance fixtures
+├── features/              # Dev Container Features (gateway, workspace-link, adapters)
+├── examples/              # slim no-Docker walkthrough, full-profile workers, AWS CDK
+├── reference/             # Compose slim/full, referencectl, seeds, acceptance checks
+├── docs/                  # user-facing documentation
+└── tests/                 # .NET integration + scenario + browser suites
 ```
 
-Delivery is vertical slices with runnable exit tests: transactional kernel → workspace link → gateway/adapters → identity/policy → artifacts/memory → slim reference → full providers → multi-work provisioning → horizontal replicas → hardening. Track via `.omp/plans/IMPLEMENTATION_ROADMAP_PLAN.md`.
-
-## Technology stack
+## Tech stack
 
 | Area | Choice |
 |---|---|
 | Facilitator | .NET 10, ASP.NET Core, SignalR, EF Core, OTLP |
-| Gateway / Link / adapters | TypeScript on Node.js, shipped as npm packages, Dev Container Features, OCI images |
+| Gateway / Link / adapters | TypeScript on Node.js ≥ 22 (npm packages, Dev Container Features, OCI images) |
 | Admin UI | Svelte 5 + Tailwind, embedded single-page app |
 | Durable state | PostgreSQL 17 (also the default memory search backend via FTS) |
 | Identity | OIDC/OAuth 2.0 — Keycloak in the reference, provider-swappable |
 | Reference infra | Docker Compose (slim/full), SeaweedFS artifacts, Aspire dashboard, Mattermost, Forgejo, Kafka, Ollama |
 
-## Development environment
-
-1. **Recommended: devcontainer.** Open the repo in the included `.devcontainer` — Docker-in-Docker, .NET SDK 10, Node 24, pnpm 12 preinstalled; nothing to install.
-2. **Manual path:** .NET SDK per `global.json` (`10.0.40x`), Node ≥ 22, then `corepack enable && corepack install` (honors `packageManager: pnpm@12.5.1`). Docker is required for `make test` (Testcontainers) and image builds.
-3. **Daily loop:** `make restore` → `make build` → `make test` → `make lint`; `make format` before committing.
-4. **Running the kernel:** start Postgres 17 (`docker run -d -e POSTGRES_USER=demo -e POSTGRES_PASSWORD=demo -e POSTGRES_DB=facilitator -p 5432:5432 postgres:17-alpine`), then `ConnectionStrings__Facilitator="Host=localhost;Database=facilitator;Username=demo;Password=demo" dotnet run --project src/facilitator` — it auto-migrates and serves `/api` with the dev bootstrap token. The CLI rides the same public API: `dotnet run --project src/facilitator -- cli work create --objective "kernel check"`. Full loop: [`docs/getting-started.md`](docs/getting-started.md).
-5. **Running tests:** .NET — `dotnet test OpenFacilitator.slnx [-c Release] [--filter FullyQualifiedName~HealthEndpointTests]` (Docker required: the Plan 02 integration suite boots Postgres 17 via Testcontainers); TypeScript — per package `pnpm --filter @ofac/gateway test`, workspace-wide `pnpm -r test`, single file `pnpm --filter @ofac/workspace-link exec vitest run test/package.test.ts`.
-6. **CI is the merge gate** — see [`.github/workflows/README.md`](.github/workflows/README.md). The slim reference-env jobs are compute-gated off on free-tier CI, so the acceptance run is a **local** gate: `./referencectl up slim --no-seed && ./referencectl verify` must exit 0 before any task is called done. Release = push a `v*` tag → images to GHCR.
-
-This repo is also an omp agent workspace: project skills in `.omp/skills/` encode the architectural rules agents must not violate (every implementation slice updates the matching skill in the same change), MCP servers are declared in `.omp/mcp.json`, plans land in `.omp/plans/`, and demo secrets are never committed (`.env`, `secrets/` are gitignored).
-
-The demo entry point is live:
-
-```bash
-./referencectl up slim      # build + wait healthy + seed the demo path
-./referencectl verify       # acceptance run: every hop, 11 steps
-./referencectl down -v
-```
-
 ## License
 
-Copyright (C) 2026 Link Three Labs, d.o.o. (VAT SI19669747)
-
-Open Facilitator is dual-licensed:
-
-- **AGPL-3.0-or-later** (see [LICENSE](LICENSE)) — free for everyone,
-  including running a modified version as a service (that's the point).
-- **Commercial license** — for anyone who cannot or does not want to ship
-  under AGPL (embedded/SaaS distribution, internal-mod policy, procurement).
-  Written to the same codebase, no copyleft obligations. Contact
-  [denis.ekart@gmail.com](mailto:denis.ekart@gmail.com).
-
-The license ships with every artifact: `LICENSE` in each npm tarball
-(`@ofac/*`), `licenseURL` in each Dev Container Feature manifest, and
-`/licenses/LICENSE` + `org.opencontainers.image.licenses` in the
-`facilitator` and `node-runtime` container images.
-
+Dual-licensed: **AGPL-3.0-or-later** (free, including running a modified
+version as a service — that's the point) or a **commercial license** with no
+copyleft obligations. See [LICENSE](LICENSE); the license ships with every
+npm tarball, Dev Container Feature, and container image.

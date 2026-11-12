@@ -41,10 +41,10 @@ WHERE work_id = '<work-id>' ORDER BY created_at;
 # timeline (also the SPA Work inspector)
 curl -s -H "Authorization: Bearer $HUMANTOK" \
   http://localhost:8089/api/admin/work/<work-id>/timeline | jq '.[-8:]'
-# queue age: pending intents age visibly (D2/N28 - a quiet queue is the bug)
+# queue age: pending intents age visibly (a quiet queue is the bug)
 curl -s -H "Authorization: Bearer $HUMANTOK" \
   http://localhost:8089/api/admin/queue | jq '.[] | {workId, ageSeconds, reason}'
-# executor disclosure: addressed endpoint + liveness + queue reason (F1)
+# executor disclosure: addressed endpoint + liveness + queue reason
 curl -s -H "Authorization: Bearer $HUMANTOK" \
   http://localhost:8089/api/admin/executions | jq '.[] | {assignmentId, endpointId, online, queueReason}'
 ```
@@ -69,28 +69,24 @@ outbox/backoff handles re-delivery; see
 [provider-api-rate-limit.md](provider-api-rate-limit.md) for the
 dead-letter path.
 
-## Drill 5 executed 2026-11-01 (dead-letter storm + replay; UTC wall-clock 04:41–04:45)
+## Proven behavior (dead-letter storm + replay)
 
 The drain-side failure mode of "stuck forever" is dead-letters, so this
-scene carries the dead-letter drill. Setup, honest about what was seeded:
-three rows INSERTed straight into `facilitator.dead_letters` (reason
-`runbook drill 5: seeded provider outage`) — two addressed to the live
-`kernel.log` sink, one to a bogus link endpoint `link.nope` — because an
-unroutable route raises `RoutePendingException` which requeues *forever*
-and cannot produce a dead letter from config alone. With the 3 seeded rows
-plus drill 2's genuine one, `GET /api/admin/deliveries?state=dead_letter`
-listed 4. Replaying each seeded row via
-`POST /api/admin/dead-letters/{id}/replay` (human token): 3× HTTP 200
-`{"replayed":true}`; an immediate second replay of the same id returned
-409 `version-conflict` (exactly-one-replay ledger law). The two
-`kernel.log` replay rows went `pending → delivered` with attempts=1 in
-under 5 s (row settles delivered). The `link.nope` replay row entered
-`pending` and stayed there with backoff — then, over the following
-minutes, consumed 5 charged attempts (the link sink rejects with no live
-session, which charges attempts) and dead-lettered at 04:45:24. Two
-honest rules learned: **a link-addressed row to a never-existing endpoint
-dead-letters after 5 attempts** (only routing's `RoutePendingException`
-path is immortal), and replay evidence stays in the audit trail +
-`dead_letters`/`outbox` rows, so post-incident the operator verifies
-settle via `SELECT status,attempts,last_error FROM facilitator.outbox
-WHERE command_id LIKE 'replay:%'`.
+scene carries the dead-letter path. Rehearsed against the reference stack
+by seeding `facilitator.dead_letters` rows — two addressed to the live
+`kernel.log` sink, one to a bogus link endpoint — then replaying each via
+`POST /api/admin/dead-letters/{id}/replay` (human token):
+
+- First replay of each id: 200 `{"replayed":true}`; an immediate second
+  replay of the same id: 409 (`version-conflict`) — the
+  exactly-one-replay ledger law.
+- Rows addressed to live sinks go `pending → delivered` with attempts=1
+  in seconds.
+- A link-addressed row to a never-existing endpoint enters `pending`,
+  consumes 5 charged attempts (the link sink rejects with no live
+  session, which charges attempts), and **dead-letters again**. Two
+  honest rules: a link row to a nonexistent endpoint dead-letters after
+  5 attempts (only routing's unroutable path requeues indefinitely), and
+  replay evidence lives in the audit trail + `dead_letters`/`outbox`
+  rows — post-incident, verify settle with
+  `SELECT status,attempts,last_error FROM facilitator.outbox WHERE command_id LIKE 'replay:%'`.

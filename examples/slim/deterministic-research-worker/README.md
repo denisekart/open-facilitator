@@ -104,7 +104,7 @@ curl -s http://127.0.0.1:8099/status | jq .bindings   # while running: the execu
 
 With `stepMs: 800` the run completes ~1.6s after the assign.
 
-## 5b. The confirm round-trip (Plan 12)
+## 5b. The confirm round-trip
 
 `gateway.yaml` carries `policy: { path: ./policy.yaml }`: `research.analyze`
 stays `allow`, `research.publish` is `confirm` for team-alpha actors. Re-seed

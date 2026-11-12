@@ -47,36 +47,30 @@ globally or wipe the outbox — the 5-attempt budget is the anti-storm
 fuse, and each replay is individually audited
 (`audit.action='admin.dead-letter.replay'`).
 
-## Drill 2 executed 2026-11-01 (provider outage; UTC wall-clock 04:24–04:33)
+## Proven behavior (provider outage end to end)
 
-Deviation recorded honestly: the reference env has no 429 injector, so
-the rate-limit manifestation chosen was a full provider outage —
-`docker stop` of `mattermost` **and** its adapter, the only shape where
-the kernel's bounded-retry law is exercised end to end. Setup: fresh
-thread (`t7waumb3z3gs3nuf45a684c3aw`) bound to a fresh work
-(`ce8d289a-8d1b-4a0a-a65f-c7a6186cf962`) via a
-`communication_bindings` row, then the work was walked to `completed` so
-the completion reply command queued against the dead provider. At
-04:27:22 (5 s after stop): reply row `pending`, `attempts=1`,
-`last_error="sink refused the delivery"` (link sink: no live session —
-note *no* `link_deliveries` row materializes for an offline endpoint),
-session lease lapsed with the adapter down. The row consumed its 5
-charged attempts at the dispatcher's few-second requeue ladder and
-**dead-lettered at 04:28:31 — ~74 s into the outage**: an offline
-provider longer than ~1 minute is over-budget for queued
-`communication.*` commands, this is the shipped law, not a bug.
-Recovery: mattermost restarted 04:28:17, but the adapter — configured
-`restart: on-failure` — had crash-looped on a not-yet-ready provider
-("adapter failed to start: fetch failed" ×5) and **stayed stopped**:
-operator action `docker restart facilitator-demo-mattermost-adapter-1`
-at 04:33:40 brought the session back (epoch bump visible in
-`link_sessions`). 04:33:43 `POST /api/admin/dead-letters/<id>/replay` →
-200 `{"replayed":true}`; replay outbox row (`command_id
-replay:26c16a66-0783-…`) `delivered` attempts=1 within 4 s; delivery
-ledger `acked`; **provider readback: exactly one bot reply on the
-thread** — no double post; audit row `allow admin.dead-letter.replay`.
-Two operational take-aways: keep the *adapter process* up through a
-provider blip (a live link queues at the delivery ledger indefinitely; a
-dead link spends the kernel's 5-attempt budget), and after any provider
-outage >~1 min, check `dead_letters` and replay — the surface restores
-exactly-once.
+Rehearsed against the reference stack as a full provider outage
+(`docker stop` of Mattermost **and** its adapter — the shape where the
+kernel's bounded-retry law is exercised end to end), with a completion
+reply queued against the dead provider:
+
+- The queued reply row consumes its 5 charged attempts at the
+  dispatcher's few-second requeue ladder and **dead-letters ~74 s into
+  the outage**: an offline provider longer than ~1 minute is
+  over-budget for queued `communication.*` commands. This is the shipped
+  law, not a bug. (No `link_deliveries` row materializes for an offline
+  endpoint — the budget is spent at the sink.)
+- An adapter configured `restart: on-failure` can crash-loop on a
+  not-yet-ready provider and stay stopped — after restoring the provider,
+  check the *adapter process* too and restart it if needed. The session
+  returns with an epoch bump.
+- `POST /api/admin/dead-letters/{id}/replay` → 200 `{"replayed":true}`;
+  the replay outbox row (`command_id` `replay:<uuid>`) delivers within
+  seconds, the delivery ledger acks, and provider readback shows exactly
+  one post — the surface restores exactly-once. The replay is audited
+  (`admin.dead-letter.replay`).
+
+Operational take-aways: keep the *adapter process* up through a provider
+blip (a live link queues at the delivery ledger indefinitely; a dead link
+spends the kernel's 5-attempt budget), and after any provider outage
+>~1 min, check `dead_letters` and replay.

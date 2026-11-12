@@ -264,5 +264,5 @@ The funnel (`Kernel/Routing/RoutingSink.cs`, dispatcher channel `routing`) is th
   `docs/scenarios/audit-results.md` and only DOWNGRADES verdicts a run
   observed failing (a filtered run proves nothing). The T4 lane
   (`docs/scenarios/manual-rubric.md`) records, never gates. The compose
-  legs live in `docs/runbooks/manual-infra-plan.md` — manual, and the law
+  legs live in `docs/runbooks/manual-verification-tiers.md` — manual, and the law
   still binds changes to reference-env inputs.

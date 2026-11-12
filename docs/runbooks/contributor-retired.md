@@ -10,12 +10,11 @@ Contributors (`facilitator.team_members` rows of contributor kind) are
 process members with a handle unique across teams and an accountable human
 owner. Retirement sets `retired_at` — the NAME stays reserved (the trail
 never gets a new actor), open work moves to the team (the accountable
-party is a person, never a machine: L2/N22), and every contributor write —
+party is a person, never a machine), and every contributor write —
 seat, retire, remit change — requires a change reason and lands as an
 audited operator action. A capability claim from a human against a
 contributor-only capability denies (`refused-not-routed`), and a
-contributor self-report without admitted evidence denies with an audit row
-(N33) — retirement changes nothing about that.
+contributor self-report without admitted evidence denies with an audit row — retirement changes nothing about that.
 
 ## Diagnosis
 
@@ -30,7 +29,7 @@ writes, history intact). Work items formerly owned by it show
 
 ## Playbook
 
-1. Work parked "with the team": that IS the design (K10) — a human owner
+1. Work parked "with the team": that IS the design — a human owner
    from the roster picks it up; assignment to a NEW contributor is a fresh
    seat plus a fresh assignment, never a silent re-ownership.
 2. Provider events from the retired handle refuse as unknown contributor —
@@ -41,7 +40,7 @@ writes, history intact). Work items formerly owned by it show
    field (`remit` + `changed_by` + `change_reason`), the audit export shows
    the who/when/why; a remit narrowed to nothing behaves like retirement
    for routing.
-4. The end-of-trail check (N22): every action naming the contributor must
+4. The end-of-trail check: every action naming the contributor must
    still terminate at a named human (the owner or a recorded gap). If a
    trail ends at the machine, that is a data bug — file it with the audit
    export rows.

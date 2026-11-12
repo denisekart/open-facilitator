@@ -3,7 +3,7 @@
 Forgejo repositories seeded for the full reference environment demos.
 
 `forgejo-adapter init` (idempotent, safe to re-run) provisions everything
-the Plan 23 live-proof chain rides on, against the forge named by
+the full-profile live-proof chain rides on, against the forge named by
 `FORGEJO_URL`:
 
 1. **First admin, login-first.** If the forge has no admin account (fresh

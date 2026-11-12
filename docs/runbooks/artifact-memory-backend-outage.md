@@ -57,5 +57,5 @@ backend, recall scope grants (`memory_scopes`) and usage audit
 store; only recall *content* degrades. If works *did* stall during the
 artifact outage, that is a bug worth a defect note — this plane is
 required to be non-blocking for work paths that don't reference it.
-No drill executed for this scene yet (the conformance env has not been
-cut over on this plane); the queries above are the standing entry point.
+This scene has not yet been rehearsed on the conformance env; the queries
+above are the standing entry point.

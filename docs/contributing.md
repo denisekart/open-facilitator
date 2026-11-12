@@ -2,7 +2,8 @@
 
 ## Repository layout
 
-Repo root **is** the `framework/` tree — no `framework/` subdirectory, `docs/specs/` holds the target design (see repository layout in the root README).
+The repository root is the whole framework (`docs/specs/` holds the target
+design; see the repository layout in the root README).
 
 ## Make targets
 
@@ -23,7 +24,7 @@ The wire contract is schema-first: edit the JSON Schema under `protocol/`, add v
 
 ## PR gate
 
-`ci.yml` must be green on the PR: `dotnet` (build + test on the `global.json` SDK), `typescript` (lint + build + test on Node 22), `meta` (actionlint, yamllint, `reference/versions.env` key completeness), `docker-build` (Facilitator image compiles). Release jobs run only on `v*` tags — see `.github/workflows/README.md`.
+`ci.yml` must be green on the PR: `dotnet` (build + test on the `global.json` SDK), `scenarios` (the scenario gate + composed walks), `typescript` (lint + build + test on Node 22), `protocol` (codegen drift gate + OpenAPI validation), `meta` (the AGENTS.md drift gate, actionlint, yamllint, `reference/versions.env` key completeness), `docker-build` (Facilitator + node-runtime images compile), plus the live-kernel tiers `link-e2e`, `gateway-e2e`, `admin-e2e`, and the `features` install-contract matrix. Release jobs run only on `v*` tags — see `.github/workflows/README.md`.
 
 **Acceptance law (agents included):** the slim reference environment is part of every task's acceptance criteria. The hosted `ref-env-bringup`/`ref-env-verify` jobs are compute-gated off (free-tier), so before declaring any task done, run the whole gauntlet **locally**: `make build test lint docs-check`, `pnpm -r --if-present typecheck`, and against a booted-but-unseeded stack:
 
@@ -58,7 +59,3 @@ The wire contract is schema-first: edit the JSON Schema under `protocol/`, add v
 1. Create the csproj without `TargetFramework` (inherited from `Directory.Build.props`).
 2. Packages: `<PackageReference Include="X" />` + matching `<PackageVersion>` in `Directory.Packages.props`.
 3. `dotnet sln add <path>` — the solution file is `OpenFacilitator.slnx`.
-
-## Status flow for plans
-
-Plans live in `.omp/plans/`; the catalogue and status legend (⬜ not-started → 🔵 replanning gate → 🟡 in-progress → 🟢 done) live in `.omp/plans/IMPLEMENTATION_ROADMAP_PLAN.md`.

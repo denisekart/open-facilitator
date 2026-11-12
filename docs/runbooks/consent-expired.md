@@ -14,7 +14,7 @@ conditional update, so a slow consume that races the sweep still denies
 The flip is one transaction: the approval row, the held action's outcome,
 and (for a confirm-held assignment) the work parks non-failed with a
 timeline row. Nobody's click is ever honoured after the deadline — a slow
-process arriving late is exactly the case C5/N6 refuse.
+process arriving late is exactly the case a re-ask must refuse.
 
 ## Diagnosis
 
@@ -42,6 +42,6 @@ check the audit row the denial left.
    the expired trail, and a fresh approval with a fresh digest is the honest
    path (reusing the old command bytes is fine; reusing the old row is not).
 4. A pattern of expiries on one team = the consent request never reached an
-   entitled approver — see `notification-undeliverable.md` (N23's law: a
+   entitled approver — see `notification-undeliverable.md` (the law: a
    held question that no one entitled could see is a notification failure
    wearing a consent costume).

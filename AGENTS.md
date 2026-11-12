@@ -8,6 +8,7 @@ independently operated execution environments. One persistent **Facilitator**
 execution authority team-side; small adapters wrap the harnesses.
 
 ## Truth pointers
+- `docs/README.md` — consumer docs map (overview, human + agent getting-started). Current state only, no plan/history prose.
 - `docs/specs/` — normative for the *target* design; the code is authoritative
   for what *exists*. Check the tree before assuming a module/table exists.
 - Implementation status: `.omp/plans/IMPLEMENTATION_ROADMAP_PLAN.md` (link only — never mirror).

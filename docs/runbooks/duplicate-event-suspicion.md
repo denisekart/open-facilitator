@@ -49,7 +49,7 @@ checkpoint, or a replay). If two inbox rows exist, the events genuinely
 differ (different `source` or `id` — e.g. provider regenerated the id on
 retry): treat external writes as `uncertain`, reconcile via readback, and
 fix the *producer's* id law, don't hand-delete rows. Replay dedupe proof
-was executed as the identity drill — see
-[identity-claim-mapper-error.md](identity-claim-mapper-error.md#drill-3-executed-2026-11-01)
+is covered in
+[identity-claim-mapper-error.md](identity-claim-mapper-error.md#proven-behavior-auth-failures--dedupe-end-to-end)
 (same CloudEvents id posted twice: 202 accepted then 200 duplicate, one
 `processed` inbox row).

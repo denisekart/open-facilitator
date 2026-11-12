@@ -56,25 +56,22 @@ rule "to make it work": the 403 detail names exactly the role the caller
 lacks, and the fix belongs on the principal side unless the pointer is
 provably wrong.
 
-## Drill 3 executed 2026-11-01 (invalid-token replay + dedupe; UTC wall-clock 05:25–05:27)
+## Proven behavior (auth failures + dedupe, end to end)
 
-Probe event: a schema-valid `event.memory.candidate.v1` envelope, CloudEvents
-`id=runbook-drill3-replay-3`, POSTed to `:8089/api/ingress/events`.
-05:27:12, tampered bearer (`Bearer XXINVALID`): **401**, ProblemDetails
-`unauthorized` ("A valid 'Authorization: Bearer <token>' header is
-required"), and `SELECT count(*) FROM facilitator.inbox WHERE
-event_id='runbook-drill3-replay-3'` → **0** — a rejected request leaves
-zero trace in the store, as the law requires. Valid client-credentials
-token (CLI mint, `kernel-operator` in `realm_access.roles`), POST #1:
-**202** `{"status":"accepted","inboxId":"11ff4611-…"}`. Same envelope
-(same CloudEvents id) POST #2 seconds later: **200**
-`{"status":"duplicate","inboxId":"11ff4611-…"}` — *the original's*
-inboxId. Final store state: exactly **1** inbox row, `state=processed`.
-Claim-mapper contrast captured alongside: alice's human token
-(`framework-admin`, no `kernel-operator`) POSTed to the same ingress
-plane gets **403** `forbidden` naming the requirement ("operation
-'work.write' requires one of the roles: kernel-operator") — a valid
-token with an unmet role set is rejected at authorization with zero
-processing, and `GET /api/identity/roles` returns the live claim-pointer
-rules (`{"claim":"/realm_access/roles","op":"contains",…}` +
-`rowVersion`) that decide it.
+Rehearsed against the reference stack's LB front door:
+
+- Tampered bearer (`Bearer XXINVALID`) ⇒ **401** (`unauthorized`,
+  ProblemDetails), and **zero** rows written for that event — a rejected
+  request leaves no trace in the store, as the law requires.
+- A schema-valid event with a valid operator token ⇒ **202**
+  `{"status":"accepted","inboxId":…}`; the identical envelope (same
+  CloudEvents `id`) again ⇒ **200** `{"status":"duplicate"}` carrying
+  *the original's* `inboxId`. Final state: exactly one inbox row,
+  `state=processed`. Dedupe keys are the envelope identity, so replay is
+  provably side-effect-free.
+- A valid token whose roles don't meet the operation gate ⇒ **403**
+  `forbidden` naming the requirement (e.g. "operation 'work.write'
+  requires one of the roles: kernel-operator"), zero processing.
+  `GET /api/identity/roles` shows the live claim-pointer rules (plus
+  `rowVersion`) that decided it — the 403 and the role table together
+  are the full diagnosis.

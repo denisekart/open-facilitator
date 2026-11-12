@@ -69,58 +69,21 @@ every sweep die on the outbox command-id unique key). Verified live: with
 6 stale rows wiped, the min-arm re-armed, provisioned the elastic, and all
 elastic legs went green across two consecutive full runs.
 
-## Drill 4 executed 2026-11-01 (replica SIGKILL — two-replica matrix; UTC wall-clock 04:44–04:48 and 05:01–05:05, two full runs)
+## Proven behavior (replica SIGKILL — two-replica shape)
 
-The shipped two-replica matrix (`./referencectl verify --replicas`) was
-re-executed twice this session. **Run 1 (04:44:42–04:48):** 4/6 pass — LB distribution
-(fleet view a=3/b=2), cross-replica dedupe, lease handover, steer
-conflict; **replica-kill FAIL (61.2 s)** and the nested full suite
-(leg `worker-restart-resume`). **Run 2 (05:01:36–05:05:00), after
-cleaning all drill residue (`dead_letters`=0, `outbox`: delivered=131,
-zero parked rows):** the *same* result — 4/6 pass, fleet view a=2/b=3,
-**replica-kill FAIL at an identical 61.2 s**, nested
-`worker-restart-resume` FAIL (138 s). Reproduced 2/2 with identical
-timing signature → recorded as a **defect found**, not a slow-poll
-flake — with one caveat recorded after the fact, since RESOLVED (2026-11-02):
-a sibling acceptance run drove `verify --full` tiers against this same
-stack during the window. The clean-volume rerun settled attribution: the
-full-tier replica matrix passed 6/6 twice (leg completed in ~13 s), so the
-61.2 s FAIL was concurrent-agent interference — two agents SIGKILLing
-victims on one stack — not a leg defect. The two structural observations
-stand regardless of who runs the leg: the eviction-plus-backoff ladder arithmetic
-(`max_fails=1 fail_timeout=30s` + SignalR 0/2/5/10/30 s + gateway
-backoff ≈ 76 s) exceeds the leg's 60 s budget, and epoch is per session
-row — a re-created row lawfully starts at epoch 1, so the leg's
-epoch-bump assertion is row-identity-dependent, not
-failover-dependent. Evidence for the kill leg: LB `connect() failed
-(111)` against
-the victim; the victim-stamped gateway (`gw.coding`) log shows its
-reconnect ladder running the full 2 s/5 s/10 s/30 s backoff — lost
-04:47:10, attempts 04:47:19 → 04:47:56, new session only at 04:48:26
-(**76 s > the leg's 60 s window**), and identically 05:03:59 → 05:05:15
-in run 2; the re-open then landed on the *restored* victim with a fresh
-session row (epoch restarted at 1, so the leg's epoch-bump assertion
-also cannot hold — the expired session row had been swept, a new row
-starts at epoch 1). Honest reading: failover *does* happen and state is
-never lost (every other leg passed both runs), but the
-LB-eviction + SignalR + gateway-backoff composition needs more than 60 s
-when the gateway's ladder is cold, and the leg's 60 s budget predates
-this deployment shape. Kernel-side laws (SKIP LOCKED handover, dedupe,
-fencing, steer conflict) all verified green both runs.
+Kernel-side failover laws verified on a live two-replica stack behind the
+LB: SKIP LOCKED lease handover, cross-replica dedupe, fleet view,
+steer-conflict handling — none of them lose state when a replica dies.
 
-Probe of the nested-suite leg in isolation
-(`./referencectl verify --only worker-restart-resume`, 05:22–05:24 — the
-sibling's `verify --full` runs may have overlapped this window as well):
-`FAIL worker-restart-resume (121.8 s) — provisioned elastic never went
-live+idle` — the leg's 120 s window for the launcher-provisioned
-`gw.team-beta` worker to register and idle elapsed with the container
-already gone at check time (launcher log shows it provisioned, stopped,
-and re-provisioned across the leg's own kill/retry cycle, but no
-live+idle observation inside the window). Consistent with the same
-reconnect-ladder law as the kill leg: under the two-replica + LB shape
-this deployment reaches `live` only after the gateway's backoff ladder
-matures, and both matrix legs' fixed budgets assume the pre-LB
-single-kernel timings. Kernel data plane is intact throughout; the
-finding is about convergence-time budgets in the verification legs
-against this topology (reported to the orchestrator; no kernel fix
-attempted here).
+Two structural facts an operator should expect:
+
+- **Failover is real but not instant.** The eviction-plus-reconnect
+  composition (nginx `max_fails=1 fail_timeout=30s` + SignalR reconnect
+  ladder 0/2/5/10/30 s + gateway backoff) can take ~76 s end to end
+  when the gateway's ladder starts cold. Fixed-timeout probes (including
+  parts of the acceptance matrix) should budget for this, not for the
+  single-kernel timings they were written against.
+- **Epoch is per session row.** A swept-and-recreated `link_sessions` row
+  lawfully restarts at epoch 1. An epoch bump across a failover implies
+  the old row survived; it is row-identity-dependent, not a failover
+  invariant — don't alert on "epoch didn't increase".

@@ -57,16 +57,20 @@ curl -s http://localhost:8080/realms/facilitator/protocol/openid-connect/token \
 ## Full profile (`FULL=1` / `make compose-full`)
 
 The overlay adds forgejo, Mattermost Team Edition
-(site `http://chat.localhost:8065`), kafka, and ollama — plus the Plan 22
+(site `http://chat.localhost:8065`), kafka, and ollama — plus the
 provider-ingest pair: `mattermost-init` (one-shot: opens signup on first
 boot, creates the `facilitator` bot + PAT, publishes the PAT to the shared
 `mm_provision` volume, exits) and `mattermost-adapter` (runs the
 `@ofac/mattermost-adapter` from the node-runtime image; `GET /healthz` on
 :8066 loopback). The facilitator container gets its `providers:mattermost`
 section via `Providers__Mattermost__*` env, so the slim stack stays
-provider-less. Live proof: `make provider-e2e` (six steps: boot, link
-challenge, mention→Work, completion reply, echo suppression,
-reaction-never-consent).
+provider-less. Live proof: `make provider-e2e` (20 steps over the whole
+overlay: the Mattermost chat legs — adapter health, identity link,
+mention→Work, completion reply, echo suppression, reaction-never-consent —
+the Forgejo forge legs (issue→Work, comments, approval-held PR creation,
+review-steer, CI status), the coding lane (label→Work→PR `Closes #<issue>`
+end to end), multi-work dependencies, and provisioning scale-from-zero /
+worker-lost legs).
 
 ### Telegram leg (opt-in `telegram` profile)
 

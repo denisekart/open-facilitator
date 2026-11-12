@@ -5,18 +5,18 @@ artifact-store and result-manifest laws below.
 The human plane federates to any OIDC IdP; roles are operator-defined claim
 rules; every gate decision audits.
 
-## Trust vs data-plane split (D-10)
+## Trust vs data-plane split
 
 The Facilitator is a coordination kernel, not a privilege holder. It authorizes *admission* (accept a command, transition a Work) and never performs privileged external writes itself:
 
 | Plane | Held by | Facilitator role |
 |---|---|---|
 | Coordination state (Works, events, inbox/outbox, approvals) | Facilitator PostgreSQL | Owner |
-| SCM / issue-tracker / deploy credentials | Team (Gateway or direct-mode workspace) | None — the Facilitator holds **no** SCM/issue/deploy credential (D-10) |
+| SCM / issue-tracker / deploy credentials | Team (Gateway or direct-mode workspace) | None — the Facilitator holds **no** SCM/issue/deploy credential |
 | External communication | Narrow chat-bot identity only (thread replies/reactions) | Admits and routes; the adapter writes |
 | Execution authority | Workspace/harness | Records status; does not drive execution |
 
-Anything that writes outside the framework runs under team-owned credentials behind team policy. See `.omp/skills/facilitator-architecture/SKILL.md` (Ownership law) for the normative table.
+Anything that writes outside the framework runs under team-owned credentials behind team policy. This ownership cut is normative in the architecture spec (`docs/specs/open_facilitator_framework_architecture.md`, the ownership/exposure section).
 
 ## Three identities
 
@@ -110,7 +110,7 @@ block (`IdentityStartupCheck`, fail closed in every environment).
 ## Ingress hard limits
 
 - Request bodies at `/api/ingress/events` are capped at **262144 bytes**; oversize ⇒ `413` (`payload-too-large`). This matches `limits.maxEnvelopeBytes` in `protocol/conformance-fixtures/index.json` and is the baseline DoS floor — large payloads travel by artifact reference, never inline.
-- Envelopes fail closed: schema/envelope violations ⇒ `400`, command types outside the 7-type known-command table ⇒ `422 unknown-command`, and the rejected envelope is still persisted to the `inbox` as an audit record (state `failed`).
+- Envelopes fail closed: schema/envelope violations ⇒ `400`, command types outside the 21-type known-command table (the fail-closed registry both harnesses validate against) ⇒ `422 unknown-command`, and the rejected envelope is still persisted to the `inbox` as an audit record (state `failed`).
 - Duplicate admission (same `(event_source, event_id)`, `command_id`, or `(provider, provider_delivery_id)`) returns `200 {"status":"duplicate"}` and reprocesses nothing — replay is cheap and side-effect-free by construction.
 
 ## Provider ingress
@@ -212,7 +212,7 @@ authorizes against.
   `UPDATE ... SET state='expired' WHERE state='pending' AND expires_at<=now`
   (audited `deny reason=expired`), then evaluates — an expired-but-not-yet-
   flipped row still denies, and it can never come back.
-- **Eligibility (law D4)**: the deciding principal must intersect
+- **Eligibility**: the deciding principal must intersect
   `eligibleActors`: `group:<path>` (case-sensitive; raw or `/teams/`-stripped
   — the token's `/groups` claim), then `user:<displayName>`, then
   `oidc:<iss>|<sub>` (canonical actor, verbatim). Deny ⇒ `403
@@ -349,7 +349,7 @@ set — `decision`, `reason`, `workId`/`assignmentId`/`capabilityId`,
   declared `sha256:`. Presigned URLs are minted ONLY for the digest-derived
   key the allocation already fixed (never a caller-supplied key), share the
   ticket's 15-min expiry, and appear only in the ticket response — never in
-  a manifest or row (appendix 8.1: no long-lived bearer secrets).
+  a manifest or row (no long-lived bearer secrets leave the kernel).
 - **Manifests record only kernel-verified canonical bytes.** A completed
   event's `resultManifestRef` records nothing until the ledger has the
   stored bytes: they must byte-equal their own RFC 8785 canonical form,

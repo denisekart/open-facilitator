@@ -64,10 +64,11 @@ artifacts:8333:127.0.0.1`, shown below).
 
 ## 4. Log in: OIDC end to end
 
-The realm fixture (auto-imported) carries users `alice`/`alice` (and
-`demo-admin` for the admin console at
-`http://localhost:8080/keycloak/admin`). Every kernel API needs a bearer;
-two grants matter:
+The realm fixture (auto-imported) carries users `alice`/`alice` (and `bob`,
+`carol` for multi-team legs). The Keycloak admin console is
+`http://localhost:8080/admin` with user `demo-admin` and the password from
+`DEMO_KEYCLOAK_ADMIN_PASSWORD` in `reference/.env`. Every kernel API needs a
+bearer; two grants matter:
 
 ```bash
 # operator/service token (client_credentials)
@@ -195,7 +196,7 @@ This run is part of every task's acceptance criteria — see
 
 ## 8. CI and releases
 
-- CI (`ci.yml`) is the merge gate: .NET build+test, TS lint+build+test, workflow/meta validation, and a Facilitator image build. Job-by-job scope: [`.github/workflows/README.md`](../.github/workflows/README.md).
+- CI (`ci.yml`) is the merge gate: .NET build+test, the scenario gate + composed walks, TS lint+build+test, the protocol drift gate, workflow/meta validation, image builds, and the live-kernel e2e tiers (`link-e2e`, `gateway-e2e`, `admin-e2e`, `features`). Job-by-job scope: [`.github/workflows/README.md`](../.github/workflows/README.md).
 - The slim reference environment is part of every task's acceptance criteria — and locally IS the gate: the hosted `ref-env-bringup`/`ref-env-verify` jobs are commented out in `ci.yml` (free-tier GitHub compute). Before calling anything done: `./referencectl down -v && ./referencectl up slim --no-seed && ./referencectl verify` exits 0.
 - Releases trigger on `v*` tags: the Facilitator image is pushed to GHCR for `linux/amd64` + `linux/arm64`, and the Dev Container Features are published as OCI artifacts under `…/features/<name>`.
 
@@ -205,7 +206,7 @@ This run is part of every task's acceptance criteria — see
 |---|---|---|
 | OCI images (facilitator) | GHCR | `ghcr.io/denisekart/open-facilitator/<name>` |
 | npm packages `@ofac/*` | npmjs.org | `https://registry.npmjs.org` — `@ofac` org, published with OIDC provenance once `ENABLE_NPM_PUBLISH=true`; the 16 publishable packages ship from the next `v*` tag |
-| Dev Container Features (OCI-published; `gateway`, `workspace-link`, `harness-adapter`) | GHCR | `ghcr.io/denisekart/open-facilitator/features/<name>:1` |
+| Dev Container Features (OCI-published: `gateway`, `workspace-link`, `harness-adapter`, `omp-adapter`, `codex-adapter`, `forgejo-provider`) | GHCR | `ghcr.io/denisekart/open-facilitator/features/<name>:1` |
 | NuGet | — (public deps from nuget.org; first internal package → `https://nuget.pkg.github.com/denisekart/index.json`) | — |
 
 ## 10. Connect an existing workspace: add one Feature
@@ -237,8 +238,12 @@ gateway ready endpointId=gw.demo epoch=1 children=0
 ```
 
 Per-Feature options, the 1:1 env surface, state law, and troubleshooting:
-[`features/src/gateway/README.md`](../features/src/gateway/README.md) (and
-the sibling `workspace-link` / `harness-adapter` READMEs). A fully composed
+[`features/src/gateway/README.md`](../features/src/gateway/README.md).
+The published Feature family:
+`gateway`, `workspace-link`, `harness-adapter` (plus the
+harness-specific `omp-adapter` / `codex-adapter` and the `forgejo-provider`
+feature) — see the sibling READMEs under
+[`features/src/`](../features/src/). A fully composed
 three-Feature example with an end-to-end walkthrough:
 [`examples/slim/deterministic-research-worker`](../examples/slim/deterministic-research-worker/README.md).
 
@@ -259,7 +264,7 @@ steers the Work: while an execution is live the steer rides the open link;
 after the run completed, the kernel re-dispatches the original assign with
 the directive in its inputs, the restarted worker re-hydrates from the branch
 and posts a "steer incorporated" comment. Live proof: `make provider-e2e`
-runs the 18 provider steps against the FULL overlay. Kafka and Ollama boot as
+runs the 20 provider steps against the FULL overlay. Kafka and Ollama boot as
 example ingest / optional routing only.
 
 ## 11. Tear down

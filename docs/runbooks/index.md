@@ -1,16 +1,12 @@
 # Operational runbooks
 
-Twelve operational scenes (plus the manual infra plan), expanded into
-operator-runnable form
-against the reference environment: each scene carries a symptom, exact
-diagnosis queries (psql, curl, admin surfaces), the action, and a dated
-drill section where one has been executed.
+One page per operational scene. Each scene carries a symptom, exact
+diagnosis queries (psql, curl, admin surfaces), the action, and the
+durable behavioral facts an operator can rely on.
 
 **The reference environment is a conformance environment, not proof of
-production hardening**. Every drill below was executed against
-the live two-replica `facilitator-demo-*` compose stack and shows what the
-*reference* deployment does — backup/restore, workload token rotation,
-upgrade/rollback, and alert ownership remain deployment-site obligations
+production hardening.** Backup/restore, workload token rotation,
+upgrade/rollback, and alert ownership are deployment-site obligations
 before a shared deployment is production-eligible.
 
 ## Reference env handles
@@ -38,11 +34,4 @@ before a shared deployment is production-eligible.
 | Notice ended `undeliverable`: the egress ladder and its named reason | [notification-undeliverable.md](notification-undeliverable.md) |
 | An automation left the roster: name reserved, work with the team, audit trail | [contributor-retired.md](contributor-retired.md) |
 | A work id 303s: merge law, loser history stands, no unmerge | [work-merged.md](work-merged.md) |
-| The legs demoted from CI: compose tiers and the clean-tree verify law | [manual-infra-plan.md](manual-infra-plan.md) |
-
-Drill sections are dated **2026-11-01** (the operator date of the drill
-session). The stack clock is UTC and the session ran past UTC midnight, so
-recorded wall-clock timestamps inside the sections read `2026-11-02T04:xx
-UTC` — same session, same drills. All five drills ran on one live
-two-replica stack (`facilitator-demo-*`, LB :8089), left up and healthy
-afterwards.
+| The verification tiers outside CI and the law that binds them | [manual-verification-tiers.md](manual-verification-tiers.md) |

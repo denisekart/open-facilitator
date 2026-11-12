@@ -12,7 +12,7 @@ Every notice writes a ledger row and its outbox command atomically
 provider → an anonymized public post in the team channel → `undeliverable`
 with a reason. A DM rung requires a LINKED provider identity — an unlinked
 DM is skipped, never guessed at. A receipt naming a vanished conversation
-flips the row `address-obsolete` and the work endures (F5). Transient
+flips the row `address-obsolete` and the work endures. Transient
 rejections never touch the ledger row; the outbox retries it.
 
 ## Diagnosis
@@ -38,7 +38,7 @@ the outbox row for the same command id, then the receipt on the delivery.
 3. `undeliverable: ... no team channel` = the team has no channel binding
    for the provider. Seat the team's binding, then re-emit (a re-notification
    is a new ledger row — trails never rewrite).
-4. Held actions parked with nobody notified (N23): check the approval row's
+4. Held actions parked with nobody notified: check the approval row's
    notification first — a consent request nobody could see is THIS failure
    wearing a consent costume. The approval's `consent-expired.md` leg then
    explains the aftermath.

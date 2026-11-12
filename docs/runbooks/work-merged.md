@@ -7,7 +7,7 @@ carries both histories.
 ## Law (from shipped code)
 
 Merge (`POST /api/works/{id}/merge`, the loser's id in the path) is the
-dedup end for A11/N11-style twins: the LOSER keeps its full history
+dedup end for duplicate-intake twins: the LOSER keeps its full history
 (timeline, approvals, artifacts, links), gains a `merged` terminal state and
 a redirect to the SURVIVOR, and reads of the loser 303 to the survivor —
 never a rewritten id, never deleted rows (`WorkEndpoints`: "A merged work

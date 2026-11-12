@@ -1,10 +1,10 @@
-# Manual infra plan (the legs demoted from CI)
+# Manual verification tiers (the legs outside CI)
 
-**Why this exists.** The scenario gate (`make scenario-gate`) must run in CI
+**Why this exists.** The scenario gate (`make scenario-gate`) runs in CI
 without a single external container, so the legs that need the compose
-stack, the dev IdP port-map, or a clean working tree were demoted from every
-`make test` to this recorded manual plan. Demoted is not deleted: **the law
-still binds for any change that touches the reference env inputs**
+stack, the dev IdP port-map, or a clean working tree are run manually,
+against this recorded plan. Manual is not optional: **the law still binds
+for any change that touches the reference env inputs**
 (`reference/config/*`, `reference/keycloak/*`, `examples/**`,
 `src/facilitator/Migrations/**`, the Dockerfiles, and the compose files).
 Before landing such a change, run the legs below and record the date here.
@@ -13,7 +13,7 @@ Before landing such a change, run the legs below and record the date here.
 
 1. **Slim compose acceptance** — `make compose-slim`, then from a clean
    tree `./referencectl up slim --no-seed && ./referencectl verify`.
-   Proves spec 21.1's hop chain (`reference/checks/verify.sh`) against the
+   Proves the full hop chain (`reference/checks/verify.sh`) against the
    real stack: no product-code hooks, waits ride timeline kinds.
 2. **Full compose provider legs** — `make compose-full`, then
    `make provider-e2e` (runs `reference/checks/verify-full.sh`: Mattermost +
@@ -34,4 +34,4 @@ separation is the point of this file.
 
 | Date | Tree SHA | Leg | Outcome | Notes |
 |---|---|---|---|---|
-| 2026-11-11 | (scenario-gap-closure branch tip) | — | recorded-not-run | the legs were demoted by the gap-closure plan; the next reference-env change must run them and fill this table |
+| _(run the legs against a clean tree and record here)_ | | | | |

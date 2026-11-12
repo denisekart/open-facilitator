@@ -188,13 +188,15 @@ relay: omp forces `--auto-approve`, codex exec runs
 `-s workspace-write -c approval_policy="never"`; both are injected a stdio
 MCP server exposing `ask_user`, so a blocked agent asks instead of stopping.
 
-### Artifacts: verified external refs (interim)
+### Artifacts: store refs and verified external refs
 
-Completion manifests reference outputs with absolute `file://` URLs plus
-`sha256:` digests (`common.v1.json#/$defs/artifactRef`). The consumer
-verifies by rehashing the bytes — an interim for the artifact-store era:
-when the store lands, `storageUrl` gains store schemes and the digest
-stays the integrity check.
+Completion manifests reference outputs by kernel artifact id (the store
+flow: allocate via `artifact.request_upload`, push bytes, confirm) or,
+where a workspace can't reach the store, by absolute `file://` URLs plus
+`sha256:` digests (`common.v1.json#/$defs/artifactRef`) — the consumer
+verifies by rehashing the bytes. External (`storageUrl`) declarations are
+screened against operator bindings and SSRF rules and never fetched by the
+kernel; the digest stays the integrity check either way.
 
 ### Resume
 
@@ -248,7 +250,7 @@ future adapter-SDK extraction would formalize.
 
 **Ownership model**: the kernel facilitates, it is not a security boundary,
 and it is never team-operated. The normative ownership, endpoint-exposure and
-runtime-role cut is spec §3.4 of
+runtime-role cut lives in the ownership/exposure section of
 `docs/specs/open_facilitator_framework_architecture.md` (zone diagram + who
 exposes what + four exposure laws); this section is the as-built form of that
 cut. Chat is a facilitator-owned integration in

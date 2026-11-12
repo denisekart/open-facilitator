@@ -40,31 +40,27 @@ WHERE status = 'leased' AND leased_until < now();
 Restore the store (tested backup / restart; validate migrations apply on
 start — `DatabaseInitializer` runs them and the kernel refuses to serve
 until ready). Then let the reclaimers work: expired outbox leases flip to
-`pending` within one dispatcher tick and redeliver exactly-once; verify
-reconciliation with the counts in the drill below. Validate link leases
-(`link_sessions.lease_until`) and replay any dead-letters the outage
-pushed past 5 attempts (see work-stuck.md). `./referencectl verify`
-includes the kernel-restart-resume and dead-letters-empty legs that prove
-this recovery path end-to-end.
+`pending` within one dispatcher tick and redeliver exactly-once. Validate
+link leases (`link_sessions.lease_until`) and replay any dead-letters the
+outage pushed past 5 attempts (see work-stuck.md).
 
-## Drill 1 executed 2026-11-01 (DB restart mid-drain; UTC wall-clock 04:34:32–04:34:55)
+## Proven behavior (DB restart mid-drain)
 
-Burst of 10 `POST /api/works` through the LB (command ids
-`drill1-<ts>-1..10`), then `docker restart facilitator-demo-postgres-1`
-within the same second the burst finished — the restart raced the drain.
-All 10 POSTs returned a `workId` (the burst completed inside the ~1 s
-window before the store actually dropped; every one was durably accepted).
-Postgres health `healthy` again at 04:34:39 (7 s down). Reconciliation at
-04:34:55: **works persisted 10/10**; **inbox rows for the burst
-commands: 10** — each command exactly once, no double-ack, no phantom ack
-(every accepted POST had its inbox row; none was acked without one);
-outbox for the burst works all terminal (`delivered`), `leased` rows with
-`leased_until < now()`: **0** (no row stranded on a dead claim — the
-kernel's own in-flight claims self-reconciled when the store returned);
-link sessions all survived the outage with epoch continuity
-(`mm-adapter/1 forgejo-adapter/2 gw.coding/1 oci-launcher/1
-gw.team-alpha/2` — the forgejo epoch 2 predates this drill, from earlier
-provider churn that evening). Kernel logs during the window show the
-fail-safe path verbatim: connection-failure warnings on the drain path
-and the LISTENER falling back to polling; no crashed task, no 202 without
-a row. Post-restart steady state: `pending=0 leased=0`.
+Rehearsed against the reference stack: a burst of 10 `POST /api/works`
+racing a `docker restart` of Postgres (~7 s down).
+
+- Every accepted POST persisted exactly once: 10/10 works, 10 inbox rows,
+  no double-ack and no phantom ack (no accepted request without its inbox
+  row).
+- No row stranded on a dead claim: in-flight outbox leases self-reconcile
+  when the store returns (`leased` rows with a past `leased_until`: 0).
+- Link sessions survive the outage with epoch continuity.
+- The kernel's fail-safe path is visible in logs (drain-path warnings,
+  LISTENER falling back to polling); no crashed task, and no `202`
+  returned without a durable row behind it.
+- Post-restart steady state: `pending=0 leased=0`. If the outage outlasted
+  link-session leases, endpoints re-hello and the ledger recomputes the
+  un-acked set — the resume cursor is a hint, the receipt ledger is truth.
+
+`./referencectl verify` re-proves this recovery path end-to-end
+(kernel-restart-resume, dead-letters-empty legs).

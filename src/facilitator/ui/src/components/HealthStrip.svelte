@@ -1,15 +1,36 @@
 <script lang="ts">
-  import { countPairs, health } from "../lib/health.svelte.js";
+  import { health } from "../lib/health.svelte.js";
+  import { stateLabel, stateTone, TONE_CLASS } from "../lib/status.js";
   import type { AdminHourBucket } from "../lib/types.js";
   import ProblemNote from "./ProblemNote.svelte";
 
   const sparks = $derived(
     health.metrics
       ? [
-          { label: "dead letters", bucket: health.metrics.deadLettersPerHour },
-          { label: "audit denies", bucket: health.metrics.auditDeniesPerHour },
-          { label: "artifacts stored", bucket: health.metrics.artifactsStoredPerHour },
-          { label: "artifacts rejected", bucket: health.metrics.artifactsRejectedPerHour },
+          {
+            label: "dead letters",
+            hint: "sent and gave up — see Deliveries to replay",
+            bad: true,
+            bucket: health.metrics.deadLettersPerHour,
+          },
+          {
+            label: "audit denies",
+            hint: "requests refused by policy",
+            bad: true,
+            bucket: health.metrics.auditDeniesPerHour,
+          },
+          {
+            label: "artifacts stored",
+            hint: "evidence accepted into the store",
+            bad: false,
+            bucket: health.metrics.artifactsStoredPerHour,
+          },
+          {
+            label: "artifacts rejected",
+            hint: "bytes refused at the gate",
+            bad: true,
+            bucket: health.metrics.artifactsRejectedPerHour,
+          },
         ]
       : [],
   );
@@ -20,39 +41,78 @@
   }
 </script>
 
-<section class="grid gap-4 md:grid-cols-2" aria-label="health strip" data-testid="health-strip">
+<section class="grid gap-4 md:grid-cols-2" aria-label="kernel health" data-testid="health-strip">
   <div class="card">
-    <h2 class="mb-2 text-xs font-medium uppercase text-ink-3">Summary</h2>
+    <h2 class="mb-2 text-xs font-medium uppercase text-ink-3">Right now</h2>
     {#if health.summary}
       {@const s = health.summary}
-      <dl class="grid grid-cols-2 gap-x-6 gap-y-1 text-sm">
+      <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
         <dt class="text-ink-3">Works</dt>
-        <dd class="mono">{countPairs(s.workByState)}</dd>
-        <dt class="text-ink-3">Assignments</dt>
-        <dd class="mono">{countPairs(s.assignmentsByState)}</dd>
-        <dt class="text-ink-3">Executions</dt>
-        <dd class="mono">{countPairs(s.executionsByState)}</dd>
-        <dt class="text-ink-3">Gateways</dt>
-        <dd class="mono">
-          <span class="text-ok">{s.gatewaysOnline} online</span> ·
-          <span class="text-ink-2">{s.gatewaysOffline} offline</span>
+        <dd class="flex flex-wrap gap-1">
+          {#each Object.entries(s.workByState) as [state, n]}
+            <span class="badge {TONE_CLASS[stateTone(state)]}"
+              ><span class="dot" aria-hidden="true"></span>{stateLabel(state)}
+              <span class="font-semibold">{n}</span></span
+            >
+          {:else}
+            <span class="text-ink-3">none yet</span>
+          {/each}
         </dd>
-        <dt class="text-ink-3">Outbox</dt>
-        <dd class="mono">{countPairs(s.outboxByState)}</dd>
-        <dt class="text-ink-3">Inbox</dt>
-        <dd class="mono">{countPairs(s.inboxByState)}</dd>
+        <dt class="text-ink-3">Assignments</dt>
+        <dd class="flex flex-wrap gap-1">
+          {#each Object.entries(s.assignmentsByState) as [state, n]}
+            <span class="badge {TONE_CLASS[stateTone(state)]}"
+              ><span class="dot" aria-hidden="true"></span>{stateLabel(state)}
+              <span class="font-semibold">{n}</span></span
+            >
+          {:else}
+            <span class="text-ink-3">none yet</span>
+          {/each}
+        </dd>
+        <dt class="text-ink-3">Gateways</dt>
+        <dd>
+          <span class="badge bg-ok-veil text-ok ring-ok/25"
+            ><span class="dot" aria-hidden="true"></span>{s.gatewaysOnline} online</span
+          >
+          {#if s.gatewaysOffline > 0}
+            <span class="badge ml-1 bg-sunken text-ink-2 ring-edge"
+              >{s.gatewaysOffline} offline</span
+            >
+          {/if}
+        </dd>
+        <dt class="text-ink-3">Awaiting a human</dt>
+        <dd>
+          {#if (s.approvalsByState["pending"] ?? 0) > 0}
+            <span class="badge bg-amber-veil text-amber ring-amber/25">
+              <span class="dot" aria-hidden="true"></span>{s.approvalsByState["pending"]}
+              pending
+            </span>
+          {:else}
+            <span class="text-ink-3">nothing is blocked on a decision</span>
+          {/if}
+        </dd>
         <dt class="text-ink-3">Dead letters</dt>
-        <dd class="mono" data-testid="deadletters">{s.deadLettersTotal}</dd>
-        <dt class="text-ink-3">Approvals</dt>
-        <dd class="mono">{countPairs(s.approvalsByState)}</dd>
+        <dd>
+          {#if s.deadLettersTotal > 0}
+            <span
+              class="badge bg-danger-veil text-danger ring-danger/25"
+              data-testid="deadletters"
+              title="undeliverable kernel messages — replay from Deliveries"
+              ><span class="dot" aria-hidden="true"></span>{s.deadLettersTotal}</span
+            >
+          {:else}
+            <span class="text-ink-3" data-testid="deadletters">0</span>
+          {/if}
+        </dd>
         <dt class="text-ink-3">Artifacts</dt>
-        <dd class="mono">{s.artifactsTotal}</dd>
-        <dt class="text-ink-3">Manifests</dt>
-        <dd class="mono">{countPairs(s.manifestsByResultState)}</dd>
-        <dt class="text-ink-3">Memories</dt>
-        <dd class="mono">{countPairs(s.memoryByStatus)}</dd>
+        <dd class="text-ink-2">
+          {s.artifactsTotal} stored · {Object.values(s.manifestsByResultState).reduce(
+            (a, b) => a + b,
+            0,
+          )} result manifests
+        </dd>
         <dt class="text-ink-3">Link sessions</dt>
-        <dd class="mono">{s.linkSessionsLive} live</dd>
+        <dd class="text-ink-2">{s.linkSessionsLive} live</dd>
       </dl>
     {:else}
       <ProblemNote error={health.error ?? "loading…"} />
@@ -60,21 +120,30 @@
   </div>
 
   <div class="card">
-    <h2 class="mb-2 text-xs font-medium uppercase text-ink-3">Metrics (per UTC hour, bounded window)</h2>
+    <h2 class="mb-2 text-xs font-medium uppercase text-ink-3">Last hours (UTC)</h2>
     {#if health.metrics}
       {@const m = health.metrics}
-      <div class="grid grid-cols-2 gap-4 text-sm">
-        <div class="mono">outbox pending {m.outboxPending} · inbox pending {m.inboxPending}</div>
-        <div class="mono">dead letters {m.deadLetters} · link sessions {m.linkSessions}</div>
+      <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-sm text-ink-2">
+        <div>outbox pending <span class="mono">{m.outboxPending}</span></div>
+        <div>inbox pending <span class="mono">{m.inboxPending}</span></div>
+        <div>dead letters <span class="mono">{m.deadLetters}</span></div>
+        <div>link sessions <span class="mono">{m.linkSessions}</span></div>
       </div>
       <div class="mt-3 grid grid-cols-2 gap-4">
-        {#each sparks as { label, bucket }}
+        {#each sparks as { label, hint, bad, bucket }}
           {@const heights = bars(bucket)}
+          {@const total = bucket.reduce((a, b) => a + b.count, 0)}
           <div>
-            <p class="mb-1 text-xs text-ink-3">{label}</p>
-            <div class="flex h-10 items-end gap-0.5" role="img" aria-label={label}>
+            <p class="mb-1 flex justify-between text-xs">
+              <span class="text-ink-3" title={hint}>{label}</span>
+              <span class="mono {total > 0 && bad ? 'text-danger' : 'text-ink-3'}">{total}</span>
+            </p>
+            <div
+              class="flex h-10 items-end gap-0.5"
+              role="img"
+              aria-label={`${label}: ${total} in the window`}>
               {#each heights as style}
-                <div class="w-2 rounded-sm bg-accent/70" {style}></div>
+                <div class="w-2 rounded-sm {bad ? 'bg-danger/60' : 'bg-accent/60'}" {style}></div>
               {/each}
             </div>
           </div>

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { ApiError, getJson, toApiError } from "../lib/api.js";
   import { apiFetch, session } from "../lib/auth.svelte.js";
+  import { stateLabel, stateTone, TONE_CLASS } from "../lib/status.js";
   import type { AdminDeliveryRow } from "../lib/types.js";
   import ProblemNote from "./ProblemNote.svelte";
 
@@ -59,7 +60,12 @@
 
 <section class="card" data-testid="deliveries-view">
   <div class="mb-3 flex items-center justify-between">
-    <h2 class="text-sm font-medium">Deliveries</h2>
+    <h2 class="text-sm font-medium">
+      Deliveries
+      <span class="ml-1 text-xs font-normal text-ink-3"
+        >— every message the kernel sent out, and what became of it</span
+      >
+    </h2>
     <button class="btn" onclick={() => void load()}>refresh</button>
   </div>
   <div class="mb-3 flex flex-wrap gap-2" role="group" aria-label="state filter">
@@ -70,24 +76,34 @@
         aria-pressed={filter === s}
         onclick={() => {
           filter = s;
-        }}>{s || "all"}</button>
+        }}>{s ? stateLabel(s) : "all"}</button
+      >
     {/each}
   </div>
   <ProblemNote {error} />
   {#if notice}
-    <p class="badge mb-2 bg-accent/15 text-accent" data-testid="replay-notice">{notice}</p>
+    <p class="badge mb-2 bg-accent-veil text-accent ring-accent/25" data-testid="replay-notice" role="status">
+      {notice}
+    </p>
   {/if}
   <table class="table">
     <thead>
-      <tr><th>Plane</th><th>Id</th><th>State</th><th>Attempts</th><th>Endpoint</th><th>Reason/Error</th>{#if canMutate}<th>Actions</th>{/if}</tr>
+      <tr>
+        <th>Plane</th><th>Id</th><th>State</th><th>Attempts</th><th>Endpoint</th
+        ><th>Reason / error</th>{#if canMutate}<th>Actions</th>{/if}
+      </tr>
     </thead>
     <tbody>
       {#each items as row}
         {@const short = row.id.slice(0, 8)}
         <tr data-testid={`delivery-${short}`}>
           <td>{row.plane}</td>
-          <td class="mono text-xs">{short}</td>
-          <td data-testid={`delivery-state-${short}`}>{row.state}</td>
+          <td class="mono text-xs" title={row.id}>{short}</td>
+          <td data-testid={`delivery-state-${short}`}>
+            <span class="badge {TONE_CLASS[stateTone(row.state)]}">
+              <span class="dot" aria-hidden="true"></span>{stateLabel(row.state)}
+            </span>
+          </td>
           <td class="mono">{row.attempts}</td>
           <td class="mono text-xs">{row.endpointId ?? "—"}</td>
           <td class="text-xs text-ink-2">{row.lastError ?? row.reason ?? "—"}</td>
@@ -101,10 +117,15 @@
                     <button class="btn" onclick={() => (replaying = null)}>cancel</button>
                   </div>
                 {:else}
-                  <button class="btn btn-danger" data-testid={`replay-${short}`} onclick={() => {
-                    reason = "";
-                    replaying = row.id;
-                  }}>replay</button>
+                  <button
+                    class="btn btn-danger"
+                    title="send it again; the reason is recorded on the audit trail"
+                    data-testid={`replay-${short}`}
+                    onclick={() => {
+                      reason = "";
+                      replaying = row.id;
+                    }}>replay</button
+                  >
                 {/if}
               {:else}
                 <span class="text-ink-3">—</span>
@@ -114,7 +135,13 @@
         </tr>
       {/each}
       {#if items.length === 0}
-        <tr><td colspan="7" class="text-ink-3">no rows</td></tr>
+        <tr>
+          <td colspan="7" class="text-ink-3">
+            {filter
+              ? `Nothing ${stateLabel(filter)} — the closest thing to a good sign.`
+              : "Nothing has been delivered yet."}
+          </td>
+        </tr>
       {/if}
     </tbody>
   </table>

@@ -2,6 +2,7 @@
   import { ApiError, getJson, toApiError } from "../lib/api.js";
   import { apiFetch } from "../lib/auth.svelte.js";
   import { renderChatMarkdown } from "../lib/markdown.js";
+  import { ago } from "../lib/status.js";
   import type {
     ChatAction,
     ChatMessage,
@@ -217,21 +218,18 @@
 
   function badgeClass(status: ChatAction["status"]): string {
     if (status === "executed") {
-      return "badge bg-ok/15 text-ok";
+      return "badge bg-ok-veil text-ok ring-ok/25";
     }
     if (status === "failed") {
-      return "badge bg-danger/15 text-danger";
+      return "badge bg-danger-veil text-danger ring-danger/25";
     }
-    return "badge bg-warn/15 text-warn";
+    return "badge bg-amber-veil text-amber ring-amber/25";
   }
 
   function bodyPreview(body: unknown): string | null {
     return body === undefined || body === null ? null : JSON.stringify(body, null, 2);
   }
 
-  function stamp(when: string | null): string {
-    return when ? when.replace("T", " ").replace(/\.\d+Z$/, "Z") : "never";
-  }
 </script>
 
 <section class="card flex flex-col gap-4 md:flex-row" data-testid="chat-view">
@@ -255,19 +253,20 @@
     </div>
     <ul class="flex gap-1 overflow-x-auto md:grid" data-testid="chat-sessions">
       {#each sessions as s}
+        {@const seen = ago(s.lastMessageAt)}
         <li class="min-w-40 shrink-0 md:min-w-0">
           <button
-            class="w-full rounded px-2 py-1 text-left hover:bg-raised {sessionId === s.sessionId
-              ? 'bg-raised'
+            class="w-full rounded px-2 py-1 text-left hover:bg-sunken {sessionId === s.sessionId
+              ? 'bg-sunken'
               : ''}"
             data-testid={`chat-session-${s.sessionId}`}
             onclick={() => void openSession(s.sessionId)}>
             <span class="block truncate text-xs">{s.title || "(untitled)"}</span>
-            <span class="mono text-[10px] text-ink-3">{stamp(s.lastMessageAt)}</span>
+            <span class="mono text-[10px] text-ink-3" title={seen.title}>{seen.text}</span>
           </button>
         </li>
       {:else}
-        <li class="text-xs text-ink-3">no sessions yet</li>
+        <li class="text-xs text-ink-3">No conversations yet — start one below.</li>
       {/each}
     </ul>
   </aside>
@@ -277,7 +276,7 @@
     <div class="flex grow flex-col gap-2 overflow-y-auto py-2">
       {#each messages as m, i}
         <div
-          class="max-w-full rounded-lg border border-edge p-3 {m.role === 'user' ? 'bg-raised' : ''}"
+          class="max-w-full rounded-lg border border-edge p-3 {m.role === 'user' ? 'bg-sunken' : ''}"
           data-testid={`chat-message-${i}`}>
           <p class="mb-1 text-[10px] uppercase text-ink-3">{m.role} · {m.basis}</p>
           {#if m.role === "assistant"}
@@ -288,7 +287,7 @@
           {#if actionsByMessage[m.messageId]?.length}
             {@const proposal = actionsByMessage[m.messageId]}
             <div
-              class="mt-2 rounded-lg border border-edge bg-raised p-2"
+              class="mt-2 rounded-lg border border-edge bg-sunken p-2"
               data-testid="chat-option-card">
               <div class="mb-1 flex items-center justify-between gap-2">
                 <h3 class="text-xs font-medium text-ink-2">
@@ -347,7 +346,7 @@
         </div>
       {/each}
       {#if pending}
-        <p class="badge w-fit bg-warn/15 text-warn" data-testid="chat-pending">thinking…</p>
+        <p class="badge w-fit bg-amber-veil text-amber ring-amber/25" data-testid="chat-pending">thinking…</p>
       {/if}
     </div>
     <div class="mt-2 flex gap-2">

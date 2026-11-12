@@ -1,8 +1,18 @@
 # `@ofac/ui` — embedded admin SPA
 
-The operator inspector: one responsive SPA served by the kernel
+The operator console: one responsive SPA served by the kernel
 itself (no separate portal). Svelte 5 runes + vite; no component library —
 the handful of primitives live in `src/components/`.
+
+Design rules that keep it coherent (all in `src/app.css` + `src/lib/status.ts`):
+
+- One vocabulary for machine states — `stateLabel`/`stateTone` render every
+  status as a plain word plus one dot of semantic color (never hue alone);
+  `ago()` shows relative time with the exact UTC stamp in the tooltip.
+- Light is the default, dark follows the OS, the header toggle persists the
+  choice (`lib/theme.svelte.ts`); accents follow the public site's palette.
+- Keyboard: `/` focuses search, Esc releases it, every control has a visible
+  focus ring; wide tables scroll inside themselves below 700px.
 
 ## Build & embed
 

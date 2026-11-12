@@ -1,6 +1,7 @@
 <script lang="ts">
   import { ApiError, getJson, toApiError } from "../lib/api.js";
   import { apiFetch, session } from "../lib/auth.svelte.js";
+  import { ago, stateLabel, stamp, TONE_CLASS, stateTone } from "../lib/status.js";
   import type { AdminWorkDetail, WorkEventRow } from "../lib/types.js";
   import ArtifactRef from "./ArtifactRef.svelte";
   import ProblemNote from "./ProblemNote.svelte";
@@ -58,11 +59,7 @@
     const body = comment.trim()
       ? JSON.stringify({ decision, comment: comment.trim() })
       : JSON.stringify({ decision });
-    void post(
-      `/api/works/${workId}/approvals/${approvalId}/respond`,
-      body,
-      `approval ${decision}`,
-    );
+    void post(`/api/works/${workId}/approvals/${approvalId}/respond`, body, `approval ${decision}`);
   }
 
   function remark(manifestId: string, resultState: string): void {
@@ -73,40 +70,69 @@
     );
   }
 
-  function stamp(when: string): string {
-    return when.replace("T", " ").replace(/\.\d+Z$/, "Z");
+  // Close on Esc only when focus isn't in the comment box, so editing a
+  // comment and dismissing the inspector don't fight each other.
+  function onKeydown(ev: KeyboardEvent): void {
+    if (ev.key === "Escape" && !(ev.target instanceof HTMLInputElement)) onclose();
   }
 </script>
 
-<section class="card" data-testid="work-inspector">
-  <div class="mb-3 flex items-center justify-between">
-    <h2 class="text-sm font-medium">Work inspector</h2>
-    <button class="btn" data-testid="inspector-close" onclick={onclose}>close</button>
+<svelte:window onkeydown={onKeydown} />
+
+<section class="card" data-testid="work-inspector" aria-label="work inspector">
+  <div class="mb-3 flex items-center justify-between gap-2">
+    <h2 class="text-sm font-medium">
+      Work
+      <span class="mono ml-1 text-xs font-normal text-ink-3" title={workId}
+        >{workId.slice(0, 8)}…</span
+      >
+    </h2>
+    <div class="flex items-center gap-2">
+      <button class="btn" title="reload" onclick={() => void load()}>↻</button>
+      <button class="btn" data-testid="inspector-close" onclick={onclose}>close</button>
+    </div>
   </div>
 
   <ProblemNote {error} />
   {#if notice}
-    <p class="badge bg-ok/15 text-ok" data-testid="inspector-notice">{notice}</p>
+    <p class="badge mb-2 bg-ok-veil text-ok ring-ok/25" data-testid="inspector-notice" role="status">
+      {notice}
+    </p>
   {/if}
 
   {#if detail}
     {@const w = detail.work}
     <div class="mb-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
       <span class="text-ink-3">Objective</span><span data-testid="work-objective">{w.objective}</span>
-      <span class="text-ink-3">State</span><span class="badge bg-accent/15 text-accent" data-testid="work-state">{w.state}</span>
+      <span class="text-ink-3">State</span>
+      <span>
+        <span class="badge {TONE_CLASS[stateTone(w.state)]}" data-testid="work-state">
+          <span class="dot" aria-hidden="true"></span>{stateLabel(w.state)}
+        </span>
+        {#if w.state === "awaitingapproval"}
+          <span class="ml-2 text-xs text-ink-3">a human decision is holding this work</span>
+        {/if}
+      </span>
       <span class="text-ink-3">Version</span><span class="mono">v{w.version}</span>
-      <span class="text-ink-3">Created</span><span class="mono text-xs text-ink-2">{stamp(w.createdAt)}</span>
+      <span class="text-ink-3">Created</span>
+      <span class="mono text-xs text-ink-2" title={stamp(w.createdAt)}>{ago(w.createdAt).text}</span>
     </div>
 
     {#if detail.assignments.length > 0}
-      <h3 class="mb-1 text-xs font-medium uppercase text-ink-3">Assignments</h3>
+      <h3 class="mb-1 text-xs font-medium uppercase text-ink-3">
+        Assignments <span class="normal-case">· {detail.assignments.length}</span>
+      </h3>
       <table class="table mb-4">
         <thead><tr><th>Assignment</th><th>Status</th><th>Gen</th><th>Attempts</th></tr></thead>
         <tbody>
           {#each detail.assignments as a}
             <tr>
-              <td class="mono text-xs">{a.assignmentId.slice(0, 8)}</td>
-              <td>{a.status}</td>
+              <td class="mono text-xs" title={a.assignmentId}>{a.assignmentId.slice(0, 8)}</td>
+              <td>
+                <span class="badge {TONE_CLASS[stateTone(a.status)]}">
+                  <span class="dot" aria-hidden="true"></span>{stateLabel(a.status)}
+                </span>
+              </td>
               <td class="mono">{a.currentExecutionGeneration}</td>
               <td class="mono text-xs">
                 {a.attempts.map((at) => `${at.status}@g${at.generation}`).join(", ") || "—"}
@@ -115,21 +141,34 @@
           {/each}
         </tbody>
       </table>
+    {:else}
+      <p class="mb-4 text-xs text-ink-3">
+        No team has taken this work yet — it is waiting for a gateway with matching capability to
+        pick it up.
+      </p>
     {/if}
 
     <h3 class="mb-1 text-xs font-medium uppercase text-ink-3">Approvals</h3>
     {#if detail.approvals.length === 0}
-      <p class="mb-4 text-ink-3">none</p>
+      <p class="mb-4 text-ink-3">No human decision requested on this work.</p>
     {:else}
       <table class="table mb-2" data-testid="approvals">
-        <thead><tr><th>Approval</th><th>State</th><th>Action</th>{#if canMutate}<th>Decide</th>{/if}</tr></thead>
+        <thead>
+          <tr>
+            <th>Approval</th><th>State</th><th>Action</th>{#if canMutate}<th>Decide</th>{/if}
+          </tr>
+        </thead>
         <tbody>
           {#each detail.approvals as ap}
             {@const short = ap.approvalId.slice(0, 8)}
             <tr>
-              <td class="mono text-xs">{short}</td>
-              <td data-testid={`approval-state-${short}`}>{ap.state}</td>
-              <td class="mono text-xs">{ap.actionDigest.slice(0, 18)}…</td>
+              <td class="mono text-xs" title={ap.approvalId}>{short}</td>
+              <td data-testid={`approval-state-${short}`}>
+                <span class="badge {TONE_CLASS[stateTone(ap.state)]}">
+                  <span class="dot" aria-hidden="true"></span>{stateLabel(ap.state)}
+                </span>
+              </td>
+              <td class="mono text-xs" title={ap.actionDigest}>{ap.actionDigest.slice(0, 18)}…</td>
               {#if canMutate}
                 <td>
                   {#if ap.state === "pending"}
@@ -138,15 +177,19 @@
                         class="btn btn-primary"
                         disabled={busy}
                         data-testid={`approve-${short}`}
-                        onclick={() => respond(ap.approvalId, "approved")}>approve</button>
+                        onclick={() => respond(ap.approvalId, "approved")}>approve</button
+                      >
                       <button
                         class="btn btn-danger"
                         disabled={busy}
                         data-testid={`deny-${short}`}
-                        onclick={() => respond(ap.approvalId, "denied")}>deny</button>
+                        onclick={() => respond(ap.approvalId, "denied")}>deny</button
+                      >
                     </div>
                   {:else}
-                    <span class="text-ink-3">{ap.decidedAt ? stamp(ap.decidedAt) : "—"}</span>
+                    <span class="text-ink-2" title={stamp(ap.decidedAt)}
+                      >{ap.decidedAt ? ago(ap.decidedAt).text : "—"}</span
+                    >
                   {/if}
                 </td>
               {/if}
@@ -155,23 +198,36 @@
         </tbody>
       </table>
       {#if canMutate}
-        <input class="input mb-4 max-w-md" placeholder="optional comment" bind:value={comment} aria-label="approval comment" />
+        <input
+          class="input mb-4 max-w-md"
+          placeholder="reason for the decision (stored on the timeline)"
+          bind:value={comment}
+          aria-label="approval comment" />
       {/if}
     {/if}
 
     {#if detail.manifests.length > 0}
-      <h3 class="mb-1 text-xs font-medium uppercase text-ink-3">Manifests</h3>
+      <h3 class="mb-1 text-xs font-medium uppercase text-ink-3">
+        Results <span class="normal-case">· {detail.manifests.length}</span>
+      </h3>
       <table class="table mb-4">
         <thead>
-          <tr><th>Manifest</th><th>Rev</th><th>Result</th><th>Artifact</th>{#if canMutate}<th>Re-mark</th>{/if}</tr>
+          <tr>
+            <th>Manifest</th><th>Rev</th><th>Result</th><th>Artifact</th
+            >{#if canMutate}<th>Re-mark</th>{/if}
+          </tr>
         </thead>
         <tbody>
           {#each detail.manifests as m}
             {@const short = m.manifestId.slice(0, 12)}
             <tr>
-              <td class="mono text-xs">{short}</td>
+              <td class="mono text-xs" title={m.manifestId}>{short}</td>
               <td class="mono">{m.revision}</td>
-              <td data-testid={`manifest-state-${short}`}>{m.resultState}</td>
+              <td data-testid={`manifest-state-${short}`}>
+                <span class="badge {TONE_CLASS[stateTone(m.resultState)]}">
+                  <span class="dot" aria-hidden="true"></span>{stateLabel(m.resultState)}
+                </span>
+              </td>
               <td><ArtifactRef artifactId={m.artifactId} /></td>
               {#if canMutate}
                 <td>
@@ -180,8 +236,12 @@
                       <button
                         class="btn {m.resultState === state ? 'btn-primary' : ''}"
                         disabled={busy || m.resultState === state}
+                        title={m.resultState === state
+                          ? "current state"
+                          : `re-mark this result as ${state}`}
                         data-testid={`remark-${short}-${state}`}
-                        onclick={() => remark(m.manifestId, state)}>{state}</button>
+                        onclick={() => remark(m.manifestId, state)}>{state}</button
+                      >
                     {/each}
                   </div>
                 </td>
@@ -196,24 +256,29 @@
   {/if}
 
   {#if timeline}
-    <h3 class="mb-1 text-xs font-medium uppercase text-ink-3">Activity</h3>
+    <h3 class="mb-1 text-xs font-medium uppercase text-ink-3">
+      Activity <span class="normal-case">· {timeline.length} entries, newest last</span>
+    </h3>
     <table class="table" data-testid="timeline">
       <thead><tr><th>At</th><th>Kind</th><th>Actor</th><th>Detail</th><th>Trace</th></tr></thead>
       <tbody>
         {#each timeline as row}
           <tr data-testid={`timeline-${row.kind}`}>
-            <td class="mono text-xs whitespace-nowrap">{stamp(row.createdAt)}</td>
+            <td class="mono text-xs whitespace-nowrap" title={stamp(row.createdAt)}>
+              {ago(row.createdAt).text}
+            </td>
             <td>{row.kind}</td>
             <td class="text-xs">{row.actor}</td>
             <td class="text-xs text-ink-2">{row.detail}</td>
             <td>
               {#if row.correlationId}
                 <button
-                  class="mono badge bg-raised text-ink-2"
-                  title="copy correlation id (the trace handle)"
+                  class="mono badge bg-sunken text-ink-2 ring-edge"
+                  title="copy correlation id — every hop of this decision shares it"
                   data-testid="trace-chip"
                   onclick={() => void navigator.clipboard.writeText(row.correlationId ?? "")}
-                  >{row.correlationId.slice(0, 8)}…</button>
+                  >{row.correlationId.slice(0, 8)}…</button
+                >
               {:else}
                 <span class="text-ink-3">—</span>
               {/if}

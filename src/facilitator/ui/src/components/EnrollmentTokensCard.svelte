@@ -3,6 +3,7 @@
   import { apiFetch } from "../lib/auth.svelte.js";
   import { enrollmentStatusLabel } from "../lib/enroll-tokens.js";
   import { health } from "../lib/health.svelte.js";
+  import { stamp } from "../lib/status.js";
   import type { EnrollmentTokenRow, MintedEnrollmentToken } from "../lib/types.js";
   import ProblemNote from "./ProblemNote.svelte";
 
@@ -101,14 +102,16 @@
     }
   }
 
-  function stamp(when: string): string {
-    return when.replace("T", " ").replace(/\.\d+Z$/, "Z");
-  }
 </script>
 
 <section class="card" data-testid="enrollment-tokens-card">
   <div class="mb-3 flex items-center justify-between">
-    <h2 class="text-sm font-medium">Enrollment tokens</h2>
+    <h2 class="text-sm font-medium">
+      Enrollment tokens
+      <span class="ml-1 text-xs font-normal text-ink-3"
+        >— one-time keys a team trades for its gateway's own identity</span
+      >
+    </h2>
     <button class="btn" data-testid="tokens-refresh" onclick={() => void load()}>refresh</button>
   </div>
   <ProblemNote {error} />
@@ -157,7 +160,7 @@
         <button class="btn" data-testid="token-copy" onclick={() => void copyToken()}>
           {copied ? "copied" : "copy"}
         </button>
-        <span class="text-xs text-warn" data-testid="minted-token-warning">
+        <span class="text-xs text-amber" data-testid="minted-token-warning">
           shown only once — store it now; the kernel keeps only the hash
         </span>
       </div>

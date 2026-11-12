@@ -171,7 +171,12 @@
 
 <section class="card" data-testid="config-view">
   <div class="mb-3 flex items-center justify-between">
-    <h2 class="text-sm font-medium">Config (stored intent — read by features that opt in)</h2>
+    <h2 class="text-sm font-medium">
+      Config
+      <span class="ml-1 text-xs font-normal text-ink-3"
+        >— stored intent, versioned; features read it, you write it</span
+      >
+    </h2>
     <button class="btn" data-testid="config-close" onclick={() => (open = null)}>close</button>
   </div>
 
@@ -194,17 +199,17 @@
   </ul>
 
   {#if open && loaded}
-    <div class="rounded-lg border border-edge bg-raised p-4">
+    <div class="rounded-lg border border-edge bg-sunken p-4">
       <h3 class="mb-1 font-medium">{open.resource}</h3>
       <p class="mb-3 text-xs text-ink-3">
         {view ? `stored v${view.rowVersion} · ${view.author} · ${view.reason}` : "never written — first save creates v1"}
       </p>
       <ProblemNote error={saveError} />
       {#if conflict}
-        <p class="badge mb-2 bg-warn/15 text-warn" data-testid="config-conflict">{describeConflict(conflict)}</p>
+        <p class="badge mb-2 bg-amber-veil text-amber ring-amber/25" data-testid="config-conflict">{describeConflict(conflict)}</p>
       {/if}
       {#if notice}
-        <p class="badge mb-2 bg-ok/15 text-ok" data-testid="config-notice">{notice}</p>
+        <p class="badge mb-2 bg-ok-veil text-ok ring-ok/25" data-testid="config-notice">{notice}</p>
       {/if}
 
       <div class="mb-3 grid gap-3 sm:grid-cols-2">

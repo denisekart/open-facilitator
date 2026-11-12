@@ -43,9 +43,3 @@ class HealthStore {
 }
 
 export const health = new HealthStore();
-
-/** Render a state-count dictionary as compact `state: n` pairs. */
-export function countPairs(byState: Record<string, number>): string {
-  const entries = Object.entries(byState);
-  return entries.length === 0 ? "—" : entries.map(([state, n]) => `${state} ${n}`).join(" · ");
-}

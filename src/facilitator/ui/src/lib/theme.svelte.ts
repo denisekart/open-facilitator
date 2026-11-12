@@ -1,6 +1,8 @@
 // Theme preference for the console: light is the default (operators sit under
 // office lights), dark follows the OS until the toggle overrides it, and the
-// override persists per browser. Kept off localStorage keys the kernel owns.
+// override persists per browser. initTheme() runs once from main.ts, BEFORE
+// mount — calling it from a component $effect would make that effect re-run
+// on its own state write (and re-spend the OIDC auth code, breaking sign-in).
 
 const KEY = "ofac-ui-theme";
 

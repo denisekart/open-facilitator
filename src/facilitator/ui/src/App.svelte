@@ -9,7 +9,7 @@
   import { apiFetch, session } from "./lib/auth.svelte.js";
   import { health } from "./lib/health.svelte.js";
   import { TONE_CLASS, stateLabel, stateTone } from "./lib/status.js";
-  import { initTheme, theme, toggleTheme } from "./lib/theme.svelte.js";
+  import { theme, toggleTheme } from "./lib/theme.svelte.js";
   import type { AdminSearchResults, SearchSection } from "./lib/types.js";
 
   type Panel = "none" | "links" | "deliveries" | "config" | "chat";
@@ -48,7 +48,6 @@
   let searchSeq = 0;
 
   $effect(() => {
-    initTheme();
     void session.init().then(
       () => {
         booted = true;

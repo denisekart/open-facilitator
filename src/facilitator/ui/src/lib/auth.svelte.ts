@@ -43,6 +43,7 @@ export function decodeTokenClaims(jwt: string | undefined | null): TokenClaims {
 export class AuthSession {
   #manager: UserManager | null = null;
   #renewTimer: ReturnType<typeof setInterval> | undefined;
+  #initialising = false;
   user = $state<User | null>(null);
   ready = $state(false);
 
@@ -74,24 +75,34 @@ export class AuthSession {
 
   /** Bootstrap: complete a redirect callback if present, then load the stored session. */
   async init(): Promise<void> {
-    const bootstrap = await uiBootstrap();
-    this.#manager = new UserManager({
-      authority: bootstrap.oidcAuthority,
-      client_id: bootstrap.oidcClientId,
-      redirect_uri: window.location.origin,
-      response_mode: "query",
-      scope: "openid profile",
-      silent_redirect_uri: window.location.origin,
-      automaticSilentRenew: false,
-    });
-    if (new URLSearchParams(window.location.search).has("code")) {
-      this.user = await this.#manager.signinRedirectCallback();
-      window.history.replaceState({}, "", "/");
-    } else {
-      this.user = await this.#manager.getUser();
+    // Idempotent: the auth-code can be spent exactly once — a second pass
+    // (effect re-run, HMR) must never re-open the callback.
+    if (this.#initialising || this.ready) {
+      return;
     }
-    this.#scheduleRenew();
-    this.ready = true;
+    this.#initialising = true;
+    try {
+      const bootstrap = await uiBootstrap();
+      this.#manager = new UserManager({
+        authority: bootstrap.oidcAuthority,
+        client_id: bootstrap.oidcClientId,
+        redirect_uri: window.location.origin,
+        response_mode: "query",
+        scope: "openid profile",
+        silent_redirect_uri: window.location.origin,
+        automaticSilentRenew: false,
+      });
+      if (new URLSearchParams(window.location.search).has("code")) {
+        this.user = await this.#manager.signinRedirectCallback();
+        window.history.replaceState({}, "", "/");
+      } else {
+        this.user = await this.#manager.getUser();
+      }
+      this.#scheduleRenew();
+      this.ready = true;
+    } finally {
+      this.#initialising = false;
+    }
   }
 
   login(): Promise<never> {

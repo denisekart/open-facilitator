@@ -1,83 +1,24 @@
 # What Open Facilitator is
 
-You run work with a mix of AI agents, people, and scripts. Some of that
+You run work with a mix of AI agents, humans, and scripts. Some of that
 work matters enough to audit, to approve, to hand over a wall between
 teams, or to still understand in six months. Open Facilitator is the
 durable record and coordinator for exactly that work — and nothing else.
 
 ## The system at a glance
 
-One picture of every moving part, grouped by **who operates it**. Click
-the ⤢ to open it fullscreen — scroll to zoom, drag to pan, hover
-anything for what it guarantees.
+One map of every moving part, grouped by **who operates it** — and it is
+interactive: click any box for what it guarantees, or walk a scenario to
+watch the pieces light up in sequence.
 
-```mermaid title="The system landscape — grouped by owner"
-flowchart TB
-    subgraph operators["Operated by you: people & agents"]
-        direction LR
-        BR["Console<br/>(browser)"]
-        API2["API clients<br/>curl · agents · CI"]
-        HUM["Decisions in chat<br/>approve · deny · steer"]
-    end
-    subgraph kernelbox["The kernel — one stateless container, deployed by you"]
-        direction LR
-        ING["Ingress<br/>idempotent admission"]
-        POL["Routing policy<br/>+ approval engine"]
-        LNK["Link hub<br/>outbound-only transport"]
-        ARTB["Artifact broker<br/>+ memory broker"]
-        CON["Serves console<br/>+ public API"]
-    end
-    subgraph infra["Commodity infrastructure — yours, replaceable"]
-        direction LR
-        PG[("PostgreSQL<br/>the durable record")]
-        IDP["OIDC provider<br/>login + claims"]
-        OBJ[("S3-compatible store<br/>artifact bytes")]
-    end
-    subgraph envA["Team environment A — your keys, your policy"]
-        direction LR
-        GWA["Gateway<br/>team ledger + policy"]
-        H1["Harness: LLM agent"]
-        H2["Harness: deterministic script"]
-        CN["Forge connector<br/>privileged writes"]
-        MA["Chat adapter<br/>Mattermost / Telegram"]
-    end
-    subgraph envB["Team environment B — maybe a different organization"]
-        direction LR
-        GWB["Gateway"]
-        H3["Harness: your own"]
-    end
-    subgraph prov["Optional: provisioning environment"]
-        PL["OCI launcher<br/>spawns fresh workspaces"]
-    end
-    BR --> CON
-    API2 --> CON
-    HUM --> MA
-    HUM --> BR
-    CON --> ING
-    ING --> POL
-    POL --> LNK
-    POL --> ARTB
-    ING --> PG
-    CON --> PG
-    CON --> IDP
-    ARTB --> OBJ
-    LNK -."outbound link".-> GWA
-    LNK -."outbound link".-> GWB
-    LNK -."outbound link".-> PL
-    GWA --> H1
-    GWA --> H2
-    GWA --> CN
-    GWA --> MA
-    GWB --> H3
-    CN --> FORGE["Forge<br/>GitHub · Forgejo · GitLab"]
-    MA --> CHAT["Chat platform"]
-    PL -."fresh linked environment".-> GWB
+```archmap
+
 ```
 
 Nothing crosses an ownership boundary except an **outbound link** or a
 **normalized event**: the kernel cannot reach into a team environment,
-and a team cannot forge another team's history. Everything inside a
-subgraph is yours alone.
+and a team cannot forge another team's history. Everything inside your
+border is yours alone.
 
 ## The object at the center: a Work
 

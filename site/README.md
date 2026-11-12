@@ -14,14 +14,27 @@ site/
 ├── package.json           # npm-managed, private; NOT part of the pnpm workspace
 └── src/
     ├── config.mjs         # navigation, content manifest, landing-page copy
+    ├── architecture.mjs   # the explorer's graph model: nodes, zones, edges, scenarios
+    ├── arch-render.mjs    # renders that model to a fixed-layout inline SVG + JSON
     ├── tooltips.mjs       # hover copy for diagram nodes (keyed by label)
     ├── styles.css         # the site theme: quiet chrome, one accent
-    ├── pages/index.mjs    # landing/404 template (interactive relay scene)
+    ├── pages/index.mjs    # landing/404 template (interactive pipeline scene)
+    ├── pages/architecture.mjs  # /architecture page shell around the explorer
     ├── pages/*.md         # site-only product pages (what/integrations/console/artifacts/extend)
-    ├── js/app.js          # hash router, doc viewer, live search (no deps)
+    ├── js/app.js          # hash router, doc viewer, live search, explorer runtime (no deps)
     ├── guides/*.md        # site-only getting-started guides
-    └── assets/            # the relay mark + product screenshots
+    └── assets/            # the mark + product screenshots
 ```
+
+## The architecture explorer
+
+`/architecture` is generated, not authored as markdown: `architecture.mjs`
+holds the graph model (one curated layout, no auto-layout engine),
+`arch-render.mjs` turns it into inline SVG + a JSON payload, and the
+explorer runtime in `app.js` adds node focus, a detail panel, and
+scenario playback. The ` ```archmap ` fence in any page renders a
+non-interactive miniature that links to it. Facts in the model must stay
+true to the implementation — they mirror `docs/`.
 
 ## Build & preview
 

@@ -64,33 +64,57 @@ function heroHtml() {
     </div>
   </div>
   <div class="scene" id="scene">
-    <p class="scene-title">The loop every Work travels</p>
+    <p class="scene-title">What one piece of work looks like</p>
     <div class="relay">
-      <svg viewBox="0 0 280 264" role="img" aria-label="Diagram: work travels a loop between teams and the central kernel">
-        <path d="${relay.path}" fill="none" stroke="#e6e3da" stroke-width="2"/>
-        <circle class="relay-hub" cx="140" cy="128" r="26" fill="#0550AE"/>
-        <circle cx="140" cy="128" r="26" fill="none" stroke="#0550AE" stroke-opacity="0.25" stroke-width="10"/>
-        <text x="140" y="124" text-anchor="middle" fill="#ffffff" font-size="11" font-weight="600" font-family="system-ui,sans-serif">kernel</text>
-        <text x="140" y="138" text-anchor="middle" fill="#b9d2ee" font-size="9" font-family="system-ui,sans-serif">remembers</text>
+      <svg viewBox="0 0 600 128" role="img" aria-label="Diagram: a work item passes from you, through the facilitator, into a team's environment, and becomes a permanent record">
+        <line x1="75" y1="62" x2="525" y2="62" stroke="#dfe5ec" stroke-width="2.5"/>
         ${relay.steps.map((s, i) => stationSvg(s, i)).join("")}
-        <circle class="workdot" r="7" fill="#D97706" style="offset-path: path('${relay.path}'); offset-distance: 0%"/>
+        <g class="workchip">
+          <rect x="-44" y="-13" width="88" height="26" rx="6" fill="#D97706"/>
+          <rect x="-37" y="-6.5" width="42" height="3.5" rx="1.75" fill="#FFF" fill-opacity="0.85"/>
+          <rect x="-37" y="0.5" width="26" height="3.5" rx="1.75" fill="#FFF" fill-opacity="0.55"/>
+          <circle cx="29" cy="-2.5" r="3.4" fill="#FFF" fill-opacity="0.9"/>
+          <text x="29" y="0.4" text-anchor="middle" font-size="5.5" font-weight="700" fill="#8a4d02" font-family="system-ui,sans-serif">✓</text>
+        </g>
       </svg>
     </div>
     <div class="relay-steps" role="tablist" aria-label="Work lifecycle">
-      ${relay.steps.map((s, i) => `<button role="tab" class="relay-step${i === 0 ? " on" : ""}" data-step="${i}" aria-selected="${i === 0}"><b>${esc(s.title)}</b>${esc(s.who)}</button>`).join("")}
+      ${relay.steps
+        .map(
+          (s, i) =>
+            `<button role="tab" class="relay-step${i === 0 ? " on" : ""}" data-step="${i}" aria-selected="${i === 0}"><b>${esc(s.title)}</b>${esc(s.who)}</button>`,
+        )
+        .join("")}
     </div>
     <div class="relay-detail" id="relay-detail" aria-live="polite"></div>
+    <div class="relay-log" aria-label="The record building up as this happens">
+      <p class="relay-log-title">The record, while it happens</p>
+      ${relay.steps
+        .map(
+          (s, i) =>
+            `<p class="relay-log-line" data-line="${i}"><span>${String(i + 1).padStart(2, "0")}</span>${esc(s.log)}</p>`,
+        )
+        .join("")}
+    </div>
   </div>
 </div></div></section>`;
 }
 
+// Station glyphs: recognisable actors, not numbered dots.
 function stationSvg(s, i) {
-  const words = ["create", "route", "execute", "record"];
-  const dy = i === 0 ? 34 : i === 1 ? -24 : i === 2 ? 34 : 40;
-  return `<g class="relay-station" data-station="${i}" transform="translate(${s.x} ${s.y})">
-    <circle r="15" fill="#ffffff" stroke="#0550AE" stroke-width="1.5"/>
-    <text y="4" text-anchor="middle" fill="#043f8a" font-size="8.5" font-family="system-ui,sans-serif">${i + 1}</text>
-    <text y="${dy}" text-anchor="middle" fill="#7d8883" font-size="9.5" font-family="system-ui,sans-serif">${esc(words[i % 4])}</text>
+  const glyphs = [
+    // you / your agent: a chat bubble + terminal
+    `<rect x="-15" y="-13" width="30" height="20" rx="5" fill="#fff" stroke="currentColor" stroke-width="1.6"/><path d="M-6 7 l0 6 l7 -6" fill="#fff" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M-8 -5 l5 4 l-5 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><line x1="1" y1="3" x2="8" y2="3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>`,
+    // the kernel: the brand chip
+    `<g stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M-9 -9 L-14 -14"/><path d="M9 -9 L14 -14"/><path d="M-9 9 L-14 14"/><path d="M9 9 L14 14"/></g><rect x="-7.5" y="-7.5" width="15" height="15" rx="4" fill="currentColor"/>`,
+    // a team environment: container with agent + human gate
+    `<rect x="-16" y="-12" width="32" height="24" rx="5" fill="#fff" stroke="currentColor" stroke-width="1.6" stroke-dasharray="3.5 3"/><circle cx="-6" cy="-3" r="3.2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M-11.5 6 a5.5 5.5 0 0 1 11 0" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="3" y="-6" width="10" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M5.5 0 l2 2 l3.5 -4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>`,
+    // the record: vault/cylinder with a check
+    `<path d="M-12 -9 a12 4 0 0 1 24 0 v14 a12 4 0 0 1 -24 0 z" fill="#fff" stroke="currentColor" stroke-width="1.6"/><path d="M-12 -9 a12 4 0 0 0 24 0" fill="none" stroke="currentColor" stroke-width="1.2" stroke-opacity="0.6"/><path d="M-4 -1 l3 3 l6 -6.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>`,
+  ];
+  return `<g class="relay-station" data-station="${i}" transform="translate(${s.x} 34)">
+    <g class="relay-glyph" color="#9aa6b4">${glyphs[i]}</g>
+    <text y="52" text-anchor="middle" fill="#7c8794" font-size="9.5" font-family="system-ui,sans-serif">${esc(s.who)}</text>
   </g>`;
 }
 
@@ -196,11 +220,15 @@ const RELAY_JS = `
   var steps = ${JSON.stringify(relay.steps)};
   var btns = document.querySelectorAll(".relay-step");
   var detail = document.getElementById("relay-detail");
-  var dot = document.querySelector(".relay .workdot");
+  var chip = document.querySelector(".workchip");
+  var glyphs = document.querySelectorAll(".relay-glyph");
+  var lines = document.querySelectorAll(".relay-log-line");
   function show(i){
     btns.forEach(function(b,j){ b.classList.toggle("on", i===j); b.setAttribute("aria-selected", i===j); });
     detail.innerHTML = "<b>"+steps[i].title+"</b> — "+steps[i].body;
-    if (dot) { dot.style.animation = "none"; dot.style.offsetDistance = steps[i].at; }
+    if (chip) chip.style.transform = "translate(" + steps[i].x + "px, 62px)";
+    glyphs.forEach(function(g,j){ g.setAttribute("color", j<=i ? (j===i ? "#0550AE" : "#7c93b5") : "#9aa6b4"); });
+    lines.forEach(function(l,j){ l.classList.toggle("lit", j<=i); });
   }
   btns.forEach(function(b){
     b.addEventListener("click", function(){ show(+b.dataset.step); });

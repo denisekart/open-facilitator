@@ -19,7 +19,7 @@ flowchart LR
   K --- ART[("Artifacts<br/>S3 or a folder")]
   K -.OIDC.- IDP["Your login provider"]
   K -."outbound link".- GW["Your team's Gateway"]
-  GW --> W["Agents, scripts, people"]
+  GW --> W["Agents, scripts, humans"]
 ```
 
 Either road ends at the same API: everything below works against both.

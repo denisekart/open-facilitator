@@ -26,7 +26,7 @@ timeline underneath — `created`, routing, two artifact filings, a memory
 candidate._
 
 This is the “who did what, when, and who allowed it” view — it is why
-people keep the kernel around after the novelty of agents fades.
+teams keep the kernel around after the novelty of agents fades.
 
 ## Fleet views
 

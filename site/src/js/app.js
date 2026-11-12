@@ -117,7 +117,9 @@
       apply();
     };
     modal.querySelector(".dia-bar").addEventListener("click", (e) => {
-      const a = e.target.dataset && e.target.dataset.a;
+      const btn = e.target.closest && e.target.closest("button");
+      if (!btn) return;
+      const a = btn.dataset.a;
       if (a === "in" || a === "out") {
         view.k = Math.min(8, Math.max(0.1, view.k * (a === "in" ? 1.3 : 1 / 1.3)));
         apply();
@@ -142,6 +144,7 @@
     );
     let drag = null;
     stage.addEventListener("pointerdown", (e) => {
+      if (e.target.closest && e.target.closest(".dia-bar")) return;
       drag = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y };
       stage.setPointerCapture(e.pointerId);
     });
@@ -368,6 +371,215 @@
     wireDiagramTips(scope);
   }
 
+  // ------------------------------------------------- architecture explorer
+
+  function wireArchitecture(root) {
+    const dataEl = root.querySelector("#arch-data");
+    const svg = root.querySelector(".arch-svg");
+    if (!dataEl || !svg) return;
+    const toc = root.querySelector("#toc");
+    if (toc) toc.style.display = "none";
+    const layout = root.querySelector(".doc-layout");
+    if (layout) layout.classList.add("arch-layout");
+    let data;
+    try {
+      data = JSON.parse(dataEl.textContent);
+    } catch {
+      return;
+    }
+    const nodeById = Object.fromEntries(data.nodes.map((n) => [n.id, n]));
+    const gNodes = new Map([...svg.querySelectorAll(".arch-node")].map((g) => [g.dataset.id, g]));
+    const gEdges = new Map([...svg.querySelectorAll(".arch-edge")].map((g) => [g.dataset.id, g]));
+    const panel = root.querySelector("#arch-panel");
+    const controls = root.querySelector("#arch-controls");
+    const player = root.querySelector("#arch-player");
+
+    const ZONE_BLURB = {
+      you: "Operated by you: the surfaces humans and your own automation use to talk to the kernel.",
+      kernel:
+        "The kernel: one stateless container. It coordinates and remembers — it never executes work itself.",
+      infra:
+        "Commodity infrastructure you already know how to run: Postgres, an OIDC provider, an object store.",
+      team: "A team environment: the team's own machine(s), keys, and policy. It dials out; nothing dials in.",
+      external:
+        "External platforms — forges and chat services owned by someone else, reached only team-side.",
+      provision: "Optional provisioning: spin up a fresh linked environment on demand.",
+    };
+
+    function overviewPanel() {
+      const un = data.nodes.length;
+      panel.innerHTML =
+        `<h3>Start anywhere</h3>` +
+        `<p>Click any box for what it guarantees; its direct connections stay lit. Or pick a walk above to watch the system move.</p>` +
+        `<ul class="arch-zonekey">` +
+        Object.entries(ZONE_BLURB)
+          .map(([, v]) => `<li>${esc(v)}</li>`)
+          .join("") +
+        `</ul>` +
+        `<p class="arch-un">${un} parts, every arrow drawn — nothing on this map is aspirational.</p>`;
+    }
+
+    function nodePanel(n) {
+      const inb = data.edges.filter((e) => e.to === n.id).map((e) => nodeById[e.from]);
+      const out = data.edges.filter((e) => e.from === n.id).map((e) => nodeById[e.to]);
+      const links = (arr) =>
+        [...new Set(arr.filter(Boolean).map((x) => x.id))]
+          .map(
+            (id) => `<button class="arch-chip" data-goto="${id}">${esc(nodeById[id].t)}</button>`,
+          )
+          .join("") || "<span class='arch-none'>nothing — a boundary</span>";
+      panel.innerHTML =
+        `<h3>${esc(n.t)}</h3>` +
+        (n.sub
+          ? `<p class="arch-sub">${esc(n.sub)} · ${esc(n.zone === "you" ? "operated by you" : n.zone === "kernel" ? "the kernel" : n.zone === "infra" ? "your infrastructure" : n.zone === "team" ? "one team's environment" : "external")}</p>`
+          : "") +
+        `<p>${esc(n.what)}</p>` +
+        (n.bullets.length
+          ? `<ul>${n.bullets.map((b) => `<li>${esc(b)}</li>`).join("")}</ul>`
+          : "") +
+        (n.artifact ? `<p class="arch-art">${esc(n.artifact)}</p>` : "") +
+        `<p class="arch-io"><b>Receives from</b> ${links(inb)}<br><b>Sends to</b> ${links(out)}</p>` +
+        (n.docs ? `<p><a class="arch-more" href="#${n.docs}">Read more →</a></p>` : "");
+      panel
+        .querySelectorAll("[data-goto]")
+        .forEach((b) => b.addEventListener("click", () => select(b.dataset.goto)));
+    }
+
+    let scenario = null; // {sc, i}
+    function clearVisual() {
+      for (const g of gNodes.values()) g.classList.remove("arch-dim", "arch-lit", "arch-sel");
+      for (const g of gEdges.values()) g.classList.remove("arch-dim", "arch-lit");
+      for (const z of svg.querySelectorAll(".arch-zone")) z.classList.remove("arch-dim");
+    }
+    function focusOn(nodeSet, edgeSet) {
+      clearVisual();
+      for (const [id, g] of gNodes) if (!nodeSet.has(id)) g.classList.add("arch-dim");
+      for (const [id, g] of gEdges) {
+        if (edgeSet.has(id)) g.classList.add("arch-lit");
+        else g.classList.add("arch-dim");
+      }
+      for (const id of nodeSet) {
+        const g = gNodes.get(id);
+        if (g) g.classList.add("arch-lit");
+      }
+    }
+    function neighbors(id) {
+      const ns = new Set([id]);
+      const es = new Set();
+      for (const e of data.edges) {
+        if (e.from === id || e.to === id) {
+          es.add(e.id);
+          ns.add(e.from);
+          ns.add(e.to);
+        }
+      }
+      return [ns, es];
+    }
+    function select(id) {
+      scenario = null;
+      syncPlayer();
+      const [ns, es] = neighbors(id);
+      focusOn(ns, es);
+      for (const [nid, g] of gNodes) g.classList.toggle("arch-sel", nid === id);
+      nodePanel(nodeById[id]);
+      const g = gNodes.get(id);
+      if (g) g.setAttribute("aria-current", "true");
+      for (const [nid, g2] of gNodes) if (nid !== id) g2.removeAttribute("aria-current");
+    }
+    function clear() {
+      scenario = null;
+      syncPlayer();
+      clearVisual();
+      overviewPanel();
+    }
+
+    // ---- scenario playback
+    let scI = 0;
+    let scBtns = {};
+    function renderScenario() {
+      if (!scenario) return;
+      const { sc } = scenario;
+      const st = sc.steps[scI];
+      focusOn(new Set(st.nodes), new Set(st.edges));
+      player.innerHTML =
+        `<div class="arch-cap"><span class="arch-step-n">Step ${scI + 1} of ${sc.steps.length}</span> ${esc(st.caption)}</div>` +
+        `<div class="arch-nav">` +
+        `<button data-p="prev" ${scI === 0 ? "disabled" : ""}>← Previous</button>` +
+        `<button data-p="next" class="primary" ${scI === sc.steps.length - 1 ? "disabled" : ""}>Next →</button>` +
+        `<button data-p="exit">Exit walk</button>` +
+        `<span class="arch-dots">${sc.steps.map((_, j) => `<i class="${j === scI ? "on" : j < scI ? "past" : ""}"></i>`).join("")}</span>` +
+        `</div>`;
+      player.querySelectorAll("button[data-p]").forEach((b) =>
+        b.addEventListener("click", () => {
+          const a = b.dataset.p;
+          if (a === "prev" && scI > 0) scI--;
+          else if (a === "next" && scI < sc.steps.length - 1) scI++;
+          else if (a === "exit") {
+            clear();
+            return;
+          }
+          renderScenario();
+        }),
+      );
+    }
+    function startScenario(sc) {
+      for (const [, g] of gNodes) g.classList.remove("arch-sel");
+      scenario = { sc };
+      scI = 0;
+      syncPlayer();
+      renderScenario();
+      overviewIntoPlayerIntro(sc);
+    }
+    function overviewIntoPlayerIntro(sc) {
+      panel.innerHTML = `<h3>${esc(sc.title)}</h3><p>${esc(sc.intro)}</p><p class="arch-un">Follow the lit pieces on the map as you step through.</p>`;
+    }
+    function syncPlayer() {
+      player.hidden = !scenario;
+      controls
+        .querySelectorAll("[data-sc]")
+        .forEach((b) =>
+          b.classList.toggle("on", Boolean(scenario && scenario.sc.id === b.dataset.sc)),
+        );
+    }
+
+    controls.innerHTML =
+      `<button class="arch-mode on" data-sc="">Overview</button>` +
+      data.scenarios
+        .map(
+          (sc) =>
+            `<button class="arch-mode" data-sc="${sc.id}">${esc(sc.title)} <span>${sc.steps.length} steps</span></button>`,
+        )
+        .join("");
+    scBtns = Object.fromEntries(
+      [...controls.querySelectorAll("[data-sc]")].map((b) => [b.dataset.sc, b]),
+    );
+    controls.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-sc]");
+      if (!b) return;
+      if (!b.dataset.sc) {
+        clear();
+        scBtns[""].classList.add("on");
+        return;
+      }
+      startScenario(data.scenarios.find((s) => s.id === b.dataset.sc));
+    });
+
+    for (const [id, g] of gNodes) {
+      g.addEventListener("click", () => select(id));
+      g.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          select(id);
+        }
+      });
+    }
+    svg.addEventListener("click", (e) => {
+      if (!e.target.closest(".arch-node")) clear();
+    });
+
+    overviewPanel();
+  }
+
   // ---------------------------------------------------------------- search
 
   const STOP = new Set(
@@ -553,6 +765,7 @@
     );
     wireDiagramTips(app);
     hydrateDiagrams(app);
+    if (route === "/architecture") wireArchitecture(app);
     if (route === "/integrations") wireIntegrationsFilter(app.querySelector(".doc-body"));
     setActiveInSidebar(route);
     requestAnimationFrame(() => activateAnchor(app, anchor));

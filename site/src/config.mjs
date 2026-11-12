@@ -13,7 +13,7 @@ export const repo = {
 
 export const nav = [
   { label: "How it works", href: "#how" },
-  { label: "Components", href: "#components" },
+  { label: "Architecture", href: "/#/architecture" },
   { label: "Integrations", href: "/#/integrations" },
   { label: "Console", href: "/#/console" },
   { label: "Get started", href: "#start" },
@@ -28,41 +28,38 @@ export const hero = {
     "A coordination kernel for teams of humans and AI agents. Hand it a piece of work — it tracks who is doing what, waits for the humans who must approve, files the evidence, and survives every crash, restart, and reorg along the way.",
 };
 
-// The interactive hero scene: one loop, four stations.
+// The interactive hero scene: a work item crossing four stations, with the
+// audit record accumulating underneath — the product promise in one image.
 export const relay = {
-  path: "M 44 128 A 88 88 0 1 1 236 128 A 88 88 0 1 1 44 128",
+  path: "M 75 62 L 525 62",
   steps: [
     {
-      at: "0%",
-      x: 44,
-      y: 128,
+      x: 75,
       who: "You or an agent",
       title: "A Work is created",
       body: "One POST to the API — or a message in chat. An objective, nothing else required. The kernel records it durably: it now outlives every process involved.",
+      log: "work opened: refresh billing docs — via chat",
     },
     {
-      at: "25%",
-      x: 140,
-      y: 40,
+      x: 225,
       who: "The kernel",
       title: "Routing decides who acts",
       body: "Deterministic policy — never a model — picks a team by capability, mints an assignment, and pushes it out over an always-outbound link. If that team is offline, the work simply waits.",
+      log: "routed to team-alpha by policy (audited)",
     },
     {
-      at: "50%",
-      x: 236,
-      y: 128,
-      who: "A team's workspace",
+      x: 375,
+      who: "A team's environment",
       title: "Agents execute, humans approve",
       body: "Execution happens in the team's own environment, with the team's own credentials. The agent proposes; a human gate decides. Neither the kernel nor any other team can reach in.",
+      log: "agent proposed merge → alice approved (identity kept)",
     },
     {
-      at: "75%",
-      x: 140,
-      y: 216,
+      x: 525,
       who: "The record",
       title: "Evidence is filed",
       body: "Every output becomes a content-addressed artifact, every decision an audit entry, every lesson a memory candidate. Six months later you can still answer: who did what, when, and why.",
+      log: "evidence filed · status: done",
     },
   ],
 };
@@ -200,6 +197,12 @@ export const pages = [
         body: "The whole model from zero: Works, teams, links, approvals, artifacts, memory — in plain language.",
       },
       {
+        route: "/architecture",
+        generated: "architecture",
+        title: "Explore the architecture",
+        body: "An interactive map of every part, who operates it, and guided scenario walkthroughs.",
+      },
+      {
         route: "/integrations",
         src: "site/src/pages/integrations.md",
         title: "Supported integrations",
@@ -261,7 +264,7 @@ export const docs = [
         route: "/docs/getting-started-agents",
         src: "docs/getting-started-agents.md",
         title: "Agent orientation (in-repo)",
-        body: "Agent-facing orientation for people working inside the source repository.",
+        body: "Agent-facing orientation for humans working inside the source repository.",
       },
       {
         route: "/docs/contributing",

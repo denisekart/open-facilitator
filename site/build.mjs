@@ -10,6 +10,8 @@ import { marked } from "marked";
 import { docs, guides, pages, repo } from "./src/config.mjs";
 import { renderMermaid, mermaidAvailable } from "./mermaid-ssr.mjs";
 import { tooltipFor, tooltips } from "./src/tooltips.mjs";
+import { renderArchitecture, renderArchitectureMini } from "./src/arch-render.mjs";
+import { architectureBody } from "./src/pages/architecture.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, ".."); // repo root
@@ -41,7 +43,7 @@ const MERMAID = new Map(); // normalized code -> svg
   for (const g of docs)
     for (const e of g.entries) allMd.push(await readFile(join(ROOT, e.src), "utf8"));
   for (const g of pages)
-    for (const e of g.entries) allMd.push(await readFile(join(ROOT, e.src), "utf8"));
+    for (const e of g.entries) if (e.src) allMd.push(await readFile(join(ROOT, e.src), "utf8"));
   for (const g of guides) allMd.push(await readFile(join(ROOT, g.src), "utf8"));
   const codes = [];
   for (const md of allMd) {
@@ -70,6 +72,13 @@ const renderer = new marked.Renderer();
 renderer.code = (token) => {
   const t = typeof token === "object" ? token : { text: token, lang: "" };
   const info = String(t.lang || "");
+  if (info.split(" ")[0] === "archmap") {
+    return (
+      `<a class="arch-teaser" href="#/architecture" aria-label="Open the interactive architecture explorer">` +
+      renderArchitectureMini() +
+      `<span class="arch-teaser-cta">Open the interactive map — click any part, walk the scenarios →</span></a>`
+    );
+  }
   if (info.split(" ")[0] === "mermaid") {
     const cap = info.match(/title="([^"]+)"/);
     const caption = cap ? cap[1] : "system diagram";
@@ -232,8 +241,23 @@ async function emit(entry, srcPath, group) {
   return { route, title };
 }
 
-for (const e of contentEntries) await emit(e, e.src, e.group);
+for (const e of contentEntries) if (!e.generated) await emit(e, e.src, e.group);
 for (const g of guides) await emit({ route: g.route, title: g.title }, g.src, "Guide");
+
+// Generated pages: the interactive architecture explorer.
+{
+  const entry = contentEntries.find((e) => e.generated === "architecture");
+  const arch = renderArchitecture();
+  const html = `<h1 class="doc-title">${entry.title}</h1>` + architectureBody(arch);
+  await writeFile(join(DIST, "content", "architecture.html"), html);
+  const secs = splitSections(html, entry.title);
+  searchPages.push({
+    r: entry.route,
+    t: entry.title,
+    g: entry.group,
+    s: secs.map((s) => ({ h: s.h, i: s.id, x: s.x, f: s.f })),
+  });
+}
 
 // search index
 await writeFile(
@@ -311,6 +335,6 @@ console.log(`pages: ${routeList.length}, search tokens: ${Object.keys(tok).lengt
 
 // sanity: every manifest source exists
 for (const e of contentEntries) {
-  if (!existsSync(join(ROOT, e.src))) throw new Error(`missing doc source: ${e.src}`);
+  if (e.src && !existsSync(join(ROOT, e.src))) throw new Error(`missing doc source: ${e.src}`);
 }
 void readdir;

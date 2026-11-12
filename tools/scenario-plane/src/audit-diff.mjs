@@ -51,8 +51,7 @@ for (const id of fresh.keys()) {
 
 const up = moved.filter((m) => m.up);
 const down = moved.filter((m) => !m.up);
-const lines = (arr) =>
-  arr.map((m) => `~ ${m.id}: ${m.oldVerdict} -> ${m.newVerdict}`).join("\n");
+const lines = (arr) => arr.map((m) => `~ ${m.id}: ${m.oldVerdict} -> ${m.newVerdict}`).join("\n");
 
 const histogram = {};
 for (const v of fresh.values()) histogram[v] = (histogram[v] ?? 0) + 1;

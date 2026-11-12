@@ -4,12 +4,7 @@
   "title": "CommunicationPostCommandV1Data",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "commandId",
-    "target",
-    "text",
-    "idempotencyKey"
-  ],
+  "required": ["commandId", "target", "text", "idempotencyKey"],
   "properties": {
     "commandId": {
       "$ref": "common.v1.json#/$defs/idToken"
@@ -24,10 +19,7 @@
       "properties": {
         "conversationKind": {
           "type": "string",
-          "enum": [
-            "dm",
-            "channel"
-          ],
+          "enum": ["dm", "channel"],
           "title": "PostConversationKind"
         }
       },
@@ -56,20 +48,14 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": [
-          "label"
-        ],
+        "required": ["label"],
         "oneOf": [
           {
-            "required": [
-              "value"
-            ],
+            "required": ["value"],
             "description": "Fire-and-forget: the surface posts this exact text AS THE PRESSER where it can author as them (channel webhooks). Where it cannot (a bot cannot speak as a user), the surface MUST fall back to the prefill law."
           },
           {
-            "required": [
-              "prefill"
-            ],
+            "required": ["prefill"],
             "description": "The honest bot law: the button opens the human's own input box with this text (Telegram reply keyboard, Slack button-block copy); the human sends it, so the resulting message carries the presser's proven authorship on the existing authority plane (C7)."
           }
         ],

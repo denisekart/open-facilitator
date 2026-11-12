@@ -84,7 +84,12 @@ beforeAll(async () => {
       OFAC_STATE_PATH: join(stateDir, "adapter.sqlite3"),
       OFAC_HEALTH_PORT: "8399",
     }),
-    { debug: () => undefined, info: () => undefined, warn: () => undefined, error: () => undefined },
+    {
+      debug: () => undefined,
+      info: () => undefined,
+      warn: () => undefined,
+      error: () => undefined,
+    },
   );
   await adapter.ready;
 }, 60_000);
@@ -127,7 +132,10 @@ describe("golden thread: ask -> issue leg (429-now retry) -> PR webhook -> revie
     // seeded work (the deep E4 fork chain itself is walked in-proc by
     // ScenarioWalks:ReviewForkWalkTests — this manual leg proves the same
     // reads against the real deployed kernel).
-    const timeline = await kernelJson<{ kind: string }[]>(`/api/works/${work.workId}/timeline`, cli);
+    const timeline = await kernelJson<{ kind: string }[]>(
+      `/api/works/${work.workId}/timeline`,
+      cli,
+    );
     const links = await kernelJson<{ kind: string }[]>(`/api/works/${work.workId}/links`, cli);
     expect(Array.isArray(timeline)).toBe(true);
     expect(Array.isArray(links)).toBe(true);
@@ -162,7 +170,8 @@ describe("golden thread: ask -> issue leg (429-now retry) -> PR webhook -> revie
     expect(issue).toBeTruthy(); // the plane's created-issue token
     const st = await planeState();
     const createCalls = st.received.filter(
-      (r) => r.family === "github" && r.method === "POST" && r.path === "/repos/demo/widgets/issues",
+      (r) =>
+        r.family === "github" && r.method === "POST" && r.path === "/repos/demo/widgets/issues",
     );
     expect(createCalls.length).toBeGreaterThanOrEqual(2); // the 429'd one + the retry
     await planeMode("github", "ok");

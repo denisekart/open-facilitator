@@ -34,17 +34,21 @@ npm run serve     # -> http://localhost:8788
 The build reads the repository's `docs/` tree as the source of truth and
 renders every relative link correctly (site routes for published docs,
 GitHub links for everything else). Mermaid diagrams render to inline SVG
-at build time when a chromium binary is present; without one they degrade
-to visible source blocks instead of failing the build. Diagram nodes get
-native `<title>` tooltips injected at build time (from `tooltips.mjs`,
-keyed by the node's visible label); the runtime styles them into hover
-cards. `404.html` forwards deep paths back into the SPA for routes that
-exist, and shows a real not-found page for the rest.
+at build time when a chromium binary is present; without one (e.g. a bare
+CI runner), the build ships the source plus the vendored `mermaid.min.js`
+and the page runtime renders the diagrams in the browser — with the same
+theme and the same hover tooltips, which it loads from `tooltips.json`.
+Diagram nodes get native `<title>` tooltips injected at build time (from
+`tooltips.mjs`, keyed by the node's visible label); the runtime styles
+them into hover cards. `404.html` forwards deep paths back into the SPA
+for routes that exist, and shows a real not-found page for the rest.
 
 Design constraints (they keep the site deployable anywhere):
 
-- **No runtime dependencies.** `app.js` is vanilla; search is an
-  inverted index (`search-index.json`) scored in the browser.
+- **No runtime dependencies on the happy path.** `app.js` is vanilla;
+  search is an inverted index (`search-index.json`) scored in the
+  browser. The vendored `mermaid.min.js` loads lazily and only when a
+  page actually contains an unrendered diagram.
 - **No absolute paths.** Every asset reference is relative, so the site
   works at a domain root _or_ under a project-page subpath.
 - **Consumer content lives here, operator content in `docs/`.** Site

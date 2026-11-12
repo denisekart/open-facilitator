@@ -225,11 +225,15 @@
   }
   function wireDiagramTips(scope) {
     for (const fig of scope.querySelectorAll(".diagram")) {
-      fig.addEventListener("mousemove", tipMoveHandler);
-      fig.addEventListener("mouseleave", tipLeaveHandler);
+      if (!fig._tipsWired) {
+        fig._tipsWired = true;
+        fig.addEventListener("mousemove", tipMoveHandler);
+        fig.addEventListener("mouseleave", tipLeaveHandler);
+      }
       const btn = fig.querySelector(".diagram-zoom");
       const svg = fig.querySelector(".svg-frame svg");
-      if (btn && svg) {
+      if (btn && svg && !btn._zoomWired) {
+        btn._zoomWired = true;
         btn.addEventListener("click", () => openDiagram(svg));
         if (svg.querySelector("title")) {
           svg.style.cursor = "zoom-in";
@@ -237,6 +241,131 @@
         }
       }
     }
+  }
+
+  // ------------------------------------------- client-side diagram fallback
+  //
+  // When the build host had no chromium, content ships `<pre class="mermaid-
+  // source">` inside a pending figure. The vendored mermaid renders it here,
+  // with the same theme and the same hover tooltips the build injects.
+
+  const MERMAID_THEME = {
+    darkMode: false,
+    fontFamily: "system-ui, sans-serif",
+    primaryColor: "#EAF1F9",
+    primaryBorderColor: "#0B5FBF",
+    primaryTextColor: "#1F2328",
+    lineColor: "#5B6B7C",
+    secondaryColor: "#FDF0DC",
+    tertiaryColor: "#F2F5F8",
+    edgeLabelBackground: "#FFFFFF",
+    clusterBkg: "#F7F9FC",
+    clusterBorder: "#C6CFDA",
+    actorBkg: "#EAF1F9",
+    actorBorder: "#0B5FBF",
+    activationBkgColor: "#E7F0FA",
+    sequenceNumberColor: "#FFFFFF",
+    labelBoxBkgColor: "#EAF1F9",
+    labelBoxBorderColor: "#0B5FBF",
+  };
+
+  let mermaidP = null;
+  function loadMermaid() {
+    if (!mermaidP) {
+      mermaidP = new Promise((resolve, reject) => {
+        const s = document.createElement("script");
+        s.src = "mermaid.min.js";
+        s.onload = () => {
+          window.mermaid.initialize({
+            startOnLoad: false,
+            theme: "base",
+            security: "strict",
+            themeVariables: MERMAID_THEME,
+          });
+          resolve(window.mermaid);
+        };
+        s.onerror = () => {
+          mermaidP = null;
+          reject(new Error("mermaid unavailable"));
+        };
+        document.head.appendChild(s);
+      });
+    }
+    return mermaidP;
+  }
+
+  let tipsP = null;
+  function loadTips() {
+    if (!tipsP)
+      tipsP = fetch("tooltips.json")
+        .then((r) => (r.ok ? r.json() : {}))
+        .catch(() => ({}));
+    return tipsP;
+  }
+
+  const normLabel = (s) => s.toLowerCase().replace(/\s+/g, " ").trim();
+
+  async function hydrateDiagrams(scope) {
+    const figs = [...scope.querySelectorAll(".diagram-pending")];
+    if (!figs.length) return;
+    let mermaid;
+    let tips;
+    try {
+      [mermaid, tips] = await Promise.all([loadMermaid(), loadTips()]);
+    } catch {
+      for (const f of figs) {
+        const cap = f.querySelector("figcaption");
+        if (cap)
+          cap.textContent = cap.textContent.replace(
+            "rendering diagram…",
+            "diagram source shown below",
+          );
+      }
+      return;
+    }
+    let n = 0;
+    for (const fig of figs) {
+      const pre = fig.querySelector("pre.mermaid-source");
+      if (!pre) continue;
+      try {
+        const { svg } = await mermaid.render("c" + Date.now().toString(36) + n++, pre.textContent);
+        const titled = svg.replace(
+          /(<g[^>]*class="[^"]*\b(?:node|actor)\b[^>]*>)([\s\S]{0,800}?)(<(?:\/g>|<g\b))/g,
+          (whole, open, inner, next) => {
+            const label = inner
+              .replace(/<[^>]+>/g, " ")
+              .replace(/\s+/g, " ")
+              .trim();
+            const tip = tips[normLabel(label)];
+            return tip ? `${open}<title>${esc(tip)}</title>${inner}${next}` : whole;
+          },
+        );
+        const frame = document.createElement("div");
+        frame.className = "svg-frame";
+        frame.innerHTML = titled;
+        const btn = document.createElement("button");
+        btn.className = "diagram-zoom";
+        btn.setAttribute("aria-label", "Expand diagram");
+        btn.textContent = "⤢ expand";
+        fig.replaceChild(frame, pre);
+        fig.insertBefore(btn, fig.firstChild);
+        const cap = fig.querySelector("figcaption");
+        if (cap)
+          cap.textContent = cap.textContent.replace(
+            "rendering diagram…",
+            "hover any box for what it guarantees",
+          );
+        fig.classList.remove("diagram-pending");
+      } catch {
+        const cap = fig.querySelector("figcaption");
+        if (cap)
+          cap.textContent = cap.textContent.replace(
+            "rendering diagram…",
+            "diagram source shown below",
+          );
+      }
+    }
+    wireDiagramTips(scope);
   }
 
   // ---------------------------------------------------------------- search
@@ -375,7 +504,7 @@
         rows.push(tr);
         tr.classList.add("intg-row");
       }
-    for (const s of sections) s.h.closest("h2") && s.h.classList.add("intg-sec");
+    for (const s of sections) if (s.h.closest("h2")) s.h.classList.add("intg-sec");
     input.addEventListener("input", () => {
       const q = input.value.trim().toLowerCase();
       let shown = 0;
@@ -423,6 +552,7 @@
       }),
     );
     wireDiagramTips(app);
+    hydrateDiagrams(app);
     if (route === "/integrations") wireIntegrationsFilter(app.querySelector(".doc-body"));
     setActiveInSidebar(route);
     requestAnimationFrame(() => activateAnchor(app, anchor));

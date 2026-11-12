@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import { marked } from "marked";
 import { docs, guides, pages, repo } from "./src/config.mjs";
 import { renderMermaid, mermaidAvailable } from "./mermaid-ssr.mjs";
-import { tooltipFor } from "./src/tooltips.mjs";
+import { tooltipFor, tooltips } from "./src/tooltips.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, ".."); // repo root
@@ -50,14 +50,17 @@ const MERMAID = new Map(); // normalized code -> svg
   const uniq = [...new Set(codes)];
   if (uniq.length) {
     if (!mermaidAvailable())
-      console.warn("no chromium for mermaid SSR; diagrams stay as source blocks");
+      console.warn("no chromium for mermaid SSR; diagrams render client-side");
     else {
       const map = await renderMermaid(uniq);
       if (map) uniq.forEach((c, i) => MERMAID.set(norm(c), injectTooltips(map.get(i))));
-      else console.warn("mermaid SSR incomplete; diagrams stay as source blocks");
+      else console.warn("mermaid SSR incomplete; diagrams render client-side");
     }
   }
 }
+
+// Ship the mermaid library so the runtime can render any source blocks
+// (hosts without chromium at build time, e.g. the GitHub Pages runner).
 
 // ---------------------------------------------------------------- markdown
 
@@ -77,7 +80,11 @@ renderer.code = (token) => {
         `<div class="svg-frame">${svg}</div>` +
         `<figcaption>${escape(caption)} · hover any box for what it guarantees</figcaption></figure>`
       );
-    return `<pre class="mermaid-source">${escape(t.text)}</pre>`;
+    return (
+      `<figure class="diagram diagram-pending">` +
+      `<pre class="mermaid-source">${escape(t.text)}</pre>` +
+      `<figcaption>${escape(caption)} · rendering diagram…</figcaption></figure>`
+    );
   }
   const cls = info.split(" ")[0] ? ` class="language-${info.split(" ")[0]}"` : "";
   return `<pre><code${cls}>${escape(t.text)}</code></pre>`;
@@ -272,6 +279,7 @@ const sections = searchPages.map((p) => ({
   s: p.s.map((s) => [s.h, s.i, s.x]),
 }));
 await writeFile(join(DIST, "search-index.json"), JSON.stringify({ pages: sections, tok }));
+await writeFile(join(DIST, "tooltips.json"), JSON.stringify(tooltips));
 // ---------------------------------------------------------------- assets
 
 const copy = async (src, dest) => {
@@ -284,6 +292,8 @@ await copy("src/assets/icon.svg", "icon.svg");
 await copy("src/assets/icon.svg", "favicon.svg");
 await copy("src/assets/console-explorer.png", "console-explorer.png");
 await copy("src/assets/console-work.png", "console-work.png");
+const mermaidMin = join(HERE, "node_modules/mermaid/dist/mermaid.min.js");
+if (existsSync(mermaidMin)) await cp(mermaidMin, join(DIST, "mermaid.min.js"));
 
 // 404 for GitHub Pages (deep path links land here; it forwards to the SPA).
 const BASE = process.env.OFAC_SITE_BASE ?? "/";

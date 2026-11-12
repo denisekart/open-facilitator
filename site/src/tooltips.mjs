@@ -207,14 +207,14 @@ tip(
   "oidc provider login + claims",
   "Any standards-compliant login authority. The kernel maps claims you configure; it stores no passwords.",
 );
-(tip(
+tip(
   "s3-compatible store artifact bytes",
   "Content-addressed artifact storage. S3, R2, MinIO, SeaweedFS — whatever you already operate.",
-),
-  tip(
-    "gateway team ledger + policy",
-    "The team's border control: one outbound connection, its own execution ledger, its own allow/deny policy before anything runs.",
-  ));
+);
+tip(
+  "gateway team ledger + policy",
+  "The team's border control: one outbound connection, its own execution ledger, its own allow/deny policy before anything runs.",
+);
 tip(
   "harness: llm agent",
   "An autonomous agent runtime doing the assignment with the team's models and keys. Proposes; the gate disposes.",

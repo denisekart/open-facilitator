@@ -138,7 +138,7 @@ function consoleHtml() {
   <p class="section-lede">Every kernel serves an operator console at its own URL: search across every Work, the live fleet, the delivery ledger, the audit trail. It is a client of the same public API your agents use — <a href="#/console">here is what each view shows</a>.</p>
   <figure class="shot" style="margin:0">
     <div class="shot-bar"><i></i><i></i><i></i></div>
-    <img src="console-explorer.png" alt="The Open Facilitator console showing Work search results, a fleet summary, and throughput counters" loading="lazy" width="1140" height="760">
+    <img src="console-explorer.png" alt="The Open Facilitator console showing Work search results, a fleet summary, and throughput counters" width="1140" height="760">
   </figure>
 </div></section>`;
 }

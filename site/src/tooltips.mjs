@@ -30,6 +30,9 @@ tip("demo team gateway", "A team runtime already connected over an outbound link
 tip("workspace + deterministic worker", "A scripted worker: fixed inputs, fixed outputs — the conformance baseline for real harnesses.");
 tip("demo workspace", "A linked team container: Gateway + worker, enrolling with a shared token.");
 tip("outbound link", "Connections only ever point outward from teams to the kernel. Nothing inbound, ever.");
+tip("kernel (one container)", "The published kernel image: coordination, approvals, artifact ledger. Stateless — pair it with a PostgreSQL you already run.");
+tip("your browser / curl", "Everything is public HTTP: the console, your scripts, and your agents all speak the same API.");
+tip("your team: gateway + agents/scripts", "The team side: npm-installed Gateway dialing out, harnesses doing the actual work with the team's own credentials.");
 
 // ---- work lifecycle (state diagram) ----
 tip("created (api, chat, webhook)", "One POST (or a chat message) creates a Work: objective, version 1, an entry in the audit timeline.");

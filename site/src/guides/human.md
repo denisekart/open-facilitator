@@ -12,10 +12,29 @@ Two roads, take either:
   demo world — kernel + login provider + artifact store + a demo team —
   and proves every hop for you).
 
+```mermaid title="Where things run, either road"
+flowchart LR
+  YOU(["You: curl / browser"]) -->|bearer token| K["The kernel<br/>(one container, your server)"]
+  K --- PG[("PostgreSQL")]
+  K --- ART[("Artifacts<br/>S3 or a folder")]
+  K -.OIDC.- IDP["Your login provider"]
+  K -."outbound link".- GW["Your team's Gateway"]
+  GW --> W["Agents, scripts, people"]
+```
+
+Either road ends at the same API: everything below works against both.
+
 ## Road A: your own kernel, three containers
 
 You need PostgreSQL and a container runtime. Everything else is one
 image.
+
+```mermaid title="What you are building — links only point outward"
+flowchart LR
+  ME([Your browser / curl]) -->|"API · console"| K["Kernel<br/>(one container)"]
+  K --- PG[(PostgreSQL)]
+  T["Your team: Gateway<br/>+ agents/scripts"] -->|"outbound link"| K
+```
 
 ```bash
 docker network create ofac

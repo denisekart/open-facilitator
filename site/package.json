@@ -1,0 +1,18 @@
+{
+  "name": "open-facilitator-site",
+  "version": "0.1.0",
+  "private": true,
+  "description": "open-facilitator.org — static landing page + documentation site. Not published to any registry.",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "serve": "node serve.mjs"
+  },
+  "dependencies": {
+    "marked": "^15.0.12"
+  },
+  "devDependencies": {
+    "jsdom": "^31.0.0",
+    "mermaid": "^12.3.0"
+  }
+}

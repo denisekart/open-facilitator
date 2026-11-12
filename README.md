@@ -109,6 +109,10 @@ tokens, Works, approvals, artifacts, traces:
 | Operate it (when things go wrong) | [docs/runbooks/index.md](docs/runbooks/index.md) |
 | Contribute | [docs/contributing.md](docs/contributing.md) |
 
+Browsing remotely? This table renders as a searchable site under
+[`site/`](site/README.md) — a GitHub Actions job publishes it to GitHub
+Pages from these same files.
+
 ## Repository layout
 
 ```text
@@ -123,6 +127,7 @@ tokens, Works, approvals, artifacts, traces:
 ├── examples/              # slim no-Docker walkthrough, full-profile workers, AWS CDK
 ├── reference/             # Compose slim/full, referencectl, seeds, acceptance checks
 ├── docs/                  # user-facing documentation
+├── site/                  # open-facilitator.org — static site + docs browser (see site/README.md)
 └── tests/                 # .NET integration + scenario + browser suites
 ```
 

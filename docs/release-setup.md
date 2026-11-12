@@ -11,7 +11,7 @@ flowchart LR
     TAG[push v* tag] --> C[containers job]
     TAG --> F[features job]
     TAG --> N[publish-npm job<br/>if vars.ENABLE_NPM_PUBLISH]
-    TAG --> S[sbom + digest-pin jobs<br/>(pipeline target)]
+    TAG --> S["sbom + digest-pin jobs<br/>(pipeline target)"]
     C -->|GITHUB_TOKEN packages:write| GHCR1[ghcr.io/denisekart/open-facilitator/facilitator<br/>ghcr.io/denisekart/open-facilitator/node-runtime]
     F -->|GITHUB_TOKEN packages:write| GHCR2[ghcr.io/denisekart/open-facilitator/features/&lt;name&gt;]
     N -->|OIDC trusted publisher| NPM[registry.npmjs.org @ofac]

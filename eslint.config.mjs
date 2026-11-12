@@ -8,6 +8,9 @@ export default tseslint.config(
     ignores: [
       "**/dist/",
       "node_modules/",
+      "site/node_modules/",
+      "site/vendor/",
+      "site/dist/",
       "docs/",
       "src/protocol/src/generated/",
       "protocol/dotnet/",
@@ -37,6 +40,26 @@ export default tseslint.config(
         fetch: "readonly",
         setTimeout: "readonly",
         clearTimeout: "readonly",
+      },
+    },
+  },
+  {
+    // Browser runtime for the static site (site/src/js).
+    files: ["site/src/js/**/*.js"],
+    languageOptions: {
+      ecmaVersion: 2024,
+      sourceType: "script",
+      globals: {
+        console: "readonly",
+        document: "readonly",
+        window: "readonly",
+        location: "readonly",
+        history: "readonly",
+        navigator: "readonly",
+        fetch: "readonly",
+        FormData: "readonly",
+        URLSearchParams: "readonly",
+        setTimeout: "readonly",
       },
     },
   },

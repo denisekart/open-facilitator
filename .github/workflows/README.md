@@ -20,3 +20,4 @@
 | `release.yml` / `publish-npm` | inert seam (`vars.ENABLE_NPM_PUBLISH` unset) | `https://registry.npmjs.org` (route c: `@ofac` org, OIDC trusted publisher) |
 | `release.yml` / `sbom` | `dotnet-CycloneDX` SBOM for the solution + pnpm's native lockfile SBOM for the workspace, attached to the GitHub release | — |
 | `release.yml` / `digest-pin` | Resolves pushed + third-party image digests and commits changed `*_DIGEST` keys back to `reference/versions.env` (also runs on `workflow_dispatch` for a re-pin) | — |
+| `site.yml` / `build` + `deploy` | The static site (`site/`) builds with npm and deploys to GitHub Pages on pushes touching `site/**`, `docs/**`, or `README.md`; PRs build without deploying | GitHub Pages |

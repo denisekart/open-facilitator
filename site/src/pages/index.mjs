@@ -54,6 +54,8 @@ function heroSvg() {
 
 export function landingHtml(opts = {}) {
   const { notFound = false, base = "/" } = opts;
+  // The 404 page is served at unknown depth: root every relative link.
+  const P = (s) => (notFound ? base + s : s);
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -61,21 +63,21 @@ export function landingHtml(opts = {}) {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${notFound ? "Not found" : "Open Facilitator — durable coordination for human + agent work"}</title>
 <meta name="description" content="Portable, pluggable, multi-workspace orchestration of autonomous, assisted, and deterministic workloads across independently operated execution environments.">
-<link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="styles.css">
+<link rel="icon" href="${P("favicon.svg")}" type="image/svg+xml">
+<link rel="stylesheet" href="${P("styles.css")}">
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
 <header class="topbar">
-  <a class="brand" href="index.html">${ICON}<span>Open&nbsp;Facilitator</span></a>
+  <a class="brand" href="${P("index.html")}">${ICON}<span>Open&nbsp;Facilitator</span></a>
   <nav class="topnav" aria-label="Main">
-    <a href="index.html#why">Why</a>
-    <a href="index.html#how">How it works</a>
-    <a href="index.html#components">Components</a>
-    <a href="index.html#start">Get started</a>
-    <a href="#/docs">Docs</a>
+    <a href="${P("index.html#why")}">Why</a>
+    <a href="${P("index.html#how")}">How it works</a>
+    <a href="${P("index.html#components")}">Components</a>
+    <a href="${P("index.html#start")}">Get started</a>
+    <a href="${P("#/docs")}">Docs</a>
     <a class="ghost" rel="noopener" href="${repo.url}">GitHub</a>
-    <form class="searchbox" action="#/search" role="search">
+    <form class="searchbox" action="${P("#/search")}" role="search">
       <input id="q" type="search" name="q" placeholder="Search docs…" aria-label="Search documentation" autocomplete="off">
     </form>
   </nav>
@@ -87,13 +89,13 @@ ${notFound ? notFoundBody(base) : homeBody()}
   <div>${ICON}&nbsp; Open Facilitator — built and maintained by teams that run mixed human/agent workloads.</div>
   <nav class="footnav" aria-label="Footer">
     <a rel="noopener" href="${repo.url}">GitHub</a>
-    <a href="#/docs">Docs</a>
+    <a href="${P("#/docs")}">Docs</a>
     <a href="#/docs/getting-started">Reference environment</a>
     <a href="#/docs/protocol">Protocol</a>
   </nav>
   <div class="fine">Dual-licensed AGPL-3.0-or-later / commercial. Every artifact ships its license.</div>
 </footer>
-<script src="app.js"></script>
+<script src="${P("app.js")}"></script>
 </body></html>`;
 }
 
@@ -186,10 +188,11 @@ ${hero.demo.lines[1]}</code></pre>
 }
 
 function notFoundBody(base) {
+  const P = (s) => base + s;
   return `<section class="hero"><div class="hero-copy">
   <h1>Nothing stands here.</h1>
   <p class="lede">That page is not in this site. The documentation may know better:</p>
-  <div class="cta"><a class="btn" href="#/docs">Docs home</a><a class="btn inverse" href="index.html">Landing page</a></div>
+  <div class="cta"><a class="btn" href="${P("index.html")}#/docs">Docs home</a><a class="btn inverse" href="${P("index.html")}">Landing page</a></div>
 </div></section>
 <script>
 // GitHub Pages serves 404.html for unknown paths (no SPA fallback). When it

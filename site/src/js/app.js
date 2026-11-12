@@ -11,8 +11,7 @@
   let manifest = null; // { repo, nav, guides }
   let searchIdx = null; // { pages, tok }
 
-  const esc = (s) =>
-    String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
   // ---------------------------------------------------------------- routing
 
@@ -53,10 +52,10 @@
           g.items
             .map(
               (it) =>
-                `<a href="#${it.r}" class="${it.r === activeRoute ? "active" : ""}">${esc(it.t)}</a>`
+                `<a href="#${it.r}" class="${it.r === activeRoute ? "active" : ""}">${esc(it.t)}</a>`,
             )
             .join("") +
-          `</div>`
+          `</div>`,
       )
       .join("");
   }
@@ -69,7 +68,7 @@
       [...hs]
         .map(
           (h) =>
-            `<a href="#${location.hash.split(/[?]/)[0]}?${h.id}" data-anchor="${h.id}">${esc(h.textContent)}</a>`
+            `<a href="#${location.hash.split(/[?]/)[0]}?${h.id}" data-anchor="${h.id}">${esc(h.textContent)}</a>`,
         )
         .join("")
     );
@@ -80,6 +79,106 @@
     const el = root.querySelector(`[id="${CSS.escape(anchor)}"]`);
     if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
   }
+
+  // ------------------------------------------------ fullscreen diagram view
+
+  let modal = null;
+  function ensureModal() {
+    if (modal) return modal;
+    modal = document.createElement("div");
+    modal.className = "dia-modal";
+    modal.innerHTML =
+      `<div class="dia-stage"><div class="dia-canvas"></div>` +
+      `<div class="dia-bar"><button data-a="in" aria-label="Zoom in">+</button>` +
+      `<button data-a="out" aria-label="Zoom out">−</button>` +
+      `<button data-a="fit" aria-label="Fit to screen">fit</button>` +
+      `<button data-a="close" aria-label="Close">close ✕</button></div>` +
+      `<div class="dia-hint">scroll = zoom · drag = pan · esc = close</div></div>`;
+    document.body.appendChild(modal);
+    const stage = modal.querySelector(".dia-stage");
+    const canvas = modal.querySelector(".dia-canvas");
+    const view = { k: 1, x: 0, y: 0 };
+    const apply = () => {
+      canvas.style.transform = `translate(${view.x}px,${view.y}px) scale(${view.k})`;
+    };
+    const fit = () => {
+      const svg = canvas.querySelector("svg");
+      if (!svg) return;
+      view.k = 1;
+      view.x = 0;
+      view.y = 0;
+      apply();
+      const r = svg.getBoundingClientRect();
+      const w = r.width || 1;
+      const h = r.height || 1;
+      view.k = Math.min((stage.clientWidth * 0.94) / w, (stage.clientHeight * 0.9) / h, 3);
+      view.x = (stage.clientWidth - w * view.k) / 2;
+      view.y = (stage.clientHeight - h * view.k) / 2;
+      apply();
+    };
+    modal.querySelector(".dia-bar").addEventListener("click", (e) => {
+      const a = e.target.dataset && e.target.dataset.a;
+      if (a === "in" || a === "out") {
+        view.k = Math.min(8, Math.max(0.1, view.k * (a === "in" ? 1.3 : 1 / 1.3)));
+        apply();
+      } else if (a === "fit") fit();
+      else close();
+    });
+    stage.addEventListener(
+      "wheel",
+      (e) => {
+        e.preventDefault();
+        const f = e.deltaY < 0 ? 1.18 : 1 / 1.18;
+        const k2 = Math.min(8, Math.max(0.1, view.k * f));
+        const r = stage.getBoundingClientRect();
+        const px = e.clientX - r.left;
+        const py = e.clientY - r.top;
+        view.x = px - ((px - view.x) * k2) / view.k;
+        view.y = py - ((py - view.y) * k2) / view.k;
+        view.k = k2;
+        apply();
+      },
+      { passive: false },
+    );
+    let drag = null;
+    stage.addEventListener("pointerdown", (e) => {
+      drag = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y };
+      stage.setPointerCapture(e.pointerId);
+    });
+    stage.addEventListener("pointermove", (e) => {
+      if (!drag) return;
+      view.x = drag.vx + (e.clientX - drag.x);
+      view.y = drag.vy + (e.clientY - drag.y);
+      apply();
+    });
+    stage.addEventListener("pointerup", () => {
+      drag = null;
+    });
+    modal._fit = fit;
+    stage.addEventListener("mousemove", tipMoveHandler);
+    stage.addEventListener("mouseleave", tipLeaveHandler);
+    return modal;
+  }
+  function openDiagram(svg) {
+    const m = ensureModal();
+    const canvas = m.querySelector(".dia-canvas");
+    canvas.innerHTML = "";
+    canvas.appendChild(svg.cloneNode(true));
+    m.classList.add("open");
+    document.body.style.overflow = "hidden";
+    m._fit();
+  }
+  function close() {
+    if (!modal) return;
+    modal.classList.remove("open");
+    document.body.style.overflow = "";
+  }
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      close();
+      if (searchPop) searchPop.classList.remove("open");
+    }
+  });
 
   // --------------------------------------------------------- hover tooltips
 
@@ -92,51 +191,68 @@
     }
     return tipEl;
   }
+  function tipMoveHandler(e) {
+    const fig = e.currentTarget;
+    let g = null;
+    for (let el = e.target; el && el !== fig; el = el.parentElement) {
+      if (el.querySelector && el.querySelector(":scope > title")) {
+        g = el;
+        break;
+      }
+    }
+    const t = g && g.querySelector(":scope > title");
+    const tip = ensureTip();
+    if (!t || !t.textContent.trim()) {
+      tip.style.display = "none";
+      return;
+    }
+    const label =
+      [...g.childNodes]
+        .filter((n) => !(n instanceof SVGTitleElement) && n.nodeName !== "title")
+        .map((n) => n.textContent || "")
+        .join(" ")
+        .replace(/\s+/g, " ")
+        .trim() || "element";
+    tip.innerHTML = `<b>${esc(label)}</b>${esc(t.textContent)}`;
+    tip.style.display = "block";
+    const w = tip.offsetWidth || 280;
+    const x = Math.min(Math.max(12, e.clientX + 14), innerWidth - w - 12);
+    tip.style.left = x + "px";
+    tip.style.top = Math.min(e.clientY + 18, innerHeight - 90) + "px";
+  }
+  function tipLeaveHandler() {
+    if (tipEl) tipEl.style.display = "none";
+  }
   function wireDiagramTips(scope) {
     for (const fig of scope.querySelectorAll(".diagram")) {
-      fig.addEventListener("mousemove", (e) => {
-        let g = null;
-        for (let el = e.target; el && el !== fig; el = el.parentElement) {
-          if (el.querySelector && el.querySelector(":scope > title")) {
-            g = el;
-            break;
-          }
+      fig.addEventListener("mousemove", tipMoveHandler);
+      fig.addEventListener("mouseleave", tipLeaveHandler);
+      const btn = fig.querySelector(".diagram-zoom");
+      const svg = fig.querySelector(".svg-frame svg");
+      if (btn && svg) {
+        btn.addEventListener("click", () => openDiagram(svg));
+        if (svg.querySelector("title")) {
+          svg.style.cursor = "zoom-in";
+          svg.addEventListener("click", () => openDiagram(svg));
         }
-        const t = g && g.querySelector(":scope > title");
-        const tip = ensureTip();
-        if (!t || !t.textContent.trim()) {
-          tip.style.display = "none";
-          return;
-        }
-        const label =
-          [...g.childNodes]
-            .filter((n) => !(n instanceof SVGTitleElement) && n.nodeName !== "title")
-            .map((n) => n.textContent || "")
-            .join(" ")
-            .replace(/\s+/g, " ")
-            .trim() || "element";
-        tip.innerHTML = `<b>${esc(label)}</b>${esc(t.textContent)}`;
-        tip.style.display = "block";
-        const w = tip.offsetWidth || 280;
-        const x = Math.min(Math.max(12, e.clientX + 14), innerWidth - w - 12);
-        tip.style.left = x + "px";
-        tip.style.top = Math.min(e.clientY + 18, innerHeight - 90) + "px";
-      });
-      fig.addEventListener("mouseleave", () => {
-        if (tipEl) tipEl.style.display = "none";
-      });
+      }
     }
   }
 
   // ---------------------------------------------------------------- search
 
   const STOP = new Set(
-    ("a an and are as at be by for from has have he if in is it its of on or that the to was were will with you your not but can this").split(" ")
+    "a an and are as at be by for from has have he if in is it its of on or that the to was were will with you your not but can this".split(
+      " ",
+    ),
   );
 
   function search(q) {
     if (!searchIdx) return [];
-    const terms = q.toLowerCase().split(/[^a-z0-9]+/).filter((t) => t.length >= 2 && !STOP.has(t));
+    const terms = q
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter((t) => t.length >= 2 && !STOP.has(t));
     if (!terms.length) return [];
     const scores = new Map(); // pageIdx -> score
     const perTerm = [];
@@ -156,7 +272,12 @@
       for (const s of p.s) {
         const st = (s[0] + " " + s[2]).toLowerCase();
         if (terms.some((t) => st.includes(t))) {
-          if (!bestSec || terms.filter((t) => st.includes(t)).length > terms.filter((t) => ((bestSec[0] + " " + bestSec[2]).toLowerCase().includes(t))).length) bestSec = s;
+          if (
+            !bestSec ||
+            terms.filter((t) => st.includes(t)).length >
+              terms.filter((t) => (bestSec[0] + " " + bestSec[2]).toLowerCase().includes(t)).length
+          )
+            bestSec = s;
         }
       }
       results.push({ p, score: score * (1 + termsHit), bestSec });
@@ -166,17 +287,24 @@
   }
 
   function mark(text, q) {
-    const terms = q.toLowerCase().split(/[^a-z0-9]+/).filter((t) => t.length >= 2);
+    const terms = q
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter((t) => t.length >= 2);
     let out = esc(text);
     for (const t of terms) {
-      out = out.replace(new RegExp(`(${t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi"), "<mark>$1</mark>");
+      out = out.replace(
+        new RegExp(`(${t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi"),
+        "<mark>$1</mark>",
+      );
     }
     return out;
   }
 
   function popHtml(q) {
     const rs = search(q).slice(0, 8);
-    if (!rs.length) return `<div class="sp-none">No matches. Try “artifact”, “approval”, “gateway”.</div>`;
+    if (!rs.length)
+      return `<div class="sp-none">No matches. Try “artifact”, “approval”, “gateway”.</div>`;
     return rs
       .map((r) => {
         const sec = r.bestSec;
@@ -219,7 +347,52 @@
     }, 120);
   }
 
-  // ---------------------------------------------------------------- views
+  // integrations page: live category/row filter
+  function wireIntegrationsFilter(body) {
+    if (!body) return;
+    const bar = document.createElement("div");
+    bar.className = "intg-filter";
+    bar.innerHTML =
+      `<input type="search" placeholder="Filter integrations: telegram, forge, harness, oidc…" aria-label="Filter integrations">` +
+      `<span class="count"></span>`;
+    body.parentNode.insertBefore(bar, body);
+    const input = bar.querySelector("input");
+    const count = bar.querySelector(".count");
+    // group content into h2 sections
+    const sections = [];
+    let cur = null;
+    for (const el of [...body.children]) {
+      if (el.tagName === "H2") {
+        cur = { h: el, els: [el], text: "" };
+        sections.push(cur);
+      }
+      if (cur) cur.els.push(el);
+      if (cur && el.tagName !== "H1") cur.text += " " + (el.textContent || "");
+    }
+    const rows = [];
+    for (const tbl of body.querySelectorAll("table"))
+      for (const tr of tbl.querySelectorAll("tbody tr")) {
+        rows.push(tr);
+        tr.classList.add("intg-row");
+      }
+    for (const s of sections) s.h.closest("h2") && s.h.classList.add("intg-sec");
+    input.addEventListener("input", () => {
+      const q = input.value.trim().toLowerCase();
+      let shown = 0;
+      for (const r of rows) {
+        const hit = !q || r.textContent.toLowerCase().includes(q);
+        r.classList.toggle("hidden", !hit);
+        if (hit) shown++;
+      }
+      let visibleSections = 0;
+      for (const s of sections) {
+        const secHit = !q || s.text.toLowerCase().includes(q);
+        for (const el of s.els) el.style.display = secHit ? "" : "none";
+        if (secHit) visibleSections++;
+      }
+      count.textContent = q ? `${visibleSections} sections · ${shown} rows match` : "";
+    });
+  }
 
   const cache = new Map();
 
@@ -227,8 +400,7 @@
     if (landing) landing.hidden = false;
     let html = cache.get(route);
     if (!html) {
-      const file =
-        route === "/docs" ? "content/docs.html" : "content" + route + ".html";
+      const file = route === "/docs" ? "content/docs.html" : "content" + route + ".html";
       const r = await fetch(file);
       if (!r.ok) return showError(route);
       html = await r.text();
@@ -236,7 +408,7 @@
     }
     const entry = findEntry(route);
     if (landing) landing.hidden = true;
-    const titleMatch = html.match(/<h1 class="doc-title">[\s\S]*?<\/h1>/);
+    const titleMatch = html.match(/<h1 class="doc-title"[^>]*>[\s\S]*?<\/h1>/);
     const titleHtml = titleMatch ? titleMatch[0] : "";
     const bodyHtml = titleHtml ? html.replace(titleHtml, "") : html;
     app.innerHTML =
@@ -248,9 +420,10 @@
       a.addEventListener("click", (e) => {
         e.preventDefault();
         location.hash = a.getAttribute("href");
-      })
+      }),
     );
     wireDiagramTips(app);
+    if (route === "/integrations") wireIntegrationsFilter(app.querySelector(".doc-body"));
     setActiveInSidebar(route);
     requestAnimationFrame(() => activateAnchor(app, anchor));
     document.title = (entry ? entry.t + " — " : "") + "Open Facilitator";
@@ -335,7 +508,11 @@
     window.addEventListener("hashchange", render);
     render();
     if (!location.hash && location.pathname.replace(/\/$/, "").endsWith("index.html")) {
-      history.replaceState(null, "", location.pathname.replace(/index\.html$/, "") + location.search);
+      history.replaceState(
+        null,
+        "",
+        location.pathname.replace(/index\.html$/, "") + location.search,
+      );
     }
   }
 

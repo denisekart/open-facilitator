@@ -34,28 +34,32 @@ export const relay = {
   steps: [
     {
       at: "0%",
-      x: 44, y: 128,
+      x: 44,
+      y: 128,
       who: "You or an agent",
       title: "A Work is created",
       body: "One POST to the API — or a message in chat. An objective, nothing else required. The kernel records it durably: it now outlives every process involved.",
     },
     {
       at: "25%",
-      x: 140, y: 40,
+      x: 140,
+      y: 40,
       who: "The kernel",
       title: "Routing decides who acts",
       body: "Deterministic policy — never a model — picks a team by capability, mints an assignment, and pushes it out over an always-outbound link. If that team is offline, the work simply waits.",
     },
     {
       at: "50%",
-      x: 236, y: 128,
+      x: 236,
+      y: 128,
       who: "A team's workspace",
       title: "Agents execute, humans approve",
-      body: "Execution happens on the team's own machines with the team's own credentials. The agent proposes; a human gate decides. Neither the kernel nor any other team can reach in.",
+      body: "Execution happens in the team's own environment, with the team's own credentials. The agent proposes; a human gate decides. Neither the kernel nor any other team can reach in.",
     },
     {
       at: "75%",
-      x: 140, y: 216,
+      x: 140,
+      y: 216,
       who: "The record",
       title: "Evidence is filed",
       body: "Every output becomes a content-addressed artifact, every decision an audit entry, every lesson a memory candidate. Six months later you can still answer: who did what, when, and why.",
@@ -69,7 +73,7 @@ export const story = [
     who: "Monday, 09:02 — a person",
     title: "The ask goes in",
     body: "A team lead opens a ticket that reads “draft the billing migration plan” — or an agent files it from a chat message. It lands as a Work: durable, versioned, searchable.",
-    cmd: "curl -X POST https://facilitator.example/api/works \\\n  -H \"authorization: Bearer $TOKEN\" \\\n  -d '{\"objective\": \"draft the billing migration plan\"}'",
+    cmd: 'curl -X POST https://facilitator.example/api/works \\\n  -H "authorization: Bearer $TOKEN" \\\n  -d \'{"objective": "draft the billing migration plan"}\'',
   },
   {
     who: "Monday, 09:02 — the kernel",
@@ -77,7 +81,7 @@ export const story = [
     body: "The kernel matches the work's capability need against what teams advertise, checks who is online, and assigns it. The decision is deterministic and written to the audit trail — a model can propose a route, only policy can take one.",
   },
   {
-    who: "Monday, 09:04 — a team's machines",
+    who: "Monday, 09:04 — a team's environment",
     title: "An agent picks it up over an outbound link",
     body: "The team's Gateway dials out to the kernel (nothing is exposed inbound), accepts the assignment, and starts a harness — an LLM agent, a deterministic script, or a human task list. The kernel never holds the team's source credentials, models, or API keys.",
   },
@@ -140,7 +144,7 @@ export const benefits = [
     body: "Crash a worker mid-approval and the run resumes exactly once. Nothing important lives only in a socket, a container, or a model's context window. The kernel's store is your PostgreSQL — back it up like anything else you care about.",
   },
   {
-    title: "No one loses authority over their machines",
+    title: "No one loses authority over their environment",
     body: "Teams dial out, never in. The kernel holds no source credentials, no deploy keys, no model access. Every external write a team makes passes the team's own policy first — enforced by code you can read, not by a hosting agreement.",
   },
   {
@@ -177,7 +181,7 @@ export const guides = [
     route: "/guide/agent",
     title: "Get running — AI agents",
     kicker: "You are an agent reading this programmatically",
-    body: "Dense orientation: auth, the HTTP surface, link enrollment, the machine-readable contract, where artifacts live.",
+    body: "Dense orientation: auth, the HTTP surface, link enrollment, the computer-readable contract, where artifacts live.",
     minutes: 6,
     src: "site/src/guides/agent.md",
   },

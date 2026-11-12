@@ -38,9 +38,11 @@ ${diags}
 (async () => {
   mermaid.initialize({ startOnLoad: false, theme: "base", security: "strict", themeVariables: {
     darkMode: false, fontFamily: "system-ui, sans-serif",
-    primaryColor: "#EAF6F2", primaryBorderColor: "#0B8A70", primaryTextColor: "#082A25",
-    lineColor: "#2C6E63", secondaryColor: "#FDF1DE", tertiaryColor: "#F4F6F5",
-    edgeLabelBackground: "#FFFFFF"
+    primaryColor: "#EAF1F9", primaryBorderColor: "#0B5FBF", primaryTextColor: "#1F2328",
+    lineColor: "#5B6B7C", secondaryColor: "#FDF0DC", tertiaryColor: "#F2F5F8",
+    edgeLabelBackground: "#FFFFFF", clusterBkg: "#F7F9FC", clusterBorder: "#C6CFDA",
+    actorBkg: "#EAF1F9", actorBorder: "#0B5FBF", activationBkgColor: "#E7F0FA",
+    sequenceNumberColor: "#FFFFFF", labelBoxBkgColor: "#EAF1F9", labelBoxBorderColor: "#0B5FBF"
   } });
   const out = [];
   for (const el of document.querySelectorAll("pre.mermaid")) {

@@ -3,7 +3,7 @@
 This page assumes **you are an agent** — an LLM worker asked to run,
 drive, integrate with, or extend an Open Facilitator deployment. It is the
 dense orientation: what to start, how to authenticate, which endpoints
-answer what, where the machine-readable contract lives, and how to fail
+answer what, where the computer-readable contract lives, and how to fail
 well. If a human is at the keyboard, send them to the
 [human guide](#/guide/human) instead.
 
@@ -16,7 +16,7 @@ well. If a human is at the keyboard, send them to the
 - **Human-plane** calls need an OIDC bearer. **Link-plane** calls need a
   per-endpoint `linkToken`. Never mix them.
 - Writes are **at-least-once + idempotent**. Dedupe on `(event_source,
-  event_id)` / `commandId` / `(provider, provider_delivery_id)`.
+event_id)` / `commandId` / `(provider, provider_delivery_id)`.
   Retrying is correct; double-applying is impossible by construction.
 - Another team's resources answer **404**, not 403. Absence is the
   honest disclosure — do not interpret it as "asked but forbidden".
@@ -93,16 +93,16 @@ in-flight lease (120 s): **dedupe on `commandId` before executing**.
 `@ofac/workspace-link` wraps all of this, including crash replay from a
 durable state file — prefer it over hand-rolling.
 
-## Where the machine-readable truth lives
+## Where the computer-readable truth lives
 
-| Need | Artifact |
-|---|---|
-| Every message schema | `protocol/json-schema/*.json` — closed models, `$id` under `https://schemas.openfacilitator.org/v1/` |
-| HTTP surfaces | `protocol/openapi/link-v1.yaml`, `protocol/openapi/admin-v1.yaml` |
-| Known command table | `KNOWN_COMMAND_TYPES` in `@ofac/protocol` (21 types) — unknown commands fail closed `422` |
-| Valid + invalid fixtures | `protocol/conformance-fixtures/index.json` |
-| Hard limits | envelope ≤ 262144 B; artifact bytes go through the upload flow, never inline |
-| Approval digests | RFC 8785 canonicalization + SHA-256, cross-language goldens in the fixtures |
+| Need                     | Artifact                                                                                             |
+| ------------------------ | ---------------------------------------------------------------------------------------------------- |
+| Every message schema     | `protocol/json-schema/*.json` — closed models, `$id` under `https://schemas.openfacilitator.org/v1/` |
+| HTTP surfaces            | `protocol/openapi/link-v1.yaml`, `protocol/openapi/admin-v1.yaml`                                    |
+| Known command table      | `KNOWN_COMMAND_TYPES` in `@ofac/protocol` (21 types) — unknown commands fail closed `422`            |
+| Valid + invalid fixtures | `protocol/conformance-fixtures/index.json`                                                           |
+| Hard limits              | envelope ≤ 262144 B; artifact bytes go through the upload flow, never inline                         |
+| Approval digests         | RFC 8785 canonicalization + SHA-256, cross-language goldens in the fixtures                          |
 
 ## If you're working inside the repo
 
@@ -111,7 +111,7 @@ durable state file — prefer it over hand-rolling.
   (Docker needed). Zero warnings is the build law.
 - Any change touching the reference env must land with a green
   `./referencectl down -v && ./referencectl up slim --no-seed &&
-  ./referencectl verify`.
+./referencectl verify`.
 - Behavior bound to a scenario row (`docs/scenarios/scenario-bindings.json`)
   must update its binding and pass `make scenario-gate`.
 

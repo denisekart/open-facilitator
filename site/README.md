@@ -46,7 +46,7 @@ Design constraints (they keep the site deployable anywhere):
 - **No runtime dependencies.** `app.js` is vanilla; search is an
   inverted index (`search-index.json`) scored in the browser.
 - **No absolute paths.** Every asset reference is relative, so the site
-  works at a domain root *or* under a project-page subpath.
+  works at a domain root _or_ under a project-page subpath.
 - **Consumer content lives here, operator content in `docs/`.** Site
   pages (`src/pages/*.md`, `src/guides/*.md`) are written for consumers
   and never point at repo files; `docs/` (protocol, runbooks, security)
@@ -72,8 +72,10 @@ subfolders) can host `site/dist` verbatim — it is a plain folder.
 
 ## The mark
 
-A **relay**: the center dot is the kernel — persistent, it remembers —
-and the arrows are work passing around it between teams. The amber dot
-on the path is the work-item in flight. Ink black + work amber on warm
-paper: the mark carries no green of its own, works at 16 px, and is
-monochrome-safe (drop the amber circle for single-color contexts).
+A **kernel chip with linked environments**: the rounded square is the
+Facilitator — a coordination core that runs nothing itself — and its
+four links reach external environments (teams, tools, people). The
+amber endpoint is the work currently in motion on one of those links.
+Ink + slate + work amber on a cool canvas: no green in the mark, works
+at 16 px, monochrome-safe (drop the amber dot for single-color
+contexts).

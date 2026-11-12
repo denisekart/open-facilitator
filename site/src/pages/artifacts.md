@@ -16,10 +16,10 @@ three things to start, all injected as configuration — and it is
 deliberately fail-closed: missing or ambiguous config stops startup with
 a readable error instead of guessing defaults:
 
-| Needs | How |
-|---|---|
-| PostgreSQL | `ConnectionStrings__Facilitator` — schema migrations run at startup |
-| An OIDC provider | config file block: authority, audience, and the claim mapping your provider emits |
+| Needs                        | How                                                                                                   |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------- |
+| PostgreSQL                   | `ConnectionStrings__Facilitator` — schema migrations run at startup                                   |
+| An OIDC provider             | config file block: authority, audience, and the claim mapping your provider emits                     |
 | S3-compatible object storage | `Storage__S3__*` env block (`Storage__Provider=filesystem` + `Storage:FileSystem:RootPath` for a toy) |
 
 ```bash
@@ -41,16 +41,16 @@ PostgreSQL — the coordination is in the database, not in the process.
 
 From the `@ofac` scope on npm:
 
-| Package | What you get |
-|---|---|
-| `@ofac/gateway` | the Gateway runtime (`ofac-gateway`) — one process, many workspaces |
-| `@ofac/workspace-link` | Link SDK + `ofac-linkd` supervisor for custom runtimes |
-| `@ofac/protocol` | typed contract: envelope builders + schema validators for your own services |
-| `@ofac/adapter` | harness-adapter SDK + conformance kit |
-| `@ofac/harness-omp`, `@ofac/harness-codex`, `@ofac/harness-deterministic` | ready-made harnesses |
-| `@ofac/mattermost-adapter`, `@ofac/telegram-adapter` | chat provider services |
-| `@ofac/github-adapter` + `@ofac/github-connector` (and `forgejo-*`, `gitlab-*`) | forge pairs: inbound normalization + approval-gated outbound writes |
-| `@ofac/provisioning-oci` | workspace-provisioning launcher |
+| Package                                                                         | What you get                                                                |
+| ------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `@ofac/gateway`                                                                 | the Gateway runtime (`ofac-gateway`) — one process, many workspaces         |
+| `@ofac/workspace-link`                                                          | Link SDK + `ofac-linkd` supervisor for custom runtimes                      |
+| `@ofac/protocol`                                                                | typed contract: envelope builders + schema validators for your own services |
+| `@ofac/adapter`                                                                 | harness-adapter SDK + conformance kit                                       |
+| `@ofac/harness-omp`, `@ofac/harness-codex`, `@ofac/harness-deterministic`       | ready-made harnesses                                                        |
+| `@ofac/mattermost-adapter`, `@ofac/telegram-adapter`                            | chat provider services                                                      |
+| `@ofac/github-adapter` + `@ofac/github-connector` (and `forgejo-*`, `gitlab-*`) | forge pairs: inbound normalization + approval-gated outbound writes         |
+| `@ofac/provisioning-oci`                                                        | workspace-provisioning launcher                                             |
 
 Everything is public: `npm install` works anywhere, without registry
 auth. Pin the version you consume; upgrades are your decision.

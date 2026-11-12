@@ -1,12 +1,22 @@
 // The landing page, as a template function. All copy lives in src/config.mjs;
 // this file only arranges it.
 
-import { repo, nav, hero, relay, story, components, benefits, guides, pages, docs } from "../config.mjs";
+import {
+  repo,
+  nav,
+  hero,
+  relay,
+  story,
+  components,
+  benefits,
+  guides,
+  pages,
+  docs,
+} from "../config.mjs";
 
-const ICON = `<svg viewBox="0 0 32 32" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6.49 10.5 A 11 11 0 0 1 25.51 10.5"/><path d="M25.51 21.5 A 11 11 0 0 1 6.49 21.5"/></g><path d="M25.51 10.5 l4.6 0.9 M25.51 10.5 l0.9 4.6 M6.49 21.5 l-4.6 -0.9 M6.49 21.5 l-0.9 -4.6" stroke="currentColor" stroke-width="3" stroke-linecap="round" fill="none"/><circle cx="16" cy="16" r="4.4" fill="currentColor"/><circle cx="20.8" cy="5.6" r="2.8" fill="#D97A22"/></svg>`;
+const ICON = `<svg viewBox="0 0 32 32" aria-hidden="true"><g stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M11.8 11.8 L6.4 6.4"/><path d="M20.2 11.8 L25.6 6.4"/><path d="M11.8 20.2 L6.4 25.6"/><path d="M20.2 20.2 L25.6 25.6"/></g><rect x="9.6" y="9.6" width="12.8" height="12.8" rx="3.4" fill="currentColor"/><circle cx="4.6" cy="4.6" r="2.7" fill="currentColor" opacity="0.55"/><circle cx="27.4" cy="4.6" r="2.7" fill="currentColor" opacity="0.55"/><circle cx="4.6" cy="27.4" r="2.7" fill="currentColor" opacity="0.55"/><circle cx="27.4" cy="27.4" r="2.7" fill="#D97706"/></svg>`;
 
-const esc = (s) =>
-  String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 function head(base, notFound) {
   const P = (s) => (notFound ? base + s : s);
@@ -58,12 +68,12 @@ function heroHtml() {
     <div class="relay">
       <svg viewBox="0 0 280 264" role="img" aria-label="Diagram: work travels a loop between teams and the central kernel">
         <path d="${relay.path}" fill="none" stroke="#e6e3da" stroke-width="2"/>
-        <circle class="relay-hub" cx="140" cy="128" r="26" fill="#0B6B57"/>
-        <circle cx="140" cy="128" r="26" fill="none" stroke="#0B6B57" stroke-opacity="0.25" stroke-width="10"/>
+        <circle class="relay-hub" cx="140" cy="128" r="26" fill="#0550AE"/>
+        <circle cx="140" cy="128" r="26" fill="none" stroke="#0550AE" stroke-opacity="0.25" stroke-width="10"/>
         <text x="140" y="124" text-anchor="middle" fill="#ffffff" font-size="11" font-weight="600" font-family="system-ui,sans-serif">kernel</text>
-        <text x="140" y="138" text-anchor="middle" fill="#bfe0d6" font-size="9" font-family="system-ui,sans-serif">remembers</text>
+        <text x="140" y="138" text-anchor="middle" fill="#b9d2ee" font-size="9" font-family="system-ui,sans-serif">remembers</text>
         ${relay.steps.map((s, i) => stationSvg(s, i)).join("")}
-        <circle class="workdot" r="7" fill="#D97A22" style="offset-path: path('${relay.path}'); offset-distance: 0%"/>
+        <circle class="workdot" r="7" fill="#D97706" style="offset-path: path('${relay.path}'); offset-distance: 0%"/>
       </svg>
     </div>
     <div class="relay-steps" role="tablist" aria-label="Work lifecycle">
@@ -78,8 +88,8 @@ function stationSvg(s, i) {
   const words = ["create", "route", "execute", "record"];
   const dy = i === 0 ? 34 : i === 1 ? -24 : i === 2 ? 34 : 40;
   return `<g class="relay-station" data-station="${i}" transform="translate(${s.x} ${s.y})">
-    <circle r="15" fill="#ffffff" stroke="#0B6B57" stroke-width="1.5"/>
-    <text y="4" text-anchor="middle" fill="#084A3C" font-size="8.5" font-family="system-ui,sans-serif">${i + 1}</text>
+    <circle r="15" fill="#ffffff" stroke="#0550AE" stroke-width="1.5"/>
+    <text y="4" text-anchor="middle" fill="#043f8a" font-size="8.5" font-family="system-ui,sans-serif">${i + 1}</text>
     <text y="${dy}" text-anchor="middle" fill="#7d8883" font-size="9.5" font-family="system-ui,sans-serif">${esc(words[i % 4])}</text>
   </g>`;
 }
@@ -97,8 +107,8 @@ function storyHtml() {
       <span class="who">${esc(s.who)}</span>
       <h3>${esc(s.title)}</h3>
       <p>${esc(s.body)}</p>
-      ${s.cmd ? `<pre class="cmd">${esc(s.cmd).replace(/^\$/, "<span class=\"c\">$</span>")}</pre>` : ""}
-    </div>`
+      ${s.cmd ? `<pre class="cmd">${esc(s.cmd).replace(/^\$/, '<span class="c">$</span>')}</pre>` : ""}
+    </div>`,
       )
       .join("")}
   </div>
@@ -124,7 +134,8 @@ function componentsHtml() {
   <div class="grid cols-3">
     ${components
       .map(
-        (c) => `<div class="cell"><span class="tag">${esc(c.tag)}</span><h3>${esc(c.name)}</h3><p>${esc(c.body)}</p><p style="margin-top:12px"><a href="${c.docs.startsWith("/") ? "#" + c.docs : c.docs}">Details →</a></p></div>`
+        (c) =>
+          `<div class="cell"><span class="tag">${esc(c.tag)}</span><h3>${esc(c.name)}</h3><p>${esc(c.body)}</p><p style="margin-top:12px"><a href="${c.docs.startsWith("/") ? "#" + c.docs : c.docs}">Details →</a></p></div>`,
       )
       .join("")}
   </div>
@@ -155,7 +166,7 @@ function startHtml() {
     </div>
     <div class="role">
       <h3>You are an agent</h3>
-      <p style="color:var(--ink-2);font-size:15px">Dense orientation for LLM workers: auth planes, the endpoints you'll actually call, idempotency rules, how to fail well, and the machine-readable contract.</p>
+      <p style="color:var(--ink-2);font-size:15px">Dense orientation for LLM workers: auth planes, the endpoints you'll actually call, idempotency rules, how to fail well, and the computer-readable contract.</p>
       <a class="btn inverse" style="margin-top:6px" href="#/guide/agent">Agent guide →</a>
     </div>
   </div>

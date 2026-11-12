@@ -38,8 +38,10 @@ const norm = (s) => s.replace(/\r\n/g, "\n").replace(/\n+$/, "");
 const MERMAID = new Map(); // normalized code -> svg
 {
   const allMd = [];
-  for (const g of docs) for (const e of g.entries) allMd.push(await readFile(join(ROOT, e.src), "utf8"));
-  for (const g of pages) for (const e of g.entries) allMd.push(await readFile(join(ROOT, e.src), "utf8"));
+  for (const g of docs)
+    for (const e of g.entries) allMd.push(await readFile(join(ROOT, e.src), "utf8"));
+  for (const g of pages)
+    for (const e of g.entries) allMd.push(await readFile(join(ROOT, e.src), "utf8"));
   for (const g of guides) allMd.push(await readFile(join(ROOT, g.src), "utf8"));
   const codes = [];
   for (const md of allMd) {
@@ -47,7 +49,8 @@ const MERMAID = new Map(); // normalized code -> svg
   }
   const uniq = [...new Set(codes)];
   if (uniq.length) {
-    if (!mermaidAvailable()) console.warn("no chromium for mermaid SSR; diagrams stay as source blocks");
+    if (!mermaidAvailable())
+      console.warn("no chromium for mermaid SSR; diagrams stay as source blocks");
     else {
       const map = await renderMermaid(uniq);
       if (map) uniq.forEach((c, i) => MERMAID.set(norm(c), injectTooltips(map.get(i))));
@@ -68,7 +71,12 @@ renderer.code = (token) => {
     const cap = info.match(/title="([^"]+)"/);
     const caption = cap ? cap[1] : "system diagram";
     const svg = MERMAID.get(norm(t.text));
-    if (svg) return `<figure class="diagram">${svg}<figcaption>${escape(caption)} · hover any box for what it guarantees</figcaption></figure>`;
+    if (svg)
+      return (
+        `<figure class="diagram"><button class="diagram-zoom" aria-label="Expand diagram">⤢ expand</button>` +
+        `<div class="svg-frame">${svg}</div>` +
+        `<figcaption>${escape(caption)} · hover any box for what it guarantees</figcaption></figure>`
+      );
     return `<pre class="mermaid-source">${escape(t.text)}</pre>`;
   }
   const cls = info.split(" ")[0] ? ` class="language-${info.split(" ")[0]}"` : "";
@@ -87,9 +95,20 @@ const slug = (s) =>
 
 // route lookups for link rewriting
 const routeBySrc = new Map();
-for (const g of docs) for (const e of g.entries) { routeBySrc.set(e.src, e.route); routeBySrc.set("route:" + e.route, e.route); }
-for (const g of pages) for (const e of g.entries) { routeBySrc.set(e.src, e.route); routeBySrc.set("route:" + e.route, e.route); }
-for (const g of guides) { routeBySrc.set(g.src, g.route); routeBySrc.set("route:" + g.route, g.route); }
+for (const g of docs)
+  for (const e of g.entries) {
+    routeBySrc.set(e.src, e.route);
+    routeBySrc.set("route:" + e.route, e.route);
+  }
+for (const g of pages)
+  for (const e of g.entries) {
+    routeBySrc.set(e.src, e.route);
+    routeBySrc.set("route:" + e.route, e.route);
+  }
+for (const g of guides) {
+  routeBySrc.set(g.src, g.route);
+  routeBySrc.set("route:" + g.route, g.route);
+}
 
 function rewriteHref(href, ctxDir) {
   if (!href) return href;
@@ -133,13 +152,13 @@ function renderMarkdown(md, ctxDir) {
     const abs = posix.normalize(posix.join(ctxDir, src));
     return abs.startsWith("site/src/assets/") ? `<img src="${posix.basename(src)}"` : m;
   });
+  // tables: frame them so wide content scrolls instead of overflowing
+  html = html.replace(/<table>[\s\S]*?<\/table>/g, (m) => `<div class="tbl-wrap">${m}</div>`);
   // bare repo paths like `src/facilitator/` become github links inside <code>
-  html = html.replace(
-    /<code>([a-z0-9_./-]+\/(?:[a-z0-9_./-]+)?(?:\/)?[^<]*)<\/code>/gi,
-    (m, p) =>
-      /^(src|docs|protocol|features|examples|reference|tests|tools)\//.test(p) && !/[ ()]/.test(p)
-        ? `<a href="https://github.com/${repo.ownerSlug}/open-facilitator/tree/main/${p.replace(/\/$/, "")}"><code>${p}</code></a>`
-        : m,
+  html = html.replace(/<code>([a-z0-9_./-]+\/(?:[a-z0-9_./-]+)?(?:\/)?[^<]*)<\/code>/gi, (m, p) =>
+    /^(src|docs|protocol|features|examples|reference|tests|tools)\//.test(p) && !/[ ()]/.test(p)
+      ? `<a href="https://github.com/${repo.ownerSlug}/open-facilitator/tree/main/${p.replace(/\/$/, "")}"><code>${p}</code></a>`
+      : m,
   );
   return html;
 }
@@ -167,10 +186,7 @@ function splitSections(html, pageTitle) {
   }));
 }
 
-const strip = (h) =>
-  h
-    .replace(/<pre[\s\S]*?<\/pre>/g, " ")
-    .replace(/<[^>]+>/g, " ");
+const strip = (h) => h.replace(/<pre[\s\S]*?<\/pre>/g, " ").replace(/<[^>]+>/g, " ");
 // ---------------------------------------------------------------- build
 
 await rm(DIST, { recursive: true, force: true });
@@ -189,9 +205,15 @@ async function emit(entry, srcPath, group) {
   const titleMatch = md.match(/^#\s+(.+)$/m);
   const title = entry.title || (titleMatch ? titleMatch[1] : srcPath);
   const route = entry.route;
-  const file = join(DIST, "content", route === "/docs" ? "docs.html" : route.replace(/^\//, "") + ".html");
+  const file = join(
+    DIST,
+    "content",
+    route === "/docs" ? "docs.html" : route.replace(/^\//, "") + ".html",
+  );
   await mkdir(dirname(file), { recursive: true });
-  const body = html.replace(/<h1[^>]*>[\s\S]*?<\/h1>/, (m) => m.replace("<h1", '<h1 class="doc-title"'));
+  const body = html.replace(/<h1[^>]*>[\s\S]*?<\/h1>/, (m) =>
+    m.replace("<h1", '<h1 class="doc-title"'),
+  );
   await writeFile(file, body);
   const secs = splitSections(body, title);
   searchPages.push({
@@ -248,10 +270,8 @@ const sections = searchPages.map((p) => ({
   t: p.t,
   g: p.g,
   s: p.s.map((s) => [s.h, s.i, s.x]),
-}));await writeFile(
-  join(DIST, "search-index.json"),
-  JSON.stringify({ pages: sections, tok }),
-);
+}));
+await writeFile(join(DIST, "search-index.json"), JSON.stringify({ pages: sections, tok }));
 // ---------------------------------------------------------------- assets
 
 const copy = async (src, dest) => {

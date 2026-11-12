@@ -1,6 +1,6 @@
 # Get running — Humans
 
-You have a machine with Docker, a browser, and opinions about your
+You have Docker, a browser, and opinions about your
 team's tools. This page gets you from nothing to a kernel answering
 your API calls, with one Work moving through it.
 
@@ -50,16 +50,19 @@ guessing, so this file is deliberately explicit:
 
 ```jsonc
 {
-  "ui": { "oidcAuthority": "https://login.example/realms/teams", "oidcClientId": "facilitator-api" },
+  "ui": {
+    "oidcAuthority": "https://login.example/realms/teams",
+    "oidcClientId": "facilitator-api",
+  },
   "identity": {
     "oidc": { "authority": "https://login.example/realms/teams", "audience": "facilitator-api" },
     "claims": {
       "subject": "/sub",
       "displayName": "/preferred_username",
-      "groups": [{ "path": "/groups", "shape": "string-array" }]
-    }
+      "groups": [{ "path": "/groups", "shape": "string-array" }],
+    },
   },
-  "Link": { "Teams": ["team-alpha"] }
+  "Link": { "Teams": ["team-alpha"] },
 }
 ```
 
@@ -102,7 +105,7 @@ the work routes, executes, and files its evidence.
 
 ## Road B: the guided tour
 
-If you want to see the *whole* system — kernel, login provider,
+If you want to see the _whole_ system — kernel, login provider,
 artifact store, a demo team with a worker, and an acceptance suite that
 proves all eleven hops unattended — run the tour instead:
 

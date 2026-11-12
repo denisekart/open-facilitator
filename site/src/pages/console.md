@@ -16,14 +16,14 @@ complete event timeline — every state change with actor, timestamp, and
 payload.
 
 ![Searching Works in the console](console-explorer.png)
-*Search “analyze the reference”, and the kernel answers with matching
-Works, a live fleet summary, and throughput metrics.*
+_Search “analyze the reference”, and the kernel answers with matching
+Works, a live fleet summary, and throughput metrics._
 
 ![The Work inspector](console-work.png)
-*One Work's inspector: assignment completed on the team's Gateway,
+_One Work's inspector: assignment completed on the team's Gateway,
 result manifest available with digest-verified artifacts, the full
 timeline underneath — `created`, routing, two artifact filings, a memory
-candidate.*
+candidate._
 
 This is the “who did what, when, and who allowed it” view — it is why
 people keep the kernel around after the novelty of agents fades.

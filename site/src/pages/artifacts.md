@@ -59,7 +59,7 @@ auth. Pin the version you consume; upgrades are your decision.
 
 Turn any team container into a linked workspace with one line of
 `devcontainer.json` — OCI images on the same GHCR namespace, semver
-tagged (`:1.0.3` and major alias `:1`):
+tagged plus a major alias (`:1.0.0` and `:1` today):
 
 ```jsonc
 "features": {

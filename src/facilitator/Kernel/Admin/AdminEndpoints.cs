@@ -67,6 +67,19 @@ public static class AdminEndpoints
         group.MapGet("/deliveries", async (string? state, int? limit, AdminReadStores stores, CancellationToken ct) =>
             Results.Ok(new { items = await stores.DeliveriesAsync(state, limit ?? 50, ct) }));
 
+        // The operator's queue: the same list law as GET /api/works (the
+        // caller's team scope applies automatically, ?team= narrows further),
+        // exposed under the admin surface so the console needs one binding.
+        group.MapGet("/works", async (
+            string? state, string? team, int? limit, int? offset,
+            AdminReadStores stores, HttpContext http, CancellationToken ct) =>
+            Results.Ok(new
+            {
+                items = await stores.WorksAsync(
+                    state, team, limit ?? 50, offset ?? 0,
+                    Facilitator.Kernel.Teams.TeamScope.VisibleTeams(http.GetFacilitatorPrincipal()), ct),
+            }));
+
         group.MapGet("/provisioning", async (AdminReadStores stores, CancellationToken ct) =>
             Results.Ok(new { items = await stores.ProvisioningAsync(ct) }));
 
@@ -78,8 +91,8 @@ public static class AdminEndpoints
 
         // Audit trail read (the chat history screen's evidence surface); the
         // admin.read binding covers it via /api/admin/audit.
-        group.MapGet("/audit", async (string? action, string? actor, DateTime? since, int? limit, AdminReadStores stores, CancellationToken ct) =>
-            Results.Ok(await stores.AuditAsync(action, actor, since, limit ?? 50, ct)));
+        group.MapGet("/audit", async (string? action, string? actor, DateTime? since, string? decision, string? correlation, int? limit, AdminReadStores stores, CancellationToken ct) =>
+            Results.Ok(await stores.AuditAsync(action, actor, since, decision, correlation, limit ?? 50, ct)));
 
         // H3/N15: the export leg - a bounded window, no raw credentials, and
         // a retention policy the operator can read (admin_config 'audit-policy').
@@ -104,17 +117,28 @@ public static class AdminEndpoints
             return Results.Ok(rows);
         });
 
-        // I2: force a sweeper pass without waiting for the loop.
+        // I2: force a sweeper pass without waiting for the loop. A manual
+        // sweep is a human act on live state, so it carries a reason and
+        // leaves an audit row like every other operator write.
         group.MapPost("/sweeps/{name}", async (
             string name,
+            HttpRequest request,
             Work.NudgeSweeper nudge,
             Work.ApprovalSweeper approvals,
             Work.ScheduleSweeper schedules,
             Work.SessionLossSweeper sessionLoss,
             IDbContextFactory<FacilitatorDbContext> contextFactory,
             TimeProvider timeProvider,
+            AuditWriter audit,
+            HttpContext http,
             CancellationToken ct) =>
         {
+            var reason = request.Headers.TryGetValue("X-Change-Reason", out var reasonValues) ? reasonValues.ToString() : string.Empty;
+            if (string.IsNullOrWhiteSpace(reason) || reason.Length > 512)
+            {
+                return Results.Problem(ProblemErrors.ConfigInvalid("the X-Change-Reason header is required (non-empty, <= 512 chars)"));
+            }
+
             var fired = name switch
             {
                 "nudge" => await nudge.SweepOnceAsync(ct),
@@ -124,11 +148,24 @@ public static class AdminEndpoints
                 "audit-retention" => await AuditRetentionSweep.PruneAsync(contextFactory, timeProvider, ct),
                 _ => -1,
             };
-            return fired < 0
-                ? Results.Problem(ProblemErrors.Create(
+            if (fired < 0)
+            {
+                return Results.Problem(ProblemErrors.Create(
                     "unknown-sweep", "Bad request", StatusCodes.Status400BadRequest,
-                    "sweep name must be nudge|approvals|schedules|session-loss|audit-retention"))
-                : Results.Ok(new { sweep = name, effects = fired });
+                    "sweep name must be nudge|approvals|schedules|session-loss|audit-retention"));
+            }
+
+            await audit.WriteAsync(new AuditRecord(
+                http.GetFacilitatorPrincipal()?.Actor,
+                "admin.sweep",
+                $"/api/admin/sweeps/{name}",
+                "allow",
+                null,
+                null,
+                null,
+                JsonSerializer.Serialize(new { sweep = name, effects = fired, reason }),
+                CorrelationId: name), ct);
+            return Results.Ok(new { sweep = name, effects = fired });
         });
 
         MapConfig(group);

@@ -40,11 +40,11 @@ public static class WorkEndpoints
         // team, paged (a fixed recent list hides exactly the starvation an
         // operator looks for).
         group.MapGet("/works", async (
-            IngressStore store, TeamScope scope, HttpContext http, string? state, string? team, int? limit, int? offset,
+            IngressStore store, HttpContext http, string? state, string? team, int? limit, int? offset,
             CancellationToken ct) =>
         {
             var works = await store.ListRecentAsync(
-                VisibleTeamsOf(http, scope), state, team, limit ?? 50, offset ?? 0, ct);
+                TeamScope.VisibleTeams(http.GetFacilitatorPrincipal()), state, team, limit ?? 50, offset ?? 0, ct);
             return Results.Ok(works.Select(WorkDtoMapper.ToDto).ToArray());
         });
 
@@ -52,9 +52,9 @@ public static class WorkEndpoints
         // query. Arrival order is the delivery pump's (available_at FIFO);
         // this read never reorders or gates.
         group.MapGet("/queue", async (
-            IngressStore store, TeamScope scope, TimeProvider time, HttpContext http, string? team, CancellationToken ct) =>
+            IngressStore store, TimeProvider time, HttpContext http, string? team, CancellationToken ct) =>
         {
-            var visible = VisibleTeamsOf(http, scope);
+            var visible = TeamScope.VisibleTeams(http.GetFacilitatorPrincipal());
             var now = time.GetUtcNow().UtcDateTime;
             var rows = await store.PendingIntentsAsync(visible, team, ct);
             var oldest = await store.OldestPendingIntentAgeSecondsAsync(ct);
@@ -250,19 +250,5 @@ public static class WorkEndpoints
         {
             return null;
         }
-    }
-
-    private static IReadOnlyList<string>? VisibleTeamsOf(HttpContext http, TeamScope scope)
-    {
-        var principal = http.GetFacilitatorPrincipal();
-        if (principal is null
-            || principal.Roles.Contains("kernel-operator")
-            || principal.Roles.Contains("framework-admin"))
-        {
-            return null;
-        }
-
-        var teams = TeamScope.TeamsOf(principal);
-        return teams.Count == 0 ? null : teams;
     }
 }

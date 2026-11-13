@@ -11,10 +11,21 @@ public static class KernelOps
 {
     public static readonly JsonSerializerOptions Web = new(JsonSerializerDefaults.Web);
 
-    /// <summary>POST JSON and assert the status, returning the parsed body.</summary>
-    public static async Task<JsonElement> PostJsonAsync(HttpClient client, string path, string payload, HttpStatusCode expected)
+    /// <summary>POST JSON and assert the status, returning the parsed body.
+    /// <c>changeReason</c> rides as the <c>X-Change-Reason</c> header the
+    /// mutation surfaces demand.</summary>
+    public static async Task<JsonElement> PostJsonAsync(HttpClient client, string path, string payload, HttpStatusCode expected, string? changeReason = null)
     {
-        using var response = await client.PostAsync(path, new StringContent(payload, Encoding.UTF8, "application/json"));
+        using var request = new HttpRequestMessage(HttpMethod.Post, path)
+        {
+            Content = new StringContent(payload, Encoding.UTF8, "application/json"),
+        };
+        if (changeReason is not null)
+        {
+            request.Headers.TryAddWithoutValidation("X-Change-Reason", changeReason);
+        }
+
+        using var response = await client.SendAsync(request);
         var body = await JsonWire.ReadJsonAsync(response.Content);
         Assert.True(expected == response.StatusCode, $"{(int)expected} expected for POST {path}, got {(int)response.StatusCode}: {body.GetRawText()}");
         return body;

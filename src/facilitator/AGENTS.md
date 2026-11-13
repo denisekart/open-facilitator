@@ -40,8 +40,8 @@ plus the read-mostly Admin surface.
   + the egress ladder (reply target → binding → linked DM → team channel →
   undeliverable-with-reason), the one cadence resolver, the receipt-side
   address retirement. Signpost: `Kernel/Notifications/AGENTS.md`.
-- `Kernel/Admin/` — `/api/admin` operator surface (read stores, config store
-  with the If-Match/`X-Change-Reason` law, replay + re-mark mutations, the
+- `Kernel/Admin/` — `/api/admin` operator surface (`/works` queue, read stores,
+  config store with the If-Match/`X-Change-Reason` law, replay + re-mark mutations, the
   audit export + `audit-policy` retention, `POST /sweeps/{name}` forcing any
   sweeper); authorization is config bindings only (`admin.read`/`admin.mutate`).
 - `ui/` — the embedded operator SPA (Svelte 5 + vite, `@ofac/ui`): `pnpm -r

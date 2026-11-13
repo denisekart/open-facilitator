@@ -499,20 +499,27 @@ public sealed class TestDbProbe : IAsyncDisposable
 
     /// <summary>A hand-minted audit row of a test-only action (retention
     /// tests must not age actions other suites read).</summary>
-    public Task SeedAuditRow(string action, int ageDays = 0) =>
+    public Task SeedAuditRow(string action, int ageDays = 0, string? correlation = null, string decision = "allow") =>
         NonQuery(
             "INSERT INTO facilitator.audit (audit_id, occurred_at, actor, action, resource, decision, "
-            + "reason, detail) VALUES (gen_random_uuid(), now() - make_interval(days => $2), 'test', $1, "
-            + "'test/resource', 'allow', 'seed', '{}')",
+            + "reason, detail, correlation_id) VALUES (gen_random_uuid(), now() - make_interval(days => $2), 'test', $1, "
+            + "'test/resource', $4, 'seed', '{}', $3)",
             cmd =>
             {
                 cmd.Parameters.AddWithValue(action);
                 cmd.Parameters.AddWithValue(ageDays);
+                cmd.Parameters.AddWithValue((object?)correlation ?? DBNull.Value);
+                cmd.Parameters.AddWithValue(decision);
             });
 
     /// <summary>True when no audit row of an action remains (pruned).</summary>
     public Task<bool> AuditActionMissing(string action) =>
         ScalarBool("SELECT count(*) = 0 FROM facilitator.audit WHERE action = $1",
+            cmd => cmd.Parameters.AddWithValue(action));
+
+    /// <summary>True when at least one audit row of an action exists.</summary>
+    public Task<bool> AuditActionPresent(string action) =>
+        ScalarBool("SELECT count(*) > 0 FROM facilitator.audit WHERE action = $1",
             cmd => cmd.Parameters.AddWithValue(action));
 
     /// <summary>Age an audit row of an action to N days ago (retention tests).</summary>
@@ -524,6 +531,65 @@ public sealed class TestDbProbe : IAsyncDisposable
                 cmd.Parameters.AddWithValue(action);
                 cmd.Parameters.AddWithValue(days);
             });
+
+    /// <summary>The jsonb detail of one audit row by action + correlation id
+    /// (the chat-plane join probe), or null when absent.</summary>
+    public async Task<string?> AuditDetailByCorrelation(string action, string correlation)
+    {
+        await using var connection = await _dataSource.OpenConnectionAsync();
+        await using var cmd = new NpgsqlCommand(
+            "SELECT detail::text FROM facilitator.audit WHERE action = $1 AND correlation_id = $2 LIMIT 1", connection);
+        cmd.Parameters.AddWithValue(action);
+        cmd.Parameters.AddWithValue(correlation);
+        var value = await cmd.ExecuteScalarAsync();
+        return value is null or DBNull ? null : (string)value;
+    }
+
+    /// <summary>Hand-mint a chat session + assistant message + action row
+    /// (chat lifecycle tests act on a proposal without driving a model turn).</summary>
+    public async Task<(Guid SessionId, Guid MessageId, Guid ActionId)> SeedChatAction(
+        string actor, string method, string path, string status, DateTime? expiresAt = null)
+    {
+        var sessionId = Guid.NewGuid();
+        var messageId = Guid.NewGuid();
+        var actionId = Guid.NewGuid();
+        await NonQuery(
+            "INSERT INTO facilitator.chat_sessions (session_id, actor, title, created_at, last_message_at) "
+            + "VALUES ($1, $2, 'seeded session', now(), now())",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(sessionId);
+                cmd.Parameters.AddWithValue(actor);
+            });
+        await NonQuery(
+            "INSERT INTO facilitator.chat_messages (message_id, session_id, role, text, basis, created_at) "
+            + "VALUES ($1, $2, 'assistant', 'seeded turn', 'model', now())",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(messageId);
+                cmd.Parameters.AddWithValue(sessionId);
+            });
+        await NonQuery(
+            "INSERT INTO facilitator.chat_actions (action_id, session_id, message_id, method, path, description, "
+            + "status, row_version, created_at, expires_at) VALUES ($1, $2, $3, $4, $5, 'seeded proposal', $6, 0, now(), $7)",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(actionId);
+                cmd.Parameters.AddWithValue(sessionId);
+                cmd.Parameters.AddWithValue(messageId);
+                cmd.Parameters.AddWithValue(method);
+                cmd.Parameters.AddWithValue(path);
+                cmd.Parameters.AddWithValue(status);
+                cmd.Parameters.AddWithValue((object?)expiresAt ?? DBNull.Value);
+            });
+        return (sessionId, messageId, actionId);
+    }
+
+    /// <summary>Status of a chat action row, or null when absent.</summary>
+    public Task<string?> ChatActionStatus(Guid actionId) =>
+        ScalarStringOrNull(
+            "SELECT status FROM facilitator.chat_actions WHERE action_id = $1",
+            cmd => cmd.Parameters.AddWithValue(actionId));
 
     /// <summary>Backoff expiry for one row (deterministic immediate retry).</summary>
     public Task ExpireOutboxBackoffById(Guid outboxId) =>
@@ -1249,15 +1315,16 @@ public sealed class TestDbProbe : IAsyncDisposable
     }
 
     /// <summary>Hand-mint a work timeline row (the sweeper's progress signal).</summary>
-    public Task SeedTimelineRow(Guid workId, string kind, string detailJson = "{}") =>
+    public Task SeedTimelineRow(Guid workId, string kind, string detailJson = "{}", string? correlation = null) =>
         NonQuery(
-            "INSERT INTO facilitator.work_events (event_id, work_id, work_version, kind, actor, detail, created_at) "
-            + "VALUES (gen_random_uuid(), $1, 1, $2, 'seed', $3::jsonb, now())",
+            "INSERT INTO facilitator.work_events (event_id, work_id, work_version, kind, actor, detail, created_at, correlation_id) "
+            + "VALUES (gen_random_uuid(), $1, 1, $2, 'seed', $3::jsonb, now(), $4)",
             cmd =>
             {
                 cmd.Parameters.AddWithValue(workId);
                 cmd.Parameters.AddWithValue(kind);
                 cmd.Parameters.AddWithValue(detailJson);
+                cmd.Parameters.AddWithValue((object?)correlation ?? DBNull.Value);
             });
 
     /// <summary>Hand-mint (or replace) an admin_config row for a test that

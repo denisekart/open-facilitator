@@ -27,6 +27,25 @@ public sealed class TeamScope(
             .Distinct(StringComparer.Ordinal)
             .ToList();
 
+    /// <summary>
+    /// The team slugs a caller's list reads are confined to, or null when the
+    /// caller is unscoped: no principal at all, an operator/admin role, or a
+    /// principal with no <c>/teams/&lt;slug&gt;</c> groups (the posture every
+    /// pre-roster caller had).
+    /// </summary>
+    public static IReadOnlyList<string>? VisibleTeams(FacilitatorPrincipal? principal)
+    {
+        if (principal is null
+            || principal.Roles.Contains("kernel-operator")
+            || principal.Roles.Contains("framework-admin"))
+        {
+            return null;
+        }
+
+        var teams = TeamsOf(principal);
+        return teams.Count == 0 ? null : teams;
+    }
+
     /// <summary>True when the caller may read a resource owned by <paramref name="teamSlug"/>.</summary>
     /// <param name="principal">The verified principal (null: an unscoped internal caller).</param>
     /// <param name="teamSlug">Owning team slug (null: an unowned resource, visible to any authenticated caller).</param>

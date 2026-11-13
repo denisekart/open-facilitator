@@ -3,7 +3,6 @@ using System.Text.Json;
 using Facilitator.Kernel.Shared.Dispatch;
 
 using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Options;
 
 namespace Facilitator.Kernel.Shared.Identity;
@@ -75,7 +74,7 @@ public sealed class IngressRoleGateMiddleware(
             mapped, evaluation.Granted, roster, context.RequestAborted));
         context.Items[IdentityAuthentication.PrincipalItem] = principal;
 
-        var binding = MatchBinding(options.Value.Authorization.Operations, context, path);
+        var binding = OperationMatcher.Match(options.Value.Authorization.Operations, context, path);
         if (binding is null)
         {
             // No binding on this route: any authenticated principal passes
@@ -121,62 +120,4 @@ public sealed class IngressRoleGateMiddleware(
             null,
             policyVersion,
             JsonSerializer.Serialize(new { roleEval = decision == "allow" ? "match" : "no-match", operationId = binding.Id, ruleCount }));
-
-    /// <summary>
-    /// First binding whose method matches and whose route-template patterns
-    /// match the resolved endpoint's template (fallback: the request path —
-    /// literal segments verbatim, parameters as wildcards).
-    /// </summary>
-    private static OperationBinding? MatchBinding(IReadOnlyList<OperationBinding> operations, HttpContext context, PathString path)
-    {
-        var endpointTemplate = (context.GetEndpoint() as RouteEndpoint)?.RoutePattern.RawText;
-        foreach (var operation in operations)
-        {
-            if (!operation.Methods.Contains(context.Request.Method, StringComparer.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            foreach (var candidate in operation.Paths)
-            {
-                if ((endpointTemplate is not null && Segmentwise(candidate, endpointTemplate))
-                    || Segmentwise(candidate, path.Value ?? string.Empty))
-                {
-                    return operation;
-                }
-            }
-        }
-
-        return null;
-    }
-
-    // Compare segment by segment. Literal segments must match; a `{param}`
-    // on either side matches any segment on the other.
-    private static bool Segmentwise(string candidate, string other)
-    {
-        var left = candidate.Split('/', StringSplitOptions.RemoveEmptyEntries);
-        var right = other.Split('/', StringSplitOptions.RemoveEmptyEntries);
-        if (left.Length != right.Length)
-        {
-            return false;
-        }
-
-        for (var i = 0; i < left.Length; i++)
-        {
-            if (IsParameter(left[i]) || IsParameter(right[i]))
-            {
-                continue;
-            }
-
-            if (!string.Equals(left[i], right[i], StringComparison.OrdinalIgnoreCase))
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private static bool IsParameter(string segment) =>
-        segment.Length > 1 && segment[0] == '{' && segment[^1] == '}';
 }

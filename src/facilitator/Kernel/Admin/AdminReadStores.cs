@@ -191,7 +191,8 @@ public sealed record AdminAuditRow(
     string Decision,
     string? Reason,
     JsonElement Detail,
-    string? TraceId);
+    string? TraceId,
+    string? CorrelationId = null);
 
 /// <summary>
 /// The admin read models: bounded <c>GroupBy</c> counts
@@ -205,7 +206,8 @@ public sealed class AdminReadStores(
     IDbContextFactory<FacilitatorDbContext> contextFactory,
     LinkConnectionRegistry connections,
     KernelMetrics metrics,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    IngressStore ingress)
 {
     /// <summary>Full roll-up over every ledger section.</summary>
     public async Task<AdminSummary> SummaryAsync(CancellationToken ct)
@@ -281,6 +283,23 @@ public sealed class AdminReadStores(
             .Select(m => new AdminSearchHit(m.EntryId.ToString(), m.ContentSummary, m.Status, m.CreatedAt))
             .ToListAsync(ct) : [];
         var messages = Section(type, "messages") ? await MessageHitsAsync(db, pattern, guid, take, ct) : [];
+        if (guid is not null && Section(type, "works"))
+        {
+            // The correlation join: a trace id (work-event correlation) IS a
+            // search key, so an operator holding any correlation finds the
+            // work it belongs to, not just a message carrying it.
+            var g = guid.Value;
+            var correlated = await db.WorkEvents.AsNoTracking()
+                .Where(e => e.CorrelationId == g.ToString())
+                .Join(db.Works.AsNoTracking(), e => e.WorkId, w => w.WorkId, (e, w) => new { w.WorkId, w.Objective, w.State, w.UpdatedAt })
+                .OrderByDescending(x => x.UpdatedAt)
+                .Take(take)
+                .Select(x => new AdminSearchHit(x.WorkId.ToString(), x.Objective, x.State, x.UpdatedAt))
+                .ToListAsync(ct);
+            var seen = works.Select(w => w.Id).ToHashSet(StringComparer.Ordinal);
+            works = [.. works, .. correlated.Where(h => seen.Add(h.Id))];
+        }
+
         return new AdminSearchResults(query, works, projects, assignments, artifacts, memories, messages);
     }
 
@@ -500,12 +519,40 @@ public sealed class AdminReadStores(
     }
 
     /// <summary>
+    /// GET /api/admin/works: the work queue. Delegates to
+    /// <see cref="IngressStore.ListRecentAsync"/> verbatim (same scoping, the
+    /// same newest-first paging) and maps to the admin row. <c>state</c> may be
+    /// a comma-separated list of wire states: exactly one parsed state filters
+    /// in the store, several filter the returned rows in memory; unparseable
+    /// words are dropped silently, never an error.
+    /// </summary>
+    public async Task<IReadOnlyList<AdminWorkRow>> WorksAsync(
+        string? state, string? team, int limit, int offset, IReadOnlyList<string>? visibleTeams, CancellationToken ct)
+    {
+        var states = (state ?? string.Empty)
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(w => Facilitator.Kernel.Work.StateGuard.TryParseWork(w, out _))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        var single = states.Count == 1 ? states[0] : null;
+        var rows = await ingress.ListRecentAsync(visibleTeams, single, team, limit, offset, ct);
+        var mapped = rows.Select(w => new AdminWorkRow(
+            w.WorkId, w.Objective, w.State, w.Version, w.CreatedAt, w.UpdatedAt,
+            w.TeamSlug, w.OwnerActor, w.Origin, w.MergedInto, w.CloseReason)).ToList();
+        return states.Count > 1
+            ? mapped.Where(r => states.Contains(r.State, StringComparer.Ordinal)).ToList()
+            : mapped;
+    }
+
+    /// <summary>
     /// GET /api/admin/audit: the audit trail, newest first, filterable by
-    /// action (exact), actor (exact), and a <c>since</c> floor. <c>limit</c>
+    /// action (exact), actor (exact), decision (exact), correlation id (exact),
+    /// and a <c>since</c> floor. <c>limit</c>
     /// defaults to 50, capped at 200 — the chat history screen points here
     /// after AI-initiated executions.
     /// </summary>
-    public async Task<IReadOnlyList<AdminAuditRow>> AuditAsync(string? action, string? actor, DateTime? since, int limit, CancellationToken ct)
+    public async Task<IReadOnlyList<AdminAuditRow>> AuditAsync(
+        string? action, string? actor, DateTime? since, string? decision, string? correlation, int limit, CancellationToken ct)
     {
         await using var db = await contextFactory.CreateDbContextAsync(ct);
         var take = Math.Clamp(limit <= 0 ? 50 : limit, 1, 200);
@@ -520,6 +567,16 @@ public sealed class AdminReadStores(
             query = query.Where(a => a.Actor == actor);
         }
 
+        if (decision is { Length: > 0 })
+        {
+            query = query.Where(a => a.Decision == decision);
+        }
+
+        if (correlation is { Length: > 0 })
+        {
+            query = query.Where(a => a.CorrelationId == correlation);
+        }
+
         if (since is { } floor)
         {
             query = query.Where(a => a.OccurredAt >= floor);
@@ -528,11 +585,11 @@ public sealed class AdminReadStores(
         var rows = await query
             .OrderByDescending(a => a.OccurredAt).ThenByDescending(a => a.AuditId)
             .Take(take)
-            .Select(a => new { a.AuditId, a.OccurredAt, a.Actor, a.Action, a.Resource, a.Decision, a.Reason, a.Detail, a.TraceId })
+            .Select(a => new { a.AuditId, a.OccurredAt, a.Actor, a.Action, a.Resource, a.Decision, a.Reason, a.Detail, a.TraceId, a.CorrelationId })
             .ToListAsync(ct);
         return rows.Select(a => new AdminAuditRow(
             a.AuditId, a.OccurredAt, a.Actor, a.Action, a.Resource, a.Decision, a.Reason,
-            JsonDocument.Parse(a.Detail).RootElement.Clone(), a.TraceId)).ToList();
+            JsonDocument.Parse(a.Detail).RootElement.Clone(), a.TraceId, a.CorrelationId)).ToList();
     }
 
     /// <summary>Per-replica fleet view: live link-session leases

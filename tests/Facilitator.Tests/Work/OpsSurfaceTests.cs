@@ -230,11 +230,10 @@ public sealed class OpsSurfaceTests(PostgresFixture fixture)
         using var kernel = factory.CreateAuthedClient();
         foreach (var name in new[] { "nudge", "approvals", "schedules", "session-loss" })
         {
-            await KernelOps.PostJsonAsync(kernel, $"/api/admin/sweeps/{name}", "{}", HttpStatusCode.OK);
+            await KernelOps.PostJsonAsync(kernel, $"/api/admin/sweeps/{name}", "{}", HttpStatusCode.OK, "test: forced sweep");
         }
 
-        using var unknown = await kernel.PostAsync("/api/admin/sweeps/whatever", Json("{}"));
-        Assert.Equal(HttpStatusCode.BadRequest, unknown.StatusCode);
+        await KernelOps.PostJsonAsync(kernel, "/api/admin/sweeps/whatever", "{}", HttpStatusCode.BadRequest, "test: forced sweep");
     }
 
     [Fact]
@@ -251,7 +250,7 @@ public sealed class OpsSurfaceTests(PostgresFixture fixture)
         var fresh = "ops.retention." + Guid.NewGuid().ToString("N");
         await fixture.Db.SeedAuditRow(aged, ageDays: 60);
         await fixture.Db.SeedAuditRow(fresh, ageDays: 0);
-        var pruned = await KernelOps.PostJsonAsync(kernel, "/api/admin/sweeps/audit-retention", "{}", HttpStatusCode.OK);
+        var pruned = await KernelOps.PostJsonAsync(kernel, "/api/admin/sweeps/audit-retention", "{}", HttpStatusCode.OK, "test: forced sweep");
         Assert.True(pruned.GetProperty("effects").GetInt32() >= 1);
         Assert.True(await fixture.Db.AuditActionMissing(aged));
         Assert.False(await fixture.Db.AuditActionMissing(fresh));

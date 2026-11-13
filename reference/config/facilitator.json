@@ -167,9 +167,16 @@
             "/api/admin/config",
             "/api/admin/config/{resource}",
             "/api/admin/config/{resource}/history",
+            "/api/admin/audit",
             "/api/admin/audit/export"
           ],
           "rolesAnyOf": ["kernel-operator", "framework-admin"]
+        },
+        {
+          "id": "admin.works.read",
+          "methods": ["GET"],
+          "paths": ["/api/admin/works"],
+          "rolesAnyOf": ["kernel-operator", "framework-admin", "team-member"]
         },
         {
           "id": "admin.mutate",
@@ -181,6 +188,24 @@
             "/api/admin/sweeps/{name}"
           ],
           "rolesAnyOf": ["kernel-operator", "framework-admin"]
+        },
+        {
+          "id": "chat.read-all",
+          "methods": ["GET"],
+          "paths": ["/api/chat/sessions"],
+          "rolesAnyOf": ["ai-operator"]
+        },
+        {
+          "id": "chat.use",
+          "methods": ["GET", "POST", "PUT", "PATCH", "DELETE"],
+          "paths": ["/api/chat/sessions", "/api/chat/sessions/{id}", "/api/chat/sessions/{id}/messages", "/api/chat/actions/{id}", "/api/chat/preferences", "/api/chat/catalog"],
+          "rolesAnyOf": ["ai-operator"]
+        },
+        {
+          "id": "chat.execute",
+          "methods": ["POST"],
+          "paths": ["/api/chat/actions/{id}/confirm", "/api/chat/actions/{id}/cancel"],
+          "rolesAnyOf": ["ai-operator"]
         },
         {
           "id": "teams.read",

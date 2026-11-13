@@ -211,6 +211,57 @@ paths:
               schema: { $ref: "#/components/schemas/AdminMetrics" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
+  /api/admin/works:
+    get:
+      operationId: getWorksQueue
+      tags: [read]
+      summary: The operator work queue — the GET /api/works law under the admin binding.
+      description: >
+        Same scoping law as the human-plane list: the caller's team scope
+        applies automatically, `team` narrows within it (a foreign team
+        answers empty, never another team's works). `state` accepts a
+        comma-separated list of wire states; unparseable words are ignored.
+      parameters:
+        - { in: query, name: state, schema: { type: string }, description: "Comma list of open|planning|active|review|completed|blocked|cancelled|failed." }
+        - { in: query, name: team, schema: { type: string } }
+        - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+        - { in: query, name: offset, schema: { type: integer, minimum: 0, default: 0 } }
+      responses:
+        "200":
+          description: Newest-first queue rows.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/AdminWorkRow" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/admin/audit:
+    get:
+      operationId: getAudit
+      tags: [read]
+      summary: Audit trail, newest first, filterable by action, actor, decision, correlation id, and a since floor.
+      parameters:
+        - { in: query, name: action, schema: { type: string } }
+        - { in: query, name: actor, schema: { type: string } }
+        - { in: query, name: decision, schema: { type: string, enum: [allow, deny] } }
+        - { in: query, name: correlation, schema: { type: string }, description: Exact correlation_id join (chat action ids, sweep names, work event correlation). }
+        - { in: query, name: since, schema: { type: string, format: date-time } }
+        - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+      responses:
+        "200":
+          description: Newest-first audit rows.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/AdminAuditRow" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
   /api/admin/audit/export:
     get:
       operationId: getAuditExport
@@ -238,12 +289,20 @@ paths:
         `nudge` | `approvals` | `schedules` | `session-loss` |
         `audit-retention`: runs the sweep now instead of waiting for the
         hosted loop. Answers the effect count (a pass a peer replica holds
-        answers 0).
+        answers 0). A manual sweep is a human act on live state: the
+        `X-Change-Reason` header is REQUIRED (non-empty, <= 512 chars) and
+        the trigger is audited (`admin.sweep`, correlation_id = the sweep
+        name).
       parameters:
         - { in: path, name: name, required: true, schema: { type: string } }
+        - in: header
+          name: X-Change-Reason
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 512 }
+          description: Why the operator forced the sweep; audited. Blank/oversize is 400 config-invalid.
       responses:
         "200": { description: "{ sweep, effects }" }
-        "400": { description: Unknown sweep name. }
+        "400": { description: Unknown sweep name, or a missing/oversize X-Change-Reason (config-invalid). }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
   /api/admin/config:
@@ -639,6 +698,21 @@ components:
         config: { type: object }
         createdAt: { type: string, format: date-time }
         works: { type: array, items: { $ref: "#/components/schemas/AdminWorkRow" } }
+    AdminAuditRow:
+      type: object
+      additionalProperties: false
+      required: [auditId, occurredAt, action, decision, detail]
+      properties:
+        auditId: { type: string, format: uuid }
+        occurredAt: { type: string, format: date-time }
+        actor: { type: [string, "null"] }
+        action: { type: string }
+        resource: { type: [string, "null"] }
+        decision: { type: string, enum: [allow, deny] }
+        reason: { type: [string, "null"] }
+        detail: { type: object }
+        traceId: { type: [string, "null"] }
+        correlationId: { type: [string, "null"], description: Exact join key (chat action ids, sweep names, work event correlation). }
     AdminWorkRow:
       type: object
       additionalProperties: false

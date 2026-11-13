@@ -15,6 +15,7 @@ namespace Facilitator.Kernel.Shared.Identity;
 /// <param name="EvidenceRef">Optional evidence pointer.</param>
 /// <param name="PolicyVersion">Role-rule policy version at decision time.</param>
 /// <param name="Detail">jsonb-safe context document.</param>
+/// <param name="CorrelationId">Optional correlation id joining this row to the trace it belongs to.</param>
 public sealed record AuditRecord(
     string? Actor,
     string Action,
@@ -23,7 +24,8 @@ public sealed record AuditRecord(
     string? Reason,
     string? EvidenceRef,
     string? PolicyVersion,
-    string Detail);
+    string Detail,
+    string? CorrelationId = null);
 
 /// <summary>
 /// The single audit append helper — every plan after
@@ -60,6 +62,7 @@ public sealed class AuditWriter(IDbContextFactory<FacilitatorDbContext> contextF
         EvidenceRef = record.EvidenceRef,
         PolicyVersion = record.PolicyVersion,
         Detail = string.IsNullOrWhiteSpace(record.Detail) ? "{}" : record.Detail,
+        CorrelationId = record.CorrelationId,
         TraceId = System.Diagnostics.Activity.Current?.TraceId.ToHexString(),
     };
 }

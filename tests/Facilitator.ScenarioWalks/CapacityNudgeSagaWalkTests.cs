@@ -69,7 +69,7 @@ public sealed class CapacityNudgeSagaWalkTests(PostgresFixture fixture)
 
         // ONE nudge sweep fires exactly one nudge (the sweep endpoint is the
         // I2 law; the ledger command id names episode/generation/count).
-        var sweep = await KernelOps.PostJsonAsync(kernel, "/api/admin/sweeps/nudge", "{}", HttpStatusCode.OK);
+        var sweep = await KernelOps.PostJsonAsync(kernel, "/api/admin/sweeps/nudge", "{}", HttpStatusCode.OK, "walk: forced sweep");
         Assert.Equal(1, sweep.GetProperty("effects").GetInt32());
         Assert.True(await fixture.Db.OutboxRowByCommand($"work-nudge:{assignmentId:N}:1:1:1"),
             "the nudge's ledger row is missing");
@@ -78,11 +78,11 @@ public sealed class CapacityNudgeSagaWalkTests(PostgresFixture fixture)
         // burn the cap; pass 4 finds the budget spent.
         for (var count = 2; count <= 3; count++)
         {
-            var pass = await KernelOps.PostJsonAsync(kernel, "/api/admin/sweeps/nudge", "{}", HttpStatusCode.OK);
+            var pass = await KernelOps.PostJsonAsync(kernel, "/api/admin/sweeps/nudge", "{}", HttpStatusCode.OK, "walk: forced sweep");
             Assert.Equal(1, pass.GetProperty("effects").GetInt32());
         }
 
-        var spent = await KernelOps.PostJsonAsync(kernel, "/api/admin/sweeps/nudge", "{}", HttpStatusCode.OK);
+        var spent = await KernelOps.PostJsonAsync(kernel, "/api/admin/sweeps/nudge", "{}", HttpStatusCode.OK, "walk: forced sweep");
         Assert.Equal(0, spent.GetProperty("effects").GetInt32());
 
         // The admin work read sees the stall (the ops-surface leg).

@@ -40,10 +40,10 @@ public sealed class HeldActionChainWalkTests(PostgresFixture fixture)
 
         // Segment C7 (nudge leg, driven): inside the nudge lead window, one
         // nudge sweep writes the timeline row and stamps exactly once.
-        await KernelOps.PostJsonAsync(kernel, "/api/admin/sweeps/approvals", "{}", HttpStatusCode.OK);
+        await KernelOps.PostJsonAsync(kernel, "/api/admin/sweeps/approvals", "{}", HttpStatusCode.OK, "walk: forced sweep");
         Assert.Equal(1, await fixture.Db.TimelineEventCount(workId, "approval.nudged"));
         Assert.True(await fixture.Db.ApprovalNudged(approvalId));
-        await KernelOps.PostJsonAsync(kernel, "/api/admin/sweeps/approvals", "{}", HttpStatusCode.OK);
+        await KernelOps.PostJsonAsync(kernel, "/api/admin/sweeps/approvals", "{}", HttpStatusCode.OK, "walk: forced sweep");
         Assert.Equal(1, await fixture.Db.TimelineEventCount(workId, "approval.nudged"));
 
         // Segment C7 (decision): the first human decides through her own
@@ -84,7 +84,7 @@ public sealed class HeldActionChainWalkTests(PostgresFixture fixture)
             WalkKit.RequiredEnvelope(lapsedId, expiredWorkId, ["user:alice"], TimeSpan.FromMinutes(5)),
             HttpStatusCode.Accepted);
         factory.AdvanceClock(TimeSpan.FromMinutes(10));
-        await KernelOps.PostJsonAsync(kernel, "/api/admin/sweeps/approvals", "{}", HttpStatusCode.OK);
+        await KernelOps.PostJsonAsync(kernel, "/api/admin/sweeps/approvals", "{}", HttpStatusCode.OK, "walk: forced sweep");
         Assert.Equal("expired", (await fixture.Db.Approval(lapsedId))!.State);
         Assert.Equal(1, await fixture.Db.TimelineEventCount(expiredWorkId, "work.consent-expired"));
         var lapsedActor = await KeycloakFixture.ActorOfAsync("bob", "bob");

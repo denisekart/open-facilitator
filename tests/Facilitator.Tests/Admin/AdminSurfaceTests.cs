@@ -302,4 +302,97 @@ public sealed class AdminSurfaceTests(DispatchDbFixture fixture)
         client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         return client;
     }
+
+    [Fact]
+    public async Task WorksQueueFiltersByStateNewestFirst()
+    {
+        using var factory = new KernelTestFactory(fixture, noDispatcher: true);
+        using var client = factory.CreateAuthedClient();
+        var blocked = await fixture.Db.SeedWork("blocked");
+        var open = await fixture.Db.SeedWork("open");
+
+        var rows = await KernelOps.GetJsonAsync(client, "/api/admin/works?state=blocked", HttpStatusCode.OK);
+        var ids = rows.GetProperty("items").EnumerateArray()
+            .Select(w => w.GetProperty("workId").GetGuid()).ToList();
+        Assert.Contains(blocked, ids);
+        Assert.DoesNotContain(open, ids);
+    }
+
+    [Fact]
+    public async Task WorksQueueInheritsTheCallersTeamScope()
+    {
+        using var factory = new KernelTestFactory(fixture, noDispatcher: true);
+        using var client = factory.CreateAuthedClient();
+        var bobActor = await KeycloakFixture.ActorOfAsync("bob", "bob");
+        await fixture.Db.SeedTeam("team-beta");
+        var betaProject = await fixture.Db.SeedProject("team-beta");
+        var betaWork = await fixture.Db.SeedWorkOwned(betaProject, bobActor, "blocked");
+        await fixture.Db.SeedRosterMember("team-beta", bobActor, "human", "operator");
+        var alphaWork = await fixture.Db.SeedWork("blocked");
+
+        // Unscoped (service account): sees both teams' works.
+        var all = await KernelOps.GetJsonAsync(client, "/api/admin/works?state=blocked", HttpStatusCode.OK);
+        var allIds = all.GetProperty("items").EnumerateArray()
+            .Select(w => w.GetProperty("workId").GetGuid()).ToList();
+        Assert.Contains(betaWork, allIds);
+        Assert.Contains(alphaWork, allIds);
+
+        // Bob (team-beta operator): only team-beta's work.
+        using var member = await CreateUserClientAsync(factory, "bob");
+        var scoped = await KernelOps.GetJsonAsync(member, "/api/admin/works?state=blocked", HttpStatusCode.OK);
+        var scopedIds = scoped.GetProperty("items").EnumerateArray()
+            .Select(w => w.GetProperty("workId").GetGuid()).ToList();
+        Assert.Contains(betaWork, scopedIds);
+        Assert.DoesNotContain(alphaWork, scopedIds);
+
+        // A team outside visibility answers empty, never another team's works.
+        var narrowed = await KernelOps.GetJsonAsync(member, "/api/admin/works?state=blocked&team=team-alpha", HttpStatusCode.OK);
+        Assert.Empty(narrowed.GetProperty("items").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task AuditFiltersByDecisionAndCorrelation()
+    {
+        using var factory = new KernelTestFactory(fixture, noDispatcher: true);
+        using var client = factory.CreateAuthedClient();
+        var correlation = Guid.NewGuid().ToString("N");
+        await fixture.Db.SeedAuditRow("audit.filter.probe", correlation: correlation, decision: "deny");
+
+        var rows = await KernelOps.GetJsonAsync(
+            client, $"/api/admin/audit?decision=deny&correlation={correlation}", HttpStatusCode.OK);
+        var row = Assert.Single(rows.EnumerateArray());
+        Assert.Equal("audit.filter.probe", row.GetProperty("action").GetString());
+        Assert.Equal("deny", row.GetProperty("decision").GetString());
+        Assert.Equal(correlation, row.GetProperty("correlationId").GetString());
+    }
+
+    [Fact]
+    public async Task SweepRequiresAChangeReasonAndAuditsTheTrigger()
+    {
+        using var factory = new KernelTestFactory(fixture, noDispatcher: true);
+        using var client = factory.CreateAuthedClient();
+
+        using var headless = await client.PostAsync("/api/admin/sweeps/nudge", new StringContent("{}", Encoding.UTF8, "application/json"));
+        Assert.Equal(HttpStatusCode.BadRequest, headless.StatusCode);
+        Assert.Contains("config-invalid", await headless.Content.ReadAsStringAsync());
+
+        var fired = await KernelOps.PostJsonAsync(client, "/api/admin/sweeps/nudge", "{}", HttpStatusCode.OK, "manual triage");
+        Assert.Equal("nudge", fired.GetProperty("sweep").GetString());
+        Assert.True(await fixture.Db.AuditActionPresent("admin.sweep"));
+    }
+
+    [Fact]
+    public async Task SearchMatchesTheCorrelationIdOfAWorkEvent()
+    {
+        using var factory = new KernelTestFactory(fixture, noDispatcher: true);
+        using var client = factory.CreateAuthedClient();
+        var workId = await fixture.Db.SeedWork("blocked");
+        var correlation = Guid.NewGuid().ToString("D");
+        await fixture.Db.SeedTimelineRow(workId, "steer", "{}", correlation);
+
+        var hits = await KernelOps.GetJsonAsync(client, $"/api/admin/search?q={correlation}", HttpStatusCode.OK);
+        var ids = hits.GetProperty("works").EnumerateArray()
+            .Select(w => w.GetProperty("id").GetString()).ToList();
+        Assert.Contains(workId.ToString(), ids);
+    }
 }

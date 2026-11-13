@@ -52,10 +52,10 @@ public sealed class RestartNoDoubleAskWalkTests(PostgresFixture fixture)
 
         // One nudge sweep after the restart asks exactly once; a second
         // sweep adds nothing — no double-ask across the process boundary.
-        await KernelOps.PostJsonAsync(afterRestart, "/api/admin/sweeps/approvals", "{}", HttpStatusCode.OK);
+        await KernelOps.PostJsonAsync(afterRestart, "/api/admin/sweeps/approvals", "{}", HttpStatusCode.OK, "walk: forced sweep");
         Assert.Equal(1, await fixture.Db.TimelineEventCount(workId, "approval.nudged"));
         Assert.True(await fixture.Db.ApprovalNudged(pendingId));
-        await KernelOps.PostJsonAsync(afterRestart, "/api/admin/sweeps/approvals", "{}", HttpStatusCode.OK);
+        await KernelOps.PostJsonAsync(afterRestart, "/api/admin/sweeps/approvals", "{}", HttpStatusCode.OK, "walk: forced sweep");
         Assert.Equal(1, await fixture.Db.TimelineEventCount(workId, "approval.nudged"));
 
         // A settled approval cannot be re-answered after the restart either.

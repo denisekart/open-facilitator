@@ -106,8 +106,7 @@ export class LinkClient {
       logger: this.logger,
       counters: this.counters,
       endpointId,
-      instrument:
-        options.instrument ?? ((_name, _env, run) => run()),
+      instrument: options.instrument ?? ((_name, _env, run) => run()),
       publishEvent: (e, traceparent, causationid) => this.publishEvent(e, traceparent, causationid),
       sendReceipt: (id, partial, correlation) => this.deliverReceipt(id, partial, correlation),
     });

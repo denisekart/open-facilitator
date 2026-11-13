@@ -25,7 +25,8 @@ export class CommandDispatcher {
       counters: LinkStats;
       endpointId: string;
       /** Trace seam from LinkClientOptions; absent = identity (byte-compatible). */
-      instrument?: (<T>(name: string, env: EnvelopeCommand, run: () => Promise<T>) => Promise<T>) | undefined;
+      instrument?:
+        (<T>(name: string, env: EnvelopeCommand, run: () => Promise<T>) => Promise<T>) | undefined;
       sendReceipt: SendReceipt;
       publishEvent(
         env: EnvelopeEvent,
@@ -119,11 +120,7 @@ export class CommandDispatcher {
   }
 
   /** The instrument seam with the identity default kept in ONE place. */
-  private instrument<T>(
-    name: string,
-    env: EnvelopeCommand,
-    run: () => Promise<T>,
-  ): Promise<T> {
+  private instrument<T>(name: string, env: EnvelopeCommand, run: () => Promise<T>): Promise<T> {
     return this.deps.instrument?.(name, env, run) ?? run();
   }
 

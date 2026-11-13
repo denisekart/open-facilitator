@@ -62,10 +62,11 @@ Operator UI: `http://localhost:8088` serves the embedded admin SPA — login `al
 ## Acceptance run (`reference/checks/verify.sh`)
 
 `./referencectl verify` proves every acceptance hop against a booted-but-
-unseeded stack, seeds its own works, exit 0 iff all 11 steps pass:
+unseeded stack, seeds its own works, exit 0 iff all 12 steps pass:
 idp-login, work-create, dispatch-link, progress, artifact-stored,
 memory-candidate, approval-roundtrip, worker-restart-resume,
-kernel-restart-resume, trace-correlation, dead-letters-empty. Laws the
+kernel-restart-resume, trace-correlation, dead-letters-empty,
+signal-emission. Laws the
 script encodes (keep them when editing):
 - Waits ride inbox/timeline event kinds (`poll_until`), never wall-clock
   sleeps; unrequested dependency steps run as prerequisites (steps own
@@ -89,14 +90,16 @@ script encodes (keep them when editing):
   stack up so a bare stack self-boots the elastic container.
 - Trace law: the dispatcher extracts the carrier parent, runs
   `outbox.dispatch` under it, and restamps every link-channel row before
-  delivery (`RestampEnvelopeAsync`, lease-guarded); the worker echoes the
-  stamped `traceparent` verbatim, so outbox stamp == progress/completed
-  envelope traceparent == the Aspire span's trace id. Read the stamp out
+  delivery (`RestampEnvelopeAsync`, lease-guarded); an instrumented worker
+  plane re-parents under that stamped carrier (W3C: same 32-hex trace id,
+  new parent id), so outbox stamp, progress/completed envelope carriers,
+  and the Aspire span's trace id all SHARE the trace id — the ids past the
+  trace id may differ by design. Read the stamp out
   of the outbox row — never a timing join.
 - Debug a leg: `verify --only <id>` (prereqs auto-run); the human plane
   dumps kernel+workspace log tails on failure.
 - Two-replica matrix (`reference/checks/verify-replicas.sh`,
-  `verify --replicas`, replica-matrix cases a–e): LB answers from both replicas;
+  `verify --replicas`, replica-matrix cases a–f): LB answers from both replicas;
   concurrent duplicate event POSTs settle to one inbox row (DB arbiter);
   SIGKILL the session-owning replica → lease expiry (15s: heartbeat 5×3 —
   the overlay's timing law) → the gateway reconnects through the LB onto

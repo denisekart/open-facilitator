@@ -142,7 +142,9 @@ describe("AuditView", () => {
 
     mountView(AuditView);
 
-    await vi.waitFor(() => expect(calls[0]).toBe(`/api/admin/audit?decision=deny&traceId=${traceId}&limit=100`));
+    await vi.waitFor(() =>
+      expect(calls[0]).toBe(`/api/admin/audit?decision=deny&traceId=${traceId}&limit=100`),
+    );
     // the trace box opens pre-filled from the link, and the row links back
     expect(byTestId<HTMLInputElement>("audit-trace").value).toBe(traceId);
     expect(byTestId(`audit-trace-0194f0a0`).getAttribute("href")).toBe(

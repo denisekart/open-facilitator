@@ -95,14 +95,15 @@ describe("instrument seam", () => {
     });
     await client.start();
     transport.pushDeliver(
-      deliveryOf("del-1", envelope("cmd-1", "00-0af1e2d3c4b5a69788796a5b4c3d2e1f-4d0c0b0a09080706-01")),
+      deliveryOf(
+        "del-1",
+        envelope("cmd-1", "00-0af1e2d3c4b5a69788796a5b4c3d2e1f-4d0c0b0a09080706-01"),
+      ),
     );
     await flush(8);
     expect(seen).toHaveLength(1);
     expect(seen[0].name).toBe("link.deliver");
-    expect(seen[0].traceparent).toBe(
-      "00-0af1e2d3c4b5a69788796a5b4c3d2e1f-4d0c0b0a09080706-01",
-    );
+    expect(seen[0].traceparent).toBe("00-0af1e2d3c4b5a69788796a5b4c3d2e1f-4d0c0b0a09080706-01");
     // The wrapper runs the handler BEFORE the receipt ships (it wraps the
     // invocation, not the whole pipeline).
     expect(seen[0].ran).toBe(true);

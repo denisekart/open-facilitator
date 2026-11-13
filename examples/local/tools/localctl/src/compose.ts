@@ -4,6 +4,7 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { must, run, fail } from "./util.js";
+import { readDotEnv } from "./env.js";
 import {
   EXAMPLE_DIR,
   LOCAL_KERNEL_IMAGE,
@@ -31,6 +32,21 @@ const composeProject = (box: RenderedBox, args: string[]): string[] => [
   box.env.file,
   ...args,
 ];
+
+/**
+ * The shell env for this box's compose calls: the bundle `.env` layered
+ * OVER the ambient env. Compose interpolates shell env BEFORE `--env-file`,
+ * so without this a host-leaked key (e.g. the devcontainer's
+ * OFAC_KERNEL_URL, or any empty-string leak that trips a `:?` guard)
+ * silently hijacks the rendered bundle. Layering the file here makes the
+ * bundle the single source of truth regardless of what the invoking shell
+ * carries — the smoke gate must measure the bundle, not the operator's
+ * environment.
+ */
+export function bundleShellEnv(box: RenderedBox): Record<string, string> {
+  const fileEnv = existsSync(box.env.file) ? readDotEnv(box.env.file) : {};
+  return { ...(process.env as Record<string, string>), ...fileEnv };
+}
 
 /** Repo root: every local image builds from here (the bundle's build
  * context is the same path, five levels up from `.out/<env>/<box>`). */
@@ -82,15 +98,23 @@ export const simDriver: BoxDriver = {
     if (opts.build && box.kernelBox) {
       await buildLocalImages();
     }
-    await must(composeProject(box, ["up", "-d"]), { inherit: true });
+    await must(composeProject(box, ["up", "-d"]), { inherit: true, env: bundleShellEnv(box) });
   },
   async down(box, opts) {
-    await must(composeProject(box, ["down", ...(opts.volumes ? ["-v"] : [])]), { inherit: true });
+    await must(composeProject(box, ["down", ...(opts.volumes ? ["-v"] : [])]), {
+      inherit: true,
+      env: bundleShellEnv(box),
+    });
   },
   async logs(box) {
-    await must(composeProject(box, ["logs", "--tail", "100"]), { inherit: true });
+    await must(composeProject(box, ["logs", "--tail", "100"]), {
+      inherit: true,
+      env: bundleShellEnv(box),
+    });
   },
   async ps(box) {
-    return await must(composeProject(box, ["ps", "--format", "json"]));
+    return await must(composeProject(box, ["ps", "--format", "json"]), {
+      env: bundleShellEnv(box),
+    });
   },
 };

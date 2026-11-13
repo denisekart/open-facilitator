@@ -93,41 +93,60 @@ async function dashboardSpanCount(aspireUi: number, traceId: string | undefined)
   }
 }
 
-/** Spans the dashboard holds for one resource (OTLP resourceSpans dump,
- * service.name attribute) — the team-side emission proof: the node bundle
- * only shows up here if @ofac/otel rides the node image AND emits. */
+/**
+ * Spans the dashboard holds for one service (the team-side emission proof:
+ * the node bundle only shows up here if @ofac/otel rides the node image AND
+ * emits). Two API facts make a naive spans-dump scan wrong: the dump is
+ * capped at 200 spans per call (the kernel's SignalR firehose fills it
+ * before any team-plane span), and the OTLP payload arrives wrapped in
+ * `{data: {resourceSpans}, totalCount, returnedCount}`. So the resource
+ * registry decides *whether* a service emitted (`hasTraces` — exact, cheap,
+ * immune to the page cap), and the per-resource page (`?resource=<name>-<id>`,
+ * the dashboard UI's own filter) counts them; spans of co-listed resources
+ * in that page are dropped by re-reading each OTLP resource's service.name.
+ */
 async function dashboardSpanCountForResource(
   aspireUi: number,
   serviceName: string,
 ): Promise<number> {
-  const r = await run([
-    "curl",
-    "-fs",
-    "--max-time",
-    "10",
-    `http://localhost:${String(aspireUi)}/api/telemetry/spans`,
-  ]);
-  if (r.code !== 0) return 0;
-  try {
-    const j = JSON.parse(r.stdout) as {
-      resourceSpans?: {
-        resource?: { attributes?: { key: string; value?: { stringValue?: string } }[] };
-        scopeSpans?: { spans?: unknown[] }[];
-      }[];
-    };
-    return (j.resourceSpans ?? [])
-      .filter((rs) =>
-        (rs.resource?.attributes ?? []).some(
-          (a) => a.key === "service.name" && a.value?.stringValue === serviceName,
-        ),
-      )
-      .reduce(
-        (sum, rs) => sum + (rs.scopeSpans ?? []).reduce((s, ss) => s + (ss.spans?.length ?? 0), 0),
-        0,
-      );
-  } catch {
-    return 0;
+  const get = async <T>(url: string): Promise<T | undefined> => {
+    const r = await run(["curl", "-fs", "--max-time", "10", url]);
+    if (r.code !== 0) return undefined;
+    try {
+      return JSON.parse(r.stdout) as T;
+    } catch {
+      return undefined;
+    }
+  };
+  const resources = await get<
+    { name?: string; displayName?: string; hasTraces?: boolean }[] | undefined
+  >(`http://localhost:${String(aspireUi)}/api/telemetry/resources`);
+  const mine = (Array.isArray(resources) ? resources : []).filter(
+    (r) => r.name === serviceName && r.hasTraces === true,
+  );
+  if (mine.length === 0) return 0;
+  let total = 0;
+  for (const res of mine) {
+    const page = await get<{
+      data?: {
+        resourceSpans?: {
+          resource?: { attributes?: { key: string; value?: { stringValue?: string } }[] };
+          scopeSpans?: { spans?: unknown[] }[];
+        }[];
+      };
+    }>(
+      `http://localhost:${String(aspireUi)}/api/telemetry/spans?resource=${encodeURIComponent(
+        res.displayName ?? serviceName,
+      )}`,
+    );
+    for (const rs of page?.data?.resourceSpans ?? []) {
+      const attrs = rs.resource?.attributes ?? [];
+      if (!attrs.some((a) => a.key === "service.name" && a.value?.stringValue === serviceName))
+        continue;
+      total += (rs.scopeSpans ?? []).reduce((s, ss) => s + (ss.spans?.length ?? 0), 0);
+    }
   }
+  return total;
 }
 
 export async function cmdSmoke(opts: SmokeOpts): Promise<number> {

@@ -422,7 +422,7 @@ public sealed class EfCoordinationStore(
             .Where(e => e.WorkId == workId)
             .OrderByDescending(e => e.CreatedAt).ThenByDescending(e => e.EventId)
             .Take(1000)
-            .Select(e => new WorkEventRow(e.EventId, e.WorkId, e.WorkVersion, e.Kind, e.Actor, e.Detail, e.CorrelationId, e.CreatedAt))
+            .Select(e => new WorkEventRow(e.EventId, e.WorkId, e.WorkVersion, e.Kind, e.Actor, e.Detail, e.CorrelationId, e.CreatedAt, e.TraceId))
             .ToListAsync(ct);
         rows.Reverse();
         return rows;

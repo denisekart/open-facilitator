@@ -547,12 +547,13 @@ public sealed class AdminReadStores(
     /// <summary>
     /// GET /api/admin/audit: the audit trail, newest first, filterable by
     /// action (exact), actor (exact), decision (exact), correlation id (exact),
+    /// trace id (exact — the 32-hex OTel trace a row was written under),
     /// and a <c>since</c> floor. <c>limit</c>
     /// defaults to 50, capped at 200 — the chat history screen points here
     /// after AI-initiated executions.
     /// </summary>
     public async Task<IReadOnlyList<AdminAuditRow>> AuditAsync(
-        string? action, string? actor, DateTime? since, string? decision, string? correlation, int limit, CancellationToken ct)
+        string? action, string? actor, DateTime? since, string? decision, string? correlation, string? traceId, int limit, CancellationToken ct)
     {
         await using var db = await contextFactory.CreateDbContextAsync(ct);
         var take = Math.Clamp(limit <= 0 ? 50 : limit, 1, 200);
@@ -575,6 +576,11 @@ public sealed class AdminReadStores(
         if (correlation is { Length: > 0 })
         {
             query = query.Where(a => a.CorrelationId == correlation);
+        }
+
+        if (traceId is { Length: > 0 })
+        {
+            query = query.Where(a => a.TraceId == traceId);
         }
 
         if (since is { } floor)

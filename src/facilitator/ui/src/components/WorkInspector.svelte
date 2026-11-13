@@ -282,6 +282,15 @@
               {:else}
                 <span class="text-ink-3">—</span>
               {/if}
+              {#if row.traceId}
+                <button
+                  class="mono badge bg-sunken text-ink-2 ring-edge"
+                  title="copy OTel trace id — paste it into the OTLP viewer to see this span"
+                  data-testid="trace-chip-trace"
+                  onclick={() => void navigator.clipboard.writeText(row.traceId ?? "")}
+                  >{row.traceId.slice(0, 8)}…</button
+                >
+              {/if}
             </td>
           </tr>
         {/each}

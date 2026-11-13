@@ -307,6 +307,11 @@ public sealed class WorkEventEntity
 
     public string? CorrelationId { get; set; }
 
+    /// <summary>Lowercase 32-hex OTel trace id of the request/mission that
+    /// appended this row (null pre-tracing). Stamped centrally by
+    /// <see cref="FacilitatorDbContext"/> from <c>Activity.Current</c>.</summary>
+    public string? TraceId { get; set; }
+
     public DateTime CreatedAt { get; set; }
 
     public WorkEntity? Work { get; set; }

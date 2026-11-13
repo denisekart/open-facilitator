@@ -23,11 +23,12 @@
   let actor = $state("");
   let action = $state("");
   let correlation = $state("");
+  let trace = $state("");
 
   async function load(): Promise<void> {
     try {
       const params = new URLSearchParams();
-      for (const key of ["decision", "actor", "action", "correlation", "since"]) {
+      for (const key of ["decision", "actor", "action", "correlation", "traceId", "since"]) {
         const value = wanted.get(key);
         if (value) {
           params.set(key, value);
@@ -48,6 +49,7 @@
     actor = wanted.get("actor") ?? "";
     action = wanted.get("action") ?? "";
     correlation = wanted.get("correlation") ?? "";
+    trace = wanted.get("traceId") ?? "";
     void load();
   });
 
@@ -65,6 +67,9 @@
     }
     if (correlation.trim()) {
       params.set("correlation", correlation.trim());
+    }
+    if (trace.trim()) {
+      params.set("traceId", trace.trim());
     }
     const since = wanted.get("since");
     if (since) {
@@ -126,6 +131,12 @@
         aria-label="audit correlation filter"
         data-testid="audit-correlation"
         bind:value={correlation} />
+      <input
+        class="input max-w-52"
+        placeholder="trace id (32 hex)"
+        aria-label="audit trace id filter"
+        data-testid="audit-trace"
+        bind:value={trace} />
       <button class="btn btn-primary" type="submit" data-testid="audit-apply">filter</button>
     </form>
   </div>
@@ -134,7 +145,7 @@
     <thead>
       <tr>
         <th>When</th><th>Decision</th><th>Actor</th><th>Action</th><th>Resource</th
-        ><th>Correlation</th>
+        ><th>Correlation</th><th>Trace</th>
       </tr>
     </thead>
     <tbody>
@@ -166,11 +177,31 @@
               —
             {/if}
           </td>
+          <td class="mono text-xs">
+            {#if row.traceId}
+              <button
+                class="mono badge bg-sunken text-ink-2 ring-edge"
+                title="copy trace id — paste it into the OTLP viewer"
+                data-testid={`audit-copy-trace-${short}`}
+                onclick={() => void navigator.clipboard.writeText(row.traceId ?? "")}
+                >{row.traceId.slice(0, 8)}…</button
+              >
+              <a
+                class="ml-1 text-accent underline"
+                title="filter to this trace"
+                data-testid={`audit-trace-${short}`}
+                href={`#/audit?traceId=${row.traceId}`}
+                >trace</a
+              >
+            {:else}
+              —
+            {/if}
+          </td>
         </tr>
       {/each}
       {#if items.length === 0}
         <tr>
-          <td colspan="6" class="text-ink-3">Nothing here — nothing matched.</td>
+          <td colspan="7" class="text-ink-3">Nothing here — nothing matched.</td>
         </tr>
       {/if}
     </tbody>

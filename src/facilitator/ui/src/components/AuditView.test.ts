@@ -133,4 +133,20 @@ describe("AuditView", () => {
     expect(location.hash).toBe("#/audit?decision=deny");
     await vi.waitFor(() => expect(calls).toContain("/api/admin/audit?decision=deny&limit=100"));
   });
+
+  it("a route carrying traceId filters the trail by that exact trace", async () => {
+    const traceId = "0f1e2d3c4b5a69788796a5b4c3d2e1f0";
+    signIn();
+    stub([auditRow({ traceId })]);
+    navigate(`#/audit?decision=deny&traceId=${traceId}`);
+
+    mountView(AuditView);
+
+    await vi.waitFor(() => expect(calls[0]).toBe(`/api/admin/audit?decision=deny&traceId=${traceId}&limit=100`));
+    // the trace box opens pre-filled from the link, and the row links back
+    expect(byTestId<HTMLInputElement>("audit-trace").value).toBe(traceId);
+    expect(byTestId(`audit-trace-0194f0a0`).getAttribute("href")).toBe(
+      `#/audit?traceId=${traceId}`,
+    );
+  });
 });

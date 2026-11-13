@@ -20,6 +20,7 @@ public sealed class WorkEventEntityConfiguration : IEntityTypeConfiguration<Work
         e.Property(x => x.Actor).HasColumnName("actor").IsRequired();
         e.Property(x => x.Detail).HasColumnName("detail").HasColumnType("jsonb").IsRequired();
         e.Property(x => x.CorrelationId).HasColumnName("correlation_id");
+        e.Property(x => x.TraceId).HasColumnName("trace_id");
         e.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
         e.HasIndex(x => new { x.WorkId, x.CreatedAt }).HasDatabaseName("work_events_work_id_created_at_idx");
         e.HasOne(x => x.Work).WithMany().HasForeignKey(x => x.WorkId).HasConstraintName("work_events_work_id_fkey");

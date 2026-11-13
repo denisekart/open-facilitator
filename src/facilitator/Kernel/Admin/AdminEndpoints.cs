@@ -91,8 +91,9 @@ public static class AdminEndpoints
 
         // Audit trail read (the chat history screen's evidence surface); the
         // admin.read binding covers it via /api/admin/audit.
-        group.MapGet("/audit", async (string? action, string? actor, DateTime? since, string? decision, string? correlation, int? limit, AdminReadStores stores, CancellationToken ct) =>
-            Results.Ok(await stores.AuditAsync(action, actor, since, decision, correlation, limit ?? 50, ct)));
+        group.MapGet("/audit", async (string? action, string? actor, DateTime? since, string? decision,
+            string? correlation, string? traceId, int? limit, AdminReadStores stores, CancellationToken ct) =>
+            Results.Ok(await stores.AuditAsync(action, actor, since, decision, correlation, traceId, limit ?? 50, ct)));
 
         // H3/N15: the export leg - a bounded window, no raw credentials, and
         // a retention policy the operator can read (admin_config 'audit-policy').

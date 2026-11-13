@@ -106,6 +106,26 @@ public class FacilitatorDbContext(DbContextOptions<FacilitatorDbContext> options
 
     public DbSet<TeamSettingEntity> TeamSettings => Set<TeamSettingEntity>();
 
+    /// <summary>Every WorkEventEntity gains the ambient OTel trace id when one
+    /// is active — one choke point instead of ~30 append sites (mirrors
+    /// AuditWriter's stamping), so a timeline row can be taken to the viewer.</summary>
+    public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        var traceId = System.Diagnostics.Activity.Current?.TraceId.ToHexString();
+        if (traceId is not null)
+        {
+            foreach (var entry in ChangeTracker.Entries<WorkEventEntity>())
+            {
+                if (entry.State == EntityState.Added && entry.Entity.TraceId is null)
+                {
+                    entry.Entity.TraceId = traceId;
+                }
+            }
+        }
+
+        return base.SaveChangesAsync(cancellationToken);
+    }
+
 
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder model)

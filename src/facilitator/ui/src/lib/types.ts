@@ -187,6 +187,7 @@ export interface WorkEventRow {
   actor: string;
   detail: string;
   correlationId: string | null;
+  traceId?: string | null;
   createdAt: string;
 }
 

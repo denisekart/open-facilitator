@@ -2534,6 +2534,10 @@ namespace Facilitator.Migrations
                         .HasColumnType("text")
                         .HasColumnName("kind");
 
+                    b.Property<string>("TraceId")
+                        .HasColumnType("text")
+                        .HasColumnName("trace_id");
+
                     b.Property<Guid>("WorkId")
                         .HasColumnType("uuid")
                         .HasColumnName("work_id");

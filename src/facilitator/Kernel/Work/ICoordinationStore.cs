@@ -43,7 +43,7 @@ public sealed record WorkView(
 /// <param name="Detail">jsonb detail document.</param>
 /// <param name="CorrelationId">Correlation id when present.</param>
 /// <param name="CreatedAt">Append time (UTC).</param>
-public sealed record WorkEventRow(Guid EventId, Guid WorkId, long WorkVersion, string Kind, string Actor, string Detail, string? CorrelationId, DateTime CreatedAt);
+public sealed record WorkEventRow(Guid EventId, Guid WorkId, long WorkVersion, string Kind, string Actor, string Detail, string? CorrelationId, DateTime CreatedAt, string? TraceId = null);
 
 /// <summary>Outcome of <see cref="ICoordinationStore.ApplyTransitionAsync"/>.</summary>
 public abstract record TransitionResult

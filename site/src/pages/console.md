@@ -7,9 +7,19 @@ you do, which means anything you can see here, an agent can query too.
 It opens on a sign-in gate: any account from your OIDC provider with an
 operator role gets in.
 
+Every view is a URL. `#/works?state=blocked,review` opens the triage
+queue pre-filtered, `#/work/<id>` reopens an inspector,
+`#/audit?correlation=<id>` opens the exact decision trail a timeline
+chip points at — paste it into chat, reload, share it; the console
+lands where you left it, even through the sign-in round-trip.
+
 ## Search, and the life of one Work
 
-Search covers works, projects, assignments, artifacts, and memories.
+Search covers works, projects, assignments, artifacts, and memories —
+and a correlation id is a search key: paste a trace id from a timeline
+chip or an audit row and the Work it belongs to surfaces. Every hit
+opens something: projects and works into their inspectors, artifacts to
+their metadata and brokered content, memories to their entry view.
 Opening a Work gives you the full inspector: its assignment history with
 fencing generations, its approvals, its result manifests, and the
 complete event timeline — every state change with actor, timestamp, and
@@ -30,19 +40,30 @@ teams keep the kernel around after the novelty of agents fades.
 
 ## Fleet views
 
-Under the search box, four surfaces:
+Under the search box, the surfaces a triage needs:
 
-- **Links** — every team Gateway currently dialed in: endpoint id,
+- **Works** — the queue: everything, newest first, filterable by state;
+  a team-scoped operator automatically sees only their teams' works.
+- **Audit** — the decision spine, filterable by allow/deny, actor,
+  action, and correlation id, with a CSV export.
+- **Links** — every team Gateway currently dialled in: endpoint id,
   session age, last acknowledged event. The honest rule the view
   follows: the database lease is the only authority — a stale socket
   means offline, never “probably up”.
 - **Deliveries** — the outbound ledger: what the kernel sent, what was
   acknowledged, what is a poison message. Replay one; try to replay it
   twice; the ledger refuses the second time.
+- **Runtime** — which replica answers, the provisioning ledger, and
+  manual sweeps: forcing a sweeper demands a change reason and audits
+  the trigger, like every other human act on live state.
 - **Config** — stored operator intents, edited with versioned
   `If-Match` writes, each change audited with a reason.
-- **AiDeck** — a chat surface for operator identities: ask about works,
-  trace a decision, all through the same governed API.
+- **AiDeck** — a chat surface for operator identities: ask “what's
+  stuck?” and the answer shows the reads it made to get there —
+  GETs the asking operator could run themselves, never more than that
+  role can reach. Proposals carry a human summary, a folded body, an
+  optional decision note, and a link to the audit row they produce; a
+  proposal nobody confirms visibly expires.
 
 ## What the console deliberately is not
 

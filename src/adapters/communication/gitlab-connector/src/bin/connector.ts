@@ -6,6 +6,7 @@
 // error · 3 register-denied-then-exhausted (restartBackoffMs: []).
 import { parseArgs } from "node:util";
 import { createConsoleLogger } from "@ofac/workspace-link";
+import { startTelemetryFromEnv } from "@ofac/otel";
 import { createAdapter } from "@ofac/adapter";
 import {
   ConnectorConfigError,
@@ -42,7 +43,13 @@ export async function bootConnector(config: ConnectorConfig): Promise<ConnectorH
   });
   const ledger = new ActionLedger(config.statePath);
   const api = new GitLabClient(config.gitlabUrl, config.gitlabToken);
+  const telemetry = startTelemetryFromEnv({
+    serviceName: "ofac-gitlab-connector",
+    meterName: "ofac.worker",
+    instanceId: config.childWorkspaceId,
+  });
   const handle = await createAdapter({
+    telemetry,
     childWorkspaceId: config.childWorkspaceId,
     ...(config.token !== undefined ? { token: config.token } : {}),
     kernel: { baseUrl: config.kernelUrl },
@@ -74,6 +81,7 @@ export async function bootConnector(config: ConnectorConfig): Promise<ConnectorH
     }),
     stop: async () => {
       await handle.close();
+      await telemetry.shutdown();
       ledger.close();
     },
   };

@@ -5,6 +5,7 @@
 // behind the GitHubApi interface so unit tests inject a fake (zero HTTP).
 // Exported for the connector package too: one seam, so the privileged-write
 // split reuses the same boundary.
+import { observeHttpStatus } from "@ofac/provider-core";
 import { trimSlash } from "@ofac/workspace-link";
 
 export class GitHubError extends Error {
@@ -184,6 +185,7 @@ export class GitHubClient implements GitHubApi {
     });
     if (!response.ok) {
       const text = await response.text().catch(() => "");
+      observeHttpStatus(response.status);
       throw new GitHubError(call, response.status, text.slice(0, 200));
     }
 

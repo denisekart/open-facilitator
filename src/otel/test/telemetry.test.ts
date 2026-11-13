@@ -97,46 +97,46 @@ describe("startTelemetryFromEnv", () => {
     "endpoint set: emits, traceFields follows the active span, shutdown leaves no handles",
     { timeout: 60_000 },
     async () => {
-    clearOtelEnv();
-    // Port 1: nothing listens, so the first-export probe warns once and stays
-    // quiet — the never-throw law under test as much as the trace fields.
-    process.env["OTEL_EXPORTER_OTLP_ENDPOINT"] = "http://127.0.0.1:1";
-    process.env["OTEL_LOGS_EXPORTER"] = "otlp";
-    const warn = console.warn;
-    let warnings = 0;
-    console.warn = () => {
-      warnings += 1;
-    };
-    try {
-      const handle = startTelemetryFromEnv({
-        serviceName: "ofac-test",
-        meterName: "ofac.test",
-        instanceId: "inst-1",
-      });
-      expect(handle.emitting).toBe(true);
-      expect(handle.logsExported).toBe(true);
-      await handle.ready();
+      clearOtelEnv();
+      // Port 1: nothing listens, so the first-export probe warns once and stays
+      // quiet — the never-throw law under test as much as the trace fields.
+      process.env["OTEL_EXPORTER_OTLP_ENDPOINT"] = "http://127.0.0.1:1";
+      process.env["OTEL_LOGS_EXPORTER"] = "otlp";
+      const warn = console.warn;
+      let warnings = 0;
+      console.warn = () => {
+        warnings += 1;
+      };
+      try {
+        const handle = startTelemetryFromEnv({
+          serviceName: "ofac-test",
+          meterName: "ofac.test",
+          instanceId: "inst-1",
+        });
+        expect(handle.emitting).toBe(true);
+        expect(handle.logsExported).toBe(true);
+        await handle.ready();
 
-      const api = await import("@opentelemetry/api");
-      const tracer = api.trace.getTracer("ofac.test");
-      const inside = tracer.startActiveSpan("unit.op", () => handle.traceFields());
-      expect(inside["traceId"]).toMatch(W3C_TRACE);
-      expect(inside["spanId"]).toMatch(W3C_SPAN);
-      // Outside any span there is nothing to correlate with.
-      expect(handle.traceFields()).toEqual({});
+        const api = await import("@opentelemetry/api");
+        const tracer = api.trace.getTracer("ofac.test");
+        const inside = tracer.startActiveSpan("unit.op", () => handle.traceFields());
+        expect(inside["traceId"]).toMatch(W3C_TRACE);
+        expect(inside["spanId"]).toMatch(W3C_SPAN);
+        // Outside any span there is nothing to correlate with.
+        expect(handle.traceFields()).toEqual({});
 
-      // A bridge line must never throw, even with nothing reachable.
-      handle.log({ message: "hello", traceId: inside["traceId"] });
-      // The first-export probe stays silent while registration is racing,
-      // so the warn-once count can only be 0 (export lost the race) or 1.
-      expect(warnings).toBeLessThanOrEqual(1);
+        // A bridge line must never throw, even with nothing reachable.
+        handle.log({ message: "hello", traceId: inside["traceId"] });
+        // The first-export probe stays silent while registration is racing,
+        // so the warn-once count can only be 0 (export lost the race) or 1.
+        expect(warnings).toBeLessThanOrEqual(1);
 
-      await handle.shutdown();
-      // After shutdown the same context carries no live span.
-      expect(api.trace.getSpanContext(api.context.active())).toBeUndefined();
-    } finally {
-      console.warn = warn;
-    }
+        await handle.shutdown();
+        // After shutdown the same context carries no live span.
+        expect(api.trace.getSpanContext(api.context.active())).toBeUndefined();
+      } finally {
+        console.warn = warn;
+      }
     },
   );
 });

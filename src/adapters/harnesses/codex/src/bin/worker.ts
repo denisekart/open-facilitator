@@ -13,6 +13,7 @@
 import { parseArgs } from "node:util";
 import { createConsoleLogger } from "@ofac/workspace-link";
 import type { LinkLogger } from "@ofac/workspace-link";
+import { startTelemetryFromEnv } from "@ofac/otel";
 import { createAdapter } from "@ofac/adapter";
 import { WorkerConfigError, loadWorkerConfigFile, type WorkerConfig } from "../config.js";
 import { createCodexHooks } from "../harness.js";
@@ -48,7 +49,13 @@ export async function bootWorker(config: WorkerConfig, log: LinkLogger): Promise
     ...(config.promptTemplate !== undefined ? { promptTemplate: config.promptTemplate } : {}),
     logger: log,
   });
+  const telemetry = startTelemetryFromEnv({
+    serviceName: "ofac-codex-worker",
+    meterName: "ofac.worker",
+    instanceId: config.childWorkspaceId,
+  });
   const handle = await createAdapter({
+    telemetry,
     childWorkspaceId: config.childWorkspaceId,
     ...(config.token !== undefined ? { token: config.token } : {}),
     kernel: {
@@ -79,7 +86,10 @@ export async function bootWorker(config: WorkerConfig, log: LinkLogger): Promise
           : `tcp=${config.transport.host ?? "127.0.0.1"}:${String(config.transport.port ?? 0)}`;
       process.stdout.write(`worker ready childId=${config.childWorkspaceId} ${endpoint}\n`);
     }),
-    stop: () => handle.close(),
+    stop: async () => {
+      await handle.close();
+      await telemetry.shutdown();
+    },
   };
 }
 

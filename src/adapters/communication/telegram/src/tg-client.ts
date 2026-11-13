@@ -4,6 +4,7 @@
 // TgError naming the call. Everything the listener, handler, and media
 // pipeline need is behind the TelegramApi interface so unit tests inject a
 // fake (the idempotency-ledger tests must run with zero HTTP).
+import { observeHttpStatus } from "@ofac/provider-core";
 import type { TgMessage, TgUpdate } from "./normalize.js";
 
 export class TgError extends Error {
@@ -144,6 +145,7 @@ export class TelegramClient implements TelegramApi {
       payload = { ok: false };
     }
     if (!response.ok || payload.ok !== true || payload.result === undefined) {
+      observeHttpStatus(response.status);
       throw new TgError(method, response.status, payload.description);
     }
     return payload.result;
@@ -171,6 +173,7 @@ export class TelegramClient implements TelegramApi {
       payload = { ok: false };
     }
     if (!response.ok || payload.ok !== true || payload.result === undefined) {
+      observeHttpStatus(response.status);
       throw new TgError(method, response.status, payload.description);
     }
     return payload.result;

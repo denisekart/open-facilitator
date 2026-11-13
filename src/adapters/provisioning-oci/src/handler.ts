@@ -50,6 +50,9 @@ export interface ProvisionStartData {
   workloadId: string;
   team: string;
   deadline: string;
+  /** The kernel's scale-law reason (the same label the kernel's own
+   *  facilitator.provisioning.ops counter carries). */
+  reason?: string | undefined;
   spec: {
     image: string;
     entrypoint?: string[] | undefined;
@@ -67,6 +70,8 @@ export interface ProvisionStopData {
   workloadId: string;
   team: string;
   deadline: string;
+  /** The kernel's scale-law reason (see ProvisionStartData.reason). */
+  reason?: string | undefined;
 }
 
 export interface HandlerDeps {
@@ -77,7 +82,41 @@ export interface HandlerDeps {
   env: Record<string, string | undefined>;
   /** Injectable clock for the GC age law (unix seconds). */
   now?: () => number;
+  /**
+   * Telemetry seam (structural twin of @ofac/otel, dark by default):
+   * `provision.start`/`provision.stop` spans parented on the command
+   * carrier + the ofac.provisioning.ops counter. Labels mirror the kernel's
+   * vocabulary (`facilitator.provisioning.ops`, KernelMetrics.cs) so the
+   * record of an op and the executor's record of it share labels.
+   */
+  telemetry?: LauncherTelemetry | undefined;
 }
+
+/** The counter + instrument surface the handler uses (subset of
+ *  @ofac/otel's TelemetryHandle, kept dependency-free). */
+export interface LauncherTelemetry {
+  readonly emitting: boolean;
+  meter(name: string): {
+    createCounter(
+      name: string,
+      options?: { description?: string },
+    ): {
+      add(delta: number, attributes?: Record<string, string>): void;
+    };
+  };
+  instrument<T>(
+    name: string,
+    carrier: { traceparent?: string | undefined },
+    run: () => Promise<T>,
+    attributes?: Record<string, string> | (() => Record<string, string>),
+  ): Promise<T>;
+}
+
+const DARK_LAUNCHER_TELEMETRY: LauncherTelemetry = {
+  emitting: false,
+  meter: () => ({ createCounter: () => ({ add: () => undefined }) }),
+  instrument: (_name, _carrier, run) => run(),
+};
 
 /** `ofac-` + the workload id folded to a DNS-safe container/hostname token. */
 export function slug(workloadId: string): string {
@@ -191,6 +230,13 @@ export async function garbageCollect(
 export function createProvisionHandler(deps: HandlerDeps): LinkHandler {
   const { docker, config, logger, env } = deps;
   const nowUnix = deps.now ?? ((): number => Math.floor(Date.now() / 1000));
+  const telemetry = deps.telemetry ?? DARK_LAUNCHER_TELEMETRY;
+  // The executor's half of the scale law: same instrument identity as the
+  // kernel's facilitator.provisioning.ops, labels op x reason.
+  const ops = telemetry.meter("ofac.provisioning").createCounter("ofac.provisioning.ops", {
+    description: "Provision ops executed by the launcher (labels: op, reason)",
+  });
+  const reasonOf = (data: { reason?: string | undefined }): string => data.reason ?? "unknown";
 
   const onStart = async (data: ProvisionStartData): Promise<CommandOutcome> => {
     const existing = await docker.listContainers([`${WORKLOAD_LABEL}=${data.workloadId}`]);
@@ -290,7 +336,17 @@ export function createProvisionHandler(deps: HandlerDeps): LinkHandler {
           return { kind: "rejected", reason: "malformed-provision-start-data" };
         }
 
-        return onStart(data);
+        return telemetry.instrument(
+          "provision.start",
+          cmd,
+          async () => {
+            const outcome = await onStart(data);
+            const reason = outcome.kind === "rejected" ? outcome.reason : reasonOf(data);
+            ops.add(1, { op: "start", reason: reason ?? "unknown" });
+            return outcome;
+          },
+          () => ({ "ofac.op": "start", "ofac.reason": reasonOf(data) }),
+        );
       }
 
       if (cmd.type === CMD_PROVISION_STOP) {
@@ -304,7 +360,16 @@ export function createProvisionHandler(deps: HandlerDeps): LinkHandler {
           return { kind: "rejected", reason: "malformed-provision-stop-data" };
         }
 
-        return onStop(data);
+        return telemetry.instrument(
+          "provision.stop",
+          cmd,
+          async () => {
+            const outcome = await onStop(data);
+            ops.add(1, { op: "stop", reason: reasonOf(data) });
+            return outcome;
+          },
+          () => ({ "ofac.op": "stop", "ofac.reason": reasonOf(data) }),
+        );
       }
 
       return {

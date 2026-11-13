@@ -32,6 +32,7 @@
     "@ofac/adapter": "workspace:*",
     "@ofac/forgejo-adapter": "workspace:*",
     "@ofac/gateway": "workspace:*",
+    "@ofac/otel": "workspace:*",
     "@ofac/protocol": "workspace:*",
     "@ofac/provider-core": "workspace:*",
     "@ofac/workspace-link": "workspace:*",

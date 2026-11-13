@@ -76,7 +76,11 @@ import {
 } from "./policy.js";
 import { loadPolicyFile, type LoadedPolicy, type PolicyRow } from "./policy-file.js";
 import { auditPolicy } from "./audit.js";
-import { startGatewayTelemetry, type GatewayTelemetry, type GatewayTelemetryStatus } from "./telemetry.js";
+import {
+  startGatewayTelemetry,
+  type GatewayTelemetry,
+  type GatewayTelemetryStatus,
+} from "./telemetry.js";
 import { defaultClaimsDeps, extractClaims, type ActorClaims } from "./claims.js";
 import { computeActionDigest } from "@ofac/protocol";
 import {
@@ -1047,6 +1051,10 @@ export class GatewayRuntime {
       // link.deliver span, so this is the delivery's trace id).
       ...this.telemetry.auditTraceFields(),
     });
+    // The same line rides OTLP logs (additive; stdout stays the durable
+    // artifact). Emitted under the active link.deliver span, so the log
+    // record carries the delivery's trace id for the cross-plane join.
+    this.telemetry.log({ message: "authorization.evaluated", decision: decision.verdict, reason });
     this.telemetry.decision(decision.verdict, reason);
   }
 
@@ -1810,10 +1818,7 @@ function readStoredToken(stateDir: string): string | null {
 
 /** The envelope as the child sees it: carrier re-stamped to the ACTIVE
  * gateway span when telemetry emits, byte-identical otherwise. */
-function stampedCarrier(
-  cmd: EnvelopeCommand,
-  telemetry: GatewayTelemetry,
-): EnvelopeCommand {
+function stampedCarrier(cmd: EnvelopeCommand, telemetry: GatewayTelemetry): EnvelopeCommand {
   const carrier = telemetry.carrierFor(cmd.traceparent);
   if (carrier === cmd.traceparent) return cmd;
   return { ...cmd, ...(carrier !== undefined ? { traceparent: carrier } : {}) };

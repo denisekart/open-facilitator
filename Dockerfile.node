@@ -11,6 +11,7 @@ RUN corepack enable
 # Manifest layer first: installs only need the workspace topology.
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY src/protocol/package.json src/protocol/
+COPY src/otel/package.json src/otel/
 COPY src/workspace-link/package.json src/workspace-link/
 COPY src/gateway/package.json src/gateway/
 COPY src/adapters/harnesses/adapter-sdk/package.json src/adapters/harnesses/adapter-sdk/
@@ -29,6 +30,7 @@ COPY examples/full/coding-worker/package.json examples/full/coding-worker/
 RUN pnpm install --frozen-lockfile
 COPY tsconfig.base.json ./
 COPY src/protocol/ src/protocol/
+COPY src/otel/ src/otel/
 COPY src/workspace-link/ src/workspace-link/
 COPY src/gateway/ src/gateway/
 COPY src/adapters/harnesses/adapter-sdk/ src/adapters/harnesses/adapter-sdk/

@@ -151,10 +151,7 @@ export class GatewayTelemetry {
 }
 
 /** Env-only bootstrap for one gateway process (called once per runtime). */
-export function startGatewayTelemetry(
-  gatewayId: string,
-  team: string,
-): GatewayTelemetry {
+export function startGatewayTelemetry(gatewayId: string, team: string): GatewayTelemetry {
   const handle = startTelemetryFromEnv({
     serviceName: "ofac-gateway",
     meterName: "ofac.gateway",

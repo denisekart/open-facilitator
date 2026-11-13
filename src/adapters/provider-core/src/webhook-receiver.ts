@@ -98,11 +98,78 @@ export interface WebhookReceiverDeps {
   logger: LinkLogger;
   /** The provider's own command handler (reply/react/etc.), when any. */
   handler?: LinkHandler | undefined;
+  /**
+   * Telemetry seam (structural twin of @ofac/otel, dark by default): one
+   * `provider.webhook` span per fan-out delivery + the ofac.provider.*
+   * counters.
+   */
+  telemetry?: ProviderTelemetry | undefined;
+  /** Provider identity for span tags + counter labels (forgejo, github…). */
+  provider?: string | undefined;
+  /**
+   * Durable seen-delivery check (providerDeliveryId): a redelivery of an
+   * already-processed id counts `duplicate`, not `normalized` again.
+   * Adapters may persist this; the default keeps the last deliveries
+   * in-memory (at-least-once fan-out duplicates are adjacent).
+   */
+  seen?: (providerDeliveryId: string) => boolean;
 }
+
+/** The counter + instrument surface the receiver uses (subset of
+ *  @ofac/otel's TelemetryHandle, kept dependency-free like adapter-sdk). */
+export interface ProviderTelemetry {
+  readonly emitting: boolean;
+  meter(name: string): {
+    createCounter(
+      name: string,
+      options?: { description?: string },
+    ): {
+      add(delta: number, attributes?: Record<string, string>): void;
+    };
+  };
+  instrument<T>(
+    name: string,
+    carrier: { traceparent?: string | undefined },
+    run: () => Promise<T>,
+    attributes?: Record<string, string> | (() => Record<string, string>),
+  ): Promise<T>;
+}
+
+const DARK_PROVIDER_TELEMETRY: ProviderTelemetry = {
+  emitting: false,
+  meter: () => ({ createCounter: () => ({ add: () => undefined }) }),
+  instrument: (_name, _carrier, run) => run(),
+};
 
 /** A LinkHandler that consumes the webhook fan-out and delegates everything
  *  else to the provider's handler. */
 export function createWebhookReceiver(deps: WebhookReceiverDeps): LinkHandler {
+  const telemetry = deps.telemetry ?? DARK_PROVIDER_TELEMETRY;
+  const provider = deps.provider ?? "unknown";
+  const events = telemetry.meter("ofac.provider").createCounter("ofac.provider.events", {
+    description: "Webhook fan-out deliveries per provider (labels: outcome)",
+  });
+  // Bounded seen-delivery memory: the fan-out is at-least-once, and the
+  // kernel may re-enqueue the SAME provider delivery under a new link
+  // deliveryId — the providerDeliveryId is the stable identity.
+  const seenDefault = new Set<string>();
+  const seenLimit = 4096;
+  const firstSeen = (ids: readonly string[]): boolean => {
+    let fresh = false;
+    for (const id of ids) {
+      if (deps.seen !== undefined) {
+        if (!deps.seen(id)) fresh = true;
+        continue;
+      }
+      if (!seenDefault.has(id)) fresh = true;
+      seenDefault.add(id);
+      if (seenDefault.size > seenLimit) {
+        const oldest = seenDefault.values().next();
+        if (!oldest.done) seenDefault.delete(oldest.value);
+      }
+    }
+    return fresh;
+  };
   return {
     async onCommand(cmd: EnvelopeCommand, ctx: CommandContext): Promise<CommandOutcome> {
       if (cmd.type !== WEBHOOK_COMMAND_TYPE) {
@@ -115,31 +182,63 @@ export function createWebhookReceiver(deps: WebhookReceiverDeps): LinkHandler {
 
       const delivery = decodeWebhookCommand(cmd);
       if (delivery === undefined) {
+        events.add(1, { provider, outcome: "rejected" });
         return { kind: "rejected", reason: "malformed-webhook-data" };
       }
 
-      let verdict: WebhookVerdict;
-      try {
-        verdict = await deps.normalize(delivery);
-      } catch (error) {
-        deps.logger.error("webhook normalize failed", { error: String(error) });
-        return { kind: "rejected", reason: "normalize-failed" };
-      }
-
-      if (verdict.kind === "bad-signature") {
-        deps.logger.warn("webhook rejected: bad signature", { provider: delivery.provider });
-        return { kind: "rejected", reason: "bad-signature" };
-      }
-
-      for (const event of verdict.events) {
-        await deps.publish(event);
-      }
-
-      deps.logger.info("webhook fan-out processed", {
-        provider: delivery.provider,
-        published: verdict.events.length,
+      // One span per fan-out delivery, parented on the command's carrier;
+      // the tags are evaluated when the span ends, from the verdict.
+      const normalize = deps.normalize;
+      let reason = "published";
+      const tags = (): Record<string, string> => ({
+        "ofac.provider": provider,
+        "ofac.reason": reason,
       });
-      return { kind: "accepted" };
+      return await telemetry.instrument(
+        "provider.webhook",
+        cmd,
+        async () => {
+          let verdict: WebhookVerdict;
+          try {
+            verdict = await normalize(delivery);
+          } catch (error) {
+            deps.logger.error("webhook normalize failed", { error: String(error) });
+            reason = "normalize-failed";
+            events.add(1, { provider, outcome: "rejected" });
+            return { kind: "rejected", reason: "normalize-failed" };
+          }
+
+          if (verdict.kind === "bad-signature") {
+            deps.logger.warn("webhook rejected: bad signature", { provider: delivery.provider });
+            reason = "bad-signature";
+            events.add(1, { provider, outcome: "rejected" });
+            return { kind: "rejected", reason: "bad-signature" };
+          }
+
+          const deliveryIds = verdict.events
+            .map((event) => event.data["providerDeliveryId"])
+            .filter((id): id is string => typeof id === "string" && id !== "");
+          const fresh = deliveryIds.length === 0 || firstSeen(deliveryIds);
+          if (!fresh) {
+            reason = "duplicate";
+            events.add(1, { provider, outcome: "duplicate" });
+            return { kind: "accepted" };
+          }
+
+          for (const event of verdict.events) {
+            await deps.publish(event);
+          }
+
+          reason = verdict.events.length === 0 ? "unmappable" : "published";
+          events.add(1, { provider, outcome: "normalized" });
+          deps.logger.info("webhook fan-out processed", {
+            provider: delivery.provider,
+            published: verdict.events.length,
+          });
+          return { kind: "accepted" };
+        },
+        tags,
+      );
     },
   };
 }

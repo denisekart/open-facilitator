@@ -78,7 +78,57 @@ export interface RunContext {
 }
 
 export type RunOutcome =
-  { readonly kind: "completed" } | { readonly kind: "failed"; readonly reason: string };
+  | {
+      readonly kind: "completed";
+      /**
+       * Harness-reported token counts, WHERE the harness reports them
+       * (native transcripts vary). The SDK records them as the
+       * `ofac.worker.tokens` counter (labels `kind: prompt|completion`) —
+       * never a span attribute holding text.
+       */
+      readonly usage?: { readonly promptTokens?: number; readonly completionTokens?: number };
+    }
+  | { readonly kind: "failed"; readonly reason: string };
+
+/** One counter, structurally (the SDK only ever calls `add`). */
+export interface AdapterCounter {
+  add(delta: number, attributes?: Record<string, string | number>): void;
+}
+
+/** A meter, structurally (the SDK only creates counters). */
+export interface AdapterMeter {
+  createCounter(name: string, options?: { description?: string; unit?: string }): AdapterCounter;
+}
+
+/**
+ * The minimal telemetry contract this package needs — a structural twin of
+ * `@ofac/otel`'s `TelemetryHandle` so the worker bin can pass a real handle
+ * without this package depending on the OTel SDK.
+ */
+export interface AdapterTelemetry {
+  readonly emitting: boolean;
+  /** W3C carrier for the ACTIVE span (undefined outside a span / when dark). */
+  currentTraceparent(): string | undefined;
+  meter(name: string): AdapterMeter;
+  /**
+   * One span around `run`, parented on the carrier when it parses. The
+   * function form of `attributes` is evaluated when the span ends.
+   */
+  instrument<T>(
+    name: string,
+    carrier: { traceparent?: string | undefined },
+    run: () => Promise<T>,
+    attributes?: Record<string, string> | (() => Record<string, string>),
+  ): Promise<T>;
+}
+
+/** The dark seam default: identity wrapper, no-op counters, zero cost. */
+export const DARK_ADAPTER_TELEMETRY: AdapterTelemetry = {
+  emitting: false,
+  currentTraceparent: () => undefined,
+  meter: () => ({ createCounter: () => ({ add: () => undefined }) }),
+  instrument: (_name, _carrier, run) => run(),
+};
 
 /** The harness half of the contract: the native run's lifecycle callbacks. */
 export interface HarnessHooks {
@@ -113,6 +163,16 @@ export interface CreateAdapterOptions {
   /** Restart backoff schedule (cap-loop forever on the last entry); `[]` disables auto-restart. */
   restartBackoffMs?: readonly number[];
   logger?: LinkLogger;
+  /**
+   * The telemetry seam — a structural twin of `@ofac/otel`'s
+   * `TelemetryHandle`, kept dependency-free here (the adapter package
+   * ships no OTel SDK). The worker bin passes `startTelemetryFromEnv(...)`;
+   * the default is the dark no-op, so every call site stays syntactically
+   * identical and a telemetry-dark worker pays zero module cost. Drives the
+   * `worker.execute` span (carrier: the command envelope) and the
+   * `ofac.worker.tokens` counter.
+   */
+  telemetry?: AdapterTelemetry;
   /**
    * Kernel origin for the artifact byte path. `RunContext.kernel`
    * surfaces it + the bearer for link-plane HTTP; `token` defaults to the

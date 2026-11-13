@@ -14,6 +14,7 @@ import {
   type LinkTokenProvider,
 } from "@ofac/workspace-link";
 import { SignalrTransport, SqliteLedger, postCapabilities } from "@ofac/workspace-link/node";
+import { startTelemetryFromEnv } from "@ofac/otel";
 import { dockerSocketPath, DockerClient, type DockerApi } from "./docker.js";
 import { createProvisionHandler, garbageCollect, launcherManifest } from "./handler.js";
 import type { LauncherConfig } from "./config.js";
@@ -74,6 +75,15 @@ export async function run(
   const docker =
     deps.docker ?? new DockerClient({ socketPath: dockerSocketPath(config.dockerHost) });
   const env = deps.env ?? process.env;
+  // Telemetry from env: the handler's ops + counters ride this handle. The
+  // reference deployment pins this process OFF (OTEL_SDK_DISABLED) — the
+  // silence is a decision; the seam exists so it CAN emit.
+  const telemetry = startTelemetryFromEnv({
+    serviceName: "oci-launcher",
+    meterName: "ofac.provisioning",
+    instanceId: config.endpointId,
+    resourceAttributes: { "ofac.team": config.team, "ofac.endpoint_id": config.endpointId },
+  });
 
   // ── link plane: enroll (secret mode) → capabilities → client ───────────
   // The enrollment shape is forgejo's verbatim: secret-mode POST /enroll with
@@ -118,9 +128,11 @@ export async function run(
       config,
       logger,
       env,
+      telemetry,
       ...(deps.now === undefined ? {} : { now: deps.now }),
     }),
     logger,
+    instrument: (name, envelope, run) => telemetry.instrument(name, envelope, run),
   });
 
   // Startup GC leg: crash-orphaned exited/dead ofac-labeled containers from a

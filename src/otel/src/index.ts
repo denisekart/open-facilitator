@@ -36,11 +36,14 @@ export interface TelemetryHandle {
   /**
    * One span around `run`, parented on the carrier when it parses (the
    * envelope IS the carrier — law 4). Identity wrapper when dark.
+   * `attributes` labels the span (low-cardinality only); a function form is
+   * evaluated when the span ENDS, so the run's outcome can tag its own span.
    */
   instrument<T>(
     name: string,
     carrier: { traceparent?: string | undefined },
     run: () => Promise<T>,
+    attributes?: Record<string, string> | (() => Record<string, string>),
   ): Promise<T>;
   /** Emits one OTLP log record (no-op unless {@link logsExported}). */
   log(fields: Record<string, unknown>): void;
@@ -63,6 +66,11 @@ export interface TelemetryOptions {
   logBridge?: (fields: Record<string, unknown>) => Record<string, unknown>;
 }
 
+/** The shared dark handle: consumers default to it so instrument/log calls
+ * stay syntactically identical on the emitting and silent paths, and a dark
+ * process pays ZERO @opentelemetry module cost. */
+export { NOOP_HANDLE as DARK_TELEMETRY };
+
 const NOOP_HANDLE: TelemetryHandle = {
   emitting: false,
   logsExported: false,
@@ -82,6 +90,12 @@ const NOOP_INSTRUMENT = {
   add: () => undefined,
   record: () => undefined,
 } as unknown as ReturnType<Meter["createCounter"]>;
+
+// The sentinel viewed structurally, for the "is this still the no-op?" test.
+const NOOP_SENTINEL: Record<string, unknown> = NOOP_INSTRUMENT as unknown as Record<
+  string,
+  unknown
+>;
 
 const EMPTY_METER: Meter = {
   createCounter: () => NOOP_INSTRUMENT,
@@ -143,14 +157,12 @@ interface TracingRegistration {
     name: string,
     carrier: { traceparent?: string | undefined },
     run: () => Promise<T>,
+    attributes?: Record<string, string> | (() => Record<string, string>),
   ): Promise<T>;
   shutdown(): Promise<void>;
 }
 
-function startEmitting(
-  options: TelemetryOptions,
-  logsExported: boolean,
-): TelemetryHandle {
+function startEmitting(options: TelemetryOptions, logsExported: boolean): TelemetryHandle {
   // Late-bound after registration; every read goes through it so the handle
   // stays valid (and silent) even while the SDK registration is in flight.
   let tracing: TracingRegistration = {
@@ -191,7 +203,8 @@ function startEmitting(
     // real instruments once the SDK lands (calls before that are no-ops).
     meter: (name) => forwardingMeter(() => tracing.meter(name)),
     tracer: (name) => forwardingTracer(() => tracing.tracer(name)),
-    instrument: (name, carrier, run) => tracing.instrument(name, carrier, run),
+    instrument: (name, carrier, run, attributes) =>
+      tracing.instrument(name, carrier, run, attributes),
     log: (fields) => emitLog(fields),
     ready: () => started,
     shutdown: async () => {
@@ -202,31 +215,87 @@ function startEmitting(
 }
 
 // Late-bound instrument facades: the caller may capture meter()/tracer()
-// synchronously at construction, while the SDK registers asynchronously.
+// AND individual instruments synchronously at construction, while the SDK
+// registers asynchronously. A captured instrument therefore forwards each
+// call at CALL time, materializing the real instrument the moment the
+// provider exists (calls before that are no-ops).
 const NOOP_OBSERVABLE = { addCallback: () => undefined, removeCallback: () => undefined };
 
-// The two structural views used to defer to the real provider once it lands.
-type InstrumentFactory = (name: string, options?: unknown) => unknown;
-type MeterFactories = Record<string, InstrumentFactory>;
-type TracerSurface = { startSpan: (...a: unknown[]) => unknown; startActiveSpan: (...a: unknown[]) => unknown };
+type InstrumentKind =
+  | "createCounter"
+  | "createUpDownCounter"
+  | "createHistogram"
+  | "createGauge"
+  | "createObservableCounter"
+  | "createObservableUpDownCounter"
+  | "createObservableGauge";
+
+// Structural views of the two SDK surfaces used after registration lands —
+// the api types are wide unions, the calls here touch one member each.
+type DeferredFactory = (name: string, options?: unknown) => unknown;
+type MeterFactories = Record<InstrumentKind, DeferredFactory>;
+type TracerSurface = {
+  startSpan: (...a: unknown[]) => unknown;
+  startActiveSpan: (...a: unknown[]) => unknown;
+};
 
 function forwardingMeter(get: () => Meter): Meter {
   const factories = (): MeterFactories => get() as unknown as MeterFactories;
-  const create = (kind: string): InstrumentFactory => {
-    return (name, options) =>
-      // The target may still be the no-op facade (registration racing);
-      // observable kinds fall back to a no-op callback holder.
-      factories()[kind]?.(name, options) ??
-      (kind.startsWith("createObservable") ? NOOP_OBSERVABLE : NOOP_INSTRUMENT);
-  };
+  const deferred =
+    (kind: InstrumentKind): DeferredFactory =>
+    (name, options) => {
+      const real = (): Record<string, unknown> | undefined => {
+        const made = factories()[kind]?.(name, options) as Record<string, unknown> | undefined;
+        // EMPTY_METER hands out the shared NOOP sentinel: not real yet.
+        return made === undefined || made === NOOP_SENTINEL ? undefined : made;
+      };
+      const observable = kind.startsWith("createObservable");
+      const callbacks: ((o: { observe: (v: number, a?: unknown) => void }) => void)[] = [];
+      let material: Record<string, unknown> | undefined;
+      const bind = (): void => {
+        if (material !== undefined) return;
+        material = real();
+        if (observable && material !== undefined) {
+          const adder = material["addCallback"];
+          if (typeof adder === "function") {
+            const apply = adder.bind(material) as (cb: unknown) => void;
+            for (const cb of callbacks) apply(cb);
+          }
+        }
+      };
+      const forward =
+        (member: string) =>
+        (...args: unknown[]): unknown => {
+          bind();
+          const target: Record<string, unknown> =
+            material ?? (observable ? (NOOP_OBSERVABLE as Record<string, unknown>) : NOOP_SENTINEL);
+          const fn = target[member];
+          return typeof fn === "function"
+            ? (fn as (...a: unknown[]) => unknown).apply(target, args)
+            : undefined;
+        };
+      if (observable) {
+        return {
+          addCallback: (cb: (o: { observe: (v: number, a?: unknown) => void }) => void) => {
+            callbacks.push(cb);
+            bind();
+          },
+          removeCallback: forward("removeCallback"),
+        };
+      }
+      return {
+        add: forward("add"),
+        record: forward("record"),
+      };
+    };
   return {
-    createCounter: create("createCounter"),
-    createUpDownCounter: create("createUpDownCounter"),
-    createHistogram: create("createHistogram"),
-    createGauge: create("createGauge"),
-    createObservableCounter: create("createObservableCounter"),
-    createObservableUpDownCounter: create("createObservableUpDownCounter"),
-    createObservableGauge: create("createObservableGauge"),
+    createCounter: deferred("createCounter"),
+    createUpDownCounter: deferred("createUpDownCounter"),
+    createHistogram: deferred("createHistogram"),
+    createGauge: deferred("createGauge"),
+    createObservableCounter: deferred("createObservableCounter"),
+    createObservableUpDownCounter: deferred("createObservableUpDownCounter"),
+    createObservableGauge: deferred("createObservableGauge"),
   } as unknown as Meter;
 }
 
@@ -302,9 +371,7 @@ async function register(
   // OTEL_TRACES_SAMPLER(_ARG) stay the operator's dial.
   const provider = new tracePkg.NodeTracerProvider({
     resource,
-    spanProcessors: [
-      new spanSdk.BatchSpanProcessor(new traceExporter.OTLPTraceExporter()),
-    ],
+    spanProcessors: [new spanSdk.BatchSpanProcessor(new traceExporter.OTLPTraceExporter())],
   });
   const contextManager = new contextHooks.AsyncLocalStorageContextManager();
   contextManager.enable();
@@ -391,7 +458,12 @@ async function register(
     tracer(name) {
       return api.trace.getTracer(name);
     },
-    async instrument(name, carrier, run) {
+    async instrument<T>(
+      name: string,
+      carrier: { traceparent?: string | undefined },
+      run: () => Promise<T>,
+      attributes?: Record<string, string> | (() => Record<string, string>),
+    ): Promise<T> {
       const tracer = api.trace.getTracer("ofac.otel");
       let parent: ReturnType<typeof api.propagation.extract> | undefined;
       if (carrier.traceparent !== undefined) {
@@ -406,7 +478,9 @@ async function register(
       }
       return tracer.startActiveSpan(
         name,
-        { kind: api.SpanKind.SERVER },
+        typeof attributes === "function" || attributes === undefined
+          ? { kind: api.SpanKind.SERVER }
+          : { kind: api.SpanKind.SERVER, attributes },
         parent ?? api.context.active(),
         async (span) => {
           try {
@@ -420,6 +494,14 @@ async function register(
             });
             throw error;
           } finally {
+            // Late attributes see the run's outcome — but only a settled one.
+            if (typeof attributes === "function") {
+              try {
+                span.setAttributes(attributes());
+              } catch {
+                /* telemetry never fails the operation */
+              }
+            }
             span.end();
           }
         },
@@ -428,11 +510,13 @@ async function register(
     async shutdown() {
       // Never-throw law: an unreachable endpoint must not fail a business
       // operation — and stop() IS one. A failed flush is the warn-once line.
-      const failed = (label: string) => (err: unknown): void => {
-        warnFirstFailure(
-          `${label} during shutdown (${err instanceof Error ? err.message : String(err)}); telemetry stays quiet`,
-        );
-      };
+      const failed =
+        (label: string) =>
+        (err: unknown): void => {
+          warnFirstFailure(
+            `${label} during shutdown (${err instanceof Error ? err.message : String(err)}); telemetry stays quiet`,
+          );
+        };
       const settle = async (what: Promise<unknown>, label: string): Promise<void> => {
         await what.catch(failed(label));
       };

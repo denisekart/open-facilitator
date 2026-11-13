@@ -73,12 +73,16 @@ export {
   type RegistryState,
 } from "./registry.js";
 export type {
+  AdapterCounter,
   AdapterDescriptor,
   AdapterHandle,
+  AdapterMeter,
   AdapterStatus,
+  AdapterTelemetry,
   CreateAdapterOptions,
   HarnessHooks,
   RunContext,
   RunOutcome,
   SessionStore,
 } from "./types.js";
+export { DARK_ADAPTER_TELEMETRY } from "./types.js";

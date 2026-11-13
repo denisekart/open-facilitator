@@ -4,6 +4,7 @@
 // edge need about the forge is behind the ForgejoApi interface so unit tests
 // inject a fake (zero HTTP). Exported for the connector package too: one
 // seam, so a later privileged-write split reuses the same boundary.
+import { observeHttpStatus } from "@ofac/provider-core";
 import { trimSlash } from "@ofac/workspace-link";
 
 export class ForgejoError extends Error {
@@ -150,6 +151,7 @@ export class ForgejoClient implements ForgejoApi {
     });
     if (!response.ok) {
       const text = await response.text().catch(() => "");
+      observeHttpStatus(response.status);
       throw new ForgejoError(call, response.status, text.slice(0, 200));
     }
 

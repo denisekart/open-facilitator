@@ -49,8 +49,12 @@ export {
 export { createConnectorHooks, type ConnectorHooks } from "./hooks-core.js";
 export {
   HttpError,
+  classifyHttpStatus,
   httpErrorFrom,
+  httpErrorStatusLabel,
+  observeHttpStatus,
   parseRetryAfter,
+  setHttpErrorObserver,
   withRetry,
   type RetryAttempt,
   type WithRetryOptions,

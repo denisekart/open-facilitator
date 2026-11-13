@@ -14,6 +14,7 @@
 import { parseArgs } from "node:util";
 import { createConsoleLogger } from "@ofac/workspace-link";
 import type { LinkLogger } from "@ofac/workspace-link";
+import { startTelemetryFromEnv } from "@ofac/otel";
 import { createAdapter } from "@ofac/adapter";
 import { WorkerConfigError, loadWorkerConfigFile, type WorkerConfig } from "../config.js";
 import { createOmpHooks } from "../harness.js";
@@ -57,7 +58,13 @@ export async function bootWorker(config: WorkerConfig, log: LinkLogger): Promise
   const cloneUrl = process.env["OFAC_GIT_CLONE_URL"];
   const cloneBranch = process.env["OFAC_GIT_BRANCH"];
   const cloneToken = process.env["OFAC_GIT_TOKEN"];
+  const telemetry = startTelemetryFromEnv({
+    serviceName: "ofac-omp-worker",
+    meterName: "ofac.worker",
+    instanceId: config.childWorkspaceId,
+  });
   const handle = await createAdapter({
+    telemetry,
     childWorkspaceId: config.childWorkspaceId,
     ...(config.token !== undefined ? { token: config.token } : {}),
     kernel: {
@@ -110,7 +117,10 @@ export async function bootWorker(config: WorkerConfig, log: LinkLogger): Promise
           : `tcp=${config.transport.host ?? "127.0.0.1"}:${String(config.transport.port ?? 0)}`;
       process.stdout.write(`worker ready childId=${config.childWorkspaceId} ${endpoint}\n`);
     }),
-    stop: () => handle.close(),
+    stop: async () => {
+      await handle.close();
+      await telemetry.shutdown();
+    },
   };
 }
 

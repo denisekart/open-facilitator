@@ -6,6 +6,7 @@
 // later privileged-write split reuses the same boundary. The `repo` inputs
 // are `group/proj` paths — v4 addresses a project by its URL-encoded
 // `path_with_namespace`, so every path segment here encodes the whole repo.
+import { observeHttpStatus } from "@ofac/provider-core";
 import { trimSlash } from "@ofac/workspace-link";
 
 export class GitLabError extends Error {
@@ -181,6 +182,7 @@ export class GitLabClient implements GitLabApi {
     });
     if (!response.ok) {
       const text = await response.text().catch(() => "");
+      observeHttpStatus(response.status);
       throw new GitLabError(call, response.status, text.slice(0, 200));
     }
 

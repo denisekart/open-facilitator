@@ -106,6 +106,49 @@ export async function withRetry<T>(fn: () => Promise<T>, opts: WithRetryOptions)
   throw lastError;
 }
 
+/** The metric label for the taxonomy (the ONE place 429/403/5xx are named):
+ *  consumers of HttpError count failures through this, never re-parsing. */
+export function httpErrorStatusLabel(error: HttpError): "429" | "403" | "5xx" | undefined {
+  return classifyHttpStatus(error.status);
+}
+
+/** The same taxonomy from a bare response status — the vendor clients
+ *  (ForgejoError/MmError/…) classify through here, never re-parsing. */
+export function classifyHttpStatus(status: number): "429" | "403" | "5xx" | undefined {
+  if (status === 429) return "429";
+  if (status === 403) return "403";
+  return status >= 500 ? "5xx" : undefined;
+}
+
+// The taxonomy's observation seam: whoever owns telemetry registers once
+// (the provider adapter face does), and every classified HttpError counts
+// itself — the retry loop included. Never throws; observers are fire-and-
+// forget metrics lines, not behavior.
+let httpErrorObserver: ((status: "429" | "403" | "5xx") => void) | undefined;
+
+export function setHttpErrorObserver(
+  observer: ((status: "429" | "403" | "5xx") => void) | undefined,
+): void {
+  httpErrorObserver = observer;
+}
+
+/** The vendor clients' one call: classify + count a non-2xx response.
+ * Dark (no observer) ⇒ a pure no-op. Never throws. */
+export function observeHttpStatus(status: number): void {
+  const label = classifyHttpStatus(status);
+  if (label !== undefined) {
+    try {
+      httpErrorObserver?.(label);
+    } catch {
+      /* telemetry never fails the operation */
+    }
+  }
+}
+
+function observeHttpError(error: HttpError): void {
+  observeHttpStatus(error.status);
+}
+
 /** Map a fetch Response onto the taxonomy: throws `HttpError` (with the
  *  honored `Retry-After`) on non-2xx, returns the parsed body otherwise. */
 export async function httpErrorFrom(
@@ -113,9 +156,13 @@ export async function httpErrorFrom(
   detail?: string,
   nowMs: number = Date.now(),
 ): Promise<HttpError> {
-  return new HttpError(
+  const error = new HttpError(
     response.status,
     detail,
     parseRetryAfter(response.headers.get("retry-after"), nowMs),
   );
+  // The taxonomy construction IS the observation point: every non-2xx
+  // provider response classifies once, here.
+  observeHttpError(error);
+  return error;
 }

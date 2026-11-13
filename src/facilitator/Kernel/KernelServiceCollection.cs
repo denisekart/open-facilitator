@@ -400,7 +400,15 @@ public static class KernelServiceCollection
         });
         if (!string.IsNullOrEmpty(builder.Configuration["Otel:Endpoint"]))
         {
-            otel.WithMetrics(m => m.AddOtlpExporter());
+            // Per-signal routing is code-side: the 1.21 exporter reads only
+            // the generic OTEL_EXPORTER_OTLP_ENDPOINT from env, while a
+            // code-set Endpoint is used VERBATIM (no signal path appended).
+            // OTEL_EXPORTER_OTLP_METRICS_ENDPOINT therefore carries a
+            // complete URL here — the same convention the JS SDK uses.
+            var metricsEndpoint = Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_METRICS_ENDPOINT");
+            otel.WithMetrics(string.IsNullOrEmpty(metricsEndpoint)
+                ? m => m.AddOtlpExporter()
+                : m => m.AddOtlpExporter(o => o.Endpoint = new Uri(metricsEndpoint)));
             otel.WithTracing(t => t.AddOtlpExporter());
         }
 

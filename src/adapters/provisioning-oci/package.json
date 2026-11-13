@@ -30,6 +30,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@ofac/otel": "workspace:*",
     "@ofac/protocol": "workspace:*",
     "@ofac/workspace-link": "workspace:*",
     "better-sqlite3": "catalog:",

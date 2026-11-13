@@ -3,6 +3,7 @@
 // call. Everything the link handler and the WS listener need about the
 // provider is behind the MattermostApi interface so unit tests inject a fake
 // (the idempotency-ledger tests must run with zero HTTP).
+import { observeHttpStatus } from "@ofac/provider-core";
 import { trimSlash } from "@ofac/workspace-link";
 import type { AdapterState } from "./post-ledger.js";
 import type { MmPost } from "./normalize.js";
@@ -110,6 +111,7 @@ export class MattermostClient implements MattermostApi {
         typeof payload === "object" && payload !== null
           ? String((payload as Record<string, unknown>)["message"] ?? "")
           : "";
+      observeHttpStatus(response.status);
       throw new MmError(call, response.status, detail === "" ? undefined : detail);
     }
     return payload as T;

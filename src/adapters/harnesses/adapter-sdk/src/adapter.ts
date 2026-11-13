@@ -20,6 +20,7 @@ import type { EnvelopeCommand, EnvelopeEvent } from "@ofac/protocol";
 import { buildEvent, createConsoleLogger } from "@ofac/workspace-link";
 import type { LinkLogger } from "@ofac/workspace-link";
 import { ExecutionRegistry, type RegistryEntry } from "./registry.js";
+import { DARK_ADAPTER_TELEMETRY, type AdapterCounter, type AdapterTelemetry } from "./types.js";
 import type {
   AdapterHandle,
   AdapterStatus,
@@ -86,6 +87,8 @@ class Adapter implements AdapterHandle {
   private readonly woken = Promise.withResolvers<void>();
   private readonly restartMs: readonly number[];
   private readonly log: LinkLogger;
+  private readonly telemetry: AdapterTelemetry;
+  private readonly tokens: AdapterCounter;
   private connection: ChildConnection | null = null;
   private generation = 0;
   private closedLocally = false;
@@ -95,6 +98,10 @@ class Adapter implements AdapterHandle {
   constructor(private readonly opts: CreateAdapterOptions) {
     this.restartMs = opts.restartBackoffMs ?? DEFAULT_RESTART_BACKOFF_MS;
     this.log = opts.logger ?? createConsoleLogger();
+    this.telemetry = opts.telemetry ?? DARK_ADAPTER_TELEMETRY;
+    this.tokens = this.telemetry.meter("ofac.worker").createCounter("ofac.worker.tokens", {
+      description: "Harness-reported token counts (labels: kind)",
+    });
     this.loop = this.runLoop();
     // ready() rejections must not surface as unhandled rejections when the
     // caller never awaits them (the restart loop keeps its own counsel).
@@ -450,13 +457,24 @@ class Adapter implements AdapterHandle {
     const hooks = this.opts.hooks;
     let outcome: RunOutcome;
     try {
-      outcome = await hooks.onExecute(ctx);
+      // One span per execution, parented on the command's carrier (law 4:
+      // the envelope IS the carrier); span ERROR status carries the failure.
+      // Dark ⇒ identity wrapper.
+      outcome = await this.telemetry.instrument("worker.execute", ctx.command, () =>
+        hooks.onExecute(ctx),
+      );
     } catch (error) {
       outcome = {
         kind: "failed",
         reason: error instanceof Error ? error.message : String(error),
       };
     }
+    // Harness-reported usage rides the counter, never a text-bearing span
+    // attribute (cardinality law).
+    const usage = outcome.kind === "completed" ? outcome.usage : undefined;
+    if (usage?.promptTokens !== undefined) this.tokens.add(usage.promptTokens, { kind: "prompt" });
+    if (usage?.completionTokens !== undefined)
+      this.tokens.add(usage.completionTokens, { kind: "completion" });
     // A hook that abandoned a requestInput without awaiting it: detach its
     // abort listener; the parked promise is honestly never resolved (a late
     // respond answers `unknown` — the run is gone).
@@ -501,6 +519,12 @@ class Adapter implements AdapterHandle {
   }
 
   private relay(env: EnvelopeEvent): void {
+    // The carrier law, stamped once for every child-published event (the
+    // plan's restamp sites all funnel through here): inside a worker.execute
+    // span the event rides THAT span; dark, the envelope stays byte-identical.
+    const carrier = this.telemetry.currentTraceparent();
+    const stamped =
+      carrier === undefined ? env : ({ ...env, traceparent: carrier } as EnvelopeEvent);
     const conn = this.connection;
     if (conn === null || !conn.connected) {
       // The socket is gone: the event has no route until the next register.
@@ -513,7 +537,7 @@ class Adapter implements AdapterHandle {
       });
       return;
     }
-    void conn.publishEvent(env).catch((error: unknown) => {
+    void conn.publishEvent(stamped).catch((error: unknown) => {
       this.log.warn("adapter-event-publish-failed", {
         reason: error instanceof Error ? error.message : String(error),
       });

@@ -366,6 +366,9 @@ importers:
       '@ofac/adapter':
         specifier: workspace:*
         version: link:../../../src/adapters/harnesses/adapter-sdk
+      '@ofac/otel':
+        specifier: workspace:*
+        version: link:../../../src/otel
       '@ofac/protocol':
         specifier: workspace:*
         version: link:../../../src/protocol
@@ -456,6 +459,9 @@ importers:
       '@ofac/gateway':
         specifier: workspace:*
         version: link:../../../gateway
+      '@ofac/otel':
+        specifier: workspace:*
+        version: link:../../../otel
       '@ofac/protocol':
         specifier: workspace:*
         version: link:../../../protocol
@@ -530,6 +536,9 @@ importers:
       '@ofac/github-adapter':
         specifier: workspace:*
         version: link:../github
+      '@ofac/otel':
+        specifier: workspace:*
+        version: link:../../../otel
       '@ofac/protocol':
         specifier: workspace:*
         version: link:../../../protocol
@@ -604,6 +613,9 @@ importers:
       '@ofac/gitlab-adapter':
         specifier: workspace:*
         version: link:../gitlab
+      '@ofac/otel':
+        specifier: workspace:*
+        version: link:../../../otel
       '@ofac/protocol':
         specifier: workspace:*
         version: link:../../../protocol
@@ -743,6 +755,9 @@ importers:
       '@ofac/gateway':
         specifier: workspace:*
         version: link:../../../gateway
+      '@ofac/otel':
+        specifier: workspace:*
+        version: link:../../../otel
       '@ofac/protocol':
         specifier: workspace:*
         version: link:../../../protocol
@@ -774,6 +789,9 @@ importers:
       '@ofac/gateway':
         specifier: workspace:*
         version: link:../../../gateway
+      '@ofac/otel':
+        specifier: workspace:*
+        version: link:../../../otel
       '@ofac/protocol':
         specifier: workspace:*
         version: link:../../../protocol
@@ -808,6 +826,9 @@ importers:
       '@ofac/gateway':
         specifier: workspace:*
         version: link:../../../gateway
+      '@ofac/otel':
+        specifier: workspace:*
+        version: link:../../../otel
       '@ofac/protocol':
         specifier: workspace:*
         version: link:../../../protocol
@@ -836,6 +857,9 @@ importers:
       '@ofac/adapter':
         specifier: workspace:*
         version: link:../harnesses/adapter-sdk
+      '@ofac/otel':
+        specifier: workspace:*
+        version: link:../../otel
       '@ofac/protocol':
         specifier: workspace:*
         version: link:../../protocol
@@ -867,6 +891,9 @@ importers:
 
   src/adapters/provisioning-oci:
     dependencies:
+      '@ofac/otel':
+        specifier: workspace:*
+        version: link:../../otel
       '@ofac/protocol':
         specifier: workspace:*
         version: link:../../protocol

@@ -35,6 +35,7 @@
     "@modelcontextprotocol/sdk": "catalog:",
     "@ofac/adapter": "workspace:*",
     "@ofac/gateway": "workspace:*",
+    "@ofac/otel": "workspace:*",
     "@ofac/protocol": "workspace:*",
     "@ofac/workspace-link": "workspace:*",
     "yaml": "catalog:"

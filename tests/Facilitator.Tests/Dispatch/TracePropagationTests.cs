@@ -1,6 +1,8 @@
 using System.Diagnostics;
+using System.Net;
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 
 using Facilitator.Kernel.Shared.Dispatch;
@@ -119,6 +121,42 @@ public sealed class TracePropagationTests(DispatchDbFixture fixture)
         var stored = JsonDocument.Parse(storedText2);
         Assert.Equal(seeded, stored.RootElement.GetProperty("traceparent").GetString());
         Assert.Equal(seeded, JsonDocument.Parse(Assert.Single(sink.Delivered, d => d.Contains(commandId))).RootElement.GetProperty("traceparent").GetString());
+    }
+
+    /// <summary>
+    /// Inbound twin of the dispatch law: an envelope that arrives over the
+    /// link plane already carrying a traceparent (minted kernel-side, stamped
+    /// into the outbox envelope, echoed back by the worker) JOINS that trace -
+    /// <c>ingress.process</c> is parented on the carrier (remote), not linked
+    /// and not a fresh root.
+    /// </summary>
+    [Fact]
+    public async Task LinkIngress_CarriesInboundTraceparentIntoIngressSpan()
+    {
+        using var factory = new KernelTestFactory(fixture, noDispatcher: true);
+        var kernel = factory.CreateAuthedClient();
+        var endpoint = "gw-tp-" + Guid.NewGuid().ToString("N")[..8];
+        var token = await LinkTestHarness.EnrollAsync(kernel, endpoint);
+        var link = factory.CreateLinkClient(token);
+        var (workId, version) = await KernelOps.CreateWorkAsync(kernel, "link trace join");
+        var root = JsonNode.Parse(PostgresFixture.SteerFixtureFor("valid/command.work.steer.json", workId, version))!.AsObject();
+        // A trace id that cannot collide with anything ambient: 0f... is never
+        // produced by the seeded RNG paths of the other legs in this run.
+        var traceId = "0f" + Convert.ToHexString(RandomNumberGenerator.GetBytes(15)).ToLowerInvariant();
+        var spanId = Convert.ToHexString(RandomNumberGenerator.GetBytes(8)).ToLowerInvariant();
+        root["traceparent"] = $"00-{traceId}-{spanId}-01";
+
+        using var collector = new SpanCollector();
+        await KernelOps.PostJsonAsync(link, "/api/link/v1/events",
+            root.ToJsonString(), HttpStatusCode.Accepted);
+
+        var ingress = Assert.Single(collector.Spans,
+            s => s.OperationName == "ingress.process"
+                && s.TagObjects.FirstOrDefault(t => t.Key == "facilitator.endpoint_id").Value as string == endpoint);
+        // A join, not a link: parent = the posted carrier, same trace, zero links.
+        Assert.Equal(traceId, ingress.RootId);
+        Assert.Equal(spanId, ingress.ParentSpanId.ToHexString());
+        Assert.Empty(ingress.Links);
     }
 
     [Fact]

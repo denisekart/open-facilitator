@@ -68,6 +68,20 @@ public sealed class LinkIngress(
             return new LinkAdmission(screen.Problem, null, null);
         }
 
+        // Durable-queue trace law, inbound twin: the carrier rides the envelope, so
+        // extract-or-fresh here and let every arm run as its child. isRemote:true -
+        // the sender is another process (docs/protocol.md:16, envelope.json:51-53).
+        var linkParent = default(ActivityContext);
+        if (screen.Root.ValueKind == JsonValueKind.Object
+            && screen.Root.TryGetProperty("traceparent", out var linkTp)
+            && linkTp.ValueKind == JsonValueKind.String)
+        {
+            ActivityContext.TryParse(linkTp.GetString(), null, isRemote: true, out linkParent);
+        }
+        using var ingressSpan = KernelActivity.Source.StartActivity(
+            "ingress.process", ActivityKind.Internal, linkParent);
+        ingressSpan?.SetTag("facilitator.endpoint_id", workload.EndpointId);
+
         if (screen.Type == "org.facilitator.event.provider.degraded.v1" && notifications is not null)
         {
             // Provider unhappy (F6): the adapter that observed the trouble
@@ -374,34 +388,34 @@ public sealed class LinkIngress(
                 ? parsed
                 : 0;
             var steerStatus = "accepted";
-            using (KernelActivity.Source.StartActivity("ingress.process", ActivityKind.Internal))
+            // The ingress.process span opened after the gate screen is the
+            // one activity for this arm; a second nested span of the same
+            // name here would double the steer spans.
+            var steer = await store.ApplySteerAsync(workId.Value, directive, screen.CommandId!, expectedVersion, ct);
+            var error = steer switch
             {
-                var steer = await store.ApplySteerAsync(workId.Value, directive, screen.CommandId!, expectedVersion, ct);
-                var error = steer switch
-                {
-                    SteerResult.Ok => null,
-                    SteerResult.Conflict => "version-conflict",
-                    SteerResult.Terminal => "terminal-state",
-                    SteerResult.Duplicate => null,
-                    _ => "work-not-found",
-                };
-                await inbox.MarkProcessedAsync(inboxId, error, ct);
-                metrics.InboxProcessed();
-                steerStatus = steer is SteerResult.Duplicate ? "duplicate" : "accepted";
-                if (steer is SteerResult.Conflict conflict)
-                {
-                    return new LinkAdmission(ProblemErrors.VersionConflict(conflict.CurrentVersion), null, null);
-                }
+                SteerResult.Ok => null,
+                SteerResult.Conflict => "version-conflict",
+                SteerResult.Terminal => "terminal-state",
+                SteerResult.Duplicate => null,
+                _ => "work-not-found",
+            };
+            await inbox.MarkProcessedAsync(inboxId, error, ct);
+            metrics.InboxProcessed();
+            steerStatus = steer is SteerResult.Duplicate ? "duplicate" : "accepted";
+            if (steer is SteerResult.Conflict conflict)
+            {
+                return new LinkAdmission(ProblemErrors.VersionConflict(conflict.CurrentVersion), null, null);
+            }
 
-                if (steer is SteerResult.Terminal)
-                {
-                    return new LinkAdmission(ProblemErrors.InvalidTransition("terminal→steer"), null, null);
-                }
+            if (steer is SteerResult.Terminal)
+            {
+                return new LinkAdmission(ProblemErrors.InvalidTransition("terminal→steer"), null, null);
+            }
 
-                if (steer is SteerResult.NotFound)
-                {
-                    return new LinkAdmission(ProblemErrors.WorkNotFound(workId.Value), null, null);
-                }
+            if (steer is SteerResult.NotFound)
+            {
+                return new LinkAdmission(ProblemErrors.WorkNotFound(workId.Value), null, null);
             }
 
             return new LinkAdmission(null, steerStatus, inboxId);

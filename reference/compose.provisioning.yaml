@@ -39,6 +39,14 @@ services:
       # The workload spec's $-names resolve against THIS env.
       DEMO_ENROLLMENT_TOKEN: ${DEMO_ENROLLMENT_TOKEN:?set in .env}
       DEMO_CHILD_SECRET: ${DEMO_CHILD_SECRET:?set in .env}
+      # The launcher's own runtime is a thin poll loop; Step 6 instruments
+      # the OCI handler's ops, so the endpoint is set but the SDK stays
+      # pinned OFF — the silence is a decision, not an accident.
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://aspire:18890
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_SERVICE_NAME: oci-launcher
+      OTEL_RESOURCE_ATTRIBUTES: service.namespace=ofac,deployment.environment.name=reference,ofac.deployment=reference-slim,ofac.link_plane_role=launcher
+      OTEL_SDK_DISABLED: "true"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - launcher_state:/var/lib/ofac

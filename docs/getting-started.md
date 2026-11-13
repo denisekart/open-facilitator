@@ -122,9 +122,10 @@ curl -sL --resolve artifacts:8333:127.0.0.1 \
 
 Traces: open the Aspire dashboard at `http://localhost:18888`, resource
 `facilitator`. Every kernel span carries the work's trace id — the W3C
-`traceparent` the dispatcher stamped onto the assign envelope, which the
-worker echoes verbatim on its progress/completion envelopes, so
-`outbox.envelope->>'traceparent'` == event envelope == dashboard trace.
+`traceparent` the dispatcher stamped onto the assign envelope. The team
+plane joins that trace and re-parents under it (same 32-hex trace id, its
+own parent id), so the outbox stamp, the worker's progress/completion
+envelope carriers, and the dashboard spans all share ONE trace id.
 
 ## 6. Admin tour: the embedded inspector
 

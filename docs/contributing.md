@@ -30,7 +30,7 @@ The wire contract is schema-first: edit the JSON Schema under `protocol/`, add v
 
 ```bash
 ./referencectl down -v && ./referencectl up slim --no-seed
-./referencectl verify --json   # 11 steps, exit 0
+./referencectl verify --json   # 12 steps, exit 0
 ```
 
 ## Version pinning policy

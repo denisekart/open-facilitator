@@ -63,16 +63,31 @@ export class Observability extends Construct {
       }),
       500,
     );
-    // Dead letters piling up = a sink stopped consuming.
+    // Dead letters piling up = a sink stopped consuming. The instrument is
+    // the kernel's gauge `facilitator.delivery.dead_letter_count`
+    // (KernelMetrics.cs); the name here MUST match an instrument or
+    // NOT_BREACHING means the alarm can never fire.
     alarm(
       "DeadLetters",
       new Metric({
         namespace: ns,
-        metricName: "facilitator.outbox.dead_letters",
+        metricName: "facilitator.delivery.dead_letter_count",
         statistic: "Maximum",
         period: Duration.minutes(5),
       }),
       1,
+    );
+    // Starvation: the oldest pending routing intent's age. A healthy sweep
+    // drains in seconds; 300s means work is sitting unclaimed.
+    alarm(
+      "QueueOldestWait",
+      new Metric({
+        namespace: ns,
+        metricName: "facilitator.queue.oldest_wait_seconds",
+        statistic: "Maximum",
+        period: Duration.minutes(5),
+      }),
+      300,
     );
     if (props.loadBalancer) {
       // 5xx at the face: kernel sick or rolled wrong. The ALB dimension

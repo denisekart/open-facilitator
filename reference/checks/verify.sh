@@ -24,7 +24,7 @@ VERIFY_S3_BUCKET=facilitator-artifacts
 # Step order + declared dependencies (skipped when a requested dep fails).
 VERIFY_ORDER=(idp-login work-create dispatch-link progress artifact-stored
   memory-candidate approval-roundtrip worker-restart-resume
-  kernel-restart-resume trace-correlation dead-letters-empty)
+  kernel-restart-resume trace-correlation dead-letters-empty signal-emission)
 verify_deps_of() {
   case "$1" in
     work-create) echo idp-login ;;
@@ -37,6 +37,7 @@ verify_deps_of() {
     kernel-restart-resume) echo approval-roundtrip ;;
     trace-correlation) echo progress artifact-stored ;;
     dead-letters-empty) echo idp-login ;;
+    signal-emission) echo trace-correlation dead-letters-empty ;;
     *) ;;
   esac
 }
@@ -557,16 +558,23 @@ step_trace_correlation() {
     return 1
   fi
   trace_id=${stamp#00-}; trace_id=${trace_id%%-*}
+  VERIFY_TRACE_ID=$trace_id # the signal-emission leg re-reads this, no re-query
 
-  # Causality proof (REQUIRED, backend-independent): the worker echoed the
-  # stamped traceparent verbatim onto its progress + completed envelopes.
+  # Causality proof (REQUIRED, backend-independent): the worker's progress +
+  # completed envelopes carry the SAME TRACE ID as the facilitator stamp.
+  # The full carrier may legitimately differ downstream: an instrumented
+  # link plane extracts the stamped carrier, runs delivery under its own
+  # span, and echoes THAT carrier onward (W3C re-parenting: same trace-id,
+  # new parent-id) — the join identity is always the 32-hex trace id.
   progress_tp=$(jq -r '.traceparent // ""' <<<"${VERIFY_PROGRESS_PAYLOAD:-{\}}")
-  [ "$progress_tp" = "$stamp" ] \
-    || { step_fail "progress envelope traceparent ('$progress_tp') != facilitator stamp ('$stamp')"; return 1; }
-  local completed_tp
+  progress_tid=${progress_tp#00-}; progress_tid=${progress_tid%%-*}
+  [ "$progress_tid" = "$trace_id" ] \
+    || { step_fail "progress envelope trace id ('$progress_tid') != facilitator stamp ('$stamp')"; return 1; }
+  local completed_tp completed_tid
   completed_tp=$(jq -r '.traceparent // ""' <<<"${VERIFY_COMPLETED_PAYLOAD:-{\}}")
-  [ "$completed_tp" = "$stamp" ] \
-    || { step_fail "completed envelope traceparent ('$completed_tp') != facilitator stamp ('$stamp')"; return 1; }
+  completed_tid=${completed_tp#00-}; completed_tid=${completed_tid%%-*}
+  [ "$completed_tid" = "$trace_id" ] \
+    || { step_fail "completed envelope trace id ('$completed_tid') != facilitator stamp ('$stamp')"; return 1; }
 
   # Dashboard half (bonus strength): the kernel's spans under that trace id
   # arrived at the Aspire query API.
@@ -583,6 +591,134 @@ verify_dashboard_trace() {
   local n
   n=$(jq -r '.returnedCount // 0' <<<"$out")
   [ "$n" -ge 1 ] && printf '%s' "$n"
+}
+
+# --- signal-emission leg ------------------------------------------------------
+# Every assertion names the instrument/resource it looks for; "some data
+# appeared" is never a pass. Traces+logs ride the Aspire query API (the
+# stack's exporter target); metrics ride the verification collector's debug
+# dump (compose.telemetry.yaml), re-pointed via OTEL_EXPORTER_OTLP_METRICS_
+# ENDPOINT only — the per-signal spec variable both SDKs honor.
+
+VERIFY_TRACE_ID="" # stashed by step_trace_correlation
+
+verify_compose_logs_telemetry() { # <service> — the FULL overlay chain
+  (cd "$VERIFY_REF" && docker compose --env-file versions.env --env-file .env \
+    -f compose.slim.yaml -f compose.provisioning.yaml -f compose.telemetry.yaml \
+    -p facilitator-demo logs --no-log-prefix "$@" 2>&1)
+}
+
+# The six identities the signal-emission leg requires in the sink dump.
+sink_identity_greps() { # -> prints one grep-arg per required identity
+  printf '%s\n' \
+    "facilitator.delivery.attempts" \
+    "ofac.link.delivered" \
+    'service\.name.*facilitator\b' \
+    'service\.name.*ofac-gateway\b' \
+    "ofac.team" \
+    "ofac.endpoint_id"
+}
+missing_sink_identities() {
+  local dump missing=()
+  dump=$(verify_compose_logs_telemetry telemetry-sink)
+  while IFS= read -r pat; do
+    grep -Eq "$pat" <<<"$dump" || missing+=("$pat")
+  done < <(sink_identity_greps)
+  printf '%s' "${missing[*]:-none}"
+}
+verify_sink_metric_identities() { # all six present -> echo dump
+  local dump
+  dump=$(verify_compose_logs_telemetry telemetry-sink)
+  while IFS= read -r pat; do
+    grep -Eq "$pat" <<<"$dump" || return 1
+  done < <(sink_identity_greps)
+  printf '%s' "$dump"
+}
+
+verify_dashboard_crossplane() { # <trace_id> -> "svcA,svcB" when the trace spans planes
+  local out
+  out=$(curl -fs --max-time 10 "http://localhost:18888/api/telemetry/traces/$1") || return 1
+  local services deliver
+  services=$(jq -r '[.data.resourceSpans[]?.resource.attributes[]?
+    | select(.key=="service.name") | .value.stringValue] | unique | join(",")' <<<"$out")
+  deliver=$(jq -r '[.data.resourceSpans[].scopeSpans[].spans[]?
+    | select(.name=="link.deliver")] | length' <<<"$out")
+  grep -q '\bfacilitator\b' <<<"$services" || return 1
+  grep -q '\bofac-gateway\b' <<<"$services" || return 1
+  [ "${deliver:-0}" -ge 1 ] || return 1
+  printf '%s' "$services"
+}
+
+verify_dashboard_gateway_log() { # <trace_id> -> record count when a gateway log joins the trace
+  local out
+  out=$(curl -fs --max-time 10 "http://localhost:18888/api/telemetry/logs") || return 1
+  # The ?resource= filter wants dashboard resource ids, not service names,
+  # so the resource is matched client-side off the full dump.
+  jq -e --arg tid "$1" '
+    [.data.resourceLogs[]?
+      | select([.resource.attributes[]?
+          | select(.key=="service.name")][0].value.stringValue == "ofac-gateway")
+      | .scopeLogs[]?.logRecords[]?
+      | select(.traceId == $tid)] | length >= 1' <<<"$out" >/dev/null || return 1
+  jq -r --arg tid "$1" '
+    [.data.resourceLogs[]?
+      | select([.resource.attributes[]?
+          | select(.key=="service.name")][0].value.stringValue == "ofac-gateway")
+      | .scopeLogs[]?.logRecords[]?
+      | select(.traceId == $tid)] | length' <<<"$out"
+}
+
+step_signal_emission() {
+  local trace_id=${VERIFY_TRACE_ID:?signal-emission needs the trace id stashed by step_trace_correlation}
+  [ -n "$trace_id" ] || { step_fail "no trace id stashed"; return 1; }
+
+  # 1) Traces, cross-plane: kernel + gateway spans under ONE id, with the
+  # delivery span that joined them.
+  local services
+  if ! services=$(poll_capture 60 verify_dashboard_crossplane "$trace_id"); then
+    step_fail "trace $trace_id does not span facilitator + ofac-gateway with a link.deliver span at the dashboard within 60s"
+    verify_dump_logs facilitator demo-workspace aspire
+    return 1
+  fi
+
+  # 2) Logs: the gateway's OTLP bridge emitted, and one record carries the
+  # SAME trace id — bridge + correlation + resource name in one assertion.
+  local logn
+  if ! logn=$(poll_capture 60 verify_dashboard_gateway_log "$trace_id"); then
+    step_fail "no ofac-gateway log record with traceId $trace_id at the dashboard within 60s"
+    verify_dump_logs demo-workspace aspire
+    return 1
+  fi
+
+  # 3) Metrics: the two required instrument identities in the collector
+  # dump, each under its own resource (service.name via the debug exporter's
+  # resource dump; a missing identity reads as a never-emitted instrument).
+  # POLLED: both SDKs export metrics on a periodic reader (default cadence
+  # 60s), so the first dump may legitimately lag the leg by a full cycle.
+  local dump
+  if ! dump=$(poll_capture 180 verify_sink_metric_identities); then
+    step_fail "collector dump lacks an instrument/resource identity within 180s: $(missing_sink_identities)"
+    verify_dump_logs telemetry-sink
+    return 1
+  fi
+
+  # 4) PII: the dump carries instrument names + low-cardinality labels only —
+  # no enrollment token, no progress prose, no bearer.
+  local pii=()
+  local enroll
+  enroll=$(grep -m1 '^DEMO_ENROLLMENT_TOKEN=' "$VERIFY_REF/.env" 2>/dev/null | cut -d= -f2-)
+  [ -n "$enroll" ] && grep -qF "$enroll" <<<"$dump" && pii+=("DEMO_ENROLLMENT_TOKEN")
+  local note
+  note=$(jq -r '.data.progressNote // ""' <<<"${VERIFY_PROGRESS_PAYLOAD:-{\}}")
+  [ -n "$note" ] && grep -qF "$note" <<<"$dump" && pii+=("progress note")
+  [ -n "$VERIFY_TOKEN_CLI" ] && grep -qF "$VERIFY_TOKEN_CLI" <<<"$dump" && pii+=("bearer token")
+  if [ ${#pii[@]} -gt 0 ]; then
+    step_fail "collector dump leaked: ${pii[*]}"
+    return 1
+  fi
+
+  step_pass "trace $trace_id spans $services (+link.deliver); $logn correlated gateway log record(s); collector dump carries delivery.attempts+link.delivered under both resources; no PII"
+  return 0
 }
 
 step_dead_letters_empty() {
@@ -628,6 +764,7 @@ verify_run_step() { # <id> — dep gate + timing + dispatch
         || verify_step_skip "$id" "approval leg did not reach the restart checkpoint" ;;
     trace-correlation) step_trace_correlation ;;
     dead-letters-empty) step_dead_letters_empty ;;
+    signal-emission) step_signal_emission ;;
     *) verify_step_skip "$id" "unknown step" ;;
   esac
 }

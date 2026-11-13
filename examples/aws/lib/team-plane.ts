@@ -136,6 +136,15 @@ export class TeamPlane extends Construct {
         environment: {
           OFAC_KERNEL_URL: props.kernelUrl,
           STATE_PATH: spec.statePath,
+          // Team-side telemetry: the ADOT sidecar is the OTLP target on
+          // localhost; both boxes are gateway hosts (the workspace runs
+          // gateway+worker units, so one resource per box is the law).
+          OTEL_EXPORTER_OTLP_ENDPOINT: "http://127.0.0.1:4318",
+          OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf",
+          OTEL_LOGS_EXPORTER: "otlp",
+          OTEL_SERVICE_NAME: `ofac-${name.toLowerCase()}`,
+          OTEL_RESOURCE_ATTRIBUTES:
+            "service.namespace=ofac,deployment.environment.name=aws,ofac.deployment=example-aws,ofac.link_plane_role=gateway",
         },
         secrets: Object.fromEntries(
           Object.entries(props.linkSecretArns).map(([k, arn]) => [

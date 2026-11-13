@@ -1381,6 +1381,14 @@ exports[`golden snapshots > ofac-example-kernel 1`] = `
                 "Value": "facilitator",
               },
               {
+                "Name": "OTEL_LOGS_EXPORTER",
+                "Value": "otlp",
+              },
+              {
+                "Name": "OTEL_RESOURCE_ATTRIBUTES",
+                "Value": "service.namespace=ofac,deployment.environment.name=aws,ofac.deployment=example-aws",
+              },
+              {
                 "Name": "identity__oidc__authority",
                 "Value": {
                   "Fn::Join": [
@@ -3687,7 +3695,7 @@ exports[`golden snapshots > ofac-example-observability 1`] = `
         "ComparisonOperator": "GreaterThanThreshold",
         "DatapointsToAlarm": 2,
         "EvaluationPeriods": 2,
-        "MetricName": "facilitator.outbox.dead_letters",
+        "MetricName": "facilitator.delivery.dead_letter_count",
         "Namespace": "facilitator",
         "Period": 300,
         "Statistic": "Maximum",
@@ -3731,6 +3739,35 @@ exports[`golden snapshots > ofac-example-observability 1`] = `
           },
         ],
         "Threshold": 500,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "ObservabilityQueueOldestWait9FD94710": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "ObservabilityAlarms72EB291A",
+          },
+        ],
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 2,
+        "EvaluationPeriods": 2,
+        "MetricName": "facilitator.queue.oldest_wait_seconds",
+        "Namespace": "facilitator",
+        "Period": 300,
+        "Statistic": "Maximum",
+        "Tags": [
+          {
+            "Key": "ofac:env",
+            "Value": "example",
+          },
+          {
+            "Key": "ofac:role",
+            "Value": "platform",
+          },
+        ],
+        "Threshold": 300,
         "TreatMissingData": "notBreaching",
       },
       "Type": "AWS::CloudWatch::Alarm",
@@ -5116,6 +5153,26 @@ exports[`golden snapshots > ofac-example-team-team-alpha-plane 1`] = `
                 "Name": "STATE_PATH",
                 "Value": "/var/lib/ofac/gateway",
               },
+              {
+                "Name": "OTEL_EXPORTER_OTLP_ENDPOINT",
+                "Value": "http://127.0.0.1:4318",
+              },
+              {
+                "Name": "OTEL_EXPORTER_OTLP_PROTOCOL",
+                "Value": "http/protobuf",
+              },
+              {
+                "Name": "OTEL_LOGS_EXPORTER",
+                "Value": "otlp",
+              },
+              {
+                "Name": "OTEL_SERVICE_NAME",
+                "Value": "ofac-gateway",
+              },
+              {
+                "Name": "OTEL_RESOURCE_ATTRIBUTES",
+                "Value": "service.namespace=ofac,deployment.environment.name=aws,ofac.deployment=example-aws,ofac.link_plane_role=gateway",
+              },
             ],
             "Essential": true,
             "Image": "ghcr.io/denisekart/open-facilitator/gateway@sha256:0000000000000000000000000000000000000000000000000000000000000000",
@@ -5525,6 +5582,26 @@ exports[`golden snapshots > ofac-example-team-team-alpha-plane 1`] = `
               {
                 "Name": "STATE_PATH",
                 "Value": "/var/lib/ofac/workspace",
+              },
+              {
+                "Name": "OTEL_EXPORTER_OTLP_ENDPOINT",
+                "Value": "http://127.0.0.1:4318",
+              },
+              {
+                "Name": "OTEL_EXPORTER_OTLP_PROTOCOL",
+                "Value": "http/protobuf",
+              },
+              {
+                "Name": "OTEL_LOGS_EXPORTER",
+                "Value": "otlp",
+              },
+              {
+                "Name": "OTEL_SERVICE_NAME",
+                "Value": "ofac-workspace",
+              },
+              {
+                "Name": "OTEL_RESOURCE_ATTRIBUTES",
+                "Value": "service.namespace=ofac,deployment.environment.name=aws,ofac.deployment=example-aws,ofac.link_plane_role=gateway",
               },
             ],
             "Essential": true,

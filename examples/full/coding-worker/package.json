@@ -32,6 +32,7 @@
   },
   "dependencies": {
     "@ofac/adapter": "workspace:*",
+    "@ofac/otel": "workspace:*",
     "@ofac/protocol": "workspace:*",
     "@ofac/workspace-link": "workspace:*",
     "yaml": "catalog:"

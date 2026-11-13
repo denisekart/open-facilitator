@@ -1,0 +1,34 @@
+# Verification-only telemetry sink (plan OTEL_THREE_SIGNAL_EMISSION_EVERY,
+# Step 8): a collector that RECEIVES the metric leg and DUMPS it to its own
+# log, so `referencectl verify` asserts signal emission by instrument
+# identity + resource instead of trusting the Aspire dashboard's retention.
+# Always loaded by referencectl's overlay chain (slim and full alike), so
+# it may only name services that exist in BOTH stacks. Traces + logs stay
+# on Aspire (compose env); only the METRICS endpoint is re-pointed here —
+# per-signal endpoints are spec (both the .NET and the JS exporters honor
+# OTEL_EXPORTER_OTLP_METRICS_ENDPOINT). The full-only services (adapters,
+# coding-workspace) emit their metrics to Aspire like today.
+services:
+  telemetry-sink:
+    image: otel/opentelemetry-collector-contrib:${OTELCOL_TAG:?set in versions.env}
+    command: ["--config=/etc/otelcol/config.yaml"]
+    user: "0:0" # numeric: the distroless image has no /etc/passwd, so even
+                # `root` by name fails to resolve; the single read-only
+                # config mount needs no uid otherwise
+    volumes:
+      - ./config/otelcol-verify.yaml:/etc/otelcol/config.yaml:ro
+    depends_on:
+      facilitator:
+        condition: service_started
+    restart: on-failure:5
+
+  facilitator:
+    environment:
+      # The kernel's 1.21 exporter ignores the per-signal ENV var, so
+      # KernelServiceCollection reads this one code-side and uses it
+      # verbatim: a COMPLETE URL (same convention the JS SDK follows).
+      OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: http://telemetry-sink:4318/v1/metrics
+
+  demo-workspace:
+    environment:
+      OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: http://telemetry-sink:4318/v1/metrics

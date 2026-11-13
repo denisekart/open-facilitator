@@ -114,6 +114,9 @@ export class KernelService extends Construct {
         OTEL_EXPORTER_OTLP_ENDPOINT: "http://127.0.0.1:4318",
         OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf",
         OTEL_SERVICE_NAME: "facilitator",
+        OTEL_LOGS_EXPORTER: "otlp",
+        OTEL_RESOURCE_ATTRIBUTES:
+          "service.namespace=ofac,deployment.environment.name=aws,ofac.deployment=example-aws",
         identity__oidc__authority: props.oidcAuthority,
         identity__oidc__audience: props.oidcAudience,
         identity__oidc__requireHttps: "true",

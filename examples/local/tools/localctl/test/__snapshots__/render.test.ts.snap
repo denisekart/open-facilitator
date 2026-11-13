@@ -211,6 +211,11 @@ services:
       OFAC_CHILD_SECRET: \${CHILD_SECRETS_HOME:?set in the secrets file}
       OTEL_EXPORTER_OTLP_ENDPOINT: \${OTLP_ENDPOINT:?set in the bundle .env}
       OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      # Team-side emission identity (one resource per box: the supervisor
+      # runs gateway+worker units here).
+      OTEL_LOGS_EXPORTER: otlp
+      OTEL_SERVICE_NAME: ofac-gateway
+      OTEL_RESOURCE_ATTRIBUTES: service.namespace=ofac,deployment.environment.name=local,ofac.deployment=example-local,ofac.link_plane_role=gateway
     volumes:
       # <stateDir>/token: the gateway persists its rotated link token here;
       # re-enroll-on-401 replays OFAC_ENROLL_SECRET after restarts.
@@ -254,6 +259,11 @@ services:
       CHILD_SECRETS_HOME: \${CHILD_SECRETS_HOME:?set in the secrets file}
       OTEL_EXPORTER_OTLP_ENDPOINT: \${OTLP_ENDPOINT:?set in the bundle .env}
       OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      # The launcher's own runtime stays silent by decision (the $-law
+      # passes these through to the elastic children it provisions).
+      OTEL_SERVICE_NAME: oci-launcher
+      OTEL_RESOURCE_ATTRIBUTES: service.namespace=ofac,deployment.environment.name=local,ofac.deployment=example-local,ofac.link_plane_role=launcher
+      OTEL_SDK_DISABLED: "true"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - launcher_state:/var/lib/ofac

@@ -232,7 +232,8 @@ verification run.
   (scale min1 → managed container → work completes → provisioning op
   reaches `running` (the kernel vocabulary's success marker) → min0 + a
   1-minute idle-shutdown window → GC),
-  zero dead letters; Aspire spans soft). NOT wired into `make test` — no
+  zero dead letters; telemetry HARD on the team-side resource — ofac-gateway spans must exist, only the kernel-side count stays soft).
+  NOT wired into `make test` — no
   hosted CI dependency, same posture as the
   AWS example.
 - Multi-box LAN run: the same verbs against real boxes (`--env example`)

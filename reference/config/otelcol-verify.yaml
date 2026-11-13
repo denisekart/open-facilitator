@@ -1,0 +1,32 @@
+# Verification-only collector (compose.telemetry.yaml): a metrics pipeline
+# only, `debug` exporter at detailed verbosity, so every metric a process
+# emits lands in `docker compose logs telemetry-sink` with its resource
+# attributes (service.name, ofac.deployment) intact — the exact identity
+# verify.sh's signal-emission step greps for. Traces/logs deliberately have
+# NO pipeline here: the Aspire dashboard stays their home, and silently
+# dropping a signal this leg does not assert would misreport coverage.
+# Sampling is generous on purpose: the assertion greps instrument NAMES, so
+# a dropped dump reads as a missing instrument.
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch: {}
+
+exporters:
+  debug:
+    verbosity: detailed
+    sampling_initial: 1000
+    sampling_thereafter: 1000
+
+service:
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug]

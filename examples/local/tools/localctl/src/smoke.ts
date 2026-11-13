@@ -2,7 +2,9 @@
 // reference/checks/verify.sh law: legs run in dependency order, a failing
 // leg is recorded and the run continues where it can, everything reports in
 // one final table, and the exit code is the AND of the HARD legs. The
-// telemetry leg is SOFT (warn): the pinned dashboard has no persistence.
+// telemetry leg is HARD on the team-side resource (ofac-gateway spans must
+// exist); only the kernel-side count stays soft, since the pinned dashboard
+// keeps telemetry in memory only.
 import path from "node:path";
 import { hostKernelUrl, hostIdpUrl, EXAMPLE_DIR } from "./render.js";
 import { loadRoles, readDotEnv, type RolesFile } from "./env.js";
@@ -86,6 +88,43 @@ async function dashboardSpanCount(aspireUi: number, traceId: string | undefined)
         ? (j as Record<string, unknown>)["returnedCount"]
         : undefined;
     return typeof n === "number" ? n : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** Spans the dashboard holds for one resource (OTLP resourceSpans dump,
+ * service.name attribute) — the team-side emission proof: the node bundle
+ * only shows up here if @ofac/otel rides the node image AND emits. */
+async function dashboardSpanCountForResource(
+  aspireUi: number,
+  serviceName: string,
+): Promise<number> {
+  const r = await run([
+    "curl",
+    "-fs",
+    "--max-time",
+    "10",
+    `http://localhost:${String(aspireUi)}/api/telemetry/spans`,
+  ]);
+  if (r.code !== 0) return 0;
+  try {
+    const j = JSON.parse(r.stdout) as {
+      resourceSpans?: {
+        resource?: { attributes?: { key: string; value?: { stringValue?: string } }[] };
+        scopeSpans?: { spans?: unknown[] }[];
+      }[];
+    };
+    return (j.resourceSpans ?? [])
+      .filter((rs) =>
+        (rs.resource?.attributes ?? []).some(
+          (a) => a.key === "service.name" && a.value?.stringValue === serviceName,
+        ),
+      )
+      .reduce(
+        (sum, rs) => sum + (rs.scopeSpans ?? []).reduce((s, ss) => s + (ss.spans?.length ?? 0), 0),
+        0,
+      );
   } catch {
     return 0;
   }
@@ -261,7 +300,7 @@ export async function cmdSmoke(opts: SmokeOpts): Promise<number> {
       if (n !== 0) fail(`${n} dead-letter row(s) — a hop failed hard somewhere`);
       return "no dead letters";
     });
-    await leg("telemetry", false, async () => {
+    await leg("telemetry", true, async () => {
       // The kernel's own stamp on the work1 dispatch envelope (locked join,
       // verify.sh law); unreadable stamps just widen the query to "any".
       const stampRow = await run([
@@ -285,7 +324,18 @@ export async function cmdSmoke(opts: SmokeOpts): Promise<number> {
         return n > 0 ? n : undefined;
       });
       if (spans === undefined) return "no spans at the dashboard (soft: transient dashboard mode)";
-      return `${spans} span(s) at the Aspire query API`;
+      // HARD leg (plan OTEL_THREE_SIGNAL_EMISSION_EVERY Step 8): the team
+      // plane must emit as its OWN resource. Nothing lands here if
+      // @ofac/otel is missing from the node image or the node bundle lost
+      // its OTEL_* env — that is the intended failure, not flake.
+      const teamSpans = await poll(30, 3_000, async () => {
+        const n = await dashboardSpanCountForResource(roles.kernel.ports.aspireUi, "ofac-gateway");
+        return n > 0 ? n : undefined;
+      });
+      if (teamSpans === undefined) {
+        fail("no ofac-gateway spans at the dashboard — the node bundle emits nothing");
+      }
+      return `${spans} kernel-side span(s) + ${String(teamSpans)} ofac-gateway span(s) at the Aspire query API`;
     });
   }
 

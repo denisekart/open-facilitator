@@ -14,7 +14,7 @@ policy-gated. One seeded `work.assign` then dispatches end-to-end.
 ./referencectl up slim        # build + wait healthy + seed the demo path
 ./referencectl up slim --no-seed   # stack only (seeds own data)
 ./referencectl status         # service table + kernel + gateway probes
-./referencectl verify         # acceptance run: 11 steps over the --no-seed stack
+./referencectl verify         # acceptance run: 12 steps over the --no-seed stack
 ./referencectl down           # down -v with -v; FULL=1 adds the overlay
 make compose-slim / compose-full / compose-down   # raw compose path
 ```
@@ -33,10 +33,21 @@ both verbatim and fail hard on a missing key.
 |`8088`|Facilitator|`GET /health` anonymous; APIs need a bearer token|
 |`8333`|SeaweedFS S3|bucket `facilitator-artifacts`, credentials from `.env`|
 |`18888`|Aspire dashboard|UI + telemetry REST API (`/api/telemetry/spans`)|
-|`18890`|Aspire OTLP/HTTP|kernel exporter target|
+|`18890`|Aspire OTLP/HTTP|kernel + team-plane exporter target|
+|`4317`/`4318`|telemetry-sink (verify overlay only)|collector-verify leg: OTLP in, `debug` dump out — receives METRICS only (endpoint routing per-signal in `compose.telemetry.yaml`); the `signal-emission` leg reads its dump|
 |`8099`|Gateway diagnostics|**not published** — binds the workspace container's loopback; `./referencectl status` probes it via `compose exec`|
 |`3000`/`8065`/`9092`/`11434`|full overlay|forgejo / mattermost / kafka / ollama|
 |`8066`|full overlay|mattermost-adapter `GET /healthz` (no inbound provider port — D1)|
+
+**Telemetry silence law** (manual leg, run outside a normal `verify`):
+telemetry must be pure decoration — with the collector target emptied the
+stack still works. `./referencectl down -v && OTEL_TARGET= ./referencectl up slim && ./referencectl verify --only dead-letters-empty`
+must exit 0, and `docker compose logs` must contain no
+`[Oo]pen[Tt]elemetry|OTLP` error line (no exporter starts, so there is
+nothing to fail — the OTel env all interpolates from `OTEL_TARGET`, which
+defaults to the dashboard's OTLP port). `trace-correlation`'s stamp +
+echo halves still pass in silence; only its dashboard-span half needs a
+collector.
 
 ## What the kernel runs with
 

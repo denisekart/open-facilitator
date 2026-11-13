@@ -16,7 +16,7 @@ before a shared deployment is production-eligible.
 - Tokens: `./referencectl token` (client-credentials, `kernel-operator`) and `./referencectl token --user alice --password alice` (human, framework-admin) from the repo root.
 - Admin API (bearer): `/api/admin/summary|search|links|deliveries|provisioning|metrics|replicas|config/{resource}[/history]|dead-letters/{id}/replay` and `/api/identity/roles`. Admin SPA (Work inspector, Links, Deliveries, Config): the kernel root at `http://localhost:8088/` (OIDC login, alice/alice).
 - Gateway diagnostics live in the gateway container: `node -e "fetch('http://127.0.0.1:8099/status').then(r=>r.json()).then(s=>console.log(JSON.stringify(s)))"` inside `facilitator-demo-demo-workspace-1` (coding fleet gateway: port 8100).
-- Proven recovery paths, re-runnable: `./referencectl verify` (slim legs incl. kernel-restart-resume and dead-letters-empty), `./referencectl verify --replicas` (two-replica matrix a–e).
+- Proven recovery paths, re-runnable: `./referencectl verify` (slim legs incl. kernel-restart-resume and dead-letters-empty), `./referencectl verify --replicas` (two-replica matrix a–f).
 
 ## Scenes
 

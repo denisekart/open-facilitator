@@ -96,6 +96,11 @@ services:
       MATTERMOST_BOT_TOKEN_FILE: /provision/mm-bot-token
       OFAC_STATE_PATH: /var/lib/ofac/mm-adapter.sqlite3
       PORT: "8066"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://aspire:18890
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_LOGS_EXPORTER: otlp
+      OTEL_SERVICE_NAME: ofac-mattermost-adapter
+      OTEL_RESOURCE_ATTRIBUTES: service.namespace=ofac,deployment.environment.name=reference,ofac.deployment=reference-slim,ofac.link_plane_role=adapter
     volumes:
       - mm_provision:/provision:ro
       - mm_adapter_state:/var/lib/ofac
@@ -132,6 +137,11 @@ services:
       TELEGRAM_CHATS: ${TELEGRAM_CHATS:-}
       TELEGRAM_MODE: poll
       OFAC_STATE_PATH: /var/lib/ofac/tg-adapter.sqlite3
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://aspire:18890
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_LOGS_EXPORTER: otlp
+      OTEL_SERVICE_NAME: ofac-telegram-adapter
+      OTEL_RESOURCE_ATTRIBUTES: service.namespace=ofac,deployment.environment.name=reference,ofac.deployment=reference-slim,ofac.link_plane_role=adapter
       PORT: "8078"
     volumes:
       - tg_provision:/provision:ro
@@ -222,6 +232,11 @@ services:
       FORGEJO_WORK_LABELS: ofac:work,ofac:coding
       OFAC_STATE_PATH: /var/lib/ofac/forgejo-adapter.sqlite3
       PORT: "8067"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://aspire:18890
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_LOGS_EXPORTER: otlp
+      OTEL_SERVICE_NAME: ofac-forgejo-adapter
+      OTEL_RESOURCE_ATTRIBUTES: service.namespace=ofac,deployment.environment.name=reference,ofac.deployment=reference-slim,ofac.link_plane_role=adapter
     volumes:
       - forgejo_provision:/provision:ro
       - forgejo_adapter_state:/var/lib/ofac
@@ -285,6 +300,11 @@ services:
       FORGEJO_ENABLE_ISSUES: "true"
       FORGEJO_ENABLE_VCS: "true"
       FORGEJO_ENABLE_MRS: "true"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://aspire:18890
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_LOGS_EXPORTER: otlp
+      OTEL_SERVICE_NAME: ofac-gateway-coding
+      OTEL_RESOURCE_ATTRIBUTES: service.namespace=ofac,deployment.environment.name=reference,ofac.deployment=reference-slim,ofac.link_plane_role=gateway
     volumes:
       - coding_workspace_state:/var/lib/ofac
       - ../features/shared/ofac-supervisor.sh:/opt/ofac/ofac-supervisor.sh:ro

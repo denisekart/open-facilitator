@@ -121,25 +121,26 @@ r_inbox_rows_eq() { # <event-id> <want>
   [ "$(r_psql "SELECT count(*) FROM facilitator.inbox WHERE payload->>'id' = '$1'")" = "$2" ]
 }
 
-# Case (b): SIGKILL replica A while it owns a STATIC gateway leg's session.
+# Case (b): SIGKILL whichever replica owns a STATIC gateway leg's session.
 # The lease expires, the client reconnects through the LB onto the SURVIVOR,
 # the session epoch bumps, and delivery accounting stays exactly-once.
 # Subject pool = the three statically-configured LB legs (the gateways +
-# the forgejo adapter) stamped facilitator-a: the pinned legs (mm-adapter
-# direct-A, oci-launcher direct-B) share their replica's fate instead of
-# failing over, and elastic fleet sessions (gw.team-beta) are scale-to-zero
-# so their lease can just lapse. The stamp filter keeps the victim
-# deterministically facilitator-a.
-r_kill_pool() { # one live A-stamped static-leg session id, or empty
-  r_psql "SELECT logical_endpoint_id FROM facilitator.link_sessions WHERE lease_until > now() AND replica_id = 'facilitator-a' AND logical_endpoint_id IN ('gw.team-alpha','gw.coding','forgejo-adapter') ORDER BY opened_at LIMIT 1" | head -n1
+# the forgejo adapter); the pinned legs (mm-adapter direct-A, oci-launcher
+# direct-B) share their replica's fate instead of failing over, and elastic
+# fleet sessions (gw.team-beta) are scale-to-zero so their lease can just
+# lapse. The VICTIM is read from the session's own stamp: LB placement
+# (least_conn over an asymmetric connection set) is not predictable, so the
+# case kills what IS, not what placement was hoped to produce.
+r_kill_pool() { # "<endpoint> <replica>" for one live static-leg session, or empty
+  r_psql "SELECT logical_endpoint_id || ' ' || replica_id FROM facilitator.link_sessions WHERE lease_until > now() AND logical_endpoint_id IN ('gw.team-alpha','gw.coding','forgejo-adapter') ORDER BY opened_at LIMIT 1" | head -n1
 }
 step_replica_kill() {
-  local owner replica victim victim_id before_epoch epoch acked acked_after
-  owner=$(r_kill_pool)
-  if [ -z "$owner" ]; then
-    # Boot tie placement may have routed every LB leg to B. A lone
-    # reconnect through a both-alive LB deterministically lands on the
-    # first upstream (facilitator): force one and retry the selection.
+  local pair owner replica victim victim_id before_epoch epoch acked acked_after
+  pair=$(r_kill_pool)
+  if [ -z "$pair" ]; then
+    # No static leg currently holds a session (e.g. every reconnect landed
+    # while a replica was mid-restart). One bounce re-opens it through the
+    # LB; the victim is then read from wherever it landed.
     # (Only full-profile shapes have an adapter to bounce; in slim the
     # pool's sole leg is gw.team-alpha's own reconnect cycle.)
     if [ -n "${FULL:-}" ]; then
@@ -149,14 +150,19 @@ step_replica_kill() {
       r_compose restart demo-workspace >&2 || true
       poll_until 60 r_a_stamped_session >/dev/null || true
     fi
-    owner=$(r_kill_pool)
+    pair=$(r_kill_pool)
   fi
-  [ -n "$owner" ] || { step_fail "no live facilitator-a session to fail over"; return 1; }
+  [ -n "$pair" ] || { step_fail "no live static-leg session to fail over"; return 1; }
+  read -r owner victim_id <<<"$pair"
   before_epoch=$(r_psql "SELECT session_epoch FROM facilitator.link_sessions WHERE logical_endpoint_id = '$owner'")
-  # The filter pins the stamp: victim is ALWAYS facilitator-a (identity
-  # facilitator-a belongs to the compose service `facilitator`; the twin's
+  # The victim is the compose service BEHIND the session's stamping replica
+  # (identity facilitator-a belongs to service `facilitator`; the twin's
   # identity names its service).
-  victim_id=facilitator-a; victim=facilitator
+  case $victim_id in
+    facilitator-a) victim=facilitator ;;
+    facilitator-b) victim=facilitator-b ;;
+    *) step_fail "session '$owner' stamped by unknown replica '$victim_id'"; return 1 ;;
+  esac
   acked=$(r_psql "SELECT count(*) FROM facilitator.link_deliveries WHERE endpoint_id = '$owner' AND state = 'acked'")
 
   # --no-ansi kill -s KILL: no graceful drain — the abrupt-death leg.
@@ -310,7 +316,7 @@ step_replica_steer_conflict() {
 }
 
 # Case (e): the full slim suite against the LB with BOTH replicas running
-# every loop — no duplicate side effects across any of the 11 legs. Nested
+# every loop — no duplicate side effects across any of the 12 legs. Nested
 # run_verify (sourced verify.sh is idempotent for a second run; the step
 # library just re-records into a fresh results file).
 step_replica_full_suite() {
@@ -334,8 +340,28 @@ step_replica_full_suite() {
   step_pass "full slim suite through the LB, both replicas live: $passed legs green"
 }
 
+# Case (f): the two replicas are TWO resources in the telemetry plane —
+# Step 1's ConfigureResource puts Kernel__ReplicaId into service.instance.id,
+# so the dashboard must list facilitator twice, distinguished the same way
+# GET /api/admin/replicas distinguishes them.
+step_replica_resource_identity() {
+  local out instances ids
+  out=$(curl -fs --max-time 10 "http://localhost:18888/api/telemetry/resources" 2>/dev/null) \
+    || { step_fail "dashboard /api/telemetry/resources unreadable"; return 1; }
+  # The API's shape: a flat array of {name, instanceId, hasLogs/...}.
+  instances=$(jq -r '[.[] | select(.name=="facilitator")] | length' <<<"$out" 2>/dev/null || echo 0)
+  ids=$(jq -r '[.[] | select(.name=="facilitator") | .instanceId]
+    | map(select(.=="facilitator-a" or .=="facilitator-b")) | unique | join(",")' <<<"$out" 2>/dev/null || true)
+  [ "${instances:-0}" -ge 2 ] \
+    || { step_fail "dashboard resources carry $instances facilitator resource(s) (want 2): $out"; return 1; }
+  grep -q "facilitator-a" <<<"$ids" && grep -q "facilitator-b" <<<"$ids" \
+    || { step_fail "facilitator resources not distinguished by service.instance.id (got '$ids')"; return 1; }
+  step_pass "two facilitator resources, distinguished by service.instance.id (facilitator-a/b)"
+}
+
 VERIFY_R_ORDER=(replica-lb-distribution replica-full-suite replica-dedupe
-                replica-kill replica-lease-handover replica-steer-conflict)
+                replica-kill replica-lease-handover replica-steer-conflict
+                replica-resource-identity)
 
 run_verify_replicas() {
   local json=0

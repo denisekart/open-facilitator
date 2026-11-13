@@ -222,6 +222,9 @@ export function kernelFacilitatorEnv(
     OTEL_EXPORTER_OTLP_ENDPOINT: "http://aspire:18890",
     OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf",
     OTEL_SERVICE_NAME: "facilitator",
+    OTEL_LOGS_EXPORTER: "otlp",
+    OTEL_RESOURCE_ATTRIBUTES:
+      "service.namespace=ofac,deployment.environment.name=local,ofac.deployment=example-local",
     Provision__LauncherEndpoint: launcherEndpoint(roles),
     Provision__SweepIntervalSeconds: "10",
     Provision__Workloads__0__WorkloadId: "gw.elastic",
@@ -239,6 +242,13 @@ export function kernelFacilitatorEnv(
     Provision__Workloads__0__Env__OFAC_ENROLL_SECRET: "$$OFAC_ENROLLMENT_TOKEN",
     Provision__Workloads__0__Env__OFAC_CHILD_SECRET: `$$${childSecretKey(roles, team)}`,
     Provision__Workloads__0__Env__OFAC_SUPERVISOR_MAX_RESTARTS: "3",
+    // Elastic children emit through the same collector (literal: the
+    // launcher's $-law resolves only pure $VARNAME values).
+    Provision__Workloads__0__Env__OTEL_EXPORTER_OTLP_ENDPOINT: "http://aspire:18890",
+    Provision__Workloads__0__Env__OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf",
+    Provision__Workloads__0__Env__OTEL_SERVICE_NAME: "ofac-harness-elastic",
+    Provision__Workloads__0__Env__OTEL_RESOURCE_ATTRIBUTES:
+      "service.namespace=ofac,deployment.environment.name=local,ofac.deployment=example-local,ofac.link_plane_role=child",
     "Provision__Workloads__0__Labels__io.facilitator.managed": "kernel-provisioned",
   };
 }

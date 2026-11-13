@@ -62,6 +62,38 @@ describe("startTelemetryFromEnv", () => {
   });
 
   it(
+    "instrument parents on the carrier: inside the span, currentTraceparent names that trace",
+    { timeout: 60_000 },
+    async () => {
+      clearOtelEnv();
+      process.env["OTEL_EXPORTER_OTLP_ENDPOINT"] = "http://127.0.0.1:1";
+      const handle = startTelemetryFromEnv({
+        serviceName: "ofac-test",
+        meterName: "ofac.test",
+        instanceId: "inst-1",
+      });
+      await handle.ready();
+      const traceId = "0f1e2d3c4b5a69788796a5b4c3d2e1f0";
+      const carrierSpan = "4d0c0b0a09080706";
+      const inside = await handle.instrument(
+        "link.deliver",
+        { traceparent: `00-${traceId}-${carrierSpan}-01` },
+        async () => ({
+          fields: handle.traceFields(),
+          carrier: handle.currentTraceparent(),
+        }),
+      );
+      // The join: same trace, a NEW span (the wrapper is the child).
+      expect(inside.fields["traceId"]).toBe(traceId);
+      expect(inside.fields["spanId"]).not.toBe(carrierSpan);
+      expect(inside.carrier).toBe(`00-${traceId}-${inside.fields["spanId"]}-01`);
+      // Outside the wrapper: nothing active.
+      expect(handle.traceFields()).toEqual({});
+      await handle.shutdown();
+    },
+  );
+
+  it(
     "endpoint set: emits, traceFields follows the active span, shutdown leaves no handles",
     { timeout: 60_000 },
     async () => {

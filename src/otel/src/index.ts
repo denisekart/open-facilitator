@@ -16,6 +16,9 @@
 
 // Type-only: erased at compile time, so the dark path stays module-free.
 import type { LoggerProvider } from "@opentelemetry/sdk-logs";
+import type { Meter, Tracer } from "@opentelemetry/api";
+
+export type { Meter, Tracer } from "@opentelemetry/api";
 
 export interface TelemetryHandle {
   /** False when the env named no endpoint: no SDK, no exporter, no timers. */
@@ -24,6 +27,21 @@ export interface TelemetryHandle {
   readonly logsExported: boolean;
   /** Extra fields every log line should carry so stdout lines join the trace. */
   traceFields(): Record<string, string>;
+  /** W3C carrier for the ACTIVE span (undefined outside a span / when dark). */
+  currentTraceparent(): string | undefined;
+  /** Instruments against the registered (or no-op) meter provider. */
+  meter(name: string): Meter;
+  /** Tracer for hand-opened spans (no-op tracer when dark). */
+  tracer(name: string): Tracer;
+  /**
+   * One span around `run`, parented on the carrier when it parses (the
+   * envelope IS the carrier — law 4). Identity wrapper when dark.
+   */
+  instrument<T>(
+    name: string,
+    carrier: { traceparent?: string | undefined },
+    run: () => Promise<T>,
+  ): Promise<T>;
   /** Emits one OTLP log record (no-op unless {@link logsExported}). */
   log(fields: Record<string, unknown>): void;
   /** Resolves once the SDK registration finished (never rejects). */
@@ -39,6 +57,8 @@ export interface TelemetryOptions {
   meterName: string;
   /** Per-process identity (gatewayId/endpointId-based) -> service.instance.id. */
   instanceId: string;
+  /** Caller-owned resource attributes (ofac.team, ofac.endpoint_id, …). */
+  resourceAttributes?: Record<string, string> | undefined;
   /** Optional transform applied to log fields before the OTLP bridge emits. */
   logBridge?: (fields: Record<string, unknown>) => Record<string, unknown>;
 }
@@ -47,10 +67,44 @@ const NOOP_HANDLE: TelemetryHandle = {
   emitting: false,
   logsExported: false,
   traceFields: () => ({}),
+  currentTraceparent: () => undefined,
+  // Hand-rolled no-op instruments: instrument calls stay syntactically
+  // identical on the dark path, and ZERO @opentelemetry module loads.
+  meter: () => EMPTY_METER,
+  tracer: () => EMPTY_TRACER,
+  instrument: (_name, _carrier, run) => run(),
   log: () => undefined,
   ready: async () => undefined,
   shutdown: async () => undefined,
 };
+
+const NOOP_INSTRUMENT = {
+  add: () => undefined,
+  record: () => undefined,
+} as unknown as ReturnType<Meter["createCounter"]>;
+
+const EMPTY_METER: Meter = {
+  createCounter: () => NOOP_INSTRUMENT,
+  createUpDownCounter: () => NOOP_INSTRUMENT,
+  createHistogram: () => NOOP_INSTRUMENT,
+  createGauge: () => NOOP_INSTRUMENT,
+} as unknown as Meter;
+
+const EMPTY_TRACER: Tracer = {
+  startSpan: () => ({
+    end: () => undefined,
+    setAttribute: () => undefined,
+    setStatus: () => undefined,
+    isRecording: () => false,
+    spanContext: () => undefined,
+    recordException: () => undefined,
+    addEvent: () => undefined,
+  }),
+  startActiveSpan: (_name: string, _span: unknown, fn?: unknown) => {
+    const callback = (fn ?? _span) as (span: never) => unknown;
+    return callback(undefined as never);
+  },
+} as unknown as Tracer;
 
 function envList(name: string): string[] {
   return (process.env[name] ?? "")
@@ -82,6 +136,14 @@ export function startTelemetryFromEnv(options: TelemetryOptions): TelemetryHandl
 
 interface TracingRegistration {
   traceFields(): Record<string, string>;
+  currentTraceparent(): string | undefined;
+  meter(name: string): Meter;
+  tracer(name: string): Tracer;
+  instrument<T>(
+    name: string,
+    carrier: { traceparent?: string | undefined },
+    run: () => Promise<T>,
+  ): Promise<T>;
   shutdown(): Promise<void>;
 }
 
@@ -93,6 +155,10 @@ function startEmitting(
   // stays valid (and silent) even while the SDK registration is in flight.
   let tracing: TracingRegistration = {
     traceFields: () => ({}),
+    currentTraceparent: () => undefined,
+    meter: () => EMPTY_METER,
+    tracer: () => EMPTY_TRACER,
+    instrument: (_name, _carrier, run) => run(),
     shutdown: async () => undefined,
   };
   let emitLog: (fields: Record<string, unknown>) => void = () => undefined;
@@ -120,6 +186,12 @@ function startEmitting(
     emitting: true,
     logsExported,
     traceFields: () => tracing.traceFields(),
+    currentTraceparent: () => tracing.currentTraceparent(),
+    // A forwarding meter: captures taken BEFORE registration still see the
+    // real instruments once the SDK lands (calls before that are no-ops).
+    meter: (name) => forwardingMeter(() => tracing.meter(name)),
+    tracer: (name) => forwardingTracer(() => tracing.tracer(name)),
+    instrument: (name, carrier, run) => tracing.instrument(name, carrier, run),
     log: (fields) => emitLog(fields),
     ready: () => started,
     shutdown: async () => {
@@ -127,6 +199,43 @@ function startEmitting(
       await tracing.shutdown();
     },
   };
+}
+
+// Late-bound instrument facades: the caller may capture meter()/tracer()
+// synchronously at construction, while the SDK registers asynchronously.
+const NOOP_OBSERVABLE = { addCallback: () => undefined, removeCallback: () => undefined };
+
+// The two structural views used to defer to the real provider once it lands.
+type InstrumentFactory = (name: string, options?: unknown) => unknown;
+type MeterFactories = Record<string, InstrumentFactory>;
+type TracerSurface = { startSpan: (...a: unknown[]) => unknown; startActiveSpan: (...a: unknown[]) => unknown };
+
+function forwardingMeter(get: () => Meter): Meter {
+  const factories = (): MeterFactories => get() as unknown as MeterFactories;
+  const create = (kind: string): InstrumentFactory => {
+    return (name, options) =>
+      // The target may still be the no-op facade (registration racing);
+      // observable kinds fall back to a no-op callback holder.
+      factories()[kind]?.(name, options) ??
+      (kind.startsWith("createObservable") ? NOOP_OBSERVABLE : NOOP_INSTRUMENT);
+  };
+  return {
+    createCounter: create("createCounter"),
+    createUpDownCounter: create("createUpDownCounter"),
+    createHistogram: create("createHistogram"),
+    createGauge: create("createGauge"),
+    createObservableCounter: create("createObservableCounter"),
+    createObservableUpDownCounter: create("createObservableUpDownCounter"),
+    createObservableGauge: create("createObservableGauge"),
+  } as unknown as Meter;
+}
+
+function forwardingTracer(get: () => Tracer): Tracer {
+  const surface = (): TracerSurface => get() as unknown as TracerSurface;
+  return {
+    startSpan: (...args: unknown[]) => surface().startSpan(...args),
+    startActiveSpan: (...args: unknown[]) => surface().startActiveSpan(...args),
+  } as unknown as Tracer;
 }
 
 // Dynamic imports here are the plan's law, not style: a telemetry-dark
@@ -179,6 +288,7 @@ async function register(
   });
   const ownAttributes: Record<string, string> = {
     "service.instance.id": options.instanceId,
+    ...(options.resourceAttributes ?? {}),
   };
   if (fromEnv.attributes["service.name"] === undefined) {
     ownAttributes["service.name"] = options.serviceName;
@@ -268,28 +378,74 @@ async function register(
       }
       return { traceId: spanContext.traceId, spanId: spanContext.spanId };
     },
+    currentTraceparent() {
+      const spanContext = api.trace.getSpanContext(api.context.active());
+      if (!spanContext || !api.isSpanContextValid(spanContext)) {
+        return undefined;
+      }
+      return `00-${spanContext.traceId}-${spanContext.spanId}-01`;
+    },
+    meter(name) {
+      return api.metrics.getMeter(name);
+    },
+    tracer(name) {
+      return api.trace.getTracer(name);
+    },
+    async instrument(name, carrier, run) {
+      const tracer = api.trace.getTracer("ofac.otel");
+      let parent: ReturnType<typeof api.propagation.extract> | undefined;
+      if (carrier.traceparent !== undefined) {
+        parent = api.propagation.extract(
+          api.context.active(),
+          { traceparent: carrier.traceparent },
+          {
+            get: (c, key) => (key === "traceparent" ? c[key] : undefined),
+            keys: (c) => Object.keys(c),
+          },
+        );
+      }
+      return tracer.startActiveSpan(
+        name,
+        { kind: api.SpanKind.SERVER },
+        parent ?? api.context.active(),
+        async (span) => {
+          try {
+            const result = await run();
+            span.setStatus({ code: api.SpanStatusCode.OK });
+            return result;
+          } catch (error) {
+            span.setStatus({
+              code: api.SpanStatusCode.ERROR,
+              message: error instanceof Error ? error.message : String(error),
+            });
+            throw error;
+          } finally {
+            span.end();
+          }
+        },
+      );
+    },
     async shutdown() {
-      const failures: unknown[] = [];
-      const settle = async (what: Promise<unknown>): Promise<void> => {
-        try {
-          await what;
-        } catch (err) {
-          failures.push(err);
-        }
+      // Never-throw law: an unreachable endpoint must not fail a business
+      // operation — and stop() IS one. A failed flush is the warn-once line.
+      const failed = (label: string) => (err: unknown): void => {
+        warnFirstFailure(
+          `${label} during shutdown (${err instanceof Error ? err.message : String(err)}); telemetry stays quiet`,
+        );
       };
-      await settle(reader.shutdown());
-      await settle(meterProvider.shutdown());
-      await settle(provider.shutdown());
+      const settle = async (what: Promise<unknown>, label: string): Promise<void> => {
+        await what.catch(failed(label));
+      };
+      await settle(reader.shutdown(), "metric flush");
+      await settle(meterProvider.shutdown(), "meter provider");
+      await settle(provider.shutdown(), "span flush");
       if (loggerProvider !== null) {
-        await settle(loggerProvider.shutdown());
+        await settle(loggerProvider.shutdown(), "log flush");
       }
       try {
         contextManager.disable();
       } catch (err) {
-        failures.push(err);
-      }
-      if (failures.length > 0) {
-        throw failures[0];
+        failed("context manager")(err);
       }
     },
   });

@@ -24,6 +24,8 @@ export class CommandDispatcher {
       logger: LinkLogger;
       counters: LinkStats;
       endpointId: string;
+      /** Trace seam from LinkClientOptions; absent = identity (byte-compatible). */
+      instrument?: (<T>(name: string, env: EnvelopeCommand, run: () => Promise<T>) => Promise<T>) | undefined;
       sendReceipt: SendReceipt;
       publishEvent(
         env: EnvelopeEvent,
@@ -84,7 +86,10 @@ export class CommandDispatcher {
     };
     // SAFETY: the DECIDED_EVENT type is an event class, not a command — the
     // dispatcher casts every delivery to EnvelopeCommand up front.
-    await this.deps.handler?.onDecided?.(env as unknown as EnvelopeEvent, ctx);
+    await this.instrument("link.deliver", env, async () => {
+      // SAFETY: the DECIDED_EVENT type is an event class, not a command.
+      await this.deps.handler?.onDecided?.(env as unknown as EnvelopeEvent, ctx);
+    });
   }
 
   private async invokeHandler(
@@ -102,7 +107,8 @@ export class CommandDispatcher {
       publishEvent: (e) => this.deps.publishEvent(e, env.traceparent, env.correlationid ?? env.id),
     };
     try {
-      return await handler.onCommand(env, ctx);
+      // The trace seam: one span (or nothing) wraps exactly one handler call.
+      return await this.instrument("link.deliver", env, () => handler.onCommand(env, ctx));
     } catch (error) {
       this.deps.logger.error("handler threw; answering rejected", {
         ...correlation,
@@ -110,6 +116,15 @@ export class CommandDispatcher {
       });
       return { kind: "rejected", reason: `handler error: ${String(error)}` };
     }
+  }
+
+  /** The instrument seam with the identity default kept in ONE place. */
+  private instrument<T>(
+    name: string,
+    env: EnvelopeCommand,
+    run: () => Promise<T>,
+  ): Promise<T> {
+    return this.deps.instrument?.(name, env, run) ?? run();
   }
 
   private async complete(

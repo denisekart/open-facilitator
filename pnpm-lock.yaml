@@ -932,6 +932,9 @@ importers:
 
   src/gateway:
     dependencies:
+      '@ofac/otel':
+        specifier: workspace:*
+        version: link:../otel
       '@ofac/protocol':
         specifier: workspace:*
         version: link:../protocol

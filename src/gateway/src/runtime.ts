@@ -76,6 +76,7 @@ import {
 } from "./policy.js";
 import { loadPolicyFile, type LoadedPolicy, type PolicyRow } from "./policy-file.js";
 import { auditPolicy } from "./audit.js";
+import { startGatewayTelemetry, type GatewayTelemetry, type GatewayTelemetryStatus } from "./telemetry.js";
 import { defaultClaimsDeps, extractClaims, type ActorClaims } from "./claims.js";
 import { computeActionDigest } from "@ofac/protocol";
 import {
@@ -139,6 +140,8 @@ export interface GatewayStatus {
   /** Every known child (live + durable offline), childWorkspaceId-sorted. */
   children: ChildStatusRow[];
   linkStats: LinkStats;
+  /** "Am I emitting?" without a viewer: env-only, verbatim from the handle. */
+  telemetry: GatewayTelemetryStatus;
 }
 
 export interface CreateGatewayRuntimeDeps {
@@ -222,6 +225,8 @@ export class GatewayRuntime {
   private tokenProvider: LinkTokenProvider | null = null;
   /** Reconcile polling: the OIDC CC provider (undefined ⇒ no REST plane). */
   private workloadToken: LinkTokenProvider | null = null;
+  /** Telemetry: dark handle until the env names an OTLP endpoint (set in ctor). */
+  private readonly telemetry: GatewayTelemetry;
   /** Digest of the manifest bytes the kernel last accepted (hello carries it). */
   private currentDigest: string;
   private _state: GatewayRuntimeState = "starting";
@@ -270,6 +275,10 @@ export class GatewayRuntime {
       deps.claimsOf ??
       ((ref: string) => extractClaims(ref, defaultClaimsDeps(`workload:${config.gatewayId}`)));
     this.currentDigest = digestOf(this.fleet.unionManifest(config.team));
+    // The telemetry decision is env-only and synchronous: dark unless
+    // OTEL_EXPORTER_OTLP_ENDPOINT names an endpoint (then instrument() is
+    // the identity wrapper and no module loads at all).
+    this.telemetry = startGatewayTelemetry(config.gatewayId, config.team);
   }
 
   get state(): GatewayRuntimeState {
@@ -286,6 +295,12 @@ export class GatewayRuntime {
 
   get executionLedger(): ExecutionLedger {
     return this.paths.execution;
+  }
+
+  /** Resolves once the telemetry SDK registration landed (dark: at once).
+   *  Tests await it so a delivery never races the dynamic imports. */
+  telemetryReady(): Promise<void> {
+    return this.telemetry.handle.ready();
   }
 
   /** The manifest the kernel holds: live fleet union, ownerTeam overridden. */
@@ -331,6 +346,9 @@ export class GatewayRuntime {
       handler: this.gatewayHandler(),
       logger: this.logger,
       eventSource: `urn:workspace:${this.config.gatewayId}`,
+      // The trace seam: one link.deliver span per delivery, parented on the
+      // inbound envelope carrier (identity wrapper when telemetry is dark).
+      instrument: (name, env, run) => this.telemetry.instrument(name, env, run),
     });
     this.client = client;
 
@@ -391,6 +409,9 @@ export class GatewayRuntime {
     }
     this.paths.link.close();
     this.paths.execution.close();
+    // Telemetry goes last: the goodbye + draining heartbeat lines are part
+    // of the trace, so the OTLP flush must not beat them.
+    await this.telemetry.shutdown();
     this._state = "closed";
   }
 
@@ -401,6 +422,21 @@ export class GatewayRuntime {
     for (const row of this.paths.execution.byState("running")) {
       runningByChild.set(row.childId, (runningByChild.get(row.childId) ?? 0) + 1);
     }
+    const children = this.fleet.statusRows(runningByChild);
+    const linkStats =
+      client?.stats ??
+      ({
+        delivered: 0,
+        duplicate: 0,
+        processed: 0,
+        failed: 0,
+        unsupported: 0,
+        reconnects: 0,
+      } satisfies LinkStats);
+    // The metric observation point: /status reads are exactly when an
+    // operator asks, and the collector's own cadence reads through the
+    // observable fleet gauge.
+    this.telemetry.observe(linkStats, children);
     return {
       gatewayId: this.config.gatewayId,
       state: this._state,
@@ -426,17 +462,9 @@ export class GatewayRuntime {
         childId: row.childId,
         childGeneration: row.childGeneration,
       })),
-      children: this.fleet.statusRows(runningByChild),
-      linkStats:
-        client?.stats ??
-        ({
-          delivered: 0,
-          duplicate: 0,
-          processed: 0,
-          failed: 0,
-          unsupported: 0,
-          reconnects: 0,
-        } satisfies LinkStats),
+      children,
+      linkStats,
+      telemetry: this.telemetry.status(),
     };
   }
 
@@ -448,6 +476,10 @@ export class GatewayRuntime {
   async publishHeartbeat(cause: "periodic" | "shutdown"): Promise<void> {
     const client = this.client;
     if (client === null) return;
+    // Metric observation rides the heartbeat cadence (and /status reads):
+    // counters take deltas of the SDK's own LinkStats, the fleet gauge is
+    // sampled at collection time.
+    this.telemetry.observe(client.stats, this.fleet.statusRows(new Map()));
     const running = this.paths.execution.counts().running;
     const status =
       this._state === "draining" || this._state === "closed"
@@ -776,7 +808,10 @@ export class GatewayRuntime {
         kind: "start",
         executionId,
         executionGeneration: data.executionGeneration ?? 1,
-        command: cmd,
+        // The child sees the Gateway span's carrier inside the envelope
+        // (msg carries the envelope; zero schema change — the child's own
+        // adapter-sdk span joins this trace).
+        command: stampedCarrier(cmd, this.telemetry),
       });
     } catch (error) {
       // Transport-dead (disconnect mid-send / reply timeout): the command
@@ -1008,7 +1043,11 @@ export class GatewayRuntime {
       ...(ctx.claims.verified ? { humanSubject: ctx.claims.subject } : {}),
       policyId: this.loadedPolicy?.policyId ?? "default",
       ...(decision.evidenceRef !== undefined ? { evidenceRef: decision.evidenceRef } : {}),
+      // The audit line joins the trace it was decided under (inside the
+      // link.deliver span, so this is the delivery's trace id).
+      ...this.telemetry.auditTraceFields(),
     });
+    this.telemetry.decision(decision.verdict, reason);
   }
 
   // ── approval lifecycle ─────────────────────────────────────────
@@ -1093,7 +1132,13 @@ export class GatewayRuntime {
         ...(notRequester ? { notRequester: true } : {}),
         ...(data.workId !== undefined ? { workId: data.workId } : {}),
       },
-      ...(cmd.traceparent !== undefined ? { traceparent: cmd.traceparent } : {}),
+      ...(() => {
+        // Outbound carrier law: the ACTIVE link.deliver span (whose trace the
+        // kernel-side ingress join continues), the envelope's own value only
+        // as fallback when telemetry is dark.
+        const carrier = this.telemetry.carrierFor(cmd.traceparent);
+        return carrier !== undefined ? { traceparent: carrier } : {};
+      })(),
       correlationid: cmd.id,
     });
     try {
@@ -1209,7 +1254,13 @@ export class GatewayRuntime {
         approvalId,
         actorEvidenceRef: `workload:${this.config.gatewayId}`,
       },
-      ...(cmd.traceparent !== undefined ? { traceparent: cmd.traceparent } : {}),
+      ...(() => {
+        // Outbound carrier law: the ACTIVE link.deliver span (whose trace the
+        // kernel-side ingress join continues), the envelope's own value only
+        // as fallback when telemetry is dark.
+        const carrier = this.telemetry.carrierFor(cmd.traceparent);
+        return carrier !== undefined ? { traceparent: carrier } : {};
+      })(),
       correlationid: cmd.id,
     });
     let rejectedProblem: string | undefined;
@@ -1297,7 +1348,10 @@ export class GatewayRuntime {
         kind: "start",
         executionId,
         executionGeneration: data.executionGeneration ?? 1,
-        command: cmd,
+        // The child sees the Gateway span's carrier inside the envelope
+        // (msg carries the envelope; zero schema change — the child's own
+        // adapter-sdk span joins this trace).
+        command: stampedCarrier(cmd, this.telemetry),
       });
     } catch (error) {
       const reason = error instanceof ChildTransportError ? error.reason : "child-disconnected";
@@ -1552,7 +1606,12 @@ export class GatewayRuntime {
       gatewayWorkload: `workload:${this.config.gatewayId}`,
       policyId: this.loadedPolicy?.policyId ?? "default",
       evidenceRef: `approval/${approvalId}`,
+      ...this.telemetry.auditTraceFields(),
     });
+    this.telemetry.decision(
+      reason === "approval-required" ? "confirm" : reason.endsWith("-failed") ? "deny" : "allow",
+      reason,
+    );
   }
 
   /** Pending rows mirror their binding row's terminal settle. */
@@ -1747,6 +1806,17 @@ function readStoredToken(stateDir: string): string | null {
   } catch {
     return null;
   }
+}
+
+/** The envelope as the child sees it: carrier re-stamped to the ACTIVE
+ * gateway span when telemetry emits, byte-identical otherwise. */
+function stampedCarrier(
+  cmd: EnvelopeCommand,
+  telemetry: GatewayTelemetry,
+): EnvelopeCommand {
+  const carrier = telemetry.carrierFor(cmd.traceparent);
+  if (carrier === cmd.traceparent) return cmd;
+  return { ...cmd, ...(carrier !== undefined ? { traceparent: carrier } : {}) };
 }
 
 function childOutcome(reply: ChildReply): CommandOutcome {

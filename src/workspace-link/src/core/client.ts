@@ -8,7 +8,7 @@
 // Terminal states: `closed` (clean stop, or ProtocolMismatchError — a null
 // welcome is a policy answer, not a network failure, so it is never retried).
 import { validateReceipt } from "@ofac/protocol";
-import type { EnvelopeEvent, ReceiptV1 } from "@ofac/protocol";
+import type { EnvelopeCommand, EnvelopeEvent, ReceiptV1 } from "@ofac/protocol";
 import type { EnvelopeObject } from "@ofac/protocol";
 import { CommandDispatcher } from "./command-dispatcher.js";
 import { DeliveryPipeline } from "./delivery-pipeline.js";
@@ -56,6 +56,13 @@ export interface LinkClientOptions {
   backoffMs?: readonly number[];
   /** Override for tests: how an outbound event gets its envelope fields. */
   eventSource?: string;
+  /**
+   * Trace seam: wraps one delivery's handler invocation (and the decided
+   * arm) so an embedding process can open a span around it WITHOUT the SDK
+   * importing @opentelemetry. Default = run it. The envelope is the carrier
+   * (law 4): `env.traceparent` inside is what the wrapper extracts from.
+   */
+  instrument?: <T>(name: string, env: EnvelopeCommand, run: () => Promise<T>) => Promise<T>;
 }
 
 export class LinkClient {
@@ -99,6 +106,8 @@ export class LinkClient {
       logger: this.logger,
       counters: this.counters,
       endpointId,
+      instrument:
+        options.instrument ?? ((_name, _env, run) => run()),
       publishEvent: (e, traceparent, causationid) => this.publishEvent(e, traceparent, causationid),
       sendReceipt: (id, partial, correlation) => this.deliverReceipt(id, partial, correlation),
     });

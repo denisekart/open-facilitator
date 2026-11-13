@@ -27,7 +27,8 @@ public sealed class CloudEventIngress(
     ArtifactIngress artifacts,
     ResultIngress results,
     MemoryIngress memory,
-    InteractionIngress interactions)
+    InteractionIngress interactions,
+    Facilitator.Kernel.Workflows.WorkflowTriggerEmitter? workflows = null)
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
@@ -87,6 +88,16 @@ public sealed class CloudEventIngress(
 
         if (!isCommand)
         {
+            // The workflow plane watches every accepted wire event: one
+            // trigger row per matching enabled definition / matching park.
+            // It fires once, right here, before the arms — an arm's refuse
+            // or accept does not change what the plane must observe (and
+            // the plane is a no-op while disabled).
+            if (workflows is not null)
+            {
+                await workflows.EmitOwnedAsync(root, ct);
+            }
+
             if (type is "org.facilitator.event.approval.required.v1" or "org.facilitator.event.approval.revoked.v1")
             {
                 var arm = await approvals.HandleEventAsync(root, type, null, ct);

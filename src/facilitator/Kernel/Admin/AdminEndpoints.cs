@@ -128,6 +128,7 @@ public static class AdminEndpoints
             Work.ApprovalSweeper approvals,
             Work.ScheduleSweeper schedules,
             Work.SessionLossSweeper sessionLoss,
+            Workflows.WorkflowSweeper workflows,
             IDbContextFactory<FacilitatorDbContext> contextFactory,
             TimeProvider timeProvider,
             AuditWriter audit,
@@ -146,6 +147,7 @@ public static class AdminEndpoints
                 "approvals" => await approvals.SweepOnceAsync(ct),
                 "schedules" => await schedules.SweepOnceAsync(ct),
                 "session-loss" => await sessionLoss.SweepOnceAsync(ct),
+                "workflows" => await workflows.SweepOnceAsync(ct),
                 "audit-retention" => await AuditRetentionSweep.PruneAsync(contextFactory, timeProvider, ct),
                 _ => -1,
             };
@@ -153,7 +155,7 @@ public static class AdminEndpoints
             {
                 return Results.Problem(ProblemErrors.Create(
                     "unknown-sweep", "Bad request", StatusCodes.Status400BadRequest,
-                    "sweep name must be nudge|approvals|schedules|session-loss|audit-retention"));
+                    "sweep name must be nudge|approvals|schedules|session-loss|workflows|audit-retention"));
             }
 
             await audit.WriteAsync(new AuditRecord(

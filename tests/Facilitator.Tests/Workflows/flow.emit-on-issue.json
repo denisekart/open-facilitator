@@ -1,0 +1,32 @@
+{
+  "id": "t.emit-on-issue",
+  "version": 1,
+  "title": "Emit on issue",
+  "description": "Phase-1 proof flow (test-only, not gallery): a work-triggering issue opens, project its action, post to the conversation.",
+  "enabled": false,
+  "on": {
+    "event": "org.facilitator.event.provider.issue.v1",
+    "where": { "data.action": "opened", "data.workTrigger": true }
+  },
+  "steps": [
+    {
+      "id": "s1",
+      "title": "Project the trigger",
+      "select": {
+        "project": {
+          "action": "event.data.action",
+          "channel": "event.data.reference.channelOrResourceId"
+        }
+      }
+    },
+    {
+      "id": "s2",
+      "title": "Acknowledge in the conversation",
+      "on": "s1:completed",
+      "emit": {
+        "command": "org.facilitator.command.communication.post.v1",
+        "inputs": { "text": "$steps.s1.output.action" }
+      }
+    }
+  ]
+}

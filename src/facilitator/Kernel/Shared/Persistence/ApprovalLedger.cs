@@ -139,7 +139,8 @@ public sealed class ApprovalLedger(
     IDbContextFactory<FacilitatorDbContext> contextFactory,
     Identity.AuditWriter audit,
     TimeProvider timeProvider,
-    EnvelopeValidator envelopeValidator) : IApprovalLedger
+    EnvelopeValidator envelopeValidator,
+    IEnumerable<IApprovalDecisionObserver>? decisionObservers = null) : IApprovalLedger
 {
     /// <summary>Envelope type of the decided-push event.</summary>
     public const string DecidedType = "org.facilitator.event.approval.decided.v1";
@@ -641,11 +642,6 @@ public sealed class ApprovalLedger(
         string evidenceRef,
         CancellationToken ct)
     {
-        if (string.IsNullOrEmpty(row.RequestedByEndpointId))
-        {
-            return;
-        }
-
         var now = timeProvider.GetUtcNow().UtcDateTime;
         var data = new JsonObject
         {
@@ -680,6 +676,24 @@ public sealed class ApprovalLedger(
             // Kernel-emitted envelopes must be contract-valid; fail closed at
             // insert rather than poison the outbox (locked decision).
             throw new InvalidOperationException($"kernel envelope rejected by the validator: {verdict.ErrorClass}: {verdict.Message}");
+        }
+
+        // Kernel-plane wake leg FIRST and endpoint-independent: a parked
+        // flow resumes on the decision even when no Link endpoint exists
+        // to be pushed (the observer appends on this same transaction —
+        // outbox law).
+        if (decisionObservers is { } observers)
+        {
+            foreach (var observer in observers)
+            {
+                await observer.OnApprovalDecidedAsync(
+                    db, JsonSerializer.Deserialize<JsonElement>(json), ct);
+            }
+        }
+
+        if (string.IsNullOrEmpty(row.RequestedByEndpointId))
+        {
+            return;
         }
 
         db.Outbox.Add(new OutboxEntity

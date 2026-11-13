@@ -348,12 +348,26 @@ public static class KernelServiceCollection
             sp.GetRequiredService<IDbContextFactory<FacilitatorDbContext>>()));
         builder.Services.AddSingleton<ISink, Facilitator.Kernel.Ai.DecodeSink>();
 
-        // The workflow definition plane (Phase 0: definitions are data, only —
-        // nothing executes until the sink/sweeper land). Store, validator,
-        // gallery seeder; the runtime registers its sink + sweeper next phase.
+        // The workflow plane: definitions are data (store, validator,
+        // gallery seeder) and, from Phase 1, an interpreter — the runtime's
+        // trigger emitter, sink, approval-wake observer and sweeper. Boot
+        // law: Facilitator:Workflows.Enabled=false by default; the emitter
+        // never appends and the sink drains leftovers while disabled.
         builder.Services.AddSingleton<Facilitator.Kernel.Workflows.WorkflowDefinitionValidator>();
         builder.Services.AddSingleton<Facilitator.Kernel.Workflows.WorkflowDefinitionStore>();
         builder.Services.AddHostedService<Facilitator.Kernel.Workflows.WorkflowGallerySeeder>();
+        builder.Services.AddSingleton(sp =>
+            builder.Configuration.GetSection(Facilitator.Kernel.Workflows.WorkflowOptions.SectionName)
+                .Get<Facilitator.Kernel.Workflows.WorkflowOptions>()
+            ?? new Facilitator.Kernel.Workflows.WorkflowOptions());
+        builder.Services.AddSingleton<Facilitator.Kernel.Workflows.WorkflowRuntime>();
+        builder.Services.AddSingleton<Facilitator.Kernel.Workflows.WorkflowSubscriptionRegistry>();
+        builder.Services.AddSingleton<Facilitator.Kernel.Workflows.WorkflowTriggerEmitter>();
+        builder.Services.AddSingleton<Facilitator.Kernel.Workflows.WorkflowRunner>();
+        builder.Services.AddSingleton<ISink, Facilitator.Kernel.Workflows.WorkflowSink>();
+        builder.Services.AddSingleton<Facilitator.Kernel.Shared.Persistence.IApprovalDecisionObserver, Facilitator.Kernel.Workflows.WorkflowApprovalWake>();
+        builder.Services.AddSingleton<Facilitator.Kernel.Workflows.WorkflowSweeper>();
+        builder.Services.AddHostedService(sp => sp.GetRequiredService<Facilitator.Kernel.Workflows.WorkflowSweeper>());
         builder.Services.AddSingleton<IDecisionProvider, Facilitator.Kernel.Ai.ModelDecisionProvider>();
         builder.Services.AddSingleton<Facilitator.Kernel.Ai.CommunicationDecision>();
         builder.Services.AddSingleton<Facilitator.Kernel.Ai.ChatProcessor>();

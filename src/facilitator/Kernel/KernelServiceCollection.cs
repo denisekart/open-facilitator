@@ -22,7 +22,9 @@ using Microsoft.Extensions.DependencyInjection;
 
 using Ofac.Protocol.Validation;
 
+using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 
 namespace Facilitator.Kernel;
@@ -31,8 +33,8 @@ namespace Facilitator.Kernel;
 /// Kernel composition root: one feature-extension method per folder under
 /// <c>Kernel/</c> — a new feature is one line in <see cref="AddKernel"/> plus
 /// its own extension. Also the OTel wiring (component packages — the
-/// OpenTelemetry.AspNetCore meta-package is not used; OTLP exporter only when
-/// <c>Otel:Endpoint</c> is configured).
+/// OpenTelemetry.AspNetCore meta-package is not used; traces/metrics need
+/// <c>Otel:Endpoint</c>, logs additionally <c>OTEL_LOGS_EXPORTER</c>).
 /// </summary>
 public static class KernelServiceCollection
 {
@@ -357,16 +359,45 @@ public static class KernelServiceCollection
         return builder;
     }
 
+    /// <summary>
+    /// Three-signal wiring on component packages (no OpenTelemetry.AspNetCore
+    /// meta-package). The resource carries the replica id so a two-replica fleet
+    /// reads as two resources in any viewer. URL query strings stay redacted
+    /// (DisableUrlQueryRedaction unset) and no headers are captured, so no PII
+    /// filter is needed — only the filters that drop chatty health/dev spans.
+    /// Traces + metrics opt in via <c>Otel:Endpoint</c>; logs opt in per process
+    /// additionally via <c>OTEL_LOGS_EXPORTER</c> (see <see cref="LogsExportEnabled"/>),
+    /// so stdout stays the single default log pipeline.
+    /// </summary>
     private static WebApplicationBuilder AddOpenTelemetry(this WebApplicationBuilder builder)
     {
         var otel = builder.Services.AddOpenTelemetry();
+        otel.ConfigureResource(r => r.AddAttributes(
+        [
+            new("service.instance.id", KernelOptions.ReplicaId(builder.Configuration)),
+            new("ofac.deployment", builder.Configuration["Otel:Deployment"] ?? "reference"),
+        ]));
         otel.WithTracing(t =>
         {
             t.AddSource(KernelActivity.SourceName);
-            t.AddAspNetCoreInstrumentation();
+            t.AddAspNetCoreInstrumentation(o => o.Filter = ctx =>
+                !ctx.Request.Path.StartsWithSegments("/api/health")
+                && !ctx.Request.Path.StartsWithSegments("/api/dev"));
+            t.AddHttpClientInstrumentation(o => o.FilterHttpRequestMessage = req =>
+                req.RequestUri?.Scheme is "http" or "https");
         });
         otel.WithMetrics(m => m.AddMeter(KernelMetrics.MeterName));
-
+        otel.WithLogging(b =>
+        {
+            // Unconditional: a log pipeline with no exporter costs nothing, so
+            // the exporter (not the pipeline) is what the gate controls. The
+            // hosting builder's WithLogging registers the 'OpenTelemetry' MEL
+            // logger provider itself; the callback only adds the exporter.
+            if (LogsExportEnabled(builder.Configuration))
+            {
+                b.AddOtlpExporter();
+            }
+        });
         if (!string.IsNullOrEmpty(builder.Configuration["Otel:Endpoint"]))
         {
             otel.WithMetrics(m => m.AddOtlpExporter());
@@ -375,4 +406,15 @@ public static class KernelServiceCollection
 
         return builder;
     }
+
+    /// <summary>Logs opt in per process: an OTLP log exporter exists only when
+    /// OTEL_LOGS_EXPORTER names one AND the kernel's own switch is on. .NET reads
+    /// OTEL_LOGS_EXPORTER but only for the built-in 'none' selector, so the
+    /// opt-in is code-side - the same asymmetry as Otel:Endpoint for the others.
+    /// stdout stays the durable artifact either way.</summary>
+    private static bool LogsExportEnabled(IConfiguration configuration) =>
+        !string.IsNullOrEmpty(configuration["Otel:Endpoint"])
+        && Environment.GetEnvironmentVariable("OTEL_LOGS_EXPORTER")
+            ?.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            .Any(v => !string.Equals(v, "none", StringComparison.OrdinalIgnoreCase)) is true;
 }

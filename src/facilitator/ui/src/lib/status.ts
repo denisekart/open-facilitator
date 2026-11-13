@@ -8,11 +8,15 @@ export type Tone = "neutral" | "progress" | "wait" | "ok" | "bad" | "motion";
 const TONES: Record<string, Tone> = {
   // works
   open: "neutral",
+  planning: "progress",
   routed: "progress",
   inprogress: "progress",
   in_progress: "progress",
+  active: "progress",
+  review: "wait",
   awaitingapproval: "wait",
   awaiting_approval: "wait",
+  blocked: "wait",
   done: "ok",
   cancelled: "neutral",
   // assignments / attempts / deliveries
@@ -28,6 +32,9 @@ const TONES: Record<string, Tone> = {
   // approvals
   approved: "ok",
   denied: "bad",
+  // audit decisions
+  allow: "ok",
+  deny: "bad",
   // links / gateways
   online: "ok",
   offline: "neutral",
@@ -38,7 +45,6 @@ const TONES: Record<string, Tone> = {
   // outbox/inbox
   published: "ok",
   // enrollment tokens
-  active: "ok",
   revoked: "neutral",
   expired: "neutral",
   // memories
@@ -46,6 +52,7 @@ const TONES: Record<string, Tone> = {
   // executions
   running: "motion",
   succeeded: "ok",
+  executed: "ok",
 };
 
 // Plain-word overrides where the wire name would read as jargon.
@@ -55,6 +62,7 @@ const LABELS: Record<string, string> = {
   in_progress: "in progress",
   awaitingapproval: "awaiting approval",
   awaiting_approval: "awaiting approval",
+  review: "in review",
 };
 
 export function stateLabel(state: string): string {

@@ -1,10 +1,11 @@
 <script lang="ts">
   import { health } from "../lib/health.svelte.js";
+  import { href, parse } from "../lib/route.svelte.js";
   import { stateLabel, stateTone, TONE_CLASS } from "../lib/status.js";
   import type { AdminHourBucket } from "../lib/types.js";
   import ProblemNote from "./ProblemNote.svelte";
 
-  const sparks = $derived(
+  const sparks = $derived<{ label: string; hint: string; bad: boolean; bucket: AdminHourBucket[]; link: string | null }[]>(
     health.metrics
       ? [
           {
@@ -12,24 +13,28 @@
             hint: "sent and gave up — see Deliveries to replay",
             bad: true,
             bucket: health.metrics.deadLettersPerHour,
+            link: null,
           },
           {
             label: "audit denies",
             hint: "requests refused by policy",
             bad: true,
             bucket: health.metrics.auditDeniesPerHour,
+            link: href(parse("#/audit?decision=deny")),
           },
           {
             label: "artifacts stored",
             hint: "evidence accepted into the store",
             bad: false,
             bucket: health.metrics.artifactsStoredPerHour,
+            link: null,
           },
           {
             label: "artifacts rejected",
             hint: "bytes refused at the gate",
             bad: true,
             bucket: health.metrics.artifactsRejectedPerHour,
+            link: null,
           },
         ]
       : [],
@@ -83,10 +88,13 @@
         <dt class="text-ink-3">Awaiting a human</dt>
         <dd>
           {#if (s.approvalsByState["pending"] ?? 0) > 0}
-            <span class="badge bg-amber-veil text-amber ring-amber/25">
-              <span class="dot" aria-hidden="true"></span>{s.approvalsByState["pending"]}
-              pending
-            </span>
+            <a
+              class="badge bg-amber-veil text-amber ring-amber/25"
+              title="the works a decision is holding up"
+              href={href(parse("#/works?state=blocked,review"))}
+              ><span class="dot" aria-hidden="true"></span>{s.approvalsByState["pending"]}
+              pending</a
+            >
           {:else}
             <span class="text-ink-3">nothing is blocked on a decision</span>
           {/if}
@@ -130,12 +138,18 @@
         <div>link sessions <span class="mono">{m.linkSessions}</span></div>
       </div>
       <div class="mt-3 grid grid-cols-2 gap-4">
-        {#each sparks as { label, hint, bad, bucket }}
+        {#each sparks as { label, hint, bad, bucket, link }}
           {@const heights = bars(bucket)}
           {@const total = bucket.reduce((a, b) => a + b.count, 0)}
           <div>
             <p class="mb-1 flex justify-between text-xs">
-              <span class="text-ink-3" title={hint}>{label}</span>
+              {#if link}
+                <a class="text-ink-3 underline decoration-dotted" title={hint} href={link}
+                  >{label}</a
+                >
+              {:else}
+                <span class="text-ink-3" title={hint}>{label}</span>
+              {/if}
               <span class="mono {total > 0 && bad ? 'text-danger' : 'text-ink-3'}">{total}</span>
             </p>
             <div

@@ -131,6 +131,8 @@ export interface AdminWorkRow {
   version: number;
   createdAt: string;
   updatedAt: string;
+  /** Detail payloads omit it; GET /api/admin/works always fills it. */
+  teamSlug?: string | null;
 }
 
 export interface AdminAttemptRow {
@@ -197,8 +199,51 @@ export interface AdminProjectDetail {
   works: AdminWorkRow[];
 }
 
-// ---- config surface ----
+/** One row of GET /api/admin/audit — gate and feature audit writes,
+    newest first, the trace correlation included. */
+export interface AdminAuditRow {
+  auditId: string;
+  occurredAt: string;
+  actor: string | null;
+  action: string;
+  resource: string | null;
+  decision: string;
+  reason: string | null;
+  detail: unknown;
+  traceId: string | null;
+  correlationId: string | null;
+}
 
+/** One replica row of GET /api/admin/replicas. */
+export interface AdminReplicaRow {
+  replicaId: string;
+  liveSessions: number;
+  socketsHere: number;
+}
+
+/** GET /api/admin/replicas: who answers, who leases, fleet queue depth. */
+export interface AdminReplicasView {
+  answeringReplicaId: string;
+  replicas: AdminReplicaRow[];
+  outboxPending: number;
+}
+
+/** One provisioning_operations ledger row (GET /api/admin/provisioning). */
+export interface AdminProvisioningRow {
+  operationId: string;
+  workloadId: string;
+  team: string;
+  operation: string;
+  state: string;
+  workId: string | null;
+  assignmentId: string | null;
+  generation: number | null;
+  reason: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ---- config surface ----
 export interface AdminConfigListRow {
   resource: string;
   exists: boolean;
@@ -240,6 +285,18 @@ export interface ChatSession {
   actor: string;
 }
 
+/** One entry of the read-phase trail a message may carry. */
+export interface ChatReadEntry {
+  method: string;
+  path: string;
+  status: number;
+}
+
+/** The jsonb shape stored on a message: null when the turn read nothing. */
+export interface ChatReadsTrail {
+  reads: ChatReadEntry[];
+}
+
 export interface ChatMessage {
   messageId: string;
   role: "user" | "assistant";
@@ -247,6 +304,8 @@ export interface ChatMessage {
   basis: string;
   createdAt: string;
   actions?: ChatAction[];
+  /** Read-phase trail ({"reads":[{method,path,status}]}), null when the turn read nothing. */
+  reads?: ChatReadsTrail | null;
 }
 
 export interface ChatAction {
@@ -255,9 +314,44 @@ export interface ChatAction {
   path: string;
   body?: unknown;
   description: string;
-  status: "pending" | "executed" | "failed" | "cancelled";
+  status: "pending" | "executed" | "failed" | "cancelled" | "expired";
   statusCode?: number | null;
   result?: unknown;
+  /** Operator decision note (confirm/cancel), when given. */
+  note?: string | null;
+  /** When a pending proposal stops being confirmable (null = never). */
+  expiresAt?: string | null;
+  /** Human summary of the target endpoint (catalog line), falling back to the description. */
+  summary?: string | null;
+}
+
+/** One row of GET /api/chat/catalog `catalog` — the principal's action slice. */
+export interface ChatCatalogEntry {
+  method: string;
+  path: string;
+  summary: string;
+  bodyHint: string;
+  notes: string | null;
+  effect: "read" | "write";
+}
+
+/** One argument spec of a registry verb. */
+export interface ChatVerbArg {
+  name: string;
+  required: boolean;
+}
+
+/** One row of GET /api/chat/catalog `verbs` — the command registry. */
+export interface ChatVerbSpec {
+  verb: string;
+  description: string;
+  args: ChatVerbArg[];
+}
+
+/** GET /api/chat/catalog: action catalog + verb registry, principal-filtered. */
+export interface ChatCatalogView {
+  catalog: ChatCatalogEntry[];
+  verbs: ChatVerbSpec[];
 }
 
 export interface ChatReply {
@@ -265,6 +359,8 @@ export interface ChatReply {
   messageId: string;
   reply: string;
   actions: ChatAction[];
+  /** Read-phase trail ({"reads":[{method,path,status}]}), null when the turn read nothing. */
+  reads?: ChatReadsTrail | null;
 }
 
 export interface ChatPreferences {

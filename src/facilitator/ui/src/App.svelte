@@ -1,28 +1,29 @@
 <script lang="ts">
+  import AuditView from "./components/AuditView.svelte";
   import ChatView from "./components/ChatView.svelte";
   import ConfigView from "./components/ConfigView.svelte";
   import DeliveriesView from "./components/DeliveriesView.svelte";
   import HealthStrip from "./components/HealthStrip.svelte";
+  import HitDetail from "./components/HitDetail.svelte";
   import LinksView from "./components/LinksView.svelte";
+  import RuntimeView from "./components/RuntimeView.svelte";
   import WorkInspector from "./components/WorkInspector.svelte";
+  import WorksView from "./components/WorksView.svelte";
   import { ApiError, getJson } from "./lib/api.js";
   import { apiFetch, session } from "./lib/auth.svelte.js";
   import { health } from "./lib/health.svelte.js";
+  import { go, route, type RouteView } from "./lib/route.svelte.js";
   import { TONE_CLASS, stateLabel, stateTone } from "./lib/status.js";
   import { theme, toggleTheme } from "./lib/theme.svelte.js";
   import type { AdminSearchResults, SearchSection } from "./lib/types.js";
 
-  type Panel = "none" | "links" | "deliveries" | "config" | "chat";
-
   let booted = $state(false);
   let bootError = $state<string | null>(null);
-  let panel = $state<Panel>("none");
   let query = $state("");
   let activeSections = $state<Set<SearchSection>>(new Set());
   let results = $state<AdminSearchResults | null>(null);
   let searchError = $state<ApiError | null>(null);
   let searching = $state(false);
-  let selectedWork = $state<string | null>(null);
   let searchBox = $state<HTMLInputElement | null>(null);
 
   const SECTIONS: { key: SearchSection; label: string }[] = [
@@ -33,7 +34,13 @@
     { key: "memories", label: "memories" },
     { key: "messages", label: "messages" },
   ];
-  const VIEW_BUTTONS: { key: Panel; label: string; hint: string; needsChatRole?: boolean }[] = [
+  const VIEW_BUTTONS: {
+    key: RouteView;
+    label: string;
+    hint: string;
+    needsChatRole?: boolean;
+  }[] = [
+    { key: "works", label: "Works", hint: "the queue — everything, newest first" },
     { key: "links", label: "Links", hint: "gateways connected to this kernel" },
     {
       key: "deliveries",
@@ -41,6 +48,7 @@
       hint: "every message the kernel sent, and its fate",
     },
     { key: "config", label: "Config", hint: "the live routing policy" },
+    { key: "runtime", label: "Runtime", hint: "replicas, provisioning, manual sweeps" },
     { key: "chat", label: "AiDeck", hint: "talk to the kernel's assistant", needsChatRole: true },
   ];
 
@@ -119,9 +127,7 @@
   }
 
   function openHit(section: SearchSection, id: string): void {
-    if (section === "works") {
-      selectedWork = id;
-    }
+    go(section === "works" ? `#/work/${id}` : `#/hit/${section}/${id}`);
   }
 
   const authenticated = $derived(!!session.user);
@@ -269,9 +275,7 @@
             {#each hits as hit}
               <li>
                 <button
-                  class="w-full rounded px-2 py-1 text-left hover:bg-sunken {key === 'works'
-                    ? 'cursor-pointer'
-                    : 'cursor-default'}"
+                  class="w-full cursor-pointer rounded px-2 py-1 text-left hover:bg-sunken"
                   data-testid={`hit-${key}-${hit.id.slice(0, 8)}`}
                   onclick={() => openHit(key, hit.id)}>
                   <span data-testid="hit-display">{hit.display}</span>
@@ -287,31 +291,43 @@
       {/each}
     {/if}
 
-    {#if selectedWork}
+    {#if route.route.view === "work" && route.route.id}
       <div class="mb-4">
-        <WorkInspector workId={selectedWork} onclose={() => (selectedWork = null)} />
+        <WorkInspector workId={route.route.id} onclose={() => go("#/")} />
+      </div>
+    {/if}
+
+    {#if route.route.view === "hit" && route.route.id && route.route.kind}
+      <div class="mb-4">
+        <HitDetail kind={route.route.kind} id={route.route.id} onclose={() => go("#/")} />
       </div>
     {/if}
 
     <nav class="mb-4 flex flex-wrap gap-2" aria-label="views">
       {#each viewButtons as { key, label, hint }}
         <button
-          class="btn {panel === key ? 'btn-primary' : ''}"
+          class="btn {route.route.view === key ? 'btn-primary' : ''}"
           title={hint}
           data-testid={`view-${key}`}
-          aria-pressed={panel === key}
-          onclick={() => (panel = panel === key ? "none" : key)}>{label}</button
+          aria-pressed={route.route.view === key}
+          onclick={() => go(route.route.view === key ? "#/" : `#/${key}`)}>{label}</button
         >
       {/each}
     </nav>
 
-    {#if panel === "links"}
+    {#if route.route.view === "works"}
+      <WorksView />
+    {:else if route.route.view === "links"}
       <LinksView />
-    {:else if panel === "deliveries"}
+    {:else if route.route.view === "deliveries"}
       <DeliveriesView />
-    {:else if panel === "config"}
+    {:else if route.route.view === "audit"}
+      <AuditView />
+    {:else if route.route.view === "config"}
       <ConfigView />
-    {:else if panel === "chat"}
+    {:else if route.route.view === "runtime"}
+      <RuntimeView />
+    {:else if route.route.view === "chat"}
       <ChatView />
     {/if}
 

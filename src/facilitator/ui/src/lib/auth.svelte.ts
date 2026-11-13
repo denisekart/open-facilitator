@@ -1,6 +1,7 @@
 import { UserManager, type User } from "oidc-client-ts";
 
 import { makeApiFetch, toApiError, uiBootstrap, type Fetcher } from "./api.js";
+import { parse, route } from "./route.svelte.js";
 
 /** Realm roles that grant the admin surface (mirrors admin.read/admin.mutate bindings). */
 const OPERATOR_ROLES = ["framework-admin", "kernel-operator"];
@@ -94,7 +95,16 @@ export class AuthSession {
       });
       if (new URLSearchParams(window.location.search).has("code")) {
         this.user = await this.#manager.signinRedirectCallback();
-        window.history.replaceState({}, "", "/");
+        // login() round-tripped the hash route through the OIDC state param —
+        // restore it instead of flattening every deep link to /.
+        const restored = this.user.state;
+        window.history.replaceState(
+          {},
+          "",
+          typeof restored === "string" && restored.startsWith("#/") ? restored : "/",
+        );
+        // replaceState fires no hashchange: tell the store where we landed.
+        route.route = parse(window.location.hash);
       } else {
         this.user = await this.#manager.getUser();
       }

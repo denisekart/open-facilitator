@@ -173,7 +173,12 @@
             "/api/admin/config/{resource}",
             "/api/admin/config/{resource}/history",
             "/api/admin/audit",
-            "/api/admin/audit/export"
+            "/api/admin/audit/export",
+            "/api/admin/workflows/definitions",
+            "/api/admin/workflows/definitions/{id}",
+            "/api/admin/workflows/definitions/export",
+            "/api/admin/workflows/registry",
+            "/api/admin/workflows/instances/{id}"
           ],
           "rolesAnyOf": ["kernel-operator", "framework-admin"]
         },
@@ -185,12 +190,16 @@
         },
         {
           "id": "admin.mutate",
-          "methods": ["POST", "PATCH"],
+          "methods": ["POST", "PATCH", "PUT"],
           "paths": [
             "/api/admin/dead-letters/{deadLetterId}/replay",
             "/api/admin/manifests/{manifestId}/re-mark",
             "/api/admin/config/{resource}",
-            "/api/admin/sweeps/{name}"
+            "/api/admin/sweeps/{name}",
+            "/api/admin/workflows/definitions/{id}",
+            "/api/admin/workflows/definitions/validate",
+            "/api/admin/workflows/definitions/import",
+            "/api/admin/workflows/definitions/{id}/versions/{version}/toggle"
           ],
           "rolesAnyOf": ["kernel-operator", "framework-admin"]
         },

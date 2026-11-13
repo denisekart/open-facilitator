@@ -1,0 +1,38 @@
+{
+  "id": "review-fork",
+  "version": 1,
+  "title": "Review fork on closed work",
+  "description": "A review arrives on work that is already terminal: open a successor work, link it, repoint the conversation binding, and tell the channel. Deterministic guard (work.state), no model consulted; the review.decision provenance row stays arm-written.",
+  "enabled": false,
+  "on": {
+    "event": "org.facilitator.event.provider.review.v1",
+    "where": { "data.action": "submitted" }
+  },
+  "steps": [
+    {
+      "id": "guard-terminal",
+      "title": "Only when the subject work is terminal",
+      "on": "always",
+      "decide": {
+        "source": "guard",
+        "guard": { "field": "work.state", "in": ["completed", "cancelled", "failed"] },
+        "fallback": "end"
+      }
+    },
+    {
+      "id": "fork",
+      "title": "Fork the follow-up work",
+      "on": "guard-terminal:completed",
+      "fork-work": { "noteRef": "$event.data.body" }
+    },
+    {
+      "id": "notify",
+      "title": "Tell the channel about the successor",
+      "on": "fork:completed",
+      "emit": {
+        "command": "org.facilitator.command.communication.reply.v1",
+        "inputs": { "text": "Review noted: this continues on the follow-up work." }
+      }
+    }
+  ]
+}

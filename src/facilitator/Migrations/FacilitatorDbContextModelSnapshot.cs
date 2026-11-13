@@ -2489,6 +2489,10 @@ namespace Facilitator.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("version");
 
+                    b.Property<Guid?>("WorkflowInstanceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workflow_instance_id");
+
                     b.HasKey("WorkId");
 
                     b.HasIndex("MergedInto")
@@ -2498,6 +2502,9 @@ namespace Facilitator.Migrations
 
                     b.HasIndex("TeamId")
                         .HasDatabaseName("works_team_id_idx");
+
+                    b.HasIndex("WorkflowInstanceId")
+                        .HasDatabaseName("works_workflow_instance_id_idx");
 
                     b.ToTable("works", "facilitator", t =>
                         {
@@ -2553,7 +2560,7 @@ namespace Facilitator.Migrations
 
                     b.ToTable("work_events", "facilitator", t =>
                         {
-                            t.HasCheckConstraint("work_events_kind_check", "kind IN ('created', 'state.transition', 'steer', 'command.accepted', 'assignment.transition', 'approval.decided', 'artifact.stored', 'artifact.registered', 'artifact.available', 'artifact.gc', 'manifest.recorded', 'manifest.superseded', 'memory.candidate', 'memory.promoted', 'provider.input', 'provider.attachment', 'provider.reaction', 'input.required', 'input.answered', 'provider.duplicate', 'work.linked', 'work.triaged', 'approval.nudged', 'work.consent-expired', 'address.obsolete', 'review.decision', 'effects-disclosed', 'assignment.queue-reason')");
+                            t.HasCheckConstraint("work_events_kind_check", "kind IN ('created', 'state.transition', 'steer', 'command.accepted', 'assignment.transition', 'approval.decided', 'artifact.stored', 'artifact.registered', 'artifact.available', 'artifact.gc', 'manifest.recorded', 'manifest.superseded', 'memory.candidate', 'memory.promoted', 'provider.input', 'provider.attachment', 'provider.reaction', 'input.required', 'input.answered', 'provider.duplicate', 'work.linked', 'work.triaged', 'approval.nudged', 'work.consent-expired', 'address.obsolete', 'review.decision', 'effects-disclosed', 'assignment.queue-reason', 'workflow.stage')");
                         });
                 });
 
@@ -2596,6 +2603,223 @@ namespace Facilitator.Migrations
                     b.ToTable("work_links", "facilitator", t =>
                         {
                             t.HasCheckConstraint("work_links_kind_check", "kind IN ('successor', 'parent', 'child', 'merged-duplicate', 'context')");
+                        });
+                });
+
+            modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.WorkflowDefinitionEntity", b =>
+                {
+                    b.Property<string>("DefId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("def_id");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("Digest")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("digest");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("enabled");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("payload");
+
+                    b.Property<bool>("Shadow")
+                        .HasColumnType("boolean")
+                        .HasColumnName("shadow");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("source");
+
+                    b.Property<string>("Team")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("team");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("title");
+
+                    b.HasKey("DefId", "Version");
+
+                    b.ToTable("workflow_definitions", "facilitator", t =>
+                        {
+                            t.HasCheckConstraint("workflow_definitions_source_check", "source IN ('gallery', 'hand', 'ai', 'derived')");
+                        });
+                });
+
+            modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.WorkflowInstanceEntity", b =>
+                {
+                    b.Property<Guid>("InstanceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("CurrentStep")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("current_step");
+
+                    b.Property<DateTime?>("DeadlineAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deadline_at");
+
+                    b.Property<string>("DefId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("def_id");
+
+                    b.Property<int>("DefVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("def_version");
+
+                    b.Property<int>("Depth")
+                        .HasColumnType("integer")
+                        .HasColumnName("depth");
+
+                    b.Property<string>("EndReason")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("end_reason");
+
+                    b.Property<string>("InvocationPath")
+                        .IsRequired()
+                        .HasMaxLength(4096)
+                        .HasColumnType("character varying(4096)")
+                        .HasColumnName("invocation_path");
+
+                    b.Property<string>("Output")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("output");
+
+                    b.Property<Guid?>("ParentInstanceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("parent_instance_id");
+
+                    b.Property<Guid?>("PrimaryWorkId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("primary_work_id");
+
+                    b.Property<Guid?>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project");
+
+                    b.Property<DateTime>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Team")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("team");
+
+                    b.Property<Guid?>("TriggerEventId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("trigger_event_id");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("InstanceId");
+
+                    b.HasIndex("DefId")
+                        .HasDatabaseName("workflow_instances_def_id_idx");
+
+                    b.HasIndex("ParentInstanceId")
+                        .HasDatabaseName("workflow_instances_parent_instance_id_idx");
+
+                    b.HasIndex("PrimaryWorkId")
+                        .HasDatabaseName("workflow_instances_primary_work_id_idx");
+
+                    b.HasIndex("Status", "DeadlineAt")
+                        .HasDatabaseName("workflow_instances_status_deadline_at_idx");
+
+                    b.ToTable("workflow_instances", "facilitator", t =>
+                        {
+                            t.HasCheckConstraint("workflow_instances_end_reason_check", "end_reason IN ('budget-exhausted', 'chain-age-exceeded', 'parent-cancelled', 'invoke-timeout', 'operator-cancel') OR end_reason IS NULL");
+
+                            t.HasCheckConstraint("workflow_instances_status_check", "status IN ('running', 'waiting', 'completed', 'failed', 'cancelled', 'shadowed')");
+                        });
+                });
+
+            modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.WorkflowStepLogEntity", b =>
+                {
+                    b.Property<Guid>("InstanceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("instance_id");
+
+                    b.Property<int>("Seq")
+                        .HasColumnType("integer")
+                        .HasColumnName("seq");
+
+                    b.Property<string>("EffectCommandId")
+                        .HasColumnType("text")
+                        .HasColumnName("effect_command_id");
+
+                    b.Property<string>("EvidenceRef")
+                        .HasColumnType("text")
+                        .HasColumnName("evidence_ref");
+
+                    b.Property<string>("Output")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("output");
+
+                    b.Property<DateTime>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<string>("StepId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("step_id");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("InstanceId", "Seq");
+
+                    b.ToTable("workflow_step_log", "facilitator", t =>
+                        {
+                            t.HasCheckConstraint("workflow_step_log_status_check", "status IN ('pending', 'running', 'done', 'failed', 'skipped', 'shadow')");
                         });
                 });
 
@@ -2849,6 +3073,28 @@ namespace Facilitator.Migrations
                         .HasConstraintName("work_links_work_id_fkey");
 
                     b.Navigation("Work");
+                });
+
+            modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.WorkflowInstanceEntity", b =>
+                {
+                    b.HasOne("Facilitator.Kernel.Shared.Persistence.WorkflowInstanceEntity", "Parent")
+                        .WithMany()
+                        .HasForeignKey("ParentInstanceId")
+                        .HasConstraintName("workflow_instances_parent_instance_id_fkey");
+
+                    b.Navigation("Parent");
+                });
+
+            modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.WorkflowStepLogEntity", b =>
+                {
+                    b.HasOne("Facilitator.Kernel.Shared.Persistence.WorkflowInstanceEntity", "Instance")
+                        .WithMany()
+                        .HasForeignKey("InstanceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("workflow_step_log_instance_id_fkey");
+
+                    b.Navigation("Instance");
                 });
 #pragma warning restore 612, 618
         }

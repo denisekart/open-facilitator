@@ -88,6 +88,17 @@ public static class ActionCatalog
         new("GET", "/api/admin/config", "Config resources with existence + row versions.", "-", null),
         new("GET", "/api/admin/config/{resource}", "One config resource payload + ETag.", "-", null),
         new("GET", "/api/admin/config/{resource}/history", "Config change history (newest first).", "-", null),
+
+        // Workflow definition plane (chat plane learns flows exist).
+        new("GET", "/api/admin/workflows/definitions", "Workflow definitions (latest version each, enablement, running-instance counts).", "-", null),
+        new("GET", "/api/admin/workflows/definitions/{id}", "One workflow definition: canonical JSON + YAML view.", "-", null),
+        new("GET", "/api/admin/workflows/registry", "Closed sets the editor may SELECT from (events, commands, capabilities, callable definitions, teams).", "-", null),
+        new("PUT", "/api/admin/workflows/definitions/{id}", "Store a new workflow definition version (X-Change-Reason + If-Match).",
+            "the canonical JSON definition document", null),
+        new("POST", "/api/admin/workflows/definitions/validate", "Dry-run validation of a definition document.",
+            "the canonical JSON definition document", null),
+        new("POST", "/api/admin/workflows/definitions/{id}/versions/{version}/toggle", "Enable/disable or shadow an exact definition version.",
+            "{\"enabled\": bool?, \"shadow\": bool?}", null),
         new("GET", "/api/admin/audit", "Audit trail; ?action=&actor=&since=&limit= (cap 200).", "-", null),
 
         // Admin mutation surface.

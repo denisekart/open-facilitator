@@ -1,0 +1,504 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openfacilitator.org/v1/workflow-definition.v1.json",
+  "title": "WorkflowDefinitionV1",
+  "description": "Workflow definition plane artifact: a durable, versioned workflow definition stored in the kernel and executed by the workflow sink on the synthetic `workflow.kernel` channel. JSON is canonical; YAML is a serialization view only. Field-level semantics are the interpreter contract: the palette is closed, `decide` always carries a `fallback`, and every `invoke` carries a mandatory `timeout`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "version", "title", "description", "on", "steps"],
+  "properties": {
+    "id": {
+      "$ref": "common.v1.json#/$defs/idToken",
+      "description": "Definition identity (stable across versions); the store keys on (id, version)."
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Monotonic version; a PUT of an existing id stores a new row, instances pin the version they started on."
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120,
+      "description": "Operator-facing name."
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2000,
+      "description": "Operator-facing law of the flow."
+    },
+    "enabled": {
+      "type": "boolean",
+      "default": false,
+      "description": "Enable-time gate. Disabled definitions never contribute trigger subscriptions; enabling a definition whose palette contains a not-yet-executable step kind is refused (validator `step-kind-not-supported`)."
+    },
+    "on": {
+      "$ref": "#/$defs/trigger",
+      "description": "Exactly one trigger source."
+    },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 20,
+      "items": { "$ref": "#/$defs/step" },
+      "description": "Flat step list; execution order comes from the `on:` edge selectors, the array order breaks ties deterministically."
+    },
+    "team": {
+      "$ref": "common.v1.json#/$defs/idToken",
+      "description": "Optional team scope (slug): the definition only fires for work/events in that team."
+    },
+    "output": {
+      "$ref": "#/$defs/output",
+      "description": "What a completed instance publishes to a waiting parent."
+    },
+    "composition": {
+      "$ref": "#/$defs/composition",
+      "description": "Sub-workflow budgets for this definition as a callee."
+    }
+  },
+  "$defs": {
+    "duration": {
+      "type": "string",
+      "pattern": "^P(?:[0-9]{1,4}D)?(?:T(?:[0-9]{1,4}H)?(?:[0-9]{1,4}M)?(?:[0-9]{1,5}S)?)$",
+      "description": "ISO-8601 duration restricted to day/hour/minute/second (e.g. \"PT15M\", \"P1D\"); the validator rejects a zero total."
+    },
+    "ref": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "description": "Value reference: a literal string, or a template over run context (\"$event.data.<path>\", \"$steps.<stepId>.output.<jsonPath>\", \"$work.<field>\", \"$input.<name>\", \"$child.status\")."
+    },
+    "matcher": {
+      "description": "Event-payload matcher value, copied from the policy-file matcher law: exact string, bare \"*\", or a single trailing \"*\" prefix-glob; scalars match by equality.",
+      "oneOf": [
+        {
+          "type": "string",
+          "pattern": "^(?:\\*|[A-Za-z0-9._:/@#\\-+ ]+)(?:\\*)?$"
+        },
+        { "type": "number" },
+        { "type": "boolean" }
+      ]
+    },
+    "jsonPath": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "description": "Projection path over a JSON document: dotted segments with optional [$n] / [*] indices, resolved by System.Text.Json only (no expression language)."
+    },
+    "trigger": {
+      "type": "object",
+      "additionalProperties": false,
+      "oneOf": [
+        { "required": ["event"], "not": { "anyOf": [{ "required": ["schedule"] }, { "required": ["invoked"] }] } },
+        { "required": ["schedule"], "not": { "anyOf": [{ "required": ["event"] }, { "required": ["invoked"] }] } },
+        { "required": ["invoked"], "not": { "anyOf": [{ "required": ["event"] }, { "required": ["schedule"] }] } }
+      ],
+      "properties": {
+        "event": {
+          "type": "string",
+          "pattern": "^org\\.facilitator\\.event\\.[a-z0-9._]+\\.v[0-9]+$",
+          "description": "Wire event type this definition triggers on; the validator requires the mirrored schema id to exist."
+        },
+        "where": {
+          "type": "object",
+          "propertyNames": { "pattern": "^data\\.[A-Za-z0-9._-]{1,120}$" },
+          "additionalProperties": { "$ref": "#/$defs/matcher" },
+          "description": "Map of dotted `data.*` paths to matcher values; all must match (AND). Only meaningful with `event`."
+        },
+        "schedule": {
+          "type": "string",
+          "pattern": "^(?:interval:[0-9]{1,6}m|daily:[0-9]{1,2}:[0-9]{2}|cron:[^\\s]+(?:\\s+[^\\s]+){4})$",
+          "description": "Cadence spec, verbatim law of the schedule plane (`interval:<n>m` | `daily:HH:mm` | `cron:<5 fields>`), evaluated by the shared schedule-spec parser."
+        },
+        "invoked": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 0,
+          "description": "Callable-only marker: startable exclusively by a parent's `invoke` step, never by events or a schedule."
+        }
+      }
+    },
+    "edge": {
+      "type": "string",
+      "pattern": "^(?:always|timeout|failed|[A-Za-z0-9._-]{1,64}:completed)$",
+      "description": "Outgoing edge selector: `always`, `timeout`, `failed`, or `<stepId>:completed`. Default (absent) is `always`. At most one outgoing edge per branch key."
+    },
+    "step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title"],
+      "oneOf": [
+        { "required": ["emit"] },
+        { "required": ["wait"] },
+        { "required": ["timer"] },
+        { "required": ["approval"] },
+        { "required": ["decide"] },
+        { "required": ["select"] },
+        { "required": ["fan-out"] },
+        { "required": ["join"] },
+        { "required": ["fork-work"] },
+        { "required": ["work-create"] },
+        { "required": ["escalate"] },
+        { "required": ["memory"] },
+        { "required": ["invoke"] }
+      ],
+      "properties": {
+        "id": {
+          "$ref": "common.v1.json#/$defs/idToken",
+          "pattern": "^[A-Za-z0-9._-]{1,64}$",
+          "description": "Step identity, unique within the document; step-log rows and edges reference it."
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "description": "Operator-facing step label (the console checklist line)."
+        },
+        "on": {
+          "$ref": "#/$defs/edge",
+          "description": "Edge this step is reached by. The entry step(s) use `always` or omit `on`."
+        },
+        "emit": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["inputs"],
+          "oneOf": [{ "required": ["command"] }, { "required": ["capability"] }],
+          "properties": {
+            "command": {
+              "type": "string",
+              "pattern": "^org\\.facilitator\\.command\\.[a-z0-9._]+\\.v[0-9]+$",
+              "description": "Wire command appended verbatim as the effect; the validator requires membership in the fail-closed command table."
+            },
+            "capability": {
+              "$ref": "common.v1.json#/$defs/idToken",
+              "description": "Capability id: dispatch appends a routing intent (the routing funnel chooses the endpoint)."
+            },
+            "inputs": {
+              "type": "object",
+              "description": "Envelope inputs: values are literals or `#/$defs/ref` templates."
+            },
+            "to": {
+              "$ref": "#/$defs/ref",
+              "description": "Envelope target reference; resolved from run context (defaults to the trigger's own target)."
+            }
+          },
+          "description": "Append one effect: a named wire command, or a capability routed through the funnel."
+        },
+        "wait": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["event", "correlate", "timeout", "onTimeout"],
+          "properties": {
+            "event": {
+              "type": "string",
+              "pattern": "^org\\.facilitator\\.event\\.[a-z0-9._]+\\.v[0-9]+$",
+              "description": "Event type awaited; the definition joins the subscription set while the instance is parked."
+            },
+            "correlate": {
+              "$ref": "#/$defs/ref",
+              "description": "Correlation key resolved at park time (e.g. \"$steps.assign.output.workId\"); matched against the waking envelope."
+            },
+            "timeout": { "$ref": "#/$defs/duration" },
+            "onTimeout": {
+              "$ref": "common.v1.json#/$defs/idToken",
+              "description": "Step id taken when the deadline passes (the sweeper drives it)."
+            }
+          },
+          "description": "Park the instance (`waiting`) until a matching event wakes it or the timeout edge fires."
+        },
+        "timer": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["for"],
+          "properties": {
+            "for": { "$ref": "#/$defs/duration" }
+          },
+          "description": "Park until the delay elapses; the sweeper is the clock."
+        },
+        "approval": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["question", "approvers"],
+          "properties": {
+            "question": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000,
+              "description": "Approval prompt (ref templates allowed)."
+            },
+            "approvers": {
+              "$ref": "#/$defs/ref",
+              "description": "Approver actor refs (comma-separated D4 actors or a ref resolving to them)."
+            }
+          },
+          "description": "Raise a human decision through the existing approval ledger, park, resume on `approval.decided` correlated by approval id."
+        },
+        "decide": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["source", "fallback"],
+          "properties": {
+            "source": {
+              "type": "string",
+              "enum": ["model", "guard"],
+              "description": "`model` consults the decision gateway with a closed option list (degrade to `fallback` on low confidence or AI outage); `guard` is a deterministic field predicate with no model and no telemetry."
+            },
+            "question": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["prompt", "options"],
+              "properties": {
+                "prompt": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 2000
+                },
+                "options": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 20,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["value", "branch"],
+                    "properties": {
+                      "value": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128,
+                        "description": "Closed answer the model may choose."
+                      },
+                      "branch": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64,
+                        "description": "Step id, or the literal \"end\": completes the instance right there."
+                      }
+                    }
+                  }
+                }
+              },
+              "description": "Model question + closed option set; required when source is `model`."
+            },
+            "guard": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["field"],
+              "oneOf": [{ "required": ["equals"] }, { "required": ["in"] }],
+              "properties": {
+                "field": {
+                  "$ref": "#/$defs/jsonPath",
+                  "description": "Field path in the built-in context (`work.state`, `event.data.action`, ...)."
+                },
+                "equals": {
+                  "type": ["string", "number", "boolean", "null"],
+                  "description": "Exact scalar match; null matches a field that resolves to absent/null (presence branching)."
+                },
+                "in": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 20,
+                  "items": {
+                    "type": ["string", "number", "boolean"]
+                  },
+                  "description": "Any-of scalar membership."
+                }
+              },
+              "description": "Deterministic predicate; required when source is `guard`."
+            },
+            "fallback": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "description": "Always required: branch taken when the answer is unresolvable or its branch is unknown. A step id, or the literal \"end\"."
+            }
+          },
+          "description": "Branch on a model answer or a deterministic guard predicate. Every branch target is a step id or \"end\"."
+        },
+        "select": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["project"],
+          "properties": {
+            "project": {
+              "type": "object",
+              "propertyNames": { "pattern": "^[A-Za-z0-9._-]{1,64}$" },
+              "additionalProperties": { "$ref": "#/$defs/jsonPath" },
+              "description": "Output name -> jsonPath over earlier step outputs / the trigger envelope. Missing paths yield null (never an error)."
+            }
+          },
+          "description": "Pure projection: copy fields out of earlier outputs."
+        },
+        "fan-out": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["over", "step"],
+          "properties": {
+            "over": {
+              "$ref": "#/$defs/ref",
+              "description": "Reference to the array to iterate."
+            },
+            "step": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["emit"],
+              "properties": {
+                "emit": { "$ref": "#/$defs/step/properties/emit" }
+              },
+              "description": "Inline emit payload executed once per element."
+            }
+          },
+          "description": "Declared in v1, executed when the fan-out consumer lands (enable-time `step-kind-not-supported` until then)."
+        },
+        "join": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["expect", "timeout"],
+          "properties": {
+            "expect": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "description": "Number of awaited child effects before advancing."
+            },
+            "timeout": { "$ref": "#/$defs/duration" }
+          },
+          "description": "Declared in v1, executed with fan-out."
+        },
+        "fork-work": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["noteRef"],
+          "properties": {
+            "noteRef": {
+              "$ref": "#/$defs/ref",
+              "description": "Note for the successor work's objective (first line wins), matching the review-arm law."
+            }
+          },
+          "description": "Port of the fork law: successor Work + `created`/`work.linked` rows + binding repoint + reply, with a deterministic successor work id."
+        },
+        "work-create": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["objectiveRef", "capability"],
+          "properties": {
+            "objectiveRef": {
+              "$ref": "#/$defs/ref",
+              "description": "Objective text for the created work."
+            },
+            "capability": {
+              "$ref": "common.v1.json#/$defs/idToken",
+              "description": "Capability of the routing intent appended for the new work (there is no `command.work.create` wire command: this maps onto the shared CreateWork + AppendRoutingIntent law)."
+            },
+            "team": {
+              "$ref": "common.v1.json#/$defs/idToken",
+              "description": "Owning team slug; defaults to the instance's team."
+            }
+          },
+          "description": "Create a Work and append its routing intent; the created work carries this instance in `works.workflow_instance_id`."
+        },
+        "escalate": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["to", "message"],
+          "properties": {
+            "to": {
+              "$ref": "#/$defs/ref",
+              "description": "Escalation target (actor/team ref)."
+            },
+            "message": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000
+            }
+          },
+          "description": "Write a notification-ledger row for a human."
+        },
+        "memory": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["op", "scope", "textRef"],
+          "properties": {
+            "op": {
+              "type": "string",
+              "enum": ["recall", "retain", "promote"]
+            },
+            "scope": {
+              "$ref": "common.v1.json#/$defs/idToken"
+            },
+            "textRef": {
+              "$ref": "#/$defs/ref"
+            }
+          },
+          "description": "Declared in v1, executed when the memory step consumer lands."
+        },
+        "invoke": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["workflow", "timeout"],
+          "properties": {
+            "workflow": {
+              "$ref": "common.v1.json#/$defs/idToken",
+              "description": "Callable definition id (must exist, be enabled, and keep the invoke-call graph acyclic)."
+            },
+            "version": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Pinned callee version; absent = the callee's live enabled version, pinned into the child at creation."
+            },
+            "inputs": {
+              "type": "object",
+              "description": "Child inputs; stored as the child's initial step-log row."
+            },
+            "await": {
+              "type": "boolean",
+              "default": true,
+              "description": "True: the parent parks and resumes with the child's projected output. False: fire-and-forget (the child is cascade-cancelled only if the parent fails or is cancelled)."
+            },
+            "timeout": {
+              "$ref": "#/$defs/duration",
+              "description": "Mandatory: breach cancels the non-terminal descendant subtree and takes `onTimeout`."
+            },
+            "onTimeout": {
+              "$ref": "common.v1.json#/$defs/idToken",
+              "description": "Step id taken on timeout; absent means the `failed` edge."
+            }
+          },
+          "description": "Sub-workflow call: starts a child instance in the parent's transaction, optionally awaits its output."
+        }
+      }
+    },
+    "output": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["project"],
+      "properties": {
+        "project": {
+          "type": "object",
+          "propertyNames": { "pattern": "^[A-Za-z0-9._-]{1,64}$" },
+          "additionalProperties": { "$ref": "#/$defs/jsonPath" },
+          "description": "Select-law projection over the instance step log: what a completed instance publishes to a caller. Absent block publishes {}."
+        }
+      }
+    },
+    "composition": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "reentrant": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether this definition may appear more than once in one ancestor chain."
+        },
+        "maxInvocations": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64,
+          "default": 20,
+          "description": "Per-definition occurrence cap along a single ancestor chain."
+        }
+      }
+    }
+  }
+}

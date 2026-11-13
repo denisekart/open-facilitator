@@ -176,6 +176,57 @@ public sealed class EnvelopeValidator
         return new EnvelopeValidationResult(true, null, null);
     }
 
+    /// <summary>Every dataschema <c>$id</c> the shipped schema set knows
+    /// (kernel-side referential checks ask this instead of re-reading files:
+    /// one loader, one registry).</summary>
+    public IReadOnlyCollection<string> SchemaIds => _schemas.Keys;
+
+    /// <summary>True when the schema set contains <paramref name="schemaId"/>.</summary>
+    public bool KnowsSchema(string schemaId) => _schemas.ContainsKey(schemaId);
+
+    /// <summary>Validate a bare payload against one registered dataschema with
+    /// the same strict options the envelope path uses (the definition plane
+    /// validates its artifact before the store sees it).</summary>
+    public EnvelopeValidationResult ValidateAgainstSchema(string schemaId, JsonElement root)
+    {
+        if (!_schemas.TryGetValue(schemaId, out var schema))
+        {
+            return new EnvelopeValidationResult(false, "schema-violation", $"unadvertised dataschema '{schemaId}'");
+        }
+
+        var result = schema.Evaluate(root, _strict);
+        if (result.IsValid)
+        {
+            return new EnvelopeValidationResult(true, null, null);
+        }
+
+        var (location, message) = FirstError(result);
+        return new EnvelopeValidationResult(false, "schema-violation",
+            $"document does not conform to '{schemaId}' at '{location}': {message}");
+    }
+
+    private static (string Location, string Message) FirstError(EvaluationResults node)
+    {
+        if (node.Errors is { Count: > 0 } errors)
+        {
+            foreach (var (instanceLocation, messages) in errors)
+            {
+                return (string.IsNullOrEmpty(instanceLocation) ? "/" : instanceLocation, string.Join("; ", messages));
+            }
+        }
+
+        foreach (var nested in node.Details ?? [])
+        {
+            var (location, message) = FirstError(nested);
+            if (message.Length > 0)
+            {
+                return (location, message);
+            }
+        }
+
+        return (node.InstanceLocation.ToString(), "constraint failed");
+    }
+
     private JsonSchema Schema(string fileName) =>
         _schemas.TryGetValue(SchemaBaseUri + fileName, out var s)
             ? s

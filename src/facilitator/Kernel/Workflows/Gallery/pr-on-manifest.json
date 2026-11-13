@@ -1,0 +1,67 @@
+{
+  "id": "pr-on-manifest",
+  "version": 1,
+  "title": "PR request on completed work's manifest",
+  "description": "A work completes carrying a result manifest: when the manifest names a branch, ask the VCS for a change request (vcs.change_request.create, effect-key base branch:<head>); else when an incorporated-steer note exists, comment (vcs.change_request.comment); else settle with no VCS effect. Deterministic guard ladder, no model consulted; the capability ids live here, not in code constants.",
+  "enabled": false,
+  "on": {
+    "event": "org.facilitator.event.assignment.completed.v1"
+  },
+  "steps": [
+    {
+      "id": "fields",
+      "title": "Read the manifest's branch and steer fields",
+      "on": "always",
+      "select": {
+        "project": {
+          "branch": "$event.data.resultManifest.branch",
+          "note": "$event.data.resultManifest.note"
+        }
+      }
+    },
+    {
+      "id": "guard-branch",
+      "title": "Branch present means create",
+      "on": "fields:completed",
+      "decide": {
+        "source": "guard",
+        "guard": { "field": "steps.fields.output.branch", "equals": null },
+        "fallback": "pr-create"
+      }
+    },
+    {
+      "id": "guard-note",
+      "title": "No branch: a steer note means comment",
+      "on": "guard-branch:completed",
+      "decide": {
+        "source": "guard",
+        "guard": { "field": "steps.fields.output.note", "equals": null },
+        "fallback": "pr-comment"
+      }
+    },
+    {
+      "id": "pr-create",
+      "title": "Ask for a change request",
+      "on": "guard-branch:failed",
+      "emit": {
+        "capability": "vcs.change_request.create",
+        "inputs": { "note": "$steps.fields.output.note" }
+      }
+    },
+    {
+      "id": "pr-comment",
+      "title": "Comment the incorporated steer",
+      "on": "guard-note:failed",
+      "emit": {
+        "capability": "vcs.change_request.comment",
+        "inputs": { "text": "$steps.fields.output.note" }
+      }
+    },
+    {
+      "id": "settle",
+      "title": "Neither case: the record alone settles",
+      "on": "guard-note:completed",
+      "select": { "project": {} }
+    }
+  ]
+}

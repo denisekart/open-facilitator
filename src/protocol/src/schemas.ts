@@ -50,6 +50,8 @@ import eventProviderChangeRequest from "../schemas/event.provider.change_request
 import eventProviderPipeline from "../schemas/event.provider.pipeline.v1.json" with { type: "json" };
 import eventProviderReview from "../schemas/event.provider.review.v1.json" with { type: "json" };
 import eventRoutingRequested from "../schemas/event.routing.requested.v1.json" with { type: "json" };
+import eventWorkflowCompleted from "../schemas/event.workflow.completed.v1.json" with { type: "json" };
+import workflowDefinition from "../schemas/workflow-definition.v1.json" with { type: "json" };
 import receiptV1 from "../schemas/receipt.v1.json" with { type: "json" };
 import controlV1 from "../schemas/control.v1.json" with { type: "json" };
 import resultManifestV1 from "../schemas/result-manifest.v1.json" with { type: "json" };
@@ -111,6 +113,8 @@ const all: JsonSchema[] = [
   eventProviderPipeline,
   eventProviderReview,
   eventRoutingRequested,
+  eventWorkflowCompleted,
+  workflowDefinition,
   receiptV1,
   controlV1,
   resultManifestV1,

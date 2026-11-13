@@ -2257,6 +2257,55 @@ namespace Ofac.Protocol
         public string workId { get; set; }
     }
 
+    /// <summary>
+    /// Kernel-internal workflow completion event: a workflow instance ended and publishes its
+    /// projected output. Emitted by the workflow runner on the instance's final advance (to
+    /// workflow.kernel); consumed by the workflow sink, which first attempts wake correlation
+    /// against a parked parent invoke step (payload instanceId + parentInstanceId) and only
+    /// otherwise offers the row to ordinary on.event trigger matching. Never leaves the kernel.
+    /// </summary>
+    public partial class WorkflowCompletedEventV1Data
+    {
+        /// <summary>
+        /// Definition the instance ran.
+        /// </summary>
+        [JsonPropertyName("definitionId")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string definitionId { get; set; }
+
+        /// <summary>
+        /// Pinned definition version the instance ran.
+        /// </summary>
+        [JsonPropertyName("definitionVersion")]
+        public long definitionVersion { get; set; }
+
+        /// <summary>
+        /// The completed instance (workflow_instances.id).
+        /// </summary>
+        [JsonPropertyName("instanceId")]
+        public string instanceId { get; set; }
+
+        /// <summary>
+        /// The definition's output.project projection over the instance step log; {} when the
+        /// definition declares no output block.
+        /// </summary>
+        [JsonPropertyName("output")]
+        public Dictionary<string, object> output { get; set; }
+
+        /// <summary>
+        /// Owning parent instance when the child was started by an invoke step; null for roots.
+        /// Required key: the sink discriminates wake-vs-trigger on it.
+        /// </summary>
+        [JsonPropertyName("parentInstanceId")]
+        public string? parentInstanceId { get; set; }
+
+        /// <summary>
+        /// Terminal state of the instance.
+        /// </summary>
+        [JsonPropertyName("status")]
+        public WorkflowCompletedEventV1DataStatus status { get; set; }
+    }
+
     public partial class WorkspaceHeartbeatEventV1Data
     {
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -2359,6 +2408,668 @@ namespace Ofac.Protocol
         public string? workId { get; set; }
     }
 
+    /// <summary>
+    /// Workflow definition plane artifact: a durable, versioned workflow definition stored in
+    /// the kernel and executed by the workflow sink on the synthetic `workflow.kernel` channel.
+    /// JSON is canonical; YAML is a serialization view only. Field-level semantics are the
+    /// interpreter contract: the palette is closed, `decide` always carries a `fallback`, and
+    /// every `invoke` carries a mandatory `timeout`.
+    /// </summary>
+    public partial class WorkflowDefinitionV1
+    {
+        /// <summary>
+        /// Sub-workflow budgets for this definition as a callee.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("composition")]
+        public Composition? composition { get; set; }
+
+        /// <summary>
+        /// Operator-facing law of the flow.
+        /// </summary>
+        [JsonPropertyName("description")]
+        [JsonConverter(typeof(MinMaxLengthCheckConverter7))]
+        public string description { get; set; }
+
+        /// <summary>
+        /// Enable-time gate. Disabled definitions never contribute trigger subscriptions; enabling a
+        /// definition whose palette contains a not-yet-executable step kind is refused (validator
+        /// `step-kind-not-supported`).
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("enabled")]
+        public bool? enabled { get; set; }
+
+        /// <summary>
+        /// Definition identity (stable across versions); the store keys on (id, version).
+        /// </summary>
+        [JsonPropertyName("id")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string id { get; set; }
+
+        /// <summary>
+        /// Exactly one trigger source.
+        /// </summary>
+        [JsonPropertyName("on")]
+        public On on { get; set; }
+
+        /// <summary>
+        /// What a completed instance publishes to a waiting parent.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("output")]
+        public Output? output { get; set; }
+
+        /// <summary>
+        /// Flat step list; execution order comes from the `on:` edge selectors, the array order
+        /// breaks ties deterministically.
+        /// </summary>
+        [JsonPropertyName("steps")]
+        public StepElement[] steps { get; set; }
+
+        /// <summary>
+        /// Optional team scope (slug): the definition only fires for work/events in that team.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("team")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string? team { get; set; }
+
+        /// <summary>
+        /// Operator-facing name.
+        /// </summary>
+        [JsonPropertyName("title")]
+        [JsonConverter(typeof(MinMaxLengthCheckConverter8))]
+        public string title { get; set; }
+
+        /// <summary>
+        /// Monotonic version; a PUT of an existing id stores a new row, instances pin the version
+        /// they started on.
+        /// </summary>
+        [JsonPropertyName("version")]
+        public long version { get; set; }
+    }
+
+    /// <summary>
+    /// Sub-workflow budgets for this definition as a callee.
+    /// </summary>
+    public partial class Composition
+    {
+        /// <summary>
+        /// Per-definition occurrence cap along a single ancestor chain.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("maxInvocations")]
+        public long? maxInvocations { get; set; }
+
+        /// <summary>
+        /// Whether this definition may appear more than once in one ancestor chain.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("reentrant")]
+        public bool? reentrant { get; set; }
+    }
+
+    /// <summary>
+    /// Exactly one trigger source.
+    /// </summary>
+    public partial class On
+    {
+        /// <summary>
+        /// Wire event type this definition triggers on; the validator requires the mirrored schema
+        /// id to exist.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("event")]
+        public string? @event { get; set; }
+
+        /// <summary>
+        /// Callable-only marker: startable exclusively by a parent's `invoke` step, never by events
+        /// or a schedule.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("invoked")]
+        public Invoked? invoked { get; set; }
+
+        /// <summary>
+        /// Cadence spec, verbatim law of the schedule plane (`interval:&lt;n&gt;m` | `daily:HH:mm` |
+        /// `cron:&lt;5 fields&gt;`), evaluated by the shared schedule-spec parser.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("schedule")]
+        public string? schedule { get; set; }
+
+        /// <summary>
+        /// Map of dotted `data.*` paths to matcher values; all must match (AND). Only meaningful
+        /// with `event`.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("where")]
+        public Dictionary<string, WhereValue>? where { get; set; }
+    }
+
+    /// <summary>
+    /// Callable-only marker: startable exclusively by a parent's `invoke` step, never by events
+    /// or a schedule.
+    /// </summary>
+    public partial class Invoked
+    {
+    }
+
+    /// <summary>
+    /// What a completed instance publishes to a waiting parent.
+    /// </summary>
+    public partial class Output
+    {
+        /// <summary>
+        /// Select-law projection over the instance step log: what a completed instance publishes to
+        /// a caller. Absent block publishes {}.
+        /// </summary>
+        [JsonPropertyName("project")]
+        public Dictionary<string, string> project { get; set; }
+    }
+
+    public partial class StepElement
+    {
+        /// <summary>
+        /// Raise a human decision through the existing approval ledger, park, resume on
+        /// `approval.decided` correlated by approval id.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("approval")]
+        public Approval? approval { get; set; }
+
+        /// <summary>
+        /// Branch on a model answer or a deterministic guard predicate. Every branch target is a
+        /// step id or "end".
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("decide")]
+        public Decide? decide { get; set; }
+
+        /// <summary>
+        /// Append one effect: a named wire command, or a capability routed through the funnel.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("emit")]
+        public Emit? emit { get; set; }
+
+        /// <summary>
+        /// Write a notification-ledger row for a human.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("escalate")]
+        public Escalate? escalate { get; set; }
+
+        /// <summary>
+        /// Declared in v1, executed when the fan-out consumer lands (enable-time
+        /// `step-kind-not-supported` until then).
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("fan-out")]
+        public FanOut? fanout { get; set; }
+
+        /// <summary>
+        /// Port of the fork law: successor Work + `created`/`work.linked` rows + binding repoint +
+        /// reply, with a deterministic successor work id.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("fork-work")]
+        public ForkWork? forkwork { get; set; }
+
+        /// <summary>
+        /// Step identity, unique within the document; step-log rows and edges reference it.
+        /// </summary>
+        [JsonPropertyName("id")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string id { get; set; }
+
+        /// <summary>
+        /// Sub-workflow call: starts a child instance in the parent's transaction, optionally awaits
+        /// its output.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("invoke")]
+        public Invoke? invoke { get; set; }
+
+        /// <summary>
+        /// Declared in v1, executed with fan-out.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("join")]
+        public Join? join { get; set; }
+
+        /// <summary>
+        /// Declared in v1, executed when the memory step consumer lands.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("memory")]
+        public Memory? memory { get; set; }
+
+        /// <summary>
+        /// Edge this step is reached by. The entry step(s) use `always` or omit `on`.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("on")]
+        public string? on { get; set; }
+
+        /// <summary>
+        /// Pure projection: copy fields out of earlier outputs.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("select")]
+        public Select? select { get; set; }
+
+        /// <summary>
+        /// Park until the delay elapses; the sweeper is the clock.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("timer")]
+        public Timer? timer { get; set; }
+
+        /// <summary>
+        /// Operator-facing step label (the console checklist line).
+        /// </summary>
+        [JsonPropertyName("title")]
+        [JsonConverter(typeof(MinMaxLengthCheckConverter8))]
+        public string title { get; set; }
+
+        /// <summary>
+        /// Park the instance (`waiting`) until a matching event wakes it or the timeout edge fires.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("wait")]
+        public Wait? wait { get; set; }
+
+        /// <summary>
+        /// Create a Work and append its routing intent; the created work carries this instance in
+        /// `works.workflow_instance_id`.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("work-create")]
+        public WorkCreate? workcreate { get; set; }
+    }
+
+    /// <summary>
+    /// Raise a human decision through the existing approval ledger, park, resume on
+    /// `approval.decided` correlated by approval id.
+    /// </summary>
+    public partial class Approval
+    {
+        /// <summary>
+        /// Approver actor refs (comma-separated D4 actors or a ref resolving to them).
+        /// </summary>
+        [JsonPropertyName("approvers")]
+        [JsonConverter(typeof(FluffyMinMaxLengthCheckConverter))]
+        public string approvers { get; set; }
+
+        /// <summary>
+        /// Approval prompt (ref templates allowed).
+        /// </summary>
+        [JsonPropertyName("question")]
+        [JsonConverter(typeof(MinMaxLengthCheckConverter7))]
+        public string question { get; set; }
+    }
+
+    /// <summary>
+    /// Branch on a model answer or a deterministic guard predicate. Every branch target is a
+    /// step id or "end".
+    /// </summary>
+    public partial class Decide
+    {
+        /// <summary>
+        /// Always required: branch taken when the answer is unresolvable or its branch is unknown. A
+        /// step id, or the literal "end".
+        /// </summary>
+        [JsonPropertyName("fallback")]
+        [JsonConverter(typeof(IndecentMinMaxLengthCheckConverter))]
+        public string fallback { get; set; }
+
+        /// <summary>
+        /// Deterministic predicate; required when source is `guard`.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("guard")]
+        public Guard? guard { get; set; }
+
+        /// <summary>
+        /// Model question + closed option set; required when source is `model`.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("question")]
+        public Question? question { get; set; }
+
+        /// <summary>
+        /// `model` consults the decision gateway with a closed option list (degrade to `fallback` on
+        /// low confidence or AI outage); `guard` is a deterministic field predicate with no model
+        /// and no telemetry.
+        /// </summary>
+        [JsonPropertyName("source")]
+        public Source source { get; set; }
+    }
+
+    /// <summary>
+    /// Deterministic predicate; required when source is `guard`.
+    /// </summary>
+    public partial class Guard
+    {
+        /// <summary>
+        /// Exact scalar match; null matches a field that resolves to absent/null (presence
+        /// branching).
+        /// </summary>
+        [JsonPropertyName("equals")]
+        public Equals? equals { get; set; }
+
+        /// <summary>
+        /// Field path in the built-in context (`work.state`, `event.data.action`, ...).
+        /// </summary>
+        [JsonPropertyName("field")]
+        [JsonConverter(typeof(MagentaMinMaxLengthCheckConverter))]
+        public string field { get; set; }
+
+        /// <summary>
+        /// Any-of scalar membership.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("in")]
+        public In[]? @in { get; set; }
+    }
+
+    /// <summary>
+    /// Model question + closed option set; required when source is `model`.
+    /// </summary>
+    public partial class Question
+    {
+        [JsonPropertyName("options")]
+        public Option[] options { get; set; }
+
+        [JsonPropertyName("prompt")]
+        [JsonConverter(typeof(MinMaxLengthCheckConverter7))]
+        public string prompt { get; set; }
+    }
+
+    public partial class Option
+    {
+        /// <summary>
+        /// Step id, or the literal "end": completes the instance right there.
+        /// </summary>
+        [JsonPropertyName("branch")]
+        [JsonConverter(typeof(IndecentMinMaxLengthCheckConverter))]
+        public string branch { get; set; }
+
+        /// <summary>
+        /// Closed answer the model may choose.
+        /// </summary>
+        [JsonPropertyName("value")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string value { get; set; }
+    }
+
+    /// <summary>
+    /// Append one effect: a named wire command, or a capability routed through the funnel.
+    /// </summary>
+    public partial class Emit
+    {
+        /// <summary>
+        /// Capability id: dispatch appends a routing intent (the routing funnel chooses the
+        /// endpoint).
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("capability")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string? capability { get; set; }
+
+        /// <summary>
+        /// Wire command appended verbatim as the effect; the validator requires membership in the
+        /// fail-closed command table.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("command")]
+        public string? command { get; set; }
+
+        /// <summary>
+        /// Envelope inputs: values are literals or `#/$defs/ref` templates.
+        /// </summary>
+        [JsonPropertyName("inputs")]
+        public Dictionary<string, object> inputs { get; set; }
+
+        /// <summary>
+        /// Envelope target reference; resolved from run context (defaults to the trigger's own
+        /// target).
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("to")]
+        [JsonConverter(typeof(FluffyMinMaxLengthCheckConverter))]
+        public string? to { get; set; }
+    }
+
+    /// <summary>
+    /// Write a notification-ledger row for a human.
+    /// </summary>
+    public partial class Escalate
+    {
+        [JsonPropertyName("message")]
+        [JsonConverter(typeof(MinMaxLengthCheckConverter7))]
+        public string message { get; set; }
+
+        /// <summary>
+        /// Escalation target (actor/team ref).
+        /// </summary>
+        [JsonPropertyName("to")]
+        [JsonConverter(typeof(FluffyMinMaxLengthCheckConverter))]
+        public string to { get; set; }
+    }
+
+    /// <summary>
+    /// Declared in v1, executed when the fan-out consumer lands (enable-time
+    /// `step-kind-not-supported` until then).
+    /// </summary>
+    public partial class FanOut
+    {
+        /// <summary>
+        /// Reference to the array to iterate.
+        /// </summary>
+        [JsonPropertyName("over")]
+        [JsonConverter(typeof(FluffyMinMaxLengthCheckConverter))]
+        public string over { get; set; }
+
+        /// <summary>
+        /// Inline emit payload executed once per element.
+        /// </summary>
+        [JsonPropertyName("step")]
+        public Step step { get; set; }
+    }
+
+    /// <summary>
+    /// Inline emit payload executed once per element.
+    /// </summary>
+    public partial class Step
+    {
+        [JsonPropertyName("emit")]
+        public Emit emit { get; set; }
+    }
+
+    /// <summary>
+    /// Port of the fork law: successor Work + `created`/`work.linked` rows + binding repoint +
+    /// reply, with a deterministic successor work id.
+    /// </summary>
+    public partial class ForkWork
+    {
+        /// <summary>
+        /// Note for the successor work's objective (first line wins), matching the review-arm law.
+        /// </summary>
+        [JsonPropertyName("noteRef")]
+        [JsonConverter(typeof(FluffyMinMaxLengthCheckConverter))]
+        public string noteRef { get; set; }
+    }
+
+    /// <summary>
+    /// Sub-workflow call: starts a child instance in the parent's transaction, optionally awaits
+    /// its output.
+    /// </summary>
+    public partial class Invoke
+    {
+        /// <summary>
+        /// True: the parent parks and resumes with the child's projected output. False:
+        /// fire-and-forget (the child is cascade-cancelled only if the parent fails or is cancelled).
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("await")]
+        public bool? await { get; set; }
+
+        /// <summary>
+        /// Child inputs; stored as the child's initial step-log row.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("inputs")]
+        public Dictionary<string, object>? inputs { get; set; }
+
+        /// <summary>
+        /// Step id taken on timeout; absent means the `failed` edge.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("onTimeout")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string? onTimeout { get; set; }
+
+        /// <summary>
+        /// Mandatory: breach cancels the non-terminal descendant subtree and takes `onTimeout`.
+        /// </summary>
+        [JsonPropertyName("timeout")]
+        public string timeout { get; set; }
+
+        /// <summary>
+        /// Pinned callee version; absent = the callee's live enabled version, pinned into the child
+        /// at creation.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("version")]
+        public long? version { get; set; }
+
+        /// <summary>
+        /// Callable definition id (must exist, be enabled, and keep the invoke-call graph acyclic).
+        /// </summary>
+        [JsonPropertyName("workflow")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string workflow { get; set; }
+    }
+
+    /// <summary>
+    /// Declared in v1, executed with fan-out.
+    /// </summary>
+    public partial class Join
+    {
+        /// <summary>
+        /// Number of awaited child effects before advancing.
+        /// </summary>
+        [JsonPropertyName("expect")]
+        public long expect { get; set; }
+
+        [JsonPropertyName("timeout")]
+        public string timeout { get; set; }
+    }
+
+    /// <summary>
+    /// Declared in v1, executed when the memory step consumer lands.
+    /// </summary>
+    public partial class Memory
+    {
+        [JsonPropertyName("op")]
+        public Op op { get; set; }
+
+        [JsonPropertyName("scope")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string scope { get; set; }
+
+        [JsonPropertyName("textRef")]
+        [JsonConverter(typeof(FluffyMinMaxLengthCheckConverter))]
+        public string textRef { get; set; }
+    }
+
+    /// <summary>
+    /// Pure projection: copy fields out of earlier outputs.
+    /// </summary>
+    public partial class Select
+    {
+        /// <summary>
+        /// Output name -&gt; jsonPath over earlier step outputs / the trigger envelope. Missing paths
+        /// yield null (never an error).
+        /// </summary>
+        [JsonPropertyName("project")]
+        public Dictionary<string, string> project { get; set; }
+    }
+
+    /// <summary>
+    /// Park until the delay elapses; the sweeper is the clock.
+    /// </summary>
+    public partial class Timer
+    {
+        [JsonPropertyName("for")]
+        public string @for { get; set; }
+    }
+
+    /// <summary>
+    /// Park the instance (`waiting`) until a matching event wakes it or the timeout edge fires.
+    /// </summary>
+    public partial class Wait
+    {
+        /// <summary>
+        /// Correlation key resolved at park time (e.g. "$steps.assign.output.workId"); matched
+        /// against the waking envelope.
+        /// </summary>
+        [JsonPropertyName("correlate")]
+        [JsonConverter(typeof(FluffyMinMaxLengthCheckConverter))]
+        public string correlate { get; set; }
+
+        /// <summary>
+        /// Event type awaited; the definition joins the subscription set while the instance is
+        /// parked.
+        /// </summary>
+        [JsonPropertyName("event")]
+        public string @event { get; set; }
+
+        /// <summary>
+        /// Step id taken when the deadline passes (the sweeper drives it).
+        /// </summary>
+        [JsonPropertyName("onTimeout")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string onTimeout { get; set; }
+
+        [JsonPropertyName("timeout")]
+        public string timeout { get; set; }
+    }
+
+    /// <summary>
+    /// Create a Work and append its routing intent; the created work carries this instance in
+    /// `works.workflow_instance_id`.
+    /// </summary>
+    public partial class WorkCreate
+    {
+        /// <summary>
+        /// Capability of the routing intent appended for the new work (there is no
+        /// `command.work.create` wire command: this maps onto the shared CreateWork +
+        /// AppendRoutingIntent law).
+        /// </summary>
+        [JsonPropertyName("capability")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string capability { get; set; }
+
+        /// <summary>
+        /// Objective text for the created work.
+        /// </summary>
+        [JsonPropertyName("objectiveRef")]
+        [JsonConverter(typeof(FluffyMinMaxLengthCheckConverter))]
+        public string objectiveRef { get; set; }
+
+        /// <summary>
+        /// Owning team slug; defaults to the instance's team.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("team")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string? team { get; set; }
+    }
+
     public enum Datacontenttype { ApplicationJson };
 
     public enum Specversion { The10 };
@@ -2417,9 +3128,65 @@ namespace Ofac.Protocol
     /// </summary>
     public enum State { Approved, ChangesRequested };
 
+    /// <summary>
+    /// Terminal state of the instance.
+    /// </summary>
+    public enum WorkflowCompletedEventV1DataStatus { Cancelled, Completed, Failed };
+
     public enum WorkspaceHeartbeatEventV1DataStatus { Busy, Draining, Error, Idle };
 
     public enum ReceiptV1Status { Accepted, Duplicate, Rejected, Unsupported };
+
+    /// <summary>
+    /// `model` consults the decision gateway with a closed option list (degrade to `fallback` on
+    /// low confidence or AI outage); `guard` is a deterministic field predicate with no model
+    /// and no telemetry.
+    /// </summary>
+    public enum Source { Guard, Model };
+
+    public enum Op { Promote, Recall, Retain };
+
+    /// <summary>
+    /// Event-payload matcher value, copied from the policy-file matcher law: exact string, bare
+    /// "*", or a single trailing "*" prefix-glob; scalars match by equality.
+    /// </summary>
+    public partial struct WhereValue
+    {
+        public bool? Bool;
+        public double? Double;
+        public string? String;
+
+        public static implicit operator WhereValue(bool Bool) => new WhereValue { Bool = Bool };
+        public static implicit operator WhereValue(double Double) => new WhereValue { Double = Double };
+        public static implicit operator WhereValue(string String) => new WhereValue { String = String };
+    }
+
+    public partial struct In
+    {
+        public bool? Bool;
+        public double? Double;
+        public string? String;
+
+        public static implicit operator In(bool Bool) => new In { Bool = Bool };
+        public static implicit operator In(double Double) => new In { Double = Double };
+        public static implicit operator In(string String) => new In { String = String };
+    }
+
+    /// <summary>
+    /// Exact scalar match; null matches a field that resolves to absent/null (presence
+    /// branching).
+    /// </summary>
+    public partial struct Equals
+    {
+        public bool? Bool;
+        public double? Double;
+        public string? String;
+
+        public static implicit operator Equals(bool Bool) => new Equals { Bool = Bool };
+        public static implicit operator Equals(double Double) => new Equals { Double = Double };
+        public static implicit operator Equals(string String) => new Equals { String = String };
+        public bool IsNull => Bool == null && Double == null && String == null;
+    }
 
     internal static class Converter
     {
@@ -2451,8 +3218,14 @@ namespace Ofac.Protocol
                 ProviderPipelineEventV1DataActionConverter.Singleton,
                 ProviderReviewEventV1DataActionConverter.Singleton,
                 StateConverter.Singleton,
+                WorkflowCompletedEventV1DataStatusConverter.Singleton,
                 WorkspaceHeartbeatEventV1DataStatusConverter.Singleton,
                 ReceiptV1StatusConverter.Singleton,
+                WhereValueConverter.Singleton,
+                EqualsConverter.Singleton,
+                InConverter.Singleton,
+                SourceConverter.Singleton,
+                OpConverter.Singleton,
                 new DateOnlyConverter(),
                 new TimeOnlyConverter(),
                 IsoDateTimeOffsetConverter.Singleton
@@ -4142,6 +4915,45 @@ namespace Ofac.Protocol
         public static readonly MinMaxLengthCheckConverter6 Singleton = new MinMaxLengthCheckConverter6();
     }
 
+    internal class WorkflowCompletedEventV1DataStatusConverter : JsonConverter<WorkflowCompletedEventV1DataStatus>
+    {
+        public override bool CanConvert(Type t) => t == typeof(WorkflowCompletedEventV1DataStatus);
+
+        public override WorkflowCompletedEventV1DataStatus Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            var value = reader.GetString();
+            switch (value)
+            {
+                case "cancelled":
+                    return WorkflowCompletedEventV1DataStatus.Cancelled;
+                case "completed":
+                    return WorkflowCompletedEventV1DataStatus.Completed;
+                case "failed":
+                    return WorkflowCompletedEventV1DataStatus.Failed;
+            }
+            throw new Exception("Cannot unmarshal type WorkflowCompletedEventV1DataStatus");
+        }
+
+        public override void Write(Utf8JsonWriter writer, WorkflowCompletedEventV1DataStatus value, JsonSerializerOptions options)
+        {
+            switch (value)
+            {
+                case WorkflowCompletedEventV1DataStatus.Cancelled:
+                    JsonSerializer.Serialize(writer, "cancelled", options);
+                    return;
+                case WorkflowCompletedEventV1DataStatus.Completed:
+                    JsonSerializer.Serialize(writer, "completed", options);
+                    return;
+                case WorkflowCompletedEventV1DataStatus.Failed:
+                    JsonSerializer.Serialize(writer, "failed", options);
+                    return;
+            }
+            throw new Exception("Cannot marshal type WorkflowCompletedEventV1DataStatus");
+        }
+
+        public static readonly WorkflowCompletedEventV1DataStatusConverter Singleton = new WorkflowCompletedEventV1DataStatusConverter();
+    }
+
     internal class WorkspaceHeartbeatEventV1DataStatusConverter : JsonConverter<WorkspaceHeartbeatEventV1DataStatus>
     {
         public override bool CanConvert(Type t) => t == typeof(WorkspaceHeartbeatEventV1DataStatus);
@@ -4228,6 +5040,275 @@ namespace Ofac.Protocol
         }
 
         public static readonly ReceiptV1StatusConverter Singleton = new ReceiptV1StatusConverter();
+    }
+
+    internal class MinMaxLengthCheckConverter7 : JsonConverter<string>
+    {
+        public override bool CanConvert(Type t) => t == typeof(string);
+
+        public override string Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            var value = reader.GetString();
+            if (value.Length >= 1 && value.Length <= 2000)
+            {
+                return value;
+            }
+            throw new Exception("Cannot unmarshal type string");
+        }
+
+        public override void Write(Utf8JsonWriter writer, string value, JsonSerializerOptions options)
+        {
+            if (value.Length >= 1 && value.Length <= 2000)
+            {
+                JsonSerializer.Serialize(writer, value, options);
+                return;
+            }
+            throw new Exception("Cannot marshal type string");
+        }
+
+        public static readonly MinMaxLengthCheckConverter7 Singleton = new MinMaxLengthCheckConverter7();
+    }
+
+    internal class WhereValueConverter : JsonConverter<WhereValue>
+    {
+        public override bool CanConvert(Type t) => t == typeof(WhereValue);
+
+        public override WhereValue Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            switch (reader.TokenType)
+            {
+                case JsonTokenType.Number:
+                    var doubleValue1 = reader.GetDouble();
+                    return new WhereValue { Double = doubleValue1 };
+                case JsonTokenType.True:
+                case JsonTokenType.False:
+                    var boolValue = reader.GetBoolean();
+                    return new WhereValue { Bool = boolValue };
+                case JsonTokenType.String:
+                    var stringValue = reader.GetString();
+                    return new WhereValue { String = stringValue };
+            }
+            throw new Exception("Cannot unmarshal type WhereValue");
+        }
+
+        public override void Write(Utf8JsonWriter writer, WhereValue value, JsonSerializerOptions options)
+        {
+            if (value.Double != null)
+            {
+                JsonSerializer.Serialize(writer, value.Double.Value, options);
+                return;
+            }
+            if (value.Bool != null)
+            {
+                JsonSerializer.Serialize(writer, value.Bool.Value, options);
+                return;
+            }
+            if (value.String != null)
+            {
+                JsonSerializer.Serialize(writer, value.String, options);
+                return;
+            }
+            throw new Exception("Cannot marshal type WhereValue");
+        }
+
+        public static readonly WhereValueConverter Singleton = new WhereValueConverter();
+    }
+
+    internal class EqualsConverter : JsonConverter<Equals>
+    {
+        public override bool CanConvert(Type t) => t == typeof(Equals);
+
+        public override Equals Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            switch (reader.TokenType)
+            {
+                case JsonTokenType.Null:
+                    return new Equals { };
+                case JsonTokenType.Number:
+                    var doubleValue1 = reader.GetDouble();
+                    return new Equals { Double = doubleValue1 };
+                case JsonTokenType.True:
+                case JsonTokenType.False:
+                    var boolValue = reader.GetBoolean();
+                    return new Equals { Bool = boolValue };
+                case JsonTokenType.String:
+                    var stringValue = reader.GetString();
+                    return new Equals { String = stringValue };
+            }
+            throw new Exception("Cannot unmarshal type Equals");
+        }
+
+        public override void Write(Utf8JsonWriter writer, Equals value, JsonSerializerOptions options)
+        {
+            if (value.IsNull)
+            {
+                writer.WriteNullValue();
+                return;
+            }
+            if (value.Double != null)
+            {
+                JsonSerializer.Serialize(writer, value.Double.Value, options);
+                return;
+            }
+            if (value.Bool != null)
+            {
+                JsonSerializer.Serialize(writer, value.Bool.Value, options);
+                return;
+            }
+            if (value.String != null)
+            {
+                JsonSerializer.Serialize(writer, value.String, options);
+                return;
+            }
+            throw new Exception("Cannot marshal type Equals");
+        }
+
+        public static readonly EqualsConverter Singleton = new EqualsConverter();
+    }
+
+    internal class InConverter : JsonConverter<In>
+    {
+        public override bool CanConvert(Type t) => t == typeof(In);
+
+        public override In Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            switch (reader.TokenType)
+            {
+                case JsonTokenType.Number:
+                    var doubleValue1 = reader.GetDouble();
+                    return new In { Double = doubleValue1 };
+                case JsonTokenType.True:
+                case JsonTokenType.False:
+                    var boolValue = reader.GetBoolean();
+                    return new In { Bool = boolValue };
+                case JsonTokenType.String:
+                    var stringValue = reader.GetString();
+                    return new In { String = stringValue };
+            }
+            throw new Exception("Cannot unmarshal type In");
+        }
+
+        public override void Write(Utf8JsonWriter writer, In value, JsonSerializerOptions options)
+        {
+            if (value.Double != null)
+            {
+                JsonSerializer.Serialize(writer, value.Double.Value, options);
+                return;
+            }
+            if (value.Bool != null)
+            {
+                JsonSerializer.Serialize(writer, value.Bool.Value, options);
+                return;
+            }
+            if (value.String != null)
+            {
+                JsonSerializer.Serialize(writer, value.String, options);
+                return;
+            }
+            throw new Exception("Cannot marshal type In");
+        }
+
+        public static readonly InConverter Singleton = new InConverter();
+    }
+
+    internal class SourceConverter : JsonConverter<Source>
+    {
+        public override bool CanConvert(Type t) => t == typeof(Source);
+
+        public override Source Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            var value = reader.GetString();
+            switch (value)
+            {
+                case "guard":
+                    return Source.Guard;
+                case "model":
+                    return Source.Model;
+            }
+            throw new Exception("Cannot unmarshal type Source");
+        }
+
+        public override void Write(Utf8JsonWriter writer, Source value, JsonSerializerOptions options)
+        {
+            switch (value)
+            {
+                case Source.Guard:
+                    JsonSerializer.Serialize(writer, "guard", options);
+                    return;
+                case Source.Model:
+                    JsonSerializer.Serialize(writer, "model", options);
+                    return;
+            }
+            throw new Exception("Cannot marshal type Source");
+        }
+
+        public static readonly SourceConverter Singleton = new SourceConverter();
+    }
+
+    internal class OpConverter : JsonConverter<Op>
+    {
+        public override bool CanConvert(Type t) => t == typeof(Op);
+
+        public override Op Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            var value = reader.GetString();
+            switch (value)
+            {
+                case "promote":
+                    return Op.Promote;
+                case "recall":
+                    return Op.Recall;
+                case "retain":
+                    return Op.Retain;
+            }
+            throw new Exception("Cannot unmarshal type Op");
+        }
+
+        public override void Write(Utf8JsonWriter writer, Op value, JsonSerializerOptions options)
+        {
+            switch (value)
+            {
+                case Op.Promote:
+                    JsonSerializer.Serialize(writer, "promote", options);
+                    return;
+                case Op.Recall:
+                    JsonSerializer.Serialize(writer, "recall", options);
+                    return;
+                case Op.Retain:
+                    JsonSerializer.Serialize(writer, "retain", options);
+                    return;
+            }
+            throw new Exception("Cannot marshal type Op");
+        }
+
+        public static readonly OpConverter Singleton = new OpConverter();
+    }
+
+    internal class MinMaxLengthCheckConverter8 : JsonConverter<string>
+    {
+        public override bool CanConvert(Type t) => t == typeof(string);
+
+        public override string Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            var value = reader.GetString();
+            if (value.Length >= 1 && value.Length <= 120)
+            {
+                return value;
+            }
+            throw new Exception("Cannot unmarshal type string");
+        }
+
+        public override void Write(Utf8JsonWriter writer, string value, JsonSerializerOptions options)
+        {
+            if (value.Length >= 1 && value.Length <= 120)
+            {
+                JsonSerializer.Serialize(writer, value, options);
+                return;
+            }
+            throw new Exception("Cannot marshal type string");
+        }
+
+        public static readonly MinMaxLengthCheckConverter8 Singleton = new MinMaxLengthCheckConverter8();
     }
     
     public class DateOnlyConverter : JsonConverter<DateOnly>

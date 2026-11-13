@@ -1,0 +1,31 @@
+{
+  "id": "assign-rules",
+  "version": 1,
+  "title": "Labeled-issue assignment rule",
+  "description": "A labeled trigger issue arrives unbound: create the work with the rule's capability and ack the thread. The template of every derived `assign-rule-<provider>-<n>` definition; the per-provider AssignRules importer seeds one copy per config rule.",
+  "enabled": false,
+  "on": {
+    "event": "org.facilitator.event.provider.issue.v1",
+    "where": { "data.workTrigger": "true" }
+  },
+  "steps": [
+    {
+      "id": "create",
+      "title": "Create the work + routing intent",
+      "on": "always",
+      "work-create": {
+        "objectiveRef": "Issue $event.data.channel#$event.data.root",
+        "capability": "work.default"
+      }
+    },
+    {
+      "id": "ack",
+      "title": "Ack the thread",
+      "on": "create:completed",
+      "emit": {
+        "command": "org.facilitator.command.communication.post.v1",
+        "inputs": { "text": "On it." }
+      }
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openfacilitator.org/v1/event.workflow.completed.v1.json",
+  "title": "WorkflowCompletedEventV1Data",
+  "description": "Kernel-internal workflow completion event: a workflow instance ended and publishes its projected output. Emitted by the workflow runner on the instance's final advance (to workflow.kernel); consumed by the workflow sink, which first attempts wake correlation against a parked parent invoke step (payload instanceId + parentInstanceId) and only otherwise offers the row to ordinary on.event trigger matching. Never leaves the kernel.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "instanceId",
+    "parentInstanceId",
+    "definitionId",
+    "definitionVersion",
+    "status",
+    "output"
+  ],
+  "properties": {
+    "instanceId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "description": "The completed instance (workflow_instances.id)."
+    },
+    "parentInstanceId": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "description": "Owning parent instance when the child was started by an invoke step; null for roots. Required key: the sink discriminates wake-vs-trigger on it."
+    },
+    "definitionId": {
+      "$ref": "common.v1.json#/$defs/idToken",
+      "description": "Definition the instance ran."
+    },
+    "definitionVersion": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Pinned definition version the instance ran."
+    },
+    "status": {
+      "type": "string",
+      "enum": ["completed", "failed", "cancelled"],
+      "description": "Terminal state of the instance."
+    },
+    "output": {
+      "type": "object",
+      "description": "The definition's output.project projection over the instance step log; {} when the definition declares no output block."
+    }
+  }
+}

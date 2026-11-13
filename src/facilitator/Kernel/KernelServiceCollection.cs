@@ -347,6 +347,13 @@ public static class KernelServiceCollection
             sp.GetRequiredService<Facilitator.Kernel.Ai.AiPolicyStore>(),
             sp.GetRequiredService<IDbContextFactory<FacilitatorDbContext>>()));
         builder.Services.AddSingleton<ISink, Facilitator.Kernel.Ai.DecodeSink>();
+
+        // The workflow definition plane (Phase 0: definitions are data, only —
+        // nothing executes until the sink/sweeper land). Store, validator,
+        // gallery seeder; the runtime registers its sink + sweeper next phase.
+        builder.Services.AddSingleton<Facilitator.Kernel.Workflows.WorkflowDefinitionValidator>();
+        builder.Services.AddSingleton<Facilitator.Kernel.Workflows.WorkflowDefinitionStore>();
+        builder.Services.AddHostedService<Facilitator.Kernel.Workflows.WorkflowGallerySeeder>();
         builder.Services.AddSingleton<IDecisionProvider, Facilitator.Kernel.Ai.ModelDecisionProvider>();
         builder.Services.AddSingleton<Facilitator.Kernel.Ai.CommunicationDecision>();
         builder.Services.AddSingleton<Facilitator.Kernel.Ai.ChatProcessor>();

@@ -1,0 +1,42 @@
+{
+  "id": "nudge-escalation",
+  "version": 1,
+  "title": "Nudge escalation ladder (documentation entry)",
+  "description": "The parity-ledger proof that the palette covers the nudge law: after a waiting assignment goes quiet, wait one interval, nudge once, wait a second interval, escalate to the owner. Stays disabled until the optional sweeper consolidation; it exercises only the timer + escalate palette.",
+  "enabled": false,
+  "on": {
+    "event": "org.facilitator.event.work.progress.v1"
+  },
+  "steps": [
+    {
+      "id": "first-pause",
+      "title": "Quiet interval before the first nudge",
+      "on": "always",
+      "timer": { "for": "PT30M" }
+    },
+    {
+      "id": "nudge",
+      "title": "Nudge the assignment",
+      "on": "first-pause:completed",
+      "emit": {
+        "command": "org.facilitator.command.work.nudge.v1",
+        "inputs": { "reason": "workflow nudge ladder: leg 1" }
+      }
+    },
+    {
+      "id": "second-pause",
+      "title": "Second interval after an unanswered nudge",
+      "on": "nudge:completed",
+      "timer": { "for": "PT2H" }
+    },
+    {
+      "id": "escalate",
+      "title": "Hand it to a human",
+      "on": "second-pause:completed",
+      "escalate": {
+        "to": "$work.owner",
+        "message": "Work $work.id is quiet after a nudge."
+      }
+    }
+  ]
+}

@@ -104,6 +104,12 @@ public class FacilitatorDbContext(DbContextOptions<FacilitatorDbContext> options
 
     public DbSet<ScheduleEntity> Schedules => Set<ScheduleEntity>();
 
+    public DbSet<WorkflowDefinitionEntity> WorkflowDefinitions => Set<WorkflowDefinitionEntity>();
+
+    public DbSet<WorkflowInstanceEntity> WorkflowInstances => Set<WorkflowInstanceEntity>();
+
+    public DbSet<WorkflowStepLogEntity> WorkflowStepLog => Set<WorkflowStepLogEntity>();
+
     public DbSet<TeamSettingEntity> TeamSettings => Set<TeamSettingEntity>();
 
     /// <summary>Every WorkEventEntity gains the ambient OTel trace id when one

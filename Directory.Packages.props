@@ -32,6 +32,7 @@
          Jcs.Net 0.1.1 (RFC 8785; passes the golden + numeric/sort/NFC vectors). -->
     <PackageVersion Include="JsonSchema.Net" Version="9.4.1" />
     <PackageVersion Include="Jcs.Net" Version="0.1.1" />
+    <PackageVersion Include="YamlDotNet" Version="18.1.0" />
     <!-- AiDeck prompt templates. 5.12.1 tripped NuGetAudit-as-error (critical
          GHSA-5wr9-m6jw-xx44, vulnerable < 7.0.0); 7.5.3 = latest stable, patched.
          Rendering stays sandboxed (see PromptRenderer): templates are data. -->

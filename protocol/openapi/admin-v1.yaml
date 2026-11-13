@@ -249,7 +249,7 @@ paths:
         - { in: query, name: action, schema: { type: string } }
         - { in: query, name: actor, schema: { type: string } }
         - { in: query, name: decision, schema: { type: string, enum: [allow, deny] } }
-        - { in: query, name: correlation, schema: { type: string }, description: Exact correlation_id join (chat action ids, sweep names, work event correlation). }
+        - { in: query, name: correlation, schema: { type: string }, description: "Exact correlation_id join (chat action ids, sweep names, work event correlation)." }
         - { in: query, name: since, schema: { type: string, format: date-time } }
         - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
       responses:
@@ -302,7 +302,7 @@ paths:
           description: Why the operator forced the sweep; audited. Blank/oversize is 400 config-invalid.
       responses:
         "200": { description: "{ sweep, effects }" }
-        "400": { description: Unknown sweep name, or a missing/oversize X-Change-Reason (config-invalid). }
+        "400": { description: "Unknown sweep name, or a missing/oversize X-Change-Reason (config-invalid)." }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
   /api/admin/config:
@@ -496,6 +496,231 @@ paths:
         "404":
           description: manifest-not-found.
           content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/admin/workflows/definitions:
+    get:
+      operationId: listWorkflowDefinitions
+      tags: [read]
+      summary: Workflow definitions (latest version each) with enablement and running-instance counts.
+      responses:
+        "200":
+          description: Definition summaries.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/WorkflowDefinitionSummary" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/admin/workflows/definitions/{id}:
+    get:
+      operationId: getWorkflowDefinition
+      tags: [read]
+      summary: One definition version; an Accept of application/yaml answers with the YAML view.
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+        - { in: query, name: version, schema: { type: integer, minimum: 1 }, description: Omitted = latest version. }
+        - { in: header, name: Accept, schema: { type: string }, description: "application/yaml returns the serialization view." }
+      responses:
+        "200":
+          description: The definition (summary + canonical document + yaml) or the YAML view.
+          content:
+            application/json:
+              schema:
+                type: object
+                description: summary/document/yaml/createdAt/createdBy
+                additionalProperties: true
+            application/yaml:
+              schema: { type: string }
+        "404":
+          description: definition-not-found.
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    put:
+      operationId: putWorkflowDefinition
+      tags: [mutate]
+      summary: >
+        Store a NEW version of a definition (versions are immutable once
+        stored). Same law as the config surface: If-Match REQUIRED ('*'
+        forces; a quoted sha256 ETag fences against the latest digest),
+        X-Change-Reason REQUIRED; validation findings come back 422 with an
+        errors extension.
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+        - name: If-Match
+          in: header
+          required: true
+          schema: { type: string }
+        - name: X-Change-Reason
+          in: header
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 512 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true, description: Canonical workflow-definition.v1 document. }
+          application/yaml:
+            schema: { type: string, description: The YAML view face. }
+      responses:
+        "200":
+          description: Stored; the new version's summary.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WorkflowDefinitionSummary" }
+        "400":
+          description: config-invalid (header/body) or too large.
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "412":
+          description: version-conflict — If-Match did not fence.
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "422":
+          description: definition-invalid (schema or referential law); extensions.errors lists structured findings.
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/admin/workflows/definitions/validate:
+    post:
+      operationId: validateWorkflowDefinition
+      tags: [mutate]
+      summary: Dry-run validation; answers structured findings, never stores.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        "200":
+          description: "{ ok, errors[] } — ok false with findings is a success response."
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [ok, errors]
+                properties:
+                  ok: { type: boolean }
+                  errors:
+                    type: array
+                    items:
+                      type: object
+                      additionalProperties: false
+                      required: [code, detail]
+                      properties:
+                        code: { type: string }
+                        detail: { type: string }
+        "400":
+          description: missing X-Change-Reason.
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/admin/workflows/definitions/export:
+    get:
+      operationId: exportWorkflowDefinitions
+      tags: [read]
+      summary: Directory listing of every stored version as YAML files.
+      responses:
+        "200":
+          description: "{ directory, files: [{ name, yaml }] }"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/admin/workflows/definitions/import:
+    post:
+      operationId: importWorkflowDefinitions
+      tags: [mutate]
+      summary: Import YAML/JSON files; an id/version collision skips (import never overwrites).
+      parameters:
+        - name: X-Change-Reason
+          in: header
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 512 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [files]
+              properties:
+                files:
+                  type: array
+                  items:
+                    type: object
+                    additionalProperties: false
+                    required: [name, content]
+                    properties:
+                      name: { type: string }
+                      content: { type: string }
+                      ifMatch: { type: string }
+      responses:
+        "200":
+          description: Per-file outcomes.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        "400":
+          description: missing X-Change-Reason or body shape.
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/admin/workflows/definitions/{id}/versions/{version}/toggle:
+    post:
+      operationId: toggleWorkflowDefinition
+      tags: [mutate]
+      summary: >
+        Enable/disable or flip shadow on one exact version (the only in-place
+        update the store allows; enabling a not-yet-executable palette fails
+        422 step-kind-not-supported).
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+        - { in: path, name: version, required: true, schema: { type: integer, minimum: 1 } }
+        - name: X-Change-Reason
+          in: header
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 512 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                enabled: { type: boolean }
+                shadow: { type: boolean }
+      responses:
+        "200":
+          description: Toggled; the version's summary.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WorkflowDefinitionSummary" }
+        "404":
+          description: definition-not-found.
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "422":
+          description: enabling refused (step-kind-not-supported, invoke-target-unavailable, composition-cycle).
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/admin/workflows/registry:
+    get:
+      operationId: getWorkflowRegistry
+      tags: [read]
+      summary: Closed sets the editor may SELECT from (event types, commands, advertised capabilities, callable definitions, teams).
+      responses:
+        "200":
+          description: The registry document.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
 components:
@@ -808,5 +1033,20 @@ components:
         author: { type: string }
         reason: { type: string }
         updatedAt: { type: string, format: date-time }
+    WorkflowDefinitionSummary:
+      type: object
+      additionalProperties: false
+      required: [id, version, title, description, source, enabled, shadow, digest, instancesRunning]
+      properties:
+        id: { type: string, description: Definition id (idToken). }
+        version: { type: integer, minimum: 1, description: Latest version. }
+        title: { type: string, maxLength: 120 }
+        description: { type: string, maxLength: 2000 }
+        source: { type: string, enum: [gallery, hand, ai, derived] }
+        enabled: { type: boolean }
+        shadow: { type: boolean, description: "Strangler flag: arm acts, plane computes." }
+        team: { type: ["string", "null"], description: "Team scope slug." }
+        digest: { type: string, description: "sha256 of the canonical payload (the ETag)." }
+        instancesRunning: { type: integer, description: "Instances in running|waiting on any version." }
 security:
   - bearerAuth: []

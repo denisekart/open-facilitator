@@ -1004,6 +1004,47 @@ export interface WorkProgressEventV1Data {
   workId: string;
 }
 
+/**
+ * Kernel-internal workflow completion event: a workflow instance ended and publishes its
+ * projected output. Emitted by the workflow runner on the instance's final advance (to
+ * workflow.kernel); consumed by the workflow sink, which first attempts wake correlation
+ * against a parked parent invoke step (payload instanceId + parentInstanceId) and only
+ * otherwise offers the row to ordinary on.event trigger matching. Never leaves the kernel.
+ */
+export interface WorkflowCompletedEventV1Data {
+  /**
+   * Definition the instance ran.
+   */
+  definitionId: string;
+  /**
+   * Pinned definition version the instance ran.
+   */
+  definitionVersion: number;
+  /**
+   * The completed instance (workflow_instances.id).
+   */
+  instanceId: string;
+  /**
+   * The definition's output.project projection over the instance step log; {} when the
+   * definition declares no output block.
+   */
+  output: { [key: string]: unknown };
+  /**
+   * Owning parent instance when the child was started by an invoke step; null for roots.
+   * Required key: the sink discriminates wake-vs-trigger on it.
+   */
+  parentInstanceId: null | string;
+  /**
+   * Terminal state of the instance.
+   */
+  status: WorkflowCompletedEventV1DataStatus;
+}
+
+/**
+ * Terminal state of the instance.
+ */
+export type WorkflowCompletedEventV1DataStatus = "completed" | "failed" | "cancelled";
+
 export interface WorkspaceHeartbeatEventV1Data {
   activeAssignments?: number;
   status: WorkspaceHeartbeatEventV1DataStatus;
@@ -1038,4 +1079,458 @@ export interface ResultManifestV1 {
   summary?: string;
   workId?: string;
   [property: string]: unknown;
+}
+
+/**
+ * Workflow definition plane artifact: a durable, versioned workflow definition stored in
+ * the kernel and executed by the workflow sink on the synthetic `workflow.kernel` channel.
+ * JSON is canonical; YAML is a serialization view only. Field-level semantics are the
+ * interpreter contract: the palette is closed, `decide` always carries a `fallback`, and
+ * every `invoke` carries a mandatory `timeout`.
+ */
+export interface WorkflowDefinitionV1 {
+  /**
+   * Sub-workflow budgets for this definition as a callee.
+   */
+  composition?: Composition;
+  /**
+   * Operator-facing law of the flow.
+   */
+  description: string;
+  /**
+   * Enable-time gate. Disabled definitions never contribute trigger subscriptions; enabling a
+   * definition whose palette contains a not-yet-executable step kind is refused (validator
+   * `step-kind-not-supported`).
+   */
+  enabled?: boolean;
+  /**
+   * Definition identity (stable across versions); the store keys on (id, version).
+   */
+  id: string;
+  /**
+   * Exactly one trigger source.
+   */
+  on: On;
+  /**
+   * What a completed instance publishes to a waiting parent.
+   */
+  output?: Output;
+  /**
+   * Flat step list; execution order comes from the `on:` edge selectors, the array order
+   * breaks ties deterministically.
+   */
+  steps: [StepElement, ...StepElement[]];
+  /**
+   * Optional team scope (slug): the definition only fires for work/events in that team.
+   */
+  team?: string;
+  /**
+   * Operator-facing name.
+   */
+  title: string;
+  /**
+   * Monotonic version; a PUT of an existing id stores a new row, instances pin the version
+   * they started on.
+   */
+  version: number;
+}
+
+/**
+ * Sub-workflow budgets for this definition as a callee.
+ */
+export interface Composition {
+  /**
+   * Per-definition occurrence cap along a single ancestor chain.
+   */
+  maxInvocations?: number;
+  /**
+   * Whether this definition may appear more than once in one ancestor chain.
+   */
+  reentrant?: boolean;
+}
+
+/**
+ * Exactly one trigger source.
+ */
+export interface On {
+  /**
+   * Wire event type this definition triggers on; the validator requires the mirrored schema
+   * id to exist.
+   */
+  event?: string;
+  /**
+   * Callable-only marker: startable exclusively by a parent's `invoke` step, never by events
+   * or a schedule.
+   */
+  invoked?: Invoked;
+  /**
+   * Cadence spec, verbatim law of the schedule plane (`interval:<n>m` | `daily:HH:mm` |
+   * `cron:<5 fields>`), evaluated by the shared schedule-spec parser.
+   */
+  schedule?: string;
+  /**
+   * Map of dotted `data.*` paths to matcher values; all must match (AND). Only meaningful
+   * with `event`.
+   */
+  where?: { [key: string]: boolean | number | string };
+}
+
+/**
+ * Callable-only marker: startable exclusively by a parent's `invoke` step, never by events
+ * or a schedule.
+ */
+export interface Invoked {}
+
+/**
+ * What a completed instance publishes to a waiting parent.
+ */
+export interface Output {
+  /**
+   * Select-law projection over the instance step log: what a completed instance publishes to
+   * a caller. Absent block publishes {}.
+   */
+  project: { [key: string]: string };
+}
+
+export interface StepElement {
+  /**
+   * Raise a human decision through the existing approval ledger, park, resume on
+   * `approval.decided` correlated by approval id.
+   */
+  approval?: Approval;
+  /**
+   * Branch on a model answer or a deterministic guard predicate. Every branch target is a
+   * step id or "end".
+   */
+  decide?: Decide;
+  /**
+   * Append one effect: a named wire command, or a capability routed through the funnel.
+   */
+  emit?: Emit;
+  /**
+   * Write a notification-ledger row for a human.
+   */
+  escalate?: Escalate;
+  /**
+   * Declared in v1, executed when the fan-out consumer lands (enable-time
+   * `step-kind-not-supported` until then).
+   */
+  "fan-out"?: FanOut;
+  /**
+   * Port of the fork law: successor Work + `created`/`work.linked` rows + binding repoint +
+   * reply, with a deterministic successor work id.
+   */
+  "fork-work"?: ForkWork;
+  /**
+   * Step identity, unique within the document; step-log rows and edges reference it.
+   */
+  id: string;
+  /**
+   * Sub-workflow call: starts a child instance in the parent's transaction, optionally awaits
+   * its output.
+   */
+  invoke?: Invoke;
+  /**
+   * Declared in v1, executed with fan-out.
+   */
+  join?: Join;
+  /**
+   * Declared in v1, executed when the memory step consumer lands.
+   */
+  memory?: Memory;
+  /**
+   * Edge this step is reached by. The entry step(s) use `always` or omit `on`.
+   */
+  on?: string;
+  /**
+   * Pure projection: copy fields out of earlier outputs.
+   */
+  select?: Select;
+  /**
+   * Park until the delay elapses; the sweeper is the clock.
+   */
+  timer?: Timer;
+  /**
+   * Operator-facing step label (the console checklist line).
+   */
+  title: string;
+  /**
+   * Park the instance (`waiting`) until a matching event wakes it or the timeout edge fires.
+   */
+  wait?: Wait;
+  /**
+   * Create a Work and append its routing intent; the created work carries this instance in
+   * `works.workflow_instance_id`.
+   */
+  "work-create"?: WorkCreate;
+}
+
+/**
+ * Raise a human decision through the existing approval ledger, park, resume on
+ * `approval.decided` correlated by approval id.
+ */
+export interface Approval {
+  /**
+   * Approver actor refs (comma-separated D4 actors or a ref resolving to them).
+   */
+  approvers: string;
+  /**
+   * Approval prompt (ref templates allowed).
+   */
+  question: string;
+}
+
+/**
+ * Branch on a model answer or a deterministic guard predicate. Every branch target is a
+ * step id or "end".
+ */
+export interface Decide {
+  /**
+   * Always required: branch taken when the answer is unresolvable or its branch is unknown. A
+   * step id, or the literal "end".
+   */
+  fallback: string;
+  /**
+   * Deterministic predicate; required when source is `guard`.
+   */
+  guard?: Guard;
+  /**
+   * Model question + closed option set; required when source is `model`.
+   */
+  question?: Question;
+  /**
+   * `model` consults the decision gateway with a closed option list (degrade to `fallback` on
+   * low confidence or AI outage); `guard` is a deterministic field predicate with no model
+   * and no telemetry.
+   */
+  source: Source;
+}
+
+/**
+ * Deterministic predicate; required when source is `guard`.
+ */
+export interface Guard {
+  /**
+   * Exact scalar match; null matches a field that resolves to absent/null (presence
+   * branching).
+   */
+  equals?: boolean | number | null | string;
+  /**
+   * Field path in the built-in context (`work.state`, `event.data.action`, ...).
+   */
+  field: string;
+  /**
+   * Any-of scalar membership.
+   */
+  in?: [boolean | number | string, ...(boolean | number | string)[]];
+}
+
+/**
+ * Model question + closed option set; required when source is `model`.
+ */
+export interface Question {
+  options: [Option, ...Option[]];
+  prompt: string;
+}
+
+export interface Option {
+  /**
+   * Step id, or the literal "end": completes the instance right there.
+   */
+  branch: string;
+  /**
+   * Closed answer the model may choose.
+   */
+  value: string;
+}
+
+/**
+ * `model` consults the decision gateway with a closed option list (degrade to `fallback` on
+ * low confidence or AI outage); `guard` is a deterministic field predicate with no model
+ * and no telemetry.
+ */
+export type Source = "model" | "guard";
+
+/**
+ * Append one effect: a named wire command, or a capability routed through the funnel.
+ */
+export interface Emit {
+  /**
+   * Capability id: dispatch appends a routing intent (the routing funnel chooses the
+   * endpoint).
+   */
+  capability?: string;
+  /**
+   * Wire command appended verbatim as the effect; the validator requires membership in the
+   * fail-closed command table.
+   */
+  command?: string;
+  /**
+   * Envelope inputs: values are literals or `#/$defs/ref` templates.
+   */
+  inputs: { [key: string]: unknown };
+  /**
+   * Envelope target reference; resolved from run context (defaults to the trigger's own
+   * target).
+   */
+  to?: string;
+}
+
+/**
+ * Write a notification-ledger row for a human.
+ */
+export interface Escalate {
+  message: string;
+  /**
+   * Escalation target (actor/team ref).
+   */
+  to: string;
+}
+
+/**
+ * Declared in v1, executed when the fan-out consumer lands (enable-time
+ * `step-kind-not-supported` until then).
+ */
+export interface FanOut {
+  /**
+   * Reference to the array to iterate.
+   */
+  over: string;
+  /**
+   * Inline emit payload executed once per element.
+   */
+  step: Step;
+}
+
+/**
+ * Inline emit payload executed once per element.
+ */
+export interface Step {
+  emit: Emit;
+}
+
+/**
+ * Port of the fork law: successor Work + `created`/`work.linked` rows + binding repoint +
+ * reply, with a deterministic successor work id.
+ */
+export interface ForkWork {
+  /**
+   * Note for the successor work's objective (first line wins), matching the review-arm law.
+   */
+  noteRef: string;
+}
+
+/**
+ * Sub-workflow call: starts a child instance in the parent's transaction, optionally awaits
+ * its output.
+ */
+export interface Invoke {
+  /**
+   * True: the parent parks and resumes with the child's projected output. False:
+   * fire-and-forget (the child is cascade-cancelled only if the parent fails or is cancelled).
+   */
+  await?: boolean;
+  /**
+   * Child inputs; stored as the child's initial step-log row.
+   */
+  inputs?: { [key: string]: unknown };
+  /**
+   * Step id taken on timeout; absent means the `failed` edge.
+   */
+  onTimeout?: string;
+  /**
+   * Mandatory: breach cancels the non-terminal descendant subtree and takes `onTimeout`.
+   */
+  timeout: string;
+  /**
+   * Pinned callee version; absent = the callee's live enabled version, pinned into the child
+   * at creation.
+   */
+  version?: number;
+  /**
+   * Callable definition id (must exist, be enabled, and keep the invoke-call graph acyclic).
+   */
+  workflow: string;
+}
+
+/**
+ * Declared in v1, executed with fan-out.
+ */
+export interface Join {
+  /**
+   * Number of awaited child effects before advancing.
+   */
+  expect: number;
+  timeout: string;
+}
+
+/**
+ * Declared in v1, executed when the memory step consumer lands.
+ */
+export interface Memory {
+  op: Op;
+  scope: string;
+  textRef: string;
+}
+
+export type Op = "recall" | "retain" | "promote";
+
+/**
+ * Pure projection: copy fields out of earlier outputs.
+ */
+export interface Select {
+  /**
+   * Output name -> jsonPath over earlier step outputs / the trigger envelope. Missing paths
+   * yield null (never an error).
+   */
+  project: { [key: string]: string };
+}
+
+/**
+ * Park until the delay elapses; the sweeper is the clock.
+ */
+export interface Timer {
+  for: string;
+}
+
+/**
+ * Park the instance (`waiting`) until a matching event wakes it or the timeout edge fires.
+ */
+export interface Wait {
+  /**
+   * Correlation key resolved at park time (e.g. "$steps.assign.output.workId"); matched
+   * against the waking envelope.
+   */
+  correlate: string;
+  /**
+   * Event type awaited; the definition joins the subscription set while the instance is
+   * parked.
+   */
+  event: string;
+  /**
+   * Step id taken when the deadline passes (the sweeper drives it).
+   */
+  onTimeout: string;
+  timeout: string;
+}
+
+/**
+ * Create a Work and append its routing intent; the created work carries this instance in
+ * `works.workflow_instance_id`.
+ */
+export interface WorkCreate {
+  /**
+   * Capability of the routing intent appended for the new work (there is no
+   * `command.work.create` wire command: this maps onto the shared CreateWork +
+   * AppendRoutingIntent law).
+   */
+  capability: string;
+  /**
+   * Objective text for the created work.
+   */
+  objectiveRef: string;
+  /**
+   * Owning team slug; defaults to the instance's team.
+   */
+  team?: string;
 }

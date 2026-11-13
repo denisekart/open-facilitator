@@ -29,10 +29,12 @@ public sealed class WorkEntityConfiguration : IEntityTypeConfiguration<WorkEntit
         e.Property(x => x.CloseReason).HasColumnName("close_reason");
         e.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
         e.Property(x => x.UpdatedAt).HasColumnName("updated_at").IsRequired();
+        e.Property(x => x.WorkflowInstanceId).HasColumnName("workflow_instance_id");
         e.HasOne(x => x.Project).WithMany().HasForeignKey(x => x.ProjectId).HasConstraintName("works_project_id_fkey");
         e.HasOne(x => x.Team).WithMany().HasForeignKey(x => x.TeamId).HasConstraintName("works_team_id_fkey");
         e.HasIndex(x => x.TeamId).HasDatabaseName("works_team_id_idx");
         e.HasIndex(x => x.MergedInto).HasDatabaseName("works_merged_into_idx");
+        e.HasIndex(x => x.WorkflowInstanceId).HasDatabaseName("works_workflow_instance_id_idx");
         e.ToTable(t => t.HasCheckConstraint("works_state_check", CheckSql.InList("state", StateGuard.AllWorkWires)));
     }
 }

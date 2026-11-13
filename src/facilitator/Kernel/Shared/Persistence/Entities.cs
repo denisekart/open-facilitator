@@ -198,9 +198,130 @@ public sealed class WorkEntity
 
     public DateTime UpdatedAt { get; set; }
 
+    /// <summary>Set by a workflow's own work-creating step: the flow that CREATED
+    /// this work (cancel-scope boundary — a flow may cancel works carrying its
+    /// id, never its subject work unless its step created it). Distinct from
+    /// <c>workflow_instances.primary_work_id</c> (the work a flow is ABOUT).</summary>
+    public Guid? WorkflowInstanceId { get; set; }
+
     public ProjectEntity? Project { get; set; }
 
     public TeamEntity? Team { get; set; }
+}
+
+/// <summary>facilitator.workflow_definitions — one version of a workflow
+/// definition. Immutable once an instance references the row; <c>enabled</c>
+/// and <c>shadow</c> are the only in-place updates (audited). <c>shadow</c> is
+/// the strangler flag, distinct from <c>enabled</c>: the legacy arm acts AND
+/// the plane computes (would-do step-log rows only, no effects).</summary>
+public sealed class WorkflowDefinitionEntity
+{
+    public required string DefId { get; set; }
+
+    public int Version { get; set; }
+
+    public required string Title { get; set; }
+
+    public required string Description { get; set; }
+
+    /// <summary>Canonical JSON payload (the wire <c>workflow-definition.v1</c> document).</summary>
+    public required string Payload { get; set; }
+
+    /// <summary><c>sha256:&lt;64 hex&gt;</c> over the canonical JSON.</summary>
+    public required string Digest { get; set; }
+
+    public bool Enabled { get; set; }
+
+    /// <summary>Strangler flag: true = arm acts and the plane only records a
+    /// shadow plan; false with enabled = the plane owns the behavior.</summary>
+    public bool Shadow { get; set; }
+
+    /// <summary>gallery | hand | ai | derived.</summary>
+    public required string Source { get; set; }
+
+    public string? Team { get; set; }
+
+    public DateTime CreatedAt { get; set; }
+
+    public required string CreatedBy { get; set; }
+}
+
+/// <summary>facilitator.workflow_instances — one run of a pinned definition
+/// version. Composition columns (parent/depth/path/output/end_reason) landed
+/// with the plane itself so the composition layer never reshapes the store.</summary>
+public sealed class WorkflowInstanceEntity
+{
+    public Guid InstanceId { get; set; }
+
+    public required string DefId { get; set; }
+
+    public int DefVersion { get; set; }
+
+    public string? Team { get; set; }
+
+    public Guid? ProjectId { get; set; }
+
+    /// <summary>The work the flow is ABOUT (resolved at trigger time; null =
+    /// workless run). Never conflated with <c>works.workflow_instance_id</c>.</summary>
+    public Guid? PrimaryWorkId { get; set; }
+
+    public Guid? TriggerEventId { get; set; }
+
+    /// <summary>running | waiting | completed | failed | cancelled | shadowed.</summary>
+    public required string Status { get; set; }
+
+    public string? CurrentStep { get; set; }
+
+    /// <summary>Deadline for a parked wait/timer/invoke, or the chain-age cap.</summary>
+    public DateTime? DeadlineAt { get; set; }
+
+    public DateTime StartedAt { get; set; }
+
+    public DateTime UpdatedAt { get; set; }
+
+    public Guid? ParentInstanceId { get; set; }
+
+    public int Depth { get; set; }
+
+    /// <summary>Dot-free ancestor chain <c>defId@ver&gt;defId@ver&gt;…</c> (root = own chain).</summary>
+    public required string InvocationPath { get; set; }
+
+    /// <summary>Projected output published to a waiting parent (jsonb).</summary>
+    public string? Output { get; set; }
+
+    /// <summary>null | budget-exhausted | chain-age-exceeded | parent-cancelled | invoke-timeout | operator-cancel.</summary>
+    public string? EndReason { get; set; }
+
+    public WorkflowInstanceEntity? Parent { get; set; }
+}
+
+/// <summary>facilitator.workflow_step_log — one row per step transition.
+/// <c>shadow</c> rows record the would-do plan (no effect was appended,
+/// <c>effect_command_id</c> stays null, the would-do envelope digest rides in
+/// <c>output</c>).</summary>
+public sealed class WorkflowStepLogEntity
+{
+    public Guid InstanceId { get; set; }
+
+    public int Seq { get; set; }
+
+    public required string StepId { get; set; }
+
+    /// <summary>pending | running | done | failed | skipped | shadow.</summary>
+    public required string Status { get; set; }
+
+    public string? EffectCommandId { get; set; }
+
+    public string? EvidenceRef { get; set; }
+
+    /// <summary>Step output (jsonb; for shadow rows, the would-do record).</summary>
+    public string? Output { get; set; }
+
+    public DateTime StartedAt { get; set; }
+
+    public DateTime UpdatedAt { get; set; }
+
+    public WorkflowInstanceEntity? Instance { get; set; }
 }
 
 /// <summary>facilitator.work_links — typed relations between works (successors,

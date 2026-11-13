@@ -9,6 +9,7 @@ using Facilitator.Kernel.Shared.Identity;
 using Facilitator.Kernel.Shared.Persistence;
 using Facilitator.Kernel.Teams;
 using Facilitator.Kernel.Work;
+using Facilitator.Kernel.Workflows;
 
 if (args.Length > 0 && args[0] == "cli")
 {
@@ -45,6 +46,7 @@ app.MapMemoryApi();
 app.MapLinkApi(app.Environment);
 app.MapIdentityApi();
 app.MapAdminApi();
+app.MapWorkflowApi();
 app.MapEnrollmentTokenApi();
 app.MapChatApi();
 app.MapProviderIdentitiesApi();

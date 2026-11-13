@@ -59,10 +59,11 @@ public sealed class ChatActionExecutor(
 
     /// <summary>Claim + replay + finalize one action.</summary>
     /// <param name="actionId">Action row.</param>
-    /// <param name="principal">Confirming admin (owner or chat.read-all — checked by the caller).</summary>
+    /// <param name="principal">Confirming admin (owner or chat.read-all — checked by the caller).</param>
     /// <param name="request">Confirming request (Authorization + X-Change-Reason forwarded; scheme+host fallback base).</param>
+    /// <param name="note">Optional operator decision note (validated by the caller: non-empty, &lt;= 1024).</param>
     /// <param name="ct">Cancellation.</param>
-    public async Task<ChatActionResult> ConfirmAsync(Guid actionId, FacilitatorPrincipal principal, HttpRequest request, CancellationToken ct)
+    public async Task<ChatActionResult> ConfirmAsync(Guid actionId, FacilitatorPrincipal principal, HttpRequest request, string? note, CancellationToken ct)
     {
         await using var db = await contextFactory.CreateDbContextAsync(ct);
         var row = await db.ChatActions.AsNoTracking()
@@ -101,13 +102,17 @@ public sealed class ChatActionExecutor(
                 .SetProperty(a => a.StatusCode, status)
                 .SetProperty(a => a.Result, responseBody)
                 .SetProperty(a => a.ExecutedBy, principal.Actor)
-                .SetProperty(a => a.ExecutedAt, now), ct);
+                .SetProperty(a => a.ExecutedAt, now)
+                .SetProperty(a => a.Note, note), ct);
 
         // The gate on the replayed call audited its own decision; this row
-        // attributes the AI-initiated execution to the confirming admin.
+        // attributes the AI-initiated execution to the confirming admin, and
+        // carries the action id as the correlation key the chat card links
+        // the audit view through.
         audit.Append(db, new AuditRecord(
             principal.Actor, "chat.action.executed", $"{row.Method} {row.Path}", "allow", null, null, null,
-            JsonSerializer.Serialize(new { aiInitiated = true, chatSessionId = row.SessionId, actionId })));
+            JsonSerializer.Serialize(new { aiInitiated = true, chatSessionId = row.SessionId, actionId, decisionNote = note }),
+            CorrelationId: actionId.ToString("N")));
         await db.SaveChangesAsync(ct);
 
         metrics.AiChatAction(finalStatus);
@@ -116,7 +121,7 @@ public sealed class ChatActionExecutor(
     }
 
     /// <summary>Status-guard <c>pending → cancelled</c>; a non-pending row is 409.</summary>
-    public async Task<ChatActionResult> CancelAsync(Guid actionId, CancellationToken ct)
+    public async Task<ChatActionResult> CancelAsync(Guid actionId, string? note, CancellationToken ct)
     {
         await using var db = await contextFactory.CreateDbContextAsync(ct);
         var exists = await db.ChatActions.AnyAsync(a => a.ActionId == actionId, ct);
@@ -129,6 +134,7 @@ public sealed class ChatActionExecutor(
             .Where(a => a.ActionId == actionId && a.Status == "pending")
             .ExecuteUpdateAsync(s => s
                 .SetProperty(a => a.Status, "cancelled")
+                .SetProperty(a => a.Note, note)
                 .SetProperty(a => a.ExecutedAt, timeProvider.GetUtcNow().UtcDateTime), ct);
         if (claimed == 0)
         {
@@ -141,9 +147,29 @@ public sealed class ChatActionExecutor(
 
     // Loopback replay: named client "chat-loopback" (plain IHttpClientFactory
     // client — no per-name registration needed beyond the factory itself).
-    private async Task<(int Status, string? Result)> ReplayAsync(ChatActionEntity row, Uri baseUri, HttpRequest request, CancellationToken ct)
+    private async Task<(int Status, string? Result)> ReplayAsync(ChatActionEntity row, Uri baseUri, HttpRequest request, CancellationToken ct, int limitBytes = ResultLimitBytes) =>
+        await SendLoopbackAsync(row.Method, row.Path, row.Body, baseUri, request, ct, limitBytes);
+
+    /// <summary>
+    /// One bounded read-phase GET for the chat turn (7c): the same loopback
+    /// mechanics as the confirm replay — the same named client, the caller's
+    /// <c>Authorization</c> forwarded, the same base-URL law — but the body is
+    /// trimmed to <paramref name="maxBodyChars"/> and NO audit row is written
+    /// here: the gate audits the call exactly as it does for a confirmed
+    /// action. Returns the response status + (truncated) body.
+    /// </summary>
+    public async Task<(int Status, string Body)> ExecuteReadAsync(
+        string method, string path, FacilitatorPrincipal principal, HttpRequest request, int maxBodyChars, CancellationToken ct)
     {
-        using var message = new HttpRequestMessage(new HttpMethod(row.Method), new Uri(baseUri, row.Path));
+        _ = principal; // the forwarded Authorization IS the principal; no separate use
+        var (status, body) = await SendLoopbackAsync(method, path, null, BaseUrl(request), request, ct, maxBodyChars);
+        return (status, body ?? string.Empty);
+    }
+
+    private async Task<(int Status, string? Result)> SendLoopbackAsync(
+        string method, string path, string? body, Uri baseUri, HttpRequest request, CancellationToken ct, int limitBytes)
+    {
+        using var message = new HttpRequestMessage(new HttpMethod(method), new Uri(baseUri, path));
         var authorization = request.Headers.TryGetValue("Authorization", out var authValues) ? authValues.ToString() : null;
         if (authorization is { Length: > 0 })
         {
@@ -156,7 +182,7 @@ public sealed class ChatActionExecutor(
             message.Headers.TryAddWithoutValidation("X-Change-Reason", changeReason);
         }
 
-        if (row.Body is { Length: > 0 } body)
+        if (body is { Length: > 0 })
         {
             message.Content = new StringContent(body, Encoding.UTF8, "application/json");
         }
@@ -165,7 +191,7 @@ public sealed class ChatActionExecutor(
         {
             using var response = await httpClientFactory.CreateClient("chat-loopback").SendAsync(message, ct);
             var text = await response.Content.ReadAsStringAsync(ct);
-            return ((int)response.StatusCode, TruncateUtf8(text, ResultLimitBytes));
+            return ((int)response.StatusCode, TruncateUtf8(text, limitBytes));
         }
         catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
         {

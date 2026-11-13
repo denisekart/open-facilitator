@@ -39,6 +39,16 @@ public sealed class AiOptions
     /// <summary>Directory overriding embedded templates per-template; null = embedded only.</summary>
     public string? TemplateDirectory { get; init; }
 
+    /// <summary>Minutes a pending chat action stays confirmable (0 = never
+    /// expires); the AiActionGauge sweeper parks expired rows in the
+    /// <c>expired</c> terminal state so a silently-stale proposal becomes
+    /// visible instead of hanging on the card forever.</summary>
+    public int ChatActionTtlMinutes { get; init; } = 60;
+
+    /// <summary>How many bounded GETs one chat turn may fetch as reading
+    /// context before answering (0 = the read phase is off).</summary>
+    public int ChatReadLimit { get; init; } = 3;
+
     /// <summary>True when the <c>Ai</c> section carried at least one endpoint.</summary>
     public bool HasEndpoints => Endpoints.Count > 0;
 

@@ -15,6 +15,7 @@ namespace Facilitator.Kernel.Ai;
 public sealed class AiActionGaugeSweeper(
     IDbContextFactory<FacilitatorDbContext> contextFactory,
     KernelMetrics metrics,
+    TimeProvider timeProvider,
     ILogger<AiActionGaugeSweeper> logger) : BackgroundService
 {
     /// <summary>Seconds between gauge passes.</summary>
@@ -41,10 +42,16 @@ public sealed class AiActionGaugeSweeper(
         }
     }
 
-    /// <summary>One pass (public for tests to drive it without waiting).</summary>
+    /// <summary>One pass (public for tests to drive it without waiting).
+    /// Expire first, then count: a silently-expired proposal becomes a
+    /// visible terminal state, so the gauge and the cards always agree.</summary>
     public async Task SweepOnceAsync(CancellationToken ct)
     {
         await using var db = await contextFactory.CreateDbContextAsync(ct);
+        var now = timeProvider.GetUtcNow().UtcDateTime;
+        await db.ChatActions
+            .Where(a => a.Status == "pending" && a.ExpiresAt != null && a.ExpiresAt <= now)
+            .ExecuteUpdateAsync(s => s.SetProperty(a => a.Status, "expired"), ct);
         metrics.SetAiPendingActions(await db.ChatActions.CountAsync(a => a.Status == "pending", ct));
     }
 }

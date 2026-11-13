@@ -303,6 +303,25 @@
       "emailVerified": true
     },
     {
+      "username": "minty",
+      "enabled": true,
+      "firstName": "Minty",
+      "realmRoles": ["default-roles-facilitator", "ai-operator"],
+      "groups": ["/teams/team-beta"],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "minty",
+          "temporary": false
+        }
+      ],
+      "requiredActions": [],
+      "disableableCredentialTypes": ["password"],
+      "lastName": "Morgan",
+      "email": "minty@example.test",
+      "emailVerified": true
+    },
+    {
       "username": "carol",
       "enabled": true,
       "firstName": "Carol",

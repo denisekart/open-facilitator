@@ -113,6 +113,33 @@ public static class ActionCatalog
         return false;
     }
 
+    /// <summary>
+    /// The principal's slice of the catalog: an entry survives when NO
+    /// binding covers its method+path (no binding ⇒ any authenticated
+    /// principal passes — the gate's own law, shared through
+    /// <see cref="Facilitator.Kernel.Shared.Identity.OperationMatcher"/>) or
+    /// when that binding's roles intersect the principal's effective roles.
+    /// <paramref name="bindingFor"/> is the matcher closure, injectable so the
+    /// prompt filter and the catalog endpoint answer with one function.
+    /// </summary>
+    public static IReadOnlyList<CatalogEntry> AllowedFor(
+        IReadOnlyList<CatalogEntry> entries,
+        IReadOnlySet<string> roles,
+        Func<string, string, Facilitator.Kernel.Shared.Identity.OperationBinding?> bindingFor)
+    {
+        var allowed = new List<CatalogEntry>(entries.Count);
+        foreach (var entry in entries)
+        {
+            var binding = bindingFor(entry.Method, entry.PathTemplate);
+            if (binding is null || binding.RolesAnyOf.Any(roles.Contains))
+            {
+                allowed.Add(entry);
+            }
+        }
+
+        return allowed;
+    }
+
     /// <summary>The catalog as prompt text: one line per endpoint, notes
     /// appended where a caller-side requirement exists.</summary>
     public static string RenderForPrompt()

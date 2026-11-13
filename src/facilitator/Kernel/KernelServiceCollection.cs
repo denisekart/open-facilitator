@@ -349,6 +349,10 @@ public static class KernelServiceCollection
         builder.Services.AddSingleton<Facilitator.Kernel.Ai.CommunicationDecision>();
         builder.Services.AddSingleton<Facilitator.Kernel.Ai.ChatProcessor>();
         builder.Services.AddSingleton<Facilitator.Kernel.Ai.ChatActionExecutor>();
+        builder.Services.AddSingleton(sp => new Facilitator.Kernel.Ai.ChatReadLoop(
+            sp.GetRequiredService<Facilitator.Kernel.Ai.ChatActionExecutor>(),
+            sp.GetRequiredService<Facilitator.Kernel.Ai.AiOptions>().ChatReadLimit,
+            Facilitator.Kernel.Ai.ChatReadLoop.DefaultMaxBodyChars));
         builder.Services.AddHostedService<Facilitator.Kernel.Ai.AiActionGaugeSweeper>();
         return builder;
     }

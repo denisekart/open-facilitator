@@ -1,9 +1,11 @@
+using System.Text;
 using System.Text.Json;
 
 using Facilitator.Kernel.Shared;
 using Facilitator.Kernel.Shared.Identity;
 using Facilitator.Kernel.Shared.Persistence;
 
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace Facilitator.Kernel.Ai;
@@ -25,6 +27,7 @@ public sealed record ChatSessionView(Guid SessionId, string Actor, string Title,
 /// <param name="TemplateId">Prompt template id on model-basis turns.</param>
 /// <param name="CreatedAt">Timestamp.</param>
 /// <param name="Actions">Proposed actions attached to this (assistant) message.</param>
+/// <param name="Reads">Read-phase trail ({"reads":[{method,path,status}]}), null when the turn read nothing.</param>
 public sealed record ChatMessageView(
     Guid MessageId,
     string Role,
@@ -32,7 +35,8 @@ public sealed record ChatMessageView(
     string Basis,
     string? TemplateId,
     DateTime CreatedAt,
-    IReadOnlyList<ChatActionView> Actions);
+    IReadOnlyList<ChatActionView> Actions,
+    JsonElement? Reads = null);
 
 /// <summary>One action row on the chat surface (full lifecycle view).</summary>
 /// <param name="ActionId">Action id.</param>
@@ -46,6 +50,9 @@ public sealed record ChatMessageView(
 /// <param name="Result">Recorded response (truncated 8 KiB) once executed.</param>
 /// <param name="ExecutedBy">Confirming actor.</param>
 /// <param name="ExecutedAt">Terminal timestamp.</param>
+/// <param name="Note">Operator decision note (confirm/cancel), when given.</param>
+/// <param name="ExpiresAt">When a pending proposal stops being confirmable (null = never).</param>
+/// <param name="Summary">Human summary of the target endpoint (catalog line), falling back to the description.</param>
 public sealed record ChatActionRowView(
     Guid ActionId,
     Guid SessionId,
@@ -57,7 +64,10 @@ public sealed record ChatActionRowView(
     int? StatusCode,
     string? Result,
     string? ExecutedBy,
-    DateTime? ExecutedAt);
+    DateTime? ExecutedAt,
+    string? Note = null,
+    DateTime? ExpiresAt = null,
+    string? Summary = null);
 
 /// <summary>POST body: one user turn.</summary>
 /// <param name="Text">Message text (non-empty).</param>
@@ -168,7 +178,8 @@ public static class ChatEndpoints
                 .ToListAsync(ct);
             return Results.Ok(messages.Select(m => new ChatMessageView(
                 m.MessageId, m.Role, m.Text, m.Basis, m.TemplateId, m.CreatedAt,
-                actions.Where(a => a.MessageId == m.MessageId).Select(ActionView).ToArray())).ToArray());
+                actions.Where(a => a.MessageId == m.MessageId).Select(ActionView).ToArray(),
+                m.Reads is { Length: > 0 } readsJson ? JsonDocument.Parse(readsJson).RootElement.Clone() : null)).ToArray());
         });
 
         // Owner-only: a read-all admin may browse, not speak in, another's
@@ -202,7 +213,7 @@ public static class ChatEndpoints
                 return Forbidden();
             }
 
-            return Results.Ok(await processor.PostMessageAsync(id, text, principal, ct));
+            return Results.Ok(await processor.PostMessageAsync(id, text, principal, http.Request, ct));
         });
 
         group.MapGet("/actions/{id:guid}", async (Guid id, ChatProcessor processor, HttpContext http, CancellationToken ct) =>
@@ -236,7 +247,13 @@ public static class ChatEndpoints
                 return Forbidden();
             }
 
-            var result = await executor.ConfirmAsync(id, principal, http.Request, ct);
+            var (noteOk, note, noteError) = await ReadDecisionNoteAsync(http.Request, ct);
+            if (!noteOk)
+            {
+                return Results.Problem(noteError!);
+            }
+
+            var result = await executor.ConfirmAsync(id, principal, http.Request, note, ct);
             return result.Outcome switch
             {
                 ChatActionOutcome.Done => Results.Ok(RowView(result.Action!)),
@@ -263,13 +280,127 @@ public static class ChatEndpoints
                 return Forbidden();
             }
 
-            var result = await executor.CancelAsync(id, ct);
+            var (noteOk, note, noteError) = await ReadDecisionNoteAsync(http.Request, ct);
+            if (!noteOk)
+            {
+                return Results.Problem(noteError!);
+            }
+
+            var result = await executor.CancelAsync(id, note, ct);
             return result.Outcome switch
             {
                 ChatActionOutcome.Done => Results.Ok(RowView(result.Action!)),
                 ChatActionOutcome.Conflict => ActionConflict(id),
                 _ => ActionNotFound(id),
             };
+        });
+
+        // The principal's slice of the action catalog + the command registry:
+        // the SPA's verb palette and proposal rendering read their single
+        // source of truth here. Role-filtered by construction (same
+        // OperationMatcher law the gate applies), so the chat plane can never
+        // offer an action the caller cannot perform.
+        group.MapGet("/catalog", (
+            HttpContext http,
+            CommandRegistry registry,
+            Microsoft.Extensions.Options.IOptions<IdentityOptions> identity) =>
+        {
+            if (http.GetFacilitatorPrincipal() is not { } principal)
+            {
+                return Unauthorized();
+            }
+
+            return Results.Ok(new
+            {
+                catalog = ChatProcessor.AllowedFor(principal, identity.Value).Select(e => new
+                {
+                    method = e.Method,
+                    path = e.PathTemplate,
+                    summary = e.Summary,
+                    bodyHint = e.BodyHint,
+                    notes = e.Notes,
+                    effect = string.Equals(e.Method, "GET", StringComparison.OrdinalIgnoreCase) ? "read" : "write",
+                }).ToList(),
+                verbs = registry.All().Select(s => new
+                {
+                    verb = s.Verb,
+                    description = s.Description,
+                    args = s.Args.Select(a => new { name = a.Name, required = a.Required }).ToList(),
+                }).ToList(),
+            });
+        });
+
+        // Owner-only hygiene: rename (400 when blank or over the 120-char
+        // column cap) and delete (204; messages/actions cascade).
+        group.MapPatch("/sessions/{id:guid}", async (
+            Guid id, HttpContext http, CancellationToken ct) =>
+        {
+            if (http.GetFacilitatorPrincipal() is not { } principal)
+            {
+                return Unauthorized();
+            }
+
+            await using var db = await Db(http, ct);
+            var session = await db.ChatSessions.FirstOrDefaultAsync(s => s.SessionId == id, ct);
+            if (session is null)
+            {
+                return SessionNotFound(id);
+            }
+
+            if (!string.Equals(session.Actor, principal.Actor, StringComparison.Ordinal))
+            {
+                return Forbidden();
+            }
+
+            string? title;
+            try
+            {
+                var body = await new StreamReader(http.Request.Body, Encoding.UTF8).ReadToEndAsync(ct);
+                title = JsonDocument.Parse(body).RootElement.TryGetProperty("title", out var t) && t.ValueKind == JsonValueKind.String
+                    ? t.GetString()
+                    : null;
+            }
+            catch (JsonException)
+            {
+                title = null;
+            }
+
+            if (title is not { Length: > 0 } trimmed || trimmed.Length > 120)
+            {
+                return Results.Problem(ProblemErrors.Create(
+                    "invalid-chat-title", "Chat title invalid", StatusCodes.Status400BadRequest,
+                    "title must be non-empty and <= 120 chars"));
+            }
+
+            session.Title = trimmed;
+            await db.SaveChangesAsync(ct);
+            return Results.Ok(View(session));
+        });
+
+        group.MapDelete("/sessions/{id:guid}", async (
+            Guid id, HttpContext http, CancellationToken ct) =>
+        {
+            if (http.GetFacilitatorPrincipal() is not { } principal)
+            {
+                return Unauthorized();
+            }
+
+            await using var db = await Db(http, ct);
+            var session = await db.ChatSessions.FirstOrDefaultAsync(s => s.SessionId == id, ct);
+            if (session is null)
+            {
+                return SessionNotFound(id);
+            }
+
+            if (!string.Equals(session.Actor, principal.Actor, StringComparison.Ordinal))
+            {
+                return Forbidden();
+            }
+
+            // Messages/actions follow through their CASCADE foreign keys.
+            db.ChatSessions.Remove(session);
+            await db.SaveChangesAsync(ct);
+            return Results.NoContent();
         });
 
         group.MapGet("/preferences", async (HttpContext http, CancellationToken ct) =>
@@ -341,6 +472,50 @@ public static class ChatEndpoints
         string.Equals(sessionActor, principal.Actor, StringComparison.Ordinal)
         || principal.Roles.Contains(ReadAllRole);
 
+    // Optional {"note": "..."} decision body on confirm/cancel: absent or
+    // null body = no note; present but blank/oversize is a 400, never a
+    // silent drop of what the operator typed.
+    private static async Task<(bool Ok, string? Note, ProblemDetails? Error)> ReadDecisionNoteAsync(
+        HttpRequest request, CancellationToken ct)
+    {
+        if (request.ContentLength is null or 0)
+        {
+            return (true, null, null);
+        }
+
+        JsonElement root;
+        try
+        {
+            var body = await new StreamReader(request.Body, Encoding.UTF8).ReadToEndAsync(ct);
+            if (string.IsNullOrWhiteSpace(body))
+            {
+                return (true, null, null);
+            }
+
+            root = JsonDocument.Parse(body).RootElement;
+        }
+        catch (JsonException)
+        {
+            return (false, null, ProblemErrors.Create(
+                "invalid-decision-note", "Decision note invalid", StatusCodes.Status400BadRequest,
+                "note must be non-empty and <= 1024 chars"));
+        }
+
+        if (!root.TryGetProperty("note", out var candidate) || candidate.ValueKind == JsonValueKind.Null)
+        {
+            return (true, null, null);
+        }
+
+        if (candidate.ValueKind != JsonValueKind.String || candidate.GetString() is not { Length: > 0 } value || value.Length > 1024)
+        {
+            return (false, null, ProblemErrors.Create(
+                "invalid-decision-note", "Decision note invalid", StatusCodes.Status400BadRequest,
+                "note must be non-empty and <= 1024 chars"));
+        }
+
+        return (true, value, null);
+    }
+
     private static Task<FacilitatorDbContext> Db(HttpContext http, CancellationToken ct) =>
         http.RequestServices.GetRequiredService<IDbContextFactory<FacilitatorDbContext>>().CreateDbContextAsync(ct);
 
@@ -353,15 +528,21 @@ public static class ChatEndpoints
     private static ChatSessionView View(ChatSessionEntity s) =>
         new(s.SessionId, s.Actor, s.Title, s.CreatedAt, s.LastMessageAt);
 
+    // Human headline for a card: the catalog line of the target endpoint,
+    // falling back to the model's own description.
+    private static string SummaryFor(string method, string path, string description) =>
+        ActionCatalog.Entries.FirstOrDefault(e => e.Matches(method, path))?.Summary ?? description;
+
     private static ChatActionView ActionView(ChatActionEntity a) =>
         new(a.ActionId, a.Method, a.Path,
             a.Body is { Length: > 0 } body ? JsonDocument.Parse(body).RootElement.Clone() : null,
-            a.Description, a.Status);
+            a.Description, a.Status, a.Note, a.ExpiresAt, SummaryFor(a.Method, a.Path, a.Description));
 
     private static ChatActionRowView RowView(ChatActionEntity a) =>
         new(a.ActionId, a.SessionId, a.Method, a.Path,
             a.Body is { Length: > 0 } body ? JsonDocument.Parse(body).RootElement.Clone() : null,
-            a.Description, a.Status, a.StatusCode, a.Result, a.ExecutedBy, a.ExecutedAt);
+            a.Description, a.Status, a.StatusCode, a.Result, a.ExecutedBy, a.ExecutedAt,
+            a.Note, a.ExpiresAt, SummaryFor(a.Method, a.Path, a.Description));
 
     private static IResult SessionNotFound(Guid id) =>
         Results.Problem(ProblemErrors.Create("chat-session-not-found", "Chat session not found", StatusCodes.Status404NotFound, $"no chat session {id}"));

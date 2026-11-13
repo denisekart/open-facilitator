@@ -17,8 +17,20 @@ namespace Facilitator.Kernel.Ai;
 /// <param name="Path">Proposed route path (catalog-validated).</param>
 /// <param name="Body">Proposed request body, raw jsonb — null when the action carries none.</param>
 /// <param name="Description">Machine-readable description shown on the action card.</param>
-/// <param name="Status">pending | executed | failed | cancelled.</param>
-public sealed record ChatActionView(Guid ActionId, string Method, string Path, JsonElement? Body, string Description, string Status);
+/// <param name="Status">pending | executed | failed | cancelled | expired.</param>
+/// <param name="Note">Operator decision note (confirm/cancel), when given.</param>
+/// <param name="ExpiresAt">When a pending proposal stops being confirmable (null = never).</param>
+/// <param name="Summary">Human summary of the target endpoint (catalog line), falling back to the description.</param>
+public sealed record ChatActionView(
+    Guid ActionId,
+    string Method,
+    string Path,
+    JsonElement? Body,
+    string Description,
+    string Status,
+    string? Note = null,
+    DateTime? ExpiresAt = null,
+    string? Summary = null);
 
 /// <summary>One completed chat turn: the stored assistant message + its
 /// proposed (NOT executed) actions.</summary>
@@ -26,7 +38,13 @@ public sealed record ChatActionView(Guid ActionId, string Method, string Path, J
 /// <param name="MessageId">Stored assistant message id.</param>
 /// <param name="Reply">Assistant text.</param>
 /// <param name="Actions">Proposed actions (empty on pure-reply turns and every degraded turn).</param>
-public sealed record ChatTurnResult(Guid SessionId, Guid MessageId, string Reply, IReadOnlyList<ChatActionView> Actions);
+/// <param name="Reads">Read-phase trail ({"reads":[{method,path,status}]}), null when the turn read nothing.</param>
+public sealed record ChatTurnResult(
+    Guid SessionId,
+    Guid MessageId,
+    string Reply,
+    IReadOnlyList<ChatActionView> Actions,
+    JsonElement? Reads = null);
 
 /// <summary>
 /// The admin-chat turn engine. Message flow (one tx with the effect):
@@ -51,7 +69,10 @@ public sealed class ChatProcessor(
     PromptRenderer renderer,
     AuditWriter audit,
     KernelMetrics metrics,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    AiOptions aiOptions,
+    Microsoft.Extensions.Options.IOptions<IdentityOptions> identityOptions,
+    ChatReadLoop readLoop)
 {
     /// <summary>Title seed on session create; replaced by the first user turn (truncated).</summary>
     public const string ProvisionalTitle = "New conversation";
@@ -123,7 +144,7 @@ public sealed class ChatProcessor(
     /// principal may post to it (owner or <c>chat.read-all</c>).
     /// </summary>
     public async Task<ChatTurnResult> PostMessageAsync(
-        Guid sessionId, string text, FacilitatorPrincipal principal, CancellationToken ct)
+        Guid sessionId, string text, FacilitatorPrincipal principal, HttpRequest request, CancellationToken ct)
     {
         await using var db = await contextFactory.CreateDbContextAsync(ct);
         await using var tx = await db.Database.BeginTransactionAsync(ct);
@@ -161,11 +182,12 @@ public sealed class ChatProcessor(
         JsonElement? decoded = null;
         int? promptTokens = null;
         int? completionTokens = null;
+        string? readsJson = null;
         List<PendingAction> proposals = [];
 
         if (!slashKnown && policy.Enabled && policy.ReplyMode == "model")
         {
-            var outcome = await ModelTurnAsync(db, sessionId, text, registry, policy, ct);
+            var outcome = await ModelTurnAsync(db, sessionId, text, registry, policy, principal, request, ct);
             reply = outcome.Reply;
             basis = outcome.Basis;
             templateId = "chat";
@@ -173,6 +195,7 @@ public sealed class ChatProcessor(
             promptTokens = outcome.PromptTokens;
             completionTokens = outcome.CompletionTokens;
             proposals = outcome.Proposals;
+            readsJson = outcome.ReadsJson;
         }
         else
         {
@@ -207,7 +230,9 @@ public sealed class ChatProcessor(
             TemplateId = templateId,
             CreatedAt = now,
             TraceId = traceId,
+            Reads = readsJson,
         });
+        var expiresAt = aiOptions.ChatActionTtlMinutes > 0 ? now.AddMinutes(aiOptions.ChatActionTtlMinutes) : (DateTime?)null;
 
         var actions = new List<ChatActionView>(proposals.Count);
         foreach (var proposal in proposals)
@@ -224,10 +249,12 @@ public sealed class ChatProcessor(
                 Description = proposal.Description,
                 Status = "pending",
                 CreatedAt = now,
+                ExpiresAt = expiresAt,
             });
             actions.Add(new ChatActionView(actionId, proposal.Method, proposal.Path,
                 proposal.Body is { } bodyText ? JsonDocument.Parse(bodyText).RootElement.Clone() : null,
-                proposal.Description, "pending"));
+                proposal.Description, "pending", null, expiresAt,
+                ActionCatalog.Entries.FirstOrDefault(e => e.Matches(proposal.Method, proposal.Path))?.Summary ?? proposal.Description));
         }
 
         audit.Append(db, new AuditRecord(
@@ -247,7 +274,9 @@ public sealed class ChatProcessor(
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
         metrics.AiChatMessage(basis);
-        return new ChatTurnResult(sessionId, assistantId, reply, actions);
+        return new ChatTurnResult(
+            sessionId, assistantId, reply, actions,
+            readsJson is null ? null : JsonDocument.Parse(readsJson).RootElement.Clone());
     }
 
     // ---- model turn ----
@@ -258,9 +287,23 @@ public sealed class ChatProcessor(
         JsonElement? Decoded,
         int? PromptTokens,
         int? CompletionTokens,
-        List<PendingAction> Proposals);
+        List<PendingAction> Proposals,
+        string? ReadsJson);
 
     private sealed record PendingAction(string Method, string Path, string? Body, string Description);
+
+    // The principal's catalog slice: no binding on an entry's method+path
+    // means the gate admits any authenticated principal (the gate's own law,
+    // shared through OperationMatcher), otherwise the binding's roles must
+    // intersect the principal's effective roles. One answer for "what may
+    // this principal invoke" — the catalog endpoint and the prompt both use
+    // this.
+    internal static IReadOnlyList<CatalogEntry> AllowedFor(
+        FacilitatorPrincipal principal, IdentityOptions identity) =>
+        ActionCatalog.AllowedFor(
+            ActionCatalog.Entries,
+            principal.Roles,
+            (method, path) => OperationMatcher.MatchPath(identity.Authorization.Operations, method, path));
 
     private async Task<ModelOutcome> ModelTurnAsync(
         FacilitatorDbContext db,
@@ -268,6 +311,8 @@ public sealed class ChatProcessor(
         string text,
         CommandRegistry registry,
         AiPolicy policy,
+        FacilitatorPrincipal principal,
+        HttpRequest request,
         CancellationToken ct)
     {
         var history = await db.ChatMessages.AsNoTracking()
@@ -277,14 +322,19 @@ public sealed class ChatProcessor(
             .ToListAsync(ct);
         history.Reverse();
 
+        // A team operator is never offered a kernel-wide sweep, because the
+        // principal cannot run one.
+        var allowed = AllowedFor(principal, identityOptions.Value);
+
         renderer.Render(
             "chat",
             new
             {
                 Commands = registry.All().Select(s => new { s.Verb, s.Description, Args = s.Args.Select(a => new { a.Name, a.Required }).ToList() }).ToList(),
-                Catalog = ActionCatalog.Entries.Select(e => new { e.Method, Path = e.PathTemplate, e.Summary, e.BodyHint, e.Notes }).ToList(),
+                Catalog = allowed.Select(e => new { e.Method, Path = e.PathTemplate, e.Summary, e.BodyHint, e.Notes }).ToList(),
                 Messages = history.Select(m => new { Role = m.Role, Text = m.Text }).ToList(),
                 Message = text,
+                ReadLimit = aiOptions.ChatReadLimit,
             },
             out var system,
             out var user);
@@ -301,15 +351,55 @@ public sealed class ChatProcessor(
             metrics.AiGatewayError("decoder");
             return new ModelOutcome(
                 "AI unavailable — the chat plane stays usable: commands and the admin surface work without it.",
-                "fallback", null, null, null, []);
+                "fallback", null, null, null, [], null);
         }
 
+        var promptTokens = completion.PromptTokens;
+        var completionTokens = completion.CompletionTokens;
         KernelActivity.SetAiTokenUsage(span, completion.PromptTokens, completion.CompletionTokens);
+
+        // Read phase (7c): the first turn may ask for bounded GETs instead of
+        // an answer. Run them under this principal's own token, append the
+        // bodies, and ask again — a turn that cannot produce usable reads or a
+        // parseable second answer degrades through the existing fallbacks.
+        var reads = TryParseReads(completion.Text);
+        string? readsTrail = null;
+        if (reads is not null)
+        {
+            var executed = await readLoop.RunAsync(
+                reads, allowed, principal, request, ct);
+            if (executed.Count == 0)
+            {
+                return new ModelOutcome(FallbackReply(CommandRegistry.BuiltIns), "fallback", null, promptTokens, completionTokens, [], null);
+            }
+
+            AiCompletion second;
+            try
+            {
+                second = await gateway.CompleteAsync(
+                    new AiRequest("decoder", "chat", system, $"{user}\n\n{ChatReadLoop.RenderResults(executed)}", policy.MaxOutputTokens), ct);
+            }
+            catch (AiUnavailableException)
+            {
+                metrics.AiGatewayError("decoder");
+                return new ModelOutcome(
+                    "AI unavailable — the chat plane stays usable: commands and the admin surface work without it.",
+                    "fallback", null, promptTokens, completionTokens, [], null);
+            }
+
+            completion = second;
+            promptTokens += second.PromptTokens;
+            completionTokens += second.CompletionTokens;
+            readsTrail = JsonSerializer.Serialize(new
+            {
+                reads = executed.Select(e => new { method = e.Method, path = e.Path, status = e.Status }).ToList(),
+            });
+        }
 
         var parsed = TryParseTurn(completion.Text);
         if (parsed is null)
         {
-            return new ModelOutcome(FallbackReply(CommandRegistry.BuiltIns), "fallback", null, completion.PromptTokens, completion.CompletionTokens, []);
+            return new ModelOutcome(FallbackReply(CommandRegistry.BuiltIns), "fallback", null, promptTokens, completionTokens, [], readsTrail);
         }
 
         var (root, decoded) = parsed.Value;
@@ -323,12 +413,12 @@ public sealed class ChatProcessor(
             foreach (var candidate in arr.EnumerateArray())
             {
                 var proposal = TryReadAction(candidate);
-                if (proposal is null || !ActionCatalog.Matches(proposal.Method, proposal.Path))
+                if (proposal is null || !allowed.Any(e => e.Matches(proposal.Method, proposal.Path)))
                 {
-                    // Whole-turn degradation: one out-of-catalog proposal voids
-                    // every proposal — partial execution of a half-trusted turn
-                    // is worse than none.
-                    return new ModelOutcome(CatalogDegradeReply, "fallback", decoded, completion.PromptTokens, completion.CompletionTokens, []);
+                    // Whole-turn degradation: one proposal outside the
+                    // principal's own slice voids every proposal — partial
+                    // execution of a half-trusted turn is worse than none.
+                    return new ModelOutcome(CatalogDegradeReply, "fallback", decoded, promptTokens, completionTokens, [], readsTrail);
                 }
 
                 proposals.Add(proposal);
@@ -340,7 +430,61 @@ public sealed class ChatProcessor(
             reply = CatalogDegradeReply;
         }
 
-        return new ModelOutcome(reply, "model", decoded, completion.PromptTokens, completion.CompletionTokens, proposals);
+        return new ModelOutcome(reply, "model", decoded, promptTokens, completionTokens, proposals, readsTrail);
+    }
+
+    // The optional read-phase shape: {"reads":[{"method","path"},...]} with NO
+    // "actions" key (a turn is either a read request or the answer). Null for
+    // anything else, so the existing {reply, actions} contract is untouched.
+    private static IReadOnlyList<(string Method, string Path)>? TryParseReads(string text)
+    {
+        var payload = text.Trim();
+        if (payload.StartsWith("```", StringComparison.Ordinal))
+        {
+            var firstBreak = payload.IndexOf('\n');
+            if (firstBreak < 0)
+            {
+                return null;
+            }
+
+            payload = payload[(firstBreak + 1)..];
+            var fenceEnd = payload.LastIndexOf("```", StringComparison.Ordinal);
+            if (fenceEnd >= 0)
+            {
+                payload = payload[..fenceEnd];
+            }
+
+            payload = payload.Trim();
+        }
+
+        try
+        {
+            using var doc = JsonDocument.Parse(payload);
+            var root = doc.RootElement;
+            if (root.ValueKind != JsonValueKind.Object
+                || !root.TryGetProperty("reads", out var reads)
+                || reads.ValueKind != JsonValueKind.Array)
+            {
+                return null;
+            }
+
+            var pairs = new List<(string, string)>();
+            foreach (var candidate in reads.EnumerateArray())
+            {
+                if (candidate.ValueKind == JsonValueKind.Object
+                    && candidate.GetPropertyText("method") is { Length: > 0 } method
+                    && candidate.GetPropertyText("path") is { Length: > 0 } path)
+                {
+                    pairs.Add((method, path));
+                }
+            }
+
+            return pairs.Count > 0 ? pairs : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
     }
 
     // Strict {reply, actions} parse, tolerant of a fenced code block. Null on

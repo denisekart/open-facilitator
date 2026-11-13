@@ -1251,6 +1251,10 @@ public sealed class ChatMessageEntity
 
     public string? TraceId { get; set; }
 
+    /// <summary>Read-phase trail (jsonb): <c>{"reads":[{"method","path","status"}]}</c>
+    /// — what the bubble looked at before answering; display context only.</summary>
+    public string? Reads { get; set; }
+
     public ChatSessionEntity? Session { get; set; }
 }
 
@@ -1292,6 +1296,13 @@ public sealed class ChatActionEntity
     public string? ExecutedBy { get; set; }
 
     public DateTime? ExecutedAt { get; set; }
+
+    /// <summary>The confirming operator's decision note (nullable; <= 1024).</summary>
+    public string? Note { get; set; }
+
+    /// <summary>When a pending proposal stops being confirmable (null = never
+    /// expires); the sweeper parks due rows in <c>expired</c>.</summary>
+    public DateTime? ExpiresAt { get; set; }
 
     public ChatSessionEntity? Session { get; set; }
 

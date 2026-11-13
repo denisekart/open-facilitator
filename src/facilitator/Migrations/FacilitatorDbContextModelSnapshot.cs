@@ -563,6 +563,10 @@ namespace Facilitator.Migrations
                         .HasColumnType("character varying(512)")
                         .HasColumnName("executed_by");
 
+                    b.Property<DateTime?>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
                     b.Property<Guid>("MessageId")
                         .HasColumnType("uuid")
                         .HasColumnName("message_id");
@@ -572,6 +576,11 @@ namespace Facilitator.Migrations
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)")
                         .HasColumnName("method");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)")
+                        .HasColumnName("note");
 
                     b.Property<string>("Path")
                         .IsRequired()
@@ -612,7 +621,7 @@ namespace Facilitator.Migrations
 
                     b.ToTable("chat_actions", "facilitator", t =>
                         {
-                            t.HasCheckConstraint("chat_actions_status_chk", "status IN ('pending','executed','failed','cancelled')");
+                            t.HasCheckConstraint("chat_actions_status_chk", "status IN ('pending','executed','failed','cancelled','expired')");
                         });
                 });
 
@@ -631,6 +640,10 @@ namespace Facilitator.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
+
+                    b.Property<string>("Reads")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("reads");
 
                     b.Property<string>("Role")
                         .IsRequired()

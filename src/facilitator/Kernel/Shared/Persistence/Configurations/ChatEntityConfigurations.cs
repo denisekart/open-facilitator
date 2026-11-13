@@ -36,6 +36,7 @@ public sealed class ChatEntityConfigurations
         e.Property(x => x.TemplateId).HasColumnName("template_id").HasMaxLength(64);
         e.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
         e.Property(x => x.TraceId).HasColumnName("trace_id").HasMaxLength(64);
+        e.Property(x => x.Reads).HasColumnName("reads").HasColumnType("jsonb");
         e.ToTable(t => t.HasCheckConstraint("chat_messages_role_chk", "role IN ('user','assistant')"));
         e.ToTable(t => t.HasCheckConstraint("chat_messages_basis_chk", "basis IN ('model','fallback','slash')"));
         e.HasOne(x => x.Session).WithMany().HasForeignKey(x => x.SessionId)
@@ -62,7 +63,9 @@ public sealed class ChatEntityConfigurations
         e.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
         e.Property(x => x.ExecutedBy).HasColumnName("executed_by").HasMaxLength(512);
         e.Property(x => x.ExecutedAt).HasColumnName("executed_at");
-        e.ToTable(t => t.HasCheckConstraint("chat_actions_status_chk", "status IN ('pending','executed','failed','cancelled')"));
+        e.Property(x => x.Note).HasColumnName("note").HasMaxLength(1024);
+        e.Property(x => x.ExpiresAt).HasColumnName("expires_at");
+        e.ToTable(t => t.HasCheckConstraint("chat_actions_status_chk", "status IN ('pending','executed','failed','cancelled','expired')"));
         e.HasOne(x => x.Session).WithMany().HasForeignKey(x => x.SessionId)
             .HasConstraintName("chat_actions_session_id_fkey").OnDelete(DeleteBehavior.Cascade);
         e.HasOne(x => x.Message).WithMany().HasForeignKey(x => x.MessageId)

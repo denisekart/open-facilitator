@@ -27,6 +27,11 @@ ENDPOINT CATALOG (the only actions you may propose)
 
 OUTPUT CONTRACT — respond with a single JSON object and nothing else:
 {"reply": "<plain-text answer>", "actions": [{"method": "<VERB>", "path": "</api/...>", "body": <json object or null>, "description": "<one-line human summary>"}]}
+- Before answering you MAY instead ask to look first: {"reads": [{"method": "GET", "path": "/api/..."}]}
+  (at most {{ read_limit }} reads, each matching a catalog line above). You will
+  then receive the fetched bodies under a READ RESULTS heading and must answer
+  with the {"reply", "actions"} shape. Reads are read-only GETs the operator
+  could run themselves; never propose a write as a read.
 - "actions" holds zero or more proposals; every path MUST match a catalog line.
 - "body" is the request body as JSON (null when the endpoint takes none).
 - "reply" renders in the admin console: plain prose with line breaks, inline

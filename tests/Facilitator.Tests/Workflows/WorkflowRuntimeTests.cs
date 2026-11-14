@@ -218,7 +218,7 @@ public sealed class WorkflowRuntimeTests(PostgresFixture fixture) : IAsyncLifeti
         await StoreAsync(Variant("""
         { "on": { "event": "org.facilitator.event.provider.issue.v1", "where": { "data.action": "opened" } },
           "steps": [
-            { "id": "t", "title": "delay", "timer": { "for": "PT1S" } },
+            { "id": "t", "title": "delay", "timer": { "for": "PT5M" } },
             { "id": "s", "title": "after", "on": "t:completed", "select": { "project": { "who": "instance" } } }
           ] }
         """));
@@ -230,7 +230,16 @@ public sealed class WorkflowRuntimeTests(PostgresFixture fixture) : IAsyncLifeti
 
         var sweeper = _factory.Services.GetRequiredService<WorkflowSweeper>();
         Assert.Equal(0, await sweeper.SweepOnceAsync(CancellationToken.None)); // not due yet
-        await Task.Delay(1200); // the PT1S deadline passes
+
+        // The pass, not the wall clock: rewind the park's deadline to just
+        // past (the approval-expiry idiom). The earlier shape — a PT1S
+        // timer plus Task.Delay(1200) — left 200 ms of slack for a loaded
+        // box to eat, twice over: the delay could fall short of the host
+        // sweep loop's own pass, and the 'not due yet' assert raced the
+        // same clock. The deadline column is the test's to steer.
+        await ExecuteAsync(
+            "UPDATE facilitator.workflow_instances SET deadline_at = now() - interval '1 minute' WHERE id = $1",
+            [waiting.GetProperty("instanceId").GetGuid()]);
         Assert.Equal(1, await sweeper.SweepOnceAsync(CancellationToken.None));
 
         var completed = Assert.Single(await InstancesAsync());

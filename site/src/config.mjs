@@ -215,6 +215,12 @@ export const pages = [
         body: "The operator surface: search, links, deliveries, config, AiDeck — with screenshots of the real thing.",
       },
       {
+        route: "/workflows",
+        src: "site/src/pages/workflows.md",
+        title: "Authoring flows",
+        body: "The workflow plane: event, schedule, and callable triggers over a closed step palette, authored in the console and stored as immutable versions.",
+      },
+      {
         route: "/artifacts",
         src: "site/src/pages/artifacts.md",
         title: "Artifacts & installation",

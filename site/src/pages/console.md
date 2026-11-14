@@ -58,6 +58,13 @@ Under the search box, the surfaces a triage needs:
   the trigger, like every other human act on live state.
 - **Config** — stored operator intents, edited with versioned
   `If-Match` writes, each change audited with a reason.
+- **Flows** — the workflow plane: every definition (live, shadow, or
+  off), every run it performed, and an editor that draws the flow you
+  are authoring. Open a run and the same picture wears its state — the
+  leg that landed, the park it waits on, the failure you can retry —
+  with pause, skip, retry, and cancel fenced by what the run's status
+  legally allows. Authoring lives here too:
+  [Authoring flows](/workflows).
 - **AiDeck** — a chat surface for operator identities: ask “what's
   stuck?” and the answer shows the reads it made to get there —
   GETs the asking operator could run themselves, never more than that

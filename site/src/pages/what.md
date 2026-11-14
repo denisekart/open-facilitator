@@ -123,4 +123,5 @@ environment, and they only appear when a human or a policy let them.
 - See the pieces you install: [Artifacts & installation](/artifacts).
 - See what plugs in today: [Supported integrations](/integrations).
 - Look at the operator surface: [The admin console](/console).
+- Teach it your team's rituals: [Authoring flows](/workflows).
 - Or stop reading and [get running](/guide/human).

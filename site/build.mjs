@@ -316,6 +316,9 @@ await copy("src/assets/icon.svg", "icon.svg");
 await copy("src/assets/icon.svg", "favicon.svg");
 await copy("src/assets/console-explorer.png", "console-explorer.png");
 await copy("src/assets/console-work.png", "console-work.png");
+for (const shot of ["console-editor.png", "console-instance.png"]) {
+  if (existsSync(join(HERE, "src/assets", shot))) await copy(`src/assets/${shot}`, shot);
+}
 const mermaidMin = join(HERE, "node_modules/mermaid/dist/mermaid.min.js");
 if (existsSync(mermaidMin)) await cp(mermaidMin, join(DIST, "mermaid.min.js"));
 

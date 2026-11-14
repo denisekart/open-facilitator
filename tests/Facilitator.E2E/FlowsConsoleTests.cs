@@ -2,6 +2,9 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
+
+using Facilitator.Tests.Infrastructure;
 
 using Microsoft.Playwright;
 
@@ -34,7 +37,12 @@ public sealed class FlowsConsoleTests(PostgresFixture fixture)
     [Fact]
     public async Task FlowsViewListsDefinitionsAndAnOpenedRunShowsItsChecklist()
     {
-        using var host = new KernelWebHostFixture(fixture, noDispatcher: true);
+        // Dispatcher on (the wf-start row rides the real claim/notify path
+        // to the sink) and the plane's master switch on (operators enable
+        // both; the emitter is silent without it).
+        using var host = new KernelWebHostFixture(
+            fixture,
+            settings: new Dictionary<string, string?> { ["Facilitator:Workflows:Enabled"] = "true" });
         var defId = $"t.e2e-flows-{Guid.NewGuid():N}"[..40];
 
         // Store + enable the definition over the admin surface (change-reason law).
@@ -42,30 +50,25 @@ public sealed class FlowsConsoleTests(PostgresFixture fixture)
         {
             client.DefaultRequestHeaders.Add("X-Change-Reason", "e2e flows console");
             client.DefaultRequestHeaders.IfMatch.Add(EntityTagHeaderValue.Any);
-            // (the same reason header covers the sweep below)
             var stored = await client.PutAsync(
                 $"/api/admin/workflows/definitions/{defId}",
                 new StringContent(FlowDef(defId), Encoding.UTF8, "application/json"));
             Assert.Equal(HttpStatusCode.OK, stored.StatusCode);
 
-            // One issue event rides the plane's trigger row...
-            var issue = JsonDocument.Parse(
-                    """
-                    {"specversion":"1.0","id":"e2e-evt-1","source":"/e2e","type":"org.facilitator.event.provider.issue.v1",
-                     "time":"2026-11-14T09:00:00Z","datacontenttype":"application/json",
-                     "data":{"repo":"demo/flows","issue":"1","state":"open","workTrigger":true}}
-                    """)
-                .RootElement.Clone();
+            // One issue event rides the plane's trigger row: the conformance
+            // fixture with a fresh wire id and the adapter's trigger flag on.
+            var envelope = JsonNode.Parse(PostgresFixture.ReadFixture("valid/event.provider.issue.opened.json"))!.AsObject();
+            envelope["id"] = "e2e-evt-" + Guid.NewGuid().ToString("N");
+            envelope["data"]!["workTrigger"] = true;
             var posted = await client.PostAsync(
                 "/api/ingress/events",
-                new StringContent(issue.GetRawText(), Encoding.UTF8, "application/json"));
+                new StringContent(envelope.ToJsonString(), Encoding.UTF8, "application/json"));
             Assert.True(
                 posted.StatusCode is HttpStatusCode.Accepted or HttpStatusCode.OK,
                 $"ingress rejected: {(int)posted.StatusCode}");
 
-            // ...and the manual sweep runs the instance to ground.
-            var swept = await client.PostAsync("/api/admin/sweeps/workflows", new StringContent(""));
-            swept.EnsureSuccessStatusCode();
+            // The row is delivered by the hosted dispatcher (LISTEN/NOTIFY);
+            // the browser assertions below wait on visibility, not a sleep.
         }
 
         using var playwright = await Playwright.CreateAsync();
@@ -85,7 +88,10 @@ public sealed class FlowsConsoleTests(PostgresFixture fixture)
 
         await Expect(page.GetByTestId("flow-detail")).ToBeVisibleAsync();
         await Expect(page.GetByTestId("step-log")).ToContainTextAsync("note");
-        await Expect(page.GetByTestId("step-log")).ToContainTextAsync("completed");
+        // The step-log vocabulary: a landed leg is 'done' (the CHECK list:
+        // pending|running|done|failed|skipped|shadow) — 'completed' is the
+        // INSTANCE badge above.
+        await Expect(page.GetByTestId("step-log")).ToContainTextAsync("done");
 
         // Deep links survive a reload: the route is the state.
         await page.ReloadAsync();

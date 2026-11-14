@@ -21,18 +21,20 @@ public sealed class KernelWebHostFixture : WebApplicationFactory<Program>
     private readonly bool _noDispatcher;
     private readonly Func<IServiceProvider, ISink>? _sinkOverride;
     private readonly HttpMessageHandler? _aiHandler;
+    private readonly Dictionary<string, string?>? _settings;
 
     /// <param name="postgres">Shared Postgres container fixture.</param>
     /// <param name="noDispatcher">True removes the OutboxDispatcher hosted service.</param>
     /// <param name="sinkOverride">When set, replaces the kernel.log stub sink.</param>
     /// <param name="aiHandler">When set, the AiDeck chat gateway runs its REAL wire path against this
     /// handler (canned LiteLLM responses — the browser tier stays deterministic).</param>
-    public KernelWebHostFixture(PostgresFixture postgres, bool noDispatcher = false, Func<IServiceProvider, ISink>? sinkOverride = null, HttpMessageHandler? aiHandler = null)
+    public KernelWebHostFixture(PostgresFixture postgres, bool noDispatcher = false, Func<IServiceProvider, ISink>? sinkOverride = null, HttpMessageHandler? aiHandler = null, Dictionary<string, string?>? settings = null)
     {
         _postgres = postgres;
         _noDispatcher = noDispatcher;
         _sinkOverride = sinkOverride;
         _aiHandler = aiHandler;
+        _settings = settings;
         UseKestrel(0);
     }
 
@@ -67,6 +69,15 @@ public sealed class KernelWebHostFixture : WebApplicationFactory<Program>
         builder.UseSetting("Link:Teams:1", "team-beta");
         builder.UseSetting("Link:Evidence:Audience", "facilitator-link");
         builder.UseSetting("Storage:Gc:IntervalSeconds", "3600");
+        if (_settings is not null)
+        {
+            // Per-test config rides last: the caller's setting wins over the
+            // fixture defaults (same law as KernelTestFactory's settings).
+            foreach (var (key, value) in _settings)
+            {
+                builder.UseSetting(key, value);
+            }
+        }
         if (_aiHandler is not null)
         {
             // The chat-plane test composes a live policy row; the gateway

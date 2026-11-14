@@ -26,7 +26,7 @@
     <!-- Plan 01 protocol harness (nuget flat container, 2026-10):
          JsonSchema.Net 9.4.1 (draft 2020-12, RequireFormatValidation),
          Jcs.Net 0.1.1 (RFC 8785; passes the golden + numeric/sort/NFC vectors). -->
-    <PackageVersion Include="JsonSchema.Net" Version="9.4.1" />
+    <PackageVersion Include="JsonSchema.Net" Version="9.7.0" />
     <PackageVersion Include="Jcs.Net" Version="0.1.1" />
     <!-- AiDeck prompt templates. 5.12.1 tripped NuGetAudit-as-error (critical
          GHSA-5wr9-m6jw-xx44, vulnerable < 7.0.0); 7.5.3 = latest stable, patched.

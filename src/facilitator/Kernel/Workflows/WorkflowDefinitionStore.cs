@@ -135,6 +135,13 @@ public sealed class WorkflowDefinitionStore(
                 : null,
             CreatedAt = now,
             CreatedBy = actor,
+            // Schedule-trigger plan (ScheduleEntity law): an enabled
+            // scheduled definition stamps NOW — enabling fires the first
+            // tick on the next pass; a disabled one keeps a null plan and
+            // gets it on the toggle that enables it.
+            NextTickAt = enabled && stamped.GetProperty("on").TryGetProperty("schedule", out _)
+                ? now
+                : null,
         };
         db.WorkflowDefinitions.Add(entity);
         audit.Append(db, new AuditRecord(actor, "admin.workflows.put", $"/api/admin/workflows/definitions/{defId}",
@@ -171,6 +178,13 @@ public sealed class WorkflowDefinitionStore(
 
         var wasEnabled = entity.Enabled;
         entity.Enabled = nowEnabled;
+        if (nowEnabled && !wasEnabled)
+        {
+            using var doc = JsonDocument.Parse(entity.Payload);
+            entity.NextTickAt = doc.RootElement.GetProperty("on").TryGetProperty("schedule", out _)
+                ? timeProvider.GetUtcNow().UtcDateTime
+                : null;
+        }
         entity.Shadow = shadow ?? entity.Shadow;
         audit.Append(db, new AuditRecord(actor, "admin.workflows.toggle", $"/api/admin/workflows/definitions/{defId}/versions/{version}/toggle",
             "allow", reason, null, $"{defId}@{version}",

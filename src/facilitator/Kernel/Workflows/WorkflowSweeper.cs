@@ -22,6 +22,7 @@ public sealed class WorkflowSweeper(
     IDbContextFactory<FacilitatorDbContext> contextFactory,
     WorkflowRuntime runtime,
     WorkflowRunner runner,
+    WorkflowTriggerEmitter emitter,
     ILogger<WorkflowSweeper> logger,
     TimeProvider timeProvider,
     WorkflowOptions options) : BackgroundService
@@ -65,24 +66,34 @@ public sealed class WorkflowSweeper(
 
         using var activity = KernelActivity.Source.StartActivity("workflow.sweep", ActivityKind.Internal);
         var fired = 0;
+        var ticks = 0;
         await using (var db = await contextFactory.CreateDbContextAsync(ct))
         {
             await using var tx = await db.Database.BeginTransactionAsync(ct);
             var now = timeProvider.GetUtcNow().UtcDateTime;
-            if (await TrySweepLockAsync(db, ct)
-                && await db.WorkflowInstances.AsNoTracking().AnyAsync(
-                    i => i.Status == "waiting" && i.DeadlineAt != null && i.DeadlineAt <= now, ct))
+            if (await TrySweepLockAsync(db, ct))
             {
-                // Due parks exist: each instance leg takes its own advisory
-                // lock and conditional flip outside this sweep lock.
-                fired = await runner.SweepDeadlinesAsync(ct);
+                // The schedule leg rides the same replica-singleton lock:
+                // one pass per cluster fires each due plan slot exactly
+                // once (the tick envelope's identity makes even a
+                // duplicated pass converge on the same trigger row).
+                ticks = await emitter.EmitScheduledTicksAsync(db, now, ct);
+                if (await db.WorkflowInstances.AsNoTracking().AnyAsync(
+                        i => i.Status == "waiting" && i.DeadlineAt != null && i.DeadlineAt <= now, ct))
+                {
+                    // Due parks exist: each instance leg takes its own advisory
+                    // lock and conditional flip outside this sweep lock.
+                    fired = await runner.SweepDeadlinesAsync(ct);
+                }
             }
 
+            await db.SaveChangesAsync(ct);
             await tx.CommitAsync(ct);
         }
 
         activity?.SetTag("ofac.workflow.deadlines_fired", fired);
-        return fired;
+        activity?.SetTag("ofac.workflow.scheduled_ticks", ticks);
+        return fired + ticks;
     }
 
     private static async Task<bool> TrySweepLockAsync(FacilitatorDbContext db, CancellationToken ct)

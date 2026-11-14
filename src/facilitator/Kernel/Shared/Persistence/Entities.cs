@@ -241,6 +241,15 @@ public sealed class WorkflowDefinitionEntity
 
     public string? Team { get; set; }
 
+    /// <summary>The schedule trigger's plan (the ScheduleEntity law, per
+    /// definition row): the next UTC minute the `on.schedule` cadence comes
+    /// due; null for definitions that do not schedule (and between a due
+    /// tick and the sweeper's recompute). Stamped at seed/enable with
+    /// NOW so enabling fires immediately; the trigger envelope's identity
+    /// (UUIDv5 over defId@version&gt;occurrenceAt) dedupes replays at the
+    /// converged trigger row, so the plan needs no claim row of its own.</summary>
+    public DateTime? NextTickAt { get; set; }
+
     public DateTime CreatedAt { get; set; }
 
     public required string CreatedBy { get; set; }

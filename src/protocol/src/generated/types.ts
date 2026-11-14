@@ -1045,6 +1045,19 @@ export interface WorkflowCompletedEventV1Data {
  */
 export type WorkflowCompletedEventV1DataStatus = "completed" | "failed" | "cancelled";
 
+/**
+ * Kernel-internal schedule-plane tick: a definition's `on.schedule` occurrence came due and
+ * the sweeper fired it. One event per (definition version, occurrence) - the envelope id is
+ * UUIDv5 over the schedule namespace, so the trigger-row convergence law makes the delivery
+ * exactly-once without a claim row. Carried as a trigger envelope copy like every wire
+ * event; consumed only by the workflow sink.
+ */
+export interface WorkflowScheduledEventV1Data {
+  definitionId: string;
+  definitionVersion: number;
+  occurrenceAt: string;
+}
+
 export interface WorkspaceHeartbeatEventV1Data {
   activeAssignments?: number;
   status: WorkspaceHeartbeatEventV1DataStatus;

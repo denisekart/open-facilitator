@@ -97,7 +97,8 @@ public sealed class WorkflowTriggerEmitter(
     IDbContextFactory<FacilitatorDbContext> contextFactory,
     WorkflowRuntime runtime,
     WorkflowSubscriptionRegistry subscriptions,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    Ofac.Protocol.Validation.EnvelopeValidator envelopeValidator)
 {
     /// <summary>One trigger row this emit appended (the arm hook needs the
     /// exact (defId, version, rowId) to compute the plane's deterministic
@@ -282,6 +283,89 @@ public sealed class WorkflowTriggerEmitter(
 
         return appended;
     }
+
+    /// <summary>
+    /// The schedule leg of the plane: one sweep pass fires every ENABLED
+    /// definition whose plan slot came due. The trigger row is appended from
+    /// a synthetic tick envelope — a wire-valid
+    /// <c>org.facilitator.event.workflow.scheduled.v1</c> whose id is
+    /// UUIDv5(defId@ver&gt;occurrence): the convergence law of
+    /// <see cref="AppendTrigger"/> makes a redelivered sweep of the same
+    /// minute settle on the SAME trigger row, hence the same instance —
+    /// exactly one start per scheduled slot, no claim row of its own. The
+    /// plan advances with the shared <see cref="ScheduleSpec"/> law (one
+    /// slot per pass when behind, verbatim schedule-plane behavior).
+    /// Runs on the caller's context, inside the sweep transaction. Returns
+    /// the number of slots fired.
+    /// </summary>
+    public async Task<int> EmitScheduledTicksAsync(
+        FacilitatorDbContext db,
+        DateTime now,
+        CancellationToken ct)
+    {
+        if (!runtime.Enabled)
+        {
+            return 0;
+        }
+
+        var due = await db.WorkflowDefinitions
+            .Where(d => d.Enabled && d.NextTickAt != null && d.NextTickAt <= now)
+            .ToListAsync(ct);
+        var fired = 0;
+        foreach (var row in due)
+        {
+            using var doc = JsonDocument.Parse(row.Payload);
+            var on = doc.RootElement.GetProperty("on");
+            if (!on.TryGetProperty("schedule", out var cadence))
+            {
+                // Stale plan on a definition that no longer schedules (a
+                // pre-column row): clear it, no tick.
+                row.NextTickAt = null;
+                continue;
+            }
+
+            var occurrence = row.NextTickAt!.Value;
+            var envelope = TickEnvelope(row.DefId, row.Version, occurrence);
+            var verdict = envelopeValidator.Validate(
+                envelope, System.Text.Encoding.UTF8.GetByteCount(envelope.GetRawText()));
+            if (!verdict.Ok)
+            {
+                // A tick that is not wire-valid is a broken build, not a
+                // runtime condition: leave the plan (the pass reports it),
+                // never dispatch a non-envelope.
+                continue;
+            }
+
+            AppendTrigger(db, row.DefId, row.Version, envelope, now, subjectWork: null);
+            row.NextTickAt = Facilitator.Kernel.Work.ScheduleSpec.NextOccurrence(
+                cadence.GetString()!, null, occurrence, now);
+            fired++;
+        }
+
+        return fired;
+    }
+
+    /// <summary>The synthetic tick envelope: minute-precision RFC 3339
+    /// (the identity name and the `time` field carry the identical
+    /// string — one slot, one spelling).</summary>
+    private static JsonElement TickEnvelope(string defId, int version, DateTime occurrenceUtc) =>
+        JsonDocument.Parse($$"""
+        {
+          "specversion": "1.0",
+          "id": "{{WorkflowIdentity.ScheduledEnvelopeId(defId, version, occurrenceUtc):N}}",
+          "source": "urn:facilitator:kernel",
+          "type": "org.facilitator.event.workflow.scheduled.v1",
+          "subject": "definition/{{defId}}",
+          "time": "{{occurrenceUtc:yyyy-MM-ddTHH:mm:ssZ}}",
+          "datacontenttype": "application/json",
+          "dataschema": "https://schemas.openfacilitator.org/v1/event.workflow.scheduled.v1.json",
+          "data": {
+            "definitionId": "{{defId}}",
+            "definitionVersion": {{version}},
+            "occurrenceAt": "{{occurrenceUtc:yyyy-MM-ddTHH:mm:ssZ}}"
+          }
+        }
+        """).RootElement.Clone();
 
     private static bool WhereMatches(JsonElement on, JsonElement envelope)
     {

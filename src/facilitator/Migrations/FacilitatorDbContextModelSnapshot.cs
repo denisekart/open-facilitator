@@ -2641,6 +2641,10 @@ namespace Facilitator.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("enabled");
 
+                    b.Property<DateTime?>("NextTickAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_tick_at");
+
                     b.Property<string>("Payload")
                         .IsRequired()
                         .HasColumnType("jsonb")

@@ -39,6 +39,20 @@ public static class WorkflowIdentity
     public static string WakeCommandId(Guid childInstance, string status) =>
         $"wf-wake:{childInstance:N}:{status}";
 
+    /// <summary>UUIDv5 namespace for schedule ticks: name =
+    /// <c>defId@ver&gt;occurrence</c> (occurrence formatted
+    /// <c>yyyy-MM-ddTHH:mm:ssZ</c>). The tick envelope's identity is a pure
+    /// function of (definition version, plan slot): a redelivered sweep of
+    /// the same slot converges on the same envelope id, hence (by the
+    /// trigger-row convergence law) the same trigger row and the same
+    /// instance — exactly one start per scheduled minute.</summary>
+    public static readonly Guid ScheduleNamespace = new("c7e40b58-1a96-4f2d-8e07-63b9d2af4c10");
+
+    /// <summary>The tick envelope identity for one (definition version,
+    /// occurrence) pair.</summary>
+    public static Guid ScheduledEnvelopeId(string defId, int version, DateTime occurrenceUtc) =>
+        Uuid5(ScheduleNamespace, $"{defId}@{version}>{occurrenceUtc:yyyy-MM-ddTHH:mm:ssZ}");
+
     /// <summary>UUIDv5 namespace for trigger rows: name =
     /// <c>defId@ver&gt;envelopeId</c>. The trigger row's identity is the
     /// envelope's own, per definition: an arm hook and the generic ingress

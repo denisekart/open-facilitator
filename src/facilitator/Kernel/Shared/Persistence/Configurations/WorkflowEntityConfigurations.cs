@@ -26,6 +26,7 @@ public sealed class WorkflowEntityConfigurations :
         e.Property(x => x.Shadow).HasColumnName("shadow").IsRequired();
         e.Property(x => x.Source).HasColumnName("source").IsRequired();
         e.Property(x => x.Team).HasColumnName("team").HasMaxLength(128);
+        e.Property(x => x.NextTickAt).HasColumnName("next_tick_at");
         e.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
         e.Property(x => x.CreatedBy).HasColumnName("created_by").IsRequired();
         e.ToTable(t => t.HasCheckConstraint("workflow_definitions_source_check",

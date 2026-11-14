@@ -58,7 +58,7 @@ public sealed class WorkflowEntityConfigurations :
         e.ToTable(t =>
         {
             t.HasCheckConstraint("workflow_instances_status_check",
-                CheckSql.InList("status", ["running", "waiting", "completed", "failed", "cancelled", "shadowed"]));
+                CheckSql.InList("status", ["running", "waiting", "paused", "completed", "failed", "cancelled", "shadowed"]));
             t.HasCheckConstraint("workflow_instances_end_reason_check",
                 CheckSql.InList("end_reason",
                     ["budget-exhausted", "chain-age-exceeded", "parent-cancelled", "invoke-timeout", "operator-cancel"])

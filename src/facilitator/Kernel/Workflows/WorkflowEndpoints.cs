@@ -309,6 +309,8 @@ public static class WorkflowEndpoints
                 endReason = instance.EndReason,
                 output = instance.Output is { Length: > 0 } o ? JsonNode.Parse(o) : null,
                 primaryWorkId = instance.PrimaryWorkId,
+                startedAt = instance.StartedAt,
+                updatedAt = instance.UpdatedAt,
                 ancestors,
                 children,
             });
@@ -388,6 +390,100 @@ public static class WorkflowEndpoints
                 : Results.Problem(ProblemErrors.Create(
                     "not-cancellable", "Workflow instance not cancellable", StatusCodes.Status409Conflict,
                     $"workflow instance {instanceId} is absent or already terminal"));
+        });
+
+        // Operator instance actions (Phase 8): fenced by the runner's
+        // status guards, audited allow AND refuse (the definition store's
+        // audit law), and every one demands a change reason like every
+        // other human act on live state.
+        static async Task<IResult> InstanceActionAsync(
+            string action,
+            Guid instanceId,
+            HttpContext http,
+            HttpRequest request,
+            WorkflowRunner runner,
+            AuditWriter audit,
+            CancellationToken ct,
+            Func<Task<WorkflowRunner.InstanceActionOutcome>> run)
+        {
+            var actor = Mutation.RequireActor(http, request, out var reason, out var problem);
+            if (problem is not null)
+            {
+                return problem;
+            }
+
+            var outcome = await run();
+            await audit.WriteAsync(new AuditRecord(
+                actor,
+                $"workflow.instance.{action}",
+                $"/api/admin/workflows/instances/{instanceId}/{action}",
+                outcome.Result == WorkflowRunner.InstanceActionResult.Applied ? "allow" : "deny",
+                reason,
+                null,
+                null,
+                // The audit detail column is jsonb and required: the refusal
+                // or applied detail rides as a document, never bare text.
+                JsonSerializer.Serialize(new { action, result = outcome.Result.ToString(), detail = outcome.Detail }),
+                CorrelationId: instanceId.ToString("N")), ct);
+            return outcome.Result switch
+            {
+                WorkflowRunner.InstanceActionResult.Applied => Results.Ok(
+                    new { instanceId, action, applied = true, detail = outcome.Detail }),
+                WorkflowRunner.InstanceActionResult.NotFound => Results.Problem(ProblemErrors.Create(
+                    "instance-not-found", "Workflow instance not found", StatusCodes.Status404NotFound, outcome.Detail)),
+                _ => Results.Problem(ProblemErrors.Create(
+                    "not-applicable", $"Cannot {action} this instance", StatusCodes.Status409Conflict, outcome.Detail)),
+            };
+        }
+
+        group.MapPost("/instances/{instanceId:guid}/pause", async (
+            Guid instanceId,
+            HttpRequest request,
+            HttpContext http,
+            WorkflowRunner runner,
+            AuditWriter audit,
+            CancellationToken ct) => await InstanceActionAsync(
+                "pause", instanceId, http, request, runner, audit, ct,
+                () => runner.PauseInstanceAsync(instanceId, ct)));
+
+        group.MapPost("/instances/{instanceId:guid}/resume", async (
+            Guid instanceId,
+            HttpRequest request,
+            HttpContext http,
+            WorkflowRunner runner,
+            AuditWriter audit,
+            CancellationToken ct) => await InstanceActionAsync(
+                "resume", instanceId, http, request, runner, audit, ct,
+                () => runner.ResumeInstanceAsync(instanceId, ct)));
+
+        group.MapPost("/instances/{instanceId:guid}/skip-step", async (
+            Guid instanceId,
+            HttpRequest request,
+            HttpContext http,
+            WorkflowRunner runner,
+            AuditWriter audit,
+            CancellationToken ct) => await InstanceActionAsync(
+                "skip-step", instanceId, http, request, runner, audit, ct,
+                () => runner.SkipStepAsync(instanceId, ct)));
+
+        group.MapPost("/instances/{instanceId:guid}/retry-step", async (
+            Guid instanceId,
+            JsonElement body,
+            HttpRequest request,
+            HttpContext http,
+            WorkflowRunner runner,
+            AuditWriter audit,
+            CancellationToken ct) =>
+        {
+            if (!body.TryGetProperty("stepId", out var stepProp) || stepProp.ValueKind != JsonValueKind.String)
+            {
+                return Results.Problem(ProblemErrors.ConfigInvalid("body must carry stepId"));
+            }
+
+            var stepId = stepProp.GetString()!;
+            return await InstanceActionAsync(
+                "retry-step", instanceId, http, request, runner, audit, ct,
+                () => runner.RetryStepAsync(instanceId, stepId, ct));
         });
 
         group.MapPost("/definitions/{id}/versions/{version:int}/toggle", async (

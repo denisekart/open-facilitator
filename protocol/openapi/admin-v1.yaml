@@ -765,6 +765,122 @@ paths:
           content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
+  /api/admin/workflows/instances/{instanceId}/pause:
+    post:
+      operationId: pauseWorkflowInstance
+      tags: [write]
+      summary: >
+        Pause a running or parked instance: no leg starts, a park keeps its deadline, wakes fall through to on.event until resumed.
+      parameters:
+        - { in: path, name: instanceId, required: true, schema: { type: string, format: uuid } }
+        - name: X-Change-Reason
+          in: header
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 512 }
+      responses:
+        "200":
+          description: Applied.
+          content:
+            application/json:
+              schema: { type: object }
+        "404":
+          description: instance-not-found.
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "409":
+          description: not-applicable (the fenced status guard refused).
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/admin/workflows/instances/{instanceId}/resume:
+    post:
+      operationId: resumeWorkflowInstance
+      tags: [write]
+      summary: >
+        Resume a paused instance: a park returns to waiting (deadline intact), a runner returns to running and walks.
+      parameters:
+        - { in: path, name: instanceId, required: true, schema: { type: string, format: uuid } }
+        - name: X-Change-Reason
+          in: header
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 512 }
+      responses:
+        "200":
+          description: Applied.
+          content:
+            application/json:
+              schema: { type: object }
+        "404":
+          description: instance-not-found.
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "409":
+          description: not-applicable (the fenced status guard refused).
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/admin/workflows/instances/{instanceId}/skip-step:
+    post:
+      operationId: skipWorkflowInstanceStep
+      tags: [write]
+      summary: >
+        The CURRENT leg ends 'skipped' and the run takes its completed edge; the operator does not fork the edge law.
+      parameters:
+        - { in: path, name: instanceId, required: true, schema: { type: string, format: uuid } }
+        - name: X-Change-Reason
+          in: header
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 512 }
+      responses:
+        "200":
+          description: Applied.
+          content:
+            application/json:
+              schema: { type: object }
+        "404":
+          description: instance-not-found.
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "409":
+          description: not-applicable (the fenced status guard refused).
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/admin/workflows/instances/{instanceId}/retry-step:
+    post:
+      operationId: retryWorkflowInstanceStep
+      tags: [write]
+      summary: >
+        A FAILED run re-enters the named leg (fresh leg seq, fresh step-command id) and advances immediately.
+      parameters:
+        - { in: path, name: instanceId, required: true, schema: { type: string, format: uuid } }
+        - name: X-Change-Reason
+          in: header
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 512 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [stepId]
+              properties:
+                stepId: { type: string }
+      responses:
+        "400":
+          description: body must carry stepId.
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "200":
+          description: Applied.
+          content:
+            application/json:
+              schema: { type: object }
+        "404":
+          description: instance-not-found.
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "409":
+          description: not-applicable (the fenced status guard refused).
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
   /api/admin/workflows/instances/{instanceId}/cancel:
     post:
       operationId: cancelWorkflowInstance

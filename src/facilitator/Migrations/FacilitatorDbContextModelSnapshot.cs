@@ -2774,7 +2774,7 @@ namespace Facilitator.Migrations
                         {
                             t.HasCheckConstraint("workflow_instances_end_reason_check", "end_reason IN ('budget-exhausted', 'chain-age-exceeded', 'parent-cancelled', 'invoke-timeout', 'operator-cancel') OR end_reason IS NULL");
 
-                            t.HasCheckConstraint("workflow_instances_status_check", "status IN ('running', 'waiting', 'completed', 'failed', 'cancelled', 'shadowed')");
+                            t.HasCheckConstraint("workflow_instances_status_check", "status IN ('running', 'waiting', 'paused', 'completed', 'failed', 'cancelled', 'shadowed')");
                         });
                 });
 

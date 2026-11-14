@@ -4,6 +4,7 @@
   import ConfigView from "./components/ConfigView.svelte";
   import DeliveriesView from "./components/DeliveriesView.svelte";
   import FlowDetail from "./components/FlowDetail.svelte";
+  import FlowEditor from "./components/FlowEditor.svelte";
   import FlowsView from "./components/FlowsView.svelte";
   import HealthStrip from "./components/HealthStrip.svelte";
   import HitDetail from "./components/HitDetail.svelte";
@@ -336,6 +337,12 @@
       <FlowsView />
     {:else if route.route.view === "flow" && route.route.id}
       <FlowDetail instanceId={route.route.id} onclose={() => go("#/flows")} />
+    {:else if route.route.view === "flowdef" && route.route.id}
+      <FlowEditor
+        defId={route.route.id}
+        clone={route.route.params.get("clone") === "1"}
+        onclose={() => go("#/flows")}
+      />
     {/if}
 
     <div class="mt-4">

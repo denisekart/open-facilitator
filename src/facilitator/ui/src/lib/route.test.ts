@@ -7,6 +7,10 @@ describe("parse", () => {
     expect(parse("#/flows").view).toBe("flows");
     const r = parse("#/flow/11111111-1111-4111-8111-111111111111");
     expect(r.view).toBe("flow");
+    const d = parse("#/flowdef/review-fork?clone=1");
+    expect(d.view).toBe("flowdef");
+    expect(d.id).toBe("review-fork");
+    expect(d.params.get("clone")).toBe("1");
     expect(r.id).toBe("11111111-1111-4111-8111-111111111111");
   });
 
@@ -73,6 +77,9 @@ describe("href", () => {
       "#/work/0194f0a0-0000-7000-8000-000000000001",
       "#/flows",
       "#/flow/0194f0a0-0000-7000-8000-000000000002",
+      "#/flowdef/review-fork",
+      "#/flowdef/new",
+      "#/flowdef/review-fork?clone=1",
       "#/audit",
       "#/audit?decision=deny",
       "#/audit?correlation=x",

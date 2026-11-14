@@ -1,6 +1,6 @@
 <script lang="ts">
   import { ApiError, getJson } from "../lib/api.js";
-  import { apiFetch } from "../lib/auth.svelte.js";
+  import { apiFetch, session } from "../lib/auth.svelte.js";
   import { go } from "../lib/route.svelte.js";
   import { ago, flowTone, stamp } from "../lib/status.js";
   import type {
@@ -9,15 +9,17 @@
   } from "../lib/types.js";
   import ProblemNote from "./ProblemNote.svelte";
 
-  // Read-only window onto the workflow plane: what definitions exist (and
-  // whether they're live, shadow, or off), and the instances they've run —
-  // each a vertical checklist one click away. Nothing here mutates: the
-  // editor is a separate stage.
+  // The workflow plane's front page: what definitions exist (and whether
+  // they're live, shadow, or off), and the instances they've run — each a
+  // vertical checklist one click away. Mutations live in the editor and the
+  // instance detail; this view only points at them.
 
   let definitions = $state<WorkflowDefinitionRow[]>([]);
   let instances = $state<WorkflowInstanceRow[]>([]);
   let error = $state<ApiError | null>(null);
   let onlyDef = $state<string | null>(null);
+
+  const canMutate = $derived(session.canMutate);
 
   async function load(): Promise<void> {
     try {
@@ -37,20 +39,37 @@
     }
   }
 
+  // The plane is live: while any instance runs or parks, the list
+  // re-polls itself, so an operator (or this page's e2e) watches a walk
+  // without hammering refresh.
+  let poll: ReturnType<typeof setTimeout> | undefined;
   $effect(() => {
-    void load();
+    void load().then(() => {
+      clearTimeout(poll);
+      if (instances.some((i) => i.status === "running" || i.status === "waiting")) {
+        poll = setTimeout(() => void load(), 3000);
+      }
+    });
+    return () => clearTimeout(poll);
   });
 </script>
 
 <section class="card" data-testid="flows-view" aria-label="flows">
   <h2 class="mb-1 text-lg font-semibold">Flows</h2>
   <p class="mb-4 text-sm text-ink-3">
-    The workflow plane, read-only: every definition (latest version) and every instance it ran.
+    The workflow plane: every definition (latest version) and every instance it ran.
+    {#if canMutate}
+      <a class="mono text-accent underline" href="#/flowdef/new" data-testid="new-flow">author a flow</a>
+    {/if}
   </p>
 
   {#if error}
     <ProblemNote {error} />
   {/if}
+
+  <button class="btn btn-ghost btn-xs mb-2" data-testid="flows-refresh" onclick={() => void load()}>
+    refresh
+  </button>
 
   <div class="mb-4 overflow-x-auto">
     <table class="table">
@@ -65,6 +84,7 @@
           <th>state</th>
           <th>team</th>
           <th>running</th>
+          <th><span class="sr-only">actions</span></th>
         </tr>
       </thead>
       <tbody>
@@ -93,6 +113,22 @@
             </td>
             <td>{d.team ?? "—"}</td>
             <td>{d.instancesRunning}</td>
+            <td class="whitespace-nowrap">
+              {#if canMutate}
+                <a
+                  class="mono text-accent underline"
+                  href={`#/flowdef/${d.id}`}
+                  onclick={(ev) => ev.stopPropagation()}
+                >edit</a
+                >
+                <a
+                  class="mono ml-2 text-accent underline"
+                  href={`#/flowdef/${d.id}?clone=1`}
+                  onclick={(ev) => ev.stopPropagation()}
+                >clone</a
+                >
+              {/if}
+            </td>
           </tr>
         {/each}
       </tbody>
@@ -130,7 +166,7 @@
             onclick={() => go(`/flow/${row.instanceId}`)}
             onkeydown={(ev) => ev.key === "Enter" && go(`/flow/${row.instanceId}`)}
           >
-            <td title={stamp(row.startedAt)}>{ago(row.startedAt)}</td>
+            <td title={stamp(row.startedAt)}>{ago(row.startedAt).text}</td>
             <td class="font-mono">{row.definitionId}@{row.definitionVersion}</td>
             <td>
               <span class="badge {flowTone(row.status)}">

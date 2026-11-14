@@ -6,6 +6,7 @@
 //   #/audit?decision=&actor=&action=&correlation=&since=
 //   #/links  #/deliveries  #/config  #/chat[/<id>]  #/runtime
 //   #/flows  #/flow/<instanceId>           the workflow plane, read-only
+//   #/flowdef/<id|new>                    one definition under edit
 //   #/hit/<kind>/<id>                 one non-work search hit
 // Anything else is #/ — the shell with no view open.
 
@@ -22,6 +23,7 @@ export type RouteView =
   | "runtime"
   | "flows"
   | "flow"
+  | "flowdef"
   | "hit"
   | "none";
 
@@ -76,6 +78,9 @@ export function parse(hash: string): Route {
   if (segments.length === 2 && segments[0] === "flow") {
     return { view: "flow", id: segments[1], kind: null, params };
   }
+  if (segments.length === 2 && segments[0] === "flowdef") {
+    return { view: "flowdef", id: segments[1], kind: null, params };
+  }
   if (segments.length === 3 && segments[0] === "hit" && isSection(segments[1])) {
     return { view: "hit", id: segments[2], kind: segments[1], params };
   }
@@ -91,11 +96,13 @@ export function href(r: Route): string {
         ? `#/chat/${r.id}`
         : r.view === "flow" && r.id
           ? `#/flow/${r.id}`
-          : r.view === "hit" && r.kind && r.id
-            ? `#/hit/${r.kind}/${r.id}`
-            : r.view === "none"
-              ? "#/"
-              : `#/${r.view}`;
+          : r.view === "flowdef" && r.id
+            ? `#/flowdef/${r.id}`
+            : r.view === "hit" && r.kind && r.id
+              ? `#/hit/${r.kind}/${r.id}`
+              : r.view === "none"
+                ? "#/"
+                : `#/${r.view}`;
   // Param order: the view's canonical keys first, then anything else that
   // rode along. Commas and colons stay literal so the canonical forms
   // (#/works?state=blocked,review, #/audit?since=2026-11-12T00:00:00Z)

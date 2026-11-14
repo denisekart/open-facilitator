@@ -4,16 +4,19 @@
   import { go } from "../lib/route.svelte.js";
   import { ago, flowTone, stamp, TONE_CLASS } from "../lib/status.js";
   import type { WorkflowInstanceDetail, WorkflowStepLogRow } from "../lib/types.js";
+  import FlowGraph from "./FlowGraph.svelte";
   import ProblemNote from "./ProblemNote.svelte";
 
   // One instance as the vertical checklist it is: step-log rows oldest
   // first, the lineage around it (ancestors up, children down), and the
-  // operator's cancel. Read-only except that one action.
+  // operator's park: cancel, pause/resume, skip-step, retry-step.
 
   let { instanceId, onclose }: { instanceId: string; onclose: () => void } = $props();
 
   let detail = $state<WorkflowInstanceDetail | null>(null);
   let log = $state<WorkflowStepLogRow[] | null>(null);
+  let definitionDoc = $state<Record<string, unknown> | null>(null);
+  let picked = $state<string | null>(null);
   let error = $state<ApiError | null>(null);
   let notice = $state<string | null>(null);
   let busy = $state(false);
@@ -46,6 +49,15 @@
       ]);
       detail = d;
       log = l.items;
+      try {
+        const view = await getJson<{ document: Record<string, unknown> }>(
+          apiFetch,
+          `/api/admin/workflows/definitions/${encodeURIComponent(d.definitionId)}?version=${d.definitionVersion}`,
+        );
+        definitionDoc = view.document;
+      } catch {
+        definitionDoc = null; // the pinned version was pruned: table-only view
+      }
     } catch (err) {
       error = err instanceof ApiError ? err : new ApiError(0, "fetch-failed", String(err), null);
     }
@@ -55,19 +67,25 @@
     void load();
   });
 
-  async function cancel(): Promise<void> {
+  // The operator's park: pause/resume/skip/retry, each fenced by the
+  // runner's status law (409 comes back as an honest notice, never a
+  // silent no-op). Every one rides a change reason like cancel does.
+  async function act(name: string, body?: Record<string, string>): Promise<void> {
     busy = true;
     notice = null;
     try {
-      const response = await apiFetch(`/api/admin/workflows/instances/${instanceId}/cancel`, {
+      const response = await apiFetch(`/api/admin/workflows/instances/${instanceId}/${name}`, {
         method: "POST",
-        headers: { "X-Change-Reason": "operator cancel from the console" },
+        headers: body
+          ? { "X-Change-Reason": `operator ${name} from the console`, "Content-Type": "application/json" }
+          : { "X-Change-Reason": `operator ${name} from the console` },
+        ...(body ? { body: JSON.stringify(body) } : {}),
       });
       if (!response.ok) {
         const problem = await toApiError(response);
         notice = `${problem.title} (${problem.code})`;
       } else {
-        notice = "cancelled (the subtree too)";
+        notice = name;
         await load();
       }
     } catch (err) {
@@ -76,6 +94,10 @@
       busy = false;
     }
   }
+
+  const failedSteps = $derived(
+    (log ?? []).filter((l) => l.status === "failed").map((l) => l.stepId),
+  );
 
   function shortOutput(raw: string | null): string {
     if (!raw) {
@@ -110,8 +132,24 @@
         </p>
       {/if}
     </div>
-    {#if detail && canMutate && (detail.status === "running" || detail.status === "waiting")}
-      <button class="btn btn-sm" data-testid="flow-cancel" disabled={busy} onclick={() => void cancel()}>cancel</button>
+    {#if detail && canMutate}
+      <div class="flex gap-2">
+        {#if detail.status === "running" || detail.status === "waiting"}
+          <button class="btn btn-sm" data-testid="flow-pause" disabled={busy} onclick={() => void act("pause")}>pause</button>
+          <button class="btn btn-sm" data-testid="flow-skip" disabled={busy} onclick={() => void act("skip-step")}>skip step</button>
+          <button class="btn btn-sm" data-testid="flow-cancel" disabled={busy} onclick={() => void act("cancel")}>cancel</button>
+        {:else if detail.status === "paused"}
+          <button class="btn btn-sm" data-testid="flow-resume" disabled={busy} onclick={() => void act("resume")}>resume</button>
+          <button class="btn btn-sm" data-testid="flow-skip" disabled={busy} onclick={() => void act("skip-step")}>skip step</button>
+        {:else if detail.status === "failed" && failedSteps.length > 0}
+          <button
+            class="btn btn-sm"
+            data-testid="flow-retry"
+            disabled={busy}
+            onclick={() => void act("retry-step", { stepId: failedSteps[failedSteps.length - 1] })}
+          >retry '{failedSteps[failedSteps.length - 1]}'</button>
+        {/if}
+      </div>
     {/if}
   </div>
 
@@ -148,6 +186,34 @@
             </li>
           {/each}
         </ul>
+      {/if}
+    </div>
+  {/if}
+
+  {#if definitionDoc}
+    <div class="mb-4">
+      <FlowGraph
+        doc={definitionDoc}
+        log={log?.map((l) => ({ stepId: l.stepId, status: l.status, output: l.output })) ?? null}
+        selected={picked}
+        instanceStatus={detail?.status ?? null}
+        currentStep={detail?.currentStep ?? null}
+        onselect={(id) => (picked = id)}
+      />
+      {#if picked}
+        {@const legs = (log ?? []).filter((l) => l.stepId === picked)}
+        {@const last = legs[legs.length - 1]}
+        <div class="mt-1 rounded border border-edge bg-sunken/40 p-2 text-sm" data-testid="graph-inspect">
+          <span class="font-mono">{picked}</span>
+          {#if last}
+            · leg {last.seq} · <span class="badge {STEP_TONE[last.status] ?? TONE_CLASS.neutral}">{last.status}</span>
+            {#if last.output}
+              <pre class="mono mt-1 max-h-40 overflow-auto whitespace-pre-wrap text-xs text-ink-2">{shortOutput(last.output)}</pre>
+            {/if}
+          {:else}
+            · no leg recorded yet
+          {/if}
+        </div>
       {/if}
     </div>
   {/if}

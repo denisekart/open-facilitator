@@ -2306,6 +2306,26 @@ namespace Ofac.Protocol
         public WorkflowCompletedEventV1DataStatus status { get; set; }
     }
 
+    /// <summary>
+    /// Kernel-internal schedule-plane tick: a definition's `on.schedule` occurrence came due and
+    /// the sweeper fired it. One event per (definition version, occurrence) - the envelope id is
+    /// UUIDv5 over the schedule namespace, so the trigger-row convergence law makes the delivery
+    /// exactly-once without a claim row. Carried as a trigger envelope copy like every wire
+    /// event; consumed only by the workflow sink.
+    /// </summary>
+    public partial class WorkflowScheduledEventV1Data
+    {
+        [JsonPropertyName("definitionId")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string definitionId { get; set; }
+
+        [JsonPropertyName("definitionVersion")]
+        public long definitionVersion { get; set; }
+
+        [JsonPropertyName("occurrenceAt")]
+        public string occurrenceAt { get; set; }
+    }
+
     public partial class WorkspaceHeartbeatEventV1Data
     {
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

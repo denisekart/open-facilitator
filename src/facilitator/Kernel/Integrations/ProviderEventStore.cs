@@ -384,7 +384,7 @@ public sealed class ProviderEventStore(
         {
             ProviderEventClass.Mention => await MentionArmAsync(db, workload, options, data, reference, providerDeliveryId, ack, now, ct),
             ProviderEventClass.Reaction => await ReactionArmAsync(db, options, data, reference, providerDeliveryId, ack, now, ct),
-            ProviderEventClass.Issue => await IssueArmAsync(db, workload, options, data, reference, providerDeliveryId, now, ct, type),
+            ProviderEventClass.Issue => await IssueArmAsync(db, workload, options, root, data, reference, providerDeliveryId, now, ct, type),
             ProviderEventClass.ChangeRequest => await ChangeRequestArmAsync(db, provider, options, data, reference, providerDeliveryId, now, ct),
             ProviderEventClass.Pipeline => await PipelineArmAsync(db, data, reference, providerDeliveryId, now, ct),
             ProviderEventClass.Review => await ReviewArmAsync(db, provider, root, data, reference, providerDeliveryId, now, ct),
@@ -739,7 +739,7 @@ public sealed class ProviderEventStore(
     // linking stays chat-first, so no provider_identities gate on these arms.
 
     private async Task<ArmEffect> IssueArmAsync(
-        FacilitatorDbContext db, Facilitator.Kernel.Shared.Auth.LinkPrincipal workload, ProviderOptions options, JsonElement data, Reference reference, string deliveryId, DateTime now, CancellationToken ct, string? wireType = null)
+        FacilitatorDbContext db, Facilitator.Kernel.Shared.Auth.LinkPrincipal workload, ProviderOptions options, JsonElement envelope, JsonElement data, Reference reference, string deliveryId, DateTime now, CancellationToken ct, string? wireType = null)
     {
         var action = data.GetProperty("action").GetString() ?? string.Empty;
         var workTrigger = data.TryGetProperty("workTrigger", out var t) && t.ValueKind == JsonValueKind.True;
@@ -756,6 +756,29 @@ public sealed class ProviderEventStore(
         if (binding is null && action == "labeled" && workTrigger)
         {
             var objective = Trim(text ?? $"Issue {reference.Channel}#{reference.Root}");
+
+            // Plane hook BEFORE the rule match (the review arm's posture):
+            // the trigger row rides this transaction, subjectless (no work
+            // exists yet — the plane's work-create mints it deterministically).
+            var appended = workflows is null
+                ? []
+                : await workflows.EmitAsync(db, envelope, subjectWork: null, ct);
+
+            // Swap law (the one knob is the definition's shadow flag): when
+            // THIS event's matched assign rule has a derived live definition
+            // (`assign-rule-<provider>-<n>`, the importer's row for it), the
+            // plane performs the creation — the arm skips MatchAssignRule
+            // for that rule by falling through to the plane's deterministic
+            // work id: recomputed from (definition, trigger row, step), no
+            // read of the plane's state. The judgment names it, so the
+            // receipt is honest while the row lands with the plane's
+            // delivery.
+            var planeWork = await PlaneOwnedAssignWorkAsync(db, appended, ct);
+            if (planeWork is not null)
+            {
+                return new ArmEffect(planeWork.Value.Work, $"work/{planeWork.Value.Work} (plane: {planeWork.Value.Definition})");
+            }
+
             var rule = MatchAssignRule(options, data);
             var workId = await CreateWorkFromProviderAsync(db, workload, options, reference, objective, deliveryId,
                 $"work created (issue #{reference.Root})", rule, now, ct, wireType: wireType,
@@ -1098,60 +1121,51 @@ public sealed class ProviderEventStore(
             // a provider config typo must not drop the Work.
             teamId = rostered;
         }
+
         var workId = Guid.NewGuid();
-        var project = await db.Projects.FirstOrDefaultAsync(
-            p => p.TeamId == teamId && p.Name == ProviderProjectName, ct);
-        if (project is null)
-        {
-            project = new ProjectEntity
-            {
-                ProjectId = Guid.NewGuid(),
-                TeamId = teamId,
-                Name = ProviderProjectName,
-                Config = "{}",
-                CreatedAt = now,
-            };
-            db.Projects.Add(project);
-        }
 
-
-        db.Works.Add(new WorkEntity
-        {
-            WorkId = workId,
-            ProjectId = project.ProjectId,
-            Objective = objective,
-            State = "open",
-            Version = 1,
-            TeamId = teamId,
-            Origin = wireType,
-            OwnerActor = ownerActor,
-            ActiveWhere = ActiveWhereOf(reference),
-            CreatedAt = now,
-            UpdatedAt = now,
-        });
-        db.WorkEvents.Add(new WorkEventEntity
-        {
-            EventId = Guid.NewGuid(),
-            WorkId = workId,
-            WorkVersion = 1,
-            Kind = "created",
-            Actor = $"link:{reference.Provider}:{options.BotUserId ?? "provider"}",
-            Detail = JsonSerializer.Serialize(new Dictionary<string, string> { ["objective"] = objective }),
-            CreatedAt = now,
-        });
-        AppendProgressRow(db, options, workId, progressNote, now);
-        db.CommunicationBindings.Add(new CommunicationBindingEntity
-        {
-            BindingId = Guid.NewGuid(),
-            Provider = reference.Provider,
-            Channel = reference.Channel,
-            RootMessageId = reference.Root,
-            ParentMessageId = reference.MessageId,
-            WorkId = workId,
-            IdempotencyKey = deliveryId,
-            CreatedAt = now,
-        });
-        AppendRoutingIntentForWork(db, options, workId, objective, reference, rule, teamId, now);
+        // The shared WorkCreate law (the plane's `work-create` step applies
+        // the SAME law): provider-ingress project (find-or-create), the
+        // Work, the `created` row, the conversation binding, the progress
+        // note back to the provider, and the routing intent. The arm's
+        // rule contribution: rule capability/target/endpoint win over the
+        // provider defaults, a rule match rides `work-assign-coding` and
+        // gains the re-hydration coordinates (repo/issue).
+        var teamSlugResolved = await db.Teams.AsNoTracking().Where(t => t.TeamId == teamId)
+            .Select(t => t.Slug).FirstOrDefaultAsync(ct);
+        var plan = new Facilitator.Kernel.Work.WorkCreate.Plan(
+            workId,
+            objective,
+            teamId,
+            teamSlugResolved,
+            wireType,
+            ownerActor,
+            reference.Provider,
+            reference.Channel,
+            reference.Root,
+            reference.Kind,
+            reference.MessageId,
+            deliveryId,
+            rule?.CapabilityId is { Length: > 0 } ruleCapability
+                ? ruleCapability
+                : options.AssignCapabilityId ?? string.Empty,
+            PreferenceEndpointId: rule?.EndpointId is { Length: > 0 } ruleEndpoint
+                ? ruleEndpoint
+                : options.AssignEndpointId,
+            TargetId: rule?.TargetId ?? options.AssignTargetId ?? options.Provider + "-interim",
+            CommandIdBase: rule is null ? "work-assign" : "work-assign-coding",
+            ExtraInputsJson: rule is null
+                ? null
+                : new JsonObject { ["repo"] = reference.Channel, ["issue"] = reference.Root }.ToJsonString(),
+            ActorEvidenceRef: $"kernel:provider-ingest:{workId}",
+            $"link:{reference.Provider}:{options.BotUserId ?? "provider"}",
+            progressNote,
+            WorkflowInstanceId: null,
+            ProgressEndpointId: options.EndpointId);
+        // An empty capability (no rule, no provider default) keeps the
+        // arm's old posture: the Work exists, nothing routes (the shared
+        // law skips the intent row).
+        Facilitator.Kernel.Work.WorkCreate.Apply(db, envelopeValidator, plan, now);
         return workId;
     }
 
@@ -1316,6 +1330,68 @@ public sealed class ProviderEventStore(
 
     /// <summary>First assign rule whose label appears (case-insensitive) in the
     /// event payload's label set, else null.</summary>
+    /// <summary>
+    /// The swap knob of the assign-rules port: the plane owns the creation
+    /// when one of THIS event's appended trigger rows points at a
+    /// definition that (a) lives in the derived-rule namespace
+    /// (<c>assign-rule-&lt;provider&gt;-&lt;n&gt;</c> — only the importer
+    /// mints those, so a hand-authored flow that triggers on the same event
+    /// never silently swallows the arm's Work) and (b) is enabled, live
+    /// (not shadowed) at exactly the triggered version. The returned work
+    /// id is the plane's DETERMINISTIC subject — recomputed from
+    /// (definition, trigger row, the template's create step) — derivable
+    /// from the delivery alone, so the arm's judgment is honest while the
+    /// row itself lands when the plane runs. Null keeps the arm path
+    /// (no rows, gallery rule template only, or shadow posture).
+    /// </summary>
+    private async Task<(Guid Work, string Definition)?> PlaneOwnedAssignWorkAsync(
+        FacilitatorDbContext db,
+        IReadOnlyList<Facilitator.Kernel.Workflows.WorkflowTriggerEmitter.AppendedTrigger> appended,
+        CancellationToken ct)
+    {
+        if (workflows is null || appended.Count == 0)
+        {
+            return null;
+        }
+
+        // THE ARM's context: the trigger rows live here, uncommitted — a
+        // second connection could not see them (ReadCommitted).
+        foreach (var trigger in appended)
+        {
+            if (!trigger.DefinitionId.StartsWith("assign-rule-", StringComparison.Ordinal)
+                || trigger.DefinitionId == Facilitator.Kernel.Workflows.AssignRulesTemplate.DefinitionId)
+            {
+                continue;
+            }
+
+            // A TRIGGER row, not a wake row of a parked instance (wake rows
+            // share the appended list): the command id is deterministic, so
+            // the check is a PK lookup, no plane-state read.
+            var expectedCommand = Facilitator.Kernel.Workflows.WorkflowIdentity.TriggerCommandId(
+                trigger.DefinitionId, trigger.Version, trigger.OutboxId);
+            if (!db.Outbox.Local.Any(o => o.OutboxId == trigger.OutboxId && o.CommandId == expectedCommand)
+                && !await db.Outbox.AnyAsync(
+                    o => o.OutboxId == trigger.OutboxId && o.CommandId == expectedCommand, ct))
+            {
+                continue;
+            }
+
+            if (await workflows.LiveVersionAsync(db, trigger.DefinitionId, ct) != trigger.Version)
+            {
+                continue;
+            }
+
+            var instance = Facilitator.Kernel.Workflows.WorkflowIdentity.InstanceIdFor(
+                trigger.DefinitionId, trigger.Version, trigger.OutboxId);
+            return (
+                Facilitator.Kernel.Workflows.WorkflowIdentity.WorkCreateWorkId(
+                    instance, Facilitator.Kernel.Workflows.AssignRulesTemplate.CreateStepId),
+                trigger.DefinitionId);
+        }
+
+        return null;
+    }
+
     internal static AssignRule? MatchAssignRule(ProviderOptions options, JsonElement? triggerEvent)
     {
         if (options.AssignRules.Count == 0 || triggerEvent is not { } data)

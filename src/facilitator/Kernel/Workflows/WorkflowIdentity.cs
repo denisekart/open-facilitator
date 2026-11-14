@@ -23,6 +23,10 @@ public static class WorkflowIdentity
     /// <c>parentInstance:stepId</c>.</summary>
     public static readonly Guid InvokeNamespace = new("6e51c8f3-14ab-4d27-b0e9-85f2a3c6d904");
 
+    /// <summary>UUIDv5 namespace for the work-create step's subject work:
+    /// name = <c>instance:stepId</c> (the fork law's shape, its own space).</summary>
+    public static readonly Guid WorkCreateNamespace = new("b48f27e0-9c15-4a63-91dd-05e8c73f1a46");
+
     /// <summary>Trigger-row command id of an instance start: exactly
     /// <c>wf-trigger:&lt;defId&gt;@&lt;ver&gt;:&lt;triggerOutboxRowId&gt;</c>.</summary>
     public static string TriggerCommandId(string defId, int version, Guid triggerOutboxRowId) =>
@@ -78,6 +82,11 @@ public static class WorkflowIdentity
     /// UUIDv5 over the fork namespace with name <c>instance:stepId</c>. Makes
     /// the arm's <c>successor:{workId:N}</c> reply command id reproducible by
     /// the plane.</summary>
+    /// <summary>The work-create step's deterministic subject work (the
+    /// fork posture): a redelivered trigger cannot mint a second work.</summary>
+    public static Guid WorkCreateWorkId(Guid instance, string stepId) =>
+        Uuid5(WorkCreateNamespace, $"{instance:N}:{stepId}");
+
     public static Guid ForkWorkId(Guid instance, string stepId) =>
         Uuid5(ForkNamespace, $"{instance:N}:{stepId}");
 

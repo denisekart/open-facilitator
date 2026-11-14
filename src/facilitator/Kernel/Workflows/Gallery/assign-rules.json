@@ -2,11 +2,14 @@
   "id": "assign-rules",
   "version": 1,
   "title": "Labeled-issue assignment rule",
-  "description": "A labeled trigger issue arrives unbound: create the work with the rule's capability and ack the thread. The template of every derived `assign-rule-<provider>-<n>` definition; the per-provider AssignRules importer seeds one copy per config rule.",
+  "description": "A labeled trigger issue arrives unbound: create the work with the rule's capability and ack the thread. The template of every derived `assign-rule-<provider>-<n>` definition; the per-provider AssignRules importer seeds one copy per config rule (baking the rule's capability, endpoint preference, target, team and actor into the create step). The copy — not this template — is what the arm defers to: enabling this template alone creates no scoped rule row, so the labeled-issue arm keeps its own path until a derived copy is live.",
   "enabled": false,
   "on": {
     "event": "org.facilitator.event.provider.issue.v1",
-    "where": { "data.workTrigger": "true" }
+    "where": {
+      "data.action": "labeled",
+      "data.workTrigger": "true"
+    }
   },
   "steps": [
     {
@@ -14,8 +17,13 @@
       "title": "Create the work + routing intent",
       "on": "always",
       "work-create": {
-        "objectiveRef": "Issue $event.data.channel#$event.data.root",
-        "capability": "work.default"
+        "objectiveRef": "${event.data.text}",
+        "capability": "work.default",
+        "commandBase": "work-assign-coding",
+        "inputs": {
+          "repo": "${event.data.reference.channelOrResourceId}",
+          "issue": "${event.data.reference.rootThreadId}"
+        }
       }
     },
     {
@@ -24,7 +32,9 @@
       "on": "create:completed",
       "emit": {
         "command": "org.facilitator.command.communication.post.v1",
-        "inputs": { "text": "On it." }
+        "inputs": {
+          "text": "On it."
+        }
       }
     }
   ]

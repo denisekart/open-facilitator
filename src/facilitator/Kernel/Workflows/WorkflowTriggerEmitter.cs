@@ -1,3 +1,5 @@
+using System.Linq;
+
 using System.Text.Json;
 
 using Facilitator.Kernel.Shared.Persistence;
@@ -154,7 +156,18 @@ public sealed class WorkflowTriggerEmitter(
         var appended = await EmitCoreAsync(db, envelope, null, ct);
         if (appended.Count > 0)
         {
-            await db.SaveChangesAsync(ct);
+            try
+            {
+                await db.SaveChangesAsync(ct);
+            }
+            catch (DbUpdateException)
+            {
+                // The arm hook of the same envelope won the race on the
+                // converged row id: the row exists, the plane sees the
+                // event once. Nothing left to do.
+                return 0;
+            }
+
             await PostgresNotifications.NotifyOutboxAsync(db, null, ct);
         }
 
@@ -281,9 +294,11 @@ public sealed class WorkflowTriggerEmitter(
         foreach (var term in where.EnumerateObject())
         {
             var path = term.Name["data.".Length..];
+            // Dotted multi-segment law (matcher docs, verbatim): the path
+            // walks nested data objects (`data.resultManifest.capability`),
+            // not just the top property.
             var actual = data.ValueKind == JsonValueKind.Object
-                         && data.TryGetProperty(path, out var v)
-                ? v
+                ? WorkflowMatcher.ResolvePath(data, path)
                 : (JsonElement?)null;
             if (!WorkflowMatcher.Matches(term.Value, actual))
             {
@@ -403,11 +418,21 @@ public sealed class WorkflowTriggerEmitter(
         DateTime now,
         Guid? subjectWork)
     {
-        // The emitter generates the row id itself: the instance identity
-        // seeds from the TRIGGER ROW's own guid (wire-level dedupe already
-        // happened at the inbox, so one accepted event = one trigger row =
-        // one instance).
-        var outboxId = Guid.NewGuid();
+        // Convergence law: the row id is UUIDv5(defId@ver > envelope id),
+        // so every code path that reports the SAME accepted envelope to the
+        // SAME definition targets one row: the arm hook (subject-stamped,
+        // inside the arm transaction) and the generic ingress hook settle on
+        // a single trigger row — one accepted event, one instance, however
+        // many paths observed it. A path that finds the row already there
+        // (committed by the other hook) reports it, adding nothing.
+        var outboxId = WorkflowIdentity.TriggerRowId(
+            defId, version, envelope.GetProperty("id").GetString()!);
+        if (db.Outbox.Local.Any(o => o.OutboxId == outboxId)
+            || db.Outbox.Any(o => o.OutboxId == outboxId))
+        {
+            return new AppendedTrigger(defId, version, outboxId);
+        }
+
         db.Outbox.Add(new OutboxEntity
         {
             OutboxId = outboxId,

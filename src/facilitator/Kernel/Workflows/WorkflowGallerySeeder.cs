@@ -22,7 +22,9 @@ public sealed class WorkflowGallerySeeder(
     IDbContextFactory<FacilitatorDbContext> contextFactory,
     IConfiguration configuration,
     TimeProvider timeProvider,
-    ILogger<WorkflowGallerySeeder> logger) : IHostedService
+    ILogger<WorkflowGallerySeeder> logger,
+    Facilitator.Kernel.Integrations.ProviderRegistry providers,
+    WorkflowSubscriptionRegistry subscriptions) : IHostedService
 {
     /// <summary>The embedded gallery documents (logical name = filename).</summary>
     public static IReadOnlyDictionary<string, string> Gallery { get; } = Load();
@@ -70,6 +72,91 @@ public sealed class WorkflowGallerySeeder(
         if (seeded > 0)
         {
             logger.LogInformation("workflow gallery seeded: {Count} definitions (enabled=false until an operator says so)", seeded);
+        }
+
+        await ImportPrRequestScopesAsync(db, cancellationToken);
+    }
+
+    /// <summary>One-release importer (Phase 4): <c>Providers:&lt;p&gt;:PrRequestCapability</c>
+    /// is DEPRECATED — it now imports a scoped COPY of pr-on-manifest
+    /// (defId <c>pr-on-manifest-&lt;p&gt;</c>, source='derived', ENABLED):
+    /// the generic gallery shape + a first guard step on
+    /// <c>assign.capability</c> (the completing assignment's capability —
+    /// what the option selected on) + the binding provider token baked in.
+    /// Missing rows only: once imported, the copy is operator data (the
+    /// TeamRosterSeeder posture). Delete the importer one release after
+    /// the swap ships.</summary>
+    private async Task ImportPrRequestScopesAsync(
+        FacilitatorDbContext db, CancellationToken cancellationToken)
+    {
+        foreach (var options in providers.All()
+                     .Where(o => o.Enabled && !string.IsNullOrEmpty(o.PrRequestCapability)))
+        {
+            var gallery = Gallery.FirstOrDefault(g =>
+                g.Key.StartsWith("pr-on-manifest", StringComparison.Ordinal)).Value;
+            if (gallery is null)
+            {
+                return;
+            }
+
+            using var parsed = JsonDocument.Parse(gallery);
+            var doc = System.Text.Json.Nodes.JsonNode.Parse(parsed.RootElement.GetRawText())!.AsObject();
+            doc["id"] = $"pr-on-manifest-{options.Provider.ToLowerInvariant()}";
+            doc["description"] = $"Scoped copy of pr-on-manifest for provider '{options.Provider}' "
+                                 + $"(imported from Providers:{options.Provider}:PrRequestCapability, "
+                                 + "deprecated): only assignments completing with capability "
+                                 + $"'{options.PrRequestCapability}' dispatch PR legs.";
+            // The where law is scalar-only (matcher terms match scalars):
+            // the capability scope rides the guard step below, which reads
+            // `assign.capability` (the runner resolves it from the event's
+            // assignmentId against the assign envelope row).
+            doc!["on"]!["where"] = new System.Text.Json.Nodes.JsonObject
+            {
+                ["data.resultManifestRef"] = "*",
+            };
+            doc["steps"]!.AsArray().Insert(0, System.Text.Json.Nodes.JsonNode.Parse(
+                """
+                {
+                  "id": "guard-assign",
+                  "title": "Scope: the completing assignment's capability",
+                  "on": "always",
+                  "decide": {
+                    "source": "guard",
+                    "guard": { "field": "assign.capability", "equals": "PLACEHOLDER" },
+                    "fallback": "end"
+                  }
+                }
+                """)!);
+            var guardStep = doc["steps"]![0]!.AsObject();
+            guardStep["decide"]!["guard"]!["equals"] = options.PrRequestCapability;
+            doc["steps"]![1]!["on"] = "guard-assign:completed";
+            doc["steps"]!.AsArray()
+                .Select(st => st!.AsObject())
+                .First(st => st["id"]!.GetValue<string>() == "pr-create")
+                ["emit"]!["binding"]!["provider"] = options.Provider.ToLowerInvariant();
+
+            var defId = doc["id"]!.GetValue<string>();
+            var affected = await db.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                 INSERT INTO facilitator.workflow_definitions
+                     (def_id, version, title, description, payload, digest, enabled, shadow, source, team, created_at, created_by)
+                 VALUES
+                     ({defId}, 1, {doc["title"]!.GetValue<string>()}, {doc["description"]!.GetValue<string>()},
+                      {doc.ToJsonString()}::jsonb, {WorkflowDoc.Digest(JsonDocument.Parse(doc.ToJsonString()).RootElement)},
+                      true, false, 'derived', NULL, {timeProvider.GetUtcNow().UtcDateTime}, 'importer')
+                 ON CONFLICT (def_id, version) DO NOTHING
+                 """, cancellationToken);
+            if (affected > 0)
+            {
+                logger.LogInformation(
+                    "pr-request scope imported: {Definition} enabled for capability {Capability} (the PrRequestCapability option is deprecated)",
+                    defId, options.PrRequestCapability);
+                // An imported ENABLED row extends the subscription set now:
+                // the boot-time cache could otherwise miss the type for its
+                // whole TTL and silently drop the first triggers (the
+                // toggle path rebuilds the same way).
+                await subscriptions.RebuildAsync(cancellationToken);
+            }
         }
     }
 

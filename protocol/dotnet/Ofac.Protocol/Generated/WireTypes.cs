@@ -2588,7 +2588,8 @@ namespace Ofac.Protocol
         public Decide? decide { get; set; }
 
         /// <summary>
-        /// Append one effect: a named wire command, or a capability routed through the funnel.
+        /// Append one effect: a named wire command, or a capability routed through the funnel
+        /// (optionally parking a binding marker).
         /// </summary>
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("emit")]
@@ -2654,7 +2655,8 @@ namespace Ofac.Protocol
         public string? on { get; set; }
 
         /// <summary>
-        /// Pure projection: copy fields out of earlier outputs.
+        /// Pure projection: copy fields out of earlier outputs, the trigger envelope, or the
+        /// digest-verified stored manifest.
         /// </summary>
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("select")]
@@ -2745,7 +2747,7 @@ namespace Ofac.Protocol
         /// and no telemetry.
         /// </summary>
         [JsonPropertyName("source")]
-        public Source source { get; set; }
+        public DecideSource source { get; set; }
     }
 
     /// <summary>
@@ -2773,6 +2775,14 @@ namespace Ofac.Protocol
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("in")]
         public In[]? @in { get; set; }
+
+        /// <summary>
+        /// Presence branch: true hits when the field resolves to a present, non-null value (works
+        /// for arrays/objects too); false hits on absent/null. Exactly one of equals/in/present.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("present")]
+        public bool? present { get; set; }
     }
 
     /// <summary>
@@ -2806,10 +2816,19 @@ namespace Ofac.Protocol
     }
 
     /// <summary>
-    /// Append one effect: a named wire command, or a capability routed through the funnel.
+    /// Append one effect: a named wire command, or a capability routed through the funnel
+    /// (optionally parking a binding marker).
     /// </summary>
     public partial class Emit
     {
+        /// <summary>
+        /// Side effect of a capability emit: park a communication binding alongside the routing
+        /// intent (the pr-request pending-PR marker law).
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("binding")]
+        public Binding? binding { get; set; }
+
         /// <summary>
         /// Capability id: dispatch appends a routing intent (the routing funnel chooses the
         /// endpoint).
@@ -2841,6 +2860,41 @@ namespace Ofac.Protocol
         [JsonPropertyName("to")]
         [JsonConverter(typeof(FluffyMinMaxLengthCheckConverter))]
         public string? to { get; set; }
+    }
+
+    /// <summary>
+    /// Side effect of a capability emit: park a communication binding alongside the routing
+    /// intent (the pr-request pending-PR marker law).
+    /// </summary>
+    public partial class Binding
+    {
+        /// <summary>
+        /// Binding channel (the repo), templated.
+        /// </summary>
+        [JsonPropertyName("channel")]
+        [JsonConverter(typeof(FluffyMinMaxLengthCheckConverter))]
+        public string channel { get; set; }
+
+        /// <summary>
+        /// `branch`: a pending-PR marker binding (the head-branch resolver's key), inserted ON
+        /// CONFLICT DO NOTHING so redelivery is inert.
+        /// </summary>
+        [JsonPropertyName("kind")]
+        public BindingKind kind { get; set; }
+
+        /// <summary>
+        /// Provider token: a literal (importers bake the provider into scoped copies).
+        /// </summary>
+        [JsonPropertyName("provider")]
+        [JsonConverter(typeof(FluffyMinMaxLengthCheckConverter))]
+        public string provider { get; set; }
+
+        /// <summary>
+        /// Binding root (for example `branch:` + the head ref), interpolated.
+        /// </summary>
+        [JsonPropertyName("root")]
+        [JsonConverter(typeof(FluffyMinMaxLengthCheckConverter))]
+        public string root { get; set; }
     }
 
     /// <summary>
@@ -2987,16 +3041,35 @@ namespace Ofac.Protocol
     }
 
     /// <summary>
-    /// Pure projection: copy fields out of earlier outputs.
+    /// Pure projection: copy fields out of earlier outputs, the trigger envelope, or the
+    /// digest-verified stored manifest.
     /// </summary>
     public partial class Select
     {
+        /// <summary>
+        /// Fill projected fields that resolved to null: name -&gt; literal or template (resolved
+        /// against the run context). Can only fill, never introduce, fields.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("defaults")]
+        public Dictionary<string, string>? defaults { get; set; }
+
         /// <summary>
         /// Output name -&gt; jsonPath over earlier step outputs / the trigger envelope. Missing paths
         /// yield null (never an error).
         /// </summary>
         [JsonPropertyName("project")]
         public Dictionary<string, string> project { get; set; }
+
+        /// <summary>
+        /// Document the paths project over: the trigger envelope (default) or, for an event carrying
+        /// `data.resultManifestRef` + `data.resultDigest`, the STORED manifest artifact re-read by
+        /// the kernel (the record arm verified the digest pre-commit; a vanished artifact fails the
+        /// leg). Paths are relative to the manifest document.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("source")]
+        public SelectSource? source { get; set; }
     }
 
     /// <summary>
@@ -3142,9 +3215,23 @@ namespace Ofac.Protocol
     /// low confidence or AI outage); `guard` is a deterministic field predicate with no model
     /// and no telemetry.
     /// </summary>
-    public enum Source { Guard, Model };
+    public enum DecideSource { Guard, Model };
+
+    /// <summary>
+    /// `branch`: a pending-PR marker binding (the head-branch resolver's key), inserted ON
+    /// CONFLICT DO NOTHING so redelivery is inert.
+    /// </summary>
+    public enum BindingKind { Branch };
 
     public enum Op { Promote, Recall, Retain };
+
+    /// <summary>
+    /// Document the paths project over: the trigger envelope (default) or, for an event carrying
+    /// `data.resultManifestRef` + `data.resultDigest`, the STORED manifest artifact re-read by
+    /// the kernel (the record arm verified the digest pre-commit; a vanished artifact fails the
+    /// leg). Paths are relative to the manifest document.
+    /// </summary>
+    public enum SelectSource { Event, Manifest };
 
     /// <summary>
     /// Event-payload matcher value, copied from the policy-file matcher law: exact string, bare
@@ -3224,8 +3311,10 @@ namespace Ofac.Protocol
                 WhereValueConverter.Singleton,
                 EqualsConverter.Singleton,
                 InConverter.Singleton,
-                SourceConverter.Singleton,
+                DecideSourceConverter.Singleton,
+                BindingKindConverter.Singleton,
                 OpConverter.Singleton,
+                SelectSourceConverter.Singleton,
                 new DateOnlyConverter(),
                 new TimeOnlyConverter(),
                 IsoDateTimeOffsetConverter.Singleton
@@ -5211,38 +5300,65 @@ namespace Ofac.Protocol
         public static readonly InConverter Singleton = new InConverter();
     }
 
-    internal class SourceConverter : JsonConverter<Source>
+    internal class DecideSourceConverter : JsonConverter<DecideSource>
     {
-        public override bool CanConvert(Type t) => t == typeof(Source);
+        public override bool CanConvert(Type t) => t == typeof(DecideSource);
 
-        public override Source Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        public override DecideSource Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             var value = reader.GetString();
             switch (value)
             {
                 case "guard":
-                    return Source.Guard;
+                    return DecideSource.Guard;
                 case "model":
-                    return Source.Model;
+                    return DecideSource.Model;
             }
-            throw new Exception("Cannot unmarshal type Source");
+            throw new Exception("Cannot unmarshal type DecideSource");
         }
 
-        public override void Write(Utf8JsonWriter writer, Source value, JsonSerializerOptions options)
+        public override void Write(Utf8JsonWriter writer, DecideSource value, JsonSerializerOptions options)
         {
             switch (value)
             {
-                case Source.Guard:
+                case DecideSource.Guard:
                     JsonSerializer.Serialize(writer, "guard", options);
                     return;
-                case Source.Model:
+                case DecideSource.Model:
                     JsonSerializer.Serialize(writer, "model", options);
                     return;
             }
-            throw new Exception("Cannot marshal type Source");
+            throw new Exception("Cannot marshal type DecideSource");
         }
 
-        public static readonly SourceConverter Singleton = new SourceConverter();
+        public static readonly DecideSourceConverter Singleton = new DecideSourceConverter();
+    }
+
+    internal class BindingKindConverter : JsonConverter<BindingKind>
+    {
+        public override bool CanConvert(Type t) => t == typeof(BindingKind);
+
+        public override BindingKind Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            var value = reader.GetString();
+            if (value == "branch")
+            {
+                return BindingKind.Branch;
+            }
+            throw new Exception("Cannot unmarshal type BindingKind");
+        }
+
+        public override void Write(Utf8JsonWriter writer, BindingKind value, JsonSerializerOptions options)
+        {
+            if (value == BindingKind.Branch)
+            {
+                JsonSerializer.Serialize(writer, "branch", options);
+                return;
+            }
+            throw new Exception("Cannot marshal type BindingKind");
+        }
+
+        public static readonly BindingKindConverter Singleton = new BindingKindConverter();
     }
 
     internal class OpConverter : JsonConverter<Op>
@@ -5282,6 +5398,40 @@ namespace Ofac.Protocol
         }
 
         public static readonly OpConverter Singleton = new OpConverter();
+    }
+
+    internal class SelectSourceConverter : JsonConverter<SelectSource>
+    {
+        public override bool CanConvert(Type t) => t == typeof(SelectSource);
+
+        public override SelectSource Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            var value = reader.GetString();
+            switch (value)
+            {
+                case "event":
+                    return SelectSource.Event;
+                case "manifest":
+                    return SelectSource.Manifest;
+            }
+            throw new Exception("Cannot unmarshal type SelectSource");
+        }
+
+        public override void Write(Utf8JsonWriter writer, SelectSource value, JsonSerializerOptions options)
+        {
+            switch (value)
+            {
+                case SelectSource.Event:
+                    JsonSerializer.Serialize(writer, "event", options);
+                    return;
+                case SelectSource.Manifest:
+                    JsonSerializer.Serialize(writer, "manifest", options);
+                    return;
+            }
+            throw new Exception("Cannot marshal type SelectSource");
+        }
+
+        public static readonly SelectSourceConverter Singleton = new SelectSourceConverter();
     }
 
     internal class MinMaxLengthCheckConverter8 : JsonConverter<string>

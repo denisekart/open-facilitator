@@ -295,7 +295,7 @@ public sealed class WorkflowDefinitionTests(PostgresFixture fixture) : IAsyncLif
     [Fact]
     public async Task ToggleToEnabledWithUnsupportedStepKindIs422()
     {
-        await StoreOneAsync(extra: """, { "id": "s3", "title": "fan", "on": "s2:completed", "fan-out": { "over": "$event.data.list", "step": { "emit": { "command": "org.facilitator.command.communication.post.v1", "inputs": {} } } } }""");
+        await StoreOneAsync(extra: """, { "id": "s3", "title": "invoke", "on": "s2:completed", "invoke": { "workflow": "t.child", "timeout": "PT1M", "inputs": {} } }""");
         var response = await KernelOps.PostJsonAsync(_client,
             "/api/admin/workflows/definitions/t.flow/versions/1/toggle", """{"enabled": true}""",
             HttpStatusCode.UnprocessableEntity, "try to enable");

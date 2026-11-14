@@ -2,66 +2,123 @@
   "id": "pr-on-manifest",
   "version": 1,
   "title": "PR request on completed work's manifest",
-  "description": "A work completes carrying a result manifest: when the manifest names a branch, ask the VCS for a change request (vcs.change_request.create, effect-key base branch:<head>); else when an incorporated-steer note exists, comment (vcs.change_request.comment); else settle with no VCS effect. Deterministic guard ladder, no model consulted; the capability ids live here, not in code constants.",
+  "description": "A work completes carrying a result manifest: when the STORED manifest (ref + digest on the event, verified-bytes law) names a prRequest with repo+head, ask the VCS for a change request (vcs.change_request.create as a routing intent from the completed work, effect-key base branch:<head>, pending-PR marker binding parked); then, per structuredResult.commentRequests[] element, comment (fan-out, vcs.change_request.comment) - both legs can run, as the arm's dispatch did. No manifest request: settle with no VCS effect. Deterministic guard ladder, no model consulted; the capability ids live here, not in code constants. Provider-agnostic by design: enable per provider through a scoped copy (source='derived', team set, provider token baked into the binding). The trigger requires a manifest ref on the event; a scoped copy adds a first-step guard on `assign.capability` (the completing assignment's capability, read from the assign envelope row). The gallery shape triggers on every completed manifest WITHOUT an assign-capability guard (a manifest with no requests settles silently); a scoped copy inserts a first guard step on `assign.capability` (the completing assignment's capability, read from the assign envelope row), bakes the binding provider token, and sets `team`. The Providers:<p>:PrRequestCapability option imports exactly that copy.",
   "enabled": false,
   "on": {
-    "event": "org.facilitator.event.assignment.completed.v1"
+    "event": "org.facilitator.event.assignment.completed.v1",
+    "where": {
+      "data.resultManifestRef": "*"
+    }
   },
   "steps": [
     {
       "id": "fields",
-      "title": "Read the manifest's branch and steer fields",
+      "title": "Read the stored manifest's prRequest fields",
       "on": "always",
       "select": {
+        "source": "manifest",
         "project": {
-          "branch": "$event.data.resultManifest.branch",
-          "note": "$event.data.resultManifest.note"
+          "repo": "structuredResult.prRequest.repo",
+          "head": "structuredResult.prRequest.head",
+          "base": "structuredResult.prRequest.base",
+          "title": "structuredResult.prRequest.title",
+          "body": "structuredResult.prRequest.body",
+          "comments": "structuredResult.commentRequests"
+        },
+        "defaults": {
+          "base": "main",
+          "title": "$work.objective",
+          "body": ""
         }
       }
     },
     {
-      "id": "guard-branch",
-      "title": "Branch present means create",
+      "id": "guard-pr",
+      "title": "A prRequest repo means check the head",
       "on": "fields:completed",
       "decide": {
         "source": "guard",
-        "guard": { "field": "steps.fields.output.branch", "equals": null },
-        "fallback": "pr-create"
+        "guard": {
+          "field": "steps.fields.output.repo",
+          "present": true
+        },
+        "fallback": "guard-note"
       }
     },
     {
-      "id": "guard-note",
-      "title": "No branch: a steer note means comment",
-      "on": "guard-branch:completed",
+      "id": "guard-head",
+      "title": "Repo + head means create",
+      "on": "guard-pr:completed",
       "decide": {
         "source": "guard",
-        "guard": { "field": "steps.fields.output.note", "equals": null },
-        "fallback": "pr-comment"
+        "guard": {
+          "field": "steps.fields.output.head",
+          "present": true
+        },
+        "fallback": "guard-note"
       }
     },
     {
       "id": "pr-create",
       "title": "Ask for a change request",
-      "on": "guard-branch:failed",
+      "on": "guard-head:completed",
       "emit": {
         "capability": "vcs.change_request.create",
-        "inputs": { "note": "$steps.fields.output.note" }
+        "inputs": {
+          "objective": "$work.objective",
+          "sourceRefs": [],
+          "repo": "$steps.fields.output.repo",
+          "head": "$steps.fields.output.head",
+          "base": "$steps.fields.output.base",
+          "title": "$steps.fields.output.title",
+          "body": "$steps.fields.output.body"
+        },
+        "binding": {
+          "kind": "branch",
+          "provider": "forgejo",
+          "channel": "$steps.fields.output.repo",
+          "root": "branch:${steps.fields.output.head}"
+        }
+      }
+    },
+    {
+      "id": "guard-note",
+      "title": "Comment requests mean comment",
+      "on": "pr-create:completed",
+      "decide": {
+        "source": "guard",
+        "guard": {
+          "field": "steps.fields.output.comments",
+          "present": true
+        },
+        "fallback": "settle"
       }
     },
     {
       "id": "pr-comment",
-      "title": "Comment the incorporated steer",
-      "on": "guard-note:failed",
-      "emit": {
-        "capability": "vcs.change_request.comment",
-        "inputs": { "text": "$steps.fields.output.note" }
+      "title": "Comment each incorporated steer",
+      "on": "guard-note:completed",
+      "fan-out": {
+        "over": "$steps.fields.output.comments",
+        "step": {
+          "emit": {
+            "capability": "vcs.change_request.comment",
+            "inputs": {
+              "repo": "$item.repo",
+              "issue": "$item.issue",
+              "body": "$item.body"
+            }
+          }
+        }
       }
     },
     {
       "id": "settle",
-      "title": "Neither case: the record alone settles",
-      "on": "guard-note:completed",
-      "select": { "project": {} }
+      "title": "Nothing to ask: the record alone settles",
+      "on": "guard-note:failed",
+      "select": {
+        "project": {}
+      }
     }
   ]
 }

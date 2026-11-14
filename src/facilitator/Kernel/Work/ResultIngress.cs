@@ -38,7 +38,8 @@ public sealed class ResultIngress(
     IDbContextFactory<FacilitatorDbContext> contextFactory,
     ProviderRegistry providers,
     EnvelopeValidator envelopeValidator,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    Facilitator.Kernel.Workflows.WorkflowTriggerEmitter? workflows = null)
 {
     /// <summary>The completed event type this arm handles on both planes.</summary>
     public const string CompletedType = "org.facilitator.event.assignment.completed.v1";
@@ -46,13 +47,12 @@ public sealed class ResultIngress(
     /// <summary>The failed event type the finalize arm handles on both planes.</summary>
     public const string FailedType = "org.facilitator.event.assignment.failed.v1";
 
-    /// <summary>Capability of the manifest-dispatched PR creation op (the
-    /// connector's op id; the gateway's policy routes it to the team's
-    /// connector unit).</summary>
-    public const string PrCreateCapability = "vcs.change_request.create";
-
-    /// <summary>Capability of the manifest-dispatched PR comment op.</summary>
-    public const string PrCommentCapability = "vcs.change_request.comment";
+    /// <summary>The workflow plane's definition that owns the PR dispatch
+    /// once swapped: manifest-field guards, capability ids as DATA. When
+    /// this definition is enabled-and-live, <see
+    /// cref="DispatchManifestRequestsAsync"/> defers to the plane (the one
+    /// knob) after feeding it the trigger row in this transaction.</summary>
+    public const string WorkflowDefinitionId = "pr-on-manifest";
 
     /// <summary>Event arm: record the manifest the completed event points at, when it points at one.</summary>
     public async Task<ResultArm> HandleCompletedAsync(
@@ -91,7 +91,7 @@ public sealed class ResultIngress(
             if (outcome is ResultManifestOutcome.Recorded or ResultManifestOutcome.Duplicate)
             {
                 await DispatchManifestRequestsAsync(
-                    data, manifestArtifactId, digest, workId, assignmentId, assignmentRaw!, ct);
+                    root, data, manifestArtifactId, digest, workId, assignmentId, assignmentRaw!, ct);
             }
 
             var outcomeProblem = outcome switch
@@ -187,6 +187,12 @@ public sealed class ResultIngress(
     /// <summary>The manifest reader. A RECORDED manifest for an
     /// assignment whose CAPABILITY one provider configured
     /// (<c>Providers:&lt;p&gt;:PrRequestCapability</c>) may carry connector
+    /// legs ONLY while the plane is not live for <see cref="WorkflowDefinitionId"/>:
+    /// the dispatch block FIRST feeds the plane (arm hook: the trigger row
+    /// rides this transaction, subject-stamped) and defers entirely when
+    /// the definition's triggered version is enabled AND not shadowed —
+    /// pr-on-manifest (or a scoped copy) then performs the identical legs
+    /// through the routing funnel.
     /// work: <c>structuredResult.prRequest</c> ⇒ one
     /// <c>vcs.change_request.create</c> assign + the <c>branch:&lt;head&gt;</c>
     /// pending-PR marker binding (the head-branch resolver's key);
@@ -201,6 +207,7 @@ public sealed class ResultIngress(
     /// stored bytes (re-read, verified) are the source — the wire restates
     /// only location + digest.</summary>
     private async Task DispatchManifestRequestsAsync(
+        JsonElement root,
         JsonElement data, Guid manifestArtifactId, string digest, Guid workId, Guid assignmentId, string wireAssignmentId, CancellationToken ct)
     {
         await using var db = await contextFactory.CreateDbContextAsync(ct);
@@ -211,6 +218,41 @@ public sealed class ResultIngress(
         if (assign is null)
         {
             return;
+        }
+
+        // Plane hook first (the review-arm law, this transaction): the
+        // trigger row + subject stamp ride the record arm's commit, and
+        // the deferral reads the definition the row was appended for. When
+        // the plane is live the manifest legs are the plane's — the funnel
+        // (not this arm) produces the assign rows.
+        if (workflows is not null)
+        {
+            var appended = await workflows.EmitAsync(db, root, workId, ct);
+            if (appended.Count > 0)
+            {
+                // The plane-observes-every-event law: the trigger row
+                // commits with the record arm's transaction whichever
+                // posture follows — an arm-dispatched delivery still feeds
+                // the plane (a later enable sees the flow history). The
+                // wake rides the commit (the outbox law): the sink runs
+                // the flow now, not at the sweeper's next sweep.
+                await db.SaveChangesAsync(ct);
+                await Facilitator.Kernel.Shared.Persistence.PostgresNotifications
+                    .NotifyOutboxAsync(db, workId.ToString(), ct);
+            }
+
+            // The deferral recognizes the gallery definition AND its
+            // scoped copies (`pr-on-manifest-<something>`: a provider or a
+            // team, from the importer or an operator) — any live one owns
+            // the legs for this delivery.
+            var trigger = appended.FirstOrDefault(a =>
+                a.DefinitionId == WorkflowDefinitionId
+                || a.DefinitionId.StartsWith(WorkflowDefinitionId + "-", StringComparison.Ordinal));
+            if (trigger is not null
+                && await workflows.LiveVersionAsync(db, trigger.DefinitionId, ct) == trigger.Version)
+            {
+                return;
+            }
         }
 
         using var assignDoc = JsonDocument.Parse(assign.Envelope);
@@ -241,7 +283,7 @@ public sealed class ResultIngress(
             {
                 var commandId = $"pr-create:{digest}";
                 var envelope = ProviderEnvelopes.ConnectorCommand(
-                    workId, PrCreateCapability, options.Provider + "-connector", options.Provider,
+                    workId, "vcs.change_request.create", options.Provider + "-connector", options.Provider,
                     new JsonObject
                     {
                         ["objective"] = objective.Length <= 512 ? objective : objective[..512],
@@ -286,7 +328,7 @@ public sealed class ResultIngress(
                 {
                     var commandId = $"pr-comment:{digest}:{index}";
                     var envelope = ProviderEnvelopes.ConnectorCommand(
-                        workId, PrCommentCapability, options.Provider + "-connector", options.Provider,
+                        workId, "vcs.change_request.comment", options.Provider + "-connector", options.Provider,
                         new JsonObject { ["repo"] = repo, ["issue"] = issue, ["body"] = body },
                         "vcs.change_request.comment",
                         now,

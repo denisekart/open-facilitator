@@ -108,11 +108,15 @@ public sealed class ProviderOptions
     /// null ⇒ <c>&lt;provider&gt;-connector</c> (the connector convention).</summary>
     public string? IssueRequestEndpointId { get; init; }
 
-    /// <summary>The completed-manifest arm of <c>ResultIngress</c> reads
-    /// <c>structuredResult.prRequest</c> / <c>commentRequests</c> only when
-    /// the completing assignment's capability equals this value (provider-
-    /// scoped: other providers ignore the manifest field). Null ⇒ the reader
-    /// is off for this provider.</summary>
+    /// <summary>DEPRECATED (Phase 4, kept one release): the completed-manifest
+    /// arm of <c>ResultIngress</c> reads <c>structuredResult.prRequest</c> /
+    /// <c>commentRequests</c> only when the completing assignment's capability
+    /// equals this value (provider-scoped). At boot the value IMPORTS a
+    /// scoped, enabled copy of the workflow gallery's pr-on-manifest
+    /// (defId <c>pr-on-manifest-&lt;provider&gt;</c>, source='derived') that
+    /// encodes the same scope as data; while any such copy is
+    /// enabled-and-live the arm defers to the workflow plane entirely.
+    /// Null ⇒ no import: the arm reader is off for this provider.</summary>
     public string? PrRequestCapability { get; init; }
 }
 

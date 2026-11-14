@@ -38,7 +38,7 @@ public sealed class WorkflowDefinitionValidator(EnvelopeValidator envelopes)
     /// interpreter does not grow speculatively.</summary>
     public static IReadOnlySet<string> ExecutableKinds { get; } = new HashSet<string>(StringComparer.Ordinal)
     {
-        "emit", "wait", "timer", "approval", "decide", "select", "fork-work", "escalate",
+        "emit", "wait", "timer", "approval", "decide", "select", "fan-out", "fork-work", "escalate",
     };
 
     /// <summary>Validate a parsed definition document (structure + referential
@@ -112,6 +112,15 @@ public sealed class WorkflowDefinitionValidator(EnvelopeValidator envelopes)
                         {
                             errors.Add(new("unknown-command",
                                 $"step '{stepId}' emits '{command}': not in the v1 command table"));
+                        }
+
+                        if (payload.TryGetProperty("binding", out var binding)
+                            && binding.TryGetProperty("provider", out var provider)
+                            && provider.ValueKind == JsonValueKind.String
+                            && provider.GetString()!.StartsWith('$'))
+                        {
+                            errors.Add(new("binding-provider-templated",
+                                $"step '{stepId}' binding provider must be a literal (scoped copies bake it)"));
                         }
 
                         break;

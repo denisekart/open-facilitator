@@ -5,7 +5,14 @@
   "description": "Workflow definition plane artifact: a durable, versioned workflow definition stored in the kernel and executed by the workflow sink on the synthetic `workflow.kernel` channel. JSON is canonical; YAML is a serialization view only. Field-level semantics are the interpreter contract: the palette is closed, `decide` always carries a `fallback`, and every `invoke` carries a mandatory `timeout`.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["id", "version", "title", "description", "on", "steps"],
+  "required": [
+    "id",
+    "version",
+    "title",
+    "description",
+    "on",
+    "steps"
+  ],
   "properties": {
     "id": {
       "$ref": "common.v1.json#/$defs/idToken",
@@ -41,7 +48,9 @@
       "type": "array",
       "minItems": 1,
       "maxItems": 20,
-      "items": { "$ref": "#/$defs/step" },
+      "items": {
+        "$ref": "#/$defs/step"
+      },
       "description": "Flat step list; execution order comes from the `on:` edge selectors, the array order breaks ties deterministically."
     },
     "team": {
@@ -76,8 +85,12 @@
           "type": "string",
           "pattern": "^(?:\\*|[A-Za-z0-9._:/@#\\-+ ]+)(?:\\*)?$"
         },
-        { "type": "number" },
-        { "type": "boolean" }
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        }
       ]
     },
     "jsonPath": {
@@ -90,9 +103,63 @@
       "type": "object",
       "additionalProperties": false,
       "oneOf": [
-        { "required": ["event"], "not": { "anyOf": [{ "required": ["schedule"] }, { "required": ["invoked"] }] } },
-        { "required": ["schedule"], "not": { "anyOf": [{ "required": ["event"] }, { "required": ["invoked"] }] } },
-        { "required": ["invoked"], "not": { "anyOf": [{ "required": ["event"] }, { "required": ["schedule"] }] } }
+        {
+          "required": [
+            "event"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "schedule"
+                ]
+              },
+              {
+                "required": [
+                  "invoked"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "required": [
+            "schedule"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "event"
+                ]
+              },
+              {
+                "required": [
+                  "invoked"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "required": [
+            "invoked"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "event"
+                ]
+              },
+              {
+                "required": [
+                  "schedule"
+                ]
+              }
+            ]
+          }
+        }
       ],
       "properties": {
         "event": {
@@ -102,8 +169,12 @@
         },
         "where": {
           "type": "object",
-          "propertyNames": { "pattern": "^data\\.[A-Za-z0-9._-]{1,120}$" },
-          "additionalProperties": { "$ref": "#/$defs/matcher" },
+          "propertyNames": {
+            "pattern": "^data\\.[A-Za-z0-9._-]{1,120}$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/matcher"
+          },
           "description": "Map of dotted `data.*` paths to matcher values; all must match (AND). Only meaningful with `event`."
         },
         "schedule": {
@@ -127,21 +198,76 @@
     "step": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "title"],
+      "required": [
+        "id",
+        "title"
+      ],
       "oneOf": [
-        { "required": ["emit"] },
-        { "required": ["wait"] },
-        { "required": ["timer"] },
-        { "required": ["approval"] },
-        { "required": ["decide"] },
-        { "required": ["select"] },
-        { "required": ["fan-out"] },
-        { "required": ["join"] },
-        { "required": ["fork-work"] },
-        { "required": ["work-create"] },
-        { "required": ["escalate"] },
-        { "required": ["memory"] },
-        { "required": ["invoke"] }
+        {
+          "required": [
+            "emit"
+          ]
+        },
+        {
+          "required": [
+            "wait"
+          ]
+        },
+        {
+          "required": [
+            "timer"
+          ]
+        },
+        {
+          "required": [
+            "approval"
+          ]
+        },
+        {
+          "required": [
+            "decide"
+          ]
+        },
+        {
+          "required": [
+            "select"
+          ]
+        },
+        {
+          "required": [
+            "fan-out"
+          ]
+        },
+        {
+          "required": [
+            "join"
+          ]
+        },
+        {
+          "required": [
+            "fork-work"
+          ]
+        },
+        {
+          "required": [
+            "work-create"
+          ]
+        },
+        {
+          "required": [
+            "escalate"
+          ]
+        },
+        {
+          "required": [
+            "memory"
+          ]
+        },
+        {
+          "required": [
+            "invoke"
+          ]
+        }
       ],
       "properties": {
         "id": {
@@ -162,8 +288,21 @@
         "emit": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["inputs"],
-          "oneOf": [{ "required": ["command"] }, { "required": ["capability"] }],
+          "required": [
+            "inputs"
+          ],
+          "oneOf": [
+            {
+              "required": [
+                "command"
+              ]
+            },
+            {
+              "required": [
+                "capability"
+              ]
+            }
+          ],
           "properties": {
             "command": {
               "type": "string",
@@ -181,14 +320,51 @@
             "to": {
               "$ref": "#/$defs/ref",
               "description": "Envelope target reference; resolved from run context (defaults to the trigger's own target)."
+            },
+            "binding": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "provider",
+                "channel",
+                "root"
+              ],
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "branch"
+                  ],
+                  "description": "`branch`: a pending-PR marker binding (the head-branch resolver's key), inserted ON CONFLICT DO NOTHING so redelivery is inert."
+                },
+                "provider": {
+                  "$ref": "#/$defs/ref",
+                  "description": "Provider token: a literal (importers bake the provider into scoped copies)."
+                },
+                "channel": {
+                  "$ref": "#/$defs/ref",
+                  "description": "Binding channel (the repo), templated."
+                },
+                "root": {
+                  "$ref": "#/$defs/ref",
+                  "description": "Binding root (for example `branch:` + the head ref), interpolated."
+                }
+              },
+              "description": "Side effect of a capability emit: park a communication binding alongside the routing intent (the pr-request pending-PR marker law)."
             }
           },
-          "description": "Append one effect: a named wire command, or a capability routed through the funnel."
+          "description": "Append one effect: a named wire command, or a capability routed through the funnel (optionally parking a binding marker)."
         },
         "wait": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["event", "correlate", "timeout", "onTimeout"],
+          "required": [
+            "event",
+            "correlate",
+            "timeout",
+            "onTimeout"
+          ],
           "properties": {
             "event": {
               "type": "string",
@@ -199,7 +375,9 @@
               "$ref": "#/$defs/ref",
               "description": "Correlation key resolved at park time (e.g. \"$steps.assign.output.workId\"); matched against the waking envelope."
             },
-            "timeout": { "$ref": "#/$defs/duration" },
+            "timeout": {
+              "$ref": "#/$defs/duration"
+            },
             "onTimeout": {
               "$ref": "common.v1.json#/$defs/idToken",
               "description": "Step id taken when the deadline passes (the sweeper drives it)."
@@ -210,16 +388,23 @@
         "timer": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["for"],
+          "required": [
+            "for"
+          ],
           "properties": {
-            "for": { "$ref": "#/$defs/duration" }
+            "for": {
+              "$ref": "#/$defs/duration"
+            }
           },
           "description": "Park until the delay elapses; the sweeper is the clock."
         },
         "approval": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["question", "approvers"],
+          "required": [
+            "question",
+            "approvers"
+          ],
           "properties": {
             "question": {
               "type": "string",
@@ -237,17 +422,26 @@
         "decide": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["source", "fallback"],
+          "required": [
+            "source",
+            "fallback"
+          ],
           "properties": {
             "source": {
               "type": "string",
-              "enum": ["model", "guard"],
+              "enum": [
+                "model",
+                "guard"
+              ],
               "description": "`model` consults the decision gateway with a closed option list (degrade to `fallback` on low confidence or AI outage); `guard` is a deterministic field predicate with no model and no telemetry."
             },
             "question": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["prompt", "options"],
+              "required": [
+                "prompt",
+                "options"
+              ],
               "properties": {
                 "prompt": {
                   "type": "string",
@@ -261,7 +455,10 @@
                   "items": {
                     "type": "object",
                     "additionalProperties": false,
-                    "required": ["value", "branch"],
+                    "required": [
+                      "value",
+                      "branch"
+                    ],
                     "properties": {
                       "value": {
                         "type": "string",
@@ -284,15 +481,33 @@
             "guard": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["field"],
-              "oneOf": [{ "required": ["equals"] }, { "required": ["in"] }],
+              "required": [
+                "field"
+              ],
+              "oneOf": [
+                {
+                  "required": [
+                    "equals"
+                  ]
+                },
+                {
+                  "required": [
+                    "in"
+                  ]
+                }
+              ],
               "properties": {
                 "field": {
                   "$ref": "#/$defs/jsonPath",
                   "description": "Field path in the built-in context (`work.state`, `event.data.action`, ...)."
                 },
                 "equals": {
-                  "type": ["string", "number", "boolean", "null"],
+                  "type": [
+                    "string",
+                    "number",
+                    "boolean",
+                    "null"
+                  ],
                   "description": "Exact scalar match; null matches a field that resolves to absent/null (presence branching)."
                 },
                 "in": {
@@ -300,9 +515,17 @@
                   "minItems": 1,
                   "maxItems": 20,
                   "items": {
-                    "type": ["string", "number", "boolean"]
+                    "type": [
+                      "string",
+                      "number",
+                      "boolean"
+                    ]
                   },
                   "description": "Any-of scalar membership."
+                },
+                "present": {
+                  "type": "boolean",
+                  "description": "Presence branch: true hits when the field resolves to a present, non-null value (works for arrays/objects too); false hits on absent/null. Exactly one of equals/in/present."
                 }
               },
               "description": "Deterministic predicate; required when source is `guard`."
@@ -319,21 +542,49 @@
         "select": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["project"],
+          "required": [
+            "project"
+          ],
           "properties": {
             "project": {
               "type": "object",
-              "propertyNames": { "pattern": "^[A-Za-z0-9._-]{1,64}$" },
-              "additionalProperties": { "$ref": "#/$defs/jsonPath" },
+              "propertyNames": {
+                "pattern": "^[A-Za-z0-9._-]{1,64}$"
+              },
+              "additionalProperties": {
+                "$ref": "#/$defs/jsonPath"
+              },
               "description": "Output name -> jsonPath over earlier step outputs / the trigger envelope. Missing paths yield null (never an error)."
+            },
+            "source": {
+              "type": "string",
+              "enum": [
+                "event",
+                "manifest"
+              ],
+              "default": "event",
+              "description": "Document the paths project over: the trigger envelope (default) or, for an event carrying `data.resultManifestRef` + `data.resultDigest`, the STORED manifest artifact re-read by the kernel (the record arm verified the digest pre-commit; a vanished artifact fails the leg). Paths are relative to the manifest document."
+            },
+            "defaults": {
+              "type": "object",
+              "propertyNames": {
+                "pattern": "^[A-Za-z0-9._-]{1,64}$"
+              },
+              "additionalProperties": {
+                "$ref": "#/$defs/ref"
+              },
+              "description": "Fill projected fields that resolved to null: name -> literal or template (resolved against the run context). Can only fill, never introduce, fields."
             }
           },
-          "description": "Pure projection: copy fields out of earlier outputs."
+          "description": "Pure projection: copy fields out of earlier outputs, the trigger envelope, or the digest-verified stored manifest."
         },
         "fan-out": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["over", "step"],
+          "required": [
+            "over",
+            "step"
+          ],
           "properties": {
             "over": {
               "$ref": "#/$defs/ref",
@@ -342,9 +593,13 @@
             "step": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["emit"],
+              "required": [
+                "emit"
+              ],
               "properties": {
-                "emit": { "$ref": "#/$defs/step/properties/emit" }
+                "emit": {
+                  "$ref": "#/$defs/step/properties/emit"
+                }
               },
               "description": "Inline emit payload executed once per element."
             }
@@ -354,7 +609,10 @@
         "join": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["expect", "timeout"],
+          "required": [
+            "expect",
+            "timeout"
+          ],
           "properties": {
             "expect": {
               "type": "integer",
@@ -362,14 +620,18 @@
               "maximum": 200,
               "description": "Number of awaited child effects before advancing."
             },
-            "timeout": { "$ref": "#/$defs/duration" }
+            "timeout": {
+              "$ref": "#/$defs/duration"
+            }
           },
           "description": "Declared in v1, executed with fan-out."
         },
         "fork-work": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["noteRef"],
+          "required": [
+            "noteRef"
+          ],
           "properties": {
             "noteRef": {
               "$ref": "#/$defs/ref",
@@ -381,7 +643,10 @@
         "work-create": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["objectiveRef", "capability"],
+          "required": [
+            "objectiveRef",
+            "capability"
+          ],
           "properties": {
             "objectiveRef": {
               "$ref": "#/$defs/ref",
@@ -401,7 +666,10 @@
         "escalate": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["to", "message"],
+          "required": [
+            "to",
+            "message"
+          ],
           "properties": {
             "to": {
               "$ref": "#/$defs/ref",
@@ -418,11 +686,19 @@
         "memory": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["op", "scope", "textRef"],
+          "required": [
+            "op",
+            "scope",
+            "textRef"
+          ],
           "properties": {
             "op": {
               "type": "string",
-              "enum": ["recall", "retain", "promote"]
+              "enum": [
+                "recall",
+                "retain",
+                "promote"
+              ]
             },
             "scope": {
               "$ref": "common.v1.json#/$defs/idToken"
@@ -436,7 +712,10 @@
         "invoke": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["workflow", "timeout"],
+          "required": [
+            "workflow",
+            "timeout"
+          ],
           "properties": {
             "workflow": {
               "$ref": "common.v1.json#/$defs/idToken",
@@ -472,12 +751,18 @@
     "output": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["project"],
+      "required": [
+        "project"
+      ],
       "properties": {
         "project": {
           "type": "object",
-          "propertyNames": { "pattern": "^[A-Za-z0-9._-]{1,64}$" },
-          "additionalProperties": { "$ref": "#/$defs/jsonPath" },
+          "propertyNames": {
+            "pattern": "^[A-Za-z0-9._-]{1,64}$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/jsonPath"
+          },
           "description": "Select-law projection over the instance step log: what a completed instance publishes to a caller. Absent block publishes {}."
         }
       }

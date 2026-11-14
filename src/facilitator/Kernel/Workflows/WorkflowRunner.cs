@@ -8,9 +8,12 @@ using Facilitator.Kernel.Notifications;
 using Facilitator.Kernel.Shared;
 using Facilitator.Kernel.Shared.Dispatch;
 using Facilitator.Kernel.Shared.Persistence;
+using Facilitator.Kernel.Shared.Storage;
 using Facilitator.Kernel.Work;
 
 using Microsoft.EntityFrameworkCore;
+
+using Microsoft.Extensions.DependencyInjection;
 
 using Ofac.Protocol.Validation;
 
@@ -41,7 +44,8 @@ public sealed partial class WorkflowRunner(
     EnvelopeValidator envelopeValidator,
     IEnumerable<IDecisionGateway> decisionGateways,
     NotificationLedger notifications,
-    Facilitator.Kernel.Integrations.ProviderRegistry providers)
+    Facilitator.Kernel.Integrations.ProviderRegistry providers,
+    IServiceScopeFactory scopeFactory)
 {
     /// <summary>Timeline actor of every plane row.</summary>
     public const string Actor = "workflow:kernel";
@@ -244,7 +248,8 @@ public sealed partial class WorkflowRunner(
         // nothing (no outbox, no timeline, no approval row).
         Task<StepOutcome> ExecuteStepKindAsync() => kind switch
         {
-            "select" => Task.FromResult(StepOutcome.Continue(SelectProject(payload, context))),
+            "select" => ExecuteSelectAsync(payload, context, ct),
+            "fan-out" => ExecuteFanOutAsync(db, instance, payload, context, commandId, now, ct, shadowMode),
             "emit" => ExecuteEmitAsync(db, instance, payload, context, commandId, now, ct, shadowMode),
             "decide" => ExecuteDecideAsync(payload, context, ct),
             "wait" => Task.FromResult(ParkOutcome(context, payload.GetProperty("correlate"), "wait",
@@ -533,7 +538,11 @@ public sealed partial class WorkflowRunner(
                 return StepOutcome.LegFailed(new JsonObject { ["error"] = "subject work vanished" });
             }
 
-            var seq = commandId[(commandId.LastIndexOf(':') + 1)..];
+            // Effect identity: everything the step-command id carries past
+            // the instance segment (`<stepId>:<n>[:<element>]`) — a fan-out
+            // leg's per-element suffix rides the effect key verbatim.
+            var keySegments = commandId.Split(':');
+            var effectKey = string.Join(':', keySegments[3..]);
             var intent = new RoutingIntent(
                 routedWork,
                 capability.GetString()!,
@@ -542,7 +551,7 @@ public sealed partial class WorkflowRunner(
                 TargetId: ResolveString(payload.TryGetProperty("to", out var toRef) ? toRef : default, context)
                            ?? $"{instance.DefId}-flow",
                 CommandIdBase: $"wf-{instance.InstanceId:N}",
-                EffectKey: $"{stepSegment(instance.CurrentStep)}:{seq}",
+                EffectKey: effectKey,
                 Objective: work.Objective,
                 SourceRefsJson: null,
                 ExtraInputsJson: inputs.Count == 0 ? null : inputs.ToJsonString(),
@@ -573,8 +582,9 @@ public sealed partial class WorkflowRunner(
             Activity.Current?.SetTag("ofac.outbox.id", intentRow.OutboxId.ToString());
             Activity.Current?.SetTag("ofac.outbox.command_id", intentRow.CommandId);
             Activity.Current?.SetTag("ofac.workflow.correlation_id", instance.InstanceId.ToString("N"));
+            var marker = await ParkBindingAsync(db, instance, payload, context, now, ct);
             return StepOutcome.Done(
-                new JsonObject { ["effect"] = "routing-intent", ["commandId"] = intent.EffectCommandId },
+                new JsonObject { ["effect"] = "routing-intent", ["commandId"] = intent.EffectCommandId, ["binding"] = marker },
                 commandId,
                 note: $"flow effect: routing intent {capability.GetString()}");
         }
@@ -731,12 +741,15 @@ public sealed partial class WorkflowRunner(
             var guard = payload.GetProperty("guard");
             var field = guard.GetProperty("field").GetString()!;
             var actual = WorkflowMatcher.ResolvePath(document, field);
-            var hit = guard.TryGetProperty("equals", out var equals)
-                ? equals.ValueKind == JsonValueKind.Null
-                    ? actual is null || actual.Value.ValueKind == JsonValueKind.Null
-                    : actual is not null && WorkflowMatcher.Matches(equals, actual)
-                : actual is not null
-                    && guard.GetProperty("in").EnumerateArray().Any(term => WorkflowMatcher.Matches(term, actual));
+            var hit = guard.TryGetProperty("present", out var present)
+                ? present.GetBoolean()
+                    == (actual is not null && actual.Value.ValueKind != JsonValueKind.Null)
+                : guard.TryGetProperty("equals", out var equals)
+                    ? equals.ValueKind == JsonValueKind.Null
+                        ? actual is null || actual.Value.ValueKind == JsonValueKind.Null
+                        : actual is not null && WorkflowMatcher.Matches(equals, actual)
+                    : actual is not null
+                        && guard.GetProperty("in").EnumerateArray().Any(term => WorkflowMatcher.Matches(term, actual));
             // A HIT has no declared branch: the guard says only whether the
             // flow continues, so the completed-edge law chooses the successor
             // (the array-adjacent chain or an explicit `<stepId>:completed`
@@ -1286,6 +1299,35 @@ public sealed partial class WorkflowRunner(
             }
         }
 
+        if (envelope is not null)
+        {
+            // As-built assignment context: the capability the completing
+            // assignment rode, read the way the arms read it (the assign
+            // envelope outbox row IS the ledger — no runtime join onto a
+            // capability column). `assign.capability` guards then scope a
+            // flow to the completing assignment's capability, provider-style.
+            var eventData = envelope.Value.TryGetProperty("data", out var d) ? d : default;
+            if (eventData.ValueKind == JsonValueKind.Object
+                && instance.PrimaryWorkId is { } subjectWork
+                && eventData.TryGetProperty("assignmentId", out var wireAssignment)
+                && wireAssignment.ValueKind == JsonValueKind.String)
+            {
+                var assignRow = db.Outbox.AsNoTracking()
+                    .Where(o => o.WorkId == subjectWork
+                                && o.EventType == "org.facilitator.command.work.assign.v1")
+                    .ToList()
+                    .FirstOrDefault(o => JsonDocument.Parse(o.Envelope).RootElement
+                        .GetProperty("data").TryGetProperty("assignmentId", out var a)
+                        && a.GetString() == wireAssignment.GetString());
+                if (assignRow is not null)
+                {
+                    var capability = JsonDocument.Parse(assignRow.Envelope).RootElement
+                        .GetProperty("data").GetProperty("capabilityId").GetString();
+                    context["assign"] = new JsonObject { ["capability"] = capability };
+                }
+            }
+        }
+
         return context;
     }
 
@@ -1446,17 +1488,175 @@ public sealed partial class WorkflowRunner(
 
     private static string stepSegment(string? stepId) => stepId ?? "entry";
 
-    private static JsonObject SelectProject(JsonElement payload, JsonObject context)
+    private async Task<StepOutcome> ExecuteSelectAsync(JsonElement payload, JsonObject context, CancellationToken ct)
     {
+        var source = payload.TryGetProperty("source", out var src) ? src.GetString() : "event";
+        JsonElement document;
+        if (source == "manifest")
+        {
+            // The manifest-source law: the completed event carries a ref +
+            // digest, the record arm verified the digest pre-commit, and
+            // the STORED bytes are the source (the ResultIngress law of the
+            // verified artifact, not the wire restatement). A missing ref or
+            // a vanished artifact fails the leg (visible, requeueable).
+            var manifest = await ManifestFromContextAsync(context, ct);
+            if (manifest is null)
+            {
+                return StepOutcome.LegFailed(new JsonObject { ["error"] = "manifest source unreadable" });
+            }
+
+            document = manifest.Value;
+        }
+        else
+        {
+            document = JsonSerializer.SerializeToElement(context);
+        }
+
         var project = new JsonObject();
-        var document = JsonSerializer.SerializeToElement(context);
         foreach (var field in payload.GetProperty("project").EnumerateObject())
         {
             var found = WorkflowMatcher.ResolvePath(document, field.Value.GetString()!);
             project[field.Name] = found is null ? null : JsonNode.Parse(found.Value.GetRawText());
         }
 
-        return project;
+        if (payload.TryGetProperty("defaults", out var defaults))
+        {
+            // Fill-only law: a default lands where the projection resolved
+            // to null, over the run context (never introduces a new field).
+            foreach (var field in defaults.EnumerateObject())
+            {
+                if (project.TryGetPropertyValue(field.Name, out var current) && current is null)
+                {
+                    project[field.Name] = ResolveTemplate(JsonNode.Parse(field.Value.GetRawText()), context);
+                }
+            }
+        }
+
+        return StepOutcome.Continue(project);
+    }
+
+    /// <summary>The stored manifest the trigger event names (data-scoped
+    /// ref + digest, read through a kernel-local scope: the ledger is a
+    /// scoped service). Null: no ref, no artifact, or a digest the stored
+    /// bytes refuse (the leg fails honestly either way).</summary>
+    private async Task<JsonElement?> ManifestFromContextAsync(JsonObject context, CancellationToken ct)
+    {
+        if (context["event"]?.AsObject() is not { } envelopeNode
+            || envelopeNode["data"]?.AsObject() is not { } dataNode
+            || dataNode["resultManifestRef"]?.GetValueKind() != JsonValueKind.String
+            || dataNode["resultDigest"]?.GetValueKind() != JsonValueKind.String)
+        {
+            return null;
+        }
+
+        var wireRef = dataNode["resultManifestRef"]!.GetValue<string>();
+        var digest = dataNode["resultDigest"]!.GetValue<string>();
+        var slash = wireRef.LastIndexOf('/');
+        if (slash < 0 || !Guid.TryParse(wireRef[(slash + 1)..], out var artifactId))
+        {
+            return null;
+        }
+
+        using var scope = scopeFactory.CreateScope();
+        var ledger = scope.ServiceProvider.GetRequiredService<IResultManifestLedger>();
+        using var stored = await ledger.ReadStoredAsync(artifactId, ct);
+        if (stored is null
+            || ApprovalDigest.CanonicalDocument(stored.RootElement.Clone()) != digest)
+        {
+            return null;
+        }
+
+        return stored.RootElement.Clone();
+    }
+
+    /// <summary>The emit side effect of a declarable binding marker (the
+    /// pending-PR marker law): ON CONFLICT DO NOTHING, so a redelivered
+    /// flow leg is inert. Returns the root it parked (audit-visible), null
+    /// when the step declares none.</summary>
+    private async Task<string?> ParkBindingAsync(
+        FacilitatorDbContext db,
+        WorkflowInstanceEntity instance,
+        JsonElement payload,
+        JsonObject context,
+        DateTime now,
+        CancellationToken ct)
+    {
+        if (!payload.TryGetProperty("binding", out var binding))
+        {
+            return null;
+        }
+
+        var provider = ResolveString(binding.GetProperty("provider"), context);
+        var channel = ResolveString(binding.GetProperty("channel"), context);
+        var root = ResolveString(binding.GetProperty("root"), context);
+        if (provider is not { Length: > 0 } || channel is not { Length: > 0 } || root is not { Length: > 0 })
+        {
+            return null;
+        }
+
+        // Idempotency: the event's own result digest names the marker (the
+        // arm's `pr-request:<digest>` law verbatim) — a manifest revision
+        // parks one marker, a redelivered leg is inert, and a genuinely new
+        // revision of the same branch may park a fresh one.
+        var wireDigest = context["event"]?.AsObject()["data"]?["resultDigest"]?.GetValue<string>()
+                         ?? instance.InstanceId.ToString("N");
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+             INSERT INTO facilitator.communication_bindings
+                 (binding_id, provider, channel, root_message_id, work_id, idempotency_key, created_at)
+             VALUES (gen_random_uuid(), {provider}, {channel}, {root}, {instance.PrimaryWorkId}, {"wf-binding:" + wireDigest + ":" + root}, {now})
+             ON CONFLICT DO NOTHING
+             """, ct);
+        return root;
+    }
+
+    private async Task<StepOutcome> ExecuteFanOutAsync(
+        FacilitatorDbContext db,
+        WorkflowInstanceEntity instance,
+        JsonElement payload,
+        JsonObject context,
+        string commandId,
+        DateTime now,
+        CancellationToken ct,
+        bool shadow)
+    {
+        // Fan-out law: resolve `over` against the context, run the inline
+        // emit per element with the element hung at `$item`; the per-element
+        // suffix rides the leg's command id (and through it the effect-key
+        // law), so element effects are individually replay-idempotent.
+        var overRef = payload.GetProperty("over").GetString()!;
+        if (ResolveTemplate(JsonValue.Create(overRef), context) is not JsonArray items)
+        {
+            return StepOutcome.LegFailed(new JsonObject { ["error"] = $"fan-out over '{overRef}': not an array" });
+        }
+
+        var inline = payload.GetProperty("step").GetProperty("emit");
+        var effects = new JsonArray();
+        var index = 0;
+        foreach (var element in items)
+        {
+            context["item"] = element?.DeepClone();
+            var legCommandId = $"{commandId}:{index}";
+            var outcome = await ExecuteEmitAsync(db, instance, inline, context, legCommandId, now, ct, shadow);
+            if (outcome.Kind != OutcomeKind.Continue)
+            {
+                return StepOutcome.LegFailed(new JsonObject
+                {
+                    ["error"] = $"fan-out element {index} failed",
+                    ["elements"] = effects,
+                });
+            }
+
+            effects.Add(outcome.Output?.DeepClone());
+            index++;
+        }
+
+        context["item"] = null;
+        // The leg's own id rides the output: element effects suffix it
+        // (`<base>:<n>`), so a reader recomputes every per-element effect
+        // command id from the log row alone.
+        return StepOutcome.Done(
+            new JsonObject { ["commandId"] = commandId, ["elements"] = effects, ["count"] = index }, commandId);
     }
 
     private static TimeSpan ParseDuration(string iso)

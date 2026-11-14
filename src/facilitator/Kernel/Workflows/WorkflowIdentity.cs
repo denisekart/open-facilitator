@@ -39,6 +39,21 @@ public static class WorkflowIdentity
     public static string WakeCommandId(Guid childInstance, string status) =>
         $"wf-wake:{childInstance:N}:{status}";
 
+    /// <summary>UUIDv5 namespace for trigger rows: name =
+    /// <c>defId@ver&gt;envelopeId</c>. The trigger row's identity is the
+    /// envelope's own, per definition: an arm hook and the generic ingress
+    /// hook on the SAME envelope converge on one row (PK) and therefore one
+    /// instance — the plane observes each accepted event exactly once
+    /// however many code paths report it.</summary>
+    public static readonly Guid TriggerRowNamespace = new("9f3b71c6-2d54-4a08-b7e2-41c8d05f6b13");
+
+    /// <summary>The trigger-row identity for one (definition, envelope)
+    /// pair. Deterministic: the instance identity becomes a pure function
+    /// of (defId, version, wire envelope id), derivable by receipts and
+    /// tests without reading the row.</summary>
+    public static Guid TriggerRowId(string defId, int version, string envelopeId) =>
+        Uuid5(TriggerRowNamespace, $"{defId}@{version}>{envelopeId}");
+
     /// <summary>The instance identity of a trigger delivery: UUIDv5 over the
     /// trigger namespace with the fixed-separator name
     /// <c>defId@ver&gt;triggerOutboxRowId</c>.</summary>

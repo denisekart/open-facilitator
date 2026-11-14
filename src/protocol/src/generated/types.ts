@@ -1204,7 +1204,8 @@ export interface StepElement {
    */
   decide?: Decide;
   /**
-   * Append one effect: a named wire command, or a capability routed through the funnel.
+   * Append one effect: a named wire command, or a capability routed through the funnel
+   * (optionally parking a binding marker).
    */
   emit?: Emit;
   /**
@@ -1243,7 +1244,8 @@ export interface StepElement {
    */
   on?: string;
   /**
-   * Pure projection: copy fields out of earlier outputs.
+   * Pure projection: copy fields out of earlier outputs, the trigger envelope, or the
+   * digest-verified stored manifest.
    */
   select?: Select;
   /**
@@ -1303,7 +1305,7 @@ export interface Decide {
    * low confidence or AI outage); `guard` is a deterministic field predicate with no model
    * and no telemetry.
    */
-  source: Source;
+  source: DecideSource;
 }
 
 /**
@@ -1323,6 +1325,11 @@ export interface Guard {
    * Any-of scalar membership.
    */
   in?: [boolean | number | string, ...(boolean | number | string)[]];
+  /**
+   * Presence branch: true hits when the field resolves to a present, non-null value (works
+   * for arrays/objects too); false hits on absent/null. Exactly one of equals/in/present.
+   */
+  present?: boolean;
 }
 
 /**
@@ -1349,12 +1356,18 @@ export interface Option {
  * low confidence or AI outage); `guard` is a deterministic field predicate with no model
  * and no telemetry.
  */
-export type Source = "model" | "guard";
+export type DecideSource = "model" | "guard";
 
 /**
- * Append one effect: a named wire command, or a capability routed through the funnel.
+ * Append one effect: a named wire command, or a capability routed through the funnel
+ * (optionally parking a binding marker).
  */
 export interface Emit {
+  /**
+   * Side effect of a capability emit: park a communication binding alongside the routing
+   * intent (the pr-request pending-PR marker law).
+   */
+  binding?: Binding;
   /**
    * Capability id: dispatch appends a routing intent (the routing funnel chooses the
    * endpoint).
@@ -1375,6 +1388,36 @@ export interface Emit {
    */
   to?: string;
 }
+
+/**
+ * Side effect of a capability emit: park a communication binding alongside the routing
+ * intent (the pr-request pending-PR marker law).
+ */
+export interface Binding {
+  /**
+   * Binding channel (the repo), templated.
+   */
+  channel: string;
+  /**
+   * `branch`: a pending-PR marker binding (the head-branch resolver's key), inserted ON
+   * CONFLICT DO NOTHING so redelivery is inert.
+   */
+  kind: BindingKind;
+  /**
+   * Provider token: a literal (importers bake the provider into scoped copies).
+   */
+  provider: string;
+  /**
+   * Binding root (for example `branch:` + the head ref), interpolated.
+   */
+  root: string;
+}
+
+/**
+ * `branch`: a pending-PR marker binding (the head-branch resolver's key), inserted ON
+ * CONFLICT DO NOTHING so redelivery is inert.
+ */
+export type BindingKind = "branch";
 
 /**
  * Write a notification-ledger row for a human.
@@ -1476,15 +1519,36 @@ export interface Memory {
 export type Op = "recall" | "retain" | "promote";
 
 /**
- * Pure projection: copy fields out of earlier outputs.
+ * Pure projection: copy fields out of earlier outputs, the trigger envelope, or the
+ * digest-verified stored manifest.
  */
 export interface Select {
+  /**
+   * Fill projected fields that resolved to null: name -> literal or template (resolved
+   * against the run context). Can only fill, never introduce, fields.
+   */
+  defaults?: { [key: string]: string };
   /**
    * Output name -> jsonPath over earlier step outputs / the trigger envelope. Missing paths
    * yield null (never an error).
    */
   project: { [key: string]: string };
+  /**
+   * Document the paths project over: the trigger envelope (default) or, for an event carrying
+   * `data.resultManifestRef` + `data.resultDigest`, the STORED manifest artifact re-read by
+   * the kernel (the record arm verified the digest pre-commit; a vanished artifact fails the
+   * leg). Paths are relative to the manifest document.
+   */
+  source?: SelectSource;
 }
+
+/**
+ * Document the paths project over: the trigger envelope (default) or, for an event carrying
+ * `data.resultManifestRef` + `data.resultDigest`, the STORED manifest artifact re-read by
+ * the kernel (the record arm verified the digest pre-commit; a vanished artifact fails the
+ * leg). Paths are relative to the manifest document.
+ */
+export type SelectSource = "event" | "manifest";
 
 /**
  * Park until the delay elapses; the sweeper is the clock.

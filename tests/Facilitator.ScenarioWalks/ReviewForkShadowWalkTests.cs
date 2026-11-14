@@ -76,6 +76,7 @@ public sealed class ReviewForkShadowWalkTests(PostgresFixture fixture)
         Assert.Equal(armSuccessor, bound);
 
         // The plane computes: drain until the shadowed instance settled.
+        var instanceId = await PlaneInstanceIdAsync(reviewDelivery);
         await KernelOps.PollUntilAsync(
             async () =>
             {
@@ -83,13 +84,13 @@ public sealed class ReviewForkShadowWalkTests(PostgresFixture fixture)
                 // Settled = the guard AND the fork leg both logged (a
                 // shadowed instance row exists before the first step runs).
                 return await ScalarLongAsync(
-                    "SELECT count(*) FROM facilitator.workflow_step_log l JOIN facilitator.workflow_instances i ON i.id = l.instance_id WHERE i.def_id = 'review-fork' AND l.step_id IN ('guard-terminal','fork')") >= 2;
+                    "SELECT count(*) FROM facilitator.workflow_step_log WHERE instance_id = $1 AND step_id IN ('guard-terminal','fork')",
+                    instanceId) >= 2;
             },
             "the shadow instance settles",
             20_000);
-        var instanceId = Guid.Parse((await ValAsync(
-            "SELECT id::text FROM facilitator.workflow_instances WHERE def_id = 'review-fork' ORDER BY started_at LIMIT 1"))!);
-        Assert.Equal("shadowed", await StatusOfInstanceAsync());
+        Assert.Equal("shadowed", await ValAsync(
+            "SELECT status FROM facilitator.workflow_instances WHERE id = $1", instanceId));
 
         var logs = await RowsAsync(
             "SELECT jsonb_build_object('stepId', step_id, 'status', status, 'output', output) FROM facilitator.workflow_step_log WHERE instance_id = $1 ORDER BY seq",
@@ -124,8 +125,7 @@ public sealed class ReviewForkShadowWalkTests(PostgresFixture fixture)
         // row: shadow computes, never appends.
         Assert.Equal(0L, await ScalarLongAsync(
             "SELECT count(*) FROM facilitator.outbox WHERE command_id = $1",
-            $"successor:{WorkflowIdentity.ForkWorkId(Guid.Parse((await ValAsync(
-                "SELECT id::text FROM facilitator.workflow_instances WHERE def_id = 'review-fork' ORDER BY started_at LIMIT 1"))!), "fork"):N}"));
+            $"successor:{WorkflowIdentity.ForkWorkId(instanceId, "fork"):N}"));
         // (The plane's own reply would carry the deterministic id below —
         // asserted absent by the wf: count and by the successor-work count.)
         // Scoped to THIS predecessor's short id: the collection's sibling
@@ -165,13 +165,13 @@ public sealed class ReviewForkShadowWalkTests(PostgresFixture fixture)
             async () =>
             {
                 await dispatcher.DrainOnceAsync(CancellationToken.None);
-                return await ScalarLongAsync(
-                    "SELECT count(*) FROM facilitator.workflow_step_log l JOIN facilitator.workflow_instances i ON i.id = l.instance_id WHERE i.def_id = 'review-fork' AND l.step_id = 'guard-terminal'") > 1;
+                return await ValAsync(
+                    "SELECT status FROM facilitator.workflow_instances WHERE id = $1",
+                    await PlaneInstanceIdAsync(review2Delivery)) is not null;
             },
             "the live-review shadow instance settles",
             20_000);
-        var liveInstance = Guid.Parse((await ValAsync(
-            "SELECT id::text FROM facilitator.workflow_instances WHERE def_id = 'review-fork' ORDER BY started_at DESC LIMIT 1"))!);
+        var liveInstance = await PlaneInstanceIdAsync(review2Delivery);
         var liveLogs = await RowsAsync(
             "SELECT jsonb_build_object('stepId', step_id, 'status', status) FROM facilitator.workflow_step_log WHERE instance_id = $1",
             liveInstance);
@@ -205,8 +205,20 @@ public sealed class ReviewForkShadowWalkTests(PostgresFixture fixture)
         return review.ToJsonString();
     }
 
-    private Task<string?> StatusOfInstanceAsync() =>
-        ValAsync("SELECT status FROM facilitator.workflow_instances WHERE def_id = 'review-fork' ORDER BY started_at LIMIT 1");
+    /// <summary>The plane's instance for one review delivery: the trigger
+    /// row carries the delivery id, the instance identity derives from the
+    /// row's own id (the deterministic law, recomputed not queried).</summary>
+    private async Task<Guid> PlaneInstanceIdAsync(string deliveryId)
+    {
+        var triggerRow = await ValAsync(
+            """
+            SELECT outbox_id::text FROM facilitator.outbox
+             WHERE recipient_endpoint_id = 'workflow.kernel'
+               AND envelope::jsonb -> 'data' ->> 'providerDeliveryId' = $1
+            """, deliveryId);
+        Assert.NotNull(triggerRow);
+        return WorkflowIdentity.InstanceIdFor("review-fork", 1, Guid.Parse(triggerRow!));
+    }
 
     private async Task<string?> ValAsync(string sql, params object[] parameters)
     {

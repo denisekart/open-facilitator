@@ -115,6 +115,15 @@ public sealed class WorkflowShadowReport(
                 false, [$"no-plane-run: judgment '{judgment}'"]);
         }
 
+        // This report reconciles SHADOW computation against the arm. A
+        // deferred (swapped, enabled-and-live) run records real done-legs,
+        // not would-do plans — nothing to reconcile, and the judgment
+        // already names the same deterministic successor.
+        if (!logs.Any(l => l.Status == "shadow"))
+        {
+            return new Row(provider, deliveryId, judgment, instanceId, false, Forked(judgment), true, []);
+        }
+
         var guard = logs.FirstOrDefault(l => l.StepId == "guard-terminal");
         var fork = logs.FirstOrDefault(l => l.StepId == "fork");
         var guardHit = guard?.Output is { Length: > 0 } guardJson

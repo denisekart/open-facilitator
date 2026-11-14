@@ -841,6 +841,14 @@ public sealed class ProviderEventStore(
         return new ArmEffect(null, $"observe:{action}");
     }
 
+    /// <summary>The swap knob's fixed names (the gallery definition's
+    /// step ids are part of its contract: the deterministic successor id
+    /// depends on (instance, stepId), so the arm must know the fork
+    /// step's id to predict the plane's successor.</summary>
+    internal const string ReviewForkDefinitionId = "review-fork";
+
+    internal const string ReviewForkStepId = "fork";
+
     // Review (E1/E4): a formal verdict on the change request - the decision
     // class the forge-native `reviewed` action was too weak to carry. Same
     // decision row as the reviewed action, plus the steer; a review on a
@@ -873,14 +881,37 @@ public sealed class ProviderEventStore(
             await AppendReviewDecisionAsync(
                 db, provider, workId, work.Version, data, reference, $"{action}:{state}", text, now, ct);
 
-            // Plane hook (shadow law): the trigger row rides THIS
-            // transaction, stamped with the subject the review actually
-            // hit — the fork below repoints the binding to the successor,
-            // so a consumer that re-resolved the work later would see a
-            // different work than the one the review landed on.
-            if (workflows is not null)
+            // Plane hook: the trigger row rides THIS transaction, stamped
+            // with the subject the review actually hit — the fork repoints
+            // the binding to the successor, so a consumer that re-resolved
+            // the work later would see a different work than the one the
+            // review landed on.
+            var appended = workflows is null
+                ? []
+                : await workflows.EmitAsync(db, envelope, workId, ct);
+
+            // Swap law (the one knob is the definition's shadow flag):
+            // when review-fork's triggered version is enabled AND live,
+            // the plane performs the fork (WorkFork.ApplyAsync, the same
+            // law the arm runs below) — the arm defers, and the judgment
+            // names the plane's DETERMINISTIC successor: derivable from
+            // the delivery alone, so the receipt is honest even while the
+            // successor row itself lands when the plane runs (inbox has no
+            // works FK; the admin join is left-outer). Toggling the
+            // definition OFF between this commit and the plane's delivery
+            // drops exactly this one fork — the operator flipped the knob
+            // mid-delivery.
+            var trigger = appended.FirstOrDefault(a => a.DefinitionId == ReviewForkDefinitionId);
+            var liveVersion = trigger is null
+                ? null
+                : await workflows!.LiveVersionAsync(db, trigger.DefinitionId, ct);
+            if (trigger is not null && liveVersion == trigger.Version)
             {
-                await workflows.EmitAsync(db, envelope, workId, ct);
+                var planeInstance = Facilitator.Kernel.Workflows.WorkflowIdentity.InstanceIdFor(
+                    trigger.DefinitionId, trigger.Version, trigger.OutboxId);
+                var planeSuccessor = Facilitator.Kernel.Workflows.WorkflowIdentity.ForkWorkId(
+                    planeInstance, ReviewForkStepId);
+                return new ArmEffect(planeSuccessor, $"work/{planeSuccessor}:input");
             }
 
             var forked = await AppendWorkInputAsync(db, provider, workId,
@@ -1198,38 +1229,11 @@ public sealed class ProviderEventStore(
         // follow-up is a new item with its own history, not a resurrected one.
         workId = await ForkTerminalAsync(db, provider, workId, note, now, ct);
         var version = await db.Works.Where(w => w.WorkId == workId).Select(w => w.Version).FirstOrDefaultAsync(ct);
-        db.WorkEvents.Add(new WorkEventEntity
-        {
-            EventId = Guid.NewGuid(),
-            WorkId = workId,
-            WorkVersion = version,
-            Kind = "provider.input",
-            Actor = $"provider:{provider}",
-            Detail = JsonSerializer.Serialize(new Dictionary<string, string> { ["note"] = note }),
-            CreatedAt = now,
-        });
-        if (sourceRefs is { Count: > 0 })
-        {
-            // Auditable media row: the refs ride the timeline, not just the
-            // note text, so a later reader dereferences them without parsing
-            // the note.
-            db.WorkEvents.Add(new WorkEventEntity
-            {
-                EventId = Guid.NewGuid(),
-                WorkId = workId,
-                WorkVersion = version,
-                Kind = "provider.attachment",
-                Actor = $"provider:{provider}",
-                Detail = new JsonObject
-                {
-                    ["note"] = note,
-                    ["sourceRefs"] = (JsonNode)sourceRefs.DeepClone(),
-                }.ToJsonString(),
-                CreatedAt = now,
-            });
-        }
-
-        AppendProgressRow(db, registry.Find(provider), workId, Trim(note), now);
+        // The input-side leg of the terminal law lives in WorkFork now
+        // (one implementation, two execution modes): provider.input, the
+        // optional auditable media row, the progress echo.
+        Facilitator.Kernel.Work.WorkFork.AddInputRows(
+            db, envelopeValidator, registry.Find(provider), provider, workId, version, note, sourceRefs, now);
         return workId;
     }
 
@@ -1244,81 +1248,14 @@ public sealed class ProviderEventStore(
             return workId;
         }
 
-        var successor = new WorkEntity
-        {
-            WorkId = Guid.NewGuid(),
-            ProjectId = target.ProjectId,
-            Objective = $"Follow-up to {target.WorkId.ToString("N")[..8]}: {note.Split('\n')[0]}",
-            State = "open",
-            Version = 1,
-            TeamId = target.TeamId,
-            OwnerActor = target.OwnerActor,
-            Origin = target.Origin,
-            ActiveWhere = target.ActiveWhere,
-            CreatedAt = now,
-            UpdatedAt = now,
-        };
-        db.Works.Add(successor);
-        db.WorkEvents.Add(new WorkEventEntity
-        {
-            EventId = Guid.NewGuid(),
-            WorkId = successor.WorkId,
-            WorkVersion = 1,
-            Kind = "created",
-            Actor = $"provider:{provider}",
-            Detail = JsonSerializer.Serialize(new Dictionary<string, string?>
-            {
-                ["objective"] = successor.Objective,
-                ["successorOf"] = target.WorkId.ToString(),
-            }),
-            CreatedAt = now,
-        });
-        db.WorkLinks.Add(new WorkLinkEntity
-        {
-            LinkId = Guid.NewGuid(),
-            WorkId = target.WorkId,
-            RefWorkId = successor.WorkId,
-            Kind = "successor",
-            Note = "input arrived after the work closed",
-            CreatedAt = now,
-        });
-        db.WorkEvents.Add(new WorkEventEntity
-        {
-            EventId = Guid.NewGuid(),
-            WorkId = target.WorkId,
-            WorkVersion = target.Version,
-            Kind = "work.linked",
-            Actor = $"provider:{provider}",
-            Detail = JsonSerializer.Serialize(new Dictionary<string, string?>
-            {
-                ["refWorkId"] = successor.WorkId.ToString(),
-                ["kind"] = "successor",
-                ["note"] = "input arrived after the work closed",
-            }),
-            CreatedAt = now,
-        });
-
-        // The conversation follows the live work: the binding (and any
-        // per-message children) repoint to the successor.
-        await db.CommunicationBindings
-            .Where(b => b.WorkId == workId)
-            .ExecuteUpdateAsync(s => s.SetProperty(b => b.WorkId, successor.WorkId), ct);
-
-        // Say so, in the place the input came from (name the new item).
-        var binding = await db.CommunicationBindings.AsNoTracking().FirstOrDefaultAsync(
-            b => b.WorkId == successor.WorkId, ct);
-        if (binding is not null && registry.Find(provider) is { EndpointId: { Length: > 0 } })
-        {
-            var target0 = new ConversationTarget(
-                binding.Provider, null, binding.Channel, binding.RootMessageId, binding.ParentMessageId,
-                null, "thread", null);
-            AppendCommand(db, ReplyEnvelope(target0,
-                $"Work {target.WorkId.ToString("N")[..8]} is closed - this continues as work {successor.WorkId.ToString("N")[..8]}.",
-                $"successor:{successor.WorkId:N}", $"work/{successor.WorkId}", now),
-                registry.Find(provider), now, successor.WorkId);
-        }
-
-        return successor.WorkId;
+        // The fork law is WorkFork's now (item 19: one implementation,
+        // two execution modes). The arm mints a fresh successor id —
+        // unchanged from E4; the plane's mode passes a deterministic one.
+        var plan = Facilitator.Kernel.Work.WorkFork.ComputePlan(target, Guid.NewGuid(), note);
+        await Facilitator.Kernel.Work.WorkFork.ApplyAsync(
+            db, envelopeValidator, registry.Find(provider), plan, target, provider,
+            workflowInstanceId: null, now, ct);
+        return plan.SuccessorWorkId;
     }
 
     private void AppendProgressRow(FacilitatorDbContext db, ProviderOptions? options, Guid workId, string note, DateTime now)

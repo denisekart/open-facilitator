@@ -40,7 +40,8 @@ public sealed partial class WorkflowRunner(
     TimeProvider timeProvider,
     EnvelopeValidator envelopeValidator,
     IEnumerable<IDecisionGateway> decisionGateways,
-    NotificationLedger notifications)
+    NotificationLedger notifications,
+    Facilitator.Kernel.Integrations.ProviderRegistry providers)
 {
     /// <summary>Timeline actor of every plane row.</summary>
     public const string Actor = "workflow:kernel";
@@ -829,11 +830,21 @@ public sealed partial class WorkflowRunner(
         var noteNode = ResolveTemplate(JsonValue.Create(payload.GetProperty("noteRef").GetString()), context);
         var note = noteNode is JsonValue nv && nv.TryGetValue<string>(out var rendered) ? rendered : string.Empty;
         note = note.Length <= 2000 ? note : note[..2000];
+        // The provider token of the trigger event (the arm's actor law:
+        // provider.input / created / work.linked rows all carry
+        // provider:<p> on BOTH execution modes; an event without one
+        // lands provider:kernel, visible and debuggable).
+        var provider = "kernel";
+        if (envelope is { } triggerEnvelope
+            && triggerEnvelope.TryGetProperty("data", out var triggerData)
+            && triggerData.TryGetProperty("provider", out var providerElement)
+            && providerElement.ValueKind == JsonValueKind.String)
+        {
+            provider = providerElement.GetString()!;
+        }
+
         var plan = Facilitator.Kernel.Work.WorkFork.ComputePlan(
-            instance.InstanceId, stepId, predecessor,
-            predecessor.ProjectId, predecessor.TeamId, predecessor.OwnerActor,
-            predecessor.Origin, predecessor.ActiveWhere, note,
-            envelope ?? JsonDocument.Parse("{}").RootElement);
+            predecessor, WorkflowIdentity.ForkWorkId(instance.InstanceId, stepId), note);
 
         if (shadow)
         {
@@ -841,108 +852,21 @@ public sealed partial class WorkflowRunner(
                 new JsonObject { ["wouldDo"] = plan.ToJson(), ["note"] = note }, null);
         }
 
-        // Apply the plan (the arm's law, field for field).
-        db.Works.Add(new WorkEntity
-        {
-            WorkId = plan.SuccessorWorkId,
-            ProjectId = predecessor.ProjectId,
-            Objective = plan.Objective,
-            State = "open",
-            Version = 1,
-            TeamId = predecessor.TeamId,
-            OwnerActor = predecessor.OwnerActor,
-            Origin = predecessor.Origin,
-            ActiveWhere = predecessor.ActiveWhere,
-            CreatedAt = now,
-            UpdatedAt = now,
-        });
-        db.WorkEvents.Add(new WorkEventEntity
-        {
-            EventId = Guid.NewGuid(),
-            WorkId = plan.SuccessorWorkId,
-            WorkVersion = 1,
-            Kind = "created",
-            Actor = Actor,
-            Detail = plan.CreatedEventDetail,
-            CreatedAt = now,
-        });
-        db.WorkLinks.Add(new WorkLinkEntity
-        {
-            LinkId = Guid.NewGuid(),
-            WorkId = plan.PredecessorWorkId,
-            RefWorkId = plan.SuccessorWorkId,
-            Kind = plan.LinkKind,
-            Note = plan.LinkNote,
-            CreatedAt = now,
-        });
-        db.WorkEvents.Add(new WorkEventEntity
-        {
-            EventId = Guid.NewGuid(),
-            WorkId = plan.PredecessorWorkId,
-            WorkVersion = predecessor.Version,
-            Kind = "work.linked",
-            Actor = Actor,
-            Detail = JsonSerializer.Serialize(new Dictionary<string, string?>
-            {
-                ["refWorkId"] = plan.SuccessorWorkId.ToString(),
-                ["kind"] = plan.LinkKind,
-                ["note"] = plan.LinkNote,
-            }),
-            CreatedAt = now,
-        });
-        await db.CommunicationBindings
-            .Where(b => b.WorkId == plan.PredecessorWorkId)
-            .ExecuteUpdateAsync(setters => setters.SetProperty(b => b.WorkId, plan.SuccessorWorkId), ct);
+        // The shared law (WorkFork, one implementation with the arm):
+        // successor + created + work.linked + link + binding repoint +
+        // reply naming the successor, then the input-side rows
+        // (provider.input, optional media, the progress echo). Same
+        // sentences, kinds, actors and command ids as the arm's path —
+        // the swap is timeline-identical (the plane adds workflow.stage
+        // rows on top, the superset law).
+        await Facilitator.Kernel.Work.WorkFork.ApplyAsync(
+            db, envelopeValidator, providers.Find(provider), plan, predecessor,
+            provider, instance.InstanceId, now, ct);
+        Facilitator.Kernel.Work.WorkFork.AddInputRows(
+            db, envelopeValidator, providers.Find(provider), provider,
+            plan.SuccessorWorkId, 1, note, sourceRefs: null, now);
 
-        // The reply naming the successor: the arm's command id verbatim
-        // (deterministic — a redelivery cannot mint a second reply).
-        var replyData = new JsonObject
-        {
-            ["commandId"] = plan.ReplyCommandId,
-            ["idempotencyKey"] = plan.ReplyCommandId,
-            ["target"] = plan.ReplyTarget.DeepClone(),
-            ["text"] = plan.ReplyText,
-        };
-        var replyEnvelope = new JsonObject
-        {
-            ["specversion"] = "1.0",
-            ["id"] = Guid.NewGuid().ToString("N"),
-            ["source"] = EnvelopeFactory.KernelSource,
-            ["type"] = "org.facilitator.command.communication.reply.v1",
-            ["subject"] = $"work/{plan.SuccessorWorkId}",
-            ["time"] = now.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
-            ["datacontenttype"] = "application/json",
-            ["dataschema"] = "https://schemas.openfacilitator.org/v1/command.communication.reply.v1.json",
-            ["data"] = replyData,
-        };
-        if (Activity.Current is { } forkSpan)
-        {
-            replyEnvelope["traceparent"] = forkSpan.Id;
-        }
-
-        var replyJson = replyEnvelope.ToJsonString();
-        var verdict = envelopeValidator.Validate(replyJson);
-        if (!verdict.Ok)
-        {
-            return StepOutcome.LegFailed(new JsonObject { ["error"] = $"reply envelope rejected: {verdict.ErrorClass}: {verdict.Message}" });
-        }
-
-        db.Outbox.Add(new OutboxEntity
-        {
-            OutboxId = Guid.NewGuid(),
-            CommandId = plan.ReplyCommandId,
-            RecipientEndpointId = RecipientFor("org.facilitator.command.communication.reply.v1", replyData),
-            AggregateType = "work",
-            AggregateId = plan.SuccessorWorkId,
-            EventType = "org.facilitator.command.communication.reply.v1",
-            Envelope = replyJson,
-            WorkId = plan.SuccessorWorkId,
-            Status = "pending",
-            AvailableAt = now,
-            Attempts = 0,
-            CreatedAt = now,
-        });
-
+        Activity.Current?.SetTag("ofac.workflow.correlation_id", instance.InstanceId.ToString("N"));
         return StepOutcome.Done(
             plan.ToJson(),
             plan.ReplyCommandId,

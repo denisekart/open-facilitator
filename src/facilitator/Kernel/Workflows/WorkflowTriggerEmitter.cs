@@ -97,11 +97,33 @@ public sealed class WorkflowTriggerEmitter(
     WorkflowSubscriptionRegistry subscriptions,
     TimeProvider timeProvider)
 {
+    /// <summary>One trigger row this emit appended (the arm hook needs the
+    /// exact (defId, version, rowId) to compute the plane's deterministic
+    /// identities and decide the swap deferral).</summary>
+    public sealed record AppendedTrigger(string DefinitionId, int Version, Guid OutboxId);
+
+    /// <summary>The swap knob, read from the row's source of truth: the
+    /// definition's live version when it is enabled AND not shadowed — the
+    /// state in which an arm that just handed the delivery to the plane
+    /// must NOT also perform the behavior itself.</summary>
+    public async Task<int?> LiveVersionAsync(
+        FacilitatorDbContext db,
+        string definitionId,
+        CancellationToken ct)
+    {
+        var row = await db.WorkflowDefinitions.AsNoTracking()
+            .Where(d => d.DefId == definitionId && d.Enabled && !d.Shadow)
+            .OrderByDescending(d => d.Version)
+            .Select(d => (int?)d.Version)
+            .FirstOrDefaultAsync(ct);
+        return row;
+    }
+
     /// <summary>Append trigger rows for one accepted wire event envelope on
     /// the caller's context (typically the arm's transaction — outbox law).
     /// Trigger rows seed their identity from their own row id (inbox dedupe
     /// already guarantees one accepted event = one trigger row).</summary>
-    public async Task<int> EmitAsync(
+    public async Task<IReadOnlyList<AppendedTrigger>> EmitAsync(
         FacilitatorDbContext db,
         JsonElement envelope,
         CancellationToken ct) => await EmitCoreAsync(db, envelope, null, ct);
@@ -112,7 +134,7 @@ public sealed class WorkflowTriggerEmitter(
     /// may move the binding (the review fork repoints it to the successor),
     /// so a consumer that re-resolved the work at delivery time would see a
     /// different subject than the one the event hit.</summary>
-    public async Task<int> EmitAsync(
+    public async Task<IReadOnlyList<AppendedTrigger>> EmitAsync(
         FacilitatorDbContext db,
         JsonElement envelope,
         Guid? subjectWork,
@@ -130,16 +152,16 @@ public sealed class WorkflowTriggerEmitter(
 
         await using var db = await contextFactory.CreateDbContextAsync(ct);
         var appended = await EmitCoreAsync(db, envelope, null, ct);
-        if (appended > 0)
+        if (appended.Count > 0)
         {
             await db.SaveChangesAsync(ct);
             await PostgresNotifications.NotifyOutboxAsync(db, null, ct);
         }
 
-        return appended;
+        return appended.Count;
     }
 
-    private async Task<int> EmitCoreAsync(
+    private async Task<IReadOnlyList<AppendedTrigger>> EmitCoreAsync(
         FacilitatorDbContext db,
         JsonElement envelope,
         Guid? subjectWork,
@@ -147,7 +169,7 @@ public sealed class WorkflowTriggerEmitter(
     {
         if (!runtime.Enabled)
         {
-            return 0;
+            return [];
         }
 
         var type = envelope.TryGetProperty("type", out var t) && t.ValueKind == JsonValueKind.String
@@ -155,18 +177,18 @@ public sealed class WorkflowTriggerEmitter(
             : string.Empty;
         if (type.Length == 0)
         {
-            return 0;
+            return [];
         }
 
         // Subscription-set fast path: no definition triggers and no park
         // awaits this type — nothing to match, nothing to append.
         if (!await subscriptions.MayContainAsync(type, ct))
         {
-            return 0;
+            return [];
         }
 
         var now = timeProvider.GetUtcNow().UtcDateTime;
-        var appended = 0;
+        var appended = new List<AppendedTrigger>();
 
         // 1) Enabled definitions triggering on this type (latest enabled
         //    version each), matcher-checked.
@@ -185,9 +207,8 @@ public sealed class WorkflowTriggerEmitter(
                 continue;
             }
 
-            AppendTrigger(db, latest.DefId, latest.Version, envelope, now,
-                subjectWork ?? EnvelopeWorkId(envelope, db));
-            appended++;
+            appended.Add(AppendTrigger(db, latest.DefId, latest.Version, envelope, now,
+                subjectWork ?? EnvelopeWorkId(envelope, db)));
         }
 
         // 2) Parked instances whose pinned definition waits on this type
@@ -243,7 +264,7 @@ public sealed class WorkflowTriggerEmitter(
             var wakeSeed = WorkflowIdentity.Uuid5(
                 WorkflowIdentity.TriggerNamespace, $"{instance.InstanceId:N}:{wireId}");
             AppendWake(db, instance.InstanceId, instance.PrimaryWorkId, wakeSeed, envelope, now);
-            appended++;
+            appended.Add(new AppendedTrigger(instance.DefId, instance.DefVersion, wakeSeed));
         }
 
         return appended;
@@ -374,7 +395,7 @@ public sealed class WorkflowTriggerEmitter(
         return null;
     }
 
-    private static void AppendTrigger(
+    private static AppendedTrigger AppendTrigger(
         FacilitatorDbContext db,
         string defId,
         int version,
@@ -402,5 +423,6 @@ public sealed class WorkflowTriggerEmitter(
             Attempts = 0,
             CreatedAt = now,
         });
+        return new AppendedTrigger(defId, version, outboxId);
     }
 }

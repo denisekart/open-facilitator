@@ -24,7 +24,8 @@ public sealed record WorkflowTrigger(
     int DefinitionVersion,
     Guid TriggerRowId,
     JsonElement Envelope,
-    Guid OutboxId)
+    Guid OutboxId,
+    Guid? SubjectWork = null)
 {
     /// <summary>Recipient constant (channel <c>workflow</c>).</summary>
     public const string Recipient = "workflow.kernel";
@@ -52,7 +53,7 @@ public sealed record WorkflowTrigger(
             return null;
         }
 
-        return new WorkflowTrigger(parts[..at], version, triggerRowId, row.Envelope, row.OutboxId);
+        return new WorkflowTrigger(parts[..at], version, triggerRowId, row.Envelope, row.OutboxId, row.WorkId);
     }
 }
 

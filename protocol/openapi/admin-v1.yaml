@@ -710,6 +710,44 @@ paths:
           content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
+  /api/admin/workflows/shadow/report:
+    get:
+      operationId: getWorkflowShadowReport
+      tags: [read]
+      summary: >
+        Shadow reconciliation: the plane's would-do step-log records diffed
+        against the acting arm's recorded effects (judgment, link, binding,
+        reply), keyed on the trigger delivery identity — the gate before a
+        shadow definition is swapped to own the behavior.
+      parameters:
+        - in: query
+          name: since
+          required: false
+          schema: { type: string, format: date-time }
+      responses:
+        "200":
+          description: One row per reconciled delivery (empty array = nothing to reconcile yet).
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: false
+                  required: [provider, deliveryId, judgment, planeWouldAct, armActed, match, diffs]
+                  properties:
+                    provider: { type: string }
+                    deliveryId: { type: string }
+                    judgment: { type: string }
+                    instanceId: { type: ["string", "null"], format: uuid }
+                    planeWouldAct: { type: boolean }
+                    armActed: { type: boolean }
+                    match: { type: boolean }
+                    diffs:
+                      type: array
+                      items: { type: string }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
   /api/admin/workflows/registry:
     get:
       operationId: getWorkflowRegistry

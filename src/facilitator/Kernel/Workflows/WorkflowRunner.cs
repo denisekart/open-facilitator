@@ -74,7 +74,12 @@ public sealed partial class WorkflowRunner(
                 }
 
                 var now = timeProvider.GetUtcNow().UtcDateTime;
-                var (primaryWork, projectId, teamSlug) = ResolveWorkContext(db, trigger.Envelope);
+                // Stamp law: the row's subject stamp (the emitter resolved it
+                // when the event was accepted, the acting arm may have
+                // refined it) outranks any re-lookup — a live binding may
+                // have moved since (the review fork repoints it).
+                var (work0, projectId, teamSlug) = ResolveWorkContext(db, trigger.Envelope);
+                var primaryWork = trigger.SubjectWork ?? work0;
                 db.WorkflowInstances.Add(new WorkflowInstanceEntity
                 {
                     InstanceId = instanceId,
@@ -124,9 +129,14 @@ public sealed partial class WorkflowRunner(
             await InstanceLockAsync(db, wake.InstanceId, ct);
             var now = timeProvider.GetUtcNow().UtcDateTime;
             var flipped = await db.WorkflowInstances
-                .Where(i => i.InstanceId == wake.InstanceId && i.Status == "waiting")
+                // A park is waiting-with-a-deadline, or shadowed-with-a-
+                // deadline (a TERMINATED shadow run carries no deadline, so
+                // a late wake finds no park and no-ops).
+                .Where(i => i.InstanceId == wake.InstanceId
+                            && i.DeadlineAt != null
+                            && (i.Status == "waiting" || i.Status == "shadowed"))
                 .ExecuteUpdateAsync(s => s
-                    .SetProperty(i => i.Status, "running")
+                    .SetProperty(i => i.Status, i => i.Status == "shadowed" ? "shadowed" : "running")
                     .SetProperty(i => i.DeadlineAt, (DateTime?)null)
                     .SetProperty(i => i.UpdatedAt, now), ct);
             if (flipped == 0)
@@ -146,12 +156,15 @@ public sealed partial class WorkflowRunner(
 
     /// <summary>Drive an instance step by step until it parks, terminates,
     /// or the iteration budget (a graph-pathology guard) is reached. Each
-    /// leg is its own transaction.</summary>
+    /// leg is its own transaction. The delivery's envelope is the run
+    /// context for EVERY leg of this advance (step templates read
+    /// <c>$event.*</c>); a leg reached after a restart carries the wake
+    /// envelope instead — the event that actually resumed the flow.</summary>
     public async Task AdvanceAsync(Guid instanceId, JsonElement? envelope, bool wake, CancellationToken ct)
     {
         for (var i = 0; i < MaxAdvanceSteps; i++)
         {
-            if (!await AdvanceOnceAsync(instanceId, i == 0 ? envelope : null, wake && i == 0, ct))
+            if (!await AdvanceOnceAsync(instanceId, envelope, wake && i == 0, ct))
             {
                 return;
             }
@@ -167,7 +180,11 @@ public sealed partial class WorkflowRunner(
         await InstanceLockAsync(db, instanceId, ct);
 
         var instance = await db.WorkflowInstances.FirstOrDefaultAsync(i => i.InstanceId == instanceId, ct);
-        if (instance is null || instance.Status is not ("running" or "waiting"))
+
+        // 'shadowed' advances exactly like 'running': the flag is carried by
+        // the DEFINITION, the step executors decide what to write (would-do
+        // records only), so the loop law is identical.
+        if (instance is null || instance.Status is not ("running" or "waiting" or "shadowed"))
         {
             await db.Database.CommitTransactionAsync(ct);
             return false;
@@ -215,23 +232,28 @@ public sealed partial class WorkflowRunner(
         // approval decision of anything but `approved` (denied, expired,
         // revoked) takes the FAILED edge; any other wake (a matching wait
         // event, an approved decision) continues along the completed edge.
+        var shadowMode = definition.Shadow;
         var outcome = wake ? WakeOutcome(envelope!.Value) : await ExecuteStepKindAsync();
 
         StepOutcome UnexecutableStep() => StepOutcome.LegFailed(
             new JsonObject { ["error"] = $"step kind '{kind}' is not executable by this interpreter phase" });
 
+        // The shadow law reaches into the steps: an executor whose effect
+        // would write computes it and reports the would-do, but writes
+        // nothing (no outbox, no timeline, no approval row).
         Task<StepOutcome> ExecuteStepKindAsync() => kind switch
         {
             "select" => Task.FromResult(StepOutcome.Continue(SelectProject(payload, context))),
-            "emit" => ExecuteEmitAsync(db, instance, payload, context, commandId, now, ct),
+            "emit" => ExecuteEmitAsync(db, instance, payload, context, commandId, now, ct, shadowMode),
             "decide" => ExecuteDecideAsync(payload, context, ct),
             "wait" => Task.FromResult(ParkOutcome(context, payload.GetProperty("correlate"), "wait",
                 now + ParseDuration(payload.GetProperty("timeout").GetString()!))),
             "timer" => Task.FromResult(new StepOutcome(OutcomeKind.Parked,
                 new JsonObject { ["parked"] = "timer" }, null, null,
                 Deadline: now + ParseDuration(payload.GetProperty("for").GetString()!))),
-            "approval" => ExecuteApprovalAsync(db, instance, stepId, payload, context, now, ct),
-            "escalate" => ExecuteEscalateAsync(db, instance, payload, context, ct),
+            "approval" => ExecuteApprovalAsync(db, instance, stepId, payload, context, now, ct, shadowMode),
+            "escalate" => ExecuteEscalateAsync(db, instance, payload, context, ct, shadowMode),
+            "fork-work" => ExecuteForkAsync(db, instance, stepId, payload, context, envelope, now, ct, shadowMode),
             _ => Task.FromResult(UnexecutableStep()),
         };
 
@@ -250,7 +272,7 @@ public sealed partial class WorkflowRunner(
         // Shadow law (the strangler flag): would-do only — a step-log row
         // with status 'shadow', no effect command id, no outbox rows, no
         // timeline rows (the arm owns the real behavior).
-        var shadow = definition.Shadow;
+        var shadow = shadowMode;
         db.WorkflowStepLog.Add(new WorkflowStepLogEntity
         {
             InstanceId = instanceId,
@@ -336,8 +358,8 @@ public sealed partial class WorkflowRunner(
         if (keepGoing && steps.Any(s => s.GetProperty("id").GetString() == instance.CurrentStep))
         {
             // Enter leg of the successor: a park may flip status inside its
-            // executor, so re-read.
-            keepGoing = instance.Status == "running";
+            // executor, so re-read. (A shadowed run continues the same way.)
+            keepGoing = instance.Status is "running" or "shadowed";
         }
         else
         {
@@ -480,7 +502,8 @@ public sealed partial class WorkflowRunner(
         JsonObject context,
         string commandId,
         DateTime now,
-        CancellationToken ct)
+        CancellationToken ct,
+        bool shadow = false)
     {
         var inputs = new JsonObject();
         if (payload.TryGetProperty("inputs", out var declared) && declared.ValueKind == JsonValueKind.Object)
@@ -534,6 +557,17 @@ public sealed partial class WorkflowRunner(
                 intentRow.Envelope = stamped.ToJsonString();
             }
 
+            if (shadow)
+            {
+                db.Entry(intentRow).State = EntityState.Detached;
+                return StepOutcome.Done(new JsonObject
+                {
+                    ["wouldDo"] = "routing-intent",
+                    ["commandId"] = intent.EffectCommandId,
+                    ["capability"] = capability.GetString(),
+                }, null);
+            }
+
             db.Outbox.Add(intentRow);
             Activity.Current?.SetTag("ofac.outbox.id", intentRow.OutboxId.ToString());
             Activity.Current?.SetTag("ofac.outbox.command_id", intentRow.CommandId);
@@ -574,7 +608,7 @@ public sealed partial class WorkflowRunner(
             JsonNode? target = payload.TryGetProperty("to", out var toRef)
                 ? ResolveTemplate(JsonNode.Parse(toRef.GetRawText()), context)
                 : ConversationTargetFromEvent(context);
-            data["target"] = ProjectTarget(target);
+            data["target"] = ProjectTarget(target, commandType);
             if (!data.ContainsKey("text"))
             {
                 data["text"] = "workflow step";
@@ -652,6 +686,23 @@ public sealed partial class WorkflowRunner(
             Attempts = 0,
             CreatedAt = now,
         };
+        if (shadow)
+        {
+            // Would-do record: the exact envelope the swap will append,
+            // digested (the reconciliation report compares digests, so a
+            // byte-level plan match is provable, not hand-waved).
+            db.Entry(effectRow).State = EntityState.Detached;
+            var digest = "sha256:" + Convert.ToHexString(
+                System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(json))).ToLowerInvariant();
+            return StepOutcome.Done(new JsonObject
+            {
+                ["wouldDo"] = "command",
+                ["commandId"] = commandId,
+                ["commandType"] = commandType,
+                ["envelopeDigest"] = digest,
+            }, null);
+        }
+
         db.Outbox.Add(effectRow);
 
         // Trace-correlation law: the effect's identity rides the step span
@@ -685,9 +736,13 @@ public sealed partial class WorkflowRunner(
                     : actual is not null && WorkflowMatcher.Matches(equals, actual)
                 : actual is not null
                     && guard.GetProperty("in").EnumerateArray().Any(term => WorkflowMatcher.Matches(term, actual));
+            // A HIT has no declared branch: the guard says only whether the
+            // flow continues, so the completed-edge law chooses the successor
+            // (the array-adjacent chain or an explicit `<stepId>:completed`
+            // selector). A MISS takes the declared fallback.
             var output = new JsonObject { ["guard"] = field, ["hit"] = hit };
             return hit
-                ? StepOutcome.WithBranch(StepOutcome.Continue(output), FirstBranch(payload))
+                ? StepOutcome.Continue(output)
                 : StepOutcome.WithBranch(StepOutcome.Continue(output), fallback);
         }
 
@@ -732,6 +787,168 @@ public sealed partial class WorkflowRunner(
         }
     }
 
+    /// <summary>The `fork-work` step: the terminal-input law through
+    /// <see cref="Facilitator.Kernel.Work.WorkFork"/> — deterministic
+    /// successor identity, the arm's sentences, the binding following the
+    /// live item. Shadow mode computes the full plan and records it in the
+    /// step output (the reconciliation source), writing nothing.</summary>
+    private async Task<StepOutcome> ExecuteForkAsync(
+        FacilitatorDbContext db,
+        WorkflowInstanceEntity instance,
+        string stepId,
+        JsonElement payload,
+        JsonObject context,
+        JsonElement? envelope,
+        DateTime now,
+        CancellationToken ct,
+        bool shadow)
+    {
+        _ = ct;
+        if (instance.PrimaryWorkId is not { } subjectId)
+        {
+            return StepOutcome.LegFailed(new JsonObject { ["error"] = "fork-work needs a subject work" });
+        }
+
+        var predecessor = await db.Works.AsNoTracking().FirstOrDefaultAsync(
+            w => w.WorkId == subjectId, ct);
+        if (predecessor is null)
+        {
+            return StepOutcome.LegFailed(new JsonObject { ["error"] = "subject work vanished" });
+        }
+
+        if (predecessor.State is not ("completed" or "cancelled" or "failed"))
+        {
+            // The terminal law is the step's precondition (the flow's guard
+            // decides who gets here; a race between guard and step fails the
+            // leg rather than resurrecting the work).
+            return StepOutcome.LegFailed(new JsonObject { ["error"] = $"fork-work needs a terminal subject (state {predecessor.State})" });
+        }
+
+        // The note is a template (the interpolation law): the review arm's
+        // exact sentence shape is declarable with one `${...|...}` ref.
+        var noteNode = ResolveTemplate(JsonValue.Create(payload.GetProperty("noteRef").GetString()), context);
+        var note = noteNode is JsonValue nv && nv.TryGetValue<string>(out var rendered) ? rendered : string.Empty;
+        note = note.Length <= 2000 ? note : note[..2000];
+        var plan = Facilitator.Kernel.Work.WorkFork.ComputePlan(
+            instance.InstanceId, stepId, predecessor,
+            predecessor.ProjectId, predecessor.TeamId, predecessor.OwnerActor,
+            predecessor.Origin, predecessor.ActiveWhere, note,
+            envelope ?? JsonDocument.Parse("{}").RootElement);
+
+        if (shadow)
+        {
+            return StepOutcome.Done(
+                new JsonObject { ["wouldDo"] = plan.ToJson(), ["note"] = note }, null);
+        }
+
+        // Apply the plan (the arm's law, field for field).
+        db.Works.Add(new WorkEntity
+        {
+            WorkId = plan.SuccessorWorkId,
+            ProjectId = predecessor.ProjectId,
+            Objective = plan.Objective,
+            State = "open",
+            Version = 1,
+            TeamId = predecessor.TeamId,
+            OwnerActor = predecessor.OwnerActor,
+            Origin = predecessor.Origin,
+            ActiveWhere = predecessor.ActiveWhere,
+            CreatedAt = now,
+            UpdatedAt = now,
+        });
+        db.WorkEvents.Add(new WorkEventEntity
+        {
+            EventId = Guid.NewGuid(),
+            WorkId = plan.SuccessorWorkId,
+            WorkVersion = 1,
+            Kind = "created",
+            Actor = Actor,
+            Detail = plan.CreatedEventDetail,
+            CreatedAt = now,
+        });
+        db.WorkLinks.Add(new WorkLinkEntity
+        {
+            LinkId = Guid.NewGuid(),
+            WorkId = plan.PredecessorWorkId,
+            RefWorkId = plan.SuccessorWorkId,
+            Kind = plan.LinkKind,
+            Note = plan.LinkNote,
+            CreatedAt = now,
+        });
+        db.WorkEvents.Add(new WorkEventEntity
+        {
+            EventId = Guid.NewGuid(),
+            WorkId = plan.PredecessorWorkId,
+            WorkVersion = predecessor.Version,
+            Kind = "work.linked",
+            Actor = Actor,
+            Detail = JsonSerializer.Serialize(new Dictionary<string, string?>
+            {
+                ["refWorkId"] = plan.SuccessorWorkId.ToString(),
+                ["kind"] = plan.LinkKind,
+                ["note"] = plan.LinkNote,
+            }),
+            CreatedAt = now,
+        });
+        await db.CommunicationBindings
+            .Where(b => b.WorkId == plan.PredecessorWorkId)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(b => b.WorkId, plan.SuccessorWorkId), ct);
+
+        // The reply naming the successor: the arm's command id verbatim
+        // (deterministic — a redelivery cannot mint a second reply).
+        var replyData = new JsonObject
+        {
+            ["commandId"] = plan.ReplyCommandId,
+            ["idempotencyKey"] = plan.ReplyCommandId,
+            ["target"] = plan.ReplyTarget.DeepClone(),
+            ["text"] = plan.ReplyText,
+        };
+        var replyEnvelope = new JsonObject
+        {
+            ["specversion"] = "1.0",
+            ["id"] = Guid.NewGuid().ToString("N"),
+            ["source"] = EnvelopeFactory.KernelSource,
+            ["type"] = "org.facilitator.command.communication.reply.v1",
+            ["subject"] = $"work/{plan.SuccessorWorkId}",
+            ["time"] = now.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
+            ["datacontenttype"] = "application/json",
+            ["dataschema"] = "https://schemas.openfacilitator.org/v1/command.communication.reply.v1.json",
+            ["data"] = replyData,
+        };
+        if (Activity.Current is { } forkSpan)
+        {
+            replyEnvelope["traceparent"] = forkSpan.Id;
+        }
+
+        var replyJson = replyEnvelope.ToJsonString();
+        var verdict = envelopeValidator.Validate(replyJson);
+        if (!verdict.Ok)
+        {
+            return StepOutcome.LegFailed(new JsonObject { ["error"] = $"reply envelope rejected: {verdict.ErrorClass}: {verdict.Message}" });
+        }
+
+        db.Outbox.Add(new OutboxEntity
+        {
+            OutboxId = Guid.NewGuid(),
+            CommandId = plan.ReplyCommandId,
+            RecipientEndpointId = RecipientFor("org.facilitator.command.communication.reply.v1", replyData),
+            AggregateType = "work",
+            AggregateId = plan.SuccessorWorkId,
+            EventType = "org.facilitator.command.communication.reply.v1",
+            Envelope = replyJson,
+            WorkId = plan.SuccessorWorkId,
+            Status = "pending",
+            AvailableAt = now,
+            Attempts = 0,
+            CreatedAt = now,
+        });
+
+        return StepOutcome.Done(
+            plan.ToJson(),
+            plan.ReplyCommandId,
+            note: $"successor work {plan.SuccessorShort} opened");
+    }
+
     private async Task<StepOutcome> ExecuteApprovalAsync(
         FacilitatorDbContext db,
         WorkflowInstanceEntity instance,
@@ -739,7 +956,8 @@ public sealed partial class WorkflowRunner(
         JsonElement payload,
         JsonObject context,
         DateTime now,
-        CancellationToken ct)
+        CancellationToken ct,
+        bool shadow = false)
     {
         _ = ct;
         var approvalId = WorkflowIdentity.Uuid5(WorkflowIdentity.ForkNamespace, $"{instance.InstanceId:N}:approval:{stepId}");
@@ -759,6 +977,21 @@ public sealed partial class WorkflowRunner(
             eligible,
             expiresAt,
             now);
+        if (shadow)
+        {
+            // Would-do: the approval row the swap would park on. A shadow
+            // run does not block on effects it will not write (a park
+            // without its row could never wake).
+            return StepOutcome.Done(
+                new JsonObject
+                {
+                    ["wouldDo"] = "approval",
+                    ["approvalId"] = approvalId.ToString(),
+                    ["expiresAt"] = expiresAt.ToString("yyyy-MM-ddTHH:mm:ssZ"),
+                },
+                null);
+        }
+
         db.Approvals.Add(new ApprovalEntity
         {
             ApprovalId = approvalId,
@@ -786,9 +1019,15 @@ public sealed partial class WorkflowRunner(
     }
 
     private async Task<StepOutcome> ExecuteEscalateAsync(
-        FacilitatorDbContext db, WorkflowInstanceEntity instance, JsonElement payload, JsonObject context, CancellationToken ct)
+        FacilitatorDbContext db, WorkflowInstanceEntity instance, JsonElement payload, JsonObject context, CancellationToken ct, bool shadow = false)
     {
         var text = ResolveString(payload.GetProperty("message"), context) ?? payload.GetProperty("message").GetString()!;
+        if (shadow)
+        {
+            return StepOutcome.Done(
+                new JsonObject { ["wouldDo"] = "escalate", ["text"] = text }, null);
+        }
+
         // The ledger is THE human-egress path: its row + outbox row join
         // this step's transaction (the promise and the attempt, atomically).
         var (notificationId, state) = await notifications.EmitAsync(
@@ -856,7 +1095,7 @@ public sealed partial class WorkflowRunner(
         "parentMessageId", "subjectRef", "conversationKind", "actorProviderAccountId",
     ];
 
-    private static JsonNode ProjectTarget(JsonNode? candidate)
+    private static JsonNode ProjectTarget(JsonNode? candidate, string commandType)
     {
         // conversationTarget law: provider + conversationKind required;
         // foreign keys (providerInstanceId, authorProviderAccountId — the
@@ -879,6 +1118,18 @@ public sealed partial class WorkflowRunner(
         }
 
         if (!projected.ContainsKey("conversationKind"))
+        {
+            projected["conversationKind"] = "channel";
+        }
+
+        // B4 as the schema spells it: a POST addresses a dm or a channel —
+        // a thread/comment trigger posted to is a top-level post into that
+        // conversation's channel, so the kind coerces (keys kept: a channel
+        // post still lands on the right resource).
+        if (commandType == "org.facilitator.command.communication.post.v1"
+            && projected["conversationKind"] is JsonValue kind
+            && kind.TryGetValue<string>(out var kindText)
+            && kindText is not ("dm" or "channel"))
         {
             projected["conversationKind"] = "channel";
         }
@@ -982,7 +1233,10 @@ public sealed partial class WorkflowRunner(
         FacilitatorDbContext db, WorkflowInstanceEntity instance, string status, string? endReason, DateTime now)
     {
         _ = db;
-        instance.Status = status;
+        // Shadow law, terminal leg: a would-do run ends 'shadowed' (never
+        // 'completed' — the arm decided the real outcome), with the
+        // terminated shape: no current step, no deadline.
+        instance.Status = instance.Status == "shadowed" ? "shadowed" : status;
         instance.CurrentStep = null;
         instance.DeadlineAt = null;
         instance.EndReason = endReason;
@@ -1116,9 +1370,73 @@ public sealed partial class WorkflowRunner(
     /// <c>$steps.&lt;id&gt;.output.&lt;path&gt;</c>, <c>$work.&lt;field&gt;</c>,
     /// <c>$input.&lt;name&gt;</c>); an unresolved ref stays the literal (visible,
     /// debuggable); anything else is a literal.</summary>
+    /// <summary>Scalar projection of a dotted path over the context (a
+    /// `|`-separated list tries each candidate in order); strings pass
+    /// through raw, other scalars stringify; a container or a miss is
+    /// null (the interpolation law's empty segment).</summary>
+    private static string? ResolveScalar(JsonObject context, string dottedPaths)
+    {
+        foreach (var path in dottedPaths.Split('|'))
+        {
+            JsonNode? node = context;
+            foreach (var segment in path.Split('.'))
+            {
+                node = node switch
+                {
+                    JsonObject o when o.TryGetPropertyValue(segment, out var next) => next,
+                    _ => null,
+                };
+                if (node is null)
+                {
+                    break;
+                }
+            }
+
+            if (node is JsonValue val)
+            {
+                return val.TryGetValue<string>(out var raw) ? raw : val.ToString();
+            }
+        }
+
+        return null;
+    }
+
     private static JsonNode? ResolveTemplate(JsonNode? value, JsonObject context)
     {
-        if (value is JsonValue v && v.TryGetValue<string>(out var text) && text.StartsWith('$'))
+        if (value is JsonValue v && v.TryGetValue<string>(out var text) && text.Contains("${", StringComparison.Ordinal))
+        {
+            // Interpolation law: `${dotted.path}` segments resolve against the
+            // context (first `|`-separated path that resolves wins, so a
+            // fallback source is declarable); an unresolved segment becomes
+            // the empty string; everything else is literal text.
+            var rendered = new System.Text.StringBuilder();
+            var cursor = 0;
+            while (cursor < text.Length)
+            {
+                var open = text.IndexOf("${", cursor, StringComparison.Ordinal);
+                if (open < 0)
+                {
+                    rendered.Append(text[cursor..]);
+                    break;
+                }
+
+                rendered.Append(text, cursor, open - cursor);
+                var close = text.IndexOf('}', open + 2);
+                if (close < 0)
+                {
+                    rendered.Append(text[open..]);
+                    break;
+                }
+
+                var path = text[(open + 2)..close];
+                rendered.Append(ResolveScalar(context, path) ?? string.Empty);
+                cursor = close + 1;
+            }
+
+            return JsonValue.Create(rendered.ToString());
+        }
+
+        if (value is JsonValue v2 && v2.TryGetValue<string>(out text) && text.StartsWith('$'))
         {
             JsonNode? node = context;
             foreach (var segment in text[1..].Split('.'))

@@ -10,7 +10,10 @@ namespace Facilitator.Kernel.Shared.Dispatch;
 /// <param name="CommandId">Business idempotency key.</param>
 /// <param name="Envelope">Parsed CloudEvent envelope document.</param>
 /// <param name="Attempts">Attempts charged to this delivery.</param>
-public sealed record OutboxRow(Guid OutboxId, string RecipientEndpointId, string EventType, string CommandId, JsonElement Envelope, int Attempts);
+/// <param name="WorkId">Subject work stamped on the row at write time
+/// (null = unstamped); consumers must prefer it over a live lookup, whose
+/// subject may have moved since the row was written.</param>
+public sealed record OutboxRow(Guid OutboxId, string RecipientEndpointId, string EventType, string CommandId, JsonElement Envelope, int Attempts, Guid? WorkId = null);
 
 /// <summary>Transport for one logical channel; the dispatcher resolves sinks by <see cref="Channel"/>.</summary>
 public interface ISink

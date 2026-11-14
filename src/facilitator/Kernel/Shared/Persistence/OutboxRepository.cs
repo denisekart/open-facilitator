@@ -53,7 +53,7 @@ public sealed class OutboxRepository(
                attempts = o.attempts + 1
           FROM claim
          WHERE o.outbox_id = claim.outbox_id
-        RETURNING o.outbox_id, o.recipient_endpoint_id, o.event_type, o.command_id, o.envelope, o.attempts
+        RETURNING o.outbox_id, o.recipient_endpoint_id, o.event_type, o.command_id, o.envelope, o.attempts, o.work_id
         """;
 
     /// <summary>Claim one batch of due rows under <c>FOR UPDATE SKIP LOCKED</c> and lease them to <paramref name="owner"/>.</summary>
@@ -82,7 +82,8 @@ public sealed class OutboxRepository(
                     reader.GetString(2),
                     reader.GetString(3),
                     JsonDocument.Parse(reader.GetString(4)).RootElement.Clone(),
-                    reader.GetInt32(5)));
+                    reader.GetInt32(5),
+                    reader.IsDBNull(6) ? null : reader.GetGuid(6)));
             }
         }
 

@@ -2,7 +2,7 @@
   "id": "review-fork",
   "version": 1,
   "title": "Review fork on closed work",
-  "description": "A review arrives on work that is already terminal: open a successor work, link it, repoint the conversation binding, and tell the channel. Deterministic guard (work.state), no model consulted; the review.decision provenance row stays arm-written.",
+  "description": "A review arrives on work that is already terminal: open a successor work, link it, repoint the conversation binding, and tell the channel. Deterministic guard (work.state), no model consulted; the review.decision provenance row stays arm-written (it is mechanism: the decision-provenance law). The fork-work step IS the terminal law — successor, link rows, binding repoint and the thread reply naming the successor are one indivisible effect with a deterministic successor id.",
   "enabled": false,
   "on": {
     "event": "org.facilitator.event.provider.review.v1",
@@ -21,17 +21,10 @@
     },
     {
       "id": "fork",
-      "title": "Fork the follow-up work",
+      "title": "Fork the follow-up work (link, repoint, reply)",
       "on": "guard-terminal:completed",
-      "fork-work": { "noteRef": "$event.data.body" }
-    },
-    {
-      "id": "notify",
-      "title": "Tell the channel about the successor",
-      "on": "fork:completed",
-      "emit": {
-        "command": "org.facilitator.command.communication.reply.v1",
-        "inputs": { "text": "Review noted: this continues on the follow-up work." }
+      "fork-work": {
+        "noteRef": "provider input (${event.data.provider} post ${event.data.reference.messageId|event.data.providerDeliveryId}): ${event.data.state} review on change request #${event.data.reference.rootThreadId}: ${event.data.text}"
       }
     }
   ]

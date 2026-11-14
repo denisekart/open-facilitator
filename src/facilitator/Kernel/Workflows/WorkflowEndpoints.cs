@@ -79,6 +79,7 @@ public static class WorkflowEndpoints
             HttpRequest request,
             HttpContext http,
             WorkflowDefinitionStore store,
+            WorkflowSubscriptionRegistry subscriptions,
             CancellationToken ct) =>
         {
             var actor = Mutation.RequireActor(http, request, out var reason, out var problem);
@@ -163,6 +164,7 @@ public static class WorkflowEndpoints
             HttpRequest request,
             HttpContext http,
             WorkflowDefinitionStore store,
+            WorkflowSubscriptionRegistry subscriptions,
             CancellationToken ct) =>
         {
             var actor = Mutation.RequireActor(http, request, out var reason, out var problem);
@@ -215,6 +217,26 @@ public static class WorkflowEndpoints
             return Results.Ok(new { ok = result.Ok, errors = result.Errors });
         });
 
+        // Shadow reconciliation: the plane's would-do step-logs diffed
+        // against the arm's recorded effects, keyed on the delivery
+        // identity — the strangler gate before a swap.
+        group.MapGet("/shadow/report", async (
+            WorkflowShadowReport report,
+            HttpRequest request,
+            CancellationToken ct) =>
+        {
+            DateTime since = DateTime.UtcNow.AddDays(-7);
+            var raw = request.Query["since"].FirstOrDefault();
+            if (raw is { Length: > 0 } && !DateTime.TryParse(raw, null,
+                    System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal,
+                    out since))
+            {
+                return Results.Problem(ProblemErrors.ConfigInvalid("since must be an ISO-8601 timestamp"));
+            }
+
+            return Results.Ok(await report.ReportAsync(since, ct));
+        });
+
         group.MapPost("/definitions/{id}/versions/{version:int}/toggle", async (
             string id,
             int version,
@@ -222,6 +244,7 @@ public static class WorkflowEndpoints
             HttpRequest request,
             HttpContext http,
             WorkflowDefinitionStore store,
+            WorkflowSubscriptionRegistry subscriptions,
             CancellationToken ct) =>
         {
             var actor = Mutation.RequireActor(http, request, out var reason, out var problem);
@@ -242,6 +265,14 @@ public static class WorkflowEndpoints
             }
 
             var outcome = await store.ToggleAsync(id, version, enabled, shadow, actor!, reason!, ct);
+            if (outcome.Outcome == WorkflowDefinitionOutcome.Stored)
+            {
+                // Admin-toggle law: the subscription set refreshes NOW, so
+                // a freshly enabled definition triggers on the very next
+                // event (not after a TTL).
+                await subscriptions.RebuildAsync(ct);
+            }
+
             return outcome.Outcome switch
             {
                 WorkflowDefinitionOutcome.Stored => Results.Ok(outcome.View!.Summary),

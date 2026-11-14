@@ -363,6 +363,7 @@ public static class KernelServiceCollection
         builder.Services.AddSingleton<Facilitator.Kernel.Workflows.WorkflowRuntime>();
         builder.Services.AddSingleton<Facilitator.Kernel.Workflows.WorkflowSubscriptionRegistry>();
         builder.Services.AddSingleton<Facilitator.Kernel.Workflows.WorkflowTriggerEmitter>();
+        builder.Services.AddScoped<Facilitator.Kernel.Workflows.WorkflowShadowReport>();
         builder.Services.AddSingleton<Facilitator.Kernel.Workflows.WorkflowRunner>();
         builder.Services.AddSingleton<ISink, Facilitator.Kernel.Workflows.WorkflowSink>();
         builder.Services.AddSingleton<Facilitator.Kernel.Shared.Persistence.IApprovalDecisionObserver, Facilitator.Kernel.Workflows.WorkflowApprovalWake>();

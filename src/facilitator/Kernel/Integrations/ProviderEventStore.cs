@@ -80,7 +80,8 @@ public sealed class ProviderEventStore(
     TimeProvider timeProvider,
     CommandApplier applier,
     AiPolicyStore policyStore,
-    AiOptions aiOptions)
+    AiOptions aiOptions,
+    Facilitator.Kernel.Workflows.WorkflowTriggerEmitter? workflows = null)
 {
     /// <summary>Per-team home for provider-created Work: the manifest
     /// ledger's team scope resolves Work → Project → Team, so a Work with no
@@ -386,7 +387,7 @@ public sealed class ProviderEventStore(
             ProviderEventClass.Issue => await IssueArmAsync(db, workload, options, data, reference, providerDeliveryId, now, ct, type),
             ProviderEventClass.ChangeRequest => await ChangeRequestArmAsync(db, provider, options, data, reference, providerDeliveryId, now, ct),
             ProviderEventClass.Pipeline => await PipelineArmAsync(db, data, reference, providerDeliveryId, now, ct),
-            ProviderEventClass.Review => await ReviewArmAsync(db, provider, data, reference, providerDeliveryId, now, ct),
+            ProviderEventClass.Review => await ReviewArmAsync(db, provider, root, data, reference, providerDeliveryId, now, ct),
             ProviderEventClass.Message => await MessageArmAsync(db, workload, options, data, reference, providerDeliveryId, now, ct),
             _ => new ArmEffect(null, "observe:unhandled"),
         };
@@ -846,7 +847,7 @@ public sealed class ProviderEventStore(
     // COMPLETED item forks through AppendWorkInputAsync's terminal law (the
     // original is untouched, the successor carries the review as input).
     private async Task<ArmEffect> ReviewArmAsync(
-        FacilitatorDbContext db, string provider, JsonElement data, Reference reference, string deliveryId, DateTime now, CancellationToken ct)
+        FacilitatorDbContext db, string provider, JsonElement envelope, JsonElement data, Reference reference, string deliveryId, DateTime now, CancellationToken ct)
     {
         var action = data.GetProperty("action").GetString() ?? string.Empty;
         var state = data.GetProperty("state").GetString() ?? string.Empty;
@@ -871,6 +872,17 @@ public sealed class ProviderEventStore(
         {
             await AppendReviewDecisionAsync(
                 db, provider, workId, work.Version, data, reference, $"{action}:{state}", text, now, ct);
+
+            // Plane hook (shadow law): the trigger row rides THIS
+            // transaction, stamped with the subject the review actually
+            // hit — the fork below repoints the binding to the successor,
+            // so a consumer that re-resolved the work later would see a
+            // different work than the one the review landed on.
+            if (workflows is not null)
+            {
+                await workflows.EmitAsync(db, envelope, workId, ct);
+            }
+
             var forked = await AppendWorkInputAsync(db, provider, workId,
                 InputNote(reference, deliveryId, $"{state} review on change request #{reference.Root}: {text}"), now, ct);
             return new ArmEffect(forked, $"work/{forked}:input");
@@ -879,6 +891,14 @@ public sealed class ProviderEventStore(
         await AppendReviewDecisionAsync(
             db, provider, workId, work.Version, data, reference,
             action == "submitted" ? $"submitted:{state}" : action, text, now, ct);
+        if (workflows is not null)
+        {
+            // Same stamp law on the live-item legs: the plane sees every
+            // review on a bound work and its guard decides (a live work
+            // takes the fallback edge, so shadow records nothing further).
+            await workflows.EmitAsync(db, envelope, workId, ct);
+        }
+
         if (action == "submitted")
         {
             var directive = Trim($"{state} review on change request #{reference.Root}: {text}");

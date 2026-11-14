@@ -93,6 +93,7 @@ public static class ActionCatalog
         new("GET", "/api/admin/workflows/definitions", "Workflow definitions (latest version each, enablement, running-instance counts).", "-", null),
         new("GET", "/api/admin/workflows/definitions/{id}", "One workflow definition: canonical JSON + YAML view.", "-", null),
         new("GET", "/api/admin/workflows/registry", "Closed sets the editor may SELECT from (events, commands, capabilities, callable definitions, teams).", "-", null),
+        new("GET", "/api/admin/workflows/shadow/report", "Shadow reconciliation: the plane's would-do records diffed against the acting arm's effects, keyed on delivery identity.", "-", null),
         new("PUT", "/api/admin/workflows/definitions/{id}", "Store a new workflow definition version (X-Change-Reason + If-Match).",
             "the canonical JSON definition document", null),
         new("POST", "/api/admin/workflows/definitions/validate", "Dry-run validation of a definition document.",

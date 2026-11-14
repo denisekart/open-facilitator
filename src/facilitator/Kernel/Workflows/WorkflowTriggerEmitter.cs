@@ -104,7 +104,19 @@ public sealed class WorkflowTriggerEmitter(
     public async Task<int> EmitAsync(
         FacilitatorDbContext db,
         JsonElement envelope,
-        CancellationToken ct) => await EmitCoreAsync(db, envelope, ct);
+        CancellationToken ct) => await EmitCoreAsync(db, envelope, null, ct);
+
+    /// <summary>The arm hook: a kernel arm that consumes a wire event feeds
+    /// the plane from INSIDE its own transaction, stamping the subject work
+    /// it acted on. The stamp is load-bearing, not an optimization: an arm
+    /// may move the binding (the review fork repoints it to the successor),
+    /// so a consumer that re-resolved the work at delivery time would see a
+    /// different subject than the one the event hit.</summary>
+    public async Task<int> EmitAsync(
+        FacilitatorDbContext db,
+        JsonElement envelope,
+        Guid? subjectWork,
+        CancellationToken ct) => await EmitCoreAsync(db, envelope, subjectWork, ct);
 
     /// <summary>The standalone leg for callers without an ambient
     /// transaction (the CloudEvent ingress after its inbox row settles):
@@ -117,7 +129,7 @@ public sealed class WorkflowTriggerEmitter(
         }
 
         await using var db = await contextFactory.CreateDbContextAsync(ct);
-        var appended = await EmitCoreAsync(db, envelope, ct);
+        var appended = await EmitCoreAsync(db, envelope, null, ct);
         if (appended > 0)
         {
             await db.SaveChangesAsync(ct);
@@ -130,6 +142,7 @@ public sealed class WorkflowTriggerEmitter(
     private async Task<int> EmitCoreAsync(
         FacilitatorDbContext db,
         JsonElement envelope,
+        Guid? subjectWork,
         CancellationToken ct)
     {
         if (!runtime.Enabled)
@@ -172,7 +185,8 @@ public sealed class WorkflowTriggerEmitter(
                 continue;
             }
 
-            AppendTrigger(db, latest.DefId, latest.Version, envelope, now);
+            AppendTrigger(db, latest.DefId, latest.Version, envelope, now,
+                subjectWork ?? EnvelopeWorkId(envelope, db));
             appended++;
         }
 
@@ -329,12 +343,44 @@ public sealed class WorkflowTriggerEmitter(
         });
     }
 
+    /// <summary>The subject-work stamp for an unguided emit: the envelope's
+    /// own data.workId, else the communication binding the arms use. The
+    /// runner prefers the stamp over any lookup at delivery time.</summary>
+    private static Guid? EnvelopeWorkId(JsonElement envelope, FacilitatorDbContext db)
+    {
+        var data = envelope.TryGetProperty("data", out var d) ? d : default;
+        if (data.ValueKind == JsonValueKind.Object
+            && data.TryGetProperty("workId", out var wid) && wid.ValueKind == JsonValueKind.String
+            && Guid.TryParse(wid.GetString(), out var direct))
+        {
+            return direct;
+        }
+
+        if (data.ValueKind == JsonValueKind.Object
+            && data.TryGetProperty("reference", out var reference) && reference.ValueKind == JsonValueKind.Object
+            && reference.TryGetProperty("provider", out var provider)
+            && reference.TryGetProperty("channelOrResourceId", out var channel)
+            && reference.TryGetProperty("rootThreadId", out var root))
+        {
+            return db.CommunicationBindings.AsNoTracking()
+                .Where(b =>
+                    b.Provider == provider.GetString()
+                    && b.Channel == channel.GetString()
+                    && b.RootMessageId == root.GetString())
+                .Select(b => b.WorkId)
+                .FirstOrDefault();
+        }
+
+        return null;
+    }
+
     private static void AppendTrigger(
         FacilitatorDbContext db,
         string defId,
         int version,
         JsonElement envelope,
-        DateTime now)
+        DateTime now,
+        Guid? subjectWork)
     {
         // The emitter generates the row id itself: the instance identity
         // seeds from the TRIGGER ROW's own guid (wire-level dedupe already
@@ -350,7 +396,7 @@ public sealed class WorkflowTriggerEmitter(
             AggregateId = null,
             EventType = envelope.GetProperty("type").GetString()!,
             Envelope = envelope.GetRawText(),
-            WorkId = null,
+            WorkId = subjectWork,
             Status = "pending",
             AvailableAt = now,
             Attempts = 0,

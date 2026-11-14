@@ -150,15 +150,121 @@ The user-level capability: *agentic research* (workflow A) calls *ensure-capacit
    - `await: false`: parent completes without the child finishing; cancelling the parent still cancels the detached child.
    - Existing phases unaffected: full xUnit + walks green; shadow-report leg unchanged (shadow invoke logs a would-do child spec, creates no child).
 
+## Phase 6.6 — Signal: point-to-point workflow-to-wakeup messaging
+
+32. **`signal` joins the closed palette** (`protocol/json-schema/workflow-definition.v1.json`
+    + the mirrored `src/protocol/schemas` copy + codegen + `WorkflowDefinitionValidator.ExecutableKinds`):
+    `signal { target: ref, event: { type, data: object }, idempotency?: ref }`. `target`
+    resolves through the template law (`$steps.<invoke-id>.output.child`, or any id the flow
+    computed — a UUID string); `event.type` obeys the registry law (must exist among mirrored
+    schema `$id`s — the same law trigger/`wait` event types already obey, so
+    `EnvelopeValidator` classifies the appended row without a new code path). No `timeout`,
+    no `onTimeout`: a signal is fire-and-forget; the step is `done` when the row is appended.
+33. **The taxonomy (three legs of inter-flow messaging, stated once):** `on.event` triggers
+    are **broadcast** — every definition whose matcher matches gets a trigger row (the
+    emitter law); `invoke` **spawns** — a child with lineage, depth, invocation path, and
+    budget (guard 1/2) and, when awaited, a completion hand-off (Phase 6); `signal` is
+    **point-to-point** — addressed to ONE instance, creating NO lineage, NO depth or
+    invocation-path entry, and passing NO preemption guard, because it can neither spawn nor
+    fail anything (nothing to budget against). It is exactly "a wire event posted by a flow,
+    addressed to an instance" — the inside twin of an adapter posting an event into a thread.
+    The use cases it exists for: sibling flows coordinating on one work (the review flow
+    signals the PR flow "reviews closed"), nudging or cancelling detached `await: false`
+    children (which by design have no completion hand-off back), and waking a long-lived
+    flow per tick without burning the chain budget an `invoke` would spend per call.
+34. **Delivery law:** the executor appends a `workflow.kernel` outbox row with command id
+    exactly `wf-signal:<senderInstance>:<stepId>:<seq>` — the step-command-id law verbatim
+    (`WorkflowIdentity.StepCommandId`), so the signal row's idempotency is the outbox
+    uniqueness law: a redelivered step leg re-derives the same command id and converges.
+    The row envelope is a wire event (validator-gated like every emit: `dataschema` = the
+    declared `event.type`'s mirrored schema) whose `data` is `{ target, ...signal data }`.
+    The sink resolves `target` at delivery: it appends (or reuses) a wake row for the target
+    instance — `wf-wake:<target>:<senderRowId>`, the existing wake codec with the sender
+    row's id as the seed — so the target's OWN per-instance race law (conditional UPDATE out
+    of a park, exactly one of {wake, timeout, cancel} wins) is the resume law, untouched.
+    The signal step itself never waits.
+35. **Sink fall-through law** (Phase 6 already forces it for `workflow.completed`): when a
+    wake row reaches an instance with no matching park — the park resolved, or never
+    existed — the sink consumes the row and OFFERS the envelope to ordinary `on.event`
+    trigger matching (`WorkflowTriggerEmitter.EmitAsync`, the same call the ingress makes).
+    A signal arriving at a not-yet-parked (or not-yet-started) instance can therefore start
+    or trigger a flow like any external event; a signal to a dead instance with no matching
+    definition is consumed, never requeued (the no-DLQ-noise law of the sink).
+36. **Correlation law:** the signal's `data` must carry the receiver's parked `wait`
+    correlation key for a wake to land — the existing data-scoped `EnvelopeCarries` law
+    decides, unchanged: one key law for an external event and a signal alike. Validator:
+    `signal.event.type` must exist among mirrored schema `$id`s (trigger/wait law again);
+    `signal.target` is a `ref` (a template-resolvable string).
+37. **Composition interaction:** signals cross lineage freely — sibling, child, parent,
+    unrelated — and the invoke-call graph (guard 1) is NOT extended: cycles stay impossible
+    by invoke edges only, because a signal spawns nothing. The honest deadlock note: two
+    flows each parked awaiting the other's signal is rescued only by their wait timeouts —
+    the schema law that every `wait` carries a `timeout` is what makes that survivable,
+    which is the point.
+38. **Observability:** the woken step's log already records `resumedBy` (the wake event
+    type); the signal envelope's `subject` carries `workflow/<senderInstance>` so both
+    directions of a coordination pair are queryable from either instance's detail endpoint
+    (Phase 6's ancestor/children view, plus a "last signals received" list read off the
+    target's wake rows).
+39. **Verify (signal gate):**
+    - xUnit happy path: two seeded instances, flow A signals flow B's parked `wait` — B
+      resumes exactly once with the signal envelope as its wake output; assert A's signal
+      step row `done`, the wake command id exact-match
+      (`wf-wake:<B>:<signalRowId:N>`), and B's step-log seq count proves exactly-once under
+      a re-delivered signal row (the sink's read-back law).
+    - Signal to a dead/never-parked instance: consumed, fall-through offered to `on.event`
+      — a definition triggered by the signal's type starts exactly one instance from it, or
+      nothing when none match; no DLQ row either way.
+    - Cross-lineage matrix: parent→child, child→sibling, unrelated→unrelated all wake;
+      assert `invocation_path`/`depth` of BOTH instances unchanged (no lineage by
+      construction).
+    - Crash mid-signal: signal row appended, host dies before the target drains → fresh
+      host resumes B exactly once (the durable outbox law, Phase 1's kill-window twin).
+    - Existing gates: full xUnit + walks green; Phase 6's completion fall-through gains its
+      signal-path twin test here.
+
 ## Phase 7 — UI stage A: read-only flows view
 
-32. **SPA**: add `"flows"` to `VIEWS` + `RouteView` (`src/facilitator/ui/src/lib/route.svelte.ts:13-23`), `FlowsView.svelte` + `FlowsView.test.ts` (list: title, description, source badge, enabled toggle state, running-instance count; detail: YAML `<pre>` rendered from `Accept: application/yaml`, instance checklist table (step log as a vertical done/current/pending checklist), static definition graph as a simple layered SVG of the `on:` edges — 5–15 nodes, plain SVG in-component, no diagram lib; composition render: child list under each `invoke` node from the instance-detail endpoint's children field). Instance detail route `#/flows/{id}`. `WorkInspector.svelte` gains the one-line strip `in flow "<title>" v<n> · step <k>/<n>` when `works.workflow_instance_id` is set (admin work read model must include it — extend `AdminReadStores` work detail). Keep every existing `data-testid` (reskin-guard rule); new controls get testids `flows-*`.
-33. **Verify**: component tests colocated; admin-e2e puppeteer leg (the `ofac-admin-ui` loop) against the slim env: a seeded `review-fork` instance renders its checklist and graph; Work strip visible on the forked successor.
+40. **SPA**: add `"flows"` to `VIEWS` + `RouteView` (`src/facilitator/ui/src/lib/route.svelte.ts:13-23`), `FlowsView.svelte` + `FlowsView.test.ts` (list: title, description, source badge, enabled toggle state, running-instance count; detail: YAML `<pre>` rendered from `Accept: application/yaml`, instance checklist table (step log as a vertical done/current/pending checklist), static definition graph as a simple layered SVG of the `on:` edges — 5–15 nodes, plain SVG in-component, no diagram lib; composition render: child list under each `invoke` node from the instance-detail endpoint's children field). Instance detail route `#/flows/{id}`. `WorkInspector.svelte` gains the one-line strip `in flow "<title>" v<n> · step <k>/<n>` when `works.workflow_instance_id` is set (admin work read model must include it — extend `AdminReadStores` work detail). Keep every existing `data-testid` (reskin-guard rule); new controls get testids `flows-*`.
+41. **Verify**: component tests colocated; admin-e2e puppeteer leg (the `ofac-admin-ui` loop) against the slim env: a seeded `review-fork` instance renders its checklist and graph; Work strip visible on the forked successor.
+
+### Phase 6 / 6.6 / 7 implementation notes (landed; Phase 8 builds on these)
+
+- **Wake-row codec, extended:** `wf-wake:<instance>:<seed>` where the seed tail is either a
+  source-row id (Phase 1: an event matched a park) or a terminal-status token
+  (`completed|failed|cancelled` — a child's completion hand-off). One codec, one idempotency
+  law (outbox `wf-*` uniqueness), no second table. The completion event's `subject` is the
+  CHILD instance id; the sink finds the parked parent via the lineage index, so the hand-off
+  needs no correlation registry.
+- **Trace lineage is tags, not span links:** the child's first span rides the parent's trace
+  (the `wf-start` envelope stamps traceparent like every emit path), and both sides carry
+  `ofac.workflow.child`/`ofac.workflow.parent` + `ofac.workflow.instance` tags — queryable
+  via the trace, honest without a synthetic ActivityContext at the invoke span.
+- **Signal is the third leg of inter-flow messaging** (broadcast trigger / spawn invoke /
+  point-to-point signal): a step-appended wire event addressed to ONE instance
+  (`data.target`), command id `wf-signal:<sender>:<step>:<seq>` (the step-command-id law),
+  no lineage, no budget. **Fall-through law:** the sink resolves a signal target AFTER the
+  per-instance park race — a live park wakes, otherwise the trigger row stands and the
+  definition's own trigger arms it normally; wake seeds append, never replace.
+- **Console reads are three thin queries** (`/instances`, `/instances/{id}`,
+  `/instances/{id}/log`), def/work filters client-side-shaped; `flowTone` joined
+  `stateTone`'s law in `status.ts` so work/flow badges agree. The work strip rides
+  `instances?work=<id>` — no WorkView/DTO change (the strip is fail-soft: a denied or
+  missing read hides it, never the work).
+- **Gallery pair:** `agentic-research` (event-triggered, invoke-await on
+  `ensure-capacity`, projects the child's decision) + `ensure-capacity` (`on.invoked`,
+  callable-only). Both `enabled: false` at seed (a live invoke would assign real work on
+  boot); the seeding test now proves six entries registered.
+- **Test-scope law learned the hard way:** global inbox/outbox purges in `postgres:persistence`
+  raced `postgres:dispatch-link`'s issue-envelope tests across collections (parallel). The
+  kill-window walk's wake-count proof now scopes event wakes (`event.wake` rows only — the
+  completion hand-off is a wake too, not a mention); purge scope must name its own def/work
+  ids, not a wire type.
 
 ## Phase 8 — UI stage B: editing
 
-34. **Editor** (`FlowEditor.svelte`): form-first palette editor — step-kind dropdown (closed palette incl. `invoke`; not-yet-executable options disabled, labelled "not yet executable"), every field populated from `GET /api/admin/workflows/registry` (new endpoint: event types from mirrored schema ids, commands from `KnownCommands`, capability ids from live advertised manifests, **callable definitions** = enabled defs with an `invoked` or any trigger for the `invoke.workflow` picker, teams from the directory) — SELECT-only law. YAML textarea as alternate face with `validate` + diff-before-save (JSON-Patch of the stored doc); save = `PUT` (new version) with `X-Change-Reason`; per-instance actions pause/cancel/skip-step/retry-step as `POST /api/admin/workflows/instances/{id}/<action>` (fenced + audited; cancel cascades to children per the Phase-6 law and cancels only works the instance created and only non-terminal ones).
-35. **Verify**: editor e2e leg — clone gallery entry, edit a title + wait timeout, toggle on, assert version bump + audit row + new instances pin new version while an old running instance keeps the old one; a second leg editing an `invoke` step's child timeout and asserting the saved doc round-trips through YAML.
+42. **Editor** (`FlowEditor.svelte`): form-first palette editor — step-kind dropdown (closed palette incl. `invoke`; not-yet-executable options disabled, labelled "not yet executable"), every field populated from `GET /api/admin/workflows/registry` (new endpoint: event types from mirrored schema ids, commands from `KnownCommands`, capability ids from live advertised manifests, **callable definitions** = enabled defs with an `invoked` or any trigger for the `invoke.workflow` picker, teams from the directory) — SELECT-only law. YAML textarea as alternate face with `validate` + diff-before-save (JSON-Patch of the stored doc); save = `PUT` (new version) with `X-Change-Reason`; per-instance actions pause/cancel/skip-step/retry-step as `POST /api/admin/workflows/instances/{id}/<action>` (fenced + audited; cancel cascades to children per the Phase-6 law and cancels only works the instance created and only non-terminal ones).
+43. **Verify**: editor e2e leg — clone gallery entry, edit a title + wait timeout, toggle on, assert version bump + audit row + new instances pin new version while an old running instance keeps the old one; a second leg editing an `invoke` step's child timeout and asserting the saved doc round-trips through YAML.
 
 ## Testing-practice improvements (separate commits, only if proven)
 

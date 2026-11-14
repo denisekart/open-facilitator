@@ -1262,6 +1262,12 @@ export interface StepElement {
    */
   select?: Select;
   /**
+   * Fire-and-forget point-to-point wake: appends a wire event addressed to ONE instance; the
+   * sink wakes the target's park (or falls through to on.event matching). No timeout, no
+   * onTimeout: the step is `done` when the row is appended.
+   */
+  signal?: Signal;
+  /**
    * Park until the delay elapses; the sweeper is the clock.
    */
   timer?: Timer;
@@ -1274,8 +1280,10 @@ export interface StepElement {
    */
   wait?: Wait;
   /**
-   * Create a Work and append its routing intent; the created work carries this instance in
-   * `works.workflow_instance_id`.
+   * Create a Work and append its routing intent (the shared WorkCreate law, one
+   * implementation with the provider arm's labeled-issue branch); the created work carries
+   * this instance in `works.workflow_instance_id`; the trigger event's conversation reference
+   * becomes the work's residence and binding.
    */
   "work-create"?: WorkCreate;
 }
@@ -1564,6 +1572,39 @@ export interface Select {
 export type SelectSource = "event" | "manifest";
 
 /**
+ * Fire-and-forget point-to-point wake: appends a wire event addressed to ONE instance; the
+ * sink wakes the target's park (or falls through to on.event matching). No timeout, no
+ * onTimeout: the step is `done` when the row is appended.
+ */
+export interface Signal {
+  event: Event;
+  /**
+   * Optional extra seed for the signal row's identity (the step-command id already makes a
+   * redelivered leg converge).
+   */
+  idempotency?: string;
+  /**
+   * The target instance id (a UUID string after template resolution, e.g.
+   * "$steps.<invoke-id>.output.child"). Point-to-point: no lineage, no budget — a signal can
+   * neither spawn nor fail anything.
+   */
+  target: string;
+}
+
+export interface Event {
+  /**
+   * Event payload; `target` is appended. The receiver's parked wait correlation key must
+   * appear here for a wake to land (the data-scoped EnvelopeCarries law).
+   */
+  data: { [key: string]: unknown };
+  /**
+   * Wire event type the signal rides (must exist among mirrored schemas — the trigger/wait
+   * registry law).
+   */
+  type: string;
+}
+
+/**
  * Park until the delay elapses; the sweeper is the clock.
  */
 export interface Timer {
@@ -1592,10 +1633,17 @@ export interface Wait {
 }
 
 /**
- * Create a Work and append its routing intent; the created work carries this instance in
- * `works.workflow_instance_id`.
+ * Create a Work and append its routing intent (the shared WorkCreate law, one
+ * implementation with the provider arm's labeled-issue branch); the created work carries
+ * this instance in `works.workflow_instance_id`; the trigger event's conversation reference
+ * becomes the work's residence and binding.
  */
 export interface WorkCreate {
+  /**
+   * Timeline actor of the created rows (the arm's link:<provider>:<bot> posture, baked by the
+   * rule importer). Absent = workflow:kernel.
+   */
+  actor?: string;
   /**
    * Capability of the routing intent appended for the new work (there is no
    * `command.work.create` wire command: this maps onto the shared CreateWork +
@@ -1603,11 +1651,39 @@ export interface WorkCreate {
    */
   capability: string;
   /**
+   * Assign command-id base of the routing intent (the family the re-dispatch and provisioning
+   * arms scan). Absent = the flow's own namespace (wf-<instance>), correct for hand-authored
+   * flows; the rule importer bakes work-assign-coding.
+   */
+  commandBase?: CommandBase;
+  /**
+   * Extra inputs riding the routing intent (the re-hydration coordinates: repo/issue); values
+   * resolve as templates over the run context.
+   */
+  inputs?: { [key: string]: string };
+  /**
    * Objective text for the created work.
    */
   objectiveRef: string;
+  /**
+   * Preferred Link endpoint id riding the routing intent (the assign rule's EndpointId
+   * posture); the funnel may still choose otherwise.
+   */
+  preference?: string;
+  /**
+   * Routing-intent targetId (the assign rule's TargetId posture); absent => a flow-derived
+   * target.
+   */
+  target?: string;
   /**
    * Owning team slug; defaults to the instance's team.
    */
   team?: string;
 }
+
+/**
+ * Assign command-id base of the routing intent (the family the re-dispatch and provisioning
+ * arms scan). Absent = the flow's own namespace (wf-<instance>), correct for hand-authored
+ * flows; the rule importer bakes work-assign-coding.
+ */
+export type CommandBase = "work-assign" | "work-assign-coding";

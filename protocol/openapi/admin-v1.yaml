@@ -710,6 +710,81 @@ paths:
           content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
+  /api/admin/workflows/instances:
+    get:
+      operationId: listWorkflowInstances
+      tags: [read]
+      summary: >
+        The flows console's checklist feed: newest instances first, one
+        definition optionally, bounded by limit.
+      parameters:
+        - { in: query, name: def, required: false, schema: { type: string } }
+        - { in: query, name: limit, required: false, schema: { type: integer, minimum: 1, maximum: 500, default: 50 } }
+      responses:
+        "200":
+          description: Instance rows (newest first).
+          content:
+            application/json:
+              schema: { type: object }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/admin/workflows/instances/{instanceId}/log:
+    get:
+      operationId: getWorkflowInstanceLog
+      tags: [read]
+      summary: >
+        The vertical checklist: an instance's step-log rows, oldest first.
+      parameters:
+        - { in: path, name: instanceId, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Step-log rows.
+          content:
+            application/json:
+              schema: { type: object }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/admin/workflows/instances/{instanceId}:
+    get:
+      operationId: getWorkflowInstance
+      tags: [read]
+      summary: >
+        Composition observability: one instance with its ancestor chain and
+        direct children (the lineage ends of every invoke edge recorded).
+      parameters:
+        - { in: path, name: instanceId, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: The instance, its ancestors, and its direct children.
+          content:
+            application/json:
+              schema: { type: object }
+        "404":
+          description: instance-not-found.
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/admin/workflows/instances/{instanceId}/cancel:
+    post:
+      operationId: cancelWorkflowInstance
+      tags: [write]
+      summary: >
+        Operator cancel: the instance and its whole non-terminal subtree end
+        cancelled (end_reason operator-cancel); in-flight wakes resolve as
+        no-ops under the park race law.
+      parameters:
+        - { in: path, name: instanceId, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Cancelled (the instance and its subtree).
+          content:
+            application/json:
+              schema: { type: object }
+        "409":
+          description: not-cancellable (absent or already terminal).
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
   /api/admin/workflows/shadow/report:
     get:
       operationId: getWorkflowShadowReport

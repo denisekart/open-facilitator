@@ -267,6 +267,11 @@
           "required": [
             "invoke"
           ]
+        },
+        {
+          "required": [
+            "signal"
+          ]
         }
       ],
       "properties": {
@@ -659,9 +664,41 @@
             "team": {
               "$ref": "common.v1.json#/$defs/idToken",
               "description": "Owning team slug; defaults to the instance's team."
+            },
+            "target": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512,
+              "description": "Routing-intent targetId (the assign rule's TargetId posture); absent => a flow-derived target."
+            },
+            "inputs": {
+              "type": "object",
+              "propertyNames": {
+                "pattern": "^[A-Za-z0-9._-]{1,64}$"
+              },
+              "additionalProperties": {
+                "$ref": "#/$defs/ref"
+              },
+              "description": "Extra inputs riding the routing intent (the re-hydration coordinates: repo/issue); values resolve as templates over the run context."
+            },
+            "preference": {
+              "$ref": "common.v1.json#/$defs/idToken",
+              "description": "Preferred Link endpoint id riding the routing intent (the assign rule's EndpointId posture); the funnel may still choose otherwise."
+            },
+            "commandBase": {
+              "type": "string",
+              "enum": [
+                "work-assign",
+                "work-assign-coding"
+              ],
+              "description": "Assign command-id base of the routing intent (the family the re-dispatch and provisioning arms scan). Absent = the flow's own namespace (wf-<instance>), correct for hand-authored flows; the rule importer bakes work-assign-coding."
+            },
+            "actor": {
+              "$ref": "common.v1.json#/$defs/evidenceRef",
+              "description": "Timeline actor of the created rows (the arm's link:<provider>:<bot> posture, baked by the rule importer). Absent = workflow:kernel."
             }
           },
-          "description": "Create a Work and append its routing intent; the created work carries this instance in `works.workflow_instance_id`."
+          "description": "Create a Work and append its routing intent (the shared WorkCreate law, one implementation with the provider arm's labeled-issue branch); the created work carries this instance in `works.workflow_instance_id`; the trigger event's conversation reference becomes the work's residence and binding."
         },
         "escalate": {
           "type": "object",
@@ -708,6 +745,44 @@
             }
           },
           "description": "Declared in v1, executed when the memory step consumer lands."
+        },
+        "signal": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "target",
+            "event"
+          ],
+          "properties": {
+            "target": {
+              "$ref": "#/$defs/ref",
+              "description": "The target instance id (a UUID string after template resolution, e.g. \"$steps.<invoke-id>.output.child\"). Point-to-point: no lineage, no budget — a signal can neither spawn nor fail anything."
+            },
+            "event": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "type",
+                "data"
+              ],
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "pattern": "^org\\.facilitator\\.event\\.[a-z0-9._]+\\.v[0-9]+$",
+                  "description": "Wire event type the signal rides (must exist among mirrored schemas — the trigger/wait registry law)."
+                },
+                "data": {
+                  "type": "object",
+                  "description": "Event payload; `target` is appended. The receiver's parked wait correlation key must appear here for a wake to land (the data-scoped EnvelopeCarries law)."
+                }
+              }
+            },
+            "idempotency": {
+              "$ref": "#/$defs/ref",
+              "description": "Optional extra seed for the signal row's identity (the step-command id already makes a redelivered leg converge)."
+            }
+          },
+          "description": "Fire-and-forget point-to-point wake: appends a wire event addressed to ONE instance; the sink wakes the target's park (or falls through to on.event matching). No timeout, no onTimeout: the step is `done` when the row is appended."
         },
         "invoke": {
           "type": "object",

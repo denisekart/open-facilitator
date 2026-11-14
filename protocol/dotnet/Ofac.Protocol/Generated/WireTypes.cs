@@ -2683,6 +2683,15 @@ namespace Ofac.Protocol
         public Select? select { get; set; }
 
         /// <summary>
+        /// Fire-and-forget point-to-point wake: appends a wire event addressed to ONE instance; the
+        /// sink wakes the target's park (or falls through to on.event matching). No timeout, no
+        /// onTimeout: the step is `done` when the row is appended.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("signal")]
+        public Signal? signal { get; set; }
+
+        /// <summary>
         /// Park until the delay elapses; the sweeper is the clock.
         /// </summary>
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -2704,8 +2713,10 @@ namespace Ofac.Protocol
         public Wait? wait { get; set; }
 
         /// <summary>
-        /// Create a Work and append its routing intent; the created work carries this instance in
-        /// `works.workflow_instance_id`.
+        /// Create a Work and append its routing intent (the shared WorkCreate law, one
+        /// implementation with the provider arm's labeled-issue branch); the created work carries
+        /// this instance in `works.workflow_instance_id`; the trigger event's conversation reference
+        /// becomes the work's residence and binding.
         /// </summary>
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("work-create")]
@@ -3093,6 +3104,52 @@ namespace Ofac.Protocol
     }
 
     /// <summary>
+    /// Fire-and-forget point-to-point wake: appends a wire event addressed to ONE instance; the
+    /// sink wakes the target's park (or falls through to on.event matching). No timeout, no
+    /// onTimeout: the step is `done` when the row is appended.
+    /// </summary>
+    public partial class Signal
+    {
+        [JsonPropertyName("event")]
+        public Event @event { get; set; }
+
+        /// <summary>
+        /// Optional extra seed for the signal row's identity (the step-command id already makes a
+        /// redelivered leg converge).
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("idempotency")]
+        [JsonConverter(typeof(FluffyMinMaxLengthCheckConverter))]
+        public string? idempotency { get; set; }
+
+        /// <summary>
+        /// The target instance id (a UUID string after template resolution, e.g.
+        /// "$steps.&lt;invoke-id&gt;.output.child"). Point-to-point: no lineage, no budget — a signal can
+        /// neither spawn nor fail anything.
+        /// </summary>
+        [JsonPropertyName("target")]
+        [JsonConverter(typeof(FluffyMinMaxLengthCheckConverter))]
+        public string target { get; set; }
+    }
+
+    public partial class Event
+    {
+        /// <summary>
+        /// Event payload; `target` is appended. The receiver's parked wait correlation key must
+        /// appear here for a wake to land (the data-scoped EnvelopeCarries law).
+        /// </summary>
+        [JsonPropertyName("data")]
+        public Dictionary<string, object> data { get; set; }
+
+        /// <summary>
+        /// Wire event type the signal rides (must exist among mirrored schemas — the trigger/wait
+        /// registry law).
+        /// </summary>
+        [JsonPropertyName("type")]
+        public string type { get; set; }
+    }
+
+    /// <summary>
     /// Park until the delay elapses; the sweeper is the clock.
     /// </summary>
     public partial class Timer
@@ -3133,11 +3190,21 @@ namespace Ofac.Protocol
     }
 
     /// <summary>
-    /// Create a Work and append its routing intent; the created work carries this instance in
-    /// `works.workflow_instance_id`.
+    /// Create a Work and append its routing intent (the shared WorkCreate law, one
+    /// implementation with the provider arm's labeled-issue branch); the created work carries
+    /// this instance in `works.workflow_instance_id`; the trigger event's conversation reference
+    /// becomes the work's residence and binding.
     /// </summary>
     public partial class WorkCreate
     {
+        /// <summary>
+        /// Timeline actor of the created rows (the arm's link:&lt;provider&gt;:&lt;bot&gt; posture, baked by the
+        /// rule importer). Absent = workflow:kernel.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("actor")]
+        public string? actor { get; set; }
+
         /// <summary>
         /// Capability of the routing intent appended for the new work (there is no
         /// `command.work.create` wire command: this maps onto the shared CreateWork +
@@ -3148,11 +3215,46 @@ namespace Ofac.Protocol
         public string capability { get; set; }
 
         /// <summary>
+        /// Assign command-id base of the routing intent (the family the re-dispatch and provisioning
+        /// arms scan). Absent = the flow's own namespace (wf-&lt;instance&gt;), correct for hand-authored
+        /// flows; the rule importer bakes work-assign-coding.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("commandBase")]
+        public CommandBase? commandBase { get; set; }
+
+        /// <summary>
+        /// Extra inputs riding the routing intent (the re-hydration coordinates: repo/issue); values
+        /// resolve as templates over the run context.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("inputs")]
+        public Dictionary<string, string>? inputs { get; set; }
+
+        /// <summary>
         /// Objective text for the created work.
         /// </summary>
         [JsonPropertyName("objectiveRef")]
         [JsonConverter(typeof(FluffyMinMaxLengthCheckConverter))]
         public string objectiveRef { get; set; }
+
+        /// <summary>
+        /// Preferred Link endpoint id riding the routing intent (the assign rule's EndpointId
+        /// posture); the funnel may still choose otherwise.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("preference")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string? preference { get; set; }
+
+        /// <summary>
+        /// Routing-intent targetId (the assign rule's TargetId posture); absent =&gt; a flow-derived
+        /// target.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("target")]
+        [JsonConverter(typeof(MagentaMinMaxLengthCheckConverter))]
+        public string? target { get; set; }
 
         /// <summary>
         /// Owning team slug; defaults to the instance's team.
@@ -3254,6 +3356,13 @@ namespace Ofac.Protocol
     public enum SelectSource { Event, Manifest };
 
     /// <summary>
+    /// Assign command-id base of the routing intent (the family the re-dispatch and provisioning
+    /// arms scan). Absent = the flow's own namespace (wf-&lt;instance&gt;), correct for hand-authored
+    /// flows; the rule importer bakes work-assign-coding.
+    /// </summary>
+    public enum CommandBase { WorkAssign, WorkAssignCoding };
+
+    /// <summary>
     /// Event-payload matcher value, copied from the policy-file matcher law: exact string, bare
     /// "*", or a single trailing "*" prefix-glob; scalars match by equality.
     /// </summary>
@@ -3335,6 +3444,7 @@ namespace Ofac.Protocol
                 BindingKindConverter.Singleton,
                 OpConverter.Singleton,
                 SelectSourceConverter.Singleton,
+                CommandBaseConverter.Singleton,
                 new DateOnlyConverter(),
                 new TimeOnlyConverter(),
                 IsoDateTimeOffsetConverter.Singleton
@@ -5479,6 +5589,40 @@ namespace Ofac.Protocol
         }
 
         public static readonly MinMaxLengthCheckConverter8 Singleton = new MinMaxLengthCheckConverter8();
+    }
+
+    internal class CommandBaseConverter : JsonConverter<CommandBase>
+    {
+        public override bool CanConvert(Type t) => t == typeof(CommandBase);
+
+        public override CommandBase Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            var value = reader.GetString();
+            switch (value)
+            {
+                case "work-assign":
+                    return CommandBase.WorkAssign;
+                case "work-assign-coding":
+                    return CommandBase.WorkAssignCoding;
+            }
+            throw new Exception("Cannot unmarshal type CommandBase");
+        }
+
+        public override void Write(Utf8JsonWriter writer, CommandBase value, JsonSerializerOptions options)
+        {
+            switch (value)
+            {
+                case CommandBase.WorkAssign:
+                    JsonSerializer.Serialize(writer, "work-assign", options);
+                    return;
+                case CommandBase.WorkAssignCoding:
+                    JsonSerializer.Serialize(writer, "work-assign-coding", options);
+                    return;
+            }
+            throw new Exception("Cannot marshal type CommandBase");
+        }
+
+        public static readonly CommandBaseConverter Singleton = new CommandBaseConverter();
     }
     
     public class DateOnlyConverter : JsonConverter<DateOnly>

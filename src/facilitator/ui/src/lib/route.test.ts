@@ -3,6 +3,13 @@ import { describe, expect, it } from "vitest";
 import { href, parse } from "./route.svelte.js";
 
 describe("parse", () => {
+  it("reads the flows console and one instance", () => {
+    expect(parse("#/flows").view).toBe("flows");
+    const r = parse("#/flow/11111111-1111-4111-8111-111111111111");
+    expect(r.view).toBe("flow");
+    expect(r.id).toBe("11111111-1111-4111-8111-111111111111");
+  });
+
   it("reads the works queue and its filters", () => {
     const r = parse("#/works?state=blocked");
     expect(r.view).toBe("works");
@@ -64,6 +71,8 @@ describe("href", () => {
       "#/works?state=blocked,review",
       "#/works?state=blocked,review&team=team-alpha",
       "#/work/0194f0a0-0000-7000-8000-000000000001",
+      "#/flows",
+      "#/flow/0194f0a0-0000-7000-8000-000000000002",
       "#/audit",
       "#/audit?decision=deny",
       "#/audit?correlation=x",

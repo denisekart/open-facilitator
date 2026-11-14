@@ -73,6 +73,22 @@ export function stateTone(state: string): Tone {
   return TONES[state] ?? "neutral";
 }
 
+/**
+ * Workflow-instance status to tone: the plane's own lifecycle vocabulary
+ * (running|waiting|completed|failed|cancelled), kept next to the work
+ * state's mapping so both badge surfaces agree.
+ */
+export function flowTone(status: string): Tone {
+  const FLOW: Record<string, Tone> = {
+    running: "progress",
+    waiting: "wait",
+    completed: "ok",
+    failed: "bad",
+    cancelled: "neutral",
+  };
+  return FLOW[status] ?? "neutral";
+}
+
 /** Tailwind classes for a state badge, keyed only off the tone. */
 export const TONE_CLASS: Record<Tone, string> = {
   neutral: "bg-sunken text-ink-2 ring-edge",

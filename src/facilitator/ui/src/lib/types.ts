@@ -367,3 +367,74 @@ export interface ChatReply {
 export interface ChatPreferences {
   verbosity: ChatVerbosity;
 }
+
+/** One row of GET /api/admin/workflows/definitions (latest version folded). */
+export interface WorkflowDefinitionRow {
+  id: string;
+  version: number;
+  title: string;
+  description: string;
+  source: string;
+  enabled: boolean;
+  shadow: boolean;
+  team: string | null;
+  digest: string;
+  instancesRunning: number;
+}
+
+/** One row of GET /api/admin/workflows/instances (newest first). */
+export interface WorkflowInstanceRow {
+  instanceId: string;
+  definitionId: string;
+  definitionVersion: number;
+  status: string;
+  currentStep: string | null;
+  depth: number;
+  parentInstanceId: string | null;
+  primaryWorkId: string | null;
+  endReason: string | null;
+  startedAt: string;
+  updatedAt: string;
+}
+
+/** GET /api/admin/workflows/instances/{id}: lineage around one instance. */
+export interface WorkflowInstanceDetail extends Omit<WorkflowInstanceRow, "parentInstanceId"> {
+  invocationPath: string;
+  output: unknown;
+  ancestors: {
+    instanceId: string;
+    definitionId: string;
+    definitionVersion: number;
+    status: string;
+    currentStep: string | null;
+  }[];
+  children: {
+    instanceId: string;
+    definitionId: string;
+    definitionVersion: number;
+    status: string;
+    currentStep: string | null;
+    depth: number;
+    endReason: string | null;
+  }[];
+}
+
+/** One step-log row: the vertical checklist behind an instance. */
+export interface WorkflowStepLogRow {
+  seq: number;
+  stepId: string;
+  status: string;
+  effectCommandId: string | null;
+  output: string | null;
+  startedAt: string;
+  updatedAt: string;
+}
+
+/** GET /api/admin/workflows/registry: the closed sets the editor selects from. */
+export interface WorkflowRegistry {
+  eventTypes: string[];
+  commands: string[];
+  capabilities: string[];
+  callable: { id: string; version: number; title: string }[];
+  teams: string[];
+}

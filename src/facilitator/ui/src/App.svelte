@@ -3,6 +3,8 @@
   import ChatView from "./components/ChatView.svelte";
   import ConfigView from "./components/ConfigView.svelte";
   import DeliveriesView from "./components/DeliveriesView.svelte";
+  import FlowDetail from "./components/FlowDetail.svelte";
+  import FlowsView from "./components/FlowsView.svelte";
   import HealthStrip from "./components/HealthStrip.svelte";
   import HitDetail from "./components/HitDetail.svelte";
   import LinksView from "./components/LinksView.svelte";
@@ -49,6 +51,7 @@
     },
     { key: "config", label: "Config", hint: "the live routing policy" },
     { key: "runtime", label: "Runtime", hint: "replicas, provisioning, manual sweeps" },
+    { key: "flows", label: "Flows", hint: "the workflow plane: definitions and their runs" },
     { key: "chat", label: "AiDeck", hint: "talk to the kernel's assistant", needsChatRole: true },
   ];
 
@@ -329,6 +332,10 @@
       <RuntimeView />
     {:else if route.route.view === "chat"}
       <ChatView />
+    {:else if route.route.view === "flows"}
+      <FlowsView />
+    {:else if route.route.view === "flow" && route.route.id}
+      <FlowDetail instanceId={route.route.id} onclose={() => go("#/flows")} />
     {/if}
 
     <div class="mt-4">

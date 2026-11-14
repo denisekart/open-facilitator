@@ -1,8 +1,8 @@
 <script lang="ts">
   import { ApiError, getJson, toApiError } from "../lib/api.js";
   import { apiFetch, session } from "../lib/auth.svelte.js";
-  import { ago, stateLabel, stamp, TONE_CLASS, stateTone } from "../lib/status.js";
-  import type { AdminWorkDetail, WorkEventRow } from "../lib/types.js";
+  import { ago, flowTone, stateLabel, stamp, TONE_CLASS, stateTone } from "../lib/status.js";
+  import type { AdminWorkDetail, WorkEventRow, WorkflowInstanceRow } from "../lib/types.js";
   import ArtifactRef from "./ArtifactRef.svelte";
   import ProblemNote from "./ProblemNote.svelte";
 
@@ -10,6 +10,7 @@
 
   let detail = $state<AdminWorkDetail | null>(null);
   let timeline = $state<WorkEventRow[] | null>(null);
+  let flow = $state<WorkflowInstanceRow | null>(null);
   let error = $state<ApiError | null>(null);
   let notice = $state<string | null>(null);
   let comment = $state("");
@@ -25,6 +26,17 @@
     try {
       detail = await getJson<AdminWorkDetail>(apiFetch, `/api/admin/work/${workId}`);
       timeline = await getJson<WorkEventRow[]>(apiFetch, `/api/admin/work/${workId}/timeline`);
+      // The flow strip: when a workflow instance backs this work, point at
+      // it. A 403/404 here never hides the work — the strip is optional.
+      try {
+        const insts = await getJson<{ items: WorkflowInstanceRow[] }>(
+          apiFetch,
+          `/api/admin/workflows/instances?work=${workId}&limit=1`,
+        );
+        flow = insts.items[0] ?? null;
+      } catch {
+        flow = null;
+      }
     } catch (err) {
       error = err instanceof ApiError ? err : new ApiError(0, "fetch-failed", String(err), null);
     }
@@ -117,6 +129,21 @@
       <span class="text-ink-3">Created</span>
       <span class="mono text-xs text-ink-2" title={stamp(w.createdAt)}>{ago(w.createdAt).text}</span>
     </div>
+
+    {#if flow}
+      <p class="mb-4 text-sm" data-testid="work-flow-strip">
+        <span class="text-ink-3">Flow</span>
+        <a class="mono text-accent underline" href={`#/flow/${flow.instanceId}`}>
+          {flow.definitionId}@{flow.definitionVersion}
+        </a>
+        <span class="badge {TONE_CLASS[flowTone(flow.status)]} ml-1">
+          {flow.status}
+        </span>
+        {#if flow.currentStep}
+          <span class="mono ml-1 text-xs text-ink-3">at {flow.currentStep}</span>
+        {/if}
+      </p>
+    {/if}
 
     {#if detail.assignments.length > 0}
       <h3 class="mb-1 text-xs font-medium uppercase text-ink-3">

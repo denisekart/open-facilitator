@@ -193,7 +193,7 @@
             cx="4.6" cy="27.4" r="2.7" fill="currentColor" opacity="0.55" /><circle
             cx="27.4" cy="27.4" r="2.7" fill="#D97706" /></svg
         >
-        <h1 class="font-medium">Facilitator</h1>
+        <h1 class="font-medium">Open Facilitator</h1>
         <span class="rounded-full bg-sunken px-2 py-0.5 text-xs text-ink-2">operator console</span>
       </span>
       <div class="flex items-center gap-2">
@@ -229,7 +229,7 @@
           data-testid="search-input" />
         {#if !query}
           <kbd
-            class="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 rounded border border-edge bg-sunken px-1.5 py-0.5 text-[10px] text-ink-3"
+            class="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 rounded border border-edge bg-sunken px-1.5 py-0.5 text-xs text-ink-3"
             >/ to focus</kbd
           >
         {/if}

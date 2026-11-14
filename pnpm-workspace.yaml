@@ -65,6 +65,16 @@ catalog:
   oidc-client-ts: "^3.5.0"
   # SPA unit tests run against a DOM.
   jsdom: "^30.1.3"
+  # Console UX overhaul (console-and-site-ux-overhaul): graph canvas, icon set,
+  # layered layout and the YAML editor. Versions verified against the npm
+  # registry 2026-11-14 — @xyflow/svelte has no 1.18 line (latest 1.x is 1.7.1,
+  # 2.x is still next), so the caret sits on the newest release that exists.
+  "@xyflow/svelte": "^1.7.1"
+  "lucide-svelte": "^0.545.0"
+  dagre: "^0.8.5"
+  "@types/dagre": "^0.7.54"
+  codemirror: "^6.0.2"
+  "@codemirror/lang-yaml": "^6.1.3"
   # harness adapters (omp/codex) ask_user MCP server
   "@modelcontextprotocol/sdk": "^1.32.2"
   # AWS reference deployment (examples/aws): CDK v2 lib + CLI + ECS client,

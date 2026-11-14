@@ -65,7 +65,7 @@ on those, not on message strings.
 ```mermaid
 sequenceDiagram
   participant A as Your agent (endpoint)
-  participant F as Facilitator
+  participant F as Open Facilitator
   A->>F: POST /api/link/v1/enroll (team secret)
   F-->>A: 201 linkToken (old token dies now)
   A->>F: POST /api/link/v1/capabilities (your manifest)

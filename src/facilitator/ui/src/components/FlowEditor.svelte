@@ -556,7 +556,7 @@
 <section class="card" data-testid="flow-editor" aria-label="flow editor">
   <div class="mb-4 flex items-start justify-between gap-4">
     <div>
-      <h2 class="mb-1 text-lg font-semibold">
+      <h2 class="mb-1 text-xl font-semibold">
         {isNew ? "New flow" : `Edit ${defId}`}
         {#if !isNew}<span class="text-sm text-ink-3">· stored v{loadedVersion}</span>{/if}
       </h2>

@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+/* Icons: lucide-svelte only, strokeWidth={1.5}, currentColor — no new icon
+   system, no emoji icons. Typography: the 12/14/16/20/24 scale
+   (text-xs sm:text-sm md:text-base xl:text-xl 2xl:text-2xl) and two weights
+   (font-medium body, font-semibold headings); no ad-hoc text-[Npx]. */
+
 /* Operator console, same design language as the public site: a tool, not a
    brochure. Cool slate canvas, precise blue reserved for actions, one warm
    amber reserved for "a human decision is pending / work in flight".

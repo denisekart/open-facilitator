@@ -472,11 +472,11 @@
                   <span class="block truncate text-xs">{s.title || "(untitled)"}</span>
                   {#if updatedSinceOpen(s)}
                     <span
-                      class="badge bg-accent-veil text-accent ring-accent/25 shrink-0 px-1 py-0 text-[9px]"
+                      class="badge bg-accent-veil text-accent ring-accent/25 shrink-0 px-1 py-0 text-xs"
                       data-testid="chat-session-updated">new</span>
                   {/if}
                 </span>
-                <span class="mono text-[10px] text-ink-3" title={seen.title}>{seen.text}</span>
+                <span class="mono text-xs text-ink-3" title={seen.title}>{seen.text}</span>
               </button>
               <button
                 class="chip shrink-0"
@@ -509,10 +509,10 @@
         <div
           class="max-w-full rounded-lg border border-edge p-3 {m.role === 'user' ? 'bg-sunken' : ''}"
           data-testid={`chat-message-${i}`}>
-          <p class="mb-1 flex items-center gap-2 text-[10px] uppercase text-ink-3">
+          <p class="mb-1 flex items-center gap-2 text-xs uppercase text-ink-3">
             {m.role}
             <span
-              class="badge px-1.5 py-0 text-[9px] {TONE_CLASS[BASIS_TONE[m.basis] ?? 'neutral']}"
+              class="badge px-1.5 py-0 text-xs {TONE_CLASS[BASIS_TONE[m.basis] ?? 'neutral']}"
               data-testid={`chat-basis-${i}`}>{BASIS_LABEL[m.basis] ?? m.basis}</span>
           </p>
           {#if m.role === "assistant"}
@@ -539,7 +539,7 @@
                 <summary class="cursor-pointer text-xs text-ink-3">looked at {readTrail(m).length} endpoint{readTrail(m).length === 1 ? "" : "s"}</summary>
                 <ul class="mt-1 space-y-0.5">
                   {#each readTrail(m) as r}
-                    <li class="mono text-[10px] text-ink-2">looked at: {r.method} {r.path} ({r.status})</li>
+                    <li class="mono text-xs text-ink-2">looked at: {r.method} {r.path} ({r.status})</li>
                   {/each}
                 </ul>
               </details>
@@ -584,7 +584,7 @@
                   data-testid={`chat-action-${action.method.toLowerCase()}`}>
                   <div class="flex items-baseline justify-between gap-2">
                     <p class="text-xs font-medium">{live.summary || action.description}</p>
-                    <span class="text-[10px] uppercase text-ink-3" data-testid={`chat-action-effect-${action.actionId}`}>
+                    <span class="text-xs uppercase text-ink-3" data-testid={`chat-action-effect-${action.actionId}`}>
                       {effectFor(action)}
                     </span>
                   </div>
@@ -597,20 +597,20 @@
                     {#if live.expiresAt}
                       {@const exp = ago(live.expiresAt)}
                       <span
-                        class="text-[10px] text-ink-3"
+                        class="text-xs text-ink-3"
                         title={stamp(live.expiresAt)}
                         data-testid="chat-action-expires">expires {exp.text}</span>
                     {/if}
                   </p>
                   {#if lines.length}
                     <details class="mt-1" data-testid="chat-action-body">
-                      <summary class="mono cursor-pointer whitespace-pre text-[10px] text-ink-3">body · {lines.length} line{lines.length === 1 ? "" : "s"}
+                      <summary class="mono cursor-pointer whitespace-pre text-xs text-ink-3">body · {lines.length} line{lines.length === 1 ? "" : "s"}
 {lines.length > 5 ? `${lines.slice(0, 5).join("\n")}\n…` : lines.join("\n")}</summary>
-                      <pre class="mono overflow-x-auto rounded bg-bg p-2 text-[10px]">{lines.join("\n")}</pre>
+                      <pre class="mono overflow-x-auto rounded bg-bg p-2 text-xs">{lines.join("\n")}</pre>
                     </details>
                   {/if}
                   {#if live.status === "failed"}
-                    <p class="mono mt-1 break-all text-[10px] text-danger" data-testid={`chat-action-result-${action.actionId}`}>
+                    <p class="mono mt-1 break-all text-xs text-danger" data-testid={`chat-action-result-${action.actionId}`}>
                       {live.statusCode ?? "no status"}
                       {#if live.result !== null && live.result !== undefined}
                         — {typeof live.result === "string" ? live.result : JSON.stringify(live.result)}

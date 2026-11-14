@@ -252,7 +252,7 @@ export const docs = [
         route: "/docs/overview",
         src: "docs/overview.md",
         title: "Overview",
-        body: "The concepts and vocabulary from zero: Facilitator, Projects, Works, Gateways, Links, approvals, artifacts, memory.",
+        body: "The concepts and vocabulary from zero: Open Facilitator, Projects, Works, Gateways, Links, approvals, artifacts, memory.",
       },
     ],
   },

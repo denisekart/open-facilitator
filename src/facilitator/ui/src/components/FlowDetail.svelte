@@ -113,7 +113,7 @@
     <div>
       <button class="btn btn-ghost btn-xs mb-1" onclick={onclose}>← flows</button>
       {#if detail}
-        <h2 class="text-lg font-semibold">
+        <h2 class="text-xl font-semibold">
           <span class="font-mono">{detail.definitionId}</span>@{detail.definitionVersion}
           <span class="badge {flowTone(detail.status)} ml-1">
             {detail.status}
@@ -124,7 +124,7 @@
             {/if}
           </span>
         </h2>
-        <p class="mono text-[11px] text-ink-3">
+        <p class="mono text-xs text-ink-3">
           {instanceId} · depth {detail.depth} · started {ago(detail.startedAt).text}
           {#if detail.primaryWorkId}
             · <a class="text-accent underline" href={`#/work/${detail.primaryWorkId}`}>work</a>
@@ -238,7 +238,7 @@
             <td>{row.seq}</td>
             <td class="font-mono">{row.stepId}</td>
             <td><span class="badge {stepTone(row.status)}">{row.status}</span></td>
-            <td class="mono max-w-md truncate text-[11px] text-ink-2" title={row.output ?? ""}>
+            <td class="mono max-w-md truncate text-xs text-ink-2" title={row.output ?? ""}>
               {shortOutput(row.output)}
             </td>
             <td title={stamp(row.updatedAt)}>{ago(row.updatedAt).text}</td>

@@ -1,0 +1,46 @@
+{
+  "id": "ensure-capacity",
+  "version": 1,
+  "title": "Ensure capacity (callable sub-flow)",
+  "description": "The callable capacity leg of composition: assign the harness spin-up capability, wait for the assignment to complete, and publish the endpoint the harness landed on. Callable-only (invoked); the motivating child of agentic-research. Its completion hand-off (workflow.completed) is what resumes the awaiting parent — the projected output below is the hand-off's payload.",
+  "enabled": false,
+  "on": {
+    "invoked": {}
+  },
+  "composition": {
+    "maxInvocations": 4
+  },
+  "output": {
+    "project": {
+      "workId": "steps.await-harness.output.wake.data.workId",
+      "assignmentId": "steps.await-harness.output.wake.data.assignmentId",
+      "executionId": "steps.await-harness.output.wake.data.executionId"
+    }
+  },
+  "steps": [
+    {
+      "id": "spin-up",
+      "title": "Spin up a harness for the requested capability",
+      "on": "always",
+      "emit": {
+        "command": "org.facilitator.command.work.assign.v1",
+        "inputs": {
+          "capabilityId": "$input.capability",
+          "objective": "ensure-capacity: harness spin-up for $input.capability",
+          "actorEvidenceRef": "kernel:ensure-capacity"
+        }
+      }
+    },
+    {
+      "id": "await-harness",
+      "title": "Wait for the harness assignment to complete",
+      "on": "spin-up:completed",
+      "wait": {
+        "event": "org.facilitator.event.assignment.completed.v1",
+        "correlate": "$work.id",
+        "timeout": "PT15M",
+        "onTimeout": "end"
+      }
+    }
+  ]
+}

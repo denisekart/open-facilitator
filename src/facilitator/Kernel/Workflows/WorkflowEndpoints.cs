@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 using Facilitator.Kernel.Ai;
 using Facilitator.Kernel.Shared;
@@ -235,6 +236,150 @@ public static class WorkflowEndpoints
             }
 
             return Results.Ok(await report.ReportAsync(since, ct));
+        });
+
+        group.MapGet("/instances/{instanceId:guid}", async (
+            FacilitatorDbContext db, Guid instanceId, CancellationToken ct) =>
+        {
+            // Composition observability (Phase 6): the ancestor chain,
+            // this instance, and its direct children — the pair-ends of
+            // every lineage relation the plane recorded.
+            var instance = await db.WorkflowInstances.AsNoTracking()
+                .FirstOrDefaultAsync(i => i.InstanceId == instanceId, ct);
+            if (instance is null)
+            {
+                return Results.Problem(ProblemErrors.Create(
+                    "instance-not-found", "Workflow instance not found", StatusCodes.Status404NotFound, $"no instance '{instanceId}'"));
+            }
+
+            var ancestors = new List<object>();
+            var walk = instance.ParentInstanceId;
+            while (walk is { } parentId)
+            {
+                var parent = await db.WorkflowInstances.AsNoTracking()
+                    .FirstOrDefaultAsync(i => i.InstanceId == parentId, ct);
+                if (parent is null)
+                {
+                    break;
+                }
+
+                ancestors.Add(new
+                {
+                    instanceId = parent.InstanceId,
+                    definitionId = parent.DefId,
+                    definitionVersion = parent.DefVersion,
+                    status = parent.Status,
+                    currentStep = parent.CurrentStep,
+                });
+                walk = parent.ParentInstanceId;
+            }
+
+            var children = await db.WorkflowInstances.AsNoTracking()
+                .Where(i => i.ParentInstanceId == instanceId)
+                .OrderBy(i => i.StartedAt)
+                .Select(i => new
+                {
+                    instanceId = i.InstanceId,
+                    definitionId = i.DefId,
+                    definitionVersion = i.DefVersion,
+                    status = i.Status,
+                    currentStep = i.CurrentStep,
+                    depth = i.Depth,
+                    endReason = i.EndReason,
+                })
+                .ToListAsync(ct);
+
+            return Results.Ok(new
+            {
+                instanceId = instance.InstanceId,
+                definitionId = instance.DefId,
+                definitionVersion = instance.DefVersion,
+                status = instance.Status,
+                currentStep = instance.CurrentStep,
+                depth = instance.Depth,
+                invocationPath = instance.InvocationPath,
+                endReason = instance.EndReason,
+                output = instance.Output is { Length: > 0 } o ? JsonNode.Parse(o) : null,
+                primaryWorkId = instance.PrimaryWorkId,
+                ancestors,
+                children,
+            });
+        });
+
+        group.MapGet("/instances", async (
+            FacilitatorDbContext db, string? def, Guid? work, int limit, CancellationToken ct) =>
+        {
+            // The flows console's checklist feed: newest instances first,
+            // optionally one definition's, optionally the instance backing
+            // one work (the console's work strip), bounded (an operator
+            // paginates by since-id, not by page counts).
+            var capped = Math.Clamp(limit <= 0 ? 50 : limit, 1, 500);
+            var query = db.WorkflowInstances.AsNoTracking().AsQueryable();
+            if (!string.IsNullOrWhiteSpace(def))
+            {
+                query = query.Where(i => i.DefId == def);
+            }
+
+            if (work is { } workId)
+            {
+                query = query.Where(i => i.PrimaryWorkId == workId);
+            }
+
+            var rows = await query
+                .OrderByDescending(i => i.StartedAt)
+                .Take(capped)
+                .Select(i => new
+                {
+                    instanceId = i.InstanceId,
+                    definitionId = i.DefId,
+                    definitionVersion = i.DefVersion,
+                    status = i.Status,
+                    currentStep = i.CurrentStep,
+                    depth = i.Depth,
+                    parentInstanceId = i.ParentInstanceId,
+                    primaryWorkId = i.PrimaryWorkId,
+                    endReason = i.EndReason,
+                    startedAt = i.StartedAt,
+                    updatedAt = i.UpdatedAt,
+                })
+                .ToListAsync(ct);
+            return Results.Ok(new { items = rows });
+        });
+
+        group.MapGet("/instances/{instanceId:guid}/log", async (
+            FacilitatorDbContext db, Guid instanceId, CancellationToken ct) =>
+        {
+            // The vertical checklist: step-log rows oldest first, outputs
+            // parsed so the console can show what each leg recorded.
+            var rows = await db.WorkflowStepLog.AsNoTracking()
+                .Where(l => l.InstanceId == instanceId)
+                .OrderBy(l => l.Seq)
+                .Select(l => new
+                {
+                    seq = l.Seq,
+                    stepId = l.StepId,
+                    status = l.Status,
+                    effectCommandId = l.EffectCommandId,
+                    output = l.Output,
+                    startedAt = l.StartedAt,
+                    updatedAt = l.UpdatedAt,
+                })
+                .ToListAsync(ct);
+            return Results.Ok(new { items = rows });
+        });
+
+        group.MapPost("/instances/{instanceId:guid}/cancel", async (
+            WorkflowRunner runner, Guid instanceId, CancellationToken ct) =>
+        {
+            // Operator cancel: the instance and its whole non-terminal
+            // subtree end `cancelled` (end_reason 'operator-cancel');
+            // in-flight wakes for it resolve as no-ops (the race law).
+            var cancelled = await runner.CancelInstanceAsync(instanceId, ct);
+            return cancelled
+                ? Results.Ok(new { instanceId, cancelled = true })
+                : Results.Problem(ProblemErrors.Create(
+                    "not-cancellable", "Workflow instance not cancellable", StatusCodes.Status409Conflict,
+                    $"workflow instance {instanceId} is absent or already terminal"));
         });
 
         group.MapPost("/definitions/{id}/versions/{version:int}/toggle", async (

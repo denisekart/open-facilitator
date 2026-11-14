@@ -125,9 +125,27 @@ public sealed partial class WorkflowRunner(
 
     /// <summary>Resume a parked instance from a wake envelope, then advance.
     /// The conditional UPDATE is the race law: exactly one of
-    /// {wake, sweeper timeout, cancel} flips the park; losers no-op.</summary>
+    /// {wake, sweeper timeout, cancel} flips the park; losers no-op.
+    /// Returns TRUE only when THIS call flipped the park; false means no
+    /// park was found (resolved or never existed) — the sink's
+    /// fall-through signal.</summary>
     public async Task<bool> ResumeAsync(WorkflowWake wake, CancellationToken ct)
     {
+        // A completion hand-off names the CHILD (its terminal row is the
+        // commit proof, its id the idempotency seed), but the PARK lives on
+        // the PARENT's invoke step: resolve the parent whose parked invoke
+        // step names this child. A root/detached child's event (or a child
+        // whose parent never parked on it) resolves to nothing — the sink's
+        // fall-through law takes the envelope to on.event.
+        var parked = wake.CompletionStatus is null
+            ? wake.InstanceId
+            : await ParkedParentAsync(wake, ct);
+        if (parked is null)
+        {
+            return false;
+        }
+
+        wake = wake with { InstanceId = parked.Value };
         await using (var db = await contextFactory.CreateDbContextAsync(ct))
         {
             await db.Database.BeginTransactionAsync(ct);
@@ -146,10 +164,11 @@ public sealed partial class WorkflowRunner(
                     .SetProperty(i => i.UpdatedAt, now), ct);
             if (flipped == 0)
             {
-                // Park already resolved (a cancel or duplicate wake raced):
-                // consumed as a no-op, never requeued.
+                // Park already resolved (a cancel or duplicate wake raced)
+                // or never existed: NOT resumed — the sink applies the
+                // fall-through law (offer the envelope to on.event).
                 await db.Database.CommitTransactionAsync(ct);
-                return true;
+                return false;
             }
 
             await db.Database.CommitTransactionAsync(ct);
@@ -232,6 +251,10 @@ public sealed partial class WorkflowRunner(
         activity?.SetTag("ofac.workflow.instance", instanceId.ToString());
         activity?.SetTag("ofac.workflow.definition", $"{instance.DefId}@{instance.DefVersion}");
         activity?.SetTag("ofac.workflow.step", stepId);
+        if (instance.ParentInstanceId is { } parentSpan)
+        {
+            activity?.SetTag("ofac.workflow.parent", parentSpan.ToString());
+        }
 
         // A wake RESOLVES the parked step: it does not re-execute it. An
         // approval decision of anything but `approved` (denied, expired,
@@ -259,7 +282,10 @@ public sealed partial class WorkflowRunner(
                 Deadline: now + ParseDuration(payload.GetProperty("for").GetString()!))),
             "approval" => ExecuteApprovalAsync(db, instance, stepId, payload, context, now, ct, shadowMode),
             "escalate" => ExecuteEscalateAsync(db, instance, payload, context, ct, shadowMode),
+            "work-create" => ExecuteWorkCreateAsync(db, instance, stepId, payload, context, envelope, now, ct, shadowMode),
             "fork-work" => ExecuteForkAsync(db, instance, stepId, payload, context, envelope, now, ct, shadowMode),
+            "invoke" => ExecuteInvokeAsync(db, instance, stepId, payload, context, now, ct, shadowMode),
+            "signal" => ExecuteSignalAsync(db, instance, stepId, payload, context, commandId, now, ct, shadowMode),
             _ => Task.FromResult(UnexecutableStep()),
         };
 
@@ -325,7 +351,7 @@ public sealed partial class WorkflowRunner(
                 {
                     if (onFailureLeg)
                     {
-                        await ProjectOutputAsync(db, instance, doc.RootElement, now);
+                        await ProjectOutputAsync(db, instance, doc.RootElement, now, ct);
                         Terminate(db, instance, "failed", null, now);
                     }
                     else
@@ -344,6 +370,10 @@ public sealed partial class WorkflowRunner(
                 var failureEdge = FailedEdgeId(steps, stepId);
                 if (failureEdge is null or "end")
                 {
+                    // end_reason stays the composition vocabulary of the
+                    // CHECK: a plain leg failure records none (the step log
+                    // carries the story); an executor-set composition
+                    // reason (preemption, invoke-timeout) survives Terminate.
                     Terminate(db, instance, "failed", null, now);
                 }
                 else
@@ -469,6 +499,22 @@ public sealed partial class WorkflowRunner(
                 target = null; // dangling edge: the park ends as a failure
             }
         }
+        else if (timedOut && step.TryGetProperty("invoke", out var invoke))
+        {
+            // Guard 4 (age + death): the awaited child's subtree is
+            // cancelled, the onTimeout edge (or the failed edge) is taken,
+            // and the run records `invoke-timeout` — the chain never waits
+            // forever on a child that stopped making progress.
+            target = invoke.TryGetProperty("onTimeout", out var ot) ? ot.GetString() : null;
+            if (target is { Length: > 0 } and not "end" && !steps.Any(s => s.GetProperty("id").GetString() == target))
+            {
+                target = null;
+            }
+
+            target ??= FailedEdgeId(steps, stepId);
+            instance.EndReason ??= "invoke-timeout";
+            CancelSubtreeCore(db, instanceId, now);
+        }
         else if (timedOut)
         {
             target = FailedEdgeId(steps, stepId); // approval expiry: the failed edge
@@ -478,6 +524,14 @@ public sealed partial class WorkflowRunner(
         instance.DeadlineAt = null;
         if (target is null or { Length: 0 } or "end")
         {
+            if (isTimer)
+            {
+                // A completing timer is a completion: the output contract
+                // rides the terminal transition (same as CompleteAsync).
+                using var rootDoc = JsonDocument.Parse(definition!.Payload);
+                await ProjectOutputAsync(db, instance, rootDoc.RootElement, now, ct);
+            }
+
             Terminate(db, instance, isTimer ? "completed" : "failed", null, now);
         }
         else
@@ -806,6 +860,368 @@ public sealed partial class WorkflowRunner(
     /// successor identity, the arm's sentences, the binding following the
     /// live item. Shadow mode computes the full plan and records it in the
     /// step output (the reconciliation source), writing nothing.</summary>
+    /// <summary>
+    /// The work-create step: the shared <see cref="WorkCreate"/> law with
+    /// the provider arm's labeled-issue branch, executed by the plane. The
+    /// subject work id is deterministic (instance, stepId) — a redelivered
+    /// trigger cannot mint a second work. Conversation identity, the
+    /// binding's idempotency key, the origin and the owner all derive from
+    /// the TRIGGER ENVELOPE (the residence is as observed, never inferred);
+    /// team resolution follows the arm's fail-open law (a declared slug
+    /// must be rostered, else the instance's team, else workless-team).
+    /// The step STAMPS the instance's subject work: the leg after it (the
+    /// ack emit) runs with a subject, like the arm's inline ack.
+    /// </summary>
+    private async Task<StepOutcome> ExecuteWorkCreateAsync(
+        FacilitatorDbContext db,
+        WorkflowInstanceEntity instance,
+        string stepId,
+        JsonElement payload,
+        JsonObject context,
+        JsonElement? envelope,
+        DateTime now,
+        CancellationToken ct,
+        bool shadow)
+    {
+        if (envelope is not { } trigger
+            || !trigger.TryGetProperty("data", out var triggerData)
+            || triggerData.ValueKind != JsonValueKind.Object
+            || !triggerData.TryGetProperty("reference", out var reference)
+            || reference.ValueKind != JsonValueKind.Object)
+        {
+            return StepOutcome.LegFailed(new JsonObject { ["error"] = "work-create needs a trigger event with a reference" });
+        }
+
+        var provider = reference.GetProperty("provider").GetString()!;
+        var channel = reference.GetProperty("channelOrResourceId").GetString()!;
+        var root = reference.GetProperty("rootThreadId").GetString() ?? channel;
+        var kind = reference.TryGetProperty("conversationKind", out var k) ? k.GetString() ?? "issue" : "issue";
+        var messageId = reference.TryGetProperty("messageId", out var m) ? m.GetString() : null;
+        var data = triggerData;
+        var deliveryId = data.TryGetProperty("providerDeliveryId", out var d) ? d.GetString() ?? instance.InstanceId.ToString("N") : instance.InstanceId.ToString("N");
+        var ownerActor = data.TryGetProperty("actorProviderAccountId", out var acct) && acct.ValueKind == JsonValueKind.String
+            ? $"provider:{provider}:{acct.GetString()}"
+            : null;
+
+        // Objective: the event's own text (the arm's posture), the
+        // reference-shaped fallback when it carries none.
+        var objectiveText = ResolveString(payload.GetProperty("objectiveRef"), context);
+        var objective = WorkFork.Trim(string.IsNullOrEmpty(objectiveText) ? $"Issue {channel}#{root}" : objectiveText!);
+
+        // Team law (arm's fail-open, anchored): a declared slug wins when
+        // rostered; else the provider adapter's own enrolled team (the
+        // plane's honest mirror of the arm's `workload.TeamId` — the
+        // adapter that posted this event is enrolled, and enrollments are
+        // unique per endpoint); else the instance's team; else teamless.
+        string? teamSlug = null;
+        Guid? teamId = null;
+        if (payload.TryGetProperty("team", out var declaredTeam)
+            && await db.Teams.AsNoTracking().Where(t => t.Slug == declaredTeam.GetString())
+                    .Select(t => (Guid?)t.TeamId).FirstOrDefaultAsync(ct) is { } rostered)
+        {
+            teamSlug = declaredTeam.GetString();
+            teamId = rostered;
+        }
+        else if (providers.Find(provider)?.EndpointId is { Length: > 0 } adapterEndpoint
+            && await db.LinkEnrollments.AsNoTracking()
+                .Where(e => e.EndpointId == adapterEndpoint)
+                .Select(e => (Guid?)e.TeamId).FirstOrDefaultAsync(ct) is { } enrolled)
+        {
+            teamId = enrolled;
+            teamSlug = await db.Teams.AsNoTracking().Where(t => t.TeamId == enrolled)
+                .Select(t => t.Slug).FirstOrDefaultAsync(ct);
+        }
+        else if (instance.Team is { Length: > 0 } instanceTeam)
+        {
+            teamSlug = instanceTeam;
+            teamId = await db.Teams.AsNoTracking().Where(t => t.Slug == instanceTeam)
+                .Select(t => (Guid?)t.TeamId).FirstOrDefaultAsync(ct);
+        }
+
+        var capability = payload.GetProperty("capability").GetString()!;
+        var commandBase = payload.TryGetProperty("commandBase", out var cb)
+            ? cb.GetString()!
+            : $"wf-{instance.InstanceId:N}";
+        var extraInputs = new JsonObject();
+        if (payload.TryGetProperty("inputs", out var declared) && declared.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var input in declared.EnumerateObject())
+            {
+                extraInputs[input.Name] = ResolveTemplate(JsonNode.Parse(input.Value.GetRawText()), context);
+            }
+        }
+
+        var workId = WorkflowIdentity.WorkCreateWorkId(instance.InstanceId, stepId);
+        var plan = new WorkCreate.Plan(
+            workId,
+            objective,
+            teamId,
+            teamSlug,
+            Origin: trigger.GetProperty("type").GetString(),
+            ownerActor,
+            provider,
+            channel,
+            root,
+            kind,
+            messageId,
+            deliveryId,
+            capability,
+            PreferenceEndpointId: payload.TryGetProperty("preference", out var pref) ? pref.GetString() : null,
+            TargetId: payload.TryGetProperty("target", out var targetRef)
+                ? targetRef.GetString()!
+                : $"{instance.DefId}-flow",
+            commandBase,
+            extraInputs.Count == 0 ? null : extraInputs.ToJsonString(),
+            payload.TryGetProperty("actor", out var actor)
+                ? actor.GetString()!
+                : commandBase.StartsWith("work-assign", StringComparison.Ordinal)
+                    ? $"kernel:provider-ingest:{workId}" // the rule posture: the arm's own evidence law
+                    : $"kernel:workflow:{instance.InstanceId:N}",
+            // The arm's timeline actor verbatim (link:<provider>:<bot>),
+            // from the same config the arm reads: the swap is
+            // timeline-identical.
+            $"link:{provider}:{providers.Find(provider)?.BotUserId ?? "provider"}",
+            $"work created (issue #{root})",
+            instance.InstanceId,
+            providers.Find(provider)?.EndpointId);
+
+        if (shadow)
+        {
+            // Would-do only (the swap posture): the exact plan, applied by
+            // nobody; the arm performed the real rows.
+            return StepOutcome.Done(
+                new JsonObject { ["wouldDo"] = "work-create", ["plan"] = plan.ToJson() },
+                null);
+        }
+
+        WorkCreate.Apply(db, envelopeValidator, plan, now);
+
+        // Subject stamp: the instance now RUNS ON the work it created (the
+        // arm created the work and acked it inline; the plane's next leg
+        // does). The advance loop reloads the row per leg.
+        instance.PrimaryWorkId = workId;
+        if (plan.TeamId is { } owned)
+        {
+            instance.ProjectId = db.Projects.Local
+                .FirstOrDefault(p => p.TeamId == owned && p.Name == WorkCreate.ProviderProjectName)?.ProjectId
+                ?? instance.ProjectId;
+        }
+
+        return StepOutcome.Done(
+            new JsonObject { ["effect"] = "work-create", ["workId"] = workId.ToString(), ["effectCommandId"] = plan.EffectCommandId },
+            null,
+            note: $"flow effect: work {workId:N} + routing intent {capability}");
+    }
+
+    /// <summary>
+    /// The composition step (Phase 6): a child instance of a callable
+    /// (`on: { invoked: {} }`) definition, created IN THE PARENT'S
+    /// TRANSACTION under the preemption law — a denial has zero side
+    /// effects. Identity: child = UUIDv5(invoke namespace,
+    /// `parentInstance:stepId`), so a redelivered invoke re-derives the
+    /// same child and collides on the PK (exactly-once child, the outbox
+    /// law verbatim). The child's inputs ride its initial step-log row
+    /// (`step_id = "input"`), which <see cref="BuildContext"/> hangs as
+    /// <c>$input.&lt;name&gt;</c>. Awaited invokes park the parent (the
+    /// park and the child row commit together — no wake-before-park
+    /// window); the hand-off is the child's terminal completion event
+    /// (see <see cref="AppendCompletionEventAsync"/>).
+    /// </summary>
+    private async Task<StepOutcome> ExecuteInvokeAsync(
+        FacilitatorDbContext db,
+        WorkflowInstanceEntity instance,
+        string stepId,
+        JsonElement payload,
+        JsonObject context,
+        DateTime now,
+        CancellationToken ct,
+        bool shadow = false)
+    {
+        var targetId = payload.GetProperty("workflow").GetString()!;
+        var pinned = payload.TryGetProperty("version", out var pv) && pv.ValueKind == JsonValueKind.Number
+            ? pv.GetInt32()
+            : (int?)null;
+
+        // Live snapshot law: the pinned version (or the callee's live
+        // enabled version) is resolved AT INVOKE TIME and pinned into the
+        // child row — a mid-flight parent version can never morph the
+        // child. Disabled/vanished targets deny as a leg failure.
+        var target = pinned is { } v
+            ? await db.WorkflowDefinitions.AsNoTracking()
+                .FirstOrDefaultAsync(d => d.DefId == targetId && d.Version == v, ct)
+            : await db.WorkflowDefinitions.AsNoTracking()
+                .Where(d => d.DefId == targetId && d.Enabled)
+                .OrderByDescending(d => d.Version)
+                .FirstOrDefaultAsync(ct);
+        if (target is not { Enabled: true })
+        {
+            return new StepOutcome(
+                OutcomeKind.LegFailed,
+                new JsonObject { ["error"] = $"invoke target '{targetId}' is not an enabled definition" },
+                null,
+                null,
+                EndReason: "invoke-target-unavailable");
+        }
+
+        var targetIdVer = $"{target.DefId}@{target.Version}";
+        var reentrant = false;
+        var maxInvocations = WorkflowLimits.DefaultMaxInvocations;
+        using (var targetDoc = JsonDocument.Parse(target.Payload))
+        {
+            if (targetDoc.RootElement.TryGetProperty("composition", out var comp))
+            {
+                reentrant = comp.TryGetProperty("reentrant", out var r) && r.ValueKind == JsonValueKind.True;
+                maxInvocations = comp.TryGetProperty("maxInvocations", out var m) && m.ValueKind == JsonValueKind.Number
+                    ? m.GetInt32()
+                    : WorkflowLimits.DefaultMaxInvocations;
+            }
+        }
+
+        var childPath = $"{instance.InvocationPath}>{targetIdVer}";
+        var childDepth = instance.Depth + 1;
+        var decision = WorkflowPreemption.TryAdmit(childPath, childDepth, targetIdVer, reentrant, maxInvocations);
+        if (!decision.Admitted)
+        {
+            // Guard 3: a denial is a branch, not a crash — the failed edge
+            // is taken, the composition reason is the recorded end_reason,
+            // the story is one timeline row. No child row, no outbox row.
+            instance.EndReason = decision.Denial!.EndReason;
+            return new StepOutcome(
+                OutcomeKind.LegFailed,
+                new JsonObject
+                {
+                    ["invoke"] = "denied",
+                    ["reason"] = decision.Denial.EndReason,
+                    ["detail"] = decision.Denial.Detail,
+                },
+                null,
+                $"invoke denied: {decision.Denial.Detail}",
+                EndReason: decision.Denial.EndReason);
+        }
+
+        var childId = WorkflowIdentity.ChildInstanceId(instance.InstanceId, stepId);
+        var inputs = new JsonObject();
+        if (payload.TryGetProperty("inputs", out var declared) && declared.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var input in declared.EnumerateObject())
+            {
+                inputs[input.Name] = ResolveTemplate(JsonNode.Parse(input.Value.GetRawText()), context);
+            }
+        }
+
+        var awaited = !payload.TryGetProperty("await", out var awaitFlag) || awaitFlag.ValueKind != JsonValueKind.False;
+        if (shadow)
+        {
+            // Would-do only: the exact child spec the swap would create,
+            // no child row, no start row, no park (a shadow run never
+            // waits for a child it did not create).
+            return StepOutcome.Continue(new JsonObject
+            {
+                ["invoke"] = "would-do",
+                ["child"] = childId.ToString(),
+                ["definition"] = targetIdVer,
+                ["await"] = awaited,
+                ["inputs"] = inputs,
+            });
+        }
+
+        var exists = await db.WorkflowInstances.AsNoTracking().AnyAsync(i => i.InstanceId == childId, ct);
+        if (!exists)
+        {
+            db.WorkflowInstances.Add(new WorkflowInstanceEntity
+            {
+                InstanceId = childId,
+                DefId = target.DefId,
+                DefVersion = target.Version,
+                Team = instance.Team,
+                ProjectId = instance.ProjectId,
+                PrimaryWorkId = instance.PrimaryWorkId, // the flow's subject work is shared
+                TriggerEventId = instance.TriggerEventId, // shared provenance
+                Status = "running",
+                ParentInstanceId = instance.InstanceId,
+                Depth = childDepth,
+                InvocationPath = childPath,
+                StartedAt = now,
+                UpdatedAt = now,
+            });
+            db.WorkflowStepLog.Add(new WorkflowStepLogEntity
+            {
+                InstanceId = childId,
+                Seq = 1,
+                StepId = "input",
+                Status = "done",
+                Output = inputs.ToJsonString(),
+                StartedAt = now,
+                UpdatedAt = now,
+            });
+            var startEnvelope = StartEnvelope(childId, targetIdVer, now);
+            if (Activity.Current is { } stepSpan)
+            {
+                startEnvelope["traceparent"] = stepSpan.Id;
+            }
+
+            db.Outbox.Add(new OutboxEntity
+            {
+                OutboxId = Guid.NewGuid(),
+                CommandId = $"wf-start:{childId:N}",
+                RecipientEndpointId = WorkflowTrigger.Recipient,
+                AggregateType = "work",
+                AggregateId = null,
+                EventType = StartRequestType,
+                Envelope = startEnvelope.ToJsonString(),
+                WorkId = instance.PrimaryWorkId,
+                Status = "pending",
+                AvailableAt = now,
+                Attempts = 0,
+                CreatedAt = now,
+            });
+        }
+
+        var output = new JsonObject
+        {
+            ["invoke"] = exists ? "already-started" : "started",
+            ["child"] = childId.ToString(),
+            ["definition"] = targetIdVer,
+            ["depth"] = childDepth,
+        };
+
+        // Composition observability: the child id names the lineage on
+        // the step span, and the start row rides the step's trace (the
+        // trace-correlation law of every plane effect) so the child's
+        // spans continue THIS trace.
+        Activity.Current?.SetTag("ofac.workflow.child", childId.ToString());
+        return awaited
+            ? new StepOutcome(
+                OutcomeKind.Parked,
+                new JsonObject { ["parked"] = "invoke", ["child"] = childId.ToString(), ["definition"] = targetIdVer },
+                null,
+                null,
+                Deadline: now + ParseDuration(payload.GetProperty("timeout").GetString()!))
+            : StepOutcome.Done(output, null);
+    }
+
+    /// <summary>The child-start row's internal channel type (the
+    /// <c>decode.kernel</c> precedent: an internal payload with no wire
+    /// schema; the sink consumes it by command id, nothing else reads
+    /// it).</summary>
+    public const string StartRequestType = "org.facilitator.internal.workflow.start";
+
+    private static JsonObject StartEnvelope(Guid childId, string targetIdVer, DateTime now) => new()
+    {
+        ["specversion"] = "1.0",
+        ["id"] = childId.ToString("N"),
+        ["source"] = EnvelopeFactory.KernelSource,
+        ["type"] = StartRequestType,
+        ["subject"] = $"workflow/{childId}",
+        ["time"] = now.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
+        ["datacontenttype"] = "application/json",
+        ["data"] = new JsonObject
+        {
+            ["child"] = childId.ToString(),
+            ["definition"] = targetIdVer,
+        },
+    };
+
     private async Task<StepOutcome> ExecuteForkAsync(
         FacilitatorDbContext db,
         WorkflowInstanceEntity instance,
@@ -1005,15 +1421,23 @@ public sealed partial class WorkflowRunner(
         "org.facilitator.command.communication.acknowledge.v1",
     };
 
-    private static string RecipientFor(string commandType, JsonObject data)
+    private string RecipientFor(string commandType, JsonObject data)
     {
-        // Communication commands address the provider's link endpoint
-        // (the channel prefix is the dispatcher's routing key); work
-        // commands ride the kernel work plane.
-        // Phase 1: every effect rides the kernel log channel — observable,
-        // consumed, never a silent drop. Endpoint-addressed delivery of
-        // plane effects lands with the review-fork swap (Phase 3).
-        _ = (commandType, data);
+        // Communication commands whose target names a REGISTERED provider
+        // address that adapter's link endpoint (the arm's AppendCommand
+        // posture — the thread that triggered the flow hears back on the
+        // wire, not into the log). Anything else — work commands, targets
+        // with no registered adapter — rides the kernel log channel:
+        // observable, consumed, never a silent drop.
+        if (commandType.StartsWith("org.facilitator.command.communication.", StringComparison.Ordinal)
+            && data["target"] is JsonObject target
+            && target["provider"] is JsonValue provider
+            && provider.TryGetValue<string>(out var providerToken)
+            && providers.Find(providerToken)?.EndpointId is { Length: > 0 } endpoint)
+        {
+            return $"link.{endpoint}";
+        }
+
         return "kernel.log";
     }
 
@@ -1138,15 +1562,18 @@ public sealed partial class WorkflowRunner(
     private async Task CompleteAsync(
         FacilitatorDbContext db, WorkflowInstanceEntity instance, JsonElement definitionRoot, DateTime now, CancellationToken ct)
     {
-        _ = ct;
-        await ProjectOutputAsync(db, instance, definitionRoot, now);
+        await ProjectOutputAsync(db, instance, definitionRoot, now, ct);
         Terminate(db, instance, "completed", null, now);
     }
 
-    private Task ProjectOutputAsync(
-        FacilitatorDbContext db, WorkflowInstanceEntity instance, JsonElement definitionRoot, DateTime now)
+    private async Task ProjectOutputAsync(
+        FacilitatorDbContext db, WorkflowInstanceEntity instance, JsonElement definitionRoot, DateTime now, CancellationToken ct)
     {
         _ = now;
+        // The final leg's log row is written in THIS transaction: flush
+        // before projecting, or a one-step flow projects over a step log
+        // that lacks its own last leg.
+        await db.SaveChangesAsync(ct);
         string? output = null;
         if (definitionRoot.TryGetProperty("output", out var outputSpec)
             && outputSpec.TryGetProperty("project", out var project) && project.ValueKind == JsonValueKind.Object)
@@ -1163,21 +1590,235 @@ public sealed partial class WorkflowRunner(
         }
 
         instance.Output = output;
-        return Task.CompletedTask;
     }
 
-    private static void Terminate(
+    /// <summary>The awaited parent of a completion hand-off: the instance
+    /// parked (waiting or shadowed, deadline set) on an invoke step whose
+    /// parked output names this child. Deterministic single lookup; a
+    /// parent that resolved its park first (timeout, cancel) is absent —
+    /// the race law decides, the loser no-ops.</summary>
+    private async Task<Guid?> ParkedParentAsync(WorkflowWake wake, CancellationToken ct)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(ct);
+        var childText = wake.InstanceId.ToString();
+        var parents = await db.WorkflowInstances
+            .Where(i => i.Status == "waiting" || i.Status == "shadowed")
+            .Where(i => i.DeadlineAt != null)
+            .Select(i => new { i.InstanceId, i.CurrentStep })
+            .ToListAsync(ct);
+        foreach (var candidate in parents)
+        {
+            var parked = await db.WorkflowStepLog.AsNoTracking()
+                .Where(l => l.InstanceId == candidate.InstanceId
+                            && l.StepId == candidate.CurrentStep
+                            && l.Status == "running")
+                .Select(l => l.Output)
+                .FirstOrDefaultAsync(ct);
+            if (parked is not { Length: > 0 })
+            {
+                continue;
+            }
+
+            using var doc = JsonDocument.Parse(parked);
+            if (doc.RootElement.TryGetProperty("parked", out var kind)
+                && kind.GetString() == "invoke"
+                && doc.RootElement.TryGetProperty("child", out var child)
+                && child.GetString() == childText)
+            {
+                return candidate.InstanceId;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>Guard 4's cascade (sync core): every non-terminal
+    /// descendant — direct or transitive, awaited or detached — ends
+    /// <c>cancelled</c> with <c>parent-cancelled</c> FIRST (bottom-up
+    /// order: a cancelled child's own completion event carries
+    /// <c>cancelled</c>, which the parent's resolved-or-failing park
+    /// consumes as a no-op), and only the works a cancelled instance
+    /// CREATED ride along (a work the flow adopted is not ours to
+    /// cancel). Called from <see cref="Terminate"/> on every real
+    /// failed/cancelled transition and from the invoke-timeout leg.</summary>
+    private void CancelSubtreeCore(FacilitatorDbContext db, Guid instanceId, DateTime now)
+    {
+        var children = db.WorkflowInstances
+            .Where(i => i.ParentInstanceId == instanceId)
+            .ToList();
+        foreach (var child in children)
+        {
+            if (child.Status is "completed" or "failed" or "cancelled" or "shadowed")
+            {
+                continue;
+            }
+
+            CancelSubtreeCore(db, child.InstanceId, now); // grandchildren first
+            Terminate(db, child, "cancelled", "parent-cancelled", now);
+            if (child.PrimaryWorkId is { } createdWork)
+            {
+                // Created-vs-adopted: a child INHERITS the flow's subject
+                // work (shared provenance) — only a work the child's own
+                // work-create leg named is ours to cancel.
+                var workText = createdWork.ToString();
+                var createdHere = db.WorkflowStepLog.Any(l => l.InstanceId == child.InstanceId
+                                                             && l.Output != null
+                                                             && l.Output.Contains("\"work-create\"", StringComparison.Ordinal)
+                                                             && l.Output.Contains(workText, StringComparison.Ordinal));
+                if (!createdHere)
+                {
+                    continue;
+                }
+
+                var work = db.Works.FirstOrDefault(w => w.WorkId == createdWork);
+                if (work is not null && work.State is not ("completed" or "cancelled" or "failed"))
+                {
+                    work.State = "cancelled";
+                    work.Version += 1;
+                    work.UpdatedAt = now;
+                    db.WorkEvents.Add(new WorkEventEntity
+                    {
+                        EventId = Guid.NewGuid(),
+                        WorkId = createdWork,
+                        WorkVersion = work.Version,
+                        Kind = "state.transition",
+                        Actor = Actor,
+                        Detail = JsonSerializer.Serialize(new Dictionary<string, string?>
+                        {
+                            ["from"] = "workflow cascade",
+                            ["to"] = "cancelled",
+                            ["reason"] = "parent-cancelled",
+                        }),
+                        CorrelationId = instanceId.ToString("N"),
+                        CreatedAt = now,
+                    });
+                }
+            }
+        }
+    }
+
+    /// <summary>The async twin of <see cref="CancelSubtreeCore"/> (the
+    /// sweeper's invoke-timeout leg: its own transaction, its own save).</summary>
+    public async Task<int> CancelSubtreeAsync(FacilitatorDbContext db, Guid instanceId, DateTime now, CancellationToken ct)
+    {
+        _ = ct;
+        var before = await db.WorkflowInstances.CountAsync(
+            i => i.ParentInstanceId != null && i.Status != "cancelled", ct);
+        CancelSubtreeCore(db, instanceId, now);
+        await db.SaveChangesAsync(ct);
+        _ = before;
+        return await Task.FromResult(0);
+    }
+
+    /// <summary>The operator cancel (Phase 6): the instance ends
+    /// <c>cancelled</c> with <c>operator-cancel</c>, the whole subtree
+    /// cascades, and every wake row aimed at it resolves as a no-op (the
+    /// conditional UPDATE of Resume/TimeoutLeg finds no park).</summary>
+    public async Task<bool> CancelInstanceAsync(Guid instanceId, CancellationToken ct)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(ct);
+        await db.Database.BeginTransactionAsync(ct);
+        await InstanceLockAsync(db, instanceId, ct);
+        var instance = await db.WorkflowInstances.FirstOrDefaultAsync(i => i.InstanceId == instanceId, ct);
+        if (instance is null || instance.Status is "completed" or "failed" or "cancelled")
+        {
+            await db.Database.CommitTransactionAsync(ct);
+            return false;
+        }
+
+        var now = timeProvider.GetUtcNow().UtcDateTime;
+        CancelSubtreeCore(db, instanceId, now); // descendants first
+        Terminate(db, instance, "cancelled", "operator-cancel", now);
+        await db.SaveChangesAsync(ct);
+        await db.Database.CommitTransactionAsync(ct);
+        await PostgresNotifications.NotifyOutboxAsync(db, instanceId.ToString(), ct);
+        return true;
+    }
+
+    private void Terminate(
         FacilitatorDbContext db, WorkflowInstanceEntity instance, string status, string? endReason, DateTime now)
     {
-        _ = db;
         // Shadow law, terminal leg: a would-do run ends 'shadowed' (never
         // 'completed' — the arm decided the real outcome), with the
         // terminated shape: no current step, no deadline.
-        instance.Status = instance.Status == "shadowed" ? "shadowed" : status;
+        var real = instance.Status != "shadowed";
+        instance.Status = real ? status : "shadowed";
         instance.CurrentStep = null;
         instance.DeadlineAt = null;
-        instance.EndReason = endReason;
+        // An end_reason set mid-run by an executor (a preemption denial)
+        // is the composition story of THIS run: a later termination never
+        // erases it.
+        instance.EndReason ??= endReason;
         instance.UpdatedAt = now;
+
+        // The completion hand-off (Phase 6): a REAL terminal transition
+        // publishes the wire event IN THE SAME TRANSACTION as the terminal
+        // row — the wake can never arrive before the child is terminal, and
+        // a crash rolls both back together. A shadowed run publishes
+        // nothing (a would-do run has no outcome to hand off).
+        if (real)
+        {
+            // Detached-child lifecycle (guard 4): a FAILED or CANCELLED
+            // run takes its whole non-terminal subtree with it (a
+            // completed parent leaves detached children to finish —
+            // fire-and-forget is the point of await: false).
+            if (status is "failed" or "cancelled")
+            {
+                CancelSubtreeCore(db, instance.InstanceId, now);
+            }
+
+            AppendCompletionEvent(db, instance, status, now);
+        }
+    }
+
+    /// <summary>The composition completion event: the child's projected
+    /// output, addressed to <c>workflow.kernel</c> with command id
+    /// <c>wf-wake:&lt;child&gt;:&lt;status&gt;</c> — the command-id uniqueness
+    /// makes the resume exactly-once (the hand-off re-delivery law of the
+    /// outbox: one row, one wake, however often the notify fires).</summary>
+    public const string CompletedEventType = "org.facilitator.event.workflow.completed.v1";
+
+    private void AppendCompletionEvent(
+        FacilitatorDbContext db, WorkflowInstanceEntity instance, string status, DateTime now)
+    {
+        var data = new JsonObject
+        {
+            ["instanceId"] = instance.InstanceId.ToString(),
+            ["parentInstanceId"] = instance.ParentInstanceId?.ToString(),
+            ["definitionId"] = instance.DefId,
+            ["definitionVersion"] = instance.DefVersion,
+            ["status"] = status,
+            ["output"] = instance.Output is { Length: > 0 } outputJson
+                ? JsonNode.Parse(outputJson)
+                : new JsonObject(),
+        };
+        var envelope = new JsonObject
+        {
+            ["specversion"] = "1.0",
+            ["id"] = $"wfc-{instance.InstanceId:N}-{status}",
+            ["source"] = EnvelopeFactory.KernelSource,
+            ["type"] = CompletedEventType,
+            ["subject"] = $"workflow/{instance.InstanceId}",
+            ["time"] = now.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
+            ["datacontenttype"] = "application/json",
+            ["dataschema"] = "https://schemas.openfacilitator.org/v1/event.workflow.completed.v1.json",
+            ["data"] = data,
+        };
+        db.Outbox.Add(new OutboxEntity
+        {
+            OutboxId = WorkflowIdentity.Uuid5(WorkflowIdentity.InvokeNamespace, $"complete:{instance.InstanceId:N}:{status}"),
+            CommandId = $"wf-wake:{instance.InstanceId:N}:{status}",
+            RecipientEndpointId = WorkflowTrigger.Recipient,
+            AggregateType = "work",
+            AggregateId = instance.PrimaryWorkId,
+            EventType = CompletedEventType,
+            Envelope = envelope.ToJsonString(),
+            WorkId = instance.PrimaryWorkId,
+            Status = "pending",
+            AvailableAt = now,
+            Attempts = 0,
+            CreatedAt = now,
+        });
     }
 
     private void AppendStageTimeline(FacilitatorDbContext db, Guid workId, Guid instanceId, string stepId, string note)
@@ -1274,6 +1915,16 @@ public sealed partial class WorkflowRunner(
         }
 
         context["steps"] = stepsOut;
+
+        // Invoke inputs: the child's initial input row (step_id "input")
+        // hangs as $input.<name> (the invoke law: inputs ride the child's
+        // first log row, shared provenance otherwise).
+        if (stepsOut.TryGetPropertyValue("input", out var inputNode)
+            && inputNode is JsonObject inputObj
+            && inputObj["output"] is { } inputOut)
+        {
+            context["input"] = inputOut.DeepClone();
+        }
 
         if (envelope is not null)
         {
@@ -1455,13 +2106,28 @@ public sealed partial class WorkflowRunner(
             ["resumedBy"] = wakeEnvelope.GetProperty("type").GetString(),
             ["wake"] = JsonNode.Parse(wakeEnvelope.GetRawText()),
         };
-        var decision = wakeEnvelope.TryGetProperty("data", out var data)
-                       && data.TryGetProperty("decision", out var d) && d.ValueKind == JsonValueKind.String
-            ? d.GetString()
+        var data = wakeEnvelope.TryGetProperty("data", out var d) ? d : default;
+        var decision = data.ValueKind == JsonValueKind.Object
+                       && data.TryGetProperty("decision", out var dec) && dec.ValueKind == JsonValueKind.String
+            ? dec.GetString()
             : null;
-        return decision is not null && decision != "approved"
-            ? new StepOutcome(OutcomeKind.LegFailed, output, null, null, EndReason: "step-failed")
-            : StepOutcome.Continue(output);
+        if (decision is not null && decision != "approved")
+        {
+            return new StepOutcome(OutcomeKind.LegFailed, output, null, null);
+        }
+
+        // The completion hand-off: a child that ended failed or cancelled
+        // wakes the parked invoke step as a FAILURE (the parent decides how
+        // to grieve it — its failed edge); a completed child resumes with
+        // the child's projected output hanging under `output`.
+        if (data.ValueKind == JsonValueKind.Object
+            && data.TryGetProperty("status", out var status) && status.ValueKind == JsonValueKind.String
+            && status.GetString() is "failed" or "cancelled")
+        {
+            return new StepOutcome(OutcomeKind.LegFailed, output, null, null);
+        }
+
+        return StepOutcome.Continue(output);
     }
 
     private static string? ResolveString(JsonElement refOrLiteral, JsonObject context) =>
@@ -1533,6 +2199,111 @@ public sealed partial class WorkflowRunner(
         }
 
         return StepOutcome.Continue(project);
+    }
+
+    /// <summary>
+    /// The signal step (Phase 6.6): a wire event appended to
+    /// <c>workflow.kernel</c> addressed to ONE instance — point-to-point,
+    /// no lineage, no budget (a signal can neither spawn nor fail
+    /// anything). Command id is the step-command id verbatim (a
+    /// redelivered leg re-derives it, the outbox law); the sink resolves
+    /// <c>data.target</c> at delivery into a wake row for the target
+    /// (the target's own park race law decides), falling through to
+    /// on.event matching when the target holds no matching park. Fire-
+    /// and-forget: <c>done</c> when the row is appended — no timeout, no
+    /// onTimeout.
+    /// </summary>
+    private async Task<StepOutcome> ExecuteSignalAsync(
+        FacilitatorDbContext db,
+        WorkflowInstanceEntity instance,
+        string stepId,
+        JsonElement payload,
+        JsonObject context,
+        string commandId,
+        DateTime now,
+        CancellationToken ct,
+        bool shadow = false)
+    {
+        _ = ct;
+        var target = ResolveString(payload.GetProperty("target"), context);
+        if (target is not { Length: > 0 } || !Guid.TryParse(target, out var targetId))
+        {
+            return StepOutcome.LegFailed(
+                new JsonObject { ["error"] = $"signal target '{target}' is not a resolvable instance id" });
+        }
+
+        var eventType = payload.GetProperty("event").GetProperty("type").GetString()!;
+        var data = new JsonObject();
+        if (payload.GetProperty("event").TryGetProperty("data", out var declared)
+            && declared.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var field in declared.EnumerateObject())
+            {
+                data[field.Name] = ResolveTemplate(JsonNode.Parse(field.Value.GetRawText()), context);
+            }
+        }
+
+        var envelope = new JsonObject
+        {
+            ["specversion"] = "1.0",
+            ["id"] = $"wfs-{Guid.NewGuid():N}",
+            ["source"] = EnvelopeFactory.KernelSource,
+            ["type"] = eventType,
+            // Both directions of a coordination pair queryable: the
+            // subject names the sender instance.
+            ["subject"] = $"workflow/{instance.InstanceId}",
+            // The routing plane-extension rides the envelope top level,
+            // NOT the data (every wire event schema is closed — the
+            // trigger-row law: plane routing stays outside the data so
+            // the data stays schema-clean).
+            ["target"] = targetId.ToString(),
+            ["time"] = now.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
+            ["datacontenttype"] = "application/json",
+            ["dataschema"] = $"https://schemas.openfacilitator.org/v1/{eventType["org.facilitator.".Length..]}.json",
+            ["data"] = data,
+        };
+        var json = envelope.ToJsonString();
+        var verdict = envelopeValidator.Validate(json);
+        if (!verdict.Ok)
+        {
+            return StepOutcome.LegFailed(
+                new JsonObject { ["error"] = $"envelope rejected: {verdict.ErrorClass}: {verdict.Message}" });
+        }
+
+        if (shadow)
+        {
+            return StepOutcome.Done(new JsonObject
+            {
+                ["wouldDo"] = "signal",
+                ["target"] = targetId.ToString(),
+                ["eventType"] = eventType,
+            }, null);
+        }
+
+        // Signal command id: the step-command law in the plane's signal
+        // namespace — wf-signal:<senderInstance>:<stepId>:<seq>. A
+        // redelivered leg re-derives it; the outbox uniqueness converges.
+        var segments = commandId.Split(':');
+        var signalCommand = $"wf-signal:{segments[2]}:{segments[3]}:{segments[4]}";
+        db.Outbox.Add(new OutboxEntity
+        {
+            OutboxId = Guid.NewGuid(),
+            CommandId = signalCommand,
+            RecipientEndpointId = WorkflowTrigger.Recipient,
+            AggregateType = "work",
+            AggregateId = instance.PrimaryWorkId,
+            EventType = eventType,
+            Envelope = json,
+            WorkId = instance.PrimaryWorkId,
+            Status = "pending",
+            AvailableAt = now,
+            Attempts = 0,
+            CreatedAt = now,
+        });
+        return StepOutcome.Done(
+            new JsonObject { ["signal"] = "sent", ["target"] = targetId.ToString(), ["eventType"] = eventType },
+            signalCommand,
+            note: $"flow signal: {eventType} -> {targetId:D}");
     }
 
     /// <summary>The stored manifest the trigger event names (data-scoped
@@ -1728,6 +2499,6 @@ public sealed partial class WorkflowRunner(
             new(OutcomeKind.Parked, output, null, null, deadline);
 
         public static StepOutcome LegFailed(JsonObject output) =>
-            new(OutcomeKind.LegFailed, output, null, null, EndReason: "step-failed");
+            new(OutcomeKind.LegFailed, output, null, null);
     }
 }

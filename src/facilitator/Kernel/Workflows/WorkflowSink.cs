@@ -4,6 +4,8 @@ using System.Text.Json;
 using Facilitator.Kernel.Shared.Dispatch;
 using Facilitator.Kernel.Shared.Persistence;
 
+using Microsoft.EntityFrameworkCore;
+
 using Ofac.Protocol.Validation;
 
 namespace Facilitator.Kernel.Workflows;
@@ -26,7 +28,10 @@ namespace Facilitator.Kernel.Workflows;
 public sealed class WorkflowSink(
     WorkflowRuntime runtime,
     WorkflowRunner runner,
+    WorkflowTriggerEmitter emitter,
     WorkflowSubscriptionRegistry subscriptions,
+    IDbContextFactory<FacilitatorDbContext> contextFactory,
+    TimeProvider timeProvider,
     ILogger<WorkflowSink> logger) : ISink
 {
     /// <inheritdoc />
@@ -67,14 +72,127 @@ public sealed class WorkflowSink(
             return await RunAsync(row, trigger, span, ct);
         }
 
+        var start = WorkflowStart.Decode(row);
+        if (start is not null)
+        {
+            // A child start: the child row committed in the PARENT's
+            // transaction, so the instance exists — advance it (a crash
+            // between commit and delivery replays here; the per-instance
+            // lock + advance law make the replay cheap).
+            try
+            {
+                span?.SetTag("ofac.workflow.instance", start.InstanceId.ToString());
+                await runner.AdvanceAsync(start.InstanceId, envelope: null, wake: false, ct);
+                await subscriptions.RebuildAsync(ct);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "workflow child start failed for {CommandId}; requeueing", row.CommandId);
+                return false;
+            }
+        }
+
+        // A signal row: a wire event appended by a flow's signal step
+        // (command id wf:..., event type an ordinary wire event, data
+        // carries `target`). Resolve the target at delivery: append (or
+        // reuse) the target's wake row — the existing wake codec, the
+        // sender row as the seed — so the target's own per-instance race
+        // law is the resume law. The sender's step is already done
+        // (fire-and-forget); this row itself consumed once resolved.
+        if (row.CommandId.StartsWith("wf-signal:", StringComparison.Ordinal))
+        {
+            try
+            {
+                var targetId = SignalTarget(row);
+                var woken = false;
+                if (targetId is not null)
+                {
+                    await using (var db = await contextFactory.CreateDbContextAsync(ct))
+                    {
+                        await using var tx = await db.Database.BeginTransactionAsync(ct);
+                        // The one key law, external event and signal
+                        // alike: the wake lands only when the target's
+                        // parked wait carries its correlation key in the
+                        // envelope data (EnvelopeCarries). No park, no
+                        // key: no wake — the envelope falls through to
+                        // on.event matching below.
+                        var target = await db.WorkflowInstances.AsNoTracking()
+                            .FirstOrDefaultAsync(i => i.InstanceId == targetId, ct);
+                        string? key = null;
+                        if (target is { DeadlineAt: not null } && target.Status is "waiting" or "shadowed")
+                        {
+                            key = WorkflowTriggerEmitter.ParkedCorrelationKey(db, target);
+                        }
+                        if (target is not null
+                            && key is { Length: > 0 } parkKey
+                            && WorkflowTriggerEmitter.EnvelopeCarries(row.Envelope, parkKey))
+                        {
+                            var wakeCommand = $"wf-wake:{targetId.Value:N}:{row.OutboxId:N}";
+                            // Append OR REUSE: the wake command id is
+                            // deterministic per (target, sender row), so a
+                            // redelivered signal row converges on the row
+                            // the first delivery appended.
+                            if (!await db.Outbox.AnyAsync(
+                                    o => o.CommandId == wakeCommand, ct))
+                            {
+                                WorkflowTriggerEmitter.AppendWake(
+                                    db, targetId.Value, target.PrimaryWorkId, row.OutboxId, row.Envelope,
+                                    timeProvider.GetUtcNow().UtcDateTime);
+                                await db.SaveChangesAsync(ct);
+                            }
+
+                            woken = true;
+                        }
+
+                        await tx.CommitAsync(ct);
+                        if (woken)
+                        {
+                            await PostgresNotifications.NotifyOutboxAsync(db, targetId.Value.ToString(), ct);
+                        }
+                    }
+                }
+
+                if (!woken)
+                {
+                    // Fall-through: the signal found no matching park —
+                    // ordinary on.event trigger matching (a signal can
+                    // start a flow like any external event; no matching
+                    // definition: consumed, never requeued).
+                    await emitter.EmitOwnedAsync(row.Envelope, ct);
+                }
+
+                span?.SetTag("ofac.workflow.signal_target", targetId?.ToString() ?? "none");
+                span?.SetTag("ofac.workflow.signal_woke", woken);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "workflow signal failed for {CommandId}; requeueing", row.CommandId);
+                return false;
+            }
+        }
+
         var wake = WorkflowWake.Decode(row);
         if (wake is not null)
         {
             try
             {
                 span?.SetTag("ofac.workflow.instance", wake.InstanceId.ToString());
-                await runner.ResumeAsync(wake, ct);
-                await subscriptions.RebuildAsync(ct);
+                if (!await runner.ResumeAsync(wake, ct))
+                {
+                    // Fall-through law: the envelope found no park (the
+                    // park resolved first, the instance never parked or is
+                    // gone). The wake row is CONSUMED (never requeued —
+                    // the no-DLQ-noise law) and the envelope is offered to
+                    // ordinary on.event trigger matching: a completed
+                    // child can drive any flow that triggers on
+                    // workflow.completed, a signal can start a flow like
+                    // any external event.
+                    await emitter.EmitOwnedAsync(wake.Envelope, ct);
+                    await subscriptions.RebuildAsync(ct);
+                }
+
                 return true;
             }
             catch (Exception ex)
@@ -88,6 +206,24 @@ public sealed class WorkflowSink(
         // here would requeue forever, and nothing can fix it).
         logger.LogWarning("workflow sink ignored row {OutboxId} command={CommandId}", row.OutboxId, row.CommandId);
         return true;
+    }
+
+    /// <summary>The signal row's target instance (data.target), null when
+    /// unparseable (a malformed row is consumed, never requeued forever).</summary>
+    private Guid? SignalTarget(OutboxRow row)
+    {
+        try
+        {
+            return row.Envelope.TryGetProperty("target", out var target)
+                   && target.ValueKind == JsonValueKind.String
+                   && Guid.TryParse(target.GetString(), out var targetId)
+                ? targetId
+                : null;
+        }
+        catch (InvalidOperationException)
+        {
+            return null; // consumed, never requeued
+        }
     }
 
     private async Task<bool> RunAsync(OutboxRow row, WorkflowTrigger trigger, Activity? span, CancellationToken ct)

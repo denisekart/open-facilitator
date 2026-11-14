@@ -28,6 +28,11 @@ namespace Facilitator.Tests.Integrations;
 public sealed class PrDispatchTests(DispatchDbFixture fixture) : IAsyncLifetime, IDisposable
 {
     private const string Repo = "demo/widgets";
+
+    /// <summary>Phase 5: the assign-rule lane endpoint the boot importer
+    /// bakes into the imported row — class-stable so the plane's funnel
+    /// preference matches every test's lane fleet.</summary>
+    internal const string CodingRuleEndpoint = "gw-coding-rule";
     private const string Head = "ofac/aaaaaaaa-1234";
 
     private readonly List<KernelTestFactory> _factories = [];
@@ -265,7 +270,11 @@ public sealed class PrDispatchTests(DispatchDbFixture fixture) : IAsyncLifetime,
         {
             ["prRequest"] = new JsonObject
             {
-                ["repo"] = Repo, ["head"] = head, ["base"] = "main", ["title"] = "t", ["body"] = "b",
+                ["repo"] = Repo,
+                ["head"] = head,
+                ["base"] = "main",
+                ["title"] = "t",
+                ["body"] = "b",
             },
         };
         var manifestId = "man-arm-" + workId.ToString("N")[..8];
@@ -329,13 +338,18 @@ public sealed class PrDispatchTests(DispatchDbFixture fixture) : IAsyncLifetime,
     private async Task<(HttpClient Adapter, HttpClient Worker, string CodingEndpoint, string LaneEndpoint, Guid WorkId, KernelTestFactory Factory, string VcsEndpoint)> CodingPlaneAsync(
         string label = "ofac:coding")
     {
-        var codingEndpoint = "gw-coding-" + Guid.NewGuid().ToString("N")[..6];
         var globalEndpoint = "gw-global-" + Guid.NewGuid().ToString("N")[..6];
         var fjEndpoint = "gw-fj-" + Guid.NewGuid().ToString("N")[..8];
         var manEndpoint = "man-" + Guid.NewGuid().ToString("N")[..6];
         // The fleet that executes the VCS ops once the plane routes them
         // (the connector convention, mirrored as a plain capability fleet).
         var vcsEndpoint = "gw-vcs-" + Guid.NewGuid().ToString("N")[..6];
+        // Phase 5: the rule ENDPOINT is class-stable — the boot importer
+        // bakes it into the imported assign-rule row (once, at the first
+        // boot of the class), and the plane's intent rides it as the
+        // funnel preference. Per-test fleets re-seed on the same endpoint
+        // (purged first), so preference-satisfied holds every run.
+        var codingEndpoint = CodingRuleEndpoint;
         var settings = new Dictionary<string, string?>
         {
             ["Providers:Forgejo:Enabled"] = "true",
@@ -380,6 +394,8 @@ public sealed class PrDispatchTests(DispatchDbFixture fixture) : IAsyncLifetime,
         // Lane fleet: the rule lane needs coding.implement live on the rule
         // endpoint, the global lane analysis.summarize on the global one.
         // team-alpha is the adapter's enrollment team (the work's team).
+        await fixture.Db.PurgeFleets("gw-coding-");
+        await fixture.Db.PurgeFleets("gw-global-");
         await FleetHarness.SeedFleetAsync(
             fixture.Db,
             label == "ofac:coding" ? codingEndpoint : globalEndpoint,
@@ -390,7 +406,25 @@ public sealed class PrDispatchTests(DispatchDbFixture fixture) : IAsyncLifetime,
         var posted = await adapter.PostAsync("/api/link/v1/events",
             Content(IssueEvent($"dlv-{Guid.NewGuid():N}", Repo, issue, "alice", label)));
         Assert.Equal(HttpStatusCode.Accepted, posted.StatusCode);
-        var workId = await fixture.Db.BindingWorkId("forgejo", Repo, issue);
+        Guid? workId;
+        if (PlaneOn)
+        {
+            // Phase 5: the labeled-issue creation is plane-owned (the
+            // importer's live assign-rule-forgejo-1 copy), so the binding
+            // lands when the plane runs — drain to it (the work id is the
+            // plane's deterministic one; the assign family is unchanged).
+            workId = Guid.Parse(await RoutingHarness.DrainUntilAsync(
+                factory,
+                async () => await fixture.Db.BindingWorkId("forgejo", Repo, issue) is { } w
+                    ? w.ToString("D")
+                    : null,
+                "plane-created labeled-issue binding"));
+        }
+        else
+        {
+            workId = await fixture.Db.BindingWorkId("forgejo", Repo, issue);
+        }
+
         Assert.NotNull(workId);
         await RoutingHarness.DrainUntilAsync(
             factory,

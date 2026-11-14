@@ -1,0 +1,52 @@
+{
+  "id": "agentic-research",
+  "version": 1,
+  "title": "Agentic research (composition entry point)",
+  "description": "The motivating composition: a mention asks for research, the flow calls the callable ensure-capacity sub-flow and WAITS for its output (composition depth 1, budget-guarded), then assigns the research capability on the capacity that just landed. The invoke's timeout is the age law (guard 4): a stalled child is cancelled with its subtree, this flow takes its failed edge.",
+  "enabled": false,
+  "on": {
+    "event": "org.facilitator.event.provider.mention.v1",
+    "where": {
+      "data.text": "Research:*"
+    }
+  },
+  "steps": [
+    {
+      "id": "capacity",
+      "title": "Ensure a harness exists (callable child, awaited)",
+      "on": "always",
+      "invoke": {
+        "workflow": "ensure-capacity",
+        "inputs": {
+          "capability": "coding.implement",
+          "objective": "$event.data.text"
+        },
+        "await": true,
+        "timeout": "PT20M",
+        "onTimeout": "grieve"
+      }
+    },
+    {
+      "id": "research",
+      "title": "Assign the research work on the capacity that landed",
+      "on": "capacity:completed",
+      "emit": {
+        "capability": "analysis.summarize",
+        "inputs": {
+          "context": "child output: $steps.capacity.output.wake.data.output"
+        }
+      }
+    },
+    {
+      "id": "grieve",
+      "title": "Capacity never landed: say so in the thread",
+      "on": "failed",
+      "emit": {
+        "command": "org.facilitator.command.communication.post.v1",
+        "inputs": {
+          "text": "Research paused: no capacity came up in time."
+        }
+      }
+    }
+  ]
+}

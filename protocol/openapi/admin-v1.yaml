@@ -719,6 +719,7 @@ paths:
         definition optionally, bounded by limit.
       parameters:
         - { in: query, name: def, required: false, schema: { type: string } }
+        - { in: query, name: work, required: false, schema: { type: string, format: uuid }, description: Only the instance backing this work (the console's work strip). }
         - { in: query, name: limit, required: false, schema: { type: integer, minimum: 1, maximum: 500, default: 50 } }
       responses:
         "200":

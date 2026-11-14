@@ -66,9 +66,20 @@ public sealed record WorkflowTrigger(
 /// Phase 6 adds the child-completion hand-off (<c>wf-wake:&lt;child&gt;:&lt;status&gt;</c>)
 /// on the same prefix.
 /// </summary>
-public sealed record WorkflowWake(Guid InstanceId, Guid SourceRowId, JsonElement Envelope, Guid OutboxId)
+public sealed record WorkflowWake(
+    Guid InstanceId,
+    Guid? SourceRowId,
+    JsonElement Envelope,
+    Guid OutboxId,
+    string? CompletionStatus = null)
 {
-    /// <summary>Decode a wake row; null for anything else.</summary>
+    /// <summary>Phase 6 hand-off status tokens (the terminal states a
+    /// published child can carry).</summary>
+    public static readonly string[] TerminalStatuses = ["completed", "failed", "cancelled"];
+
+    /// <summary>Decode a wake row; null for anything else. The tail is
+    /// either the source row id (Phase 1: an event matched a park) or a
+    /// terminal status token (Phase 6: a child's completion hand-off).</summary>
     public static WorkflowWake? Decode(OutboxRow row)
     {
         if (!row.CommandId.StartsWith("wf-wake:", StringComparison.Ordinal))
@@ -83,10 +94,31 @@ public sealed record WorkflowWake(Guid InstanceId, Guid SourceRowId, JsonElement
             return null;
         }
 
-        // Phase 6 hand-offs carry a status token; Phase 1 wakes carry the
-        // source row id. Only the guid form decodes to a wake here.
-        return Guid.TryParse(parts[(colon + 1)..], out var sourceRowId)
+        var tail = parts[(colon + 1)..];
+        if (TerminalStatuses.Contains(tail, StringComparer.Ordinal))
+        {
+            return new WorkflowWake(instanceId, null, row.Envelope, row.OutboxId, tail);
+        }
+
+        return Guid.TryParse(tail, out var sourceRowId)
             ? new WorkflowWake(instanceId, sourceRowId, row.Envelope, row.OutboxId)
             : null;
     }
+}
+
+/// <summary>
+/// A child start (Phase 6): the deterministic row an invoke step appends
+/// in the parent's transaction. Command id exactly
+/// <c>wf-start:&lt;childInstance&gt;</c> — the child row itself is the
+/// commit proof (same transaction), so the sink only ever advances an
+/// already-committed instance, and a redelivery is a read-back advance.
+/// </summary>
+public sealed record WorkflowStart(Guid InstanceId, JsonElement Envelope, Guid OutboxId)
+{
+    /// <summary>Decode a start row; null for anything else.</summary>
+    public static WorkflowStart? Decode(OutboxRow row) =>
+        row.CommandId.StartsWith("wf-start:", StringComparison.Ordinal)
+        && Guid.TryParse(row.CommandId["wf-start:".Length..], out var instanceId)
+            ? new WorkflowStart(instanceId, row.Envelope, row.OutboxId)
+            : null;
 }

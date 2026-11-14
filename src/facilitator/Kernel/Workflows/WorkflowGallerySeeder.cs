@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 using Facilitator.Kernel.Shared.Persistence;
 
@@ -11,7 +12,7 @@ using Microsoft.Extensions.Logging;
 namespace Facilitator.Kernel.Workflows;
 
 /// <summary>
-/// Gallery seeding: the four built-in definitions ship as embedded resources
+/// Gallery seeding: the six built-in definitions ship as embedded resources
 /// (canonical JSON) and land at boot as <c>source='gallery'</c>,
 /// <c>enabled=false</c> rows — <b>missing rows only, operator edits are never
 /// overwritten</b> (the TeamRosterSeeder posture: config seeds, DB is truth
@@ -75,6 +76,96 @@ public sealed class WorkflowGallerySeeder(
         }
 
         await ImportPrRequestScopesAsync(db, cancellationToken);
+        await ImportAssignRulesAsync(db, cancellationToken);
+    }
+
+    /// <summary>
+    /// The assign-rules importer (Phase 5): each
+    /// <c>Providers:&lt;p&gt;:AssignRules[n]</c> config row imports (if
+    /// absent) an ENABLED scoped copy of the <c>assign-rules</c> gallery
+    /// template — defId <c>assign-rule-&lt;p&gt;-&lt;n&gt;</c> (n is the
+    /// 1-based config order), source='derived' — with the rule baked into
+    /// the create step: capability, endpoint preference, target, owning
+    /// team, and a <c>data.labels</c> matcher term for the rule's label.
+    /// An imported live copy is exactly what the labeled-issue arm defers
+    /// to (<c>PlaneOwnedAssignWorkAsync</c>): the arm's own
+    /// <c>MatchAssignRule</c> path stops performing the creation the plane
+    /// owns. Deleting the config rule leaves the definition (the operator
+    /// owns it now — the "never removes a seam" law); with the plane
+    /// disabled the arm runs exactly as today. Corner law: an issue whose
+    /// labels hit TWO of one provider's rules fires two plane flows (the
+    /// arm's law was first-match-wins) — an honest, visible difference an
+    /// operator resolves by disambiguating labels or disabling a copy.
+    /// </summary>
+    private async Task ImportAssignRulesAsync(FacilitatorDbContext db, CancellationToken cancellationToken)
+    {
+        var template = JsonNode.Parse(Gallery[AssignRulesTemplate.DefinitionId])!;
+        foreach (var options in providers.All().Where(static o => o.Enabled))
+        {
+            for (var index = 0; index < options.AssignRules.Count; index++)
+            {
+                var rule = options.AssignRules[index];
+                if (rule.Label is not { Length: > 0 } label)
+                {
+                    continue;
+                }
+
+                var doc = JsonNode.Parse(template.ToJsonString())!.AsObject();
+                var defId = AssignRulesTemplate.DefinitionIdFor(options.Provider, index + 1);
+                doc["id"] = defId;
+                doc["title"] = $"Assign rule {label} ({options.Provider} rule {index + 1})";
+                doc["description"] =
+                    $"Derived from Providers:{options.Provider}:AssignRules[{index}] (label {label}): "
+                    + "create the work under the rule's capability and ack the thread. Baked from config at boot; "
+                    + "the row is the operator's from here (disable to hand the behavior back to the arm).";
+                var where = doc["on"]!["where"]!.AsObject();
+                where["data.labels"] = label.ToLowerInvariant();
+                var create = doc["steps"]!.AsArray()
+                    .Select(st => st!.AsObject())
+                    .First(st => st["id"]!.GetValue<string>() == AssignRulesTemplate.CreateStepId);
+                var workCreate = create["work-create"]!.AsObject();
+                workCreate["capability"] = rule.CapabilityId ?? options.AssignCapabilityId ?? "work.default";
+                if (rule.Team is { Length: > 0 } team)
+                {
+                    workCreate["team"] = team;
+                }
+
+                if (rule.EndpointId is { Length: > 0 } endpoint)
+                {
+                    workCreate["preference"] = endpoint;
+                }
+
+                workCreate["target"] = rule.TargetId ?? options.AssignTargetId ?? $"{options.Provider}-interim";
+                // Baked at import (the row is the operator's from then on —
+                // the "never removes a seam" law): a later config edit
+                // changes the ARM's read but not the imported flow; the
+                // operator edits the definition to move the flow.
+
+
+
+                var canonical = WorkflowDoc.Canonical(JsonDocument.Parse(doc.ToJsonString()).RootElement);
+                var affected = await db.Database.ExecuteSqlInterpolatedAsync(
+                    $"""
+                     INSERT INTO facilitator.workflow_definitions
+                         (def_id, version, title, description, payload, digest, enabled, shadow, source, team, created_at, created_by, next_tick_at)
+                     VALUES
+                         ({defId}, 1, {doc["title"]!.GetValue<string>()}, {doc["description"]!.GetValue<string>()},
+                          {canonical}::jsonb, {WorkflowDoc.Digest(JsonDocument.Parse(canonical).RootElement)},
+                          true, false, 'derived', {(rule.Team is { Length: > 0 } ruleTeam ? ruleTeam : null)}, {timeProvider.GetUtcNow().UtcDateTime}, 'importer', NULL)
+                     ON CONFLICT (def_id, version) DO NOTHING
+                     """, cancellationToken);
+                if (affected > 0)
+                {
+                    logger.LogInformation(
+                        "assign rule imported: {Definition} enabled (label {Label}, capability {Capability})",
+                        defId, label, workCreate["capability"]!.GetValue<string>());
+                    // Same subscription-set law as the PR scopes: an
+                    // imported ENABLED row must be visible to the emitter
+                    // now, not after the cache TTL.
+                    await subscriptions.RebuildAsync(cancellationToken);
+                }
+            }
+        }
     }
 
     /// <summary>One-release importer (Phase 4): <c>Providers:&lt;p&gt;:PrRequestCapability</c>
@@ -171,11 +262,12 @@ public sealed class WorkflowGallerySeeder(
                      .Where(static n => n.EndsWith(".json", StringComparison.Ordinal))
                      .Where(static n =>
                      {
-                         // The gallery files are the four known names; the
+                         // The gallery files are the six known names; the
                          // protocol schemas embed under the same simple
                          // logical-name regime in Ofac.Protocol, not here.
                          var name = n[..^".json".Length];
-                         return name is "review-fork" or "pr-on-manifest" or "assign-rules" or "nudge-escalation";
+                         return name is "review-fork" or "pr-on-manifest" or "assign-rules" or "nudge-escalation"
+                                or "ensure-capacity" or "agentic-research";
                      }))
         {
             using var stream = assembly.GetManifestResourceStream(resourceName)!;

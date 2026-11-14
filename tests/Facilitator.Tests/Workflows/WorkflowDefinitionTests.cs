@@ -295,7 +295,7 @@ public sealed class WorkflowDefinitionTests(PostgresFixture fixture) : IAsyncLif
     [Fact]
     public async Task ToggleToEnabledWithUnsupportedStepKindIs422()
     {
-        await StoreOneAsync(extra: """, { "id": "s3", "title": "invoke", "on": "s2:completed", "invoke": { "workflow": "t.child", "timeout": "PT1M", "inputs": {} } }""");
+        await StoreOneAsync(extra: """, { "id": "s3", "title": "memory", "on": "s2:completed", "memory": { "op": "retain", "scope": "walk-scope", "textRef": "$work.id" } }""");
         var response = await KernelOps.PostJsonAsync(_client,
             "/api/admin/workflows/definitions/t.flow/versions/1/toggle", """{"enabled": true}""",
             HttpStatusCode.UnprocessableEntity, "try to enable");
@@ -319,12 +319,19 @@ public sealed class WorkflowDefinitionTests(PostgresFixture fixture) : IAsyncLif
     }
 
     [Fact]
-    public async Task GallerySeedsFourDisabledDefinitionsAtBoot()
+    public async Task GallerySeedsTheBuiltInDefinitionsDisabledAtBoot()
     {
         var list = await GetAsync("/api/admin/workflows/definitions");
         var byId = list.EnumerateArray().ToDictionary(
             d => d.GetProperty("id").GetString()!, d => d, StringComparer.Ordinal);
-        foreach (var id in new[] { "review-fork", "pr-on-manifest", "assign-rules", "nudge-escalation" })
+        // The composition pair (agentic-research -> ensure-capacity)
+        // ships with the plane: their descriptions document the invoke
+        // law, and the gallery is the editor's starting shelf.
+        foreach (var id in new[]
+                 {
+                     "review-fork", "pr-on-manifest", "assign-rules", "nudge-escalation",
+                     "ensure-capacity", "agentic-research",
+                 })
         {
             Assert.True(byId.ContainsKey(id), $"gallery entry '{id}' seeded");
             Assert.False(byId[id].GetProperty("enabled").GetBoolean()); // gallery ships disabled

@@ -181,7 +181,11 @@ public sealed class WorkflowKillWindowWalkTests(PostgresFixture fixture) : IAsyn
             """, [Guid.NewGuid(), workId]);
 
     private Task<long> WakeRowCountAsync() =>
-        ScalarLongAsync("SELECT count(*) FROM facilitator.outbox WHERE command_id LIKE 'wf-wake:%'");
+        // Event wakes only: the completion hand-off (wf-wake:<child>:
+        // <status>) is a composition hand-off, not a wake of THIS park.
+        ScalarLongAsync(
+            "SELECT count(*) FROM facilitator.outbox WHERE command_id LIKE 'wf-wake:%'"
+            + " AND command_id !~ ':completed$' AND command_id !~ ':failed$' AND command_id !~ ':cancelled$'");
 
     private async Task PurgeAsync()
     {

@@ -38,7 +38,7 @@ public sealed class WorkflowDefinitionValidator(EnvelopeValidator envelopes)
     /// interpreter does not grow speculatively.</summary>
     public static IReadOnlySet<string> ExecutableKinds { get; } = new HashSet<string>(StringComparer.Ordinal)
     {
-        "emit", "wait", "timer", "approval", "decide", "select", "fan-out", "fork-work", "escalate",
+        "emit", "wait", "timer", "approval", "decide", "select", "fan-out", "fork-work", "work-create", "escalate", "invoke", "signal",
     };
 
     /// <summary>Validate a parsed definition document (structure + referential
@@ -153,6 +153,15 @@ public sealed class WorkflowDefinitionValidator(EnvelopeValidator envelopes)
                             }
                         }
 
+                        break;
+                    case "signal":
+                        // The registry law again: the signal rides a wire
+                        // event type the mirrored schema set knows (the
+                        // sink validates the row's envelope on delivery).
+                        RequireEventType(
+                            errors,
+                            payload.GetProperty("event").GetProperty("type").GetString()!,
+                            $"step '{stepId}' signal event");
                         break;
                     case "invoke":
                         // Existence/enabled checks need the store, so the

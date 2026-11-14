@@ -39,6 +39,23 @@ public static class WorkflowMatcher
 
     private static bool MatchTerm(string term, JsonElement actual)
     {
+        // Array law: a scalar term over an array ACTUAL holds when ANY
+        // element matches (`data.labels: "ofac:coding"` is true when the
+        // issue carries the label — the policy-file actorAnyOf posture,
+        // pointed at the payload side).
+        if (actual.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var element in actual.EnumerateArray())
+            {
+                if (MatchTerm(term, element))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         var actualText = actual.ValueKind switch
         {
             JsonValueKind.String => actual.GetString(),

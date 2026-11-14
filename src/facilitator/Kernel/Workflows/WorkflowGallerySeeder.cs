@@ -120,6 +120,12 @@ public sealed class WorkflowGallerySeeder(
                     + "the row is the operator's from here (disable to hand the behavior back to the arm).";
                 var where = doc["on"]!["where"]!.AsObject();
                 where["data.labels"] = label.ToLowerInvariant();
+                // Provider scope (the arm's law: rules live on ONE provider's
+                // options): a forgejo rule must not fire on a telegram issue
+                // that happens to carry the same label — without this term
+                // the broadcast trigger law fans one labeled event across
+                // every provider's same-labeled rule copy.
+                where["data.provider"] = options.Provider.ToLowerInvariant();
                 var create = doc["steps"]!.AsArray()
                     .Select(st => st!.AsObject())
                     .First(st => st["id"]!.GetValue<string>() == AssignRulesTemplate.CreateStepId);

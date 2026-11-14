@@ -191,6 +191,14 @@ public static class WorkflowEndpoints
             var etag = request.Headers.IfMatch.ToString();
             var forceEnabled = doc.TryGetProperty("enabled", out var e) && e.ValueKind == JsonValueKind.True;
             var outcome = await store.PutAsync(id, doc, string.IsNullOrEmpty(etag) ? "*" : etag, actor!, reason!, forceEnabled, ct);
+            if (outcome.Outcome == WorkflowDefinitionOutcome.Stored)
+            {
+                // Admin-toggle law, same as the toggle route: a stored
+                // definition is a subscription change — the set refreshes
+                // NOW, so the very next event can trigger it (no TTL wait).
+                await subscriptions.RebuildAsync(ct);
+            }
+
             return outcome.Outcome switch
             {
                 WorkflowDefinitionOutcome.Stored => Results.Ok(outcome.View!.Summary),
@@ -307,13 +315,13 @@ public static class WorkflowEndpoints
         });
 
         group.MapGet("/instances", async (
-            FacilitatorDbContext db, string? def, Guid? work, int limit, CancellationToken ct) =>
+            FacilitatorDbContext db, string? def, Guid? work, int? limit, CancellationToken ct) =>
         {
             // The flows console's checklist feed: newest instances first,
             // optionally one definition's, optionally the instance backing
             // one work (the console's work strip), bounded (an operator
             // paginates by since-id, not by page counts).
-            var capped = Math.Clamp(limit <= 0 ? 50 : limit, 1, 500);
+            var capped = Math.Clamp(limit is > 0 ? limit.Value : 50, 1, 500);
             var query = db.WorkflowInstances.AsNoTracking().AsQueryable();
             if (!string.IsNullOrWhiteSpace(def))
             {

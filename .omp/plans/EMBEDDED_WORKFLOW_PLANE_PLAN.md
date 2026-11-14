@@ -182,3 +182,110 @@ Allowed per user instruction; each must keep coverage and land as its own commit
 - If YamlDotNet conflicts with an existing transitive YAML dependency, switch the YAML face to `System.Text.Json`-based serialization emitting stable key order and keep the YAML↔JSON law (canonical is always JSON).
 - Phases are strictly ordered; a phase may stop shipping after its gate passes (each gate is a release point). If the shadow report (Phase 2) cannot reach zero-mismatch, stop before Phase 3 and treat the mismatch as a palette gap (§5 law), not a deadline.
 - Out of scope here (single lines): semantic catalog / `GET /api/registry` beyond the editor-population fields, AI drafting, `kernel.model` virtual endpoint, fan-out/join/memory execution, gateway `policy-file` law, user-visible flows.
+
+## Phase 6.5 — The component shelf (gallery of callable pieces)
+
+Extend the gallery (`src/facilitator/Kernel/Workflows/Gallery/`) with a shelf of
+COMPONENTS: small, reusable, **callable-only** definitions an operator wires into
+flows they author. The feature is the shelf itself — useful pieces that stand on
+their own and connect to whatever the operator is doing. The list below is
+suggestion; the law is *few honest components over many thin ones*: ship what the
+kernel's existing mechanisms support well.
+
+Laws every component must follow:
+- Trigger is `invoked` only: it can never fire from the wire; a parent's `invoke`
+  step (Phase 6) is its sole entry point.
+- Typed INPUT contract via `invoke.inputs` (the child context's `$input.<name>`,
+  already the template law); typed OUTPUT contract via the instance's projected
+  `output` (`output.project`, select-law over the step log — already lands in
+  `workflow_instances.output`; surfaced on
+  `org.facilitator.event.workflow.completed.v1` by Phase 6's hand-off). A parent
+  may depend on the component's output; side effects (emits, approvals, markers)
+  must stay idempotent — they already are (effect ids derive from
+  instance+step+seq; `emit.binding` parks ON CONFLICT DO NOTHING).
+- Ships `enabled: false` like the rest of the gallery (scoped/derived copies may
+  import enabled, the Phase 4/5 importer posture); enabling stays the operator's
+  act.
+- The invoke-call graph stays ACYCLIC across the WHOLE gallery (a component may
+  invoke another — e.g. announce inside a longer leg — never a cycle). The
+  validator's static pass runs over the stored set at enable/boot, not just the
+  document at hand.
+- Each component's `description` documents, in prose: expected inputs, the
+  produced output shape, and what enabling it changes (nothing until an invoke
+  points at it).
+- One gallery-pair-style xUnit test per component: store + validate + enable,
+  invoke it through a tiny parent flow, assert the OUTPUT CONTRACT lands
+  (`workflow_instances.output` matches the projected shape).
+
+### Honest-ship set (what existing mechanisms support today — the analysis)
+Mechanism inventory the shelf may use: `emit {command|capability, inputs, to,
+binding}` (routing-intent + marker legs live), `wait` (parks on ANY mirrored wire
+event, correlation = key appears in `data`; wake output carries the whole wake
+envelope under `wake` — `WakeOutcome`), `approval` (parks on
+`approval.decided.v1`, denied/expired take the failed edge), `fork-work` (the
+WorkFork shared law, subject = the instance's primary work), `select` incl.
+`source:"manifest"` + `defaults` (a constant output field = absent path +
+literal default), `fan-out` (per-element emits), `escalate`. Graph is acyclic —
+no loops, no condition-retries.
+
+Ship (five):
+1. **`fork-on-terminal`** — the WorkFork law as data, invokable by any flow that
+   hits a closed work: one `fork-work` step; inputs {note}; output
+   {successor} (`fork-work` leg output). Subject work = the child's stamped
+   primary work (invoke passes the parent's subject — Phase 6 child-context
+   law; without it the leg fails honestly).
+2. **`vcs-change-request`** — inputs {repo, head, base?, title?, body?}: `emit
+   capability vcs.change_request.create` + `emit.binding branch` (the exact
+   pr-on-manifest leg, now a component); then `wait` on
+   `org.facilitator.event.provider.change_request.v1` correlated on
+   `branch:${input.head}` (the opened-event payload carries the head ref — the
+   substring correlation law resolves it, the head-branch resolver's own path);
+   output {repo, prBinding} projected from
+   `steps.<wait>.output.wake.data.reference.rootMessageId`.
+3. **`await-input`** — the reusable "ask a human" pause: `wait` on
+   `org.facilitator.event.assignment.input.required.v1` correlated on a named
+   `$input.correlateKey`, `timeout` input; output {text} projected from the wake
+   envelope (`wake.data.text` — check the answering event's field when wiring).
+4. **`consent-then-act`** — `approval {question: $input.question, approvers:
+   $input.approvers}` → approved edge `emit {command: $input... }` (capability or
+   command per input, declared by the caller's inputs), failed edge `escalate`;
+   output {decision, effect} from the wake (`wake.data.decision`) + the emit leg
+   output.
+5. **`announce`** — the thread-ack primitive the assign-rule template inlines:
+   `emit {command: communication.post.v1, inputs:{text: $input.text}}` (the
+   work-scoped addressing law routes it to the work's live conversation);
+   output {posted} via the defaults trick (constant true).
+   Follow-up once the shelf lands: the derived `assign-rule-*` copies may invoke
+   announce instead of inlining the ack (same behavior, shelf dogfooded).
+
+Skip (mechanism honesty, recorded verdicts): **await-capacity** (the flow cannot
+name the chosen endpointId — the funnel decides after the flow ends; no-capacity
+already auto-triggers provisioning and the audit carries the reason; a component
+would output a null it cannot know); **work-status-gate** (state transitions are
+TIMELINE kinds, not wire events — a wait has nothing to park on; a re-check loop
+needs a cyclic graph, forbidden); **timer-retry** (acyclic palette: fan-out would
+emit unconditionally, not on-failure; a `retry` combinator is a palette change,
+not a component).
+
+### Implementation order (during the actual phase)
+1. Phase 6 lands `invoke` + the completed-event hand-off FIRST; this shelf is
+   pure data on top (no new step kinds). Confirm during Phase 6 that the child
+   context exposes `input` (`$input.<name>`) and that invoke stamps the child's
+   `primary_work_id` from the parent when the flow has one (needed by
+   fork-on-terminal and announce's work-scoped post).
+2. Ship the five documents, each self-documenting per the law. No schema change
+   expected (the `invoked` trigger + `output.project` landed in Phase 0) — if
+   `invoke.inputs` needs a schema relaxation for template refs, widen `inputs`
+   values to `$defs/ref` and regenerate (drift gate).
+3. Validator: whole-gallery acyclic pass — at enable-time AND at boot seeding,
+   walk every stored definition's invoke targets (store query, cycle over the
+   enabled set only).
+4. Tests: one parameterized xUnit file (`WorkflowComponentTests`), one case per
+   component: store + validate + enable, a minimal parent flow
+   (`{ invoke: {workflow: <component>, timeout, inputs: {...} } }`), drive it,
+   assert the component child's projected `output` matches the documented
+   shape; plus the gallery enumeration update (`WorkflowDefinitionTests.cs:327`
+   id list + seeder count) and codegen drift-clean (`make protocol`).
+5. Wire one real invocation end-to-end once (announce inside a derived
+   assign-rule copy, behind the importer) so the shelf is exercised by an
+   existing seam, not only by tests.

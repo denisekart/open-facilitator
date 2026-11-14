@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.openfacilitator.org/v1/event.workflow.scheduled.v1.json",
+  "title": "WorkflowScheduledEventV1Data",
+  "description": "Kernel-internal schedule-plane tick: a definition's `on.schedule` occurrence came due and the sweeper fired it. One event per (definition version, occurrence) - the envelope id is UUIDv5 over the schedule namespace, so the trigger-row convergence law makes the delivery exactly-once without a claim row. Carried as a trigger envelope copy like every wire event; consumed only by the workflow sink.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["definitionId", "definitionVersion", "occurrenceAt"],
+  "properties": {
+    "definitionId": {
+      "$ref": "common.v1.json#/$defs/idToken"
+    },
+    "definitionVersion": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "occurrenceAt": {
+      "$ref": "common.v1.json#/$defs/rfc3339DateTime"
+    }
+  }
+}

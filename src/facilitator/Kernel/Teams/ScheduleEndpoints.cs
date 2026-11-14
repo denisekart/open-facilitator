@@ -1,6 +1,7 @@
 using System.Text.Json;
 
 using Facilitator.Kernel.Shared;
+using Facilitator.Kernel.Work;
 using Facilitator.Kernel.Shared.Persistence;
 
 using Microsoft.EntityFrameworkCore;
@@ -117,7 +118,7 @@ public static partial class TeamEndpoints
                         Objective = objective,
                         Cadence = cadence!,
                         Timezone = timezone,
-                        NextRunAt = Facilitator.Kernel.Work.ScheduleSweeper.NextOccurrence(cadence!, timezone, now, now),
+                        NextRunAt = Facilitator.Kernel.Work.ScheduleSpec.NextOccurrence(cadence!, timezone, now, now),
                         Enabled = enabled,
                         OwnerActor = owner,
                         CreatedBy = ActorOf(http),
@@ -131,7 +132,7 @@ public static partial class TeamEndpoints
                     row.Timezone = timezone;
                     row.Enabled = enabled;
                     row.OwnerActor = owner;
-                    row.NextRunAt = Facilitator.Kernel.Work.ScheduleSweeper.NextOccurrence(cadence!, timezone, row.LastRunAt ?? now, now);
+                    row.NextRunAt = Facilitator.Kernel.Work.ScheduleSpec.NextOccurrence(cadence!, timezone, row.LastRunAt ?? now, now);
                 }
 
                 await db.SaveChangesAsync(ct);
@@ -196,7 +197,7 @@ public static partial class TeamEndpoints
         {
             try
             {
-                Facilitator.Kernel.Work.ScheduleSweeper.Cron.NextUtc(
+                ScheduleSpec.Cron.NextUtc(
                     cadence["cron:".Length..], new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc), TimeSpan.Zero);
                 return true;
             }

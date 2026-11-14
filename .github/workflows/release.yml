@@ -155,7 +155,7 @@ jobs:
       - name: pnpm workspace SBOM
         run: pnpm sbom --sbom-format cyclonedx --lockfile-only --out sbom-npm.cdx.json
       - name: attach to release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             sbom-dotnet/sbom.cdx.json

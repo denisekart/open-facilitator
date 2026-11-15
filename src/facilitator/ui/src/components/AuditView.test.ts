@@ -99,7 +99,7 @@ describe("AuditView", () => {
   it("keeps the decision cell on the wire word and links the correlation", async () => {
     signIn();
     stub([auditRow()]);
-    navigate("#/audit?decision=deny&correlation=abc");
+    navigate("#/monitor/audit?decision=deny&correlation=abc");
 
     mountView(AuditView);
 
@@ -108,7 +108,7 @@ describe("AuditView", () => {
     );
     expect(byTestId("audit-row-0194f0a0").textContent).toContain("work.create");
     expect(byTestId("audit-correlation-0194f0a0").getAttribute("href")).toBe(
-      "#/audit?correlation=abc",
+      "#/monitor/audit?correlation=abc",
     );
     expect(byTestId("audit-export").getAttribute("href")).toBe(
       "/api/admin/audit/export?format=csv",
@@ -121,7 +121,7 @@ describe("AuditView", () => {
   it("a decision chip rewrites the hash, so a filtered trail stays a link", async () => {
     signIn();
     stub([]);
-    navigate("#/audit");
+    navigate("#/monitor/audit");
 
     mountView(AuditView);
     await vi.waitFor(() =>
@@ -130,7 +130,7 @@ describe("AuditView", () => {
 
     byTestId("audit-filter-deny").click();
 
-    expect(location.hash).toBe("#/audit?decision=deny");
+    expect(location.hash).toBe("#/monitor/audit?decision=deny");
     await vi.waitFor(() => expect(calls).toContain("/api/admin/audit?decision=deny&limit=100"));
   });
 
@@ -138,7 +138,7 @@ describe("AuditView", () => {
     const traceId = "0f1e2d3c4b5a69788796a5b4c3d2e1f0";
     signIn();
     stub([auditRow({ traceId })]);
-    navigate(`#/audit?decision=deny&traceId=${traceId}`);
+    navigate(`#/monitor/audit?decision=deny&traceId=${traceId}`);
 
     mountView(AuditView);
 
@@ -148,7 +148,7 @@ describe("AuditView", () => {
     // the trace box opens pre-filled from the link, and the row links back
     expect(byTestId<HTMLInputElement>("audit-trace").value).toBe(traceId);
     expect(byTestId(`audit-trace-0194f0a0`).getAttribute("href")).toBe(
-      `#/audit?traceId=${traceId}`,
+      `#/monitor/audit?traceId=${traceId}`,
     );
   });
 });

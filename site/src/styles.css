@@ -4,8 +4,10 @@
    flight. No beige, no serif. */
 
 :root {
-  --paper: #fbfcfd;
-  --sunken: #f2f5f8;
+  /* Same hexes as the console's app.css light theme (parity law: two
+     files, one palette). */
+  --paper: #f6f8fa;
+  --sunken: #eef2f6;
   --card: #ffffff;
   --ink: #1f2328;
   --ink-2: #55606b;
@@ -15,10 +17,11 @@
   --accent: #0550ae;
   --accent-dark: #043f8a;
   --accent-veil: #e7f0fa;
-  --amber: #d97706;
+  --amber: #b45309;
   --amber-veil: #fdf0dc;
   --code-bg: #0d1420;
   --code-ink: #d5e0ee;
+  color-scheme: light;
 
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Menlo, Consolas, monospace;
@@ -26,6 +29,27 @@
   --step: 4px;
   --maxw: 1080px;
   --r: 8px;
+}
+
+/* Dark follows the OS until the header toggle overrides it — the same law
+   and the same hexes as the console's [data-theme="dark"]. */
+[data-theme="dark"] {
+  --paper: #0f141a;
+  --sunken: #171d26;
+  --card: #131923;
+  --ink: #e6edf3;
+  --ink-2: #a8b3bf;
+  --ink-3: #7d8896;
+  --line: #2b3543;
+  --line-2: #3d4a5c;
+  --accent: #4c8dff;
+  --accent-dark: #7aa9ff;
+  --accent-veil: #123055;
+  --amber: #e3a008;
+  --amber-veil: #3a2c10;
+  --code-bg: #0b1017;
+  --code-ink: #d5e0ee;
+  color-scheme: dark;
 }
 
 * {
@@ -1148,6 +1172,16 @@ pre.cmd code {
 }
 .doc-body td code {
   font-size: 12.5px;
+}
+.cook-yaml {
+  background: var(--code-bg);
+  color: var(--code-ink);
+  border-radius: var(--r);
+  padding: 14px 16px;
+  overflow-x: auto;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.5;
 }
 
 /* ---------------------------------------------------------------- diagrams */

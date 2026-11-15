@@ -525,3 +525,35 @@ Full ladder after all waves: `make build && make test && make admin-e2e
   than a morning on it.
 - Zone count is 7 (idea text says "five zones" for far zoom): render **all
   zones** at far zoom, labeled; no data change.
+
+## Execution addenda (recorded while implementing)
+
+- **xyflow svelte 1.7.1 API reality (console + site):** `Edge.style` and
+  `labelStyle` are CSS *strings*, not objects (unlike React Flow);
+  `markerEnd` stays the `MarkerType` object. Event handlers are
+  positional: `onnodeclick({node})` (object param), `onmoveend(event,
+  viewport)`. `exactOptionalPropertyTypes` forbids `label: undefined` —
+  omit absent optionals.
+- **jsdom harness (`src/lib/test-harness.ts`):** xyflow needs
+  `matchMedia` (MediaQuery at store construction), ResizeObserver,
+  IntersectionObserver, DOMPoint/DOMMatrix; CodeMirror's measure loop
+  needs `Range.getClientRects`/`getBoundingClientRect`. All stubbed.
+- **SvelteFlowProvider must wrap from OUTSIDE** the component that calls
+  `useSvelteFlow` (site explorer: `ArchExplorer.svelte` wraps
+  `ExplorerInner.svelte`).
+- **Site build:** the explorer bundle builds to `site/.explorer-dist`
+  (scratch) — vite's `emptyOutDir` would otherwise wipe `site/dist`
+  mid-build. Entries with `generated:` other than `architecture` DO flow
+  through `emit()` (the workflows page hooks its appendix there).
+- **Posture through YAML-first save:** the store derives `enabled`/`shadow`
+  from the PUT document, but a toggle rewrites only the entity — so the
+  editor must carry posture from the GET *summary* into every save
+  (`postureEnabled`/`postureShadow` state -> mergedDoc). Without it a
+  plain save silently switched a live definition off (the v2 row came
+  back `off`).
+- **Callback URL strip (reload law):** after `signinRedirectCallback`,
+  the restore URL must include `location.pathname` — a hash-only
+  `replaceState` keeps the `?code=` query, so the next reload replays a
+  spent code ("No matching state found in storage") and hard-fails the
+  boot. `init()` now also survives a replay: strip the params, fall back
+  to the stored session.

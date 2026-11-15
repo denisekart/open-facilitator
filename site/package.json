@@ -12,7 +12,13 @@
     "marked": "^15.0.12"
   },
   "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^7.3.1",
+    "@xyflow/svelte": "^1.7.1",
+    "dagre": "^0.8.5",
     "jsdom": "^31.0.0",
-    "mermaid": "^12.3.0"
+    "mermaid": "^12.3.0",
+    "svelte": "^5.57.3",
+    "vite": "^8.3.8",
+    "yaml": "^2.9.1"
   }
 }

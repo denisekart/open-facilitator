@@ -80,7 +80,9 @@ public sealed class FlowsConsoleTests(PostgresFixture fixture)
         await Expect(page.GetByTestId("flows-view")).ToContainTextAsync(defId);
         await Expect(page.GetByTestId("flows-view")).ToContainTextAsync("live");
 
-        // The instance row: one run of this definition, completed at 'note'.
+        // The instance row lives on the Monitor column now: the def's runs
+        // link goes to the filtered instance table.
+        await page.GetByTestId("view-monitor").ClickAsync();
         var row = page.Locator("[data-testid='instance-list'] tbody tr", new() { HasText = defId });
         await Expect(row).ToBeVisibleAsync();
         await Expect(row).ToContainTextAsync("completed");

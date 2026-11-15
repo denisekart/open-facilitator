@@ -8,7 +8,8 @@ code, nothing published to any registry, no backend.
 
 ```
 site/
-├── build.mjs              # the whole build: markdown -> HTML + search index
+├── build.mjs              # the whole build: markdown -> HTML + search index + explorer bundle
+├── arch-explorer.vite.config.mjs  # IIFE bundle config for src/arch-explorer
 ├── mermaid-ssr.mjs        # diagrams rendered at build time (headless chromium)
 ├── serve.mjs              # dev server: node serve.mjs [port]
 ├── package.json           # npm-managed, private; NOT part of the pnpm workspace
@@ -16,14 +17,16 @@ site/
     ├── config.mjs         # navigation, content manifest, landing-page copy
     ├── architecture.mjs   # the explorer's graph model: nodes, zones, edges, scenarios
     ├── arch-render.mjs    # renders that model to a fixed-layout inline SVG + JSON
+    ├── schema-ref.mjs     # palette reference generated from the wire schema at build time
+    ├── arch-explorer/     # the interactive map: a small Svelte 5 app (the site's one island)
     ├── tooltips.mjs       # hover copy for diagram nodes (keyed by label)
-    ├── styles.css         # the site theme: quiet chrome, one accent
+    ├── styles.css         # the site theme: quiet chrome, one accent (light + dark parity with the console)
     ├── pages/index.mjs    # landing/404 template (interactive pipeline scene)
     ├── pages/architecture.mjs  # /architecture page shell around the explorer
     ├── pages/*.md         # site-only product pages (what/integrations/console/artifacts/extend)
-    ├── js/app.js          # hash router, doc viewer, live search, explorer runtime (no deps)
+    ├── js/app.js          # hash router, doc viewer, live search, snapshot explorer (no deps)
     ├── guides/*.md        # site-only getting-started guides
-    └── assets/            # the mark + product screenshots
+    └── assets/            # the mark + product screenshots (light + dark, produced by the e2e run)
 ```
 
 ## The architecture explorer

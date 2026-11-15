@@ -1,6 +1,7 @@
 <script lang="ts">
   import { ApiError, getJson, toApiError } from "../lib/api.js";
   import { apiFetch, session } from "../lib/auth.svelte.js";
+  import { deckChanged } from "../lib/deck.svelte.js";
   import { ago, flowTone, stateLabel, stamp, TONE_CLASS, stateTone } from "../lib/status.js";
   import type { AdminWorkDetail, WorkEventRow, WorkflowInstanceRow } from "../lib/types.js";
   import ArtifactRef from "./ArtifactRef.svelte";
@@ -43,6 +44,9 @@
   }
 
   $effect(() => {
+    // Deck law: after the AiDeck executes a change, this screen re-loads
+    // its slice — the operator sees the effect without touching refresh.
+    void deckChanged();
     void load();
   });
 
@@ -133,7 +137,7 @@
     {#if flow}
       <p class="mb-4 text-sm" data-testid="work-flow-strip">
         <span class="text-ink-3">Flow</span>
-        <a class="mono text-accent underline" href={`#/flow/${flow.instanceId}`}>
+        <a class="mono text-accent underline" href={`#/monitor/runs/${flow.instanceId}`}>
           {flow.definitionId}@{flow.definitionVersion}
         </a>
         <span class="badge {TONE_CLASS[flowTone(flow.status)]} ml-1">

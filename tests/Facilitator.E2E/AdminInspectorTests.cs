@@ -37,7 +37,33 @@ public sealed class AdminInspectorTests(PostgresFixture fixture)
         await using var browser = await playwright.Chromium.LaunchAsync();
         var page = await NewLoginPageAsync(browser, host.ServerAddress);
         Assert.Contains("alice", await page.GetByTestId("identity-chip").TextContentAsync());
+        // The health bar lives on the Monitor column since the shell
+        // overhaul; a fresh login lands on Works, so visit Monitor first.
+        await page.GetByTestId("view-monitor").ClickAsync();
         await Expect(page.GetByTestId("health-strip")).ToBeVisibleAsync();
+    }
+
+    // The site's two work-plane screenshots are produced here, by the
+    // real walkthrough: the search face before a hit opens, then the
+    // inspector with a live approval. OFAC_E2E_SHOTS=<dir> enables them;
+    // OFAC_E2E_SHOTS_DARK=1 adds the dark-theme twins.
+    private static string? ShotDir => Environment.GetEnvironmentVariable("OFAC_E2E_SHOTS");
+
+    private static async Task ShootAsync(IPage page, string name)
+    {
+        if (ShotDir is not { } dir)
+        {
+            return;
+        }
+
+        await page.ScreenshotAsync(new() { Path = Path.Combine(dir, name) });
+        if (Environment.GetEnvironmentVariable("OFAC_E2E_SHOTS_DARK") is "1")
+        {
+            var darkName = Path.GetFileNameWithoutExtension(name) + "-dark.png";
+            await page.EvaluateAsync("document.documentElement.dataset.theme = 'dark'");
+            await page.ScreenshotAsync(new() { Path = Path.Combine(dir, darkName) });
+            await page.EvaluateAsync("document.documentElement.dataset.theme = 'light'");
+        }
     }
 
     [Fact]
@@ -49,12 +75,18 @@ public sealed class AdminInspectorTests(PostgresFixture fixture)
 
         using var playwright = await Playwright.CreateAsync();
         await using var browser = await playwright.Chromium.LaunchAsync();
-        var page = await NewLoginPageAsync(browser, host.ServerAddress);
+        var page = await NewLoginPageAsync(
+            browser,
+            host.ServerAddress,
+            ShotDir is null ? null : new ViewportSize { Width = 1440, Height = 900 });
         await page.GetByTestId("search-input").FillAsync(objective);
         await page.GetByTestId("search-go").ClickAsync();
+        await Expect(page.GetByTestId("hits-works")).ToBeVisibleAsync();
+        await ShootAsync(page, "console-explorer.png");
         await page.GetByTestId($"hit-works-{workId.ToString()[..8]}").ClickAsync();
 
         await Expect(page.GetByTestId("work-inspector")).ToBeVisibleAsync();
+        await ShootAsync(page, "console-work.png");
         await Expect(page.GetByTestId("timeline-created")).ToBeVisibleAsync();
         var shortId = approvalId.ToString()[..8];
         await Expect(page.GetByTestId($"approval-state-{shortId}")).ToHaveTextAsync("pending");
@@ -80,7 +112,7 @@ public sealed class AdminInspectorTests(PostgresFixture fixture)
         using var playwright = await Playwright.CreateAsync();
         await using var browser = await playwright.Chromium.LaunchAsync();
         var page = await NewLoginPageAsync(browser, baseUrl);
-        await page.GetByTestId("view-links").ClickAsync();
+        await page.GetByTestId("view-team").ClickAsync();
 
         await Expect(page.GetByTestId($"gateway-{live}")).ToBeVisibleAsync();
         await Expect(page.GetByTestId($"online-{live}")).ToHaveTextAsync("online");
@@ -189,9 +221,11 @@ public sealed class AdminInspectorTests(PostgresFixture fixture)
     // ---- plumbing ----------------------------------------------------------
 
     /// <summary>Hosted-Login flow: gate → Keycloak form (alice) → back to the SPA shell.</summary>
-    private static async Task<IPage> NewLoginPageAsync(IBrowser browser, string baseUrl)
+    private static async Task<IPage> NewLoginPageAsync(
+        IBrowser browser, string baseUrl, ViewportSize? viewport = null)
     {
-        var context = await browser.NewContextAsync();
+        var context = await browser.NewContextAsync(
+            viewport is null ? null : new BrowserNewContextOptions { ViewportSize = viewport });
         var page = await context.NewPageAsync();
         await page.GotoAsync(baseUrl);
         await page.GetByTestId("login").ClickAsync();

@@ -10,6 +10,7 @@ class HealthStore {
   metrics = $state<AdminMetrics | null>(null);
   error = $state<string | null>(null);
   #started = false;
+  #refresh: (() => void) | null = null;
 
   start(fetcher: Fetcher): void {
     if (this.#started) {
@@ -35,10 +36,19 @@ class HealthStore {
         () => undefined,
       );
     };
+    this.#refresh = () => {
+      refreshSummary();
+      refreshMetrics();
+    };
     refreshSummary();
     refreshMetrics();
     setInterval(refreshSummary, 15_000);
     setInterval(refreshMetrics, 60_000);
+  }
+
+  /** Immediate re-poll — the deck just changed something observable. */
+  refresh(): void {
+    this.#refresh?.();
   }
 }
 

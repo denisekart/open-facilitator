@@ -1,427 +1,295 @@
 <script lang="ts">
-  import { ApiError, getJson, toApiError } from "../lib/api.js";
+  import { basicSetup } from "codemirror";
+  import { EditorView } from "@codemirror/view";
+  import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
+  import { getJson, toApiError } from "../lib/api.js";
   import { apiFetch, session } from "../lib/auth.svelte.js";
   import type { WorkflowRegistry } from "../lib/types.js";
-  import FlowGraph from "./FlowGraph.svelte";
+  import { ofacYamlExtensions, type SchemaDoc, type YamlEditorSources } from "../lib/yaml-editor.js";
+  import FlowCanvas from "./FlowCanvas.svelte";
+  import EmptyState from "./EmptyState.svelte";
+  import ProblemNote from "./ProblemNote.svelte";
 
-  // Form-first definition editor over the frozen palette. Every picker is
-  // SELECT-only, populated from GET /api/admin/workflows/registry — the
-  // browser never invents an event type, command, capability, or callable.
-  // Kinds the runtime does not execute yet render as a labelled payload
-  // face, never a dead dropdown. The YAML textarea is the alternate face:
-  // it validates before it may save, and save always lands a NEW version.
+  // The YAML face IS the editor. CodeMirror 6 with a schema-driven
+  // completion/lint extension built from GET /schema + GET /registry (the
+  // same documents the 422 validator compiles — the browser never invents
+  // an event type, command, capability or callable, and never outranks the
+  // server's verdict). The live graph sits beside it and never blanks: a
+  // broken keystroke keeps the last good picture and shows why instead.
+  // The one-line title stays a plain input: title edits are metadata, not
+  // YAML body.
 
   let { defId, clone = false, onclose }: { defId: string; clone?: boolean; onclose: () => void } =
     $props();
 
   type Doc = Record<string, unknown>;
-  type StepForm = {
-    id: string;
-    title: string;
-    on: string;
-    kind: string;
-    payload: Record<string, unknown>;
-    raw: string; // JSON face for kinds without a form
-    rawError: string | null;
-  };
-
-  const EXECUTED = [
-    "select",
-    "emit",
-    "wait",
-    "timer",
-    "approval",
-    "decide",
-    "fork-work",
-    "work-create",
-    "escalate",
-    "fan-out",
-    "signal",
-    "invoke",
-  ];
-  const PALETTE = [...EXECUTED, "join", "memory"];
 
   let registry = $state<WorkflowRegistry | null>(null);
+  let schema = $state<SchemaDoc | null>(null);
   let original = $state<Doc | null>(null); // the stored doc, for the diff
   let digest = $state<string | null>(null); // latest digest = the If-Match etag
   let loadedVersion = $state<number>(0);
-  let savedYaml = $state("");
 
-  // svelte-ignore state_referenced_locally -- the editor mounts per route id,
-  // so the props are the initial AND only values by construction.
+  // svelte-ignore state_referenced_locally -- the editor mounts per route id.
   let id = $state(defId === "new" || clone ? "" : defId);
   let title = $state("");
   let description = $state("");
-  let team = $state("");
-  let enabled = $state(false);
-  let shadow = $state(false);
-  let triggerKind = $state<"event" | "schedule" | "invoked">("event");
-  let triggerEvent = $state("");
-  let triggerWhere = $state<{ key: string; value: string }[]>([]);
-  let triggerSchedule = $state("");
-  let steps = $state<StepForm[]>([]);
-  let composition = $state<Doc | null>(null); // carried through untouched
-
-  let mode = $state<"form" | "yaml">("form");
-  let yamlText = $state("");
   let notice = $state<string | null>(null);
   let formError = $state<string | null>(null);
   let validation = $state<{ ok: boolean; errors: { code: string; detail: string }[] } | null>(null);
   let busy = $state(false);
 
-  const canMutate = $derived(session.canMutate);
-  const isNew = $derived(original === null);
-
-  const STEP_TITLES: Record<string, string> = {
-    select: "project (select)",
-    emit: "send a command (emit)",
-    wait: "wait for an event (wait)",
-    timer: "park on a timer (timer)",
-    approval: "ask a human (approval)",
-    decide: "branch (decide)",
-    "fork-work": "fork the subject work (fork-work)",
-    "work-create": "create work (work-create)",
-    escalate: "escalate (escalate)",
-    "fan-out": "fan out children (fan-out)",
-    signal: "signal a waiter (signal)",
-    invoke: "call a child flow (invoke)",
-    join: "join children (join)",
-    memory: "memory (memory)",
-  };
-
-  // The editor anchors on a definition id that starts at the route and
-  // MOVES once a clone lands: saving a clone re-anchors on the copy, so
-  // the form, the etag, and the toggles all speak the new definition.
-  // svelte-ignore state_referenced_locally -- props are the initial AND
-  // only values: the route remounts the editor on every id change.
+  // svelte-ignore state_referenced_locally
   let anchorId = $state(defId);
   // svelte-ignore state_referenced_locally
-  let freshId = $state(clone || defId === "new"); // no stored version under `id` yet
+  let freshId = $state(clone || defId === "new");
+
+  const canMutate = $derived(session.canMutate);
+  const isNew = $derived(original === null);
+  // Posture truth rides the summary, not the document: a toggle rewrites
+  // the stored entity, never the canonical payload.
+  let postureEnabled = $state(false);
+  let postureShadow = $state(false);
+  const enabled = $derived(postureEnabled);
+  const shadow = $derived(postureShadow);
+
+  // ---- CodeMirror host -----------------------------------------------------
+
+  let host = $state<HTMLDivElement | null>(null);
+  // Non-reactive: the template never reads them; the mount effect must not
+  // re-run on view swaps.
+  let view: EditorView | null = null;
+  let docText = $state("");
+  let parseError = $state<string | null>(null);
+  let lastGoodDoc = $state<Doc | null>(null);
+  let selectedStep = $state<string | null>(null);
+
+  const parsed = $derived.by((): Doc | null => {
+    try {
+      const value = parseYaml(docText) as Doc | null;
+      return value && typeof value === "object" && !Array.isArray(value) ? value : null;
+    } catch (err) {
+      return null;
+    }
+  });
+
+  // Keystroke → 200 ms debounce → parse. A failure keeps the last good
+  // graph and shows the parser message; the graph never blanks.
+  let parseTimer: ReturnType<typeof setTimeout> | undefined;
+  $effect(() => {
+    const text = docText;
+    clearTimeout(parseTimer);
+    parseTimer = setTimeout(() => {
+      try {
+        const value = parseYaml(text) as Doc | null;
+        if (value && typeof value === "object" && !Array.isArray(value)) {
+          lastGoodDoc = value;
+          parseError = null;
+        } else {
+          parseError = "the document is empty";
+        }
+      } catch (err) {
+        parseError = err instanceof Error ? err.message : String(err);
+      }
+    }, 200);
+    return () => clearTimeout(parseTimer);
+  });
+
+  const graphDoc = $derived(lastGoodDoc ?? { steps: [] });
+
+  const changes = $derived.by(() => {
+    const paths: string[] = [];
+    const walk = (a: unknown, b: unknown, at: string): void => {
+      if (a === b) return;
+      if (
+        a && b &&
+        typeof a === "object" &&
+        typeof b === "object" &&
+        !Array.isArray(a) &&
+        !Array.isArray(b)
+      ) {
+        const ka = a as Doc;
+        const kb = b as Doc;
+        for (const key of new Set([...Object.keys(ka), ...Object.keys(kb)])) {
+          walk(ka[key], kb[key], at ? `${at}.${key}` : key);
+        }
+        return;
+      }
+      if (JSON.stringify(a) !== JSON.stringify(b)) paths.push(at || "(root)");
+    };
+    const next = mergedDoc();
+    if (original !== null && next !== null) {
+      walk(original, next, "");
+    }
+    return paths;
+  });
+
+  /** The doc the editor would store: YAML body + the metadata fields.
+   *  Posture rides along unchanged — enabling is the toggle's act, and a
+   *  plain save must never silently switch a live definition off. */
+  function mergedDoc(): Doc | null {
+    if (parsed === null) {
+      return null;
+    }
+    const out: Doc = { ...parsed };
+    if (id.trim() !== "") out["id"] = id.trim();
+    out["title"] = title;
+    if (description.trim() !== "") out["description"] = description.trim();
+    out["enabled"] = postureEnabled;
+    if (postureShadow) {
+      out["shadow"] = true;
+    }
+    return out;
+  }
 
   async function boot(): Promise<void> {
     const asClone = clone;
     try {
       registry = await getJson<WorkflowRegistry>(apiFetch, "/api/admin/workflows/registry");
+      try {
+        schema = await getJson<SchemaDoc>(apiFetch, "/api/admin/workflows/schema");
+      } catch {
+        schema = null; // completion/lint degrades; the server still rules
+      }
       if (anchorId !== "new") {
-        const view = await getJson<{
+        const stored = await getJson<{
           summary: { version: number; digest: string; enabled: boolean; shadow: boolean };
           document: Doc;
           yaml: string;
         }>(apiFetch, `/api/admin/workflows/definitions/${encodeURIComponent(anchorId)}`);
         const first = original === null;
-        loadDoc(view.document, view.summary.version, view.summary.digest, view.yaml);
-        // The live posture is the summary's: a toggle edits the column,
-        // the stored payload keeps the posture it was stored with.
-        enabled = view.summary.enabled;
-        shadow = view.summary.shadow;
+        original = stored.document;
+        loadedVersion = stored.summary.version;
+        digest = stored.summary.digest;
+        postureEnabled = stored.summary.enabled;
+        postureShadow = stored.summary.shadow;
+        id = String(stored.document.id ?? "");
+        title = String(stored.document.title ?? "");
+        description = String(stored.document.description ?? "");
+        let text = stored.yaml;
         if (asClone && first) {
           // rename exactly once: a re-anchor on the copy must not double-suffix
-          id = `${anchorId}-copy`;
+          id = `${id}-copy`;
           title = `${title} (copy)`;
+          try {
+            const doc = parseYaml(text) as Doc;
+            doc["id"] = id;
+            doc["title"] = title;
+            text = stringifyYaml(doc);
+          } catch {
+            // leave the body: save merges the fields anyway
+          }
         }
+        docText = text;
+        lastGoodDoc = stored.document;
+        parseError = null;
+      } else {
+        docText = starterYaml();
+        lastGoodDoc = parsed;
       }
     } catch (err) {
-      formError = err instanceof ApiError ? `${err.title}: ${err.detail}` : String(err);
+      formError = err instanceof Error ? String(err) : "editor failed to load";
     }
   }
 
-  function loadDoc(doc: Doc, version: number, docDigest: string, yaml: string): void {
-    original = doc;
-    loadedVersion = version;
-    digest = docDigest;
-    savedYaml = yaml;
-    yamlText = yaml;
-    id = String(doc.id ?? "");
-    title = String(doc.title ?? "");
-    description = String(doc.description ?? "");
-    team = String(doc.team ?? "");
-    enabled = doc.enabled === true;
-    shadow = doc.shadow === true;
-    composition = (doc.composition as Doc) ?? null;
-    const on = (doc.on ?? { event: "" }) as Doc;
-    if ("event" in on) {
-      triggerKind = "event";
-      triggerEvent = String(on.event ?? "");
-      triggerWhere = Object.entries((on.where ?? {}) as Record<string, string>).map(
-        ([key, value]) => ({ key, value: String(value) }),
-      );
-    } else if ("schedule" in on) {
-      triggerKind = "schedule";
-      triggerSchedule = String(on.schedule ?? "");
-    } else {
-      triggerKind = "invoked";
+  function starterYaml(): string {
+    return `id: ${id.trim() || "my-flow"}\ntitle: ${title.trim() || "My flow"}\non:\n  event: org.facilitator.event.work.created.v1\nsteps:\n  - id: first\n    title: first step\n    emit:\n      command: org.facilitator.command.communication.post.v1\n      inputs: {}\n`;
+  }
+
+  // ---- CodeMirror mount ------------------------------------------------------
+
+  // Mount when the host exists; RE-create the view once the schema sources
+  // arrive so the completion/lint extension is present. Doc text survives
+  // the recreation.
+  let mountedWithSources = false; // plain: only the mount effect sees it
+  $effect(() => {
+    const ready = schema !== null && registry !== null;
+    if (host === null) {
+      return;
     }
-    steps = ((doc.steps ?? []) as Doc[]).map((s) => {
-      const kind = PALETTE.find((k) => k in s) ?? "select";
-      const payload = { ...((s[kind] ?? {}) as Record<string, unknown>) };
-      return {
-        id: String(s.id ?? ""),
-        title: String(s.title ?? ""),
-        on: String(s.on ?? "always"),
-        kind,
-        payload,
-        raw: JSON.stringify(payload, null, 2),
-        rawError: null,
-      };
+    if (view !== null && mountedWithSources === ready) {
+      return;
+    }
+    const current = view === null ? docText : view.state.doc.toString();
+    if (view !== null) {
+      view.destroy();
+      view = null;
+    }
+    const sources: YamlEditorSources | null = ready
+      ? {
+          definition: schema as SchemaDoc,
+          registry: {
+            eventTypes: (registry as WorkflowRegistry).eventTypes,
+            commands: (registry as WorkflowRegistry).commands,
+            capabilities: (registry as WorkflowRegistry).capabilities,
+            callable: (registry as WorkflowRegistry).callable,
+            teams: (registry as WorkflowRegistry).teams,
+          },
+        }
+      : null;
+    view = new EditorView({
+      doc: current,
+      extensions: [
+        basicSetup,
+        EditorView.lineWrapping,
+        ...(sources ? ofacYamlExtensions(sources) : []),
+        EditorView.updateListener.of((update: { docChanged: boolean; state: EditorView["state"] }) => {
+          if (update.docChanged) {
+            docText = update.state.doc.toString();
+          }
+        }),
+      ],
+      parent: host,
+    });
+    mountedWithSources = ready;
+    // Unmount teardown: this effect tracks nothing (the cleanup reads the
+    // view), so it runs once and destroys the editor exactly on unmount.
+    return () => {
+      view?.destroy();
+      view = null;
+    };
+  });
+
+  // First boot resolves after mount: push the loaded text into CodeMirror
+  // programmatically (not a keystroke — it must not dirty the diff).
+  $effect(() => {
+    void boot().then(() => {
+      if (view !== null && view.state.doc.toString() !== docText) {
+        view.dispatch({
+          changes: { from: 0, to: view.state.doc.length, insert: docText },
+        });
+      }
+    });
+  });
+
+  function jumpToStep(stepId: string): void {
+    if (view === null) {
+      return;
+    }
+    const needle = `- id: ${stepId}`;
+    const alt = `id: ${stepId}`;
+    const text = view.state.doc.toString();
+    const at = text.indexOf(needle) !== -1 ? text.indexOf(needle) : text.indexOf(alt);
+    if (at === -1) {
+      return;
+    }
+    view.focus();
+    const line = view.state.doc.lineAt(at);
+    view.dispatch({
+      selection: { anchor: line.from, head: line.to },
+      effects: EditorView.scrollIntoView(line.from, { y: "center" }),
     });
   }
 
-  // ---- serialize (form -> document) --------------------------------------
-
-  function parseRaw(step: StepForm): Record<string, unknown> | null {
-    try {
-      const parsed = JSON.parse(step.raw) as unknown;
-      if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
-        return null;
-      }
-      return parsed as Record<string, unknown>;
-    } catch {
+  const selectedStepDoc = $derived.by(() => {
+    if (selectedStep === null || lastGoodDoc === null) {
       return null;
     }
-  }
-
-  function jsonField(step: StepForm, key: string): string {
-    const v = step.payload[key];
-    return v === undefined ? "" : JSON.stringify(v);
-  }
-
-  function serialize(): Doc | null {
-    const on: Doc =
-      triggerKind === "event"
-        ? {
-            event: triggerEvent,
-            ...(triggerWhere.length > 0
-              ? {
-                  where: Object.fromEntries(
-                    triggerWhere.filter((w) => w.key !== "").map((w) => [w.key, w.value]),
-                  ),
-                }
-              : {}),
-          }
-        : triggerKind === "schedule"
-          ? { schedule: triggerSchedule }
-          : { invoked: {} };
-    const stepDocs: (Doc | null)[] = steps.map((s) => {
-        const payload = EXECUTED.includes(s.kind) ? formPayload(s) : parseRaw(s);
-        if (payload === null) {
-          return null;
-        }
-        return { id: s.id, title: s.title, on: s.on, [s.kind]: payload };
-      });
-    if (stepDocs.some((s) => s === null)) {
-      return null;
-    }
-    const out: Doc = {
-      id,
-      version: loadedVersion > 0 ? loadedVersion : 1,
-      title,
-      description,
-      enabled,
-      on,
-      steps: stepDocs as Doc[],
-    };
-    if (team !== "") {
-      out.team = team;
-    }
-    if (shadow) {
-      out.shadow = true;
-    }
-    if (original && "output" in original) {
-      out.output = original.output;
-    }
-    if (composition) {
-      out.composition = composition;
-    }
-    return out;
-  }
-
-  function formPayload(s: StepForm): Record<string, unknown> | null {
-    const p = s.payload;
-    const keep = (keys: string[]): Record<string, unknown> => {
-      const out: Record<string, unknown> = {};
-      for (const k of keys) {
-        if (p[k] !== undefined) {
-          out[k] = p[k];
-        }
-      }
-      return out;
-    };
-    switch (s.kind) {
-      case "emit":
-      case "work-create":
-      case "invoke":
-      case "signal":
-      case "fan-out":
-      case "approval":
-      case "escalate":
-      case "fork-work":
-      case "wait":
-      case "timer":
-      case "decide":
-        return p; // forms mutate payload in place
-      case "select": {
-        try {
-          const project = JSON.parse(jsonField(s, "project") || "{}") as unknown;
-          if (typeof project !== "object" || project === null) {
-            return null;
-          }
-          return { ...keep(["source", "defaults"]), project };
-        } catch {
-          return null;
-        }
-      }
-      default:
-        return p;
-    }
-  }
-
-  // The picture over the current form: the graph component reads a plain
-  // definition document, so the preview re-derives one from the form on
-  // every keystroke. Invalid payload faces fall back to their last parse.
-  const preview = $derived.by((): Doc => {
-    const on: Doc =
-      triggerKind === "event"
-        ? { event: triggerEvent }
-        : triggerKind === "schedule"
-          ? { schedule: triggerSchedule }
-          : { invoked: {} };
-    return {
-      id,
-      version: loadedVersion > 0 ? loadedVersion : 1,
-      title,
-      description,
-      enabled,
-      on,
-      steps: steps.map((s) => ({
-        id: s.id,
-        title: s.title,
-        on: s.on,
-        [s.kind]: EXECUTED.includes(s.kind) ? s.payload : (parseRaw(s) ?? s.payload),
-      })),
-    };
-  });
-  let pickedStep = $state<number | null>(null);
-
-  // ---- diff against the stored doc ---------------------------------------
-
-  const changes = $derived.by(() => {
-    if (original === null) {
-      return ["new definition (version 1)"];
-    }
-    const next = serialize();
-    if (next === null) {
-      return [];
-    }
-    const paths: string[] = [];
-    const walk = (a: unknown, b: unknown, at: string): void => {
-      if (JSON.stringify(a) === JSON.stringify(b)) {
-        return;
-      }
-      if (
-        a !== null && b !== null && typeof a === "object" && typeof b === "object" &&
-        !Array.isArray(a) && !Array.isArray(b)
-      ) {
-        const ka = a as Doc;
-        const kb = b as Doc;
-        for (const key of new Set([...Object.keys(ka), ...Object.keys(kb)])) {
-          if (key === "version") {
-            continue; // the store stamps the version
-          }
-          walk(ka[key], kb[key], at === "" ? key : `${at}.${key}`);
-        }
-        return;
-      }
-      if (Array.isArray(a) && Array.isArray(b) && a.length === b.length) {
-        for (let i = 0; i < a.length; i += 1) {
-          walk(a[i], b[i], `${at}[${i}]`);
-        }
-        return;
-      }
-      paths.push(at);
-    };
-    walk(original, next, "");
-    return paths;
+    const steps = (lastGoodDoc["steps"] ?? []) as Doc[];
+    return steps.find((s) => String(s["id"] ?? "") === selectedStep) ?? null;
   });
 
-  // ---- actions ------------------------------------------------------------
-
-  function addStep(kind: string): void {
-    const n = steps.length + 1;
-    steps = [
-      ...steps,
-      {
-        id: `step-${n}`,
-        title: STEP_TITLES[kind] ?? kind,
-        on: steps.length === 0 ? "always" : `${steps[steps.length - 1]?.id ?? "step-1"}:completed`,
-        kind,
-        payload: defaultPayload(kind),
-        raw: JSON.stringify(defaultPayload(kind), null, 2),
-        rawError: null,
-      },
-    ];
-  }
-
-  function defaultPayload(kind: string): Record<string, unknown> {
-    switch (kind) {
-      case "emit":
-        return { command: registry?.commands[0] ?? "", inputs: {} };
-      case "wait":
-        return {
-          event: registry?.eventTypes[0] ?? "",
-          correlate: "",
-          timeout: "PT30M",
-          onTimeout: "end",
-        };
-      case "timer":
-        return { for: "PT30M" };
-      case "approval":
-        return { question: "approve?", approvers: "role:admin" };
-      case "decide":
-        return { source: "guard", guard: { field: "work.state", in: ["completed"] }, fallback: "end" };
-      case "select":
-        return { project: { value: "instance" } };
-      case "fork-work":
-        return { noteRef: "carried note" };
-      case "work-create":
-        return { objectiveRef: "new objective", capability: registry?.capabilities[0] ?? "" };
-      case "escalate":
-        return { to: "$work.owner", message: "escalation" };
-      case "fan-out":
-        return { over: "$event.data.items", step: { title: "child", emit: { inputs: {} } } };
-      case "signal":
-        return {
-          target: "$event.data.payload.target",
-          event: { type: registry?.eventTypes[0] ?? "", data: {} },
-        };
-      case "invoke":
-        return {
-          workflow: registry?.callable[0]?.id ?? "",
-          await: true,
-          timeout: "PT30M",
-        };
-      default:
-        return {};
-    }
-  }
-
-  function removeStep(index: number): void {
-    steps = steps.filter((_, i) => i !== index);
-  }
-
-  function moveStep(index: number, delta: number): void {
-    const to = index + delta;
-    if (to < 0 || to >= steps.length) {
-      return;
-    }
-    const next = [...steps];
-    const [moved] = next.splice(index, 1);
-    next.splice(to, 0, moved);
-    steps = next;
-  }
-
-  function stepIds(): string[] {
-    return [...steps.map((s) => s.id), "end"];
-  }
+  // ---- the wire ------------------------------------------------------------
 
   async function save(): Promise<void> {
     busy = true;
@@ -432,23 +300,22 @@
         formError = "the definition needs an id";
         return;
       }
-      const doc = serialize();
+      const doc = mergedDoc();
       if (doc === null) {
-        formError = "the form holds invalid JSON in a payload face";
+        notice = "the YAML body does not parse — fix the highlighted lines first";
         return;
       }
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
-        "X-Change-Reason": "flow edited in the console",
+        "X-Change-Reason": "flow edited as YAML in the console",
       };
       if (digest !== null && !freshId) {
         headers["If-Match"] = digest;
       }
-      const response = await apiFetch(`/api/admin/workflows/definitions/${encodeURIComponent(targetId)}`, {
-        method: "PUT",
-        headers,
-        body: JSON.stringify(doc),
-      });
+      const response = await apiFetch(
+        `/api/admin/workflows/definitions/${encodeURIComponent(targetId)}`,
+        { method: "PUT", headers, body: JSON.stringify(doc) },
+      );
       if (!response.ok) {
         const problem = await toApiError(response);
         notice = `${problem.title} (${problem.code}): ${problem.detail}`;
@@ -458,68 +325,54 @@
       notice = `stored as version ${summary.version}`;
       anchorId = targetId;
       freshId = false;
-      await boot(); // re-anchor the form on the stored version
+      await reloadInto(targetId);
     } catch (err) {
-      formError = err instanceof ApiError ? err.detail : String(err);
+      formError = err instanceof Error ? String(err) : "save failed";
     } finally {
       busy = false;
+    }
+  }
+
+  async function reloadInto(targetId: string): Promise<void> {
+    const stored = await getJson<{
+      summary: { version: number; digest: string; enabled: boolean; shadow: boolean };
+      document: Doc;
+      yaml: string;
+    }>(apiFetch, `/api/admin/workflows/definitions/${encodeURIComponent(targetId)}`);
+    original = stored.document;
+    loadedVersion = stored.summary.version;
+    digest = stored.summary.digest;
+    postureEnabled = stored.summary.enabled;
+    postureShadow = stored.summary.shadow;
+    docText = stored.yaml;
+    lastGoodDoc = stored.document;
+    parseError = null;
+    if (view !== null && view.state.doc.toString() !== docText) {
+      view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: docText } });
     }
   }
 
   async function validateYaml(): Promise<void> {
     validation = null;
-    // The validate face speaks both stored-doc languages verbatim.
     const res = await apiFetch("/api/admin/workflows/definitions/validate", {
       method: "POST",
       headers: { "Content-Type": "text/yaml" },
-      body: yamlText,
+      body: docText,
     });
     validation = (await res.json()) as { ok: boolean; errors: { code: string; detail: string }[] };
   }
 
-  async function saveYaml(): Promise<void> {
-    busy = true;
-    notice = null;
-    try {
-      const headers: Record<string, string> = {
-        "Content-Type": "application/yaml",
-        "X-Change-Reason": "flow edited as YAML in the console",
-      };
-      if (digest !== null && !freshId) {
-        headers["If-Match"] = digest;
-      }
-      const response = await apiFetch(`/api/admin/workflows/definitions/${encodeURIComponent(id.trim())}`, {
-        method: "PUT",
-        headers,
-        body: yamlText,
-      });
-      if (!response.ok) {
-        const problem = await toApiError(response);
-        notice = `${problem.title} (${problem.code}): ${problem.detail}`;
-        return;
-      }
-      const summary = (await response.json()) as { version: number };
-      notice = `stored as version ${summary.version}`;
-      anchorId = id.trim();
-      freshId = false;
-      await boot();
-    } finally {
-      busy = false;
-    }
-  }
-
   async function toggle(on: boolean, toShadow: boolean): Promise<void> {
     notice = null;
-    const body = on
-      ? { enabled: true }
-      : toShadow
-        ? { shadow: false }
-        : { enabled: false };
+    const body = on ? { enabled: true } : toShadow ? { shadow: false } : { enabled: false };
     const response = await apiFetch(
       `/api/admin/workflows/definitions/${encodeURIComponent(id)}/versions/${loadedVersion}/toggle`,
       {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-Change-Reason": "posture toggle from the console" },
+        headers: {
+          "Content-Type": "application/json",
+          "X-Change-Reason": "posture toggle from the console",
+        },
         body: JSON.stringify(body),
       },
     );
@@ -529,416 +382,163 @@
       return;
     }
     notice = on ? "enabled (subscriptions refreshed)" : "posture changed";
-    await boot();
-  }
-
-  $effect(() => {
-    void boot();
-  });
-
-  function updatePayload(step: StepForm, key: string, value: unknown): void {
-    step.payload = { ...step.payload, [key]: value };
-    if (!EXECUTED.includes(step.kind)) {
-      step.raw = JSON.stringify(step.payload, null, 2);
-    }
-  }
-
-  function updateJsonField(step: StepForm, key: string, text: string): void {
-    try {
-      updatePayload(step, key, text === "" ? undefined : (JSON.parse(text) as unknown));
-      step.rawError = null;
-    } catch {
-      step.rawError = "invalid JSON";
-    }
+    await reloadInto(id);
   }
 </script>
 
 <section class="card" data-testid="flow-editor" aria-label="flow editor">
-  <div class="mb-4 flex items-start justify-between gap-4">
+  <div class="mb-2 flex items-start justify-between gap-4">
     <div>
       <h2 class="mb-1 text-xl font-semibold">
-        {isNew ? "New flow" : `Edit ${defId}`}
-        {#if !isNew}<span class="text-sm text-ink-3">· stored v{loadedVersion}</span>{/if}
+        {#if isNew}author a flow{:else}<span class="mono">{id}</span> · v{loadedVersion}{/if}
       </h2>
       <p class="text-sm text-ink-3">
-        Every picker is populated from the live registry; a save lands a new version.
+        YAML is the source of truth; the graph redraws as you type.
+        <a class="text-accent underline" href={`#/monitor/definitions/${id}`}>runs &amp; history</a>
       </p>
     </div>
-    <button class="btn btn-ghost btn-sm" data-testid="editor-close" onclick={onclose}>close</button>
+    <div class="flex gap-2">
+      {#if canMutate}
+        {#if original !== null}
+          {#if !enabled}
+            <button class="btn" data-testid="editor-enable" onclick={() => void toggle(true, false)}>
+              enable
+            </button>
+          {:else if !shadow}
+            <button class="btn" data-testid="editor-shadow" onclick={() => void toggle(false, true)}>
+              shadow
+            </button>
+            <button class="btn" data-testid="editor-disable" onclick={() => void toggle(false, false)}>
+              disable
+            </button>
+          {:else}
+            <button class="btn" data-testid="editor-enable" onclick={() => void toggle(true, false)}>
+              enable
+            </button>
+          {/if}
+        {/if}
+        <button
+          class="btn btn-primary"
+          data-testid="editor-save"
+          disabled={busy}
+          onclick={() => void save()}>
+          save
+        </button>
+      {/if}
+      <button class="btn btn-ghost btn-sm" data-testid="editor-close" onclick={onclose}>close</button>
+    </div>
   </div>
 
   {#if formError}
-    <p class="mb-2 rounded bg-bad-veil px-3 py-2 text-sm text-bad" role="alert">{formError}</p>
+    <ProblemNote error={formError} />
   {/if}
   {#if notice}
     <p class="mb-2 rounded bg-ok-veil px-3 py-2 text-sm text-ok" data-testid="editor-notice">{notice}</p>
   {/if}
 
-  <div class="mb-3 flex gap-2" role="tablist">
-    <button class="btn btn-sm {mode === 'form' ? 'btn-active' : ''}" onclick={() => (mode = "form")}>
-      form
-    </button>
-    <button class="btn btn-sm {mode === 'yaml' ? 'btn-active' : ''}" onclick={() => (mode = "yaml")}>
-      YAML
-    </button>
+  <div class="mb-3 grid gap-3 md:grid-cols-2">
+    <label class="block">
+      <span class="label">id</span>
+      <input
+        class="input font-mono"
+        data-testid="editor-id"
+        bind:value={id}
+        required
+        maxlength="80"
+        pattern="[a-z0-9][a-z0-9._-]*" />
+    </label>
+    <label class="block">
+      <span class="label">title</span>
+      <input class="input" data-testid="editor-title" bind:value={title} required maxlength="120" />
+    </label>
   </div>
 
-  {#if mode === "form"}
-    <div class="mb-4 grid gap-3 md:grid-cols-2">
-      <label class="field-label"
-        >id
-        <input
-          class="input mono"
-          data-testid="editor-id"
-          bind:value={id}
-          disabled={!isNew && !clone}
-          required
-        />
-      </label>
-      <label class="field-label"
-        >title
-        <input class="input" data-testid="editor-title" bind:value={title} required maxlength="120" />
-      </label>
-      <label class="field-label md:col-span-2"
-        >description
-        <textarea class="input" data-testid="editor-description" bind:value={description} rows="2" maxlength="2000"></textarea>
-      </label>
-      <label class="field-label"
-        >team
-        <select class="input" data-testid="editor-team" bind:value={team}>
-          <option value="">— none —</option>
-          {#each registry?.teams ?? [] as slug}
-            <option value={slug}>{slug}</option>
-          {/each}
-        </select>
-      </label>
-      <div class="flex items-end gap-4 pb-1">
-        <label class="flex items-center gap-2 text-sm">
-          <input type="checkbox" data-testid="editor-enabled" bind:checked={enabled} />
-          enabled
-          {#if enabled}<span class="text-xs text-amber">(a save force-enables the new version)</span>{/if}
-        </label>
-        <label class="flex items-center gap-2 text-sm">
-          <input type="checkbox" data-testid="editor-shadow" bind:checked={shadow} />
-          shadow
-        </label>
-      </div>
-    </div>
-
-    <fieldset class="mb-4 rounded border border-edge p-3">
-      <legend class="px-1 text-sm font-semibold">trigger</legend>
-      <div class="mb-2 flex gap-4 text-sm">
-        {#each ["event", "schedule", "invoked"] as kind}
-          <label class="flex items-center gap-1">
-            <input
-              type="radio"
-              name="trigger-kind"
-              value={kind}
-              checked={triggerKind === kind}
-              onchange={() => (triggerKind = kind as "event" | "schedule" | "invoked")}
-              data-testid={`trigger-${kind}`}
-            />
-            {kind}
-          </label>
-        {/each}
-      </div>
-      {#if triggerKind === "event"}
-        <label class="field-label mb-2 block"
-          >event type
-          <select class="input" data-testid="trigger-event" bind:value={triggerEvent}>
-            {#each registry?.eventTypes ?? [] as t}
-              <option value={t}>{t}</option>
-            {/each}
-          </select>
-        </label>
-        {#each triggerWhere as row, i}
-          <div class="mb-1 flex gap-2">
-            <input class="input mono flex-1" placeholder="data.field" bind:value={row.key} />
-            <input class="input flex-1" placeholder="value or *" bind:value={row.value} />
-            <button class="btn btn-ghost btn-xs" onclick={() => (triggerWhere = triggerWhere.filter((_, j) => j !== i))}>
-              remove
-            </button>
-          </div>
-        {/each}
-        <button class="btn btn-ghost btn-xs" onclick={() => (triggerWhere = [...triggerWhere, { key: "", value: "" }])}>
-          + where
-        </button>
-      {:else if triggerKind === "schedule"}
-        <label class="field-label block"
-          >cadence spec
-          <input
-            class="input mono"
-            data-testid="trigger-schedule"
-            bind:value={triggerSchedule}
-            placeholder="interval:15m | daily:07:30 | cron:<5 fields>"
-          />
-        </label>
-      {:else}
-        <p class="text-sm text-ink-3">callable only: this flow runs when another flow invokes it.</p>
-      {/if}
-    </fieldset>
-
-    <div class="mb-4">
-      <FlowGraph doc={preview} selected={pickedStep === null ? null : (steps[pickedStep]?.id ?? null)}
-        onselect={(sid) => {
-          const i = steps.findIndex((x) => x.id === sid);
-          pickedStep = i >= 0 ? i : null;
-        }} />
-    </div>
-
-    <div class="mb-2 flex items-center justify-between">
-      <h3 class="text-sm font-semibold">steps ({steps.length})</h3>
-      <div class="flex gap-2">
-        {#each PALETTE as kind}
-          {#if !EXECUTED.includes(kind)}
-            <button
-              class="btn btn-ghost btn-xs"
-              disabled
-              title={`${kind}: not yet executable`}
-              data-testid={`add-${kind}`}
-            >+ {kind} (not yet executable)</button>
-          {/if}
-        {/each}
-        {#each EXECUTED as kind}
-          <button class="btn btn-ghost btn-xs" onclick={() => addStep(kind)} data-testid={`add-${kind}`}>
-            + {kind}
+  <div class="grid gap-4 lg:grid-cols-2">
+    <div class="min-w-0">
+      <div class="mb-1 flex items-center justify-between">
+        <span class="label mb-0">definition YAML</span>
+        <div class="flex gap-2">
+          <button class="btn" data-testid="yaml-validate" onclick={() => void validateYaml()}>
+            validate
           </button>
-        {/each}
-      </div>
-    </div>
-
-    {#each steps as step, i (i)}
-      <div class="mb-3 rounded border border-edge p-3" data-testid={`step-${step.id}`}>
-        <div class="mb-2 flex flex-wrap items-center gap-2">
-          <span class="badge bg-sunken text-ink-2 ring-edge">{step.kind}</span>
-          <input class="input mono w-40" bind:value={step.id} data-testid={`step-id-${i}`} />
-          <input class="input flex-1" bind:value={step.title} maxlength="120" />
-          <label class="text-sm text-ink-3"
-            >on
-            <select class="input w-48" bind:value={step.on}>
-              {#each ["always", "timeout", "failed"] as fixed}
-                <option value={fixed}>{fixed}</option>
-              {/each}
-              {#each steps.filter((_, j) => j !== i) as other}
-                <option value={`${other.id}:completed`}>{other.id}:completed</option>
-              {/each}
-            </select>
-          </label>
-          <button class="btn btn-ghost btn-xs" onclick={() => moveStep(i, -1)} disabled={i === 0}>↑</button>
-          <button class="btn btn-ghost btn-xs" onclick={() => moveStep(i, 1)} disabled={i === steps.length - 1}>↓</button>
-          <button class="btn btn-ghost btn-xs" onclick={() => removeStep(i)} data-testid={`remove-step-${i}`}>remove</button>
+          {#if canMutate}
+            <button class="btn btn-primary" data-testid="yaml-save" disabled={busy} onclick={() => void save()}>
+              save
+            </button>
+          {/if}
         </div>
-
-        {#if EXECUTED.includes(step.kind)}
-          <div class="grid gap-2 md:grid-cols-2">
-            {#if step.kind === "emit"}
-              <label class="field-label"
-                >mode
-                <select
-                  class="input"
-                  value={step.payload.command !== undefined ? "command" : "capability"}
-                  onchange={(ev) => {
-                    const which = (ev.target as HTMLSelectElement).value;
-                    step.payload =
-                      which === "command"
-                        ? { command: registry?.commands[0] ?? "", inputs: step.payload.inputs ?? {} }
-                        : { capability: registry?.capabilities[0] ?? "", inputs: step.payload.inputs ?? {} };
-                  }}
-                >
-                  <option value="command">command</option>
-                  <option value="capability">capability</option>
-                </select>
-              </label>
-              {#if step.payload.command !== undefined}
-                <label class="field-label"
-                  >command
-                  <select class="input" data-testid="emit-command" value={String(step.payload.command)}
-                    onchange={(ev) => updatePayload(step, "command", (ev.target as HTMLSelectElement).value)}>
-                    {#each registry?.commands ?? [] as c}
-                      <option value={c}>{c}</option>
-                    {/each}
-                  </select>
-                </label>
-              {:else}
-                <label class="field-label"
-                  >capability
-                  <select class="input" data-testid="emit-capability" value={String(step.payload.capability ?? "")}
-                    onchange={(ev) => updatePayload(step, "capability", (ev.target as HTMLSelectElement).value)}>
-                    {#each registry?.capabilities ?? [] as c}
-                      <option value={c}>{c}</option>
-                    {/each}
-                  </select>
-                </label>
-              {/if}
-              <label class="field-label md:col-span-2"
-                >inputs (JSON)
-                <textarea
-                  class="input mono"
-                  rows="3"
-                  value={jsonField(step, "inputs")}
-                  oninput={(ev) => updateJsonField(step, "inputs", (ev.target as HTMLTextAreaElement).value)}
-                ></textarea>
-              </label>
-            {:else if step.kind === "wait"}
-              <label class="field-label"
-                >event
-                <select class="input" value={String(step.payload.event ?? "")}
-                  onchange={(ev) => updatePayload(step, "event", (ev.target as HTMLSelectElement).value)}>
-                  {#each registry?.eventTypes ?? [] as t}
-                    <option value={t}>{t}</option>
-                  {/each}
-                </select>
-              </label>
-              <label class="field-label"
-                >correlate
-                <input class="input mono" value={String(step.payload.correlate ?? "")}
-                  oninput={(ev) => updatePayload(step, "correlate", (ev.target as HTMLInputElement).value)} />
-              </label>
-              <label class="field-label"
-                >timeout (ISO-8601)
-                <input class="input mono" data-testid="wait-timeout" value={String(step.payload.timeout ?? "")}
-                  oninput={(ev) => updatePayload(step, "timeout", (ev.target as HTMLInputElement).value)} />
-              </label>
-              <label class="field-label"
-                >onTimeout
-                <select class="input" value={String(step.payload.onTimeout ?? "end")}
-                  onchange={(ev) => updatePayload(step, "onTimeout", (ev.target as HTMLSelectElement).value)}>
-                  {#each stepIds() as sid}
-                    <option value={sid}>{sid}</option>
-                  {/each}
-                </select>
-              </label>
-            {:else if step.kind === "timer"}
-              <label class="field-label"
-                >for (ISO-8601)
-                <input class="input mono" value={String(step.payload.for ?? "")}
-                  oninput={(ev) => updatePayload(step, "for", (ev.target as HTMLInputElement).value)} />
-              </label>
-            {:else if step.kind === "invoke"}
-              <label class="field-label"
-                >child definition
-                <select class="input" data-testid="invoke-workflow" value={String(step.payload.workflow ?? "")}
-                  onchange={(ev) => updatePayload(step, "workflow", (ev.target as HTMLSelectElement).value)}>
-                  {#each registry?.callable ?? [] as c}
-                    <option value={c.id}>{c.id} — {c.title}</option>
-                  {/each}
-                </select>
-              </label>
-              <label class="field-label"
-                >timeout (ISO-8601)
-                <input class="input mono" data-testid="invoke-timeout" value={String(step.payload.timeout ?? "")}
-                  oninput={(ev) => updatePayload(step, "timeout", (ev.target as HTMLInputElement).value)} />
-              </label>
-              <label class="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={step.payload.await !== false}
-                  onchange={(ev) => updatePayload(step, "await", (ev.target as HTMLInputElement).checked)} />
-                await the child
-              </label>
-            {:else if step.kind === "select"}
-              <label class="field-label md:col-span-2"
-                >project (JSON map: field → ref)
-                <textarea
-                  class="input mono"
-                  rows="3"
-                  data-testid="select-project"
-                  value={jsonField(step, "project") || "{\"value\": \"instance\"}"}
-                  oninput={(ev) => updateJsonField(step, "project", (ev.target as HTMLTextAreaElement).value)}
-                ></textarea>
-              </label>
-              {#if step.rawError}<p class="text-xs text-bad">{step.rawError}</p>{/if}
-            {:else}
-              <label class="field-label md:col-span-2"
-                >payload (JSON)
-                <textarea
-                  class="input mono"
-                  rows="4"
-                  value={step.raw}
-                  oninput={(ev) => {
-                    step.raw = (ev.target as HTMLTextAreaElement).value;
-                    const parsed = parseRaw(step);
-                    step.rawError = parsed === null ? "payload is not a JSON object" : null;
-                    if (parsed !== null) {
-                      step.payload = parsed;
-                    }
-                  }}
-                ></textarea>
-              </label>
-              {#if step.rawError}<p class="text-xs text-bad" data-testid="step-raw-error">{step.rawError}</p>{/if}
-            {/if}
-          </div>
-        {:else}
-          <p class="mb-1 text-xs text-amber">{step.kind} is stored, not yet executable — JSON face:</p>
-          <textarea
-            class="input mono"
-            rows="4"
-            value={step.raw}
-            oninput={(ev) => {
-              step.raw = (ev.target as HTMLTextAreaElement).value;
-              const parsed = parseRaw(step);
-              step.rawError = parsed === null ? "payload is not a JSON object" : null;
-            }}
-          ></textarea>
-        {/if}
       </div>
-    {/each}
-
-    {#if changes.length > 0}
-      <div class="mb-3 rounded border border-edge bg-sunken/40 p-3" data-testid="editor-diff">
-        <h3 class="mb-1 text-sm font-semibold">changes vs stored v{loadedVersion || "—"}</h3>
-        <ul class="list-inside list-disc text-sm text-ink-2">
-          {#each changes as path}
-            <li class="mono">{path}</li>
+      {#if parseError}
+        <p class="badge mb-1 bg-amber-veil text-amber ring-amber/25" data-testid="graph-error">
+          graph shows the last good version: {parseError}
+        </p>
+      {/if}
+      <div
+        class="yaml-host rounded border border-edge"
+        data-testid="editor-yaml"
+        bind:this={host}></div>
+      {#if validation}
+        <div class="mt-2" data-testid="yaml-validation">
+          {#if validation.ok}
+            <p class="badge bg-ok-veil text-ok ring-ok/25">valid</p>
+          {:else}
+            <ul class="grid gap-1">
+              {#each validation.errors as e (e.code + e.detail)}
+                <li class="badge bg-danger-veil text-danger ring-danger/25">
+                  <span class="mono">{e.code}</span> {e.detail}
+                </li>
+              {/each}
+            </ul>
+          {/if}
+        </div>
+      {/if}
+      {#if changes.length > 0}
+        <ul class="mt-2 flex flex-wrap gap-1" data-testid="editor-diff" aria-label="pending changes">
+          {#each changes as path (path)}
+            <li class="badge bg-amber-veil text-amber ring-amber/25 mono">{path}</li>
           {/each}
         </ul>
-      </div>
-    {/if}
+      {:else}
+        <p class="mt-2 hidden" data-testid="editor-diff"></p>
+      {/if}
+    </div>
 
-    {#if canMutate}
-      <div class="flex gap-2">
-        <button class="btn btn-primary btn-sm" data-testid="editor-save" onclick={save} disabled={busy}>
-          {busy ? "saving…" : isNew ? "store v1" : "save as new version"}
-        </button>
-        {#if !isNew && !freshId}
-          {#if !enabled}
-            <button class="btn btn-ghost btn-sm" data-testid="editor-enable" onclick={() => toggle(true, false)}>
-              enable v{loadedVersion}
+    <div class="min-w-0">
+      {#if lastGoodDoc !== null}
+        <FlowCanvas
+          doc={graphDoc}
+          selected={selectedStep}
+          onselect={(stepId) => (selectedStep = stepId && stepId !== "trigger" && stepId !== "end" ? stepId : null)} />
+      {:else}
+        <EmptyState title="the graph waits for a parseable document" testid="graph-empty" />
+      {/if}
+      {#if selectedStepDoc}
+        <div class="card mt-3" data-testid="step-card">
+          <div class="mb-2 flex items-center justify-between">
+            <span class="mono text-sm font-medium">{String(selectedStepDoc["id"])}</span>
+            <button
+              class="btn"
+              data-testid="step-jump"
+              onclick={() => jumpToStep(String(selectedStepDoc["id"]))}>
+              jump to YAML
             </button>
-          {/if}
-          {#if enabled}
-            <button class="btn btn-ghost btn-sm" data-testid="editor-disable" onclick={() => toggle(false, false)}>
-              disable v{loadedVersion}
-            </button>
-          {/if}
-        {/if}
-      </div>
-    {:else}
-      <p class="text-sm text-ink-3">read-only principal: the form mirrors the doc, saving needs a mutator.</p>
-    {/if}
-  {:else}
-    <p class="mb-2 text-sm text-ink-3">
-      YAML face: validation runs before the save may land, and the save stamps a new version.
-    </p>
-    <textarea class="input mono mb-2" rows="18" data-testid="editor-yaml" bind:value={yamlText}></textarea>
-    {#if validation}
-      <p class="mb-2 text-sm {validation.ok ? 'text-ok' : 'text-bad'}" data-testid="yaml-validation">
-        {validation.ok ? "valid" : `rejected: ${validation.errors.map((e) => e.detail).join("; ")}`}
-      </p>
-    {/if}
-    {#if yamlText !== savedYaml}
-      <p class="mb-2 text-sm text-amber" data-testid="yaml-dirty">the YAML differs from stored v{loadedVersion}</p>
-    {/if}
-    {#if canMutate}
-      <div class="flex gap-2">
-        <button class="btn btn-ghost btn-sm" data-testid="yaml-validate" onclick={validateYaml}>validate</button>
-        <button
-          class="btn btn-primary btn-sm"
-          data-testid="yaml-save"
-          onclick={saveYaml}
-          disabled={busy || !(validation?.ok ?? false)}
-        >
-          save YAML as new version
-        </button>
-      </div>
-    {/if}
-  {/if}
+          </div>
+          <pre class="mono overflow-x-auto rounded bg-bg p-2 text-xs">{JSON.stringify(selectedStepDoc, null, 2)}</pre>
+        </div>
+      {/if}
+    </div>
+  </div>
 </section>
+
+<style>
+  .yaml-host :global(.cm-editor) {
+    border-radius: 6px;
+    font-size: 13px;
+  }
+  .yaml-host :global(.cm-editor.cm-focused) {
+    outline: 1px solid var(--color-accent);
+  }
+  .yaml-host :global(.cm-scroller) {
+    font-family: var(--font-mono);
+  }
+</style>

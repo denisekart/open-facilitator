@@ -1,14 +1,25 @@
 // The /architecture page: intro chrome around the generated explorer
-// graph. The interactive behaviour lives in app.js; this file only shapes
-// the static shell (headings carry search-index weight).
+// graph. The interactive behaviour lives in the explorer bundle (app.js
+// hydrates it over the snapshot); this file shapes the static shell —
+// headings and walk titles carry search-index weight and read honestly
+// with JS off.
+
+import { scenarios } from "../architecture.mjs";
 
 export function architectureBody({ svg, payload }) {
+  const walks = scenarios
+    .map(
+      (sc) =>
+        `<span class="arch-walk"><b>${sc.title}</b> — ${sc.intro}</span>`,
+    )
+    .join("");
   return `<p class="lede">One map, drawn to scale with the system: a box is a thing that runs, an
 arrow is data actually moving. Hover a box to see what touches it, click it
 for what it guarantees. Then walk a scenario to watch the pieces light up in
 sequence.</p>
 
 <div class="arch-controls" id="arch-controls" role="tablist" aria-label="Ways to explore"></div>
+<p class="arch-walks" hidden>${walks}</p>
 
 <div class="arch-fig">
   <div class="arch-scroll">${svg}</div>

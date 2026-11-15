@@ -17,7 +17,11 @@
     "typecheck": "svelte-check --threshold error --output human"
   },
   "dependencies": {
+    "@codemirror/autocomplete": "catalog:",
     "@codemirror/lang-yaml": "catalog:",
+    "@codemirror/lint": "catalog:",
+    "@codemirror/state": "catalog:",
+    "@codemirror/view": "catalog:",
     "@xyflow/svelte": "catalog:",
     "codemirror": "catalog:",
     "dagre": "catalog:",

@@ -953,6 +953,28 @@ paths:
               schema: { type: object, additionalProperties: true }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
+  /api/admin/workflows/schema:
+    get:
+      operationId: getWorkflowSchema
+      tags: [read]
+      summary: >
+        The editor's grammar, verbatim from the validation authority: the
+        embedded workflow-definition.v1.json and common.v1.json the 422
+        validator compiles, so browser-side completion/lint can never
+        drift from what POST /definitions/validate accepts.
+      responses:
+        "200":
+          description: "Both schema documents: { definition, common }."
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [definition, common]
+                properties:
+                  definition: { type: object, additionalProperties: true }
+                  common: { type: object, additionalProperties: true }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
 components:
   securitySchemes:
     bearerAuth:

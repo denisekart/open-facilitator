@@ -29,12 +29,28 @@ public sealed class FlowEditorConsoleTests(PostgresFixture fixture)
     // screenshots stay honest, produced by this very walkthrough.
     private static string? ShotDir => Environment.GetEnvironmentVariable("OFAC_E2E_SHOTS");
 
+    // OFAC_E2E_SHOTS_DARK=1 additionally photographs every screen with the
+    // console's dark theme forced — the site shows both, so both must be
+    // the honest product, produced by this run.
+    private static bool ShotDark => Environment.GetEnvironmentVariable("OFAC_E2E_SHOTS_DARK") is "1";
+
     private static async Task ShootAsync(IPage page, string name)
     {
-        if (ShotDir is { } dir)
+        if (ShotDir is not { } dir)
         {
-            await page.ScreenshotAsync(new() { Path = Path.Combine(dir, name) });
+            return;
         }
+
+        await page.ScreenshotAsync(new() { Path = Path.Combine(dir, name) });
+        if (!ShotDark)
+        {
+            return;
+        }
+
+        var darkName = Path.GetFileNameWithoutExtension(name) + "-dark.png";
+        await page.EvaluateAsync("document.documentElement.dataset.theme = 'dark'");
+        await page.ScreenshotAsync(new() { Path = Path.Combine(dir, darkName) });
+        await page.EvaluateAsync("document.documentElement.dataset.theme = 'light'");
     }
 
     [Fact]
@@ -83,11 +99,13 @@ public sealed class FlowEditorConsoleTests(PostgresFixture fixture)
         await Expect(copyRow).ToContainTextAsync("live");
 
         // One work.progress event: an instance of v1, parked on a timer.
+        // The run table lives on the Monitor column; the live toggle is on
+        // by default, but the walkthrough still pokes refresh once so the
+        // assertion is about the row, not the poll.
         await PostWorkProgressAsync(host, "e2e-editor-a");
-        // The trigger row lands in its own transaction and the instance is
-        // born on the dispatch path: refresh until the run shows, not sleep.
+        await page.GetByTestId("view-monitor").ClickAsync();
+        await page.GetByTestId("monitor-refresh").ClickAsync();
         var parked = page.Locator("[data-testid='instance-list'] tbody tr", new() { HasText = "nudge-escalation-copy@1" });
-        await page.GetByTestId("flows-refresh").ClickAsync();
         await Expect(parked).ToBeVisibleAsync(new() { Timeout = 15_000 });
         if (ShotDir is not null)
         {
@@ -102,6 +120,7 @@ public sealed class FlowEditorConsoleTests(PostgresFixture fixture)
 
         // Edit again through the UI: v2 lands, and the OLD instance keeps
         // its v1 pin — a stored version is immutable under a running run.
+        await page.GetByTestId("view-flows").ClickAsync();
         await copyRow.GetByText("edit", new() { Exact = true }).ClickAsync();
         await Expect(page.GetByTestId("flow-editor")).ToBeVisibleAsync();
         await Expect(page.GetByTestId("editor-title")).ToHaveValueAsync("Nudge escalation (tuned)");
@@ -114,8 +133,12 @@ public sealed class FlowEditorConsoleTests(PostgresFixture fixture)
             .ToContainTextAsync("live");
 
         await PostWorkProgressAsync(host, "e2e-editor-b");
+        await page.GetByTestId("view-monitor").ClickAsync();
+        // Reload law: the session lives in oidc-client-ts storage, and the
+        // spent auth code must be off the URL before this moment — a
+        // replayed ?code= must not break the boot.
         await page.ReloadAsync();
-        await page.GetByTestId("flows-refresh").ClickAsync();
+        await page.GetByTestId("monitor-refresh").ClickAsync();
         await Expect(
             page.Locator("[data-testid='instance-list'] tbody tr", new() { HasText = "nudge-escalation-copy@2" }))
             .ToBeVisibleAsync(new() { Timeout = 15_000 });
@@ -150,25 +173,35 @@ public sealed class FlowEditorConsoleTests(PostgresFixture fixture)
         var page = await NewLoginPageAsync(browser, host.ServerAddress);
 
         // Open the agentic-research gallery entry (its 'research' step is
-        // an invoke with a PT20M child timeout) and go straight to YAML.
+        // an invoke with a PT20M child timeout). The YAML face IS the
+        // editor now: CodeMirror owns the body, no tab to click. The
+        // legacy #/flowdef/... hash must land the editor (redirect law).
         await page.GotoAsync($"{host.ServerAddress}/#/flowdef/agentic-research");
         await Expect(page.GetByTestId("flow-editor")).ToBeVisibleAsync();
-        await page.GetByRole(AriaRole.Button, new() { Name = "YAML" }).ClickAsync();
-        var yaml = page.GetByTestId("editor-yaml");
-        // A bound textarea speaks through its value, not its text content.
-        await Expect(yaml).ToHaveValueAsync(new Regex("PT20M"));
+        await Expect(page.GetByTestId("editor-yaml")).ToBeVisibleAsync();
+        var content = page.GetByTestId("editor-yaml").Locator(".cm-content");
+        await Expect(content).ToContainTextAsync("PT20M");
+        // The address bar healed to the canonical editor route.
+        await Expect(page).ToHaveURLAsync(new Regex(@"/#/flows/agentic-research$"));
 
-        // Edit the child timeout in YAML, validate, save.
-        var text = await yaml.InputValueAsync();
-        await yaml.FillAsync(text.Replace("PT20M", "PT25M"));
+        // Edit the child timeout in the editor, validate, save. CodeMirror
+        // renders one .cm-line div per row and textContent loses the line
+        // breaks; join the rows to recover the doc.
+        await content.ClickAsync();
+        await page.Keyboard.PressAsync("Control+A");
+        var lines = await content.Locator(".cm-line").AllInnerTextsAsync();
+        // CodeMirror inserts multiline text as one paste-like transaction,
+        // so newlines survive without per-line auto-indent.
+        await page.Keyboard.InsertTextAsync(
+            string.Join("\n", lines).Replace("PT20M", "PT25M"));
         await page.GetByTestId("yaml-validate").ClickAsync();
         await Expect(page.GetByTestId("yaml-validation")).ToContainTextAsync("valid");
         await page.GetByTestId("yaml-save").ClickAsync();
         await Expect(page.GetByTestId("editor-notice")).ToContainTextAsync("version 2");
 
-        // The server's own YAML face now speaks PT25M: the edited doc
-        // round-tripped YAML -> store -> YAML.
-        await Expect(page.GetByTestId("editor-yaml")).ToHaveValueAsync(new Regex("PT25M"));
+        // The editor re-anchored on the stored version: its CodeMirror now
+        // speaks PT25M — the edited doc round-tripped editor -> store -> editor.
+        await Expect(content).ToContainTextAsync("PT25M");
 
         using var client = host.CreateSeedClient();
         var stored = await client.GetStringAsync("/api/admin/workflows/definitions/agentic-research");

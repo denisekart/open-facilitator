@@ -1,6 +1,8 @@
 <script lang="ts">
   import { ApiError, getJson, toApiError, type Fetcher } from "../lib/api.js";
   import { apiFetch } from "../lib/auth.svelte.js";
+  import { deck } from "../lib/deck.svelte.js";
+  import type { ScreenContext } from "../lib/deck.svelte.js";
   import { renderChatMarkdown } from "../lib/markdown.js";
   import { go } from "../lib/route.svelte.js";
   import { ago, stamp, stateTone, TONE_CLASS, type Tone } from "../lib/status.js";
@@ -17,7 +19,17 @@
   import ProblemNote from "./ProblemNote.svelte";
 
   // Tests inject a mock fetcher; production rides the shared bearer fetch.
-  let { fetcher: api = apiFetch }: { fetcher?: Fetcher } = $props();
+  // screenContext is what the AiDeck drawer knows the operator is looking
+  // at (see lib/deck.svelte.ts); absent in tests and standalone mounts.
+  let {
+    fetcher: api = apiFetch,
+    screenContext = null,
+    initialSession = null,
+  }: {
+    fetcher?: Fetcher;
+    screenContext?: ScreenContext | null;
+    initialSession?: string | null;
+  } = $props();
 
   const VERBOSITIES: ChatVerbosity[] = ["terse", "balanced", "proactive"];
 
@@ -107,6 +119,9 @@
     void loadSessions();
     void loadCatalog();
     void loadPreferences();
+    if (initialSession) {
+      void openSession(initialSession);
+    }
     // The list also rides the pollAction cadence below; this interval keeps
     // it honest while the panel is merely open.
     const timer = setInterval(() => void loadSessions(), 15_000);
@@ -269,8 +284,15 @@
         const created = await postJson<{ sessionId: string }>("/api/chat/sessions");
         target = created.sessionId;
       }
+      // Screen context travels inside the message text: the wire request
+      // (ChatMessageRequest) has only `text`, so no protocol change — the
+      // assistant reads the preamble line, the operator's own echo stays
+      // exactly what they typed.
+      const wire = screenContext
+        ? `${text}\n[screen: ${screenContext.label} @ ${screenContext.route}${screenContext.ids.length > 0 ? ` ids: ${screenContext.ids.join(", ")}` : ""}]`
+        : text;
       const reply = await postJson<ChatReply>(`/api/chat/sessions/${target}/messages`, {
-        text,
+        text: wire,
       });
       sessionId = target;
       draft = "";
@@ -338,6 +360,12 @@
       actionStatus = { ...actionStatus, [id]: updated };
       if (updated.status === "pending") {
         await pollAction(id);
+      }
+      const settled = actionStatus[id] ?? updated;
+      if (settled.status === "executed") {
+        // The change is law now: every live screen re-loads its slice, so
+        // the operator sees the effect without touching refresh.
+        deck.broadcastExecuted(settled.method, settled.path);
       }
     } catch (err) {
       error = err instanceof ApiError ? err : "confirm-failed";
@@ -620,11 +648,11 @@
                   {#if live.status === "executed"}
                     <a
                       class="text-xs text-accent underline"
-                      href={`#/audit?correlation=${action.actionId}`}
+                      href={`#/monitor/audit?correlation=${action.actionId}`}
                       data-testid="chat-action-audit-link"
                       onclick={(e) => {
                         e.preventDefault();
-                        go(`#/audit?correlation=${action.actionId}`);
+                        go(`#/monitor/audit?correlation=${action.actionId}`);
                       }}>audit trail</a>
                   {/if}
                   {#if live.status === "pending"}

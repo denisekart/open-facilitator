@@ -27,6 +27,7 @@ export default defineConfig(({ mode }) => ({
   ...(mode === "test" ? { resolve: { conditions: ["browser"] } } : {}),
   test: {
     environment: "jsdom",
+    setupFiles: ["./src/lib/test-harness.ts"],
     server: {
       deps: {
         inline: ["svelte"],

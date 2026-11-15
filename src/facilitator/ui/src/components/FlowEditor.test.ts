@@ -3,9 +3,13 @@ import type { User } from "oidc-client-ts";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { session } from "../lib/auth.svelte.js";
-import type { WorkflowInstanceDetail, WorkflowRegistry, WorkflowStepLogRow } from "../lib/types.js";
-import FlowDetail from "./FlowDetail.svelte";
+import type { WorkflowRegistry } from "../lib/types.js";
 import FlowEditor from "./FlowEditor.svelte";
+
+// The YAML-first editor: metadata fields, the CodeMirror host, the server
+// validate face, and the save law (If-Match when stored, none when fresh).
+// The graph's own laws live in flow-layout.test.ts (pure), and the run
+// detail in FlowDetail.test.ts.
 
 function jwt(roles: string[]): string {
   const b64 = (input: string) =>
@@ -31,24 +35,33 @@ const registry: WorkflowRegistry = {
   teams: ["team-alpha"],
 };
 
+const storedYaml = [
+  "id: review-fork",
+  "title: Review fork",
+  "on:",
+  "  event: org.facilitator.event.provider.review.v1",
+  "steps:",
+  "  - id: guard",
+  "    title: terminal only",
+  "    decide:",
+  "      guard: { field: work.state, in: [completed] }",
+  "      fallback: end",
+  "  - id: fork",
+  "    title: fork",
+  "    on: guard:completed",
+  "    fork-work: { noteRef: a note }",
+  "",
+].join("\n");
+
 const storedDoc = {
   id: "review-fork",
   version: 3,
   title: "Review fork",
   description: "fork a review",
   enabled: false,
-  on: { event: "org.facilitator.event.provider.review.v1", where: { "data.action": "submitted" } },
+  on: { event: "org.facilitator.event.provider.review.v1" },
   steps: [
-    {
-      id: "guard",
-      title: "terminal only",
-      on: "always",
-      decide: {
-        source: "guard",
-        guard: { field: "work.state", in: ["completed"] },
-        fallback: "end",
-      },
-    },
+    { id: "guard", title: "terminal only", decide: { fallback: "end" } },
     { id: "fork", title: "fork", on: "guard:completed", "fork-work": { noteRef: "a note" } },
   ],
 };
@@ -58,8 +71,33 @@ const summary = {
   version: 3,
   digest: "sha256:beef",
   title: "Review fork",
+  description: "fork a review",
   enabled: false,
   shadow: false,
+  team: null,
+};
+
+const schemaDoc = {
+  $id: "https://openfacilitator.org/protocol/workflow-definition.v1.json",
+  type: "object",
+  properties: {
+    id: { type: "string" },
+    title: { type: "string" },
+    on: { type: "object" },
+    steps: { type: "array", items: { $ref: "#/$defs/step" } },
+  },
+  $defs: {
+    step: {
+      type: "object",
+      required: ["id", "title"],
+      properties: {
+        id: { type: "string" },
+        title: { type: "string" },
+        on: { type: "string" },
+        emit: { type: "object" },
+      },
+    },
+  },
 };
 
 interface Call {
@@ -109,10 +147,13 @@ function signIn(roles: string[]): void {
   flushSync();
 }
 
+let pending = 0;
+
 async function settle(): Promise<void> {
   await vi.waitFor(() => {
     flushSync();
-    if (calls.length === 0) {
+    const boot = calls.filter((c) => c.path.includes("/registry") || c.path.includes("/schema"));
+    if (boot.length < 2 || pending > 0) {
       throw new Error("boot fetches pending");
     }
   });
@@ -129,64 +170,71 @@ function stubEditor(opts: { putStatus?: number } = {}): void {
   vi.stubGlobal(
     "fetch",
     vi.fn(async (path: string, init?: RequestInit) => {
-      const method = init?.method ?? "GET";
-      const url = String(path);
-      calls.push({
-        path: url,
-        method,
-        headers: Object.fromEntries(
-          [...new Headers(init?.headers).entries()].map(([k, v]) => [k.toLowerCase(), v]),
-        ),
-        body: typeof init?.body === "string" ? init.body : null,
-      });
-      if (url.includes("/registry")) return json(registry);
-      if (url.includes("/validate")) return json({ ok: true, errors: [] });
-      if (method === "PUT") {
-        if (opts.putStatus && opts.putStatus !== 200) {
-          return json(
-            {
-              type: "https://errors.openfacilitator.org/v1/version-conflict",
-              title: "Version conflict",
-              detail: "digested moved",
-            },
-            opts.putStatus,
-          );
-        }
-        return json({ ...summary, version: 4 });
+      pending += 1;
+      try {
+        return await respond(path, init, opts);
+      } finally {
+        pending -= 1;
       }
-      if (url.includes("/definitions/review-fork")) {
-        return json({ summary, document: storedDoc, yaml: "id: review-fork\n" });
-      }
-      if (url.includes("/instances/") && url.endsWith("/log")) {
-        return json({ items: stepLog });
-      }
-      if (url.includes("/instances/")) {
-        return json(instanceDetail);
-      }
-      throw new Error(`unstubbed ${method} ${url}`);
     }),
   );
 }
 
-describe("FlowEditor", () => {
-  it("loads a definition into the form and shows its picture", async () => {
+async function respond(
+  path: string,
+  init: RequestInit | undefined,
+  opts: { putStatus?: number },
+): Promise<Response> {
+  const method = init?.method ?? "GET";
+  const url = String(path);
+  calls.push({
+    path: url,
+    method,
+    headers: Object.fromEntries(
+      [...new Headers(init?.headers).entries()].map(([k, v]) => [k.toLowerCase(), v]),
+    ),
+    body: typeof init?.body === "string" ? init.body : null,
+  });
+  if (url.includes("/registry")) return json(registry);
+  if (url.includes("/schema")) return json({ definition: schemaDoc, common: {} });
+  if (url.includes("/validate")) return json({ ok: true, errors: [] });
+  if (method === "PUT") {
+    if (opts.putStatus && opts.putStatus !== 200) {
+      return json(
+        {
+          type: "https://errors.openfacilitator.org/v1/version-conflict",
+          title: "Version conflict",
+          detail: "digested moved",
+        },
+        opts.putStatus,
+      );
+    }
+    return json({ ...summary, version: 4 });
+  }
+  if (url.includes("/definitions/review-fork")) {
+    return json({ summary, document: storedDoc, yaml: storedYaml });
+  }
+  throw new Error(`unstubbed ${method} ${url}`);
+}
+
+describe("FlowEditor (YAML face)", () => {
+  it("loads a definition: metadata fields, the CodeMirror host, the graph container", async () => {
     signIn(["framework-admin"]);
     stubEditor();
     mountView(FlowEditor, { defId: "review-fork", onclose: () => {} });
     await settle();
 
     expect(byTestId<HTMLInputElement>("editor-title").value).toBe("Review fork");
-    expect(byTestId<HTMLInputElement>("editor-id").disabled).toBe(true);
-    // the graph mirrors the stored steps: trigger + two steps, no 'end'
-    // (the editor has no run status, so no terminal edge is drawn)
-    const svg = byTestId("flow-graph").querySelector("svg");
-    expect(svg).not.toBeNull();
-    const labels = [...(svg?.querySelectorAll("[role='button']") ?? [])].map((g) =>
-      g.getAttribute("aria-label"),
+    expect(byTestId<HTMLInputElement>("editor-id").value).toBe("review-fork");
+    // The YAML body reached the editor (CodeMirror renders it, and the
+    // testid root exists regardless of viewport measurement in jsdom).
+    expect(byTestId("editor-yaml")).toBeTruthy();
+    await settleUntil(() =>
+      expect(
+        (container?.querySelector(".cm-content")?.textContent ?? "").includes("Review fork"),
+      ).toBe(true),
     );
-    expect(labels.some((l) => l?.startsWith("guard:"))).toBe(true);
-    expect(labels.some((l) => l?.startsWith("fork:"))).toBe(true);
-    expect(labels.some((l) => l?.startsWith("trigger:"))).toBe(true);
+    expect(byTestId("flow-graph")).toBeTruthy();
   });
 
   it("edits the title, shows the diff, and saves a new version with If-Match", async () => {
@@ -195,13 +243,12 @@ describe("FlowEditor", () => {
     mountView(FlowEditor, { defId: "review-fork", onclose: () => {} });
     await settle();
 
-    const title = byTestId<HTMLInputElement>("editor-title");
-    title.value = "Review fork v2";
-    title.dispatchEvent(new Event("input"));
+    const titleField = byTestId<HTMLInputElement>("editor-title");
+    titleField.value = "Review fork v2";
+    titleField.dispatchEvent(new Event("input"));
     flushSync();
 
-    const diff = byTestId("editor-diff");
-    expect(diff.textContent).toContain("title");
+    await settleUntil(() => expect(byTestId("editor-diff").textContent).toContain("title"));
 
     byTestId<HTMLButtonElement>("editor-save").click();
     await settleUntil(() => expect(calls.some((c) => c.method === "PUT")).toBe(true));
@@ -222,9 +269,9 @@ describe("FlowEditor", () => {
     mountView(FlowEditor, { defId: "review-fork", onclose: () => {} });
     await settle();
 
-    const title = byTestId<HTMLInputElement>("editor-title");
-    title.value = "racing edit";
-    title.dispatchEvent(new Event("input"));
+    const titleField = byTestId<HTMLInputElement>("editor-title");
+    titleField.value = "racing edit";
+    titleField.dispatchEvent(new Event("input"));
     flushSync();
     byTestId<HTMLButtonElement>("editor-save").click();
     await settleUntil(() => expect(calls.some((c) => c.method === "PUT")).toBe(true));
@@ -238,140 +285,30 @@ describe("FlowEditor", () => {
     mountView(FlowEditor, { defId: "review-fork", clone: true, onclose: () => {} });
     await settle();
 
-    const idField = byTestId<HTMLInputElement>("editor-id");
-    expect(idField.value).toBe("review-fork-copy");
-    expect(idField.disabled).toBe(false);
+    expect(byTestId<HTMLInputElement>("editor-id").value).toBe("review-fork-copy");
+    expect(byTestId<HTMLInputElement>("editor-title").value).toContain("(copy)");
 
     byTestId<HTMLButtonElement>("editor-save").click();
     await settleUntil(() => expect(calls.some((c) => c.method === "PUT")).toBe(true));
     const put = calls.find((c) => c.method === "PUT");
     expect(put?.path).toBe("/api/admin/workflows/definitions/review-fork-copy");
     expect(put?.headers["if-match"]).toBeUndefined();
+    // The YAML body itself carries the copy's identity, not just the field.
+    const body = JSON.parse(put?.body ?? "{}") as Record<string, unknown>;
+    expect(body["id"]).toBe("review-fork-copy");
 
     // The editor re-anchors on the copy: its posture toggles speak the
     // new definition now.
     await settleUntil(() => expect(byTestId("editor-enable")).toBeTruthy());
   });
 
-  it("the palette offers every kind; not-yet-executable ones are disabled and labelled", async () => {
+  it("the server validate face reports through yaml-validation", async () => {
     signIn(["framework-admin"]);
-    stubEditor();
-    mountView(FlowEditor, { defId: "new", onclose: () => {} });
-    await settle();
-
-    expect(byTestId<HTMLButtonElement>("add-timer").disabled).toBe(false);
-    expect(byTestId<HTMLButtonElement>("add-invoke").disabled).toBe(false);
-    const join = byTestId<HTMLButtonElement>("add-join");
-    expect(join.disabled).toBe(true);
-    expect(join.textContent).toContain("not yet executable");
-  });
-
-  it("adding a timer step draws it in the picture and saves", async () => {
-    signIn(["framework-admin"]);
-    stubEditor();
-    mountView(FlowEditor, { defId: "new", onclose: () => {} });
-    await settle();
-
-    const idField = byTestId<HTMLInputElement>("editor-id");
-    idField.value = "t-new-flow";
-    idField.dispatchEvent(new Event("input"));
-    flushSync();
-
-    byTestId<HTMLButtonElement>("add-timer").click();
-    flushSync();
-    const svg = byTestId("flow-graph").querySelector("svg");
-    const labels = [...(svg?.querySelectorAll("[role='button']") ?? [])].map((g) =>
-      g.getAttribute("aria-label"),
-    );
-    expect(labels.some((l) => l?.startsWith("step-1:"))).toBe(true);
-
-    byTestId<HTMLButtonElement>("editor-save").click();
-    await settleUntil(() => expect(calls.some((c) => c.method === "PUT")).toBe(true));
-    const body = JSON.parse(calls.find((c) => c.method === "PUT")?.body ?? "{}") as {
-      steps: { timer: { for: string } }[];
-    };
-    expect(body.steps[0]?.timer?.for).toBe("PT30M");
-  });
-
-  it("a read-only principal gets the form without the save", async () => {
-    signIn(["reader"]);
     stubEditor();
     mountView(FlowEditor, { defId: "review-fork", onclose: () => {} });
     await settle();
-    expect(byTestId<HTMLInputElement>("editor-title").value).toBe("Review fork");
-    expect(container?.querySelector("[data-testid='editor-save']")).toBeNull();
-  });
-});
 
-const instanceDetail: WorkflowInstanceDetail = {
-  instanceId: "11111111-1111-4111-8111-111111111111",
-  definitionId: "review-fork",
-  definitionVersion: 3,
-  status: "failed",
-  currentStep: null,
-  depth: 0,
-  primaryWorkId: null,
-  endReason: "step-failed",
-  startedAt: "2026-11-14T09:00:00Z",
-  updatedAt: "2026-11-14T09:05:00Z",
-  invocationPath: "$",
-  output: null,
-  ancestors: [],
-  children: [],
-};
-
-const stepLog: WorkflowStepLogRow[] = [
-  {
-    seq: 1,
-    stepId: "guard",
-    status: "done",
-    effectCommandId: null,
-    output: '{"branch":"fork"}',
-    startedAt: "2026-11-14T09:00:00Z",
-    updatedAt: "2026-11-14T09:00:01Z",
-  },
-  {
-    seq: 2,
-    stepId: "fork",
-    status: "failed",
-    effectCommandId: null,
-    output: '{"error":"endpoint went away"}',
-    startedAt: "2026-11-14T09:00:01Z",
-    updatedAt: "2026-11-14T09:05:00Z",
-  },
-];
-
-describe("FlowDetail's graph", () => {
-  it("wears the run: a done node, a failed node, and click-to-inspect", async () => {
-    signIn(["framework-admin"]);
-    stubEditor();
-    mountView(FlowDetail, {
-      instanceId: instanceDetail.instanceId,
-      onclose: () => {},
-    });
-    await settle();
-
-    const svg = byTestId("flow-graph").querySelector("svg");
-    expect(svg).not.toBeNull();
-    const done = [...(svg?.querySelectorAll("rect") ?? [])].filter((r) =>
-      r.classList.contains("fg-done"),
-    );
-    const failed = [...(svg?.querySelectorAll("rect") ?? [])].filter((r) =>
-      r.classList.contains("fg-failed"),
-    );
-    expect(done).toHaveLength(1); // guard landed
-    expect(failed).toHaveLength(1); // fork is why the run failed
-
-    // click the failed node: its leg's output surfaces
-    const node = [...(svg?.querySelectorAll("[role='button']") ?? [])].find((g) =>
-      g.getAttribute("aria-label")?.startsWith("fork:"),
-    );
-    node?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    flushSync();
-    expect(byTestId("graph-inspect").textContent).toContain("failed");
-    expect(byTestId("graph-inspect").textContent).toContain("endpoint went away");
-
-    // a failed run offers retry on the last failed step
-    expect(byTestId("flow-retry").textContent).toContain("retry 'fork'");
+    byTestId<HTMLButtonElement>("yaml-validate").click();
+    await settleUntil(() => expect(byTestId("yaml-validation").textContent).toContain("valid"));
   });
 });

@@ -375,4 +375,16 @@ public sealed class WorkflowDefinitionTests(PostgresFixture fixture) : IAsyncLif
         registry.GetProperty("callable");
         registry.GetProperty("teams");
     }
+
+    [Fact]
+    public async Task SchemaAnswersTheEmbeddedGrammarForTheEditor()
+    {
+        // The editor's completion/lint grammar is the very document the 422
+        // validator compiles: $defs.step must be in the served definition.
+        var schema = await GetAsync("/api/admin/workflows/schema");
+        Assert.Equal(
+            JsonValueKind.Object,
+            schema.GetProperty("definition").GetProperty("$defs").GetProperty("step").ValueKind);
+        Assert.Equal(JsonValueKind.Object, schema.GetProperty("common").ValueKind);
+    }
 }

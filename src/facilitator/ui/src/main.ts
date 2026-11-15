@@ -2,6 +2,7 @@ import { mount } from "svelte";
 
 import App from "./App.svelte";
 import "./app.css";
+import "@xyflow/svelte/dist/style.css";
 import { startRouting } from "./lib/route.svelte.js";
 import { initTheme } from "./lib/theme.svelte.js";
 

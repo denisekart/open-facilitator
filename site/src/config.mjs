@@ -218,6 +218,7 @@ export const pages = [
         route: "/workflows",
         src: "site/src/pages/workflows.md",
         title: "Authoring flows",
+        generated: "workflows",
         body: "The workflow plane: event, schedule, and callable triggers over a closed step palette, authored in the console and stored as immutable versions.",
       },
       {

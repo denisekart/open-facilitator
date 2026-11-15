@@ -20,7 +20,7 @@
             hint: "requests refused by policy",
             bad: true,
             bucket: health.metrics.auditDeniesPerHour,
-            link: href(parse("#/audit?decision=deny")),
+            link: href(parse("#/monitor/audit?decision=deny")),
           },
           {
             label: "artifacts stored",

@@ -387,6 +387,49 @@
     } catch {
       return;
     }
+
+    // Prefer the interactive Svelte Flow bundle: lazily inject it (only the
+    // architecture page pays for it), then hand it the same JSON payload
+    // the static snapshot was drawn from. The snapshot stays the no-JS face.
+    let focus = null;
+    const fm = (location.hash || "").match(/focus=([\w-]+)/);
+    if (fm) focus = fm[1];
+    const hydrate = () => {
+      const api = window.OfacArchExplorer;
+      if (!api) return;
+      const fig = root.querySelector(".arch-fig");
+      const controls = root.querySelector("#arch-controls");
+      const player = root.querySelector("#arch-player");
+      if (!fig) return;
+      if (window.__ofacArchApp) {
+        try {
+          window.__ofacArchApp.destroy();
+        } catch {
+          /* already gone */
+        }
+      }
+      const mountPoint = document.createElement("div");
+      mountPoint.className = "arch-explorer-mount";
+      fig.after(mountPoint);
+      fig.style.display = "none";
+      if (controls) controls.style.display = "none";
+      if (player) player.style.display = "none";
+      window.__ofacArchApp = api.mount(mountPoint, { data, focus });
+    };
+    if (window.OfacArchExplorer) {
+      hydrate();
+    } else {
+      const s = document.createElement("script");
+      s.src = "arch-explorer.js";
+      s.defer = true;
+      s.addEventListener("load", hydrate, { once: true });
+      document.head.append(s);
+      const link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = "arch-explorer.css";
+      document.head.append(link);
+    }
+
     const nodeById = Object.fromEntries(data.nodes.map((n) => [n.id, n]));
     const gNodes = new Map([...svg.querySelectorAll(".arch-node")].map((g) => [g.dataset.id, g]));
     const gEdges = new Map([...svg.querySelectorAll(".arch-edge")].map((g) => [g.dataset.id, g]));
@@ -827,6 +870,32 @@
       searchIdx = { pages: [], tok: {} };
     }
     searchInput.addEventListener("input", onSearchInput);
+    const toggle = document.getElementById("theme-toggle");
+    if (toggle) {
+      // Lucide sun (light) and moon (dark), inlined — the site JS stays
+      // dependency-free outside the explorer bundle.
+      const SUN =
+        '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>';
+      const MOON =
+        '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>';
+      const paint = () => {
+        const dark = document.documentElement.dataset.theme === "dark";
+        toggle.innerHTML = dark ? MOON : SUN;
+        toggle.setAttribute("aria-label", dark ? "Switch to light theme" : "Switch to dark theme");
+        toggle.setAttribute("aria-pressed", String(dark));
+      };
+      toggle.addEventListener("click", () => {
+        const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+        document.documentElement.dataset.theme = next;
+        try {
+          localStorage.setItem("ofac-ui-theme", next);
+        } catch {
+          /* private mode: session-only */
+        }
+        paint();
+      });
+      paint();
+    }
     searchInput.addEventListener("focus", onSearchInput);
     searchInput.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {

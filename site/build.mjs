@@ -12,6 +12,7 @@ import { renderMermaid, mermaidAvailable } from "./mermaid-ssr.mjs";
 import { tooltipFor, tooltips } from "./src/tooltips.mjs";
 import { renderArchitecture, renderArchitectureMini } from "./src/arch-render.mjs";
 import { architectureBody } from "./src/pages/architecture.mjs";
+import { paletteReference, galleryDoc } from "./src/schema-ref.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, ".."); // repo root
@@ -214,10 +215,99 @@ const contentEntries = [
   ...docs.flatMap((g) => g.entries.map((e) => ({ ...e, group: g.group }))),
 ];
 
+// The workflows manual's generated tail: the palette described by the
+// schema that validates it, a lifecycle diagram (mermaid: the existing
+// SSR pipeline renders it), and the cookbook's gallery YAML — the actual
+// seeder bytes, with a jump into the live console rather than a second
+// graph renderer (a second layout engine would be a second truth).
+async function workflowsAppendix(root) {
+  const palette = await paletteReference(root);
+  const nudge = await galleryDoc(root, "nudge-escalation");
+  const fork = await galleryDoc(root, "review-fork");
+  const code = (t, label) =>
+    `<pre class="cook-yaml" aria-label="${label}"><code>${escape(t)}</code></pre>`;
+  const lifecycle = `stateDiagram-v2
+    [*] --> running: triggered (event, schedule, invoke)
+    [*] --> shadowed: triggered by a shadow definition
+    shadowed --> shadowed: every leg only recorded
+    running --> waiting: park (approval, wait, timer)
+    waiting --> running: woken (decision, match, deadline)
+    running --> completed: end reached
+    running --> failed: leg failed unhandled
+    running --> cancelled: operator cancel
+    running --> paused: operator pause
+    paused --> running: operator resume
+    completed --> [*]
+    failed --> [*]
+    cancelled --> [*]`;
+  return (
+    `<h2 id="lifecycle">How a run moves</h2>
+<p>An instance is a row, not a process. These are the only states it
+holds; every arrow is an act the kernel itself records. A shadowed
+definition never enters <code>running</code> — its instances park as
+<code>shadowed</code> and the shadow report shows what they would have
+done.</p>
+<figure class="diagram diagram-pending"><button class="diagram-zoom" aria-label="Expand diagram">⤢ expand</button><pre class="mermaid-source">${escape(lifecycle)}</pre><figcaption>workflow instance lifecycle · every arrow is a kernel act</figcaption></figure>
+<h2 id="palette-reference">The palette, field by field</h2>
+<p>Generated from <code>protocol/json-schema/workflow-definition.v1.json</code>
+— the schema the kernel validates against, so this table and the
+validator can never disagree. <code>*</code> marks a required field.</p>
+${palette}
+<h2 id="cookbook">Cookbook: the gallery, byte for byte</h2>
+<p>Two of the six shipped definitions, embedded as the seeder stores
+them. Clone either in the console (<code>#/flows</code>) and the diff
+block will show exactly what you bent.</p>
+<h3 id="cookbook-nudge">Nudge ladder</h3>
+<p>The patience curve: park, nudge, escalate, end — every park a durable
+row, every nudge an audit line.</p>
+${code(nudge.yaml, "nudge-escalation gallery definition")}
+<p><a class="arch-more" href="#/flows/nudge-escalation">Open it in the console editor →</a></p>
+<h3 id="cookbook-fork">Review fork</h3>
+<p>The review law as data: a terminal guard, then a fork that inherits
+the subject's identity.</p>
+${code(fork.yaml, "review-fork gallery definition")}
+<p><a class="arch-more" href="#/flows/review-fork">Open it in the console editor →</a></p>`
+  );
+}
+
+// A console screenshot and its dark twin, offered as one <picture>: the
+// dark source rides the OS preference (the site's default theme law).
+// Only rewritten when the e2e run actually produced the twin, so the
+// markup never references a file that was not photographed.
+const SHOT_NAMES = [
+  "console-explorer",
+  "console-work",
+  "console-editor",
+  "console-instance",
+];
+function withDarkShots(html) {
+  for (const name of SHOT_NAMES) {
+    if (!existsSync(join(HERE, "src/assets", `${name}-dark.png`))) continue;
+    html = html.replaceAll(
+      `<img src="${name}.png"`,
+      `<picture><source media="(prefers-color-scheme: dark)" srcset="${name}-dark.png"><img src="${name}.png"`,
+    );
+  }
+  // <picture> needs a closing tag: mark the wrapped imgs and close them.
+  for (const name of SHOT_NAMES) {
+    const wrapped = `<picture><source media="(prefers-color-scheme: dark)" srcset="${name}-dark.png">`;
+    let at = html.indexOf(wrapped);
+    while (at !== -1) {
+      const close = html.indexOf(">", html.indexOf("<img", at));
+      const end = close + 1;
+      html = html.slice(0, end) + "</picture>" + html.slice(end);
+      at = html.indexOf(wrapped, end + 10);
+    }
+  }
+  return html;
+}
+
 async function emit(entry, srcPath, group) {
   const md = await readFile(join(ROOT, srcPath), "utf8");
   const ctxDir = dirname(srcPath);
-  const html = renderMarkdown(md, ctxDir);
+  let html = renderMarkdown(md, ctxDir);
+  if (entry.generated === "workflows") html += await workflowsAppendix(ROOT);
+  html = withDarkShots(html);
   const titleMatch = md.match(/^#\s+(.+)$/m);
   const title = entry.title || (titleMatch ? titleMatch[1] : srcPath);
   const route = entry.route;
@@ -241,7 +331,8 @@ async function emit(entry, srcPath, group) {
   return { route, title };
 }
 
-for (const e of contentEntries) if (!e.generated) await emit(e, e.src, e.group);
+for (const e of contentEntries)
+  if (e.generated !== "architecture") await emit(e, e.src, e.group);
 for (const g of guides) await emit({ route: g.route, title: g.title }, g.src, "Guide");
 
 // Generated pages: the interactive architecture explorer.
@@ -316,16 +407,37 @@ await copy("src/assets/icon.svg", "icon.svg");
 await copy("src/assets/icon.svg", "favicon.svg");
 await copy("src/assets/console-explorer.png", "console-explorer.png");
 await copy("src/assets/console-work.png", "console-work.png");
-for (const shot of ["console-editor.png", "console-instance.png"]) {
+for (const shot of [
+  "console-editor.png",
+  "console-instance.png",
+  "console-editor-dark.png",
+  "console-instance-dark.png",
+]) {
   if (existsSync(join(HERE, "src/assets", shot))) await copy(`src/assets/${shot}`, shot);
 }
+
+// The interactive explorer bundle (Svelte 5 + Svelte Flow). Programmatic
+// vite build so the site stays a single `npm run build`; the page stays
+// dependency-free outside this one lazily-injected pair of files.
+{
+  const { build } = await import("vite");
+  await build({
+    configFile: join(HERE, "arch-explorer.vite.config.mjs"),
+    root: HERE,
+    logLevel: "warn",
+  });
+  await cp(join(HERE, ".explorer-dist/arch-explorer.js"), join(DIST, "arch-explorer.js"));
+  const bundleCss = join(HERE, ".explorer-dist/arch-explorer.css");
+  if (existsSync(bundleCss)) await cp(bundleCss, join(DIST, "arch-explorer.css"));
+}
+
 const mermaidMin = join(HERE, "node_modules/mermaid/dist/mermaid.min.js");
 if (existsSync(mermaidMin)) await cp(mermaidMin, join(DIST, "mermaid.min.js"));
 
 // 404 for GitHub Pages (deep path links land here; it forwards to the SPA).
 const BASE = process.env.OFAC_SITE_BASE ?? "/";
 const { landingHtml } = await import("./src/pages/index.mjs");
-await writeFile(join(DIST, "index.html"), landingHtml({ base: BASE }));
+await writeFile(join(DIST, "index.html"), withDarkShots(landingHtml({ base: BASE })));
 await writeFile(join(DIST, "404.html"), landingHtml({ notFound: true, base: BASE }));
 await writeFile(join(DIST, ".nojekyll"), "");
 

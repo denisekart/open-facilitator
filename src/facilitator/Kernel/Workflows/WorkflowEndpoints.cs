@@ -60,6 +60,29 @@ public static class WorkflowEndpoints
             return Results.Ok(new { eventTypes, commands, capabilities, callable, teams });
         });
 
+        // The editor's grammar, straight from the 422 authority: the same
+        // embedded resources the validator compiles, served verbatim so the
+        // browser-side completion/lint can never drift from what POST
+        // /definitions/validate will actually accept.
+        group.MapGet("/schema", static () =>
+        {
+            var assembly = typeof(Ofac.Protocol.Validation.EnvelopeValidator).Assembly;
+            JsonNode Load(string name)
+            {
+                using var stream = assembly.GetManifestResourceStream(name)
+                    ?? throw new InvalidOperationException($"embedded schema {name} missing");
+                using var reader = new StreamReader(stream, Encoding.UTF8);
+                return JsonNode.Parse(reader.ReadToEnd())
+                    ?? throw new InvalidOperationException($"embedded schema {name} unparseable");
+            }
+
+            return Results.Ok(new
+            {
+                definition = Load("workflow-definition.v1.json"),
+                common = Load("common.v1.json"),
+            });
+        });
+
         group.MapGet("/definitions/export", async (WorkflowDefinitionStore store, CancellationToken ct) =>
         {
             var rows = await store.AllVersionsAsync(ct);

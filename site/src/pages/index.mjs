@@ -27,6 +27,24 @@ function head(base, notFound) {
 <meta name="description" content="Open-source orchestration for teams of humans and AI agents: a durable coordination kernel your teams connect to over outbound links. Approvals, evidence, artifacts — survive every crash.">
 <link rel="icon" href="${P("favicon.svg")}" type="image/svg+xml">
 <link rel="stylesheet" href="${P("styles.css")}">
+<script>
+  // Same law as the console: light default, OS dark until the toggle
+  // overrides, persisted per browser under the shared key.
+  (function () {
+    try {
+      var s = localStorage.getItem("ofac-ui-theme");
+      var v =
+        s === "light" || s === "dark"
+          ? s
+          : window.matchMedia("(prefers-color-scheme: dark)").matches
+            ? "dark"
+            : "light";
+      document.documentElement.dataset.theme = v;
+    } catch (e) {
+      /* private mode: light stands */
+    }
+  })();
+</script>
 </head>`;
 }
 
@@ -47,6 +65,9 @@ function header(base, notFound) {
       <input id="q" type="search" name="q" placeholder="Search…" aria-label="Search the documentation" autocomplete="off">
       <div class="search-pop" id="search-pop"></div>
     </form>
+    <button class="ghost icon-btn" id="theme-toggle" type="button" aria-label="Switch to dark theme">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+</button>
     <a class="ghost" rel="noopener" href="${repo.url}">GitHub</a>
   </nav>
 </header>`;

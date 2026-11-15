@@ -4,7 +4,7 @@
   import { go } from "../lib/route.svelte.js";
   import { ago, flowTone, stamp, TONE_CLASS } from "../lib/status.js";
   import type { WorkflowInstanceDetail, WorkflowStepLogRow } from "../lib/types.js";
-  import FlowGraph from "./FlowGraph.svelte";
+  import FlowCanvas from "./FlowCanvas.svelte";
   import ProblemNote from "./ProblemNote.svelte";
 
   // One instance as the vertical checklist it is: step-log rows oldest
@@ -111,8 +111,13 @@
 <section class="card" data-testid="flow-detail" aria-label="flow instance">
   <div class="mb-2 flex items-start justify-between gap-2">
     <div>
-      <button class="btn btn-ghost btn-xs mb-1" onclick={onclose}>← flows</button>
+      <button class="btn btn-ghost btn-xs mb-1" onclick={onclose}>← runs</button>
       {#if detail}
+        <a
+          class="mono ml-2 text-xs text-accent underline"
+          data-testid="detail-to-editor"
+          href={`#/flows/${detail.definitionId}`}>edit definition</a
+        >
         <h2 class="text-xl font-semibold">
           <span class="font-mono">{detail.definitionId}</span>@{detail.definitionVersion}
           <span class="badge {flowTone(detail.status)} ml-1">
@@ -169,7 +174,7 @@
             {#if i > 0} →{/if}
             <button
               class="mono text-accent underline"
-              onclick={() => go(`/flow/${a.instanceId}`)}>{a.definitionId}</button
+              onclick={() => go(`#/monitor/runs/${a.instanceId}`)}>{a.definitionId}</button
             >
           {/each}
         </p>
@@ -179,7 +184,7 @@
         <ul class="ml-4 list-disc">
           {#each detail.children as c (c.instanceId)}
             <li>
-              <button class="mono text-accent underline" onclick={() => go(`/flow/${c.instanceId}`)}
+              <button class="mono text-accent underline" onclick={() => go(`#/monitor/runs/${c.instanceId}`)}
                 >{c.definitionId}</button
               >
               <span class="badge {flowTone(c.status)} ml-1">{c.status}</span>
@@ -192,7 +197,7 @@
 
   {#if definitionDoc}
     <div class="mb-4">
-      <FlowGraph
+      <FlowCanvas
         doc={definitionDoc}
         log={log?.map((l) => ({ stepId: l.stepId, status: l.status, output: l.output })) ?? null}
         selected={picked}

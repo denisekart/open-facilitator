@@ -214,11 +214,29 @@ export function renderArchitecture() {
     `</svg>`;
 
   const payload = JSON.stringify({
+    canvas,
+    zones: zones.map((z) => ({
+      id: z.id,
+      x: z.x,
+      y: z.y,
+      w: z.w,
+      h: z.h,
+      title: z.title,
+      tag: z.tag || "",
+      own: z.own,
+      dashed: z.dashed === true,
+      ghost: z.ghost === true,
+    })),
     nodes: nodes.map((n) => ({
       id: n.id,
       t: n.t,
       sub: n.sub || "",
       zone: n.zone,
+      x: n.x,
+      y: n.y,
+      w: n.w,
+      h: n.h,
+      ghost: n.ghost === true,
       what: n.what,
       bullets: n.bullets,
       docs: n.docs || null,
@@ -230,6 +248,9 @@ export function renderArchitecture() {
       to: e.to,
       kind: e.kind,
       label: e.label || "",
+      fs: e.fs || "right",
+      ts: e.ts || "left",
+      via: e.via || null,
     })),
     scenarios,
   }).replace(/</g, "\\u003c");

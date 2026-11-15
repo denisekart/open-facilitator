@@ -1,6 +1,7 @@
 <script lang="ts">
   import { ApiError, getJson } from "../lib/api.js";
   import { apiFetch } from "../lib/auth.svelte.js";
+  import { deckChanged } from "../lib/deck.svelte.js";
   import { ago, stateTone, stamp, TONE_CLASS } from "../lib/status.js";
   import { go, href, parse, route } from "../lib/route.svelte.js";
   import type { AdminAuditRow } from "../lib/types.js";
@@ -50,6 +51,8 @@
     action = wanted.get("action") ?? "";
     correlation = wanted.get("correlation") ?? "";
     trace = wanted.get("traceId") ?? "";
+    // Deck law: after the AiDeck executes a change, re-read the trail.
+    void deckChanged();
     void load();
   });
 
@@ -75,7 +78,7 @@
     if (since) {
       params.set("since", since);
     }
-    go(href(parse(`#/audit?${params.toString()}`)));
+    go(href(parse(`#/monitor/audit?${params.toString()}`)));
   }
 </script>
 
@@ -170,7 +173,7 @@
                 class="text-accent underline"
                 title="every row carrying this correlation"
                 data-testid={`audit-correlation-${short}`}
-                href={`#/audit?correlation=${row.correlationId}`}
+                href={`#/monitor/audit?correlation=${row.correlationId}`}
                 >{row.correlationId.slice(0, 8)}</a
               >
             {:else}
@@ -190,7 +193,7 @@
                 class="ml-1 text-accent underline"
                 title="filter to this trace"
                 data-testid={`audit-trace-${short}`}
-                href={`#/audit?traceId=${row.traceId}`}
+                href={`#/monitor/audit?traceId=${row.traceId}`}
                 >trace</a
               >
             {:else}

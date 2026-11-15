@@ -613,8 +613,8 @@ export const scenarios = [
       {
         caption:
           "Anyone opens a Work: one idempotent POST from an API client, a console action, or a chat message. Nothing executes yet — the kernel only records.",
-        nodes: ["cli", "console", "chatdec", "ingress", "apisrv"],
-        edges: ["e-cli", "e-con"],
+        nodes: ["cli", "console", "chatdec", "chat", "chatplat", "ingress", "apisrv"],
+        edges: ["e-cli", "e-con", "e-chat-plat", "e-chat-dec"],
       },
       {
         caption:
@@ -638,12 +638,12 @@ export const scenarios = [
         caption:
           "The agent proposes a privileged write (push, merge, release). The forge connector performs it only after a human approves — the same gate a person would pass through, with an identity attached.",
         nodes: ["h1", "gw", "forge", "forgeplat"],
-        edges: ["e-gw-forge", "e-forge-plat"],
+        edges: ["e-gw-h1", "e-gw-forge", "e-forge-plat"],
       },
       {
         caption:
           "The human answers from chat: approve, deny, or steer. Their identity is a real login mapped from your OIDC provider, and the decision lands on the Work's timeline.",
-        nodes: ["chat", "chatplat", "chatdec"],
+        nodes: ["gw", "chat", "chatplat", "chatdec"],
         edges: ["e-chat-plat", "e-chat-dec", "e-gw-chat"],
       },
       {
@@ -663,7 +663,7 @@ export const scenarios = [
       {
         caption:
           "Human plane: console and API calls carry an OIDC bearer from your login provider. The kernel maps claims, stores no passwords, and every action is attributed.",
-        nodes: ["console", "cli", "apisrv", "oidc"],
+        nodes: ["console", "cli", "apisrv", "ingress", "oidc"],
         edges: ["e-con", "e-cli", "e-oidc"],
       },
       {
@@ -707,8 +707,8 @@ export const scenarios = [
       {
         caption:
           "Operators see the waiting state with an explicit reason — no silent black hole. The same view your agents read over the API.",
-        nodes: ["console", "apisrv", "coord"],
-        edges: ["e-con"],
+        nodes: ["console", "apisrv", "coord", "pg"],
+        edges: ["e-con", "e-coord-pg"],
       },
       {
         caption:

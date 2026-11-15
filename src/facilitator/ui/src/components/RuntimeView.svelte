@@ -1,6 +1,7 @@
 <script lang="ts">
   import { ApiError, getJson, toApiError } from "../lib/api.js";
   import { apiFetch, session } from "../lib/auth.svelte.js";
+  import { deckChanged } from "../lib/deck.svelte.js";
   import { ago, stateLabel, stateTone, stamp, TONE_CLASS } from "../lib/status.js";
   import type { AdminProvisioningRow, AdminReplicasView } from "../lib/types.js";
   import ProblemNote from "./ProblemNote.svelte";
@@ -34,6 +35,9 @@
   }
 
   $effect(() => {
+    // Deck law: after the AiDeck executes a change, this screen re-loads
+    // its slice — the operator sees the effect without touching refresh.
+    void deckChanged();
     void load();
   });
 

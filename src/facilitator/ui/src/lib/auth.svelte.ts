@@ -94,17 +94,30 @@ export class AuthSession {
         automaticSilentRenew: false,
       });
       if (new URLSearchParams(window.location.search).has("code")) {
-        this.user = await this.#manager.signinRedirectCallback();
-        // login() round-tripped the hash route through the OIDC state param —
-        // restore it instead of flattening every deep link to /.
-        const restored = this.user.state;
-        window.history.replaceState(
-          {},
-          "",
-          typeof restored === "string" && restored.startsWith("#/") ? restored : "/",
-        );
-        // replaceState fires no hashchange: tell the store where we landed.
-        route.route = parse(window.location.hash);
+        try {
+          this.user = await this.#manager.signinRedirectCallback();
+        } catch {
+          // A spent auth code replayed by a reload (the callback URL was
+          // pasted, bookmarked, or refreshed): the session, if any, is
+          // already stored — strip the wire params and boot normally
+          // rather than breaking the whole console.
+          window.history.replaceState({}, "", window.location.pathname + window.location.hash);
+          this.user = await this.#manager.getUser();
+        }
+        if (this.user) {
+          // login() round-tripped the hash route through the OIDC state
+          // param — restore it instead of flattening every deep link to /.
+          // The pathname is mandatory here: a hash-only URL would keep the
+          // ?code= query, and the next reload would re-enter the callback.
+          const restored = this.user.state;
+          const target =
+            typeof restored === "string" && restored.startsWith("#/")
+              ? window.location.pathname + restored
+              : window.location.pathname;
+          window.history.replaceState({}, "", target);
+          // replaceState fires no hashchange: tell the store where we landed.
+          route.route = parse(window.location.hash);
+        }
       } else {
         this.user = await this.#manager.getUser();
       }

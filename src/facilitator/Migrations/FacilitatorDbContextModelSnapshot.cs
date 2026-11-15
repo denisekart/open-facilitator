@@ -336,6 +336,11 @@ namespace Facilitator.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("expires_at");
 
+                    b.Property<string>("Kind")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("kind");
+
                     b.Property<string>("MediaType")
                         .IsRequired()
                         .HasColumnType("text")
@@ -406,7 +411,7 @@ namespace Facilitator.Migrations
 
                     b.ToTable("artifacts", "facilitator", t =>
                         {
-                            t.HasCheckConstraint("artifacts_origin_check", "origin IN ('link', 'rest', 'external')");
+                            t.HasCheckConstraint("artifacts_origin_check", "origin IN ('link', 'rest', 'external', 'kernel')");
 
                             t.HasCheckConstraint("artifacts_state_check", "state IN ('pending', 'stored', 'rejected', 'deleted')");
 

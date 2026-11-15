@@ -47,6 +47,15 @@ function delivery(
 const silentApi = (prs: number[]): GitHubApi =>
   ({
     prsForHeadSha: async () => prs,
+    uploadIssueImage: async () => {
+      throw new Error("unused");
+    },
+    downloadAsset: async () => {
+      throw new Error("unused");
+    },
+    listIssueComments: async () => {
+      throw new Error("unused");
+    },
   }) as unknown as GitHubApi;
 
 function normalizer(api: GitHubApi | undefined = silentApi([])) {

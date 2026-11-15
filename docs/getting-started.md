@@ -147,10 +147,13 @@ inspector. Trace the acceptance-run Work without psql:
    offline — the DB lease is the sole authority) + trust tier.
    **Deliveries**: filter poisoned rows and replay a dead-letter once —
    the second replay reports the ledger's `already replayed`.
-   **Config**: the five stored-intent resources (e.g. `nudge-policy`) edit
-   via versioned PATCH (`If-Match`); a concurrent writer's 409 reloads and
-   names the other author + reason. Writes are audited intent — a feature
-   reads a value through only when it opts in.
+   **Config**: the stored-intent resources (e.g. `nudge-policy`,
+   `media-policy`) edit via versioned PATCH (`If-Match`); a concurrent
+   writer's 409 reloads and names the other author + reason. Writes are
+   audited intent — a feature reads a value through only when it opts in.
+   `media-policy` is the media plane's federation law: per-item/count
+   defaults, per-kind retention days, and per-team allow/forbid lists plus
+   the history-forwarding switches (an absent row = the defaults above).
 
 The browser tier runs in CI as the `admin-e2e` job
 (`make admin-e2e` locally; chromium downloads on first run).

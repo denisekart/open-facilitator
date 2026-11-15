@@ -36,11 +36,11 @@ All payload schemas live in `protocol/json-schema/`; `$id` = `https://schemas.op
 |`org.facilitator.command.work.cancel.v1`|command|`command.work.cancel.v1.json`|common five + `assignmentId`, `reason`|
 |`org.facilitator.command.work.status.request.v1`|command|`command.work.status.request.v1.json`|common five + `assignmentId`|
 |`org.facilitator.command.work.nudge.v1`|command|`command.work.nudge.v1.json`|common five + `assignmentId`|
-|`org.facilitator.command.context.fetch.v1`|command|`command.context.fetch.v1.json`|common five + `contextRefs`|
+|`org.facilitator.command.context.fetch.v1`|command|`command.context.fetch.v1.json`|common five + `contextRefs` (`thread://`, `memory://`, `artifact://` URIs, 1..32). The kernel answers every resolvable item INLINE on the admission ack `data` (`{fetchId, items:[{uri, content, truncated}], pending:[…]}`) — a fetch is a read, the ack carries it; unresolved `thread://<provider>/…` legs come back `pending` and route onward to the source adapter as the same command class (`commandId` `context-fetch:<fetchId>`, ledger-idempotent), answered asynchronously by `event.context.fetched.v1`|
 |`org.facilitator.command.approval.respond.v1`|command|`command.approval.respond.v1.json`|`commandId`, `approvalId`, `decision`, `actorEvidenceRef` (the approval record owns routing and expiry, so no `targetId`/`deadline`)|
 |`org.facilitator.command.approval.consume.v1`|command|`command.approval.consume.v1.json`|`commandId`, `approvalId`, `actorEvidenceRef` (the recording Gateway's own `workload:` ref; the approval row owns routing, so no `workId`)|
 |`org.facilitator.command.assignment.input.v1`|command|`command.assignment.input.v1.json`|`commandId`, `requestId` (the `input.required` request it answers), `answer` (≤16384), `actorEvidenceRef`. Routes to the Gateway bound to the assignment, which delivers a `respond` child message to the live run; the kernel moves the assignment `input_required → running`|
-|`org.facilitator.command.artifact.request_upload.v1`|command|`command.artifact.request_upload.v1.json`|`commandId`, `mediaType`, `size`, `digest`, `actorEvidenceRef` (+ optional `workId`, `assignmentId`, `retentionPolicy` — `"permanent"` \| `"archive"` \| `Nd` (`^[1-9][0-9]{0,3}d$`; absent = `permanent`), `comment` ≤1024; `digest` = `^sha256:[0-9a-f]{64}$` — lowercase hex is a schema pattern, uppercase is a `schema-violation`)|
+|`org.facilitator.command.artifact.request_upload.v1`|command|`command.artifact.request_upload.v1.json`|`commandId`, `mediaType`, `size`, `digest`, `actorEvidenceRef` (+ optional `workId`, `assignmentId`, `retentionPolicy` — `"permanent"` \| `"archive"` \| `Nd` (`^[1-9][0-9]{0,3}d$`; absent = `permanent`, except a declared `kind` listed in the `media-policy` admin resource's `defaults.retentionDays`, whose `Nd` then applies), `comment` ≤1024, `kind` (≤64, the same open taxonomy label as `artifactRef.kind` — opaque to the kernel, persisted, echoed by readers); `digest` = `^sha256:[0-9a-f]{64}$` — lowercase hex is a schema pattern, uppercase is a `schema-violation`)|
 |`org.facilitator.command.artifact.confirm_upload.v1`|command|`command.artifact.confirm_upload.v1.json`|`commandId`, `artifactId` (the ticket's kernel GUID; Link-plane only, the link principal is the actor proof — no `actorEvidenceRef`) + optional `comment` ≤1024. Settles a direct-to-store upload: the kernel HEADs + re-hashes the declared key|
 |`org.facilitator.command.memory.retain.v1`|command|`command.memory.retain.v1.json`|`commandId`, `actorEvidenceRef`, `scopeSelector`, `type` (`observed_fact|experience|decision|lesson_candidate|lesson_verified|hypothesis|preference`), `content` (≤16384), `provenance` (`{source, evidenceRef, createdBy, createdAt, workId?}`) + optional `mediaType`, `contentSummary`, `policyLabel`, `classification`, `observedAt`. Receipt `{entryId, status, duplicate}` rides the ack `data`; a workload retain lands `candidate`|
 |`org.facilitator.command.memory.recall.v1`|command|`command.memory.recall.v1.json`|`commandId`, `actorEvidenceRef`, `query` (≤1024), `purpose` (`assignment.context|requirements.clarification|report.synthesis`) + optional `workId`, `scopeSelectors` (≤8), `maxItems` (1–20, default 8), `maxTokens` (≥256), `includeSuperseded`. The recall response `{requestId, providerProfile, entries, truncated, asOf}` rides the ack `data`; a duplicate `commandId` honestly re-runs the read|
@@ -55,6 +55,7 @@ All payload schemas live in `protocol/json-schema/`; `$id` = `https://schemas.op
 |`org.facilitator.event.approval.required.v1`|event|`event.approval.required.v1.json`|`approvalId`, `actionDigest`, `eligibleActors`, `nonce`, `expiresAt`, `createdAt`; optional 1.1: `action` (the exact payload `actionDigest` covers — the kernel re-digests it), `workId` (the Work the approval belongs to, when one exists)|
 |`org.facilitator.event.approval.revoked.v1`|event|`event.approval.revoked.v1.json`|`approvalId`, `revokedBy`, `reason`|
 |`org.facilitator.event.approval.decided.v1`|event|`event.approval.decided.v1.json`|`approvalId`, `decision` (`approved|denied|expired|revoked`), `decidedBy` (canonical actor, `""` for lazy expiry), `evidenceRef` (`kernel:` receipt on approve, else `""`), `expiresAt`, `createdAt` (binds the push to the exact digest record); optional `workId`. Kernel→Gateway decided-push on the recorder's `link.<endpointId>` channel|
+|`org.facilitator.event.context.fetched.v1`|event|`event.context.fetched.v1.json`|`fetchId`, `workId`, `responder`, `items` (1..32 of `{uri, content, truncated}`, closed) + optional `deadline`, `note` (≤512). A source adapter's asynchronous answer to a routed `command.context.fetch.v1`: the kernel stores the item set as a `context.history` artifact (retention per policy, default 1d), records the answer verbatim on the audit leg, and wakes any routing intent parked on the fetch|
 |`org.facilitator.event.memory.used.v1`|event|`event.memory.used.v1.json`|`memoryId`, `consumer`, `justification`. An external read-then-decide attestation: records the same `memory_usage` row an in-kernel recall writes when the consumer's team may read the entry; otherwise audited deny + swallow (append-only usage law — the event never refuses)|
 |`org.facilitator.event.provider.message.v1`|event|`event.provider.message.v1.json`|`reference` (`conversationReference`), `provider` (provider token, MUST equal `reference.provider`), `providerDeliveryId`, `actorProviderAccountId`, `text` (1..8192) + optional `payload` (verbatim provider body, open). Chat-domain family: a plain message a chat adapter deemed worth relaying|
 |`org.facilitator.event.provider.mention.v1`|event|`event.provider.mention.v1.json`|same as `message.v1`. Chat-domain family: an @-mention of the bot identity — the kernel's identity-gated Work-creation arm|
@@ -83,7 +84,7 @@ Supporting schemas, referenced by the types above and by the HTTP surface:
 |`receipt.v1.json`|Delivery receipt for commands and events|
 |`control.v1.json`|Handshake and session frames: `hello`, `welcome`, `heartbeat`, `flow_control`, `goodbye`|
 |`result-manifest.v1.json`|`manifestId`, `outputs` (`artifactRef` items, widened additively: optional `kind`/`classification` producer taxonomy labels, opaque to the kernel); optional declared vocabulary `workId`/`assignmentId`/`capability`/`summary`/`structuredResult`/`externalRefs`/`sourceRefs`/`notes`/`createdAt`/`revisionOf`; open model (`additionalProperties: true`) so future producers extend it additively|
-|`capability-manifest.v1.json`|Advertised capabilities (`apiVersion` `facilitator.framework/v1`), closed model; served by `GET /api/link/v1/capabilities`|
+|`capability-manifest.v1.json`|Advertised capabilities (`apiVersion` `facilitator.framework/v1`), closed model; served by `GET /api/link/v1/capabilities`. A descriptor may declare an optional `media` facet (`directions` `in|out`, MIME-glob `kinds`, `maxCount` ≤ the wire ceiling 8, `maxBytesPerItem`, `semantics.caption|attachmentUpload`): the kernel's outbound selection law reads it before attaching anything to a `communication.*` command — an absent facet is an honest text-only declaration, a facet may only narrow the wire law|
 |`common.v1.json`|Shared `$defs` (`artifactRef`, `deliverable`, `evidenceRef`, `idToken`, `rfc3339DateTime`); no root validation|
 
 Events carry identity in the envelope (`source` + `id` + `time`), so their `data` payloads do not repeat it.
@@ -380,6 +381,42 @@ The kernel is the durable artifact authority: the `facilitator.artifacts` metada
 Reading: `GET /api/artifacts/{id}` (metadata) and `GET /api/artifacts/{id}/content` — object-store adapters answer `302` to a presigned GET (same 15-min TTL law; the redirect carries a `response-content-type` override so the row's media type survives a producer that PUT without one), the filesystem adapter streams with the row's media type + digest `ETag`; gated `artifacts.read` + team-scoped in the ledger — foreign-team and missing answer the same 404 (non-disclosure, the approvals precedent). Port note: an `IArtifactStore.List` method is deliberately absent in the reference implementation — listing queries ride the metadata ledger (a second FS-walk source of truth would duplicate the DB).
 
 Config: `Storage:Provider` (`filesystem` | `s3`; s3 requires `Storage:S3:{Endpoint,Bucket,Region,AccessKey,SecretKey}`, fail-closed at startup) + `Storage:FileSystem:RootPath`; a stored row's scheme decides every later read/confirm/GC action — provider switch mid-life leaves foreign-scheme rows readable-but-inert. Artifact timeline kinds (`artifact.stored`, `artifact.registered`, `artifact.available`, `artifact.gc`) are legal `work_events.kind` values; the gate roles include `team-member` (any `/groups` claim), which is what lets a foreign-team human reach the ledger's 404 instead of the gate's 403 on reads.
+
+## Context plane
+
+Context refs are URIs a component asks the kernel to resolve — the same
+`contextRefs` vocabulary the assign envelope and the fetch command carry.
+Three classes, three laws:
+
+- `artifact://<work>/<assignment>/<guid>` — kernel-local. The answer is
+  metadata plus a brokered content URL, never bytes (envelope-bounded law);
+  the team scope of the stored row is the read guard, so a foreign-team ref
+  answers an honest error item, not another team's digest.
+- `memory://<selector>?q=…` — kernel-local, the recall path's team-scope law
+  verbatim: a selector naming a team outside the caller's answers an error
+  item.
+- `thread://<provider>/<channel>/<root>?limit=N` — NOT kernel-local: the
+  bodies live on the source platform. The command returns the leg as
+  `pending` and routes itself onward to that adapter, which answers
+  asynchronously with `event.context.fetched.v1`; the kernel stores the item
+  set as a `context.history` artifact and wakes whatever parked on it.
+  Budget law is central: ≤ 32 refs, ≤ 32 KB per item, truncation recorded as
+  `truncated: true` — never a silent cut, never a failed command.
+
+A dispatch may fold context before the assign: a provider rule (or a
+provider-level default) declares a `context` block — `envelope`, `history`,
+`media`, `work`, `timeline`, `memory`, `budget` rows, one source key each,
+validated fail-closed at config load. The kernel resolves the block at
+routing time and stores the result as a `context.dispatch.v1` document
+artifact (kind `context.dispatch`, retention from the `media-policy`
+resource, default 7d); the assign's `inputs.context` then carries
+`{artifactId, digest, document}`, so "what exactly did the harness see" is
+evidence — the digest is what the harness got, the artifact is the bytes, one
+audit row names both. Routes without a block get the envelope verbatim
+(parity law). An unanswered `thread://` leg parks the routing intent
+(`context-pending`, the dependency-gate posture) and requeues on the answer;
+a park past its deadline answers a `{error: "deadline"}` item instead of
+parking forever.
 
 ## Result manifests
 

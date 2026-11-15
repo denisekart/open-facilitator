@@ -22,6 +22,7 @@ import commandApprovalRespond from "../schemas/command.approval.respond.v1.json"
 import commandAssignmentInput from "../schemas/command.assignment.input.v1.json" with { type: "json" };
 import commandArtifactRequestUpload from "../schemas/command.artifact.request_upload.v1.json" with { type: "json" };
 import commandArtifactConfirmUpload from "../schemas/command.artifact.confirm_upload.v1.json" with { type: "json" };
+import eventContextFetched from "../schemas/event.context.fetched.v1.json" with { type: "json" };
 import commandMemoryRetain from "../schemas/command.memory.retain.v1.json" with { type: "json" };
 import commandMemoryRecall from "../schemas/command.memory.recall.v1.json" with { type: "json" };
 import commandCommunicationReply from "../schemas/command.communication.reply.v1.json" with { type: "json" };
@@ -100,6 +101,7 @@ const all: JsonSchema[] = [
   eventAssignmentFailed,
   eventWorkspaceHeartbeat,
   eventArtifactAvailable,
+  eventContextFetched,
   eventMemoryCandidate,
   eventApprovalDecided,
   eventApprovalRequired,

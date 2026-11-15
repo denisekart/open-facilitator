@@ -3,6 +3,8 @@
 //   comments — the idempotency law: a command's idempotencyKey
 //              maps to the provider comment it created; replay answers with
 //              the stored id without touching Forgejo.
+//   files    — the media dedupe ledger (attachment id → artifactId): an
+//              image edited into two comments costs one upload and one ref.
 import { chmodSync, existsSync } from "node:fs";
 import Database from "better-sqlite3";
 
@@ -14,6 +16,14 @@ CREATE TABLE IF NOT EXISTS comments (
   provider_object_id TEXT NOT NULL,
   repo          TEXT NOT NULL,
   number        TEXT NOT NULL,
+  created_at    INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS files (
+  file_unique_id TEXT PRIMARY KEY,
+  artifact_id   TEXT NOT NULL,
+  media_type    TEXT NOT NULL,
+  size          INTEGER NOT NULL,
+  digest        TEXT NOT NULL,
   created_at    INTEGER NOT NULL
 );
 `;
@@ -32,6 +42,23 @@ interface CommentRow {
   repo: string;
   number: string;
   created_at: number;
+}
+
+/** One row of the media dedupe ledger: the artifact an issue attachment became. */
+export interface FileLedgerEntry {
+  fileUniqueId: string;
+  artifactId: string;
+  mediaType: string;
+  size: number;
+  digest: string;
+}
+
+interface FileRow {
+  file_unique_id: string;
+  artifact_id: string;
+  media_type: string;
+  size: number;
+  digest: string;
 }
 
 export class AdapterState {
@@ -89,6 +116,42 @@ export class AdapterState {
         "INSERT OR IGNORE INTO comments (idempotency_key, provider_object_id, repo, number, created_at) VALUES (?, ?, ?, ?, ?)",
       )
       .run(entry.idempotencyKey, entry.providerObjectId, entry.repo, entry.number, entry.createdAt);
+  }
+
+  // ── media dedupe ledger ──────────────────────────────────────────────────
+
+  findFile(fileUniqueId: string): FileLedgerEntry | undefined {
+    const row = this.db
+      .prepare(
+        "SELECT file_unique_id, artifact_id, media_type, size, digest FROM files WHERE file_unique_id = ?",
+      )
+      .get(fileUniqueId) as FileRow | undefined;
+    return row === undefined
+      ? undefined
+      : {
+          fileUniqueId: row.file_unique_id,
+          artifactId: row.artifact_id,
+          mediaType: row.media_type,
+          size: row.size,
+          digest: row.digest,
+        };
+  }
+
+  /** Record BEFORE publish: a redelivered delivery converges without a
+   *  second upload. */
+  recordFile(entry: FileLedgerEntry): void {
+    this.db
+      .prepare(
+        "INSERT INTO files (file_unique_id, artifact_id, media_type, size, digest, created_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(file_unique_id) DO UPDATE SET artifact_id = excluded.artifact_id, media_type = excluded.media_type, size = excluded.size, digest = excluded.digest, created_at = excluded.created_at",
+      )
+      .run(
+        entry.fileUniqueId,
+        entry.artifactId,
+        entry.mediaType,
+        entry.size,
+        entry.digest,
+        Date.now(),
+      );
   }
 
   close(): void {

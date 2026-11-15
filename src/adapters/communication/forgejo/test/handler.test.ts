@@ -31,6 +31,26 @@ class FakeApi implements ForgejoApi {
     return { id: this.nextId++, html_url: `http://git.localhost/repos/${repo}/issues/${number}#c` };
   }
 
+  async createIssue(): Promise<number> {
+    throw new Error("unused");
+  }
+
+  async closeIssue(): Promise<void> {
+    /* unused */
+  }
+
+  async findIssueByMarker(): Promise<number | undefined> {
+    throw new Error("unused");
+  }
+
+  async mergePr(): Promise<boolean> {
+    throw new Error("unused");
+  }
+
+  async getPrState(): Promise<{ number: number; merged: boolean }> {
+    throw new Error("unused");
+  }
+
   async openPr(): Promise<ForgejoPullRequest> {
     throw new Error("unused");
   }
@@ -68,6 +88,18 @@ class FakeApi implements ForgejoApi {
   }
 
   async reviewPullRequest(): Promise<never> {
+    throw new Error("unused");
+  }
+
+  async uploadIssueAttachment(): Promise<never> {
+    throw new Error("unused");
+  }
+
+  async downloadAsset(): Promise<never> {
+    throw new Error("unused");
+  }
+
+  async listIssueComments(): Promise<never> {
     throw new Error("unused");
   }
 }
@@ -185,14 +217,22 @@ describe("forgejo handler", () => {
     }
   });
 
-  it("advertises the full communication command family", () => {
+  it("advertises the full communication command family plus the context-fetch arm", () => {
     const manifest = forgejoAdapterManifest("team-alpha");
     expect(manifest.capabilities.map((c) => c.id)).toEqual([
       CMD_REPLY,
       "org.facilitator.command.communication.react.v1",
       "org.facilitator.command.communication.update.v1",
       "org.facilitator.command.communication.acknowledge.v1",
+      "org.facilitator.command.context.fetch.v1",
     ]);
     expect(manifest.ownerTeam).toBe("team-alpha");
+    const context = manifest.capabilities.find(
+      (c) => c.id === "org.facilitator.command.context.fetch.v1",
+    );
+    expect(context?.execution).toBe("asynchronous");
+    expect(context?.inputSchema).toBe(
+      "https://schemas.openfacilitator.org/v1/command.context.fetch.v1.json",
+    );
   });
 });

@@ -97,6 +97,9 @@ export interface TelegramApi {
   downloadFile(filePath: string): Promise<Uint8Array>;
   /** Returns the created Message. */
   sendMessage(params: SendMessageParams): Promise<TgMessage>;
+  /** GET-equivalent `getChatHistory` (the Bot API's offset/limit window,
+   *  newest-first): what answers a routed `thread://` context fetch. */
+  getChatHistory(params: { chat_id: string | number; limit: number }): Promise<TgMessage[]>;
   sendPhoto(params: SendMediaParams): Promise<TgMessage>;
   sendDocument(params: SendMediaParams): Promise<TgMessage>;
   /** Settle a button press (the spinner law: an unanswered callback spins
@@ -197,6 +200,13 @@ export class TelegramClient implements TelegramApi {
 
   async getFile(fileId: string): Promise<TgFile> {
     return await this.call<TgFile>("getFile", { file_id: fileId });
+  }
+
+  async getChatHistory(params: { chat_id: string | number; limit: number }): Promise<TgMessage[]> {
+    return await this.call<TgMessage[]>("getChatHistory", {
+      chat_id: params.chat_id,
+      limit: params.limit,
+    });
   }
 
   async downloadFile(filePath: string): Promise<Uint8Array> {

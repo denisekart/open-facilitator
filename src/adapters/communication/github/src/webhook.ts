@@ -15,6 +15,7 @@ import {
 } from "@ofac/provider-core/node";
 import type { LinkLogger } from "@ofac/workspace-link";
 import type { GitHubApi } from "./github-client.js";
+import type { MediaPipeline } from "./media.js";
 import {
   normalizeCheckSuite,
   normalizeIssueComment,
@@ -35,11 +36,14 @@ export interface GitHubNormalizerDeps {
   /** Undefined when the adapter has no bot token: commit-status deliveries
    *  (the only I/O arm) then drop, everything else normalizes. */
   api: GitHubApi | undefined;
+  /** Undefined without a bot token (no media leg): markdown-hosted inbound
+   *  images are then noted nowhere and the events publish text-only. */
+  media?: MediaPipeline | undefined;
   logger: LinkLogger;
 }
 
 export function createGitHubNormalizer(deps: GitHubNormalizerDeps): WebhookNormalizer {
-  const { ctx, webhookSecret, api, logger } = deps;
+  const { ctx, webhookSecret, api, media, logger } = deps;
 
   return async (delivery: WebhookDelivery) => {
     const signature = delivery.headers["x-hub-signature-256"];
@@ -63,6 +67,19 @@ export function createGitHubNormalizer(deps: GitHubNormalizerDeps): WebhookNorma
     const eventKind = delivery.headers["x-github-event"];
     if (typeof deliveryId !== "string" || deliveryId === "" || typeof eventKind !== "string") {
       return { kind: "normalized", events: [] };
+    }
+
+    // The media-before-publish law: every uploads-host image of the delivered
+    // comment/issue/PR body is downloaded + ingested FIRST, so the normalized
+    // events carry their sourceRefs. The never-fail-the-event law: media
+    // errors are contained in the pipeline (logged skips).
+    if (media !== undefined) {
+      for (const key of ["comment", "issue", "review", "pull_request"]) {
+        const container = payload[key];
+        if (typeof container === "object" && container !== null && !Array.isArray(container)) {
+          await media.processContainer(container as Payload);
+        }
+      }
     }
 
     const events = await dispatch(payload, deliveryId, eventKind, ctx, api, logger);

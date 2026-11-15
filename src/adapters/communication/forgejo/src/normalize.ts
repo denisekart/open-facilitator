@@ -25,6 +25,7 @@
 // normalized fields (headRef/labels/commentId) ride so the kernel NEVER
 // digs vendor payload shapes.
 import type {
+  ArtifactRef,
   ConversationReference,
   ProviderChangeRequestEventV1Data,
   ProviderIssueEventV1Data,
@@ -64,6 +65,10 @@ export interface NormalizeContext {
   workLabels: ReadonlySet<string>;
   /** Exact-match echo identity (FORGEJO_BOT_USER). */
   botUser: string;
+  /** Artifact refs the media pipeline already uploaded for this provider
+   *  object id (comment/issue id). Optional: a no-token boot has no media
+   *  leg, and the wire's sourceRefs slot then simply stays empty. */
+  mediaArtifactsFor?(objectId: string): ArtifactRef[];
 }
 
 function repoOf(payload: Payload): string | undefined {
@@ -111,6 +116,7 @@ function mentionCompanion(
   text: string | undefined,
 ): NormalizedEvent[] {
   if (!mentionsBot(text, ctx.botUser)) return [];
+  const refs = ctx.mediaArtifactsFor?.(messageId ?? "") ?? [];
   const data: ProviderMentionEventV1Data = {
     reference: reference(ctx, repo, number, author, messageId),
     provider: "forgejo",
@@ -118,6 +124,7 @@ function mentionCompanion(
     actorProviderAccountId: author,
     text: (text ?? "").slice(0, 8192),
     payload,
+    ...(refs.length > 0 ? { sourceRefs: refs } : {}),
   };
   return [{ type: MENTION_EVENT_TYPE, data }];
 }

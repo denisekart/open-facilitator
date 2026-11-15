@@ -31,6 +31,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@ofac/adapter": "workspace:*",
     "@ofac/protocol": "workspace:*",
     "@ofac/provider-core": "workspace:*",
     "@ofac/workspace-link": "workspace:*",

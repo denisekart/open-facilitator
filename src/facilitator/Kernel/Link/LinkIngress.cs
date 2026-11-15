@@ -54,6 +54,7 @@ public sealed class LinkIngress(
     Facilitator.Kernel.Work.ResultIngress results,
     Facilitator.Kernel.Work.MemoryIngress memory,
     Facilitator.Kernel.Work.InteractionIngress interactions,
+    Facilitator.Kernel.Work.ContextIngress context,
     Facilitator.Kernel.Integrations.ProviderEventStore? providers = null,
     Facilitator.Kernel.Notifications.NotificationLedger? notifications = null)
 {
@@ -218,6 +219,22 @@ public sealed class LinkIngress(
                 return new LinkAdmission(null, "accepted", inboxId);
             }
 
+            if (screen.Type == Facilitator.Kernel.Work.ContextIngress.FetchedType)
+            {
+                // The context plane's asynchronous answer: store the item set
+                // as context.history, audit it verbatim, wake parked intents.
+                var arm = await context.HandleFetchedAsync(root, ct);
+                if (arm.Refused)
+                {
+                    await inbox.MarkProcessedAsync(inboxId, arm.Status, ct);
+                    return new LinkAdmission(arm.Problem, null, null);
+                }
+
+                await inbox.MarkProcessedAsync(inboxId, null, ct);
+                metrics.InboxProcessed();
+                return new LinkAdmission(null, "accepted", inboxId);
+            }
+
             if (screen.Type == Facilitator.Kernel.Work.ResultIngress.CompletedType
                 || screen.Type == Facilitator.Kernel.Work.ResultIngress.FailedType)
             {
@@ -358,6 +375,24 @@ public sealed class LinkIngress(
             await inbox.MarkProcessedAsync(inboxId, null, ct);
             metrics.InboxProcessed();
             return new LinkAdmission(null, "confirmed", inboxId);
+        }
+
+        if (screen.Type == Facilitator.Kernel.Work.ContextIngress.FetchType)
+        {
+            // The context plane's read: the kernel-local items answer INLINE
+            // on the ack (a fetch is a read, the ack carries it), and each
+            // unresolved thread:// leg routes to the source adapter's
+            // endpoint as a routed twin of this command.
+            var arm = await context.HandleFetchAsync(root, workload, ct);
+            if (arm.Refused)
+            {
+                await inbox.MarkProcessedAsync(inboxId, arm.Status, ct);
+                return new LinkAdmission(arm.Problem, null, null);
+            }
+
+            await inbox.MarkProcessedAsync(inboxId, null, ct);
+            metrics.InboxProcessed();
+            return new LinkAdmission(null, "accepted", inboxId, arm.Data);
         }
 
         if (screen.Type == Facilitator.Kernel.Work.MemoryIngress.RetainType

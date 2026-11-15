@@ -75,6 +75,45 @@ export interface RunContext {
    * Required by the kill rule — every adapter carries a kernel.
    */
   readonly kernel: { readonly baseUrl: string; readonly token: string };
+  /**
+   * The dispatch-time context document the kernel folded for this assign
+   * (`inputs.context.document`, schema `context.dispatch.v1`) — what the
+   * harness was given to see, resolved at routing time. Absent for routes
+   * without a context block (parity law: today's envelope, verbatim).
+   */
+  readonly context?: ContextDocument | undefined;
+  /**
+   * Synchronous context read: post `command.context.fetch.v1` and get the
+   * kernel-local items INLINE on the ack (memory:/artifact:// resolved;
+   * thread:// legs come back `pending` — the kernel routes them to the
+   * source adapter and the answer lands as `event.context.fetched.v1`).
+   */
+  fetchContext(uris: readonly string[]): Promise<ContextFetchAck>;
+}
+
+/** One answered context item (the inline ack shape of
+ *  `command.context.fetch.v1`): `content` is the resolved object (refs and
+ *  brokered URLs, never raw bytes), `truncated` says the budget trimmed it,
+ *  `pending` says a `thread://` leg still awaits the source adapter. */
+export interface ContextFetchItem {
+  readonly uri: string;
+  readonly content?: Record<string, unknown>;
+  readonly truncated?: boolean;
+  readonly pending?: boolean;
+}
+
+export interface ContextFetchAck {
+  readonly fetchId: string;
+  readonly items: ContextFetchItem[];
+}
+
+/** The folded dispatch-context document (the kernel's `context.dispatch.v1`). */
+export interface ContextDocument {
+  readonly schema: string;
+  readonly sources: readonly Record<string, unknown>[];
+  readonly digest?: string;
+  readonly truncated?: boolean;
+  readonly note?: string;
 }
 
 export type RunOutcome =

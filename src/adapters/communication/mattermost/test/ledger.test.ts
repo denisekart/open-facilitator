@@ -39,7 +39,14 @@ function fakeApi(): FakeApi {
     },
     botChannels: async () => [],
     channelPosts: async () => [],
+    getPostThread: async () => ({ order: [], posts: {} }),
     missedEvents: async () => [] as WsEvent[],
+    createPostWithFiles: async () => {
+      calls.createPost += 1;
+      return `made-post-${n++}`;
+    },
+    uploadFile: async () => ({ id: "file-unused" }),
+    downloadFile: async () => new Uint8Array(),
     editPost: async () => {
       calls.editPost += 1;
     },

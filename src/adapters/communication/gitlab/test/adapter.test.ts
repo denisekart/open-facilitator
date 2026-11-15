@@ -94,6 +94,10 @@ class FakeApi implements GitLabApi {
   openMrsForSha = async () => this.mrForSha;
   findNoteByMarker = async () => undefined;
   getIssue = async () => ({ iid: 1, state: "opened", title: "" });
+  createIssue = async () => 1;
+  closeIssue = async () => undefined;
+  findIssueByMarker = async () => undefined;
+  mergeMr = async () => true;
   addLabels = async () => undefined;
   getMergeRequest = async () => ({
     iid: 1,
@@ -108,6 +112,29 @@ class FakeApi implements GitLabApi {
   reviewMergeRequest = async () => ({ id: 1 });
   replyDiscussion = async () => "1";
   resolveDiscussion = async () => undefined;
+  uploads: { repo: string; filename: string; bytes: number; mediaType: string }[] = [];
+  uploadFails = false;
+  uploadProjectFile = async (
+    repo: string,
+    filename: string,
+    bytes: Uint8Array,
+    mediaType: string,
+  ) => {
+    if (this.uploadFails) throw new GitLabError("uploadProjectFile", 500, "boom");
+    this.uploads.push({ repo, filename, bytes: bytes.byteLength, mediaType });
+    const secret = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    return {
+      alt: filename,
+      url: `/uploads/${secret}/${filename}`,
+      markdown: `![${filename}](/uploads/${secret}/${filename})`,
+    };
+  };
+  downloads: string[] = [];
+  downloadAsset = async (url: string) => {
+    this.downloads.push(url);
+    return new Uint8Array(0);
+  };
+  listIssueNotes = async () => [];
 }
 
 function delivery(body: string, headers: Record<string, string>): WebhookDelivery {
@@ -415,7 +442,12 @@ describe("reply handler + comment ledger", () => {
   it("posts an issue note; replay answers accepted with zero new posts", async () => {
     const api = new FakeApi();
     const state = new AdapterState(join(dir, "ledger-1.sqlite3"));
-    const handler = createGitLabHandler({ api, state, logger: silent });
+    const handler = createGitLabHandler({
+      api,
+      state,
+      providerInstanceId: "local-gitlab",
+      logger: silent,
+    });
     expect(await handler.onCommand(reply("k1"), ctx)).toEqual({ kind: "accepted" });
     expect(api.issueNotes).toHaveLength(1);
     expect(await handler.onCommand(reply("k1"), ctx)).toEqual({ kind: "accepted" });
@@ -427,7 +459,12 @@ describe("reply handler + comment ledger", () => {
     const api = new FakeApi();
     api.failIssueNotes = true;
     const state = new AdapterState(join(dir, "ledger-2.sqlite3"));
-    const handler = createGitLabHandler({ api, state, logger: silent });
+    const handler = createGitLabHandler({
+      api,
+      state,
+      providerInstanceId: "local-gitlab",
+      logger: silent,
+    });
     expect(await handler.onCommand(reply("k2", true), ctx)).toEqual({ kind: "accepted" });
     expect(api.mrNotes).toHaveLength(1);
     state.close();
@@ -435,7 +472,12 @@ describe("reply handler + comment ledger", () => {
 
   it("no bot token answers unsupported", async () => {
     const state = new AdapterState(join(dir, "ledger-3.sqlite3"));
-    const handler = createGitLabHandler({ api: undefined, state, logger: silent });
+    const handler = createGitLabHandler({
+      api: undefined,
+      state,
+      providerInstanceId: "local-gitlab",
+      logger: silent,
+    });
     expect(await handler.onCommand(reply("k3"), ctx)).toEqual({
       kind: "unsupported",
       reason: "no-bot-token",

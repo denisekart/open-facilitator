@@ -45,6 +45,14 @@ export interface AdapterConfig {
   botUser: string;
   /** SQLite state file: comment ledger (idempotency law). */
   statePath: string;
+  /** Inbound media size cap (the shared media law skips — never fails —
+   *  anything bigger): 5242880 = the 5 MB the capability facet declares
+   *  (GitHub's own issue-image upload cap). */
+  mediaMaxBytes: number;
+  /** Inbound media pipeline switch: false ⇒ markdown-hosted images are noted
+   *  and skipped (fail-closed per the config law: an unparseable value
+   *  names its key, it never silently enables the leg). */
+  mediaEnabled: boolean;
   /** GET /healthz listen port (the webhook edge lives on the kernel sink). */
   port: number;
   logLevel: "debug" | "info" | "warn" | "error";
@@ -105,6 +113,31 @@ export function parseEnvConfig(env: Record<string, string | undefined>): Adapter
     throw new AdapterConfigError(portKey, `'${portRaw}' is not a port`);
   }
 
+  const mediaMaxRaw = env["GITHUB_MEDIA_MAX_BYTES"]?.trim();
+  let mediaMaxBytes = 5242880;
+  if (mediaMaxRaw !== undefined && mediaMaxRaw !== "") {
+    const size = Number(mediaMaxRaw);
+    if (!Number.isInteger(size) || size <= 0) {
+      throw new AdapterConfigError(
+        "GITHUB_MEDIA_MAX_BYTES",
+        `'${mediaMaxRaw}' is not a positive integer`,
+      );
+    }
+    mediaMaxBytes = size;
+  }
+
+  const mediaEnabledRaw = env["GITHUB_MEDIA_ENABLED"]?.trim();
+  let mediaEnabled = true;
+  if (mediaEnabledRaw !== undefined && mediaEnabledRaw !== "") {
+    if (mediaEnabledRaw !== "true" && mediaEnabledRaw !== "false") {
+      throw new AdapterConfigError(
+        "GITHUB_MEDIA_ENABLED",
+        `'${mediaEnabledRaw}' is not 'true' or 'false'`,
+      );
+    }
+    mediaEnabled = mediaEnabledRaw === "true";
+  }
+
   return {
     kernelUrl: required(env, "OFAC_KERNEL_URL"),
     enrollSecret: required(env, "OFAC_ENROLL_SECRET"),
@@ -120,6 +153,8 @@ export function parseEnvConfig(env: Record<string, string | undefined>): Adapter
       .filter((label) => label !== ""),
     botUser: required(env, "GITHUB_BOT_USER"),
     statePath: env["OFAC_STATE_PATH"] ?? "./ofac-github-adapter.sqlite3",
+    mediaMaxBytes,
+    mediaEnabled,
     port,
     logLevel: logLevel as AdapterConfig["logLevel"],
   };

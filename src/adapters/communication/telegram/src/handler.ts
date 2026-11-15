@@ -42,6 +42,7 @@ import {
   type LinkLogger,
 } from "@ofac/workspace-link";
 import { MESSAGE_EVENT } from "./normalize.js";
+import { CONTEXT_FETCH_COMMAND, answerContextFetch } from "./context.js";
 import { type ChatLedger } from "./chat-ledger.js";
 import {
   TgError,
@@ -109,20 +110,48 @@ const DOCUMENT_MAX_BYTES = 50 * 1024 * 1024;
 
 /** The capability manifest this adapter advertises (POST /api/link/v1/capabilities). */
 export function communicationManifest(team: string): CapabilityManifestV1 {
-  const descriptor = (id: string): CapabilityDescriptor => ({
+  const descriptor = (id: string, withMedia = false): CapabilityDescriptor => ({
     id,
     version: 1,
     execution: "synchronous",
     inputSchema: dataschemaFor(id),
+    // The declared media facet: the kernel's outbound selection law reads it
+    // before attaching anything. In: photos/videos/documents download into
+    // artifacts (media.ts); out: reply/post commands may carry
+    // data.artifacts, sent as photo+caption or a document (DOCUMENT_MAX_BYTES
+    // = 50 MB is the outbound size law). No facet descriptor ⇒ the honest
+    // text-only default for the other communication commands.
+    ...(withMedia
+      ? {
+          media: {
+            directions: ["in", "out"] as const,
+            kinds: ["image/*", "video/*", "application/pdf", "text/*", "application/*"],
+            maxCount: 8,
+            maxBytesPerItem: 52428800,
+            semantics: { caption: true, attachmentUpload: false },
+          },
+        }
+      : {}),
   });
-  // The tuple type demands a first element; the law is exactly these four.
+  // The law is exactly: the four communication descriptors (the two media
+  // ones carry the facet) plus the asynchronous context-fetch arm.
   return {
     apiVersion: "facilitator.framework/v1",
     kind: "CapabilityManifest",
     ownerTeam: team,
     capabilities: [
-      descriptor(CMD_REPLY),
-      ...COMMUNICATION_COMMANDS.filter((id) => id !== CMD_REPLY).map(descriptor),
+      descriptor(CMD_REPLY, true),
+      ...COMMUNICATION_COMMANDS.filter((id) => id !== CMD_REPLY).map((id) =>
+        descriptor(id, id === CMD_POST),
+      ),
+      // The context plane's read leg (plan 3.2): a routed thread:// fetch is
+      // answered asynchronously with event.context.fetched.v1.
+      {
+        id: CONTEXT_FETCH_COMMAND,
+        version: 1,
+        execution: "asynchronous",
+        inputSchema: dataschemaFor(CONTEXT_FETCH_COMMAND),
+      },
     ],
   };
 }
@@ -564,6 +593,8 @@ export function createAdapterHandler(deps: HandlerDeps): LinkHandler {
           void state.findCommand(data.idempotencyKey);
           return { kind: "accepted" };
         }
+        case CONTEXT_FETCH_COMMAND:
+          return await answerContextFetch(api, identity.providerInstanceId, cmd, ctx);
         default:
           return { kind: "unsupported" };
       }

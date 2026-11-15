@@ -1644,29 +1644,65 @@ public sealed class ProviderEventStore(
 
     internal static JsonObject ReplyEnvelope(
         ConversationTarget target, string text, string idempotencyKey, string subject, DateTime now,
-        IReadOnlyList<(string Label, string Value)>? buttons = null) =>
+        IReadOnlyList<(string Label, string Value)>? buttons = null, JsonArray? artifacts = null) =>
         CommunicationEnvelope("org.facilitator.command.communication.reply.v1", "command.communication.reply.v1.json", target, subject, now, idempotencyKey,
-            TextTail(text, buttons));
+            TextTail(text, buttons, artifacts));
 
     /// <summary>The B4 law: a top-level team notice is a POST (dm|channel
     /// target), not a reply wearing a thread costume. The rung kind decides.</summary>
     internal static JsonObject PostEnvelope(
         ConversationTarget target, string text, string idempotencyKey, string subject, DateTime now,
-        IReadOnlyList<(string Label, string Value)>? buttons = null) =>
+        IReadOnlyList<(string Label, string Value)>? buttons = null, JsonArray? artifacts = null) =>
         CommunicationEnvelope("org.facilitator.command.communication.post.v1", "command.communication.post.v1.json", target, subject, now, idempotencyKey,
-            TextTail(text, buttons));
+            TextTail(text, buttons, artifacts));
+
+    /// <summary>The emitter-side artifactRef law: the one builder that stamps
+    /// outbound <c>communication.*.artifacts</c> entries, so every hop writes
+    /// the seven required common.v1 fields the same way plus the taxonomy
+    /// <c>kind</c>. The wire <c>storageUrl</c> is the logical URI: an
+    /// externally registered row answers its registered URL, a kernel-stored
+    /// row the GUID-free <c>artifact://work/assignment/&lt;guid&gt;</c> law —
+    /// never the internal <c>kernel-fs:</c> path.</summary>
+    internal static JsonArray ArtifactRefs(IEnumerable<(ArtifactEntity Row, string Kind)> rows)
+    {
+        var array = new JsonArray();
+        foreach (var (row, kind) in rows)
+        {
+            var storageUrl = row.StorageUri.StartsWith("external:", StringComparison.Ordinal)
+                ? row.StorageUri["external:".Length..]
+                : $"artifact://{row.WorkId?.ToString("N") ?? "unbound"}/{row.AssignmentId?.ToString("N") ?? "unbound"}/{row.ArtifactId:N}";
+            array.Add((JsonNode)new JsonObject
+            {
+                ["artifactId"] = row.ArtifactId.ToString("N"),
+                ["mediaType"] = row.MediaType,
+                ["size"] = row.Size,
+                ["digest"] = row.Digest,
+                ["storageUrl"] = storageUrl,
+                ["createdBy"] = row.CreatedBy,
+                ["createdAt"] = row.CreatedAt.ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'", System.Globalization.CultureInfo.InvariantCulture),
+                ["kind"] = row.Kind is { Length: > 0 } declared ? declared : kind,
+            });
+        }
+
+        return array;
+    }
 
     /// <summary>The C7 buttons: each carries the EXACT text the surface
     /// re-submits as the pressing user's own message (a slash command rides
     /// the existing authority plane, so the press carries proven identity).
     /// A surface without buttons renders none — the text always stands alone.</summary>
-    internal static JsonObject TextTail(string text, IReadOnlyList<(string Label, string Value)>? buttons)
+    internal static JsonObject TextTail(string text, IReadOnlyList<(string Label, string Value)>? buttons, JsonArray? artifacts = null)
     {
         var tail = new JsonObject { ["text"] = text };
         if (buttons is { Count: > 0 })
         {
             tail["buttons"] = new JsonArray(
                 buttons.Select(b => (JsonNode)new JsonObject { ["label"] = b.Label, ["value"] = b.Value }).ToArray());
+        }
+
+        if (artifacts is { Count: > 0 })
+        {
+            tail["artifacts"] = artifacts;
         }
 
         return tail;

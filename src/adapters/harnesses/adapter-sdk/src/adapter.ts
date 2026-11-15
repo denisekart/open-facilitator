@@ -19,11 +19,13 @@ import type { ChildConnection, ChildReply, CommandFrame } from "@ofac/gateway";
 import type { EnvelopeCommand, EnvelopeEvent } from "@ofac/protocol";
 import { buildEvent, createConsoleLogger } from "@ofac/workspace-link";
 import type { LinkLogger } from "@ofac/workspace-link";
+import { fetchContext } from "./artifacts.js";
 import { ExecutionRegistry, type RegistryEntry } from "./registry.js";
 import { DARK_ADAPTER_TELEMETRY, type AdapterCounter, type AdapterTelemetry } from "./types.js";
 import type {
   AdapterHandle,
   AdapterStatus,
+  ContextDocument,
   CreateAdapterOptions,
   RunContext,
   RunOutcome,
@@ -71,6 +73,22 @@ function validateChildWorkspaceId(id: string): void {
 /** The abort rejection for a pending requestInput (AbortError by name). */
 function abortError(): Error {
   return Object.assign(new Error("The input request was aborted"), { name: "AbortError" });
+}
+
+/** The folded context document when the assign carries one
+ *  (`inputs.context.document`); absent for routes without a context
+ *  block — the parity law keeps such envelopes exactly as they were. */
+function contextDocumentOf(command: EnvelopeCommand): ContextDocument | undefined {
+  const data = command.data as Record<string, unknown>;
+  const inputs = data["inputs"];
+  if (typeof inputs !== "object" || inputs === null) return undefined;
+  const context = (inputs as Record<string, unknown>)["context"];
+  if (typeof context !== "object" || context === null) return undefined;
+  const document = (context as Record<string, unknown>)["document"];
+  if (typeof document !== "object" || document === null) return undefined;
+  const doc = document as Record<string, unknown>;
+  if (doc["schema"] !== "context.dispatch.v1" || !Array.isArray(doc["sources"])) return undefined;
+  return doc as unknown as ContextDocument;
 }
 
 /** 06's dedupe identity: the assign envelope's commandId (required by its schema). */
@@ -335,6 +353,16 @@ class Adapter implements AdapterHandle {
         baseUrl: this.opts.kernel.baseUrl,
         token: this.opts.kernel.token ?? this.childToken(),
       },
+      context: contextDocumentOf(command),
+      fetchContext: (uris) =>
+        fetchContext(
+          {
+            baseUrl: this.opts.kernel.baseUrl,
+            token: this.opts.kernel.token ?? this.childToken(),
+          },
+          uris,
+          { workId, targetId: String(data["targetId"] ?? "kernel") },
+        ),
       executionId: entry.executionId,
       executionGeneration,
       command,

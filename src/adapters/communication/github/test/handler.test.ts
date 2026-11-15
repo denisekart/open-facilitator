@@ -12,10 +12,12 @@ import {
   createGitHubHandler,
   githubAdapterManifest,
   CMD_ACK,
+  CMD_POST,
   CMD_REACT,
   CMD_REPLY,
   CMD_UPDATE,
 } from "../src/handler.js";
+import { CONTEXT_FETCH_COMMAND } from "../src/context.js";
 import { AdapterState } from "../src/comment-ledger.js";
 import type { GitHubApi } from "../src/github-client.js";
 
@@ -44,6 +46,15 @@ function fakeApi(posted: string[] = [], reactions: string[] = [], edits: string[
     updateComment: async (repo: string, commentId: number, body: string) => {
       edits.push(`${repo}/${String(commentId)}:${body}`);
     },
+    uploadIssueImage: async () => {
+      throw new Error("unused");
+    },
+    downloadAsset: async () => {
+      throw new Error("unused");
+    },
+    listIssueComments: async () => {
+      throw new Error("unused");
+    },
   } as unknown as GitHubApi;
 }
 
@@ -67,7 +78,7 @@ function reply(idempotencyKey: string): EnvelopeCommand {
 }
 
 describe("github handler", () => {
-  it("advertises the full communication command family", () => {
+  it("advertises the full communication command family + the context arm", () => {
     const manifest = githubAdapterManifest("team-alpha");
     expect(manifest.ownerTeam).toBe("team-alpha");
     expect(manifest.capabilities.map((c) => c.id)).toEqual([
@@ -75,7 +86,11 @@ describe("github handler", () => {
       CMD_REACT,
       CMD_UPDATE,
       CMD_ACK,
+      CMD_POST,
+      CONTEXT_FETCH_COMMAND,
     ]);
+    const context = manifest.capabilities.find((c) => c.id === CONTEXT_FETCH_COMMAND);
+    expect(context?.execution).toBe("asynchronous");
   });
 
   it("posts the comment and accepts", async () => {

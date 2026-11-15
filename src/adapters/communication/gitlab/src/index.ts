@@ -11,7 +11,9 @@
 // comment-ledger idempotency law. Stateless apart from the SQLite comment
 // ledger — deployable anywhere the kernel link plane is dialable.
 import { createServer, type Server } from "node:http";
+import { randomBytes } from "node:crypto";
 import type {
+  ArtifactRef,
   CapabilityDescriptor,
   CapabilityManifestV1,
   CommunicationAcknowledgeCommandV1Data,
@@ -19,12 +21,15 @@ import type {
   CommunicationReplyCommandV1Data,
   CommunicationUpdateCommandV1Data,
   EnvelopeCommand,
+  Media,
 } from "@ofac/protocol";
-import { dataschemaFor } from "@ofac/workspace-link";
+import { dataschemaFor, enroll } from "@ofac/workspace-link";
 import type { LinkClient, LinkHandler, LinkLogger, CommandOutcome } from "@ofac/workspace-link";
 import { deriveTenant, type AdapterConfig } from "./config.js";
 import { AdapterState } from "./comment-ledger.js";
 import { GitLabClient, type GitLabApi } from "./gitlab-client.js";
+import { MediaPipeline, fetchArtifactContent } from "./media.js";
+import { CONTEXT_FETCH_COMMAND, answerContextFetch } from "./context.js";
 import {
   normalizeIssueHook,
   normalizeMergeRequestHook,
@@ -57,14 +62,32 @@ export {
   type GitLabMergeRequest,
   type GitLabMergeRequestDetail,
   type GitLabNote,
+  type GitLabIssueNote,
+  type GitLabUpload,
 } from "./gitlab-client.js";
 export { AdapterState, type CommentLedgerEntry } from "./comment-ledger.js";
+export {
+  MediaPipeline,
+  fetchArtifactContent,
+  collectUploads,
+  uploadUniqueId,
+  type MediaPipelineDeps,
+  type GitLabFileRef,
+} from "./media.js";
+export {
+  CONTEXT_FETCH_COMMAND,
+  CONTEXT_FETCHED_EVENT,
+  HISTORY_MAX,
+  answerContextFetch,
+  parseThreadUri,
+} from "./context.js";
 export {
   CHANGE_REQUEST_EVENT,
   ISSUE_EVENT,
   MENTION_EVENT,
   PIPELINE_EVENT,
   REVIEW_EVENT,
+  collectUploadUrls,
   normalizeIssueHook,
   normalizeMergeRequestHook,
   normalizeNoteHook,
@@ -101,24 +124,57 @@ function isNotFound(error: unknown): boolean {
   );
 }
 
+/** The declared media facet (the reply leg's own local caps read the same
+ *  numbers): 10 items of at most 10 MiB, images/PDFs/text — GitLab's own
+ *  default instance limits. A GitLab note has no caption concept: the
+ *  attachment rides the note markdown (GitLab's own `markdown` line from the
+ *  uploads route). */
+export const MEDIA_FACET: Media = {
+  directions: ["in", "out"],
+  kinds: ["image/*", "application/pdf", "text/*"],
+  maxCount: 10,
+  maxBytesPerItem: 10485760,
+  semantics: { caption: false, attachmentUpload: true },
+};
+
+/** Outbound media download seam (media.ts fetchArtifactContent in
+ *  production; a fake in tests) — telegram's ArtifactSource law. */
+export interface ArtifactSource {
+  download(artifactId: string): Promise<Uint8Array>;
+}
+
 /** The capability manifest this adapter advertises (POST /api/link/v1/capabilities).
- *  The full communication command family (E3). */
+ *  The full communication command family (E3); the reply leg carries the
+ *  media facet (project uploads folded into the note markdown), the others
+ *  stay honestly text-only, and the context plane rides the asynchronous
+ *  fetch arm (thread://gitlab/<repo>/<iid> answered by the issue-notes API). */
 export function gitlabAdapterManifest(team: string): CapabilityManifestV1 {
-  const descriptor = (id: string): CapabilityDescriptor => ({
+  const descriptor = (id: string, withMedia = false): CapabilityDescriptor => ({
     id,
     version: 1,
     execution: "synchronous",
     inputSchema: dataschemaFor(id),
+    // Honest declaration: only the reply leg has the upload leg (an empty
+    // allow-list means text-only for the rest).
+    media: withMedia ? MEDIA_FACET : { directions: ["in", "out"], kinds: [] },
   });
   return {
     apiVersion: "facilitator.framework/v1",
     kind: "CapabilityManifest",
     ownerTeam: team,
     capabilities: [
-      descriptor(CMD_REPLY),
+      descriptor(CMD_REPLY, true),
       descriptor(CMD_REACT),
       descriptor(CMD_UPDATE),
       descriptor(CMD_ACK),
+      // The context plane's read leg (plan 3.2): a routed thread:// fetch is
+      // answered asynchronously with event.context.fetched.v1.
+      {
+        id: CONTEXT_FETCH_COMMAND,
+        version: 1,
+        execution: "asynchronous",
+        inputSchema: dataschemaFor(CONTEXT_FETCH_COMMAND),
+      },
     ],
   };
 }
@@ -133,11 +189,89 @@ function replyData(cmd: EnvelopeCommand): CommunicationReplyCommandV1Data | unde
   return data as unknown as CommunicationReplyCommandV1Data;
 }
 
+function fileNameFor(ref: ArtifactRef): string {
+  const ext =
+    ref.mediaType === "image/png"
+      ? ".png"
+      : ref.mediaType === "image/jpeg"
+        ? ".jpg"
+        : ref.mediaType === "image/gif"
+          ? ".gif"
+          : ref.mediaType === "image/webp"
+            ? ".webp"
+            : ref.mediaType === "application/pdf"
+              ? ".pdf"
+              : ref.mediaType.startsWith("text/")
+                ? ".txt"
+                : ".bin";
+  const tail = (ref.storageUrl.split("/").pop() ?? ref.artifactId).split("?")[0] ?? "attachment";
+  const base = tail.replace(/[^A-Za-z0-9._-]/g, "_").slice(0, 64) || "attachment";
+  return base.includes(".") ? base : base + ext;
+}
+
+/** The degrade law's answer (the kernel's mirror): a dropped artifact appends
+ *  a plain link line to the note text — never a silent loss, never a failed
+ *  reply. Both "no resolvable project+IID" and per-item download/upload
+ *  failures ride this single form. */
+function linkLines(artifacts: readonly ArtifactRef[], reason?: string): string {
+  const suffix = reason === undefined ? "" : ` (${reason})`;
+  return artifacts.map((ref) => `\n\nattachment available: ${ref.storageUrl}${suffix}`).join("");
+}
+
+/** The outbound media leg: every ref (up to the facet's maxCount, each under
+ *  maxBytesPerItem) downloads from the kernel and uploads into the project's
+ *  upload store, folded into the note body as GitLab's OWN `markdown` line —
+ *  GitLab's native note-media semantic. Anything the caps drop or that fails
+ *  degrades to a link line and NEVER fails the reply. */
+async function artifactsMarkdown(
+  api: GitLabApi,
+  logger: LinkLogger,
+  media: ArtifactSource,
+  repo: string,
+  artifacts: readonly ArtifactRef[],
+): Promise<string> {
+  const maxCount = MEDIA_FACET.maxCount ?? Number.POSITIVE_INFINITY;
+  const maxBytes = MEDIA_FACET.maxBytesPerItem ?? Number.POSITIVE_INFINITY;
+  let markdown = "";
+  for (const [index, ref] of artifacts.entries()) {
+    if (index >= maxCount) {
+      markdown += linkLines([ref], `over the ${String(maxCount)}-item cap`);
+      continue;
+    }
+    try {
+      const bytes = await media.download(ref.artifactId);
+      if (bytes.byteLength > maxBytes) {
+        markdown += linkLines([ref], "over the size cap");
+        continue;
+      }
+      const upload = await api.uploadProjectFile(repo, fileNameFor(ref), bytes, ref.mediaType);
+      if (upload.markdown === "") {
+        markdown += linkLines([ref]);
+        continue;
+      }
+      markdown += `\n\n${upload.markdown}`;
+    } catch (error) {
+      logger.warn("artifact upload failed: degrading to a link line", {
+        artifactId: ref.artifactId,
+        error: String(error),
+      });
+      markdown += linkLines([ref]);
+    }
+  }
+  return markdown;
+}
+
 export interface HandlerDeps {
   /** Undefined when the adapter has no bot token: replies then answer
    *  `unsupported` as a receipt instead of throwing. */
   api: GitLabApi | undefined;
   state: AdapterState;
+  /** The provider-instance identity the context plane answers under. */
+  providerInstanceId: string;
+  /** Outbound media source (reply-with-artifact path): undefined when the
+   *  adapter cannot reach the kernel content route; artifacts then degrade
+   *  to the link line, never fail the reply. */
+  media?: ArtifactSource | undefined;
   logger: LinkLogger;
 }
 
@@ -149,7 +283,15 @@ export interface HandlerDeps {
 export function createGitLabHandler(deps: HandlerDeps): LinkHandler {
   const { state, logger } = deps;
   return {
-    async onCommand(cmd: EnvelopeCommand): Promise<CommandOutcome> {
+    async onCommand(cmd: EnvelopeCommand, cmdCtx): Promise<CommandOutcome> {
+      if (cmd.type === CONTEXT_FETCH_COMMAND) {
+        // The context plane needs a provider read: no token ⇒ an honest
+        // unsupported receipt, never a throw.
+        if (deps.api === undefined) {
+          return { kind: "unsupported", reason: "no-bot-token" };
+        }
+        return await answerContextFetch(deps.api, deps.providerInstanceId, cmd, cmdCtx);
+      }
       if (cmd.type === CMD_REACT || cmd.type === CMD_UPDATE || cmd.type === CMD_ACK) {
         return await nonReplyCommand(deps, cmd);
       }
@@ -172,9 +314,24 @@ export function createGitLabHandler(deps: HandlerDeps): LinkHandler {
         return { kind: "rejected", reason: "target-missing-repo-or-issue" };
       }
 
+      // Outbound media: artifacts ride the note as project uploads folded in
+      // as GitLab's own markdown line. No resolvable project+IID, no content
+      // route, or a failed download/upload ⇒ degrade to a public link line
+      // appended to the text (the degrade line rides the echo).
+      const artifacts = data.artifacts ?? [];
+      const iid = Number(number);
+      const hasIssueContext = Number.isInteger(iid) && iid > 0;
+      let body = data.text;
+      if (artifacts.length > 0) {
+        body +=
+          hasIssueContext && deps.media !== undefined
+            ? await artifactsMarkdown(deps.api, logger, deps.media, repo, artifacts)
+            : linkLines(artifacts.slice(0, MEDIA_FACET.maxCount ?? artifacts.length));
+      }
+
       let note;
       try {
-        note = await deps.api.postIssueNote(repo, Number(number), data.text);
+        note = await deps.api.postIssueNote(repo, Number(number), body);
       } catch (error) {
         const notAnIssue =
           typeof error === "object" &&
@@ -182,7 +339,7 @@ export function createGitLabHandler(deps: HandlerDeps): LinkHandler {
           "status" in error &&
           (error as { status: unknown }).status === 404;
         if (!notAnIssue) throw error;
-        note = await deps.api.postMrNote(repo, Number(number), data.text);
+        note = await deps.api.postMrNote(repo, Number(number), body);
       }
 
       state.recordComment({
@@ -302,6 +459,9 @@ export interface GitLabNormalizerDeps {
    *  number needs the sha→MR lookup (the only I/O arm) then drop, everything
    *  else normalizes. */
   api: GitLabApi | undefined;
+  /** Undefined without a bot token (no media leg): inbound /uploads images
+   *  are then noted nowhere and the events publish text-only. */
+  media?: MediaPipeline | undefined;
   logger: LinkLogger;
 }
 
@@ -314,7 +474,7 @@ export interface GitLabNormalizerDeps {
  *  `X-Request-Id` (GitLab's per-delivery id) is the providerDeliveryId —
  *  passed through, never synthesized. */
 export function createGitLabNormalizer(deps: GitLabNormalizerDeps): WebhookNormalizer {
-  const { ctx, webhookToken, api, logger } = deps;
+  const { ctx, webhookToken, api, media, logger } = deps;
 
   return async (delivery: WebhookDelivery) => {
     if (!verifyTokenToken(delivery.headers["x-gitlab-token"], webhookToken)) {
@@ -337,6 +497,18 @@ export function createGitLabNormalizer(deps: GitLabNormalizerDeps): WebhookNorma
     const eventKind = delivery.headers["x-gitlab-event"];
     if (typeof deliveryId !== "string" || deliveryId === "" || typeof eventKind !== "string") {
       return { kind: "normalized", events: [] };
+    }
+
+    // The media-before-publish law: a GitLab payload has NO structured
+    // attachment list, so every /uploads image the note/issue/MR markdown
+    // carries is downloaded + ingested FIRST, so the normalized events carry
+    // their sourceRefs. The never-fail-the-event law: media errors are
+    // contained in the pipeline (logged skips).
+    if (media !== undefined) {
+      const container = payload["object_attributes"];
+      if (typeof container === "object" && container !== null && !Array.isArray(container)) {
+        await media.processContainer(container as Payload);
+      }
     }
 
     const events = await dispatch(payload, deliveryId, eventKind, ctx, api, logger);
@@ -411,11 +583,54 @@ export async function run(
       ? undefined
       : new GitLabClient(config.gitlabUrl, config.botToken, deps.fetchImpl));
   const state = new AdapterState(config.statePath);
+
+  // Our own link credential for the artifact client + content GETs (the
+  // telegram law): the adapter-face owns the CLIENT's token, so media rides
+  // an enrollment of its own (same secret/endpoint — the kernel issues
+  // per-enrollment tokens; 401 re-enrolls).
+  const linkToken = { value: "" };
+  const enrollSelf = async (): Promise<string> => {
+    const response = await enroll(
+      {
+        baseUrl: config.kernelUrl,
+        token: config.enrollSecret,
+        endpointId: config.endpointId,
+        instanceId: `gl-${randomBytes(6).toString("hex")}`,
+        trustMode: "isolated-executor",
+        role: "child",
+        team: config.team,
+      },
+      ...(deps.fetchImpl === undefined ? [] : [deps.fetchImpl]),
+    );
+    linkToken.value = response.linkToken ?? "";
+    return linkToken.value;
+  };
+  const token = async (): Promise<string> =>
+    linkToken.value === "" ? await enrollSelf() : linkToken.value;
+
+  // The media leg rides the bot token (the only GitLab identity) and the
+  // facet's own caps: no token ⇒ no media, text-only events as before.
+  const media =
+    api === undefined
+      ? undefined
+      : new MediaPipeline({
+          api,
+          state,
+          kernelUrl: config.kernelUrl,
+          token,
+          endpointId: config.endpointId,
+          maxBytes: config.mediaMaxBytes,
+          enabled: config.mediaEnabled,
+          logger,
+          ...(deps.fetchImpl === undefined ? {} : { fetchImpl: deps.fetchImpl }),
+        });
+
   const ctx: NormalizeContext = {
     providerInstanceId: config.providerInstanceId,
     tenantOrOrganizationId: tenant,
     workLabels: new Set(config.workLabels.map((label) => label.toLowerCase())),
     botUser: config.botUser,
+    mediaArtifactsFor: (objectId) => media?.artifactsFor(objectId) ?? [],
   };
 
   const handle = await runProviderAdapter(
@@ -430,9 +645,21 @@ export async function run(
         ctx,
         webhookToken: config.webhookToken,
         api,
+        ...(media === undefined ? {} : { media }),
         logger,
       }),
-      handler: createGitLabHandler({ api, state, logger }),
+      handler: createGitLabHandler({
+        api,
+        state,
+        providerInstanceId: config.providerInstanceId,
+        // The reply-with-artifact path: the link-plane content GET rides our
+        // own enrollment token.
+        media: {
+          download: (artifactId: string) =>
+            fetchArtifactContent(config.kernelUrl, artifactId, token, deps.fetchImpl ?? fetch),
+        },
+        logger,
+      }),
       logger,
       ...(deps.fetchImpl === undefined ? {} : { fetchImpl: deps.fetchImpl }),
     },

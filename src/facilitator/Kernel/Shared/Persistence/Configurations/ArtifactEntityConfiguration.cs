@@ -17,6 +17,7 @@ public sealed class ArtifactEntityConfiguration : IEntityTypeConfiguration<Artif
         e.Property(x => x.WorkId).HasColumnName("work_id");
         e.Property(x => x.AssignmentId).HasColumnName("assignment_id");
         e.Property(x => x.MediaType).HasColumnName("media_type").IsRequired();
+        e.Property(x => x.Kind).HasColumnName("kind").HasMaxLength(64);
         e.Property(x => x.Size).HasColumnName("size").IsRequired();
         e.Property(x => x.Digest).HasColumnName("digest").IsRequired();
         e.Property(x => x.StorageUri).HasColumnName("storage_uri").IsRequired();
@@ -42,7 +43,9 @@ public sealed class ArtifactEntityConfiguration : IEntityTypeConfiguration<Artif
             CheckSql.InList("state", ["pending", "stored", "rejected", "deleted"])));
         e.ToTable(t => t.HasCheckConstraint("artifacts_verification_check",
             CheckSql.InList("verification", ["verified", "unverified"])));
+        // The context plane mints kernel-owned artifacts (context.dispatch,
+        // context.history): the kernel itself is a legal origin.
         e.ToTable(t => t.HasCheckConstraint("artifacts_origin_check",
-            CheckSql.InList("origin", ["link", "rest", "external"])));
+            CheckSql.InList("origin", ["link", "rest", "external", "kernel"])));
     }
 }

@@ -17,6 +17,7 @@ import {
 } from "@ofac/provider-core/node";
 import type { LinkLogger } from "@ofac/workspace-link";
 import type { ForgejoApi } from "./forgejo-client.js";
+import type { MediaPipeline } from "./media.js";
 import {
   normalizeIssueComment,
   normalizeIssues,
@@ -36,11 +37,14 @@ export interface ForgejoNormalizerDeps {
   /** Undefined when the adapter has no bot token: commit-status deliveries
    *  (the only I/O arm) then drop, everything else normalizes. */
   api: ForgejoApi | undefined;
+  /** Undefined without a bot token (no media leg): inbound attachments are
+   *  then noted nowhere and the events publish text-only. */
+  media?: MediaPipeline | undefined;
   logger: LinkLogger;
 }
 
 export function createForgejoNormalizer(deps: ForgejoNormalizerDeps): WebhookNormalizer {
-  const { ctx, webhookSecret, api, logger } = deps;
+  const { ctx, webhookSecret, api, media, logger } = deps;
 
   return async (delivery: WebhookDelivery) => {
     const signature =
@@ -68,6 +72,19 @@ export function createForgejoNormalizer(deps: ForgejoNormalizerDeps): WebhookNor
     const eventKind = delivery.headers["x-forgejo-event"] ?? delivery.headers["x-gitea-event"];
     if (typeof deliveryId !== "string" || deliveryId === "" || typeof eventKind !== "string") {
       return { kind: "normalized", events: [] };
+    }
+
+    // The media-before-publish law: every attachment of the delivered
+    // comment/issue is downloaded + ingested FIRST, so the normalized
+    // events carry their sourceRefs. The never-fail-the-event law: media
+    // errors are contained in the pipeline (logged skips).
+    if (media !== undefined) {
+      for (const key of ["comment", "issue", "review", "pull_request"]) {
+        const container = payload[key];
+        if (typeof container === "object" && container !== null && !Array.isArray(container)) {
+          await media.processContainer(container as Payload);
+        }
+      }
     }
 
     const events = await dispatch(payload, deliveryId, eventKind, ctx, api, logger);

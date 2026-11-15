@@ -41,6 +41,8 @@ describe("parseEnvConfig", () => {
     expect(config.providerInstanceId).toBe("github-com");
     expect(config.team).toBe("team-alpha");
     expect(config.port).toBe(8068);
+    expect(config.mediaMaxBytes).toBe(5242880);
+    expect(config.mediaEnabled).toBe(true);
     expect(config.logLevel).toBe("info");
   });
 
@@ -88,6 +90,26 @@ describe("parseEnvConfig", () => {
 
   it("rejects a non-numeric port", () => {
     expect(() => parseEnvConfig(base({ OFAC_HEALTH_PORT: "http" }))).toThrow(/^OFAC_HEALTH_PORT:/);
+  });
+
+  it("takes the media caps from the env", () => {
+    const config = parseEnvConfig(
+      base({ GITHUB_MEDIA_MAX_BYTES: "1048576", GITHUB_MEDIA_ENABLED: "false" }),
+    );
+    expect(config.mediaMaxBytes).toBe(1048576);
+    expect(config.mediaEnabled).toBe(false);
+  });
+
+  it("fails closed on a garbage media cap or media switch", () => {
+    expect(() => parseEnvConfig(base({ GITHUB_MEDIA_MAX_BYTES: "eight-mb" }))).toThrow(
+      /^GITHUB_MEDIA_MAX_BYTES:/,
+    );
+    expect(() => parseEnvConfig(base({ GITHUB_MEDIA_MAX_BYTES: "0" }))).toThrow(
+      /^GITHUB_MEDIA_MAX_BYTES:/,
+    );
+    expect(() => parseEnvConfig(base({ GITHUB_MEDIA_ENABLED: "yes" }))).toThrow(
+      /^GITHUB_MEDIA_ENABLED:/,
+    );
   });
 });
 

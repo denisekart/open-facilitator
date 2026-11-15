@@ -26,7 +26,20 @@ approval prompts, and results come back as chat.
 
 Each chat adapter runs as its own small service (`@ofac/mattermost-adapter`,
 `@ofac/telegram-adapter`) on your side of the network, with a
-webhook-in / API-out shape you can audit.
+webhook-in / API-out shape you can audit. Every adapter declares a
+`media` facet in its capability manifest, and every provider speaks media
+in both directions — chat providers post files natively, the forges
+carry images as issue attachments or note markdown, each within the
+caps its facet declares. A completion reply attaches manifest outputs
+only where the facet allows it, and degrades honestly (a brokered link
+line + one audit row per media act) everywhere else — nothing ever
+vanishes silently. Every provider also answers `context.fetch`: a
+`thread://` reference is routed to the source adapter, which reads the
+thread window from the platform and answers as a stored
+`context.history` artifact. A route may also declare a `context` block: the kernel then
+folds the thread history, work fields and memory recalls into a
+digest-stamped document the harness receives with its assign, so "what
+did the agent actually see" is a queryable answer.
 
 ## Forges (source hosting)
 

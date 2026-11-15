@@ -38,7 +38,8 @@ public sealed class RoutingSink(
     EnvelopeValidator envelopeValidator,
     IEnumerable<IDecisionProvider> providers,
     TimeProvider timeProvider,
-    Facilitator.Kernel.Integrations.ProviderRegistry? providerRegistry = null) : ISink
+    Facilitator.Kernel.Integrations.ProviderRegistry? providerRegistry = null,
+    Facilitator.Kernel.Work.ContextBuilder? contextBuilder = null) : ISink
 {
     /// <inheritdoc />
     public string Channel => "routing";
@@ -140,6 +141,38 @@ public sealed class RoutingSink(
         // triage disclosure stays on the timeline).
         await UntriageAsync(db, audit, work.WorkId, now, ct);
 
+        // The context fold (plan 4.3): a route whose rule/provider declares a
+        // `context` block gets the dispatch-time document beside the assign.
+        // Not-ready (a thread:// leg still pending) parks the intent exactly
+        // like the dependency gate — audit first, then requeue.
+        JsonObject? contextInput = null;
+        var contextBlock = ContextBlockFor(chosen);
+        if (contextBlock is { Count: > 0 } && contextBuilder is not null)
+        {
+            var build = await contextBuilder.BuildAsync(db, contextBlock, intent, intent.EffectCommandId, ct);
+            if (!build.Ready)
+            {
+                var contextAudit = await db.RoutingDecisions.FirstOrDefaultAsync(
+                    d => d.IntentCommandId == intent.IntentCommandId, ct);
+                UpsertAudit(db, contextAudit, intent, work.WorkId, allowedJson, chosen: null,
+                    "pending", "context-pending", providerRef: null, now);
+                await db.SaveChangesAsync(ct);
+                await tx.CommitAsync(ct);
+                throw new RoutePendingException("context-pending");
+            }
+
+            contextInput = new JsonObject
+            {
+                ["artifactId"] = build.ArtifactId!.Value.ToString("N"),
+                ["digest"] = build.Digest,
+                ["document"] = build.Document,
+            };
+            if (build.Note is { Length: > 0 } note)
+            {
+                contextInput["note"] = note;
+            }
+        }
+
         // Crash-replay idempotency: the effect row's command id is the
         // ledger. An already-present effect row ⇒ the prior pass committed
         // and died before the mark; re-record the decision, deliver nothing twice.
@@ -147,7 +180,7 @@ public sealed class RoutingSink(
             .AnyAsync(o => o.CommandId == intent.EffectCommandId, ct);
         if (!effectExists)
         {
-            EmitEffect(db, intent, work.TeamId, chosen, now);
+            EmitEffect(db, intent, work.TeamId, chosen, now, contextInput);
         }
 
         UpsertAudit(db, audit, intent, work.WorkId, allowedJson, chosen, "routed", basis, providerRef, now);
@@ -155,6 +188,41 @@ public sealed class RoutingSink(
         await PostgresNotifications.NotifyOutboxAsync(db, work.WorkId.ToString(), ct);
         await tx.CommitAsync(ct);
         return true;
+    }
+
+    /// <summary>The declared context block for a chosen endpoint, resolved
+    /// from the provider registry: a rule whose <c>endpointId</c> equals the
+    /// choice answers its own <c>context</c> block; otherwise the provider
+    /// whose global <c>assignEndpointId</c> equals it answers its
+    /// <c>assignContext</c> default. No match ⇒ no block ⇒ today's envelope
+    /// verbatim (parity law).</summary>
+    private IReadOnlyList<Facilitator.Kernel.Integrations.ContextSource>? ContextBlockFor(string chosen)
+    {
+        if (providerRegistry is null)
+        {
+            return null;
+        }
+
+        foreach (var provider in providerRegistry.All())
+        {
+            var rule = provider.AssignRules.FirstOrDefault(r =>
+                string.Equals(r.EndpointId, chosen, StringComparison.Ordinal) && r.Context.Count > 0);
+            if (rule is not null)
+            {
+                return rule.Context;
+            }
+        }
+
+        foreach (var provider in providerRegistry.All())
+        {
+            if (string.Equals(provider.AssignEndpointId, chosen, StringComparison.Ordinal)
+                && provider.AssignContext.Count > 0)
+            {
+                return provider.AssignContext;
+            }
+        }
+
+        return null;
     }
 
     /// <summary>Allowed candidates (deterministic order) + whether the
@@ -337,7 +405,8 @@ public sealed class RoutingSink(
     /// the assign envelope outbox row + timeline <c>assignment.transition</c>,
     /// all in the decision's transaction.</summary>
     private void EmitEffect(
-        FacilitatorDbContext db, RoutingIntent intent, Guid? workTeamId, string chosen, DateTime now)
+        FacilitatorDbContext db, RoutingIntent intent, Guid? workTeamId, string chosen, DateTime now,
+        System.Text.Json.Nodes.JsonObject? contextInput = null)
     {
         // The DAG-visible identity: derived from the effect command id, so a
         // create that wrote sibling dependencies into `depends_on` before any
@@ -362,6 +431,12 @@ public sealed class RoutingSink(
         {
             extraInputs ??= [];
             extraInputs["sourceRefs"] = JsonNode.Parse(intent.SourceRefsJson)!.DeepClone();
+        }
+
+        if (contextInput is not null)
+        {
+            extraInputs ??= [];
+            extraInputs["context"] = contextInput;
         }
 
         var envelope = ProviderEnvelopes.Assign(

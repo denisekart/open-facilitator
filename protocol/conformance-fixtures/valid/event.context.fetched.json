@@ -1,0 +1,35 @@
+{
+  "specversion": "1.0",
+  "id": "01JEVENT-context-fetched",
+  "source": "urn:facilitator:instance:main",
+  "type": "org.facilitator.event.context.fetched.v1",
+  "subject": "work/work-123",
+  "time": "2026-10-22T18:05:00Z",
+  "datacontenttype": "application/json",
+  "dataschema": "https://schemas.openfacilitator.org/v1/event.context.fetched.v1.json",
+  "data": {
+    "fetchId": "fetch-123",
+    "workId": "work-123",
+    "responder": "telegram",
+    "items": [
+      {
+        "uri": "thread://telegram/123/456?limit=20",
+        "content": {
+          "messages": [
+            {
+              "id": "455",
+              "text": "can you annotate this?"
+            },
+            {
+              "id": "456",
+              "text": "please mark the crack in the hull plate"
+            }
+          ]
+        },
+        "truncated": false
+      }
+    ],
+    "deadline": "2026-10-23T18:00:00Z",
+    "note": "Answered from the platform; ledger holds ids only."
+  }
+}

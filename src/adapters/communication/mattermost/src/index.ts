@@ -6,7 +6,9 @@
 // command.communication.* execute over REST v4 under the post-ledger
 // idempotency law.
 import { createServer, type Server } from "node:http";
+import { randomBytes } from "node:crypto";
 import type { LinkClient, LinkLogger } from "@ofac/workspace-link";
+import { enroll } from "@ofac/workspace-link";
 import type { NormalizedEvent as ProviderCoreEvent } from "@ofac/provider-core";
 import { runProviderAdapter } from "@ofac/provider-core/node";
 import { deriveTenant, type AdapterConfig } from "./config.js";
@@ -21,6 +23,7 @@ import {
 } from "./normalize.js";
 import { AdapterState } from "./post-ledger.js";
 import { MattermostClient, type MattermostApi, type WsEvent } from "./mm-client.js";
+import { MediaPipeline, fetchArtifactContent } from "./media.js";
 import { WsListener } from "./ws-listener.js";
 import { communicationManifest, createAdapterHandler, type AdapterIdentity } from "./handler.js";
 
@@ -39,9 +42,11 @@ export {
   REACTION_EVENT,
   asPost,
   asReaction,
+  collectFileInfos,
   normalizePost,
   normalizeReaction,
   parseJsonField,
+  type MmFileInfo,
   type MmPost,
   type MmReaction,
   type NormalizeContext,
@@ -49,6 +54,7 @@ export {
 } from "./normalize.js";
 export { AdapterState, type ChannelType, type PostLedgerEntry } from "./post-ledger.js";
 export { WsListener, type WsListenerOptions } from "./ws-listener.js";
+export { MediaPipeline, fetchArtifactContent, type MediaPipelineDeps } from "./media.js";
 export {
   CMD_ACK,
   CMD_REACT,
@@ -58,6 +64,7 @@ export {
   communicationManifest,
   createAdapterHandler,
   type AdapterIdentity,
+  type ArtifactSource,
   type HandlerDeps,
 } from "./handler.js";
 
@@ -95,6 +102,41 @@ export async function run(
   };
   const source = `urn:ofac:provider:mattermost:${tenant}`;
 
+  // Our own link credential for the artifact client + content GETs (the
+  // telegram law): the adapter-face owns the CLIENT's token, so media rides
+  // an enrollment of its own (same secret/endpoint; 401 re-enrolls).
+  const linkToken = { value: "" };
+  const enrollSelf = async (): Promise<string> => {
+    const response = await enroll(
+      {
+        baseUrl: config.kernelUrl,
+        token: config.enrollSecret,
+        endpointId: config.endpointId,
+        instanceId: `mmm-${randomBytes(6).toString("hex")}`,
+        trustMode: "isolated-executor",
+        role: "child",
+        team: config.team,
+      },
+      ...(deps.fetchImpl === undefined ? [] : [deps.fetchImpl]),
+    );
+    linkToken.value = response.linkToken ?? "";
+    return linkToken.value;
+  };
+  const token = async (): Promise<string> =>
+    linkToken.value === "" ? await enrollSelf() : linkToken.value;
+
+  const media = new MediaPipeline({
+    api,
+    state,
+    kernelUrl: config.kernelUrl,
+    token,
+    endpointId: config.endpointId,
+    maxBytes: config.mediaMaxBytes,
+    enabled: config.mediaEnabled,
+    logger,
+    ...(deps.fetchImpl === undefined ? {} : { fetchImpl: deps.fetchImpl }),
+  });
+
   // ── link plane: the @ofac/provider-core adapter face owns enroll (secret
   // mode, 401 re-enroll) → capabilities → SignalrTransport + SqliteLedger
   // client wiring; mattermost has NO webhook edge (normalizeWebhook:
@@ -113,7 +155,16 @@ export async function run(
       statePath: config.statePath,
       manifest: communicationManifest(config.team),
       normalizeWebhook: undefined,
-      handler: createAdapterHandler({ api, state, identity, logger }),
+      handler: createAdapterHandler({
+        api,
+        state,
+        identity,
+        media: {
+          download: (artifactId: string) =>
+            fetchArtifactContent(config.kernelUrl, artifactId, token, deps.fetchImpl ?? fetch),
+        },
+        logger,
+      }),
       logger,
       // Mattermost envelope law: the subject is the message id (else the
       // delivery id), never the generic subjectRef. The core spreads the
@@ -162,6 +213,7 @@ export async function run(
       }
     },
     boundRootIds: () => state.boundRootIds(),
+    mediaArtifactsFor: (postId) => media.artifactsFor(postId),
   };
 
   const onWsEvent = async (event: WsEvent): Promise<void> => {
@@ -169,6 +221,8 @@ export async function run(
       const raw = parseJsonField(event.data?.["post"] as string | undefined);
       const post = raw === undefined ? undefined : asPost(raw);
       if (post === undefined) return;
+      // The media law runs BEFORE publish: the event carries its sourceRefs.
+      await media.processPost(post);
       const normalized = await normalizePost(post, raw as Record<string, unknown>, normalizeCtx);
       if (normalized !== null) await publish(normalized);
       return;
@@ -207,6 +261,8 @@ export async function run(
     try {
       for (const channelId of await api.botChannels()) {
         for (const post of await api.channelPosts(channelId, since)) {
+          // Media before publish (the replay leg rides the same law).
+          await media.processPost(post);
           const normalized = await normalizePost(
             post,
             post as unknown as Record<string, unknown>,

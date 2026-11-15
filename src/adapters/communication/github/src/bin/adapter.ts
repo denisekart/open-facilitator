@@ -14,6 +14,8 @@ run env: OFAC_KERNEL_URL OFAC_ENROLL_SECRET OFAC_ENDPOINT_ID OFAC_TEAM
      GITHUB_BOT_USER (required)
      OFAC_PROVIDER_INSTANCE_ID (default github-com) GITHUB_WORK_LABELS
      (default ofac:work) OFAC_STATE_PATH (default ./ofac-github-adapter.sqlite3)
+     GITHUB_MEDIA_MAX_BYTES (default 5242880) GITHUB_MEDIA_ENABLED
+     (default true)
      PORT|OFAC_HEALTH_PORT (default 8068: GET /healthz only) OFAC_ADAPTER_LOG
 Exit codes: 0 clean, 1 runtime, 2 config error.`;
 

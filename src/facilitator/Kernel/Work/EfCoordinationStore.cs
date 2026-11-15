@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 using Facilitator.Kernel.Ai;
 using Facilitator.Kernel.Shared.Persistence;
@@ -23,7 +24,8 @@ public sealed class EfCoordinationStore(
     Facilitator.Kernel.Integrations.ProviderRegistry? providers = null,
     AiPolicyStore? aiPolicies = null,
     CommunicationDecision? communication = null,
-    Facilitator.Kernel.Notifications.NotificationLedger? notifications = null) : ICoordinationStore
+    Facilitator.Kernel.Notifications.NotificationLedger? notifications = null,
+    InteractionOptions? interaction = null) : ICoordinationStore
 {
     private const string KernelLogChannel = "kernel.log";
 
@@ -790,6 +792,27 @@ public sealed class EfCoordinationStore(
             ? $"communication-reply:{transitionEventId}"
             : $"communication-reply:{transitionEventId}:b{index}";
 
+        // The media arm: a terminal-COMPLETED reply on a provider whose
+        // section opted in attaches the recorded manifest's outputs, filtered
+        // by the endpoint's declared media facet. Everything the facet (or
+        // policy) drops appends a brokered link line to the text and writes
+        // an audit row — "why did my image vanish" is a queryable answer.
+        var replyText = $"Work reached {to.Wire()}.";
+        JsonArray? mediaArtifacts = null;
+        if (action != "react"
+            && to == WorkState.Completed
+            && providers.Find(binding.Provider) is { SendManifestArtifacts: true })
+        {
+            var (artifacts, degradeNote, mediaAudits) = await SelectCompletionMediaAsync(
+                db, workId, endpoint, commandId, now, ct);
+            mediaArtifacts = artifacts;
+            replyText += degradeNote;
+            foreach (var audit in mediaAudits)
+            {
+                db.Audit.Add(audit);
+            }
+        }
+
         // Ledger path (step 4): the notice is recorded with its ladder, so a
         // vanished address becomes a retired address (F5), not a lost word.
         if (notifications is not null && action != "react")
@@ -799,12 +822,13 @@ public sealed class EfCoordinationStore(
             var ladder = new List<Facilitator.Kernel.Integrations.ConversationTarget> { target };
             await notifications.EmitAsync(db, new Facilitator.Kernel.Notifications.NotificationRequest(
                 Audience: "team",
-                Text: $"Work reached {to.Wire()}.",
+                Text: replyText,
                 WorkId: workId,
                 TeamSlug: teamSlug,
                 Target: target,
                 Ladder: ladder,
-                CommandId: commandId), ct);
+                CommandId: commandId,
+                Artifacts: mediaArtifacts), ct);
             return BindingOutcome.Handled;
         }
 
@@ -812,7 +836,7 @@ public sealed class EfCoordinationStore(
             ? Facilitator.Kernel.Integrations.ProviderEventStore.ReactEnvelope(
                 target, Facilitator.Kernel.Integrations.ProviderEventStore.ReactionAckEmoji, commandId, $"work/{workId}", now)
             : Facilitator.Kernel.Integrations.ProviderEventStore.ReplyEnvelope(
-                target, $"Work reached {to.Wire()}.", commandId, $"work/{workId}", now);
+                target, replyText, commandId, $"work/{workId}", now, null, mediaArtifacts);
         var json = envelope.ToJsonString();
         var verdict = envelopeValidator.Validate(json);
         if (!verdict.Ok)
@@ -836,6 +860,132 @@ public sealed class EfCoordinationStore(
             CreatedAt = now,
         });
         return BindingOutcome.Handled;
+    }
+
+    /// <summary>The completion-reply media leg: load the work's recorded
+    /// manifest outputs (stored + verified, work-team scoped only), read the
+    /// bound endpoint's declared media facet off its enrollment manifest, and
+    /// let <see cref="MediaReplyPolicy"/> split attach vs degrade. Returns
+    /// the wire artifact array (null ⇒ none), the degrade note appended to
+    /// the reply text ("" when nothing dropped), and one audit row per media
+    /// act (<c>media.reply</c> per attached artifact, <c>media.degrade</c>
+    /// per dropped one, reason verbatim in the detail). Never throws: a
+    /// manifest problem means no media, not a failed completion reply.</summary>
+    private async Task<(JsonArray? Artifacts, string DegradeNote, List<AuditEventEntity> Audits)> SelectCompletionMediaAsync(
+        FacilitatorDbContext db,
+        Guid workId,
+        string endpoint,
+        string commandId,
+        DateTime now,
+        CancellationToken ct)
+    {
+        var empty = ((JsonArray?)null, "", new List<AuditEventEntity>());
+        var manifest = await db.ResultManifests.AsNoTracking()
+            .Where(m => m.WorkId == workId && m.State == "recorded")
+            .OrderByDescending(m => m.Revision)
+            .FirstOrDefaultAsync(ct);
+        if (manifest is null || manifest.OutputArtifactIds.Length == 0)
+        {
+            return empty;
+        }
+
+        var ids = manifest.OutputArtifactIds
+            .Select(id => Guid.TryParse(id, out var parsed) ? parsed : (Guid?)null)
+            .Where(id => id is not null)
+            .Select(id => id!.Value)
+            .ToArray();
+        if (ids.Length == 0)
+        {
+            return empty;
+        }
+
+        var teamSlug = await db.Works.AsNoTracking()
+            .Where(w => w.WorkId == workId).Select(w => w.Team!.Slug).FirstOrDefaultAsync(ct);
+        var candidates = await db.Artifacts.AsNoTracking()
+            .Where(a => ids.Contains(a.ArtifactId)
+                        && a.State == "stored" && a.Verification == "verified"
+                        && a.TeamSlug == teamSlug)
+            .OrderBy(a => a.CreatedAt)
+            .ToListAsync(ct);
+        if (candidates.Count == 0)
+        {
+            return empty;
+        }
+
+        // The facet rides the enrollment the binding's endpoint enrolled with;
+        // the reply command's descriptor is the facet's home.
+        var enrollment = await db.LinkEnrollments.AsNoTracking()
+            .Where(e => e.EndpointId == endpoint)
+            .OrderByDescending(e => e.EnrolledAt)
+            .FirstOrDefaultAsync(ct);
+        var facet = MediaFacet.FromManifest(
+            enrollment?.CapabilityManifest, "org.facilitator.command.communication.reply.v1");
+        // The team's media policy (5.1) narrows the facet; absent resource =
+        // wave-1 behavior (facet-only, 8 MB / 8 items).
+        var mediaPolicy = await MediaPolicy.ForTeamAsync(db, teamSlug, foreignDestination: null, ct);
+        var (attach, degraded) = MediaReplyPolicy.Select(candidates, facet, 8 * 1024 * 1024, policy: mediaPolicy);
+
+        var publicBase = interaction?.PublicBaseUrl?.TrimEnd('/');
+        var audits = new List<AuditEventEntity>();
+        foreach (var (row, kind) in attach)
+        {
+            audits.Add(new AuditEventEntity
+            {
+                AuditId = Guid.NewGuid(),
+                OccurredAt = now,
+                Actor = "kernel",
+                Action = "media.reply",
+                Resource = $"link.{endpoint}",
+                Decision = "allow",
+                Reason = "facet-allowed",
+                EvidenceRef = $"artifact/{row.ArtifactId:N}",
+                CorrelationId = commandId,
+                Detail = JsonSerializer.Serialize(new
+                {
+                    work = workId,
+                    artifact = row.ArtifactId.ToString("N"),
+                    mediaType = row.MediaType,
+                    kind,
+                    facetEndpoint = endpoint,
+                    facet = "attached",
+                }),
+            });
+        }
+
+        var notes = new List<string>();
+        foreach (var (row, reason) in degraded)
+        {
+            var noPublicBaseUrl = string.IsNullOrWhiteSpace(publicBase);
+            var note = noPublicBaseUrl
+                ? $"attachment available: artifact {row.ArtifactId:N}"
+                : $"attachment available: {publicBase}/api/artifacts/{row.ArtifactId:N}/content";
+            notes.Add(note);
+            audits.Add(new AuditEventEntity
+            {
+                AuditId = Guid.NewGuid(),
+                OccurredAt = now,
+                Actor = "kernel",
+                Action = "media.degrade",
+                Resource = $"link.{endpoint}",
+                Decision = "allow",
+                Reason = reason,
+                EvidenceRef = $"artifact/{row.ArtifactId:N}",
+                CorrelationId = commandId,
+                Detail = JsonSerializer.Serialize(new
+                {
+                    work = workId,
+                    artifact = row.ArtifactId.ToString("N"),
+                    mediaType = row.MediaType,
+                    dropReason = reason,
+                    facetEndpoint = endpoint,
+                    facet = "degraded",
+                    degradeLeg = noPublicBaseUrl ? "no-public-base-url" : "public-link",
+                }),
+            });
+        }
+
+        var degradeNote = notes.Count == 0 ? "" : "\n\n" + string.Join("\n", notes);
+        return (attach.Count == 0 ? null : Facilitator.Kernel.Integrations.ProviderEventStore.ArtifactRefs(attach), degradeNote, audits);
     }
 
     /// <summary>The advisory communication answer for this completion ("reply"

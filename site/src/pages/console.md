@@ -67,6 +67,9 @@ Under the search box, what each rail entry opens:
   last acknowledged event, enrollment and link-token revocation.
 - **Config** — the live routing policy: stored operator intents, edited
   with versioned `If-Match` writes, each change audited with a reason.
+  Includes `media-policy`: the media plane's federation law — size and
+  count defaults, per-kind retention, per-team allow/forbid lists and
+  the history-forwarding switches (absent row = the defaults above).
 - **AiDeck** — a drawer, not a screen: a chat surface for operator
   identities. Ask “what's stuck?” and the answer shows the reads it
   made to get there — GETs the asking operator could run themselves,

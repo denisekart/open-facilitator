@@ -1019,6 +1019,12 @@ public sealed class ArtifactEntity
     /// <summary>Declared media type — the kernel never parses it.</summary>
     public required string MediaType { get; set; }
 
+    /// <summary>Producer-owned taxonomy label (e.g. <c>chat.attachment</c>,
+    /// <c>context.dispatch</c>); the same open vocabulary as the wire
+    /// <c>artifactRef.kind</c>. Null = unclassified (pre-column rows and
+    /// external registrations); readers fall back to the media-type class.</summary>
+    public string? Kind { get; set; }
+
     /// <summary>Declared byte size; the store path counts actual bytes and rejects a lie.</summary>
     public long Size { get; set; }
 

@@ -22,6 +22,13 @@ public sealed class InteractionOptions
     /// <summary>Link endpoint id the kernel addresses a question at when the
     /// work has no originating-integration communication binding (arm b).</summary>
     public string? InteractionDefaultEndpoint { get; init; }
+
+    /// <summary>The externally reachable base URL of this kernel (no trailing
+    /// slash). Media degrade lines name <c>{PublicBaseUrl}/api/artifacts/&lt;id&gt;/content</c>
+    /// so a channel without an upload leg still hands the human a working
+    /// brokered link; unset ⇒ the degrade note carries only the artifact id
+    /// (and the audit reason says <c>no-public-base-url</c>).</summary>
+    public string? PublicBaseUrl { get; init; }
 }
 
 /// <summary>What an interaction arm hands back to the ingress that invoked it.</summary>

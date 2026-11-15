@@ -323,6 +323,29 @@ public sealed class TestDbProbe : IAsyncDisposable
                 cmd.Parameters.AddWithValue((object?)expiresAt ?? DBNull.Value);
             });
 
+    /// <summary>Hand-mint a stored, verified artifact the media arm can see:
+    /// a real media type, size, team scope and origin endpoint (the media
+    /// reply tests seed the manifest's output rows directly).</summary>
+    public Task SeedStoredArtifact(
+        Guid artifactId, string mediaType, long size, Guid? workId, string? teamSlug, string endpointId) =>
+        NonQuery(
+            "INSERT INTO facilitator.artifacts (artifact_id, work_id, media_type, size, digest, storage_uri, "
+            + "state, verification, origin, created_by, team_slug, requested_by_endpoint_id, "
+            + "created_at, expires_at, stored_at, retention_policy) "
+            + "VALUES ($1, $2, $3, $4, 'sha256:' || repeat('a', 64), "
+            + "$5, 'stored', 'verified', 'link', 'link:' || $6, $7, $6, "
+            + "now(), now(), now(), '90d')",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(artifactId);
+                cmd.Parameters.AddWithValue((object?)workId ?? DBNull.Value);
+                cmd.Parameters.AddWithValue(mediaType);
+                cmd.Parameters.AddWithValue(size);
+                cmd.Parameters.AddWithValue($"kernel-fs:aa/bb/sha256/{new string('a', 64)}");
+                cmd.Parameters.AddWithValue(endpointId);
+                cmd.Parameters.AddWithValue((object?)teamSlug ?? DBNull.Value);
+            });
+
     /// <summary>Force a row's state (crash-recovery seeding: pretend the
     /// backend delete landed but the tombstone transaction did not).</summary>
     public Task RevertArtifactState(Guid artifactId, string state) =>
@@ -449,18 +472,21 @@ public sealed class TestDbProbe : IAsyncDisposable
             });
 
     /// <summary>A work row on a team's project (ops reads need team scope).</summary>
-    public async Task<Guid> SeedWorkOwned(Guid projectId, string? ownerActor, string state)
+    public async Task<Guid> SeedWorkOwned(Guid projectId, string? ownerActor, string state, string? teamSlug = null)
     {
         var workId = Guid.NewGuid();
         await NonQuery(
-            "INSERT INTO facilitator.works (work_id, project_id, objective, state, version, owner_actor, created_at, updated_at) "
-            + "VALUES ($1, $2, 'owned seed', $3, 1, $4, now(), now())",
+            "INSERT INTO facilitator.works (work_id, project_id, objective, state, version, owner_actor, team_id, created_at, updated_at) "
+            + "VALUES ($1, $2, 'owned seed', $3, 1, $4, "
+            + "CASE WHEN $5::text IS NULL THEN NULL ELSE (SELECT team_id FROM facilitator.teams WHERE slug = $5) END, "
+            + "now(), now())",
             cmd =>
             {
                 cmd.Parameters.AddWithValue(workId);
                 cmd.Parameters.AddWithValue(projectId);
                 cmd.Parameters.AddWithValue(state);
                 cmd.Parameters.AddWithValue((object?)ownerActor ?? DBNull.Value);
+                cmd.Parameters.AddWithValue((object?)teamSlug ?? DBNull.Value);
             });
         return workId;
     }
@@ -1998,6 +2024,67 @@ public sealed class TestDbProbe : IAsyncDisposable
             "UPDATE facilitator.outbox SET status = 'pending', attempts = 0, available_at = now(), "
             + "lease_owner = NULL, leased_until = NULL WHERE command_id = $1",
             cmd => cmd.Parameters.AddWithValue(commandId));
+
+    /// <summary>Stored artifacts of one producer-kind for a work (the
+    /// context plane's taxonomy: <c>context.dispatch</c> /
+    /// <c>context.history</c> rows carry the kind + retention the fold and
+    /// the fetched-answer leg stamped).</summary>
+    public async Task<List<KindedArtifactRow>> ArtifactRowsForKind(Guid workId, string kind)
+    {
+        await using var connection = await _dataSource.OpenConnectionAsync();
+        await using var cmd = new NpgsqlCommand(
+            "SELECT artifact_id::text, state, retention_policy, digest, coalesce(command_id, ''), expires_at "
+            + "FROM facilitator.artifacts WHERE work_id = $1 AND kind = $2 ORDER BY created_at", connection);
+        cmd.Parameters.AddWithValue(workId);
+        cmd.Parameters.AddWithValue(kind);
+        await using var reader = await cmd.ExecuteReaderAsync();
+        var rows = new List<KindedArtifactRow>();
+        while (await reader.ReadAsync())
+        {
+            rows.Add(new KindedArtifactRow(
+                Guid.Parse(reader.GetString(0)), reader.GetString(1), reader.GetString(2),
+                reader.GetString(3), reader.GetString(4), reader.GetDateTime(5)));
+        }
+
+        return rows;
+    }
+
+    /// <summary>One context-taxonomy artifact assertion row.</summary>
+    public sealed record KindedArtifactRow(
+        Guid ArtifactId, string State, string RetentionPolicy, string Digest, string CommandId, DateTime ExpiresAt);
+
+    /// <summary>Stamp the producer-kind taxonomy label on a seeded artifact
+    /// (the context plane seeds via <see cref="SeedArtifact"/>, which
+    /// predates the column).</summary>
+    public Task SeedArtifactKind(Guid artifactId, string kind) =>
+        NonQuery("UPDATE facilitator.artifacts SET kind = $2 WHERE artifact_id = $1",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(artifactId);
+                cmd.Parameters.AddWithValue(kind);
+            });
+
+    /// <summary>Hold one outbox row back on a future availability (parking a
+    /// routing intent the way a context-pending pass leaves it).</summary>
+    public Task DelayOutboxAvailability(Guid outboxId, TimeSpan by) =>
+        NonQuery("UPDATE facilitator.outbox SET available_at = now() + make_interval(mins => $2) WHERE outbox_id = $1",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(outboxId);
+                cmd.Parameters.AddWithValue((int)by.TotalMinutes);
+            });
+
+    /// <summary>True when an outbox row's availability was pulled forward to
+    /// at most <paramref name="cutoff"/> (the wake law's observable).</summary>
+    public async Task<bool> OutboxAvailableAtOrBefore(Guid outboxId, DateTime cutoff)
+    {
+        await using var connection = await _dataSource.OpenConnectionAsync();
+        await using var cmd = new NpgsqlCommand(
+            "SELECT available_at <= $2 FROM facilitator.outbox WHERE outbox_id = $1", connection);
+        cmd.Parameters.AddWithValue(outboxId);
+        cmd.Parameters.AddWithValue(cutoff);
+        return (bool)(await cmd.ExecuteScalarAsync() ?? false);
+    }
 
     /// <summary>Hand-mint an actor verbosity preference row (precedence tests).</summary>
     public Task SeedActorPreference(string actor, string verbosity) =>

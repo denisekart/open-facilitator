@@ -39,6 +39,21 @@ class FakeApi implements ForgejoApi {
   async postComment(): Promise<{ id: number; html_url: string }> {
     throw new Error("unused");
   }
+  async createIssue(): Promise<number> {
+    throw new Error("unused");
+  }
+  async closeIssue(): Promise<void> {
+    /* unused */
+  }
+  async findIssueByMarker(): Promise<number | undefined> {
+    throw new Error("unused");
+  }
+  async mergePr(): Promise<boolean> {
+    throw new Error("unused");
+  }
+  async getPrState(): Promise<never> {
+    throw new Error("unused");
+  }
   async openPr(): Promise<never> {
     throw new Error("unused");
   }
@@ -59,7 +74,7 @@ class FakeApi implements ForgejoApi {
     throw new Error("unused");
   }
   async createBranch(): Promise<void> {
-    throw new Error("unused");
+    /* unused */
   }
   async addLabels(): Promise<void> {
     throw new Error("unused");
@@ -68,6 +83,15 @@ class FakeApi implements ForgejoApi {
     throw new Error("unused");
   }
   async reviewPullRequest(): Promise<never> {
+    throw new Error("unused");
+  }
+  async uploadIssueAttachment(): Promise<never> {
+    throw new Error("unused");
+  }
+  async downloadAsset(): Promise<never> {
+    throw new Error("unused");
+  }
+  async listIssueComments(): Promise<never> {
     throw new Error("unused");
   }
 }

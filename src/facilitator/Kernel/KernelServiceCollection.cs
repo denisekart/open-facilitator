@@ -143,6 +143,11 @@ public static class KernelServiceCollection
         builder.Services.AddScoped<MemoryIngress>();
         builder.Services.AddSingleton(builder.Configuration.GetSection(InteractionOptions.SectionName).Get<InteractionOptions>() ?? new InteractionOptions());
         builder.Services.AddScoped<InteractionIngress>();
+        // The context plane: the fetch expansion core, its two link-plane
+        // arms, and the dispatch-time builder the routing sink folds.
+        builder.Services.AddScoped<ContextFetchService>();
+        builder.Services.AddScoped<ContextIngress>();
+        builder.Services.AddSingleton<ContextBuilder>();
         return builder;
     }
 

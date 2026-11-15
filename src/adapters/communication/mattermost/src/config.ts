@@ -33,6 +33,11 @@ export interface AdapterConfig {
   botMention: string;
   /** SQLite state file: delivery ledger + post ledger + caches. */
   statePath: string;
+  /** Inbound media size cap (the shared media law skips — never fails —
+   *  anything bigger): 52428800 = the 50 MB the capability facet declares. */
+  mediaMaxBytes: number;
+  /** Inbound media pipeline switch: false ⇒ attachments are noted and skipped. */
+  mediaEnabled: boolean;
   /** Optional GET /healthz server port. */
   healthPort?: number;
   logLevel: "debug" | "info" | "warn" | "error";
@@ -88,6 +93,18 @@ export function parseEnvConfig(env: Record<string, string | undefined>): Adapter
   // Fail closed on an unparseable site URL — it feeds both the REST base and
   // the tenant identity.
   deriveTenant(mmUrl);
+  const mediaMaxRaw = env["MATTERMOST_MEDIA_MAX_BYTES"]?.trim();
+  let mediaMaxBytes = 52428800;
+  if (mediaMaxRaw !== undefined && mediaMaxRaw !== "") {
+    const n = Number(mediaMaxRaw);
+    if (!Number.isInteger(n) || n <= 0) {
+      throw new AdapterConfigError(
+        "MATTERMOST_MEDIA_MAX_BYTES",
+        `'${mediaMaxRaw}' is not a positive integer`,
+      );
+    }
+    mediaMaxBytes = n;
+  }
   const config: AdapterConfig = {
     kernelUrl: required(env, "OFAC_KERNEL_URL"),
     enrollSecret: required(env, "OFAC_ENROLL_SECRET"),
@@ -98,6 +115,8 @@ export function parseEnvConfig(env: Record<string, string | undefined>): Adapter
     botToken: resolveBotToken(env),
     botMention: env["OFAC_BOT_MENTION"]?.trim() || "@facilitator",
     statePath: env["OFAC_STATE_PATH"]?.trim() || "./ofac-mm-adapter.sqlite3",
+    mediaMaxBytes,
+    mediaEnabled: (env["MATTERMOST_MEDIA_ENABLED"]?.trim() || "true") !== "false",
     logLevel: (LEVELS[level] === true ? level : "info") as AdapterConfig["logLevel"],
   };
   return healthPort === undefined ? config : { ...config, healthPort };

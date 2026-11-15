@@ -45,6 +45,27 @@ export interface GitLabMergeRequestDetail {
   source_branch: string;
 }
 
+/** What `POST /projects/{id}/uploads` answers (REST v4 upload shape): the
+ *  full root-relative path, the bare name, and GitLab's OWN markdown line —
+ *  `![name](/uploads/<secret>/<name>)` — which is what the reply leg folds
+ *  into the note body (the markdown is the provider's, never ours). */
+export interface GitLabUpload {
+  alt: string;
+  url: string;
+  markdown: string;
+}
+
+/** One issue note as the CONTEXT plane reads it (the thread window): the
+ *  author username, the raw body (clamping is the caller's law) and the
+ *  system-flag — a journal entry is not a message. */
+export interface GitLabIssueNote {
+  id: number;
+  author: string;
+  body: string;
+  createdAt: string | undefined;
+  system: boolean;
+}
+
 export interface GitLabApi {
   /** POST an issue note (decision 4 mirror: bot-identity notes only) or an
    *  MR note — GitLab has no unified comment endpoint, so the caller picks
@@ -123,6 +144,22 @@ export interface GitLabApi {
   /** Resolve an MR discussion thread (connector `vcs.discussion.resolve` —
    *  GitLab has native resolve, so this op is advertised). */
   resolveDiscussion(repo: string, iid: number, discussionId: string): Promise<void>;
+  /** Multipart-upload one file into the project's upload store (the OUTBOUND
+   *  media leg: `POST /projects/{id}/uploads`, FormData field `file`). The
+   *  answer carries GitLab's own markdown line for the note body. */
+  uploadProjectFile(
+    repo: string,
+    filename: string,
+    bytes: Uint8Array,
+    mediaType: string,
+  ): Promise<GitLabUpload>;
+  /** GET an ABSOLUTE or root-relative URL (an inbound note markdown's
+   *  `/uploads/...` path resolves against the configured base) with the same
+   *  PRIVATE-TOKEN law — the media leg's download seam. */
+  downloadAsset(url: string): Promise<Uint8Array>;
+  /** Read an issue's note window (the CONTEXT plane's thread read): newest
+   *  first as GitLab answers, capped caller-side. */
+  listIssueNotes(repo: string, iid: number, limit: number): Promise<GitLabIssueNote[]>;
 }
 
 interface NoteDto {
@@ -151,19 +188,37 @@ interface NoteListDto {
   body: string;
 }
 
+interface NoteWindowDto {
+  id: number;
+  body: string;
+  system?: boolean;
+  created_at?: string;
+  author?: { username?: string };
+}
+
+interface UploadDto {
+  alt: string;
+  url: string;
+  markdown: string;
+}
+
 interface DiscussionDto {
   id: string;
 }
 
 export class GitLabClient implements GitLabApi {
   private readonly base: string;
+  /** The site origin WITHOUT the `/api/v4` suffix: an inbound note's
+   *  root-relative `/uploads/...` path is served by the site, not the API. */
+  private readonly site: string;
 
   constructor(
     gitlabUrl: string,
     private readonly token: string,
     private readonly fetchImpl: typeof fetch = fetch,
   ) {
-    this.base = trimSlash(gitlabUrl) + "/api/v4";
+    this.site = trimSlash(gitlabUrl);
+    this.base = `${this.site}/api/v4`;
   }
 
   /** v4 project addressing: the URL-encoded `path_with_namespace`. */
@@ -477,5 +532,82 @@ export class GitLabClient implements GitLabApi {
     if (dto.id !== discussionId) {
       throw new GitLabError("resolveDiscussion", 200, "discussion id mismatch");
     }
+  }
+
+  /** Multipart sibling of `request<T>` with the SAME error shaping: the
+   *  token header rides, the content-type does NOT (fetch mints the
+   *  multipart boundary), and a non-2xx answers a typed GitLabError naming
+   *  the call. An absolute path bypasses the /api/v4 base. */
+  private async requestForm(
+    call: string,
+    method: string,
+    path: string,
+    body: FormData,
+  ): Promise<unknown> {
+    const response = await this.fetchImpl(path.startsWith("http") ? path : `${this.base}${path}`, {
+      method,
+      headers: { "private-token": this.token },
+      body,
+    });
+    if (!response.ok) {
+      const text = await response.text().catch(() => "");
+      observeHttpStatus(response.status);
+      throw new GitLabError(call, response.status, text.slice(0, 200));
+    }
+    return response.status === 204 || response.status === 205 ? undefined : response.json();
+  }
+
+  async uploadProjectFile(
+    repo: string,
+    filename: string,
+    bytes: Uint8Array,
+    mediaType: string,
+  ): Promise<GitLabUpload> {
+    const form = new FormData();
+    // The multipart part name carries the URL-encoded filename (GitLab's own
+    // upload law: the stored path is derived from it).
+    form.append(
+      "file",
+      new Blob([new Uint8Array(bytes)], { type: mediaType }),
+      encodeURIComponent(filename),
+    );
+    const dto = (await this.requestForm(
+      "uploadProjectFile",
+      "POST",
+      `/projects/${this.project(repo)}/uploads`,
+      form,
+    )) as Partial<UploadDto>;
+    return { alt: dto.alt ?? "", url: dto.url ?? "", markdown: dto.markdown ?? "" };
+  }
+
+  async downloadAsset(url: string): Promise<Uint8Array> {
+    // A root-relative `/uploads/...` (what a note's markdown carries) is a
+    // SITE path, not an API one — join it with the configured base.
+    const target = url.startsWith("http") ? url : `${this.site}${url}`;
+    const response = await this.fetchImpl(target, {
+      headers: { "private-token": this.token },
+      redirect: "follow",
+    });
+    if (!response.ok) {
+      const text = await response.text().catch(() => "");
+      observeHttpStatus(response.status);
+      throw new GitLabError("downloadAsset", response.status, text.slice(0, 200));
+    }
+    return new Uint8Array(await response.arrayBuffer());
+  }
+
+  async listIssueNotes(repo: string, iid: number, limit: number): Promise<GitLabIssueNote[]> {
+    const dtos = await this.request<NoteWindowDto[]>(
+      "listIssueNotes",
+      "GET",
+      `/projects/${this.project(repo)}/issues/${iid}/notes?per_page=${Math.max(1, Math.min(limit, 100))}&order_by=created_at&sort=desc`,
+    );
+    return dtos.map((dto) => ({
+      id: dto.id,
+      author: dto.author?.username ?? "unknown",
+      body: dto.body ?? "",
+      createdAt: dto.created_at,
+      system: dto.system === true,
+    }));
   }
 }

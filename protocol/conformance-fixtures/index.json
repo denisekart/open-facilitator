@@ -41,6 +41,18 @@
       "type": "org.facilitator.command.context.fetch.v1"
     },
     {
+      "file": "valid/command.context.fetch.history.json",
+      "expect": "valid",
+      "class": "command",
+      "type": "org.facilitator.command.context.fetch.v1"
+    },
+    {
+      "file": "valid/event.context.fetched.json",
+      "expect": "valid",
+      "class": "event",
+      "type": "org.facilitator.event.context.fetched.v1"
+    },
+    {
       "file": "valid/command.approval.respond.json",
       "expect": "valid",
       "class": "command",

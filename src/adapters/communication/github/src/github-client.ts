@@ -129,6 +129,37 @@ export interface GitHubApi {
     description: string,
     context: string,
   ): Promise<void>;
+  /** Upload an image into an issue/PR conversation (the outbound media leg):
+   *  the issue-image route on the UPLOADS host (`uploads.github.com` on the
+   *  public API, the same host on GHE), the raw bytes as the body. The
+   *  answer's `asset_url` rides the comment markdown the reply folds the
+   *  image into. */
+  uploadIssueImage(
+    repo: string,
+    number: number,
+    filename: string,
+    bytes: Uint8Array,
+    mediaType: string,
+  ): Promise<GitHubAsset>;
+  /** GET an ABSOLUTE asset URL (an inbound markdown image URL on the
+   *  uploads/assets host) with the same token header — the media leg's
+   *  download seam. */
+  downloadAsset(url: string): Promise<Uint8Array>;
+  /** GET the comment window of an issue/PR thread (the context leg: what
+   *  answers a routed `thread://github/…` fetch, the URI's `limit`). A
+   *  thread here IS the issue/PR comment thread, so the window is the
+   *  issue's comment list; the author is the comment author's login. */
+  listIssueComments(
+    repo: string,
+    number: number,
+    limit: number,
+  ): Promise<{ author: string; body: string; created: string }[]>;
+}
+
+/** The created issue image (REST API shape, subset): the media leg folds the
+ *  absolute `asset_url` into the comment markdown. */
+export interface GitHubAsset {
+  asset_url: string;
 }
 
 interface CommentDto {
@@ -162,8 +193,47 @@ interface GraphQLErrorBody {
   errors?: { message: string }[];
 }
 
+/** The context leg's window DTO (subset): the author's login, the body and
+ *  the creation stamp the issue-comments route answers with. */
+interface CommentWindowDto {
+  body?: string;
+  created_at?: string;
+  user?: { login?: string };
+}
+
+interface AssetDto {
+  asset_url?: string;
+}
+
+/** The context leg's window ceiling (GitHub's own page limit): what
+ *  `listIssueComments` caps the URI's `limit` at. */
+const CONTEXT_WINDOW_MAX = 50;
+
+/** Derive the issue-image UPLOADS base from the configured REST base. The
+ *  public API serves uploads on its OWN host (api.github.com →
+ *  uploads.github.com, the same `/repos/…/issues/…/images` path law); every
+ *  other install (GHE, a test fake) serves that route on the SAME host under
+ *  the SAME base, so the REST base is the uploads base there. */
+export function deriveUploadsBase(githubUrl: string): string {
+  let url: URL;
+  try {
+    url = new URL(githubUrl);
+  } catch {
+    throw new Error(`GITHUB_URL: '${githubUrl}' is not a URL`);
+  }
+
+  if (url.hostname === "api.github.com") {
+    return "https://uploads.github.com";
+  }
+
+  return trimSlash(githubUrl);
+}
+
 export class GitHubClient implements GitHubApi {
   private readonly base: string;
+  /** The issue-image UPLOADS base (media leg): `uploads.github.com` for the
+   *  public API, the same host/base for a GHE install (deriveUploadsBase). */
+  private readonly uploadsBase: string;
 
   constructor(
     githubUrl: string,
@@ -171,6 +241,7 @@ export class GitHubClient implements GitHubApi {
     private readonly fetchImpl: typeof fetch = fetch,
   ) {
     this.base = trimSlash(githubUrl);
+    this.uploadsBase = deriveUploadsBase(githubUrl);
   }
 
   private async request<T>(call: string, method: string, path: string, body?: unknown): Promise<T> {
@@ -417,5 +488,91 @@ export class GitHubClient implements GitHubApi {
       description,
       context,
     });
+  }
+
+  /** The raw-body sibling of `request`: the media leg's upload POST. Same
+   *  token header, same GitHubError shaping; NO json content-type — the
+   *  caller's media type rides, with the filename as the form `name`
+   *  parameter (GitHub's uploads law for a non-multipart body). `absolute`
+   *  urls bypass the REST base (the uploads host is a different origin). */
+  private async requestForm(
+    call: string,
+    method: string,
+    url: string,
+    body: BodyInit,
+    contentType: string,
+  ): Promise<unknown> {
+    const response = await this.fetchImpl(url, {
+      method,
+      headers: {
+        authorization: `Bearer ${this.token}`,
+        "content-type": contentType,
+        accept: "application/vnd.github+json",
+      },
+      body,
+    });
+    if (!response.ok) {
+      const text = await response.text().catch(() => "");
+      observeHttpStatus(response.status);
+      throw new GitHubError(call, response.status, text.slice(0, 200));
+    }
+
+    if (response.status === 204) return undefined;
+    return (await response.json()) as unknown;
+  }
+
+  async uploadIssueImage(
+    repo: string,
+    number: number,
+    filename: string,
+    bytes: Uint8Array,
+    mediaType: string,
+  ): Promise<GitHubAsset> {
+    // GitHub's issue-image route takes the RAW bytes as the body (not
+    // multipart) with the media type as content-type and the filename as the
+    // form `name` parameter; it lives on the uploads base, not the REST base.
+    const dto = (await this.requestForm(
+      "uploadIssueImage",
+      "POST",
+      `${this.uploadsBase}/repos/${repo}/issues/${String(number)}/images`,
+      new Uint8Array(bytes),
+      `${mediaType}; name="${filename.replace(/"/g, "")}"`,
+    )) as AssetDto | undefined;
+    return { asset_url: dto?.asset_url ?? "" };
+  }
+
+  async downloadAsset(url: string): Promise<Uint8Array> {
+    const response = await this.fetchImpl(url, {
+      headers: {
+        authorization: `Bearer ${this.token}`,
+        accept: "application/octet-stream",
+      },
+      redirect: "follow",
+    });
+    if (!response.ok) {
+      const text = await response.text().catch(() => "");
+      observeHttpStatus(response.status);
+      throw new GitHubError("downloadAsset", response.status, text.slice(0, 200));
+    }
+
+    return new Uint8Array(await response.arrayBuffer());
+  }
+
+  async listIssueComments(
+    repo: string,
+    number: number,
+    limit: number,
+  ): Promise<{ author: string; body: string; created: string }[]> {
+    const capped = Math.min(Math.max(Math.trunc(limit), 1), CONTEXT_WINDOW_MAX);
+    const dtos = await this.request<CommentWindowDto[]>(
+      "listIssueComments",
+      "GET",
+      `/repos/${repo}/issues/${String(number)}/comments?per_page=${String(capped)}`,
+    );
+    return dtos.slice(0, capped).map((dto) => ({
+      author: dto.user?.login ?? "unknown",
+      body: dto.body ?? "",
+      created: dto.created_at ?? "",
+    }));
   }
 }

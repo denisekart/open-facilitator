@@ -11,6 +11,7 @@
 //   thread rooted at a post the adapter created (ledger) → message.v1
 //   anything else           → ignored (never normalize every public post)
 import type {
+  ArtifactRef,
   ConversationReference,
   ProviderMentionEventV1Data,
   ProviderMessageEventV1Data,
@@ -24,6 +25,14 @@ export const MENTION_EVENT = "org.facilitator.event.provider.mention.v1";
 export const REACTION_EVENT = "org.facilitator.event.provider.reaction.v1";
 export const MESSAGE_EVENT = "org.facilitator.event.provider.message.v1";
 
+/** The wire subset of a Mattermost FileInfo we ingest on (the media leg). */
+export interface MmFileInfo {
+  id: string;
+  name?: string;
+  size?: number;
+  mime_type?: string;
+}
+
 /** The wire subset of a Mattermost Post we classify on. */
 export interface MmPost {
   id: string;
@@ -34,6 +43,7 @@ export interface MmPost {
   create_at?: number;
   type?: string;
   props?: Record<string, unknown>;
+  file_infos?: MmFileInfo[];
 }
 
 /** The wire subset of a Mattermost Reaction we classify on. */
@@ -57,6 +67,9 @@ export interface NormalizeContext {
   channelTypeFor(channelId: string): Promise<ChannelType | undefined>;
   /** Post ids the adapter itself created (post-ledger): bound thread roots. */
   boundRootIds(): Set<string>;
+  /** Artifact refs the media pipeline already uploaded for this post id
+   *  (the pipeline runs BEFORE normalize; default: no media). */
+  mediaArtifactsFor?(postId: string): ArtifactRef[];
 }
 
 export type NormalizedEvent =
@@ -78,6 +91,25 @@ function clamp(text: string): string {
 /** `@token` followed by whitespace or end-of-message (not a prefix of a longer handle). */
 function mentions(text: string, token: string): boolean {
   return text === token || text.startsWith(`${token} `) || text.startsWith(`${token}\n`);
+}
+
+/** Every attachment a post carries, as the ingest-ready file triples (the
+ *  Mattermost file id is the provider unique id the shared media law
+ *  dedupes on). Defensive: a malformed file_infos list is "no files". */
+export function collectFileInfos(post: MmPost): MmFileInfo[] {
+  if (!Array.isArray(post.file_infos)) return [];
+  return post.file_infos.filter(
+    (file): file is MmFileInfo =>
+      typeof file === "object" && file !== null && typeof file.id === "string" && file.id !== "",
+  );
+}
+
+/** Caption-or-text law (shared with telegram): a file-only post publishes
+ *  "(attachment)" so the frozen schema's minLength: 1 holds. */
+function textOf(post: MmPost): string {
+  const text = clamp(post.message);
+  if (text !== "") return text;
+  return collectFileInfos(post).length > 0 ? "(attachment)" : text;
 }
 
 function reference(
@@ -123,7 +155,9 @@ export async function normalizePost(
   options: NormalizeOptions = {},
 ): Promise<NormalizedEvent | null> {
   const rootId = post.root_id !== undefined && post.root_id !== "" ? post.root_id : undefined;
-  const text = clamp(post.message);
+  const text = textOf(post);
+  // The media pipeline ran BEFORE this call; its refs (if any) ride the event.
+  const sourceRefs = ctx.mediaArtifactsFor?.(post.id) ?? [];
 
   // (a) Echo: the bot's own post — always message.v1, kernel-side suppression
   // owns it (the stored event is how the binding ledger learns our post id).
@@ -145,6 +179,7 @@ export async function normalizePost(
         actorProviderAccountId: post.user_id,
         text,
         payload: raw,
+        ...(sourceRefs.length > 0 ? { sourceRefs } : {}),
       },
     };
   }
@@ -171,6 +206,7 @@ export async function normalizePost(
         actorProviderAccountId: post.user_id,
         text,
         payload: raw,
+        ...(sourceRefs.length > 0 ? { sourceRefs } : {}),
       },
     };
   }
@@ -188,6 +224,7 @@ export async function normalizePost(
         actorProviderAccountId: post.user_id,
         text,
         payload: raw,
+        ...(sourceRefs.length > 0 ? { sourceRefs } : {}),
       },
     };
   }
@@ -201,6 +238,7 @@ export async function normalizePost(
         actorProviderAccountId: post.user_id,
         text,
         payload: raw,
+        ...(sourceRefs.length > 0 ? { sourceRefs } : {}),
       },
     };
   }
@@ -271,6 +309,11 @@ export function asPost(raw: Record<string, unknown>): MmPost | undefined {
   const createAt = num(raw, "create_at");
   const type = str(raw, "type");
   const props = raw["props"];
+  // file_infos rides only when it is a well-formed list of {id, …} objects;
+  // anything else behaves exactly like "no files" (collectFileInfos guards).
+  const fileInfos = Array.isArray(raw["file_infos"])
+    ? (raw["file_infos"] as MmFileInfo[])
+    : undefined;
   return {
     id,
     channel_id: channelId,
@@ -282,6 +325,7 @@ export function asPost(raw: Record<string, unknown>): MmPost | undefined {
     ...(typeof props === "object" && props !== null
       ? { props: props as Record<string, unknown> }
       : {}),
+    ...(fileInfos !== undefined ? { file_infos: fileInfos } : {}),
   };
 }
 

@@ -37,15 +37,41 @@ export interface MmChannel {
   type: "O" | "P" | "D";
 }
 
+/** The GET /posts/{root}/thread answer: `order` is the platform's own
+ *  chronological post-id list, `posts` maps each id to its post object. */
+export interface MmThread {
+  order: string[];
+  posts: Record<string, MmPost>;
+}
+
 export interface MattermostApi {
   me(): Promise<MmUser>;
   channel(channelId: string): Promise<MmChannel>;
   botChannels(): Promise<string[]>;
   channelPosts(channelId: string, sinceCreateAt: number): Promise<MmPost[]>;
+  /** The thread a post belongs to (the context plane's read leg): a thread
+   *  IS a post thread, so this is the whole platform window. */
+  getPostThread(postId: string): Promise<MmThread>;
   /** WS-gap recovery: events the socket missed after sequence `seq`. */
   missedEvents(seq: number): Promise<WsEvent[]>;
   /** Returns the created post id. */
   createPost(channelId: string, message: string, rootId?: string): Promise<string>;
+  /** Post carrying attachments: POST /posts with file_ids; returns the post id. */
+  createPostWithFiles(
+    channelId: string,
+    message: string,
+    fileIds: readonly string[],
+    rootId?: string,
+  ): Promise<string>;
+  /** Upload one attachment into a channel (multipart POST /uploads); returns the file id. */
+  uploadFile(
+    channelId: string,
+    filename: string,
+    bytes: Uint8Array,
+    mediaType: string,
+  ): Promise<{ id: string }>;
+  /** Download one attachment's bytes (GET /files/{id}). */
+  downloadFile(fileId: string): Promise<Uint8Array>;
   /** Returns the ledger identity of the created reaction: a synthesized
    * composite (live 11.11 Reaction objects carry no id field). */
   createReaction(postId: string, emojiName: string): Promise<string>;
@@ -56,6 +82,9 @@ export interface MattermostApi {
 }
 
 interface PostDto {
+  id: string;
+}
+interface FileDto {
   id: string;
 }
 interface UserDto {
@@ -117,6 +146,38 @@ export class MattermostClient implements MattermostApi {
     return payload as T;
   }
 
+  /** The binary sibling of `request`: FormData bodies (the uploads API is
+   *  multipart-only) and raw GET downloads. Same error-shaping law: non-2xx
+   *  answers a typed MmError naming the call. No content-type header — fetch
+   *  sets it (a manual value would drop the multipart boundary). */
+  private async requestRaw(
+    call: string,
+    method: string,
+    path: string,
+    body?: FormData,
+  ): Promise<Response> {
+    const response = await this.fetchImpl(`${this.base}/api/v4${path}`, {
+      method,
+      headers: { authorization: `Bearer ${this.botToken}` },
+      ...(body === undefined ? {} : { body }),
+    });
+    if (!response.ok) {
+      let detail: string;
+      try {
+        const payload: unknown = await response.json();
+        detail =
+          typeof payload === "object" && payload !== null
+            ? String((payload as Record<string, unknown>)["message"] ?? "")
+            : "";
+      } catch {
+        detail = "";
+      }
+      observeHttpStatus(response.status);
+      throw new MmError(call, response.status, detail === "" ? undefined : detail);
+    }
+    return response;
+  }
+
   async me(): Promise<MmUser> {
     const dto = await this.request<UserDto>("me", "GET", "/users/me");
     return { id: dto.id, username: dto.username };
@@ -156,6 +217,18 @@ export class MattermostClient implements MattermostApi {
       .filter((post): post is MmPost => post !== undefined && post !== null);
   }
 
+  async getPostThread(postId: string): Promise<MmThread> {
+    // Lenient parse (same law as channelPosts): a platform answer missing
+    // either field degrades to the empty thread, never a TypeError.
+    const dto = await this.request<{ order?: string[]; posts?: Record<string, MmPost> }>(
+      "getPostThread",
+      "GET",
+      `/posts/${postId}/thread`,
+    );
+    const posts = dto.posts ?? {};
+    return { order: dto.order ?? Object.keys(posts), posts };
+  }
+
   async missedEvents(seq: number): Promise<WsEvent[]> {
     // MM WS docs: GET /users/me/missed_events?seq=N returns the buffered
     // events after that sequence (answer is an event array).
@@ -173,6 +246,48 @@ export class MattermostClient implements MattermostApi {
       ...(rootId === undefined ? {} : { root_id: rootId }),
     });
     return dto.id;
+  }
+
+  async createPostWithFiles(
+    channelId: string,
+    message: string,
+    fileIds: readonly string[],
+    rootId?: string,
+  ): Promise<string> {
+    const dto = await this.request<PostDto>("createPost", "POST", "/posts", {
+      channel_id: channelId,
+      message,
+      file_ids: [...fileIds],
+      ...(rootId === undefined ? {} : { root_id: rootId }),
+    });
+    return dto.id;
+  }
+
+  async uploadFile(
+    channelId: string,
+    filename: string,
+    bytes: Uint8Array,
+    mediaType: string,
+  ): Promise<{ id: string }> {
+    // The uploads API law: multipart, the form field name IS the filename,
+    // the channel rides the query. A JSON body would 400 missing_upload.
+    const form = new FormData();
+    const blob = new Blob([bytes.slice()], { type: mediaType });
+    form.append(filename, blob, filename);
+    const response = await this.requestRaw(
+      "uploadFile",
+      "POST",
+      `/uploads?channel_id=${encodeURIComponent(channelId)}`,
+      form,
+    );
+    // MM answers the full FileInfo object; only the id is the contract.
+    const dto = (await response.json()) as FileDto;
+    return { id: dto.id };
+  }
+
+  async downloadFile(fileId: string): Promise<Uint8Array> {
+    const response = await this.requestRaw("downloadFile", "GET", `/files/${fileId}`);
+    return new Uint8Array(await response.arrayBuffer());
   }
 
   async createReaction(postId: string, emojiName: string): Promise<string> {

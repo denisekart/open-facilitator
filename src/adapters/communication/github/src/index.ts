@@ -7,14 +7,17 @@
 // normalizer, publishing the central forge domain events
 // (data.provider = "github"). Outbound command.communication.reply.v1
 // executes as a bot-identity comment under the comment-ledger idempotency
-// law. Stateless apart from the SQLite comment ledger — deployable anywhere
-// the kernel link plane is dialable.
+// law; artifacts ride that comment as uploaded issue images. Stateless apart
+// from the SQLite comment + media ledgers — deployable anywhere the kernel
+// link plane is dialable.
 import { createServer, type Server } from "node:http";
-import type { LinkClient, LinkLogger } from "@ofac/workspace-link";
+import { randomBytes } from "node:crypto";
+import { enroll, type LinkClient, type LinkLogger } from "@ofac/workspace-link";
 import { runProviderAdapter } from "@ofac/provider-core/node";
 import { deriveTenant, type AdapterConfig } from "./config.js";
 import { AdapterState } from "./comment-ledger.js";
 import { GitHubClient, type GitHubApi } from "./github-client.js";
+import { MediaPipeline, assetHostsFor, fetchArtifactContent } from "./media.js";
 import type { NormalizeContext } from "./normalize.js";
 import { createGitHubNormalizer } from "./webhook.js";
 import { createGitHubHandler, githubAdapterManifest } from "./handler.js";
@@ -29,19 +32,29 @@ export {
 export {
   GitHubError,
   GitHubClient,
+  deriveUploadsBase,
   type GitHubApi,
+  type GitHubAsset,
   type GitHubComment,
   type GitHubIssue,
   type GitHubPullRequest,
   type GitHubPullRequestDetail,
   type GitHubReviewComment,
 } from "./github-client.js";
-export { AdapterState, type CommentLedgerEntry } from "./comment-ledger.js";
+export { AdapterState, type CommentLedgerEntry, type FileLedgerEntry } from "./comment-ledger.js";
+export { CONTEXT_FETCH_COMMAND, CONTEXT_FETCHED_EVENT } from "./context.js";
+export {
+  MediaPipeline,
+  assetHostsFor,
+  fetchArtifactContent,
+  type MediaPipelineDeps,
+} from "./media.js";
 export {
   CI_EVENT,
   ISSUE_EVENT,
   MENTION_EVENT,
   PULL_REQUEST_EVENT,
+  collectAssetUrls,
   normalizeCheckSuite,
   normalizeIssueComment,
   normalizeIssues,
@@ -49,14 +62,18 @@ export {
   normalizeReview,
   normalizeReviewComment,
   normalizeStatus,
+  type AssetUrl,
   type NormalizeContext,
   type NormalizedEvent,
 } from "./normalize.js";
 export { createGitHubNormalizer, type GitHubNormalizerDeps } from "./webhook.js";
 export {
+  CMD_POST,
   CMD_REPLY,
+  MEDIA_FACET,
   createGitHubHandler,
   githubAdapterManifest,
+  type ArtifactSource,
   type HandlerDeps,
 } from "./handler.js";
 
@@ -84,11 +101,57 @@ export async function run(
       ? undefined
       : new GitHubClient(config.githubUrl, config.botToken, deps.fetchImpl));
   const state = new AdapterState(config.statePath);
+
+  // Our own link credential for the artifact client + content GETs (the
+  // telegram law): the adapter-face owns the CLIENT's token, so media rides
+  // an enrollment of its own (same secret/endpoint — the kernel issues
+  // per-enrollment tokens; 401 re-enrolls).
+  const linkToken = { value: "" };
+  const enrollSelf = async (): Promise<string> => {
+    const response = await enroll(
+      {
+        baseUrl: config.kernelUrl,
+        token: config.enrollSecret,
+        endpointId: config.endpointId,
+        instanceId: `gha-${randomBytes(6).toString("hex")}`,
+        trustMode: "isolated-executor",
+        role: "child",
+        team: config.team,
+      },
+      ...(deps.fetchImpl === undefined ? [] : [deps.fetchImpl]),
+    );
+    linkToken.value = response.linkToken ?? "";
+    return linkToken.value;
+  };
+  const token = async (): Promise<string> =>
+    linkToken.value === "" ? await enrollSelf() : linkToken.value;
+
+  // The media leg rides the bot token (the only GitHub identity) and the
+  // facet's own caps: no token ⇒ no media, text-only events as before; the
+  // GITHUB_MEDIA_ENABLED switch rides the shared law's own `enabled` gate
+  // (a disabled leg notes and skips, never ingests).
+  const media =
+    api === undefined
+      ? undefined
+      : new MediaPipeline({
+          api,
+          state,
+          kernelUrl: config.kernelUrl,
+          token,
+          endpointId: config.endpointId,
+          maxBytes: config.mediaMaxBytes,
+          enabled: config.mediaEnabled,
+          assetHosts: assetHostsFor(config.githubUrl),
+          logger,
+          ...(deps.fetchImpl === undefined ? {} : { fetchImpl: deps.fetchImpl }),
+        });
+
   const ctx: NormalizeContext = {
     providerInstanceId: config.providerInstanceId,
     tenantOrOrganizationId: tenant,
     workLabels: new Set(config.workLabels.map((label) => label.toLowerCase())),
     botUser: config.botUser,
+    mediaArtifactsFor: (objectId) => media?.artifactsFor(objectId) ?? [],
   };
 
   const handle = await runProviderAdapter(
@@ -103,9 +166,21 @@ export async function run(
         ctx,
         webhookSecret: config.webhookSecret,
         api,
+        ...(media === undefined ? {} : { media }),
         logger,
       }),
-      handler: createGitHubHandler({ api, state, logger }),
+      handler: createGitHubHandler({
+        api,
+        state,
+        // The reply-with-artifact path: the link-plane content GET rides our
+        // own enrollment token.
+        media: {
+          download: (artifactId: string) =>
+            fetchArtifactContent(config.kernelUrl, artifactId, token, deps.fetchImpl ?? fetch),
+        },
+        providerInstanceId: config.providerInstanceId,
+        logger,
+      }),
       logger,
       ...(deps.fetchImpl === undefined ? {} : { fetchImpl: deps.fetchImpl }),
     },

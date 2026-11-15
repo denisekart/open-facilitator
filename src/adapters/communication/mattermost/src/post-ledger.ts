@@ -6,11 +6,16 @@
 //   channels    — channel-type cache (MM WS events carry no channel type).
 //   bound_roots — thread roots the adapter participated in (the outbound
 //                 posts' root_id): the bound-thread classifier.
+//   files       — the media dedupe ledger (Mattermost file id → artifactId):
+//                 an inbound file seen twice costs one upload (the shared
+//                 media law in @ofac/adapter reads/writes it through the
+//                 column names below).
 //   kv          — cursor state (last_seen create_at for startup replay).
 import { chmodSync, existsSync } from "node:fs";
+import { createMediaLedger, type MediaLedger } from "@ofac/adapter";
 import Database from "better-sqlite3";
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 const DDL = `
 CREATE TABLE IF NOT EXISTS posts (
@@ -29,6 +34,14 @@ CREATE TABLE IF NOT EXISTS bound_roots (
   root_id TEXT PRIMARY KEY,
   channel_id TEXT NOT NULL,
   seen_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS files (
+  file_unique_id TEXT PRIMARY KEY,
+  artifact_id   TEXT NOT NULL,
+  media_type    TEXT NOT NULL,
+  size          INTEGER NOT NULL,
+  digest        TEXT NOT NULL,
+  created_at    INTEGER NOT NULL
 );
 CREATE TABLE IF NOT EXISTS kv (
   key TEXT PRIMARY KEY,
@@ -80,6 +93,12 @@ export class AdapterState {
     const version = this.db.pragma("user_version", { simple: true }) as number;
     if (version === 0) {
       this.db.exec(`BEGIN IMMEDIATE;${DDL}PRAGMA user_version = ${SCHEMA_VERSION};COMMIT;`);
+    } else if (version === 1) {
+      // Wave-2 media leg: the v1 state files carry every table but `files` —
+      // additive migration, never a rebuild.
+      this.db.exec(
+        "BEGIN IMMEDIATE;CREATE TABLE IF NOT EXISTS files (file_unique_id TEXT PRIMARY KEY, artifact_id TEXT NOT NULL, media_type TEXT NOT NULL, size INTEGER NOT NULL, digest TEXT NOT NULL, created_at INTEGER NOT NULL);PRAGMA user_version = 2;COMMIT;",
+      );
     } else if (version !== SCHEMA_VERSION) {
       throw new Error(
         `adapter state: unsupported schema version ${version} (this build writes ${SCHEMA_VERSION})`,
@@ -148,6 +167,13 @@ export class AdapterState {
       root_id: string;
     }[];
     return new Set(rows.map((r) => r.root_id));
+  }
+
+  /** The `files`-table media dedupe ledger, built on the shared law
+   *  (`@ofac/adapter` media-law): this adapter's schema stays its own —
+   *  the timestamp column is `created_at`, not the law's `seen_at` default. */
+  mediaLedger(): MediaLedger {
+    return createMediaLedger(this.db, { createdAt: "created_at" });
   }
 
   getKv(key: string): string | undefined {

@@ -13,7 +13,8 @@ plus the read-mostly Admin surface.
   here: `DependencyGate` (DAG gate + wake law), `ExecutionLedger` (attempt
   open/finalize behind the `current_execution_generation` fence — a terminal
   event at a stale generation is 422 `stale-generation`), `NudgeSweeper`
-  (bounded nudge behind admin_config `nudge-policy`; absent = inert).
+  (bounded nudge behind admin_config `nudge-policy`; absent = inert); the
+  media/context plane (`MediaReplyPolicy`, `Context*`) lives here too.
 - `Kernel/Routing/` — the routing funnel (`RoutingSink`, dispatcher channel
   `routing`): the ONLY producer of `work.assign` rows + the
   `routing_decisions` audit ledger; intents are appended by Work/Provider

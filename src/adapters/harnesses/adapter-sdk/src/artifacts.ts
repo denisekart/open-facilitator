@@ -22,6 +22,7 @@ import {
   type EnvelopeEvent,
 } from "@ofac/protocol";
 import { buildEvent, dataschemaFor, trimSlash } from "@ofac/workspace-link";
+import type { ContextFetchAck, ContextFetchItem } from "./types.js";
 
 const REQUEST_UPLOAD_TYPE = "org.facilitator.command.artifact.request_upload.v1";
 const CONFIRM_UPLOAD_TYPE = "org.facilitator.command.artifact.confirm_upload.v1";
@@ -190,6 +191,62 @@ async function safeBody(response: Response): Promise<string> {
   } catch {
     return "<no body>";
   }
+}
+
+const CONTEXT_FETCH_TYPE = "org.facilitator.command.context.fetch.v1";
+
+/**
+ * The synchronous context read: post `command.context.fetch.v1` and read the
+ * kernel-local items INLINE off the admission ack (the fetch arm answers the
+ * read in-band; unresolved `thread://` legs come back marked `pending`).
+ */
+export async function fetchContext(
+  client: KernelHttpOptions,
+  uris: readonly string[],
+  opts: { readonly workId?: string; readonly targetId?: string } = {},
+): Promise<ContextFetchAck> {
+  const base = trimSlash(client.baseUrl);
+  const doFetch: typeof fetch = client.fetchImpl ?? ((...args) => fetch(...args));
+  const token = typeof client.token === "function" ? await client.token() : client.token;
+  const commandId = `cmd-ctx-${randomUUID()}`;
+  const response = await doFetch(`${base}/api/link/v1/events`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+    body: JSON.stringify({
+      specversion: "1.0",
+      id: randomUUID(),
+      source: "urn:ofac:adapter",
+      type: CONTEXT_FETCH_TYPE,
+      subject: opts.workId !== undefined ? `work/${opts.workId}` : `context/${commandId}`,
+      time: new Date().toISOString(),
+      datacontenttype: "application/json",
+      dataschema: dataschemaFor(CONTEXT_FETCH_TYPE),
+      data: {
+        commandId,
+        workId: opts.workId ?? "00000000-0000-0000-0000-000000000000",
+        targetId: opts.targetId ?? "kernel",
+        actorEvidenceRef: "workload:adapter",
+        deadline: new Date(Date.now() + 60_000).toISOString(),
+        contextRefs: [...uris],
+      },
+    } satisfies EnvelopeCommand),
+  });
+  if (!response.ok && response.status !== 202) {
+    throw new Error(`context fetch post failed: ${response.status} ${await safeBody(response)}`);
+  }
+  const ack = (await response.json()) as Record<string, unknown>;
+  const data = (ack["data"] ?? {}) as Record<string, unknown>;
+  const items = Array.isArray(data["items"]) ? (data["items"] as ContextFetchItem[]) : [];
+  const pending = Array.isArray(data["pending"])
+    ? (data["pending"] as { uri: string }[]).map((p) => ({
+        uri: String(p["uri"]),
+        pending: true as const,
+      }))
+    : [];
+  return {
+    fetchId: String(data["fetchId"] ?? ""),
+    items: [...items, ...pending],
+  };
 }
 
 /** One `outputs[]` entry: an `artifactRef` (common.v1.json) — the 7 frozen

@@ -4,12 +4,7 @@
   "title": "CapabilityManifestV1",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "apiVersion",
-    "kind",
-    "ownerTeam",
-    "capabilities"
-  ],
+  "required": ["apiVersion", "kind", "ownerTeam", "capabilities"],
   "properties": {
     "apiVersion": {
       "const": "facilitator.framework/v1"
@@ -26,11 +21,7 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": [
-          "id",
-          "version",
-          "execution"
-        ],
+        "required": ["id", "version", "execution"],
         "properties": {
           "id": {
             "$ref": "common.v1.json#/$defs/idToken"
@@ -41,10 +32,7 @@
           },
           "execution": {
             "type": "string",
-            "enum": [
-              "synchronous",
-              "asynchronous"
-            ]
+            "enum": ["synchronous", "asynchronous"]
           },
           "inputSchema": {
             "type": "string",
@@ -54,11 +42,7 @@
             "type": "array",
             "items": {
               "type": "string",
-              "enum": [
-                "uri-reference",
-                "inline-text",
-                "artifact-reference"
-              ]
+              "enum": ["uri-reference", "inline-text", "artifact-reference"]
             }
           },
           "outputKinds": {
@@ -84,6 +68,48 @@
           },
           "supportsInteraction": {
             "type": "boolean"
+          },
+          "media": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["directions"],
+            "properties": {
+              "directions": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "enum": ["in", "out"]
+                }
+              },
+              "kinds": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-z]+/[a-z*+.\\-]+$"
+                }
+              },
+              "maxCount": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 8
+              },
+              "maxBytesPerItem": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "semantics": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "caption": {
+                    "type": "boolean"
+                  },
+                  "attachmentUpload": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
           }
         },
         "title": "CapabilityDescriptor"

@@ -26,6 +26,7 @@
 // strings depending on hook family — the mapping to names is THIS module's
 // job, before the shared normalizeLabels pass.
 import type {
+  ArtifactRef,
   ConversationReference,
   ProviderChangeRequestEventV1Data,
   ProviderIssueEventV1Data,
@@ -66,6 +67,10 @@ export interface NormalizeContext {
   workLabels: ReadonlySet<string>;
   /** Exact-match echo identity (GITLAB_BOT_USER). */
   botUser: string;
+  /** Artifact refs the media pipeline already uploaded for this provider
+   *  object id (note id). Optional: a no-token boot has no media leg, and
+   *  the wire's sourceRefs slot then simply stays empty. */
+  mediaArtifactsFor?(objectId: string): ArtifactRef[];
 }
 
 /** GitLab hooks scope everything to `project` — `path_with_namespace` is the
@@ -117,6 +122,24 @@ function reference(
   };
 }
 
+/** GitLab webhook payloads carry NO structured attachments — a pasted image
+ *  lives only in the markdown the web UI wrote into the note/issue body.
+ *  This is the extraction the media leg rides: image markdown
+ *  (`![name](url)`) whose URL starts with or contains `/uploads/` (GitLab's
+ *  project-upload path, root-relative or absolute), de-duplicated in order.
+ *  The returned strings ride verbatim into `downloadAsset`, which joins a
+ *  root-relative path with the configured base. */
+export function collectUploadUrls(body: string | undefined): string[] {
+  if (body === undefined || body === "") return [];
+  const urls: string[] = [];
+  for (const match of body.matchAll(/!\[[^\]]*\]\(\s*<?([^)>\s]+)>?/g)) {
+    const url = match[1] ?? "";
+    if (!url.includes("/uploads/")) continue;
+    if (!urls.includes(url)) urls.push(url);
+  }
+  return urls;
+}
+
 /** The @-bot mention companion for a mapped comment delivery (empty when the
  *  body does not name the bot or carries no text). */
 function mentionCompanion(
@@ -130,6 +153,9 @@ function mentionCompanion(
   text: string | undefined,
 ): NormalizedEvent[] {
   if (!mentionsBot(text, ctx.botUser)) return [];
+  // The media-before-publish law: the pipeline already ran for THIS note, so
+  // its refs (if any) ride the mention event's sourceRefs.
+  const refs = ctx.mediaArtifactsFor?.(messageId ?? "") ?? [];
   const data: ProviderMentionEventV1Data = {
     reference: reference(ctx, repo, number, author, messageId),
     provider: "gitlab",
@@ -137,6 +163,7 @@ function mentionCompanion(
     actorProviderAccountId: author,
     text: (text ?? "").slice(0, 8192),
     payload,
+    ...(refs.length > 0 ? { sourceRefs: refs } : {}),
   };
   return [{ type: MENTION_EVENT_TYPE, data }];
 }

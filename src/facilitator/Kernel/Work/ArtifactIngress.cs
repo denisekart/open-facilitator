@@ -2,9 +2,11 @@ using System.Text.Json;
 
 using Facilitator.Kernel.Shared;
 using Facilitator.Kernel.Shared.Evidence;
+using Facilitator.Kernel.Shared.Persistence;
 using Facilitator.Kernel.Shared.Storage;
 
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace Facilitator.Kernel.Work;
 
@@ -31,7 +33,9 @@ public sealed record ArtifactArm(ProblemDetails? Problem, string Status, Artifac
 /// rewrites a kernel row — first writer owns it (a mismatched re-declaration is
 /// a refused 422 + denied audit).
 /// </summary>
-public sealed class ArtifactIngress(IArtifactLedger ledger)
+public sealed class ArtifactIngress(
+    IArtifactLedger ledger,
+    IDbContextFactory<FacilitatorDbContext> contextFactory)
 {
     /// <summary>Command arm: allocate an upload slot for a screened request_upload envelope.</summary>
     public async Task<ArtifactArm> HandleRequestUploadAsync(
@@ -43,10 +47,20 @@ public sealed class ArtifactIngress(IArtifactLedger ledger)
             return new ArtifactArm(problem, "failed");
         }
 
+        // 5.2: a declared kind inherits the policy's retentionDays for that
+        // kind (media rows are disposable by default); an unkinded upload or
+        // an unlisted kind keeps the caller's/ permanent default.
+        var retention = fields.RetentionPolicy;
+        if (retention is null && fields.Kind is { Length: > 0 } artifactKind)
+        {
+            await using var db = await contextFactory.CreateDbContextAsync(ct);
+            retention = await MediaPolicy.RetentionForKindAsync(db, artifactKind, 30, ct);
+        }
+
         var ticket = await ledger.AllocateAsync(
             fields.MediaType, fields.Size, fields.Digest, fields.WorkId, fields.AssignmentId,
-            fields.RetentionPolicy, fields.Comment, fields.CommandId,
-            principal, null, "link", ct);
+            retention, fields.Comment, fields.CommandId,
+            principal, null, "link", ct, fields.Kind);
         return new ArtifactArm(null, "accepted", ticket);
     }
 
@@ -111,7 +125,7 @@ internal static class ArtifactArmPolicy
     /// <summary>Parse + validate the allocation fields. Returns false with the typed problem on any violation.</summary>
     public static bool TryParse(
         JsonElement data,
-        out (string MediaType, long Size, string Digest, Guid? WorkId, Guid? AssignmentId, string? RetentionPolicy, string? Comment, string? CommandId) fields,
+        out (string MediaType, long Size, string Digest, Guid? WorkId, Guid? AssignmentId, string? RetentionPolicy, string? Comment, string? CommandId, string? Kind) fields,
         out ProblemDetails? problem)
     {
         fields = default;
@@ -180,7 +194,16 @@ internal static class ArtifactArmPolicy
             return false;
         }
 
-        fields = (mediaType!, size, digest, workId, assignmentId, retention, comment, GetString(data, "commandId"));
+        // Optional taxonomy label (same law as the wire artifactRef.kind):
+        // opaque to the kernel, persisted so readers echo what was declared.
+        var kind = GetString(data, "kind");
+        if (kind is { Length: > 64 })
+        {
+            problem = ProblemErrors.SchemaViolation("kind exceeds 64 chars");
+            return false;
+        }
+
+        fields = (mediaType!, size, digest, workId, assignmentId, retention, comment, GetString(data, "commandId"), kind);
         return true;
     }
 

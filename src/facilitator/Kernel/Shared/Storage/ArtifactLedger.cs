@@ -118,7 +118,8 @@ public interface IArtifactLedger
         EffectivePrincipal? principal,
         FacilitatorPrincipal? human,
         string origin,
-        CancellationToken ct);
+        CancellationToken ct,
+        string? kind = null);
 
     /// <summary>The ticket a duplicate request_upload re-attaches: only while the row is pending and un-expired.</summary>
     Task<ArtifactTicket?> TicketForCommandAsync(string commandId, string origin, CancellationToken ct);
@@ -176,7 +177,8 @@ public sealed class ArtifactLedger(
         EffectivePrincipal? principal,
         FacilitatorPrincipal? human,
         string origin,
-        CancellationToken ct)
+        CancellationToken ct,
+        string? kind = null)
     {
         var now = timeProvider.GetUtcNow().UtcDateTime;
         var (createdBy, teamSlug, endpointId) = OriginOf(principal, human, origin);
@@ -201,6 +203,7 @@ public sealed class ArtifactLedger(
             WorkId = workId,
             AssignmentId = assignmentId,
             MediaType = mediaType,
+            Kind = kind,
             Size = size,
             Digest = digest,
             StorageUri = string.Empty,

@@ -97,6 +97,36 @@ export interface ForgejoApi {
     event: string,
     body: string,
   ): Promise<{ id: number }>;
+  /** Upload an issue/PR attachment (multipart POST issues/{n}/attachments).
+   *  The outbound media leg: the answer's `download_url` rides the comment
+   *  markdown the reply folds the attachment into. */
+  uploadIssueAttachment(
+    repo: string,
+    number: number,
+    filename: string,
+    bytes: Uint8Array,
+    mediaType: string,
+  ): Promise<ForgejoAttachment>;
+  /** GET an ABSOLUTE forge URL (an inbound attachment's download URL) with
+   *  the same token header — the media leg's download seam. */
+  downloadAsset(url: string): Promise<Uint8Array>;
+  /** GET the comment window of an issue/PR thread (the context leg: what
+   *  answers a routed `thread://forgejo/…` fetch, the URI's `limit`). A
+   *  thread here IS the issue/PR comment thread, so the window is the
+   *  issue's comment list; the author is the comment author's login. */
+  listIssueComments(
+    repo: string,
+    number: number,
+    limit: number,
+  ): Promise<{ author: string; body: string; created: string }[]>;
+}
+
+/** The created attachment (REST API shape, subset): the media leg reads the
+ *  id as the dedupe key and the download URL for the comment markdown. */
+export interface ForgejoAttachment {
+  id: number;
+  url: string;
+  download_url: string;
 }
 
 export interface ForgejoPullRequestDetail {
@@ -122,6 +152,14 @@ interface CommentListDto {
   id: number;
   html_url: string;
   body: string;
+}
+
+/** The context leg's window DTO (subset): the author's login, the body and
+ *  the creation stamp the issue-comments route answers with. */
+interface CommentWindowDto {
+  body?: string;
+  created_at?: string;
+  user?: { login?: string };
 }
 
 interface PrDto {
@@ -344,5 +382,75 @@ export class ForgejoClient implements ForgejoApi {
       { event, body },
     );
     return { id: dto.id };
+  }
+
+  /** The FormData sibling of `request`: same token header, same ForgejoError
+   *  shaping; no content-type header — fetch mints the multipart boundary.
+   *  `absolute` paths bypass the /api/v1 base (downloadAsset's law). */
+  private async requestForm(
+    call: string,
+    method: string,
+    path: string,
+    body: FormData,
+  ): Promise<unknown> {
+    const response = await this.fetchImpl(path.startsWith("http") ? path : `${this.base}${path}`, {
+      method,
+      headers: { authorization: `token ${this.token}` },
+      body,
+    });
+    if (!response.ok) {
+      const text = await response.text().catch(() => "");
+      observeHttpStatus(response.status);
+      throw new ForgejoError(call, response.status, text.slice(0, 200));
+    }
+    return response.status === 204 || response.status === 205 ? undefined : response.json();
+  }
+
+  async uploadIssueAttachment(
+    repo: string,
+    number: number,
+    filename: string,
+    bytes: Uint8Array,
+    mediaType: string,
+  ): Promise<ForgejoAttachment> {
+    const form = new FormData();
+    form.append("file", new Blob([new Uint8Array(bytes)], { type: mediaType }), filename);
+    const dto = (await this.requestForm(
+      "uploadIssueAttachment",
+      "POST",
+      `/repos/${repo}/issues/${number}/attachments`,
+      form,
+    )) as Partial<ForgejoAttachment>;
+    return { id: dto.id ?? 0, url: dto.url ?? "", download_url: dto.download_url ?? "" };
+  }
+
+  async downloadAsset(url: string): Promise<Uint8Array> {
+    const response = await this.fetchImpl(url, {
+      headers: { authorization: `token ${this.token}` },
+      redirect: "follow",
+    });
+    if (!response.ok) {
+      const text = await response.text().catch(() => "");
+      observeHttpStatus(response.status);
+      throw new ForgejoError("downloadAsset", response.status, text.slice(0, 200));
+    }
+    return new Uint8Array(await response.arrayBuffer());
+  }
+
+  async listIssueComments(
+    repo: string,
+    number: number,
+    limit: number,
+  ): Promise<{ author: string; body: string; created: string }[]> {
+    const dtos = await this.request<CommentWindowDto[]>(
+      "listIssueComments",
+      "GET",
+      `/repos/${repo}/issues/${number}/comments?limit=${limit}`,
+    );
+    return dtos.map((dto) => ({
+      author: dto.user?.login ?? "unknown",
+      body: dto.body ?? "",
+      created: dto.created_at ?? "",
+    }));
   }
 }

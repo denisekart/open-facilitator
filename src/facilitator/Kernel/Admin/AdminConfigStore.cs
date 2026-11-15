@@ -285,9 +285,105 @@ public sealed class AdminConfigStore(
             UnknownFields(payload, "notifyAfterMinutes", "audience"),
             IntField(payload, "notifyAfterMinutes", 1, 10080),
             EnumField(payload, "audience", ["owner", "team", "operators"])),
+        // ^ The media plane's federation law (plan 5.1): system-wide defaults
+        // plus per-team entries; absent resource = today's behavior
+        // (facet-only, 8 MB / 8 items). MediaPolicy reads the stored shape.
+        ["media-policy"] = ValidateMediaPolicy,
     };
 
     private static string? FirstError(params string?[] errors) => errors.FirstOrDefault(static e => e is not null);
+
+    /// <summary>The <c>media-policy</c> shape (plan 5.1): <c>defaults</c>
+    /// (per-item byte budget, item count, per-kind retention days) and a
+    /// <c>teams</c> array of per-team federation entries. Deliberately narrow:
+    /// the readers (MediaPolicy, ContextBuilder) treat anything unparseable as
+    /// "no policy", so this gate only keeps clearly broken shapes off the
+    /// wire — MIME glob syntax is the readers' match law, not a write gate.</summary>
+    private static string? ValidateMediaPolicy(JsonElement payload)
+    {
+        var unknown = UnknownFields(payload, "defaults", "teams");
+        if (unknown is not null)
+        {
+            return unknown;
+        }
+
+        if (payload.TryGetProperty("defaults", out var defaults))
+        {
+            if (defaults.ValueKind != JsonValueKind.Object)
+            {
+                return "defaults must be an object";
+            }
+
+            var defaultsError = FirstError(
+                UnknownFields(defaults, "maxBytesPerItem", "maxCount", "retentionDays"),
+                IntField(defaults, "maxBytesPerItem", 1, 1_073_741_824),
+                IntField(defaults, "maxCount", 1, 8));
+            if (defaultsError is not null)
+            {
+                return defaultsError;
+            }
+
+            if (defaults.TryGetProperty("retentionDays", out var retention))
+            {
+                if (retention.ValueKind != JsonValueKind.Object)
+                {
+                    return "retentionDays must be an object";
+                }
+
+                foreach (var kind in retention.EnumerateObject())
+                {
+                    if (!kind.Value.TryGetInt32(out var days) || days < 1 || days > 9999)
+                    {
+                        return $"retentionDays.{kind.Name} must be an integer 1..9999";
+                    }
+                }
+            }
+        }
+
+        if (!payload.TryGetProperty("teams", out var teams))
+        {
+            return null;
+        }
+
+        if (teams.ValueKind != JsonValueKind.Array)
+        {
+            return "teams must be an array";
+        }
+
+        foreach (var entry in teams.EnumerateArray())
+        {
+            var entryError = FirstError(
+                UnknownFields(entry, "team", "allowKinds", "forbidKinds", "history"),
+                StringField(entry, "team", 1, 64));
+            if (entryError is not null)
+            {
+                return entryError;
+            }
+
+            foreach (var list in new[] { "allowKinds", "forbidKinds" })
+            {
+                if (entry.TryGetProperty(list, out var kinds)
+                    && kinds.ValueKind != JsonValueKind.Array)
+                {
+                    return $"{list} must be an array";
+                }
+            }
+
+            if (entry.TryGetProperty("history", out var history))
+            {
+                var historyError = FirstError(
+                    UnknownFields(history, "toHarnessMaxMessages", "toForeignTeam"),
+                    IntField(history, "toHarnessMaxMessages", 1, 100),
+                    BoolField(history, "toForeignTeam"));
+                if (historyError is not null)
+                {
+                    return historyError;
+                }
+            }
+        }
+
+        return null;
+    }
 
     private static string? UnknownFields(JsonElement payload, params string[] allowed)
     {

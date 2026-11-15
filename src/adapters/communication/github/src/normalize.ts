@@ -28,7 +28,9 @@
 // The label policy lives HERE (the kernel only reads workTrigger). The
 // normalized fields (headRef/labels/commentId) ride so the kernel NEVER
 // digs vendor payload shapes.
+import { createHash } from "node:crypto";
 import type {
+  ArtifactRef,
   ConversationReference,
   ProviderChangeRequestEventV1Data,
   ProviderIssueEventV1Data,
@@ -68,10 +70,53 @@ export interface NormalizeContext {
   workLabels: ReadonlySet<string>;
   /** Exact-match echo identity (GITHUB_BOT_USER). */
   botUser: string;
+  /** Artifact refs the media pipeline already uploaded for this provider
+   *  object id (comment/issue id). Optional: a no-token boot has no media
+   *  leg, and the wire's sourceRefs slot then simply stays empty. */
+  mediaArtifactsFor?(objectId: string): ArtifactRef[];
 }
 
 function repoOf(payload: Payload): string | undefined {
   return str(obj(payload["repository"])?.["full_name"]);
+}
+
+/** One image URL a comment/issue body carries (the GitHub inbound media
+ *  form: the webhook payload has NO structured attachments field, the
+ *  uploads route only answers an `asset_url`, so the markdown IS the
+ *  attachment list). */
+export interface AssetUrl {
+  url: string;
+  /** The stable dedupe key: sha256 hex of the URL, first 16 chars. */
+  uniqueId: string;
+}
+
+const IMAGE_MARKDOWN = /!\[[^\]]*\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g;
+
+/** The `![alt](url)` / `![alt](url "title")` image URLs of one markdown body
+ *  whose HOST equals one of the deployment's uploads/asset hosts (an exact
+ *  host match, so a screenshot hotlinked off someone's blog is not ingested).
+ *  Fragments are stripped (`url#…` occurs on edited bodies) before the key is
+ *  taken and the URL is reported; duplicates collapse. */
+export function collectAssetUrls(body: string, hosts: ReadonlySet<string>): AssetUrl[] {
+  const seen = new Set<string>();
+  const found: AssetUrl[] = [];
+  for (const match of body.matchAll(IMAGE_MARKDOWN)) {
+    const raw = match[1];
+    if (raw === undefined) continue;
+    const url = raw.split("#")[0] ?? raw;
+    let parsed: URL;
+    try {
+      parsed = new URL(url);
+    } catch {
+      continue;
+    }
+    if (!hosts.has(parsed.hostname)) continue;
+    const uniqueId = createHash("sha256").update(url).digest("hex").slice(0, 16);
+    if (seen.has(uniqueId)) continue;
+    seen.add(uniqueId);
+    found.push({ url, uniqueId });
+  }
+  return found;
 }
 
 function senderDropped(payload: Payload, ctx: NormalizeContext): boolean {
@@ -115,6 +160,7 @@ function mentionCompanion(
   text: string | undefined,
 ): NormalizedEvent[] {
   if (!mentionsBot(text, ctx.botUser)) return [];
+  const refs = ctx.mediaArtifactsFor?.(messageId ?? "") ?? [];
   const data: ProviderMentionEventV1Data = {
     reference: reference(ctx, repo, number, author, messageId),
     provider: "github",
@@ -122,6 +168,7 @@ function mentionCompanion(
     actorProviderAccountId: author,
     text: (text ?? "").slice(0, 8192),
     payload,
+    ...(refs.length > 0 ? { sourceRefs: refs } : {}),
   };
   return [{ type: MENTION_EVENT_TYPE, data }];
 }

@@ -449,6 +449,9 @@ importers:
 
   src/adapters/communication/forgejo:
     dependencies:
+      '@ofac/adapter':
+        specifier: workspace:*
+        version: link:../../harnesses/adapter-sdk
       '@ofac/protocol':
         specifier: workspace:*
         version: link:../../../protocol
@@ -526,6 +529,9 @@ importers:
 
   src/adapters/communication/github:
     dependencies:
+      '@ofac/adapter':
+        specifier: workspace:*
+        version: link:../../harnesses/adapter-sdk
       '@ofac/protocol':
         specifier: workspace:*
         version: link:../../../protocol
@@ -603,6 +609,9 @@ importers:
 
   src/adapters/communication/gitlab:
     dependencies:
+      '@ofac/adapter':
+        specifier: workspace:*
+        version: link:../../harnesses/adapter-sdk
       '@ofac/protocol':
         specifier: workspace:*
         version: link:../../../protocol
@@ -680,6 +689,9 @@ importers:
 
   src/adapters/communication/mattermost:
     dependencies:
+      '@ofac/adapter':
+        specifier: workspace:*
+        version: link:../../harnesses/adapter-sdk
       '@ofac/protocol':
         specifier: workspace:*
         version: link:../../../protocol

@@ -94,6 +94,7 @@ export interface CapabilityDescriptor {
   execution: Execution;
   id: string;
   inputSchema?: string;
+  media?: Media;
   outputKinds?: string[];
   outputMediaTypes?: string[];
   supportsCancellation?: boolean;
@@ -106,6 +107,21 @@ export interface CapabilityDescriptor {
 export type AcceptedContext = "uri-reference" | "inline-text" | "artifact-reference";
 
 export type Execution = "synchronous" | "asynchronous";
+
+export interface Media {
+  directions: [Direction, ...Direction[]];
+  kinds?: string[];
+  maxBytesPerItem?: number;
+  maxCount?: number;
+  semantics?: Semantics;
+}
+
+export type Direction = "in" | "out";
+
+export interface Semantics {
+  attachmentUpload?: boolean;
+  caption?: boolean;
+}
 
 export type CapabilityManifestV1Kind = "CapabilityManifest";
 
@@ -142,6 +158,7 @@ export interface ArtifactRequestUploadCommandV1Data {
   commandId: string;
   comment?: string;
   digest: string;
+  kind?: string;
   mediaType: string;
   retentionPolicy?: string;
   size: number;
@@ -655,6 +672,21 @@ export interface AssignmentInputRequiredEventV1Data {
   question: string;
   requestId: string;
   workId: string;
+}
+
+export interface ContextFetchedEventV1Data {
+  deadline?: string;
+  fetchId: string;
+  items: [Item, ...Item[]];
+  note?: string;
+  responder: string;
+  workId: string;
+}
+
+export interface Item {
+  content: { [key: string]: unknown };
+  truncated: boolean;
+  uri: string;
 }
 
 export interface MemoryCandidateEventV1Data {

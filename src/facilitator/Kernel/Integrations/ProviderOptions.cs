@@ -88,6 +88,22 @@ public sealed class ProviderOptions
     /// Interim routing until capability routing lands.</summary>
     public List<AssignRule> AssignRules { get; init; } = [];
 
+    /// <summary>Outbound media arm: when true, a completion reply that reaches
+    /// a terminal-completed state attaches the work's recorded-manifest output
+    /// artifacts to the <c>communication.reply.v1</c>/<c>post.v1</c> envelope
+    /// (subject to the endpoint's declared <c>media</c> capability facet and
+    /// the media policy). Dropped or unsupported candidates never vanish
+    /// silently: the reply text carries a brokered link line and every media
+    /// act writes one audit row (<c>media.reply</c>/<c>media.degrade</c>).
+    /// Default false: no route attaches bytes until its operator opts in.</summary>
+    public bool SendManifestArtifacts { get; init; }
+
+    /// <summary>Provider-level default context block (mirrors how
+    /// <see cref="AssignEndpointId"/> defaults what <see cref="AssignRules"/>
+    /// may override per rule): the rule's own <c>context</c> wins when it
+    /// carries one.</summary>
+    public List<ContextSource> AssignContext { get; init; } = [];
+
     /// <summary>Chat-plane label routing: when true, the chat Work-creation
     /// paths (mention arm, slash plane, decode sink) match
     /// <see cref="AssignRules"/> against the event's adapter-normalized
@@ -142,6 +158,110 @@ public sealed class AssignRule
     /// endpoint's fleet: the result-manifest ledger team-scopes a work's
     /// artifacts, so a cross-team worker could never record its manifest.</summary>
     public string? Team { get; init; }
+
+    /// <summary>The declarative context block folded into this rule's assign
+    /// envelope (see <see cref="ContextSource"/>): routes without a block get
+    /// today's envelope verbatim, forever.</summary>
+    public List<ContextSource> Context { get; init; } = [];
+}
+
+/// <summary>One <c>context[n]</c> row of a route's declared context block.
+/// Exactly ONE source key per row (validated at config load,
+/// <c>context-key-unknown</c> for anything else — the additionalProperties
+/// law is the validator's, not the binder's):</summary>
+/// <example>
+/// <code>
+/// "context": [
+///   { "envelope": "required" },
+///   { "history": { "thread": "$event.reference", "last": 20, "order": "asc" } },
+///   { "media": { "from": "$event.data.sourceRefs", "content": "brokered", "maxBytes": 8388608 } },
+///   { "work": { "fields": ["objective", "state", "requirements"] } },
+///   { "timeline": { "last": 30 } },
+///   { "memory": { "recall": "$project.tags", "scopes": ["team:$work.team"], "limit": 6 } },
+///   { "budget": { "totalBytes": 32768, "onOverflow": "truncate-note" } }
+/// ]
+/// </code>
+/// </example>
+public sealed class ContextSource
+{
+    /// <summary>Envelope source: <c>required</c> (refuse when absent) or
+    /// <c>optional</c>; the dispatch envelope's event/mention payload rides
+    /// the document.</summary>
+    public string? Envelope { get; init; }
+
+    /// <summary>Thread history: <c>thread</c> names the thread (a
+    /// <c>$event.reference</c> template or a literal <c>thread://</c> URI),
+    /// <c>last</c> caps messages (≤ 100), <c>order</c> asc|desc.</summary>
+    public ContextHistory? History { get; init; }
+
+    /// <summary>Inbound media: <c>from</c> a <c>$…sourceRefs</c> template,
+    /// content mode (brokered URL today), per-item <c>maxBytes</c>.</summary>
+    public ContextMedia? Media { get; init; }
+
+    /// <summary>Work fields: the named subset of the work row
+    /// (<c>objective</c>, <c>state</c>, <c>requirements</c>, …).</summary>
+    public ContextWork? Work { get; init; }
+
+    /// <summary>Work timeline: the last <c>last</c> (≤ 100) work events.</summary>
+    public ContextTimeline? Timeline { get; init; }
+
+    /// <summary>Memory recall: <c>recall</c> is the query (a <c>$…</c>
+    /// template), <c>scopes</c> selector list (team-scoped or composition
+    /// fails), <c>limit</c> entries.</summary>
+    public ContextMemory? Memory { get; init; }
+
+    /// <summary>The whole document's byte budget + overflow behavior
+    /// (<c>truncate-note</c> today: trim items and say so).</summary>
+    public ContextBudget? Budget { get; init; }
+
+    /// <summary>The <c>context[n]</c> index paths this row populates (for
+    /// audit justification strings).</summary>
+    public string Key() =>
+        Envelope is not null ? "envelope"
+        : History is not null ? "history"
+        : Media is not null ? "media"
+        : Work is not null ? "work"
+        : Timeline is not null ? "timeline"
+        : Memory is not null ? "memory"
+        : Budget is not null ? "budget"
+        : string.Empty;
+}
+
+public sealed class ContextHistory
+{
+    public string? Thread { get; init; }
+    public int Last { get; init; } = 20;
+    public string? Order { get; init; }
+}
+
+public sealed class ContextMedia
+{
+    public string? From { get; init; }
+    public string Content { get; init; } = "brokered";
+    public long MaxBytes { get; init; } = 8 * 1024 * 1024;
+}
+
+public sealed class ContextWork
+{
+    public List<string> Fields { get; init; } = [];
+}
+
+public sealed class ContextTimeline
+{
+    public int Last { get; init; } = 30;
+}
+
+public sealed class ContextMemory
+{
+    public string? Recall { get; init; }
+    public List<string> Scopes { get; init; } = [];
+    public int Limit { get; init; } = 6;
+}
+
+public sealed class ContextBudget
+{
+    public int TotalBytes { get; init; } = 32768;
+    public string OnOverflow { get; init; } = "truncate-note";
 }
 
 /// <summary>
@@ -182,11 +302,91 @@ public sealed class ProviderRegistry
                     $"Providers:{section.Key} enabled but EndpointId/Tenant unset — fail-closed.");
             }
 
+            ValidateContextBlocks(section, options);
             options.Provider = section.Key.ToLowerInvariant();
             registry[options.Provider] = options;
         }
 
         return new ProviderRegistry(registry);
+    }
+
+    /// <summary>The closed <c>context[n]</c> key vocabulary — anything else
+    /// fails composition (the additionalProperties law, enforced here because
+    /// the options binder ignores what it cannot bind).</summary>
+    private static readonly string[] ContextKeys =
+        ["envelope", "history", "media", "work", "timeline", "memory", "budget"];
+
+    /// <summary>Fail-closed per-section validation of declared context
+    /// blocks (ProviderRegistry precedent): unknown keys, a memory scope
+    /// selector naming a team outside the route's team, budgets past the
+    /// 1 KB–256 KB band or windows past 100 rows. The composition error names
+    /// the section and index like the existing addressing failures.</summary>
+    private static void ValidateContextBlocks(IConfigurationSection section, ProviderOptions options)
+    {
+        Fail("AssignContext", "AssignContext", options.AssignContext);
+        for (var rule = 0; rule < options.AssignRules.Count; rule++)
+        {
+            Fail($"AssignRules:{rule}:Context", $"AssignRules[{rule}].Context", options.AssignRules[rule].Context);
+        }
+
+        void Fail(string configPath, string displayName, List<ContextSource> block)
+        {
+            for (var i = 0; i < block.Count; i++)
+            {
+                var row = block[i];
+                var where = $"Providers:{section.Key}:{displayName}[{i}]";
+                var raw = section.GetSection($"{configPath}:{i}");
+                foreach (var child in raw.GetChildren())
+                {
+                    if (!ContextKeys.Contains(child.Key, StringComparer.OrdinalIgnoreCase))
+                    {
+                        throw new InvalidOperationException(
+                            $"{where}: context-key-unknown '{child.Key}' — allowed: {string.Join(", ", ContextKeys)}.");
+                    }
+                }
+
+                var key = row.Key();
+                if (key.Length == 0)
+                {
+                    throw new InvalidOperationException(
+                        $"{where}: context-key-unknown — a context row names exactly one source key.");
+                }
+
+                if (row.History is { Last: > 100 } || row.Timeline is { Last: > 100 })
+                {
+                    throw new InvalidOperationException(
+                        $"{where}: context-budget-exceeded — history/timeline windows cap at 100.");
+                }
+
+                if (row.Budget is { } budget && (budget.TotalBytes < 1024 || budget.TotalBytes > 262144))
+                {
+                    throw new InvalidOperationException(
+                        $"{where}: context-budget-exceeded — totalBytes must sit within 1 KB–256 KB.");
+                }
+
+                if (row.Memory is { } memory)
+                {
+                    var ruleTeam = displayName.Contains("AssignRules[")
+                        ? options.AssignRules[int.Parse(
+                            displayName[(displayName.IndexOf('[') + 1)..displayName.IndexOf(']')],
+                            System.Globalization.CultureInfo.InvariantCulture)].Team
+                        : null;
+                    var owningTeam = ruleTeam ?? options.Tenant;
+                    foreach (var selector in memory.Scopes)
+                    {
+                        var scopeTeam = selector.StartsWith("team:", StringComparison.Ordinal)
+                            ? selector["team:".Length..]
+                            : null;
+                        if (scopeTeam is not null && !selector.StartsWith("team:$", StringComparison.Ordinal)
+                            && !string.Equals(scopeTeam, owningTeam, StringComparison.Ordinal))
+                        {
+                            throw new InvalidOperationException(
+                                $"{where}: memory-scope-outside-team '{selector}' (route team '{owningTeam}').");
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /// <summary>Number of enabled providers.</summary>

@@ -27,7 +27,11 @@ public sealed record NotificationRequest(
     /// <summary>Interactive affordances (C7): exact-text buttons the
     /// receiving surface may render; a surface without them posts plain
     /// text.</summary>
-    IReadOnlyList<(string Label, string Value)>? Buttons = null);
+    IReadOnlyList<(string Label, string Value)>? Buttons = null,
+    /// <summary>Outbound media (the media plane): artifactRef JSON entries
+    /// (the ProviderEventStore.ArtifactRefs law) posted alongside the text;
+    /// null/empty ⇒ a text-only notice, exactly as before the media arm.</summary>
+    JsonArray? Artifacts = null);
 
 /// <summary>
 /// The single human-egress path (A6, B4, B5, D5): every notice the kernel sends a
@@ -138,9 +142,9 @@ public sealed class NotificationLedger(
         var subject = request.WorkId is { } w ? $"work/{w}" : $"notification/{row.NotificationId}";
         var envelope = answer.Rung.Target.ConversationKind is "channel" or "dm"
             ? ProviderEventStore.PostEnvelope(
-                answer.Rung.Target, request.Text, commandId, subject, now, request.Buttons)
+                answer.Rung.Target, request.Text, commandId, subject, now, request.Buttons, request.Artifacts)
             : ProviderEventStore.ReplyEnvelope(
-                answer.Rung.Target, request.Text, commandId, subject, now, request.Buttons);
+                answer.Rung.Target, request.Text, commandId, subject, now, request.Buttons, request.Artifacts);
         var json = envelope.ToJsonString();
         var verdict = envelopeValidator.Validate(json);
         if (!verdict.Ok)

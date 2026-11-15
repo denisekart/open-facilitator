@@ -47,6 +47,13 @@ export interface AdapterConfig {
   botUser: string;
   /** SQLite state file: comment ledger (idempotency law). */
   statePath: string;
+  /** Inbound media size gate (the facet's own number): 10 MB is GitLab's
+   *  default per-upload instance limit. */
+  mediaMaxBytes: number;
+  /** The media leg's kill switch (`GITLAB_MEDIA_ENABLED=false` ⇒ inbound
+   *  uploads are noted + skipped, events publish text-only — fail-closed on
+   *  the byte plane, never on the event). */
+  mediaEnabled: boolean;
   /** GET /healthz listen port (the webhook edge lives on the kernel sink). */
   port: number;
   logLevel: "debug" | "info" | "warn" | "error";
@@ -105,6 +112,20 @@ export function parseEnvConfig(env: Record<string, string | undefined>): Adapter
     throw new AdapterConfigError("PORT", `'${portRaw}' is not a port`);
   }
 
+  // The media gate: GitLab's own default instance limit (10 MB per upload).
+  const mediaMaxRaw = env["GITLAB_MEDIA_MAX_BYTES"]?.trim();
+  let mediaMaxBytes = 10485760;
+  if (mediaMaxRaw !== undefined && mediaMaxRaw !== "") {
+    const n = Number(mediaMaxRaw);
+    if (!Number.isInteger(n) || n <= 0) {
+      throw new AdapterConfigError(
+        "GITLAB_MEDIA_MAX_BYTES",
+        `'${mediaMaxRaw}' is not a positive integer`,
+      );
+    }
+    mediaMaxBytes = n;
+  }
+
   return {
     kernelUrl: required(env, "OFAC_KERNEL_URL"),
     enrollSecret: required(env, "OFAC_ENROLL_SECRET"),
@@ -120,6 +141,8 @@ export function parseEnvConfig(env: Record<string, string | undefined>): Adapter
       .filter((label) => label !== ""),
     botUser: required(env, "GITLAB_BOT_USER"),
     statePath: env["OFAC_STATE_PATH"] ?? "./ofac-gitlab-adapter.sqlite3",
+    mediaMaxBytes,
+    mediaEnabled: (env["GITLAB_MEDIA_ENABLED"]?.trim() || "true") !== "false",
     port,
     logLevel: logLevel as AdapterConfig["logLevel"],
   };

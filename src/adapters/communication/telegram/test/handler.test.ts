@@ -18,6 +18,7 @@ import type { CommandContext } from "@ofac/workspace-link";
 import { validateEnvelope } from "@ofac/protocol";
 import type { ArtifactRef, EnvelopeCommand, EnvelopeEvent } from "@ofac/protocol";
 import { ChatLedger, parseObjectIds } from "../src/chat-ledger.js";
+import { CONTEXT_FETCH_COMMAND } from "../src/context.js";
 import {
   CMD_POST,
   CMD_REACT,
@@ -71,6 +72,7 @@ function fakeApi(options: { reject413OnDocument?: boolean } = {}): TelegramApi &
     getMe: async (): Promise<TgUser> => ({ id: 777001, is_bot: true, username: "facilitator" }),
     getFile: noop,
     downloadFile: noop,
+    getChatHistory: noop,
     sendMessage: async (params) => {
       sent.messages.push(params);
       return message();
@@ -691,10 +693,14 @@ describe("manifest", () => {
     const manifest = communicationManifest("team-alpha");
     expect(manifest.ownerTeam).toBe("team-alpha");
     expect(manifest.capabilities.map((c) => c.id).sort()).toEqual(
-      [...COMMUNICATION_COMMANDS].sort(),
+      [...COMMUNICATION_COMMANDS, CONTEXT_FETCH_COMMAND].sort(),
     );
     for (const capability of manifest.capabilities) {
-      expect(capability.execution).toBe("synchronous");
+      // The context-fetch arm is asynchronous (the answer rides the event
+      // plane); every communication command answers in-band.
+      expect(capability.execution).toBe(
+        capability.id === CONTEXT_FETCH_COMMAND ? "asynchronous" : "synchronous",
+      );
       expect(capability.inputSchema).toBe(
         `https://schemas.openfacilitator.org/v1/${capability.id.replace(/^org\.facilitator\./, "")}.json`,
       );

@@ -32,7 +32,7 @@ import { validateAgainstSchemaId } from "@ofac/protocol";
 import type { EnvelopeEvent } from "@ofac/protocol";
 import { createConsoleLogger } from "@ofac/workspace-link";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { AdapterHandle, RunContext } from "./types.js";
+import type { AdapterHandle, ContextDocument, RunContext } from "./types.js";
 
 /** The determinism seam the consumer's onExecute awaits. */
 export interface AdapterRunGate {
@@ -55,6 +55,13 @@ export interface AdapterLifecycleContractOptions {
   gatewayId: string;
   /** Expected steer answer for THIS adapter implementation (default: accepted). */
   steerReply?: "accepted" | "unsupported";
+  /**
+   * Context leg (default OFF): the kit sends an assign whose
+   * `inputs.context` carries a folded `context.dispatch.v1` document and
+   * asserts the hook's RunContext exposes `ctx.context.sources` (the
+   * pass-through law — the SDK parses the document, the harness reads it).
+   */
+  contextLeg?: boolean;
   /** Consumer-side proof the steer reached the harness (throw/expect inside). */
   afterSteer?(directive: string): void | Promise<void>;
   /** Consumer-side proof the stop aborted the run (throw/expect inside). */
@@ -115,6 +122,31 @@ function assignEnvelope(
   };
 }
 
+/** The context-bearing twin: today's assign plus the kernel-folded
+ *  `inputs.context` (artifactId + digest + the dispatch document). */
+function contextAssignEnvelope(
+  commandId: string,
+  workId: string,
+  assignmentId: string,
+): Record<string, unknown> {
+  const envelope = assignEnvelope(commandId, workId, assignmentId);
+  const data = envelope["data"] as Record<string, unknown>;
+  data["inputs"] = {
+    objective: "kit",
+    sourceRefs: [],
+    context: {
+      artifactId: "kitctxartifact000000000000000000",
+      digest: "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      document: {
+        schema: "context.dispatch.v1",
+        sources: [{ path: "context[0]", key: "envelope", required: false }],
+        digest: "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      },
+    },
+  };
+  return envelope;
+}
+
 function steerEnvelope(
   commandId: string,
   workId: string,
@@ -164,6 +196,9 @@ async function waitFor<T>(
 export function runAdapterLifecycleContract(opts: AdapterLifecycleContractOptions): void {
   const steerExpectation = opts.steerReply ?? "accepted";
   const interactionLeg = opts.interactionLeg ?? true;
+  const contextLeg = opts.contextLeg ?? false;
+  /** executionId -> the RunContext the gate saw (the context leg's proof). */
+  const seenContexts = new Map<string, ContextDocument | undefined>();
   const interactionAnswer = opts.interactionAnswer ?? "kit-interaction-answer";
   /** requestIds the kit already answered (never double-answer a question). */
   const answered = new Set<string>();
@@ -202,6 +237,7 @@ export function runAdapterLifecycleContract(opts: AdapterLifecycleContractOption
 
   const gate: AdapterRunGate = {
     hold(ctx: RunContext): Promise<void> {
+      seenContexts.set(ctx.executionId, ctx.context);
       if (heldPrefix === null || !ctx.executionId.startsWith(heldPrefix)) {
         return Promise.resolve();
       }
@@ -536,6 +572,30 @@ export function runAdapterLifecycleContract(opts: AdapterLifecycleContractOption
       await waitFor("run completes after answering", () =>
         h.events.some((e) => e.type === COMPLETED_TYPE),
       );
+    });
+
+    it("context: an assign carrying inputs.context surfaces ctx.context.sources in the hook", async () => {
+      if (!contextLeg) return;
+      const h = await attached();
+      caseCounter += 1;
+      const executionId = `kit-ctx-${caseCounter}`;
+      const workId = `kit-ctxwork-${caseCounter}`;
+      const assignmentId = `kit-ctxassign-${caseCounter}`;
+      holdRuns(executionId);
+      const reply = await h.link.send({
+        kind: "start",
+        executionId,
+        executionGeneration: 1,
+        command: contextAssignEnvelope(`kit-ctxcmd-${caseCounter}`, workId, assignmentId) as never,
+      });
+      expect(reply).toEqual({ kind: "accepted", executionId });
+      await waitFor("the hook saw a RunContext", () => seenContexts.has(executionId));
+      // The pass-through law: the SDK parsed inputs.context.document, the
+      // harness sees the sources array the kernel folded.
+      expect(seenContexts.get(executionId)?.schema).toBe("context.dispatch.v1");
+      expect(seenContexts.get(executionId)?.sources.length).toBe(1);
+      release(executionId);
+      await waitFor("run completes", () => h.events.some((e) => e.type === COMPLETED_TYPE));
     });
 
     it("restart law: a dead listener mid-run reconnects; the probe gets running", async () => {

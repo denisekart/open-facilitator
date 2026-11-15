@@ -86,8 +86,10 @@ public sealed class AdminInspectorTests(PostgresFixture fixture)
         await page.GetByTestId($"hit-works-{workId.ToString()[..8]}").ClickAsync();
 
         await Expect(page.GetByTestId("work-inspector")).ToBeVisibleAsync();
-        await ShootAsync(page, "console-work.png");
+        // The site screenshot must show a FILLED inspector: wait for the
+        // timeline's first row before pressing the shutter.
         await Expect(page.GetByTestId("timeline-created")).ToBeVisibleAsync();
+        await ShootAsync(page, "console-work.png");
         var shortId = approvalId.ToString()[..8];
         await Expect(page.GetByTestId($"approval-state-{shortId}")).ToHaveTextAsync("pending");
 

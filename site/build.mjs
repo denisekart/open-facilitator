@@ -172,8 +172,12 @@ function renderMarkdown(md, ctxDir) {
   // tables: frame them so wide content scrolls instead of overflowing
   html = html.replace(/<table>[\s\S]*?<\/table>/g, (m) => `<div class="tbl-wrap">${m}</div>`);
   // bare repo paths like `src/facilitator/` become github links inside <code>
+  // - but not globs or placeholders (`src/<name>/`, `examples/**`): those
+  // would 404 on GitHub, so they stay plain code.
   html = html.replace(/<code>([a-z0-9_./-]+\/(?:[a-z0-9_./-]+)?(?:\/)?[^<]*)<\/code>/gi, (m, p) =>
-    /^(src|docs|protocol|features|examples|reference|tests|tools)\//.test(p) && !/[ ()]/.test(p)
+    /^(src|docs|protocol|features|examples|reference|tests|tools)\//.test(p) &&
+      !/[ ()<>*]/.test(p) &&
+      existsSync(join(ROOT, p.replace(/\/$/, "")))
       ? `<a href="https://github.com/${repo.ownerSlug}/open-facilitator/tree/main/${p.replace(/\/$/, "")}"><code>${p}</code></a>`
       : m,
   );
@@ -261,12 +265,12 @@ block will show exactly what you bent.</p>
 <p>The patience curve: park, nudge, escalate, end — every park a durable
 row, every nudge an audit line.</p>
 ${code(nudge.yaml, "nudge-escalation gallery definition")}
-<p><a class="arch-more" href="#/flows/nudge-escalation">Open it in the console editor →</a></p>
+<p>Clone it under <b>Flows</b> in your console (see <a class="arch-more" href="#/console">the console tour</a>) and the diff block will show your bend against this stored version.</p>
 <h3 id="cookbook-fork">Review fork</h3>
 <p>The review law as data: a terminal guard, then a fork that inherits
 the subject's identity.</p>
 ${code(fork.yaml, "review-fork gallery definition")}
-<p><a class="arch-more" href="#/flows/review-fork">Open it in the console editor →</a></p>`
+<p>Same drill: clone <code>review-fork</code> under <b>Flows</b> and rename the pieces to your team — the audit line will say exactly who bent what.</p>`
   );
 }
 
@@ -408,6 +412,8 @@ await copy("src/assets/icon.svg", "favicon.svg");
 await copy("src/assets/console-explorer.png", "console-explorer.png");
 await copy("src/assets/console-work.png", "console-work.png");
 for (const shot of [
+  "console-explorer-dark.png",
+  "console-work-dark.png",
   "console-editor.png",
   "console-instance.png",
   "console-editor-dark.png",

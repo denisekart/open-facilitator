@@ -26,18 +26,39 @@ const PAYLOAD_ORDER = [
   "memory",
 ];
 
+// Human glossary for the schema's named types - the generator prints the
+// schema's own wording, this explains the jargon the schema assumes.
+const DEF_NOTES = {
+  duration:
+    'ISO-8601 duration, days/hours/minutes/seconds only — "PT30M" is 30 minutes, "PT2H" two hours, "P1D" one day; zero is refused.',
+  ref: 'a literal string, or a run-context template: "$event.data.<path>", "$steps.<stepId>.output.<path>", "$input.<path>".',
+};
+const EXT_NOTES = {
+  "common.v1.json#/$defs/idToken": "an identifier string (team slug, step id, capability id…)",
+  "common.v1.json#/$defs/evidenceRef": "an evidence actor reference",
+};
+
 function fieldsOf(schema) {
   const props = schema?.properties ?? {};
   const required = new Set(schema?.required ?? []);
-  return Object.entries(props).map(([name, s]) => ({
-    name,
-    type:
-      Array.isArray(s?.type)
-        ? s.type.join(" | ")
-        : (s?.type ?? (s?.$ref ? "object" : "any")),
-    required: required.has(name),
-    description: typeof s?.description === "string" ? s.description : "",
-  }));
+  return Object.entries(props).map(([name, s]) => {
+    const ref = typeof s?.$ref === "string" ? s.$ref : null;
+    let type = Array.isArray(s?.type)
+      ? s.type.join(" | ")
+      : (s?.type ?? (ref ? "object" : "any"));
+    let description = typeof s?.description === "string" ? s.description : "";
+    if (ref) {
+      const defName = ref.startsWith("#/$defs/") ? ref.slice(8) : null;
+      if (defName) {
+        type = defName;
+        description = [description, DEF_NOTES[defName]].filter(Boolean).join(" ");
+      } else if (EXT_NOTES[ref]) {
+        type = "id";
+        description = [description, EXT_NOTES[ref]].filter(Boolean).join(" ");
+      }
+    }
+    return { name, type, required: required.has(name), description };
+  });
 }
 
 export async function paletteReference(root) {

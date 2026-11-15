@@ -68,7 +68,10 @@
       [...hs]
         .map(
           (h) =>
-            `<a href="#${location.hash.split(/[?]/)[0]}?${h.id}" data-anchor="${h.id}">${esc(h.textContent)}</a>`,
+            // location.hash already carries the '#': one more would produce
+      // "##/route?anchor", which the router reads as a landing hash and
+      // the click silently does nothing.
+      `<a href="${location.hash.split(/[?]/)[0]}?${h.id}" data-anchor="${h.id}">${esc(h.textContent)}</a>`,
         )
         .join("")
     );
@@ -482,7 +485,7 @@
           : "") +
         (n.artifact ? `<p class="arch-art">${esc(n.artifact)}</p>` : "") +
         `<p class="arch-io"><b>Receives from</b> ${links(inb)}<br><b>Sends to</b> ${links(out)}</p>` +
-        (n.docs ? `<p><a class="arch-more" href="#${n.docs}">Read more →</a></p>` : "");
+        (n.docs ? `<p><a class="arch-more" href="${n.docs}">Read more →</a></p>` : "");
       panel
         .querySelectorAll("[data-goto]")
         .forEach((b) => b.addEventListener("click", () => select(b.dataset.goto)));

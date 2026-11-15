@@ -27,11 +27,16 @@ exactly which rule it broke when it refuses.
 
 Each step declares exactly one payload:
 
+Durations everywhere in a flow are ISO-8601: `PT30M` is thirty
+minutes, `PT2H` two hours, `P1D` one day, `PT1H30M` ninety minutes.
+Only days, hours, minutes, and seconds are allowed, and a zero-length
+duration is refused by the validator.
+
 | step | what it does |
 | --- | --- |
 | `emit` | append one command (a known wire command, or a capability for the router to place) |
 | `wait` | park until a matching event arrives, with a timeout branch |
-| `timer` | park for a duration, then continue (or branch on timeout) |
+| `timer` | park for a fixed duration (`for: "PT30M"`), then continue on the `always` edge — this is how you say "wait half an hour, then keep going" |
 | `approval` | ask named humans; resume on the decision |
 | `decide` | branch on a guard or a model verdict, with a mandatory fallback |
 | `select` | project values into the run's output |

@@ -242,7 +242,8 @@ export function renderArchitecture() {
       ghost: n.ghost === true,
       what: n.what,
       bullets: n.bullets,
-      docs: n.docs || null,
+      // site routes ride the SPA router: "/docs/x" -> "#/docs/x"
+      docs: n.docs ? `#${n.docs}` : null,
       artifact: n.artifact || null,
     })),
     edges: edges.map((e) => ({

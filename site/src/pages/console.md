@@ -25,39 +25,25 @@ fencing generations, its approvals, its result manifests, and the
 complete event timeline — every state change with actor, timestamp, and
 payload.
 
-![Searching Works in the console](console-explorer.png)
-_Search “analyze the reference”, and the kernel answers with matching
-Works, a live fleet summary, and throughput metrics._
+![Searching the console](console-explorer.png)
+_Search an objective, and the hit opens the Work it belongs to —
+artifacts, memories, and messages are the other search sections. The
+left rail switches surfaces; every one of them is a URL._
 
 ![The Work inspector](console-work.png)
-_One Work's inspector: assignment completed on the team's Gateway,
-result manifest available with digest-verified artifacts, the full
-timeline underneath — `created`, routing, two artifact filings, a memory
-candidate._
+_The same Work opened: a pending approval names its approver, the
+timeline rows carry actor and timestamp, and the approve button is the
+same audited write the API would take._
 
 This is the “who did what, when, and who allowed it” view — it is why
 teams keep the kernel around after the novelty of agents fades.
 
-## Fleet views
+## Every surface on the rail
 
-Under the search box, the surfaces a triage needs:
+Under the search box, what each rail entry opens:
 
 - **Works** — the queue: everything, newest first, filterable by state;
   a team-scoped operator automatically sees only their teams' works.
-- **Audit** — the decision spine, filterable by allow/deny, actor,
-  action, and correlation id, with a CSV export.
-- **Links** — every team Gateway currently dialled in: endpoint id,
-  session age, last acknowledged event. The honest rule the view
-  follows: the database lease is the only authority — a stale socket
-  means offline, never “probably up”.
-- **Deliveries** — the outbound ledger: what the kernel sent, what was
-  acknowledged, what is a poison message. Replay one; try to replay it
-  twice; the ledger refuses the second time.
-- **Runtime** — which replica answers, the provisioning ledger, and
-  manual sweeps: forcing a sweeper demands a change reason and audits
-  the trigger, like every other human act on live state.
-- **Config** — stored operator intents, edited with versioned
-  `If-Match` writes, each change audited with a reason.
 - **Flows** — the workflow plane: every definition (live, shadow, or
   off), every run it performed, and an editor that draws the flow you
   are authoring. Open a run and the same picture wears its state — the
@@ -65,12 +51,28 @@ Under the search box, the surfaces a triage needs:
   with pause, skip, retry, and cancel fenced by what the run's status
   legally allows. Authoring lives here too:
   [Authoring flows](/workflows).
-- **AiDeck** — a chat surface for operator identities: ask “what's
-  stuck?” and the answer shows the reads it made to get there —
-  GETs the asking operator could run themselves, never more than that
-  role can reach. Proposals carry a human summary, a folded body, an
-  optional decision note, and a link to the audit row they produce; a
-  proposal nobody confirms visibly expires.
+- **Monitor** — running workflow instances and the fleet health strip:
+  replica status, queue depth, link uptime. The honest rule the strip
+  follows: the database lease is the only authority — a stale socket
+  means offline, never “probably up”.
+- **Deliveries** — the outbound ledger: what the kernel sent, what was
+  acknowledged, what is a poison message. Replay one; try to replay it
+  twice; the ledger refuses the second time.
+- **Audit** — the decision spine, filterable by allow/deny, actor,
+  action, and correlation id, with a CSV export.
+- **Runtime** — which replica answers, the provisioning ledger, and
+  manual sweeps: forcing a sweeper demands a change reason and audits
+  the trigger, like every other human act on live state.
+- **Team** — every team Gateway dialled in: endpoint id, session age,
+  last acknowledged event, enrollment and link-token revocation.
+- **Config** — the live routing policy: stored operator intents, edited
+  with versioned `If-Match` writes, each change audited with a reason.
+- **AiDeck** — a drawer, not a screen: a chat surface for operator
+  identities. Ask “what's stuck?” and the answer shows the reads it
+  made to get there — GETs the asking operator could run themselves,
+  never more than that role can reach. Proposals carry a human summary,
+  a folded body, an optional decision note, and a link to the audit row
+  they produce; a proposal nobody confirms visibly expires.
 
 ## What the console deliberately is not
 

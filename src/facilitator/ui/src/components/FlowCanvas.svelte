@@ -65,7 +65,7 @@
 </script>
 
 <div
-  class="h-[420px] overflow-hidden rounded border border-edge bg-sunken/20"
+  class="flow-canvas h-[420px] overflow-hidden rounded border border-edge bg-sunken/20"
   data-testid="flow-graph">
   <SvelteFlow
     {nodes}
@@ -80,3 +80,18 @@
     onpaneclick={() => onselect(null)}
   />
 </div>
+
+<style>
+  /* xyflow sizes edge labels to the edge bbox and clips overflow - on
+     short legs that truncates the text to a stray initial. Size to
+     content; colors keep the site theme (light/dark both legible). */
+  .flow-canvas :global(.svelte-flow__edge-label) {
+    width: max-content !important;
+    max-width: none !important;
+    height: max-content !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    white-space: nowrap;
+    border-radius: 4px;
+  }
+</style>

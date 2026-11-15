@@ -51,10 +51,10 @@ happens in team environments, evidence lands in your object store, state in
 your Postgres. Scaling is horizontal and boring — add kernels behind a
 load balancer, add teams by pointing another gateway at the hub. There is no
 second control plane to adopt. Deep dives:
-<a href="/docs/overview">concepts</a> ·
-<a href="/docs/protocol">the wire contract</a> ·
-<a href="/docs/security">security posture</a> ·
-<a href="/docs/advanced">operations</a>.</p>
+<a href="#/docs/overview">concepts</a> ·
+<a href="#/docs/protocol">the wire contract</a> ·
+<a href="#/docs/security">security posture</a> ·
+<a href="#/docs/advanced">operations</a>.</p>
 
 <script type="application/json" id="arch-data">${payload}</script>`;
 }

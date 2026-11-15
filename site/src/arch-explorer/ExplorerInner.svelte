@@ -25,7 +25,7 @@
   const flow = useSvelteFlow();
   const base = $derived(toFlow(data));
 
-  let zoomBand = $state("far"); // far | mid | near
+  let zoomBand = $state("far"); // far | mid | near | deep
   let selection = $state(null); // node id
   let scenario = $state(null); // {sc, i}
   let hover = $state(null);
@@ -33,7 +33,7 @@
   const nodeById = $derived(Object.fromEntries(data.nodes.map((n) => [n.id, n])));
 
   function band(k) {
-    return k < 0.45 ? "far" : k < 0.9 ? "mid" : "near";
+    return k < 0.45 ? "far" : k < 0.9 ? "mid" : k < 1.7 ? "near" : "deep";
   }
 
   // incident-edge highlight set for hover/selection/scenario
@@ -73,6 +73,8 @@
       const dim = lit !== null && !lit.has(n.id);
       return {
         ...n,
+        // Deep-band annotations paint above neighbouring cards.
+        ...(zoomBand === "deep" ? { zIndex: 5 } : {}),
         data: {
           ...n.data,
           band: zoomBand,
@@ -106,20 +108,9 @@
 
   const nodeTypes = { zone: ZoneNode, part: PartNode };
 
-  // Follow the site's theme law: the header toggle rewrites
-  // <html data-theme>, so watch that attribute and hand xyflow the
-  // matching colour mode.
-  let siteDark = $state(document.documentElement.dataset.theme === "dark");
-  $effect(() => {
-    const obs = new MutationObserver(() => {
-      siteDark = document.documentElement.dataset.theme === "dark";
-    });
-    obs.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["data-theme"],
-    });
-    return () => obs.disconnect();
-  });
+  // The map is a fixed dark-slate instrument surface in BOTH site themes
+  // (the code-block precedent), so xyflow is pinned dark and the header
+  // toggle does not touch it.
 
   function onNodeClick({ node }) {
     if (node.type !== "part") return;
@@ -195,7 +186,7 @@
       {nodes}
       {edges}
       {nodeTypes}
-      colorMode={siteDark ? "dark" : "light"}
+      colorMode="dark"
       minZoom={0.2}
       maxZoom={2.4}
       nodesConnectable={false}
@@ -211,10 +202,24 @@
       onmovestart={() => undefined}
       onmoveend={onMoveEnd}
     >
-      <Background gap={24} size={1} />
+      <Background gap={24} size={1} color="#26313f" />
       <Controls showInteractive={false} />
       {#if zoomBand === "mid"}
-        <MiniMap pannable zoomable ariaLabel="minimap" />
+        <MiniMap
+          pannable
+          zoomable
+          ariaLabel="minimap"
+          maskColor="rgba(6,10,16,0.55)"
+          nodeColor={(n) =>
+            n.type === "zone"
+              ? { you: "#1d3a63", infra: "#232c37", team: "#4a3714", external: "#2a3138" }[
+                  n.data?.zone?.own
+                ] || "#232c37"
+              : n.data?.own === "team"
+                ? "#E3A008"
+                : "#2f4a72"}
+          nodeStrokeWidth={0}
+        />
       {/if}
     </SvelteFlow>
 
@@ -281,6 +286,30 @@
     opacity: 0;
     pointer-events: none;
   }
+  /* Edge labels ride the slate as small chips - legible over zone
+     borders and never clipped mid-word, and painted ABOVE the zone
+     fills (the container defaults to z:auto and loses to nodes). */
+  .arch-explorer :global(.svelte-flow__edge-labels) {
+    z-index: 3;
+  }
+  .arch-explorer :global(.svelte-flow__edge-label) {
+    max-width: none;
+    width: auto;
+    overflow: visible;
+    text-overflow: clip;
+    color: #9fb0c3;
+    background: #0d1420;
+    border: 1px solid #223042;
+    padding: 1px 6px;
+    border-radius: 5px;
+    font-size: 10.5px;
+  }
+  .arch-explorer :global(.svelte-flow__minimap) {
+    border: 1px solid #2b3a4d;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #101826;
+  }
   @media (prefers-reduced-motion: reduce) {
     .arch-explorer :global(.svelte-flow__edge.animated path) {
       animation: none;
@@ -289,19 +318,24 @@
   .arch-explorer {
     position: relative;
     height: min(78vh, 860px);
-    border: 1px solid var(--line, #d9e0e8);
+    border: 1px solid #223042;
     border-radius: 12px;
     overflow: hidden;
-    background: var(--bg, #fff);
+    background: #0d1420;
+    color-scheme: dark;
+    --chrome-line: #2b3a4d;
+    --chrome-bg: rgba(13, 20, 32, 0.88);
+    --chrome-ink: #d5e0ee;
   }
   .arch-full {
     position: absolute;
     top: 10px;
     left: 10px;
     z-index: 5;
-    border: 1px solid var(--line, #d9e0e8);
+    border: 1px solid var(--chrome-line);
     border-radius: 8px;
-    background: color-mix(in srgb, var(--bg, #fff) 90%, transparent);
+    background: var(--chrome-bg);
+    color: var(--chrome-ink);
     font-size: 15px;
     line-height: 1;
     padding: 5px 8px;
@@ -317,12 +351,16 @@
     gap: 8px;
   }
   .arch-scen {
-    border: 1px solid var(--line, #d9e0e8);
+    border: 1px solid var(--chrome-line);
     border-radius: 999px;
-    background: color-mix(in srgb, var(--bg, #fff) 92%, transparent);
+    background: var(--chrome-bg);
+    color: var(--chrome-ink);
     font-size: 12px;
     padding: 4px 12px;
     cursor: pointer;
+  }
+  .arch-scen:hover {
+    border-color: #4c8dff;
   }
   .arch-ownkey {
     position: absolute;
@@ -333,8 +371,9 @@
     gap: 12px;
     padding: 6px 10px;
     border-radius: 8px;
-    background: color-mix(in srgb, var(--bg, #fff) 88%, transparent);
-    border: 1px solid var(--line, #d9e0e8);
+    background: var(--chrome-bg);
+    border: 1px solid var(--chrome-line);
+    color: var(--chrome-ink);
     font-size: 12px;
   }
   .arch-ownkey span {
@@ -355,22 +394,48 @@
     bottom: 12px;
     z-index: 6;
     max-width: 420px;
-    padding: 10px 12px;
+    padding: 12px 14px;
     border-radius: 10px;
-    background: color-mix(in srgb, var(--bg, #fff) 94%, transparent);
-    border: 1px solid var(--line, #d9e0e8);
+    /* Solid card: on the slate map a translucent panel lets edges and
+       zones bleed through the caption text. */
+    background: #18212d;
+    border: 1px solid #3b4b60;
+    box-shadow: 0 6px 24px rgba(4, 8, 14, 0.5);
+    color: #d5e0ee;
   }
   .arch-cap {
-    margin: 0 0 8px;
+    margin: 0 0 10px;
     font-size: 13px;
+    line-height: 1.45;
+    color: #e6edf3;
   }
   .arch-step-n {
+    display: inline-block;
     font-weight: 700;
     margin-right: 6px;
+    color: #4c8dff;
   }
   .arch-nav {
     display: flex;
     gap: 8px;
+  }
+  .arch-nav button {
+    border: 1px solid var(--chrome-line);
+    border-radius: 8px;
+    background: #18212d;
+    color: var(--chrome-ink);
+    font-size: 12px;
+    padding: 4px 10px;
+    cursor: pointer;
+  }
+  .arch-nav button.primary {
+    background: #0b5fbf;
+    border-color: #0b5fbf;
+    color: #fff;
+  }
+  .arch-nav button:disabled {
+    opacity: 0.45;
+    cursor: default;
   }
   .arch-sheet {
     position: absolute;
@@ -382,22 +447,40 @@
     overflow: auto;
     padding: 12px 14px;
     border-radius: 10px;
-    background: color-mix(in srgb, var(--bg, #fff) 96%, transparent);
-    border: 1px solid var(--line, #d9e0e8);
+    background: #18212d;
+    border: 1px solid #3b4b60;
+    box-shadow: 0 6px 24px rgba(4, 8, 14, 0.5);
+    color: #d5e0ee;
+  }
+  .arch-sheet p {
+    color: #c3cedb;
+  }
+  .arch-sheet ul {
+    color: #c3cedb;
+  }
+  .arch-sheet h3 {
+    color: #e6edf3;
+  }
+  .arch-sheet a {
+    color: #4c8dff;
+  }
+  .arch-sheet li {
+    color: #c3cedb;
   }
   .arch-sheet-x {
     float: right;
     border: 0;
     background: none;
+    color: #9aa8b8;
     font-size: 18px;
     cursor: pointer;
   }
   .arch-sub {
-    color: var(--ink-3, #64748b);
+    color: #9aa8b8;
     font-size: 12px;
   }
   .arch-art {
     font-size: 12px;
-    color: var(--ink-3, #64748b);
+    color: #9aa8b8;
   }
 </style>

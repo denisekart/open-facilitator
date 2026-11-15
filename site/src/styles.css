@@ -496,9 +496,9 @@ p {
   align-items: start;
 }
 .arch-scroll {
-  border: 1px solid var(--line);
+  border: 1px solid #223042;
   border-radius: 12px;
-  background: #fff;
+  background: #0d1420;
   overflow: auto;
 }
 .arch-svg {
@@ -509,45 +509,45 @@ p {
 }
 .arch-zt {
   font: 700 13px var(--sans);
-  fill: var(--ink-2);
+  fill: #c3cedb;
 }
 .arch-zs {
   font: 400 10.5px var(--sans);
-  fill: var(--ink-3);
+  fill: #7d8896;
 }
 .arch-ztag {
   font: 600 9.5px var(--mono);
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  fill: var(--ink-3);
+  fill: #7d8896;
 }
 .arch-nt {
   font: 650 12px var(--sans);
-  fill: var(--ink);
+  fill: #e6edf3;
 }
 .arch-ns {
   font: 400 10px var(--sans);
-  fill: var(--ink-3);
+  fill: #9aa8b8;
 }
 .arch-el {
   font: 500 9.5px var(--sans);
-  fill: var(--ink-3);
+  fill: #9fb0c3;
   paint-order: stroke fill;
-  stroke: #fff;
+  stroke: #0d1420;
   stroke-width: 4;
   stroke-linejoin: round;
 }
 .arch-mzt {
   font: 600 15px var(--sans);
-  fill: var(--ink-3);
+  fill: #7d8896;
 }
 .arch-teaser {
   display: block;
   position: relative;
   margin: 20px 0;
-  border: 1px solid var(--line);
+  border: 1px solid #223042;
   border-radius: 12px;
-  background: #fff;
+  background: #0d1420;
   overflow: hidden;
 }
 .arch-teaser:hover {

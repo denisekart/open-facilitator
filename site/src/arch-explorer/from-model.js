@@ -1,27 +1,33 @@
 // Data adapter: architecture.mjs -> Svelte Flow primitives, 1:1.
 // The curated x/y/w/h layout is the source of truth (no auto-layout on
-// the published map: the reading order is designed, not computed), so
-// zones become parent group nodes and nodes keep their authored rects.
+// the published map: the reading order is designed, not computed).
+// Zones are plain sized nodes at a negative zIndex; parts keep their
+// authored ABSOLUTE rects on top. NO parentNode: in @xyflow/svelte 1.x a
+// parent's dimensions come only from a post-mount measure, so parenting
+// silently collapses every child onto the parent's top-left corner.
+// The palette is deliberately site-independent (a fixed middle surface
+// that survives the light/dark header toggle untouched); see the
+// .arch-explorer block in the site stylesheet for the surface itself.
 
 export const OWN_STYLE = {
-  you: { border: "#0B5FBF", fill: "#F2F7FD", chip: "yours: central deploy" },
-  infra: { border: "#8A97A6", fill: "#F6F8FA", chip: "yours: commodity infra" },
-  team: { border: "#B25E09", fill: "#FDFAF3", chip: "team's" },
-  external: { border: "#9AA6B2", fill: "#F7F8FA", chip: "external" },
+  you: { border: "#4C8DFF", fill: "rgba(76,141,255,0.10)", chip: "yours: central deploy" },
+  infra: { border: "#7D8896", fill: "rgba(125,136,150,0.10)", chip: "yours: commodity infra" },
+  team: { border: "#E3A008", fill: "rgba(227,160,8,0.10)", chip: "team's" },
+  external: { border: "#94A3B8", fill: "rgba(148,163,184,0.10)", chip: "external" },
 };
 
-// Same kind -> stroke table as arch-render.mjs (the static twin).
+// Same kind -> stroke table as arch-render.mjs (the static twin). The map
+// is a fixed dark-slate instrument surface in BOTH site themes (the
+// --code-bg precedent), so these hexes are deliberately constant.
 export const KIND_STYLE = {
-  internal: { stroke: "#B9C4D0", dash: "", width: 1.6 },
-  sync: { stroke: "#0B5FBF", dash: "", width: 2 },
-  idp: { stroke: "#6C7A89", dash: "6 5", width: 1.8 },
-  link: { stroke: "#0B5FBF", dash: "1 6", width: 2.6 },
-  spawn: { stroke: "#B25E09", dash: "", width: 1.8 },
-  webhook: { stroke: "#6C7A89", dash: "2 5", width: 1.8 },
-  async: { stroke: "#8A97A6", dash: "8 6", width: 1.6 },
+  internal: { stroke: "#3F4B5B", dash: "", width: 1.6 },
+  sync: { stroke: "#4C8DFF", dash: "", width: 2 },
+  idp: { stroke: "#7D8896", dash: "6 5", width: 1.8 },
+  link: { stroke: "#7AA9FF", dash: "1 6", width: 2.6 },
+  spawn: { stroke: "#E3A008", dash: "", width: 1.8 },
+  webhook: { stroke: "#7D8896", dash: "2 5", width: 1.8 },
+  async: { stroke: "#5B6B7C", dash: "8 6", width: 1.6 },
 };
-
-const ZONE_PAD = 8;
 
 export function toFlow(data) {
   const zoneById = Object.fromEntries(data.zones.map((z) => [z.id, z]));
@@ -43,16 +49,12 @@ export function toFlow(data) {
     })),
     ...data.nodes.map((n) => {
       const z = zoneById[n.zone];
-      const parent = z && !z.ghost ? `zone:${z.id}` : undefined;
       return {
         id: n.id,
         type: "part",
-        position: parent
-          ? { x: n.x - z.x + ZONE_PAD, y: n.y - z.y + ZONE_PAD }
-          : { x: n.x, y: n.y },
+        position: { x: n.x, y: n.y },
         width: n.w,
         height: n.h,
-        ...(parent ? { parentNode: parent, extent: "parent" } : {}),
         draggable: false,
         zIndex: 1,
         data: {

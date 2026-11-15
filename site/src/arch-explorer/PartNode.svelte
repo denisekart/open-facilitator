@@ -4,8 +4,12 @@
 
   // One part of the system. The label is ALWAYS visible (every band);
   // bands only add detail: mid adds the sub-line, near adds the click
-  // affordance. The border carries the zone's ownership hue so the node
-  // stays classifiable even when its zone scrolls off.
+  // affordance, deep (zoomed on one component) expands the node's own
+  // one-line brief and artifact right there on the card - the sheet
+  // stays the home for the full dossier. The border carries the zone's
+  // ownership hue so the node stays classifiable even when its zone
+  // scrolls off. All colours are fixed for the dark-slate map surface
+  // (constant across site themes).
   let { data } = $props();
   const n = $derived(data.part);
   const band = $derived(data.band ?? "near");
@@ -32,10 +36,20 @@
   aria-label={n.t}
 >
   <span class="arch-part-t">{n.t}</span>
-  {#if band !== "far" && n.sub}
+  {#if band !== "far" && band !== "deep" && n.sub}
     <span class="arch-part-sub">{n.sub}</span>
   {/if}
 </div>
+{#if band === "deep"}
+  <!-- Deep tier: the authored rect stays the map; the brief rides as an
+       attached annotation card below it, so expansion never collides
+       with the fixed grid. -->
+  <div class="arch-part-peek" style="border-color:{own.border}">
+    {#if n.sub}<span class="arch-part-sub">{n.sub}</span>{/if}
+    {#if n.what}<span class="arch-part-what">{n.what}</span>{/if}
+    {#if n.artifact}<span class="arch-part-art">{n.artifact}</span>{/if}
+  </div>
+{/if}
 
 {#each ["top", "right", "bottom", "left"] as side (side)}
   <Handle id="{side}-tgt" type="target" position={POSITIONS[side]} connectable={false} />
@@ -49,7 +63,7 @@
     box-sizing: border-box;
     border: 2px solid;
     border-radius: 8px;
-    background: var(--arch-card, #fff);
+    background: #18212d;
     padding: 5px 8px;
     display: flex;
     flex-direction: column;
@@ -62,9 +76,10 @@
   .arch-part.ghost {
     border-style: dashed;
     opacity: 0.85;
+    background: #141c27;
   }
   .arch-part.selected {
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, #0b5fbf) 35%, transparent);
+    box-shadow: 0 0 0 3px rgba(76, 141, 255, 0.45);
   }
   .arch-part.dim {
     opacity: 0.18;
@@ -79,14 +94,48 @@
     font-size: 12px;
     font-weight: 650;
     line-height: 1.15;
-    color: var(--ink, #18222f);
+    color: #e6edf3;
   }
   .arch-part.far .arch-part-t {
     font-size: 10.5px;
   }
   .arch-part-sub {
     font-size: 10px;
-    color: var(--ink-3, #64748b);
+    color: #9aa8b8;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .arch-part.deep .arch-part-t {
+    font-size: 13px;
+  }
+  .arch-part-peek {
+    position: absolute;
+    top: calc(100% + 3px);
+    left: 0;
+    right: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 6px 8px;
+    box-sizing: border-box;
+    border: 1.5px solid;
+    border-radius: 8px;
+    background: #131b27;
+    box-shadow: 0 4px 16px rgba(4, 8, 14, 0.45);
+  }
+  .arch-part-what {
+    font-size: 10.5px;
+    line-height: 1.35;
+    color: #c3cedb;
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .arch-part-art {
+    font: 500 9.5px/1.3 var(--mono, ui-monospace, monospace);
+    color: #7d8896;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;

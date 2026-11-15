@@ -5,11 +5,14 @@ import { canvas, zones, nodes, edges, scenarios } from "./architecture.mjs";
 
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
+// Fixed dark-slate instrument surface in BOTH site themes (the code-block
+// precedent) — keeps the static snapshot and the hydrated explorer the
+// same picture. Tints are alpha washes so the slate shows through.
 const OWN = {
-  you: { border: "#0B5FBF", fill: "#F2F7FD", tag: "yours" },
-  infra: { border: "#8A97A6", fill: "#F6F8FA", tag: "yours" },
-  team: { border: "#B25E09", fill: "#FDFAF3", tag: "team's" },
-  external: { border: "#9AA6B2", fill: "#F7F8F9", tag: "external" },
+  you: { border: "#4C8DFF", fill: "rgba(76,141,255,0.10)", tag: "yours" },
+  infra: { border: "#7D8896", fill: "rgba(125,136,150,0.10)", tag: "yours" },
+  team: { border: "#E3A008", fill: "rgba(227,160,8,0.10)", tag: "team's" },
+  external: { border: "#94A3B8", fill: "rgba(148,163,184,0.10)", tag: "external" },
 };
 
 const byId = Object.fromEntries(nodes.map((n) => [n.id, n]));
@@ -98,13 +101,13 @@ const norm2 = (v) => {
 };
 
 const KIND = {
-  internal: { stroke: "#B9C4D0", dash: "", width: 1.6 },
-  sync: { stroke: "#0B5FBF", dash: "", width: 2 },
-  idp: { stroke: "#6C7A89", dash: "6 5", width: 1.8 },
-  link: { stroke: "#0B5FBF", dash: "1 6", width: 2.6 },
-  spawn: { stroke: "#B25E09", dash: "", width: 1.8 },
-  webhook: { stroke: "#6C7A89", dash: "2 5", width: 1.8 },
-  async: { stroke: "#8A97A6", dash: "8 6", width: 1.6 },
+  internal: { stroke: "#3F4B5B", dash: "", width: 1.6 },
+  sync: { stroke: "#4C8DFF", dash: "", width: 2 },
+  idp: { stroke: "#7D8896", dash: "6 5", width: 1.8 },
+  link: { stroke: "#7AA9FF", dash: "1 6", width: 2.6 },
+  spawn: { stroke: "#E3A008", dash: "", width: 1.8 },
+  webhook: { stroke: "#7D8896", dash: "2 5", width: 1.8 },
+  async: { stroke: "#5B6B7C", dash: "8 6", width: 1.6 },
 };
 
 function wrap(s, max) {
@@ -130,8 +133,8 @@ export function renderArchitecture() {
       return (
         `<g class="arch-zone" data-zone="${z.id}">` +
         `<rect x="${z.x}" y="${z.y}" width="${z.w}" height="${z.h}" rx="14" fill="${o.fill}" stroke="${o.border}" stroke-opacity="0.55" stroke-width="1.4"${dash}/>` +
-        `<text class="arch-zt" x="${z.x + 16}" y="${z.y + 26}">${esc(z.title)}</text>` +
-        `<text class="arch-ztag" x="${z.x + z.w - 14}" y="${z.y + 26}" text-anchor="end">${esc(z.tag)}</text>` +
+        `<text class="arch-zt" x="${z.x + 16}" y="${z.y + 24}">${esc(z.title)}</text>` +
+        `<text class="arch-ztag" x="${z.x + 16}" y="${z.y + 39}" text-anchor="start">${esc(z.tag)}</text>` +
         `</g>`
       );
     })
@@ -149,8 +152,8 @@ export function renderArchitecture() {
             : "arch-ar";
       const label = e.label
         ? e.rotate
-          ? `<text class="arch-el" x="${p.mid[0]}" y="${p.mid[1]}" text-anchor="middle" transform="rotate(${e.rotate} ${p.mid[0]} ${p.mid[1]})">${esc(e.label)}</text>`
-          : `<text class="arch-el" x="${p.mid[0]}" y="${p.mid[1] - 5}" text-anchor="middle">${esc(e.label)}</text>`
+          ? `<text class="arch-el" x="${p.mid[0]}" y="${p.mid[1] + 3}" text-anchor="middle" transform="rotate(${e.rotate} ${p.mid[0]} ${p.mid[1]})">${esc(e.label)}</text>`
+          : `<text class="arch-el" x="${p.mid[0]}" y="${p.mid[1] - 2}" text-anchor="middle">${esc(e.label)}</text>`
         : "";
       return (
         `<g class="arch-edge" data-id="${e.id}" data-from="${e.from}" data-to="${e.to}">` +
@@ -170,7 +173,7 @@ export function renderArchitecture() {
         n.zone === "kernel" &&
         ["coord", "policy", "hub", "ingress", "apisrv", "broker"].includes(n.id);
       const stroke =
-        n.zone === "team" || n.zone === "teamB" ? "#B25E09" : core ? "#0B5FBF" : "#5B6B7C";
+        n.zone === "team" || n.zone === "teamB" ? "#E3A008" : core ? "#4C8DFF" : "#7D8896";
       const LH = 13.5;
       const SH = 11.5;
       const GAP = 3;
@@ -193,7 +196,7 @@ export function renderArchitecture() {
         .join("");
       return (
         `<g class="arch-node${n.ghost ? " arch-ghost" : ""}" data-id="${n.id}" tabindex="0" role="button" aria-label="${esc(n.t)}">` +
-        `<rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="9" fill="#FFFFFF" stroke="${stroke}" stroke-width="1.6"${ghost}/>` +
+        `<rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="9" fill="#18212D" stroke="${stroke}" stroke-width="1.6"${ghost}/>` +
         title +
         subt +
         `</g>`
@@ -204,9 +207,9 @@ export function renderArchitecture() {
   const svg =
     `<svg class="arch-svg" viewBox="0 0 ${canvas.w} ${canvas.h}" role="img" aria-label="System architecture map">` +
     `<defs>` +
-    `<marker id="arch-ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#6C7A89"/></marker>` +
-    `<marker id="arch-arb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#0B5FBF"/></marker>` +
-    `<marker id="arch-dot" viewBox="0 0 6 6" refX="3" refY="3" markerWidth="6" markerHeight="6" orient="auto"><circle cx="3" cy="3" r="2.6" fill="#0B5FBF"/></marker>` +
+    `<marker id="arch-ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#7D8896"/></marker>` +
+    `<marker id="arch-arb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#4C8DFF"/></marker>` +
+    `<marker id="arch-dot" viewBox="0 0 6 6" refX="3" refY="3" markerWidth="6" markerHeight="6" orient="auto"><circle cx="3" cy="3" r="2.6" fill="#4C8DFF"/></marker>` +
     `</defs>` +
     zoneSvg +
     edgeSvg +
@@ -272,7 +275,7 @@ export function renderArchitectureMini() {
   const nodeSvg = nodes
     .map(
       (n) =>
-        `<rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="7" fill="#FFFFFF" fill-opacity="0.85" stroke="${n.zone === "team" ? "#B25E09" : "#5B6B7C"}" stroke-opacity="0.5" stroke-width="1"/>`,
+        `<rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="7" fill="#18212D" stroke="${n.zone === "team" || n.zone === "teamB" ? "#E3A008" : "#3F4B5B"}" stroke-opacity="0.5" stroke-width="1"/>`,
     )
     .join("");
   return `<svg class="arch-mini" viewBox="0 0 ${canvas.w} ${canvas.h}" aria-hidden="true">${zoneSvg}${nodeSvg}</svg>`;

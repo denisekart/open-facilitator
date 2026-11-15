@@ -21,16 +21,13 @@
 
 <style>
   .arch-zone {
+    position: relative;
     width: 100%;
     height: 100%;
     border: 1.6px solid;
     border-radius: 14px;
     padding: 6px 10px;
     box-sizing: border-box;
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 8px;
     pointer-events: none;
     opacity: 0.9;
   }
@@ -38,15 +35,21 @@
     border-style: dashed;
   }
   .arch-zone-title {
+    display: block;
     font-size: 13px;
     font-weight: 700;
-    color: var(--ink-2, #334155);
+    line-height: 1.25;
+    color: #c3cedb;
   }
   .arch-zone-chip {
+    position: absolute;
+    top: 26px;
+    left: 10px;
     font-size: 10px;
     border: 1px solid;
     border-radius: 999px;
     padding: 1px 7px;
     white-space: nowrap;
+    background: rgba(13, 20, 32, 0.55);
   }
 </style>

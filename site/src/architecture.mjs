@@ -479,7 +479,12 @@ export const edges = [
     fs: "bottom",
     ts: "top",
     kind: "sync",
+    via: [
+      [484, 380],
+      [454, 380],
+    ],
     label: "state + audit",
+    lpos: 0.75,
   },
   {
     id: "e-brk-s3",
@@ -528,8 +533,8 @@ export const edges = [
     kind: "link",
     via: [
       [809, 268],
-      [809, 376],
-      [1034, 376],
+      [809, 366],
+      [1034, 360],
     ],
     label: "the same link",
     lpos: 0.35,
@@ -580,7 +585,20 @@ export const edges = [
     lpos: 0.79,
     label: "gated writes · webhooks in",
   },
-  { id: "e-chat-plat", from: "chat", to: "chatplat", fs: "bottom", ts: "top", kind: "webhook" },
+  {
+    id: "e-chat-plat",
+    from: "chat",
+    to: "chatplat",
+    fs: "bottom",
+    ts: "left",
+    kind: "webhook",
+    via: [
+      [1038, 312],
+      [1266, 312],
+      [1266, 188],
+    ],
+    lpos: 0.4,
+  },
   // Decisions surface back to humans: right margin, top corridor, then
   // down into the "you" zone at the decision node.
   {

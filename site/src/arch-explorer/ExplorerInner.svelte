@@ -10,6 +10,7 @@
   import { toFlow, OWN_STYLE } from "./from-model.js";
   import ZoneNode from "./ZoneNode.svelte";
   import PartNode from "./PartNode.svelte";
+  import CorridorEdge from "./CorridorEdge.svelte";
 
   // The interactive architecture map. The static SVG snapshot stays the
   // no-JS face; this bundle replaces it when present. Laws:
@@ -107,6 +108,7 @@
   });
 
   const nodeTypes = { zone: ZoneNode, part: PartNode };
+  const edgeTypes = { corridor: CorridorEdge };
 
   // The map is a fixed dark-slate instrument surface in BOTH site themes
   // (the code-block precedent), so xyflow is pinned dark and the header
@@ -186,6 +188,7 @@
       {nodes}
       {edges}
       {nodeTypes}
+      {edgeTypes}
       colorMode="dark"
       minZoom={0.2}
       maxZoom={2.4}
@@ -208,6 +211,7 @@
         <MiniMap
           pannable
           zoomable
+          position="bottom-right"
           ariaLabel="minimap"
           maskColor="rgba(6,10,16,0.55)"
           nodeColor={(n) =>

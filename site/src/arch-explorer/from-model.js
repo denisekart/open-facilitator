@@ -77,11 +77,13 @@ export function toFlow(data) {
       sourceHandle: `${e.fs || "right"}-src`,
       target: e.to,
       targetHandle: `${e.ts || "left"}-tgt`,
-      type: "default",
+      // Hand-routed edges render through CorridorEdge so the live map
+      // shows the same orthogonal corridors as the static snapshot.
+      type: e.via ? "corridor" : "default",
       ...(e.label ? { label: e.label } : {}),
       style,
       markerEnd: { type: "arrowclosed", color: k.stroke },
-      data: { kind: e.kind },
+      data: { kind: e.kind, via: e.via || null, lpos: e.lpos ?? 0.5 },
     };
   });
   return { nodes, edges };

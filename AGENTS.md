@@ -63,11 +63,11 @@ you touch — the nearest file wins.
 ## omp workspace layer
 - Profiles: dotnet-aspire, svelte. Stack is .NET + TypeScript — ignore
   zephyr/zmk skills unless on an embedded harness.
-- Project skills `.omp/skills/`: `facilitator-architecture`,
-  `facilitator-protocol`, `facilitator-workspace-packaging`,
-  `facilitator-reference-env`. **Maintenance rule:** skills describe
-  implemented reality — update the matching skill in the same change that
-  lands a schema/endpoint/table/CLI.
+- Project skills `.omp/skills/`: `facilitator-architecture`, `facilitator-protocol`,
+  `facilitator-workspace-packaging`, `facilitator-reference-env`; docs:
+  `ofac-doc-authoring` + agent-diagram-gif siblings. **Maintenance rule:**
+  skills describe implemented reality — update the matching skill in the
+  same change that lands a schema/endpoint/table/CLI.
 - Plans → `.omp/plans/` (reviewable in-repo); `/continue` for handoff;
   `--plan` mode + `xd://propose` for approvals.
 - Knowledge base: KB name = repo directory name, store `~/.omp/knowledge`;

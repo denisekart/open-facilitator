@@ -139,6 +139,7 @@ export class LinkClient {
       capabilityManifestDigest: options.capabilityManifestDigest,
       logger: this.logger,
       bus: this.bus,
+      token: options.token,
       onReady: (welcome) => this.onSessionReady(welcome),
     });
     this.heartbeat = new HeartbeatMonitor({

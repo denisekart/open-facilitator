@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ApiError, getJson } from "../lib/api.js";
+  import { ApiError, getJson, toApiError } from "../lib/api.js";
   import { apiFetch, session } from "../lib/auth.svelte.js";
   import { deckChanged } from "../lib/deck.svelte.js";
   import { ago, stateLabel, stamp, stateTone, TONE_CLASS } from "../lib/status.js";
@@ -11,8 +11,13 @@
   // broader operator surface.
   const canManageTokens = $derived(session.canManageEnrollmentTokens);
 
+  // Revoking an endpoint is an admin mutation (the group's law): the operator
+  // surface, not the narrower enrollment-tokens gate.
+  const canRevoke = $derived(session.canMutate);
+
   let links = $state<AdminLinksView | null>(null);
   let error = $state<ApiError | null>(null);
+  let revoking = $state<string | null>(null);
 
   async function load(): Promise<void> {
     try {
@@ -20,6 +25,26 @@
       error = null;
     } catch (err) {
       error = err instanceof ApiError ? err : new ApiError(0, "fetch-failed", String(err), null);
+    }
+  }
+
+  async function revoke(endpointId: string): Promise<void> {
+    if (!window.confirm(`Revoke ${endpointId}? Its enrollment, key and live session die; the endpoint rejoins only with a fresh enrollment code.`)) {
+      return;
+    }
+    revoking = endpointId;
+    try {
+      const response = await apiFetch(`/api/admin/links/${encodeURIComponent(endpointId)}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) {
+        throw await toApiError(response);
+      }
+      await load();
+    } catch (err) {
+      error = err instanceof ApiError ? err : new ApiError(0, "fetch-failed", String(err), null);
+    } finally {
+      revoking = null;
     }
   }
 
@@ -53,7 +78,7 @@
         <thead>
           <tr>
             <th>Endpoint</th><th>Team</th><th>Trust</th><th>Status</th><th>Epoch</th
-            ><th>Lease until</th><th>Sockets</th>
+            ><th>Lease until</th><th>Sockets</th><th>Credential</th><th>Key</th><th></th>
           </tr>
         </thead>
         <tbody>
@@ -81,11 +106,38 @@
                   </span>
                 {/if}
               </td>
-              <td class="mono">{g.sessionEpoch ?? "—"}</td>
+              <td
+                class="mono"
+                title={`revocation epoch ${g.epoch ?? "—"} · replay fence seq ${g.seq ?? "—"}`}
+                >{g.sessionEpoch ?? "—"}</td
+              >
               <td class="mono text-xs" title={g.leaseUntil ? stamp(g.leaseUntil) : null}>
                 {g.leaseUntil ? ago(g.leaseUntil).text : "—"}
               </td>
               <td class="mono">{g.liveSockets}</td>
+              <td class="text-xs text-ink-2">
+                {#if g.replaySuspect}
+                  <span class="badge bg-warn-veil text-warn ring-warn/25" data-testid={`replay-${g.endpointId}`}
+                    title="the last proof of possession was rejected by the replay fence"
+                    >replay?</span
+                  >
+                {/if}
+                {g.credentialClass ?? "—"}
+              </td>
+              <td class="mono text-xs" title={g.endpointKeyId ?? "no active key"}>
+                {g.endpointKeyId ? g.endpointKeyId.slice("sha256:".length, "sha256:".length + 12) : "—"}
+              </td>
+              <td>
+                {#if canRevoke}
+                  <button
+                    class="btn text-xs"
+                    data-testid={`revoke-${g.endpointId}`}
+                    disabled={revoking === g.endpointId}
+                    onclick={() => void revoke(g.endpointId)}>
+                    {revoking === g.endpointId ? "revoking…" : "revoke"}
+                  </button>
+                {/if}
+              </td>
             </tr>
           {/each}
         </tbody>

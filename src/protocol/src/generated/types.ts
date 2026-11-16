@@ -505,10 +505,25 @@ export interface ControlFrame {
   lastKnownAck?: string;
   leaseEpoch?: number;
   maxInFlight?: number;
+  /**
+   * Detached EdDSA JWS proof of possession of the endpoint's enrolled key for this socket
+   * (htm WS, htu the hub URL as the client sees it). Required by the kernel: a hello without
+   * it cannot authenticate.
+   */
+  proof?: string;
   protocolVersion?: string;
   protocolVersions?: [string, ...string[]];
   reason?: string;
+  /**
+   * The replay fence this session starts from (additive 2.0.0).
+   */
+  seq?: number;
   sessionId?: string;
+  /**
+   * Key id (kid) of the kernel session key that signed the session JWT this socket
+   * authenticated with (additive 2.0.0).
+   */
+  sessionKeyId?: string;
   supportedTransports?: [SupportedTransport, ...SupportedTransport[]];
 }
 
@@ -516,28 +531,43 @@ export type ControlFrameKind = "hello" | "welcome" | "heartbeat" | "flow_control
 
 export type SupportedTransport = "signalr" | "websocket" | "http-poll";
 
+/**
+ * Bootstrap enrollment request. `token` is the one-time enrollment code (or the configured
+ * bootstrap secret): it authorizes the join and is consumed as enrollment state, never as a
+ * standing credential. `publicKey`/`keyAlgorithm` are the endpoint's Ed25519 identity,
+ * required whenever the enrollment is keyed (as opposed to OIDC-asserted, where identity
+ * stays the issuer trust).
+ */
 export interface EnrollRequestV1 {
   endpointId: string;
   instanceId: string;
+  keyAlgorithm: KeyAlgorithm;
+  /**
+   * One raw Ed25519 public key, base64url without padding (32 bytes => 43 or 44 characters).
+   */
+  publicKey: string;
   role?: Role;
   team?: string;
   token: string;
   trustMode: TrustMode;
 }
 
+export type KeyAlgorithm = "ed25519";
+
 export type Role = "gateway" | "child";
 
 export type TrustMode = "shared-runtime" | "separate-process-same-host" | "isolated-executor";
 
 /**
- * Bootstrap enrollment response. linkToken/expiresAt are additive (OpenAPI 1.0.1): the
- * interim link-token credential the Link server issues at enrollment; a server MAY omit
- * both when it issues no bearer credential.
+ * Bootstrap enrollment response. It carries no secret: enrollment registers an identity, it
+ * does not hand out a bearer. `endpointKeyId` is the fingerprint of the registered public
+ * key (`sha256:` + lowercase hex) and `seq` is the replay fence the endpoint starts from;
+ * every later authentication is a proof of possession of that key.
  */
 export interface EnrollResponseV1 {
+  endpointKeyId: string;
   enrollmentId: string;
-  expiresAt?: string;
-  linkToken?: string;
+  seq: number;
   trustMode: TrustMode;
 }
 

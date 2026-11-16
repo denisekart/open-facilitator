@@ -12,6 +12,7 @@ import { createMemoryLogger } from "@ofac/workspace-link";
 import type { EnvelopeAck, LinkTransport, WelcomeFrame } from "@ofac/workspace-link";
 import { SqliteLedger } from "@ofac/workspace-link/node";
 import { afterEach, describe, expect, it } from "vitest";
+import { fakeKernel as makeFakeKernel } from "../fake-kernel.js";
 import { parseConfig, type GatewayConfig } from "../../src/config.js";
 import { ExecutionLedger, type GatewayPaths } from "../../src/ledger.js";
 import { createGatewayRuntime, type GatewayRuntime } from "../../src/runtime.js";
@@ -62,31 +63,29 @@ class MockTransport implements LinkTransport {
   }
 }
 
-/** Injected kernel: enroll/capabilities/token + the approvals poll answer. */
-function kernel(approvals: { approvalId: string; state: string }[]) {
-  const fetchImpl = (async (url: unknown) => {
-    const path = String(url);
-    if (path.includes("/token")) {
-      return new Response(JSON.stringify({ access_token: "cc-jwt", expires_in: 300 }), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      });
-    }
-    if (path.endsWith("/api/link/v1/enroll")) {
-      return new Response(
-        JSON.stringify({ enrollmentId: "e1", trustMode: "shared-runtime", linkToken: "tok" }),
-        { status: 201 },
-      );
-    }
-    if (path.endsWith("/api/link/v1/capabilities")) return new Response(null, { status: 204 });
-    if (path.includes("/api/works/"))
-      return new Response(JSON.stringify(approvals), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      });
-    return new Response("no route", { status: 500 });
-  }) as typeof fetch;
-  return fetchImpl;
+/**
+ * Injected kernel: the shared link plane (enroll pins a key, sessions are bought
+ * with proofs) plus the OIDC token route and the approvals poll answer.
+ */
+function kernel(approvals: { approvalId: string; state: string }[]): typeof fetch {
+  return makeFakeKernel({
+    workload: { token: "cc-jwt" },
+    fallback: (path) => {
+      if (path.includes("/token")) {
+        return new Response(JSON.stringify({ access_token: "cc-jwt", expires_in: 300 }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      if (path.includes("/api/works/")) {
+        return new Response(JSON.stringify(approvals), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      return undefined;
+    },
+  }).fetchImpl;
 }
 
 /**

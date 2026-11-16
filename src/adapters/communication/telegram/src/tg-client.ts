@@ -6,6 +6,7 @@
 // fake (the idempotency-ledger tests must run with zero HTTP).
 import { observeHttpStatus } from "@ofac/provider-core";
 import type { TgMessage, TgUpdate } from "./normalize.js";
+export type { TgMessage };
 
 export class TgError extends Error {
   constructor(

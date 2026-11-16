@@ -4,7 +4,7 @@
 // re-claim re-pushes (attempts=2) ⇒ the client's ledger answers `duplicate`
 // WITHOUT re-running the handler ⇒ the server acks and the loop terminates.
 import { describe, expect, it } from "vitest";
-import { FaultInjector, type LinkHandler } from "../../src/index.js";
+import { FaultInjector, type LinkHandler, type LinkTokenProvider } from "../../src/index.js";
 import type { EnvelopeCommand, WorkAssignCommandV1Data } from "@ofac/protocol";
 import { SignalrTransport } from "../../src/node/index.js";
 import {
@@ -36,19 +36,16 @@ describe.skipIf(!E2E)("receipt loss redelivery", () => {
     const a = await sdkClient(h, {
       endpointId,
       handler: counting,
-      transportFactory: (token: string) =>
-        new FaultInjector(
-          new SignalrTransport({ baseUrl: h.baseUrl, token: { getToken: async () => token } }),
-          {
-            dropReceipt: () => {
-              if (drop) {
-                drop = false;
-                return true;
-              }
-              return false;
-            },
+      transportFactory: (provider: LinkTokenProvider) =>
+        new FaultInjector(new SignalrTransport({ baseUrl: h.baseUrl, token: provider }), {
+          dropReceipt: () => {
+            if (drop) {
+              drop = false;
+              return true;
+            }
+            return false;
           },
-        ),
+        }),
     });
 
     const envelope = assignEnvelope({

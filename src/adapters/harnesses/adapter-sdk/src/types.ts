@@ -4,7 +4,7 @@
 // protocol/json-schema/adapter.v1.json). Documentation-grade types only —
 // nothing here hits the wire beyond what adapter.v1.json already describes.
 import type { CapabilityManifestV1, EnvelopeCommand, EnvelopeEvent } from "@ofac/protocol";
-import type { LinkLogger } from "@ofac/workspace-link";
+import type { EndpointIdentity, LinkLogger } from "@ofac/workspace-link";
 
 /**
  * The Adapter Descriptor, documentation-grade (NOT on the wire in
@@ -70,11 +70,17 @@ export interface RunContext {
   sessionRef?: string | undefined;
   /**
    * Kernel byte-path surface: the configured origin plus the child
-   * link token, which IS the workload credential (link-plane HTTP:
+   * link credential, which IS the workload credential (link-plane HTTP:
    * request_upload + PUT). Harnesses hand this to `createArtifactClient`.
+   * A plain string is a static bearer (tests, stub kernels); production
+   * passes the session provider's `getToken`, because a 5-minute session JWT
+   * is only ever valid when it is read at call time.
    * Required by the kill rule — every adapter carries a kernel.
    */
-  readonly kernel: { readonly baseUrl: string; readonly token: string };
+  readonly kernel: {
+    readonly baseUrl: string;
+    readonly token: string | (() => Promise<string>);
+  };
   /**
    * The dispatch-time context document the kernel folded for this assign
    * (`inputs.context.document`, schema `context.dispatch.v1`) — what the
@@ -191,8 +197,23 @@ export interface HarnessHooks {
 export interface CreateAdapterOptions {
   /** `<gatewayId>/<name>` — Gateway-side law, validated here too (fail fast). */
   childWorkspaceId: string;
-  /** Omitted ⇒ read `OFAC_CHILD_SECRET`; absent both ⇒ empty token. */
+  /**
+   * Gateway-facing first-boot pairing secret only: it pins `identity` below and
+   * then retires. Omitted ⇒ read `OFAC_CHILD_SECRET`; absent both ⇒ empty token.
+   */
   token?: string;
+  /**
+   * The worker's Ed25519 identity (`loadOrCreateIdentity(stateDir)`), presented
+   * in the hello and used for the proof of possession on every reconnect. With
+   * no identity the hello stays a pre-identity token hello (the unauthenticated
+   * local-socket fleet).
+   */
+  identity?: EndpointIdentity;
+  /**
+   * TLS for a remote (non-unix-socket) Gateway leg, where the proof is the whole
+   * authentication and the channel must be encrypted.
+   */
+  tls?: boolean | { servername?: string; rejectUnauthorized?: boolean };
   manifest: CapabilityManifestV1;
   transport: { readonly socketPath: string } | { readonly host: string; readonly port: number };
   descriptor: AdapterDescriptor;
@@ -214,14 +235,19 @@ export interface CreateAdapterOptions {
   telemetry?: AdapterTelemetry;
   /**
    * Kernel origin for the artifact byte path. `RunContext.kernel`
-   * surfaces it + the bearer for link-plane HTTP; `token` defaults to the
-   * child token — pass the worker's separately enrolled KERNEL link token
-   * when the Gateway-facing token is not one (e2e/example enroll role
-   * `child`: the Gateway fleet secret does not validate kernel-side).
-   * Required by the kill rule: the file:// inline-manifest path
-   * is retired, every adapter uploads through a kernel.
+   * surfaces it + the credential for link-plane HTTP. The kernel leg is its
+   * OWN endpoint relationship: pass the worker's own kernel session-provider
+   * token factory (`createEndpointCredential(...).provider.getToken` — the
+   * worker bins do this when OFAC_KERNEL_ENDPOINT names the kernel endpoint to
+   * enroll as), or a static bearer for tests and stub kernels. A plain string
+   * defaults to the first-boot pairing secret (the unauthenticated local
+   * fleet). Required by the kill rule: the file:// inline-manifest path is
+   * retired, every adapter uploads through a kernel.
    */
-  kernel: { readonly baseUrl: string; readonly token?: string };
+  kernel: {
+    readonly baseUrl: string;
+    readonly token?: string | (() => Promise<string>);
+  };
 }
 
 export interface AdapterStatus {

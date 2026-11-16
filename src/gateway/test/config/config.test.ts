@@ -3,12 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import {
-  GatewayConfigError,
-  loadConfigFile,
-  parseConfig,
-  tokenFilePath,
-} from "../../src/config.js";
+import { GatewayConfigError, loadConfigFile, parseConfig } from "../../src/config.js";
 
 function stateDir(): string {
   return mkdtempSync(join(tmpdir(), "gw-config-"));
@@ -29,9 +24,9 @@ child:
 `;
 
 function expectKey(yaml: string, key: string, env: Record<string, string | undefined> = {}): void {
-  expect(() => parseConfig(yaml, { env, hasStoredToken: () => false })).toThrow(GatewayConfigError);
+  expect(() => parseConfig(yaml, { env })).toThrow(GatewayConfigError);
   try {
-    parseConfig(yaml, { env, hasStoredToken: () => false });
+    parseConfig(yaml, { env });
   } catch (error) {
     expect((error as Error).message).toContain(key);
   }
@@ -39,7 +34,7 @@ function expectKey(yaml: string, key: string, env: Record<string, string | undef
 
 describe("parseConfig happy path", () => {
   it("parses the locked key set with defaults", () => {
-    const config = parseConfig(BASE, { hasStoredToken: () => false });
+    const config = parseConfig(BASE, {});
     expect(config.gatewayId).toBe("gw.team-alpha");
     expect(config.team).toBe("default");
     expect(config.trustMode).toBe("shared-runtime");
@@ -48,26 +43,32 @@ describe("parseConfig happy path", () => {
     expect(config.diagnostics.port).toBe(0);
     expect(config.heartbeatSeconds).toBe(30);
     expect(config.enrollmentSecret).toBe("enroll-dev");
-    expect(config.linkToken).toBeUndefined();
   });
 
   it("loads from a YAML file (layout)", () => {
     const file = join(stateDir(), "gateway.yaml");
     writeFileSync(file, BASE);
-    expect(loadConfigFile(file, { hasStoredToken: () => false }).gatewayId).toBe("gw.team-alpha");
+    expect(loadConfigFile(file, {}).gatewayId).toBe("gw.team-alpha");
   });
 
-  it("accepts a stored token file as the credential when no secret/token is configured", () => {
+  it("a stored identity key is the credential: a restart needs no enrollment code", () => {
     const dir = stateDir();
     mkdirSync(dir, { recursive: true });
-    writeFileSync(tokenFilePath(dir), "tok-abc");
+    writeFileSync(join(dir, "identity.key"), '{"v":1,"algorithm":"ed25519"}');
     const yaml = BASE.replace("enrollmentSecret: enroll-dev\n", "").replace(
       "stateDir: /tmp/gw-state",
       `stateDir: ${dir}`,
     );
     const config = parseConfig(yaml);
     expect(config.enrollmentSecret).toBeUndefined();
-    expect(config.linkToken).toBeUndefined();
+    expect(config.stateDir).toBe(dir);
+  });
+
+  it("no code, no workload and no stored key: refused (the first-boot law)", () => {
+    const yaml = BASE.replace("enrollmentSecret: enroll-dev\n", "");
+    expect(() => parseConfig(yaml, { hasStoredIdentity: () => false })).toThrow(
+      /neither enrollmentSecret\/OFAC_ENROLL_SECRET nor a workload block is set/,
+    );
   });
 });
 
@@ -124,7 +125,7 @@ workload:
 
 describe("parseConfig plan-10 identity keys", () => {
   it("parses role and the workload block", () => {
-    const config = parseConfig(`${BASE}${WORKLOAD}`, { hasStoredToken: () => false });
+    const config = parseConfig(`${BASE}${WORKLOAD}`, {});
     expect(config.workload).toEqual({
       tokenUrl: "http://localhost:8081/realms/facilitator/protocol/openid-connect/token",
       clientId: "gw-team-a",
@@ -134,9 +135,7 @@ describe("parseConfig plan-10 identity keys", () => {
   });
 
   it("accepts role: gateway and rejects a role off the enum", () => {
-    expect(parseConfig(`${BASE}role: gateway\n`, { hasStoredToken: () => false }).role).toBe(
-      "gateway",
-    );
+    expect(parseConfig(`${BASE}role: gateway\n`, {}).role).toBe("gateway");
     expectKey(`${BASE}role: operator\n`, "role");
   });
 
@@ -150,7 +149,6 @@ describe("parseConfig plan-10 identity keys", () => {
   it("OFAC_OIDC_* env overlay wins per-key and completes a file block", () => {
     const config = parseConfig(`${BASE}${WORKLOAD}`, {
       env: { OFAC_OIDC_CLIENT_SECRET: "from-env" },
-      hasStoredToken: () => false,
     });
     expect(config.workload?.clientSecret).toBe("from-env");
     expect(config.workload?.clientId).toBe("gw-team-a");
@@ -217,7 +215,7 @@ childTransport:
 
 function keyMessage(yaml: string, env: Record<string, string | undefined> = {}): string {
   try {
-    parseConfig(yaml, { env, hasStoredToken: () => false });
+    parseConfig(yaml, { env });
   } catch (error) {
     expect(error).toBeInstanceOf(GatewayConfigError);
     return (error as Error).message;
@@ -227,7 +225,7 @@ function keyMessage(yaml: string, env: Record<string, string | undefined> = {}):
 
 describe("parseConfig mode matrix (config v2)", () => {
   it("loads a v1 file (no mode, child: block) as embedded — 05 back-compat", () => {
-    const config = parseConfig(BASE, { hasStoredToken: () => false });
+    const config = parseConfig(BASE, {});
     expect(config.mode).toBe("embedded");
     expect(config.children).toBeUndefined();
     expect(config.childTransport).toBeUndefined();
@@ -235,7 +233,7 @@ describe("parseConfig mode matrix (config v2)", () => {
   });
 
   it("parses a shared fleet with defaults and explicit overrides", () => {
-    const config = parseConfig(SHARED, { hasStoredToken: () => false });
+    const config = parseConfig(SHARED, {});
     expect(config.mode).toBe("shared");
     expect(config.child).toBeUndefined();
     expect(config.children).toEqual([
@@ -250,14 +248,14 @@ describe("parseConfig mode matrix (config v2)", () => {
   });
 
   it("boots standalone with zero children", () => {
-    const config = parseConfig(STANDALONE, { hasStoredToken: () => false });
+    const config = parseConfig(STANDALONE, {});
     expect(config.mode).toBe("standalone");
     expect(config.children).toBeUndefined();
     expect(config.childTransport?.tcp).toEqual({ port: 8090 });
   });
 
   it("accepts an explicitly empty children list in standalone", () => {
-    const config = parseConfig(`${STANDALONE}children: []\n`, { hasStoredToken: () => false });
+    const config = parseConfig(`${STANDALONE}children: []\n`, {});
     expect(config.children).toEqual([]);
   });
 
@@ -337,12 +335,12 @@ describe("parseConfig mode matrix (config v2)", () => {
 
   it("allows shared and standalone with isolated-executor", () => {
     const shared = SHARED.replace("trustMode: shared-runtime", "trustMode: isolated-executor");
-    expect(() => parseConfig(shared, { hasStoredToken: () => false })).not.toThrow();
+    expect(() => parseConfig(shared, {})).not.toThrow();
     const standalone = STANDALONE.replace(
       "trustMode: shared-runtime",
       "trustMode: isolated-executor",
     );
-    expect(() => parseConfig(standalone, { hasStoredToken: () => false })).not.toThrow();
+    expect(() => parseConfig(standalone, {})).not.toThrow();
   });
 });
 
@@ -396,14 +394,14 @@ describe("parseConfig children fleet entries", () => {
 
 describe("parseConfig childTransport block", () => {
   it("resolves a relative socket path against stateDir", () => {
-    const config = parseConfig(SHARED, { hasStoredToken: () => false });
+    const config = parseConfig(SHARED, {});
     expect(config.childTransport?.socket.path).toBe("/tmp/gw-state/child.sock");
   });
 
   it("keeps an absolute socket path as-is", () => {
     const config = parseConfig(
       SHARED.replace("path: ./child.sock", "path: /var/run/ofac/child.sock"),
-      { hasStoredToken: () => false },
+      {},
     );
     expect(config.childTransport?.socket.path).toBe("/var/run/ofac/child.sock");
   });
@@ -422,9 +420,7 @@ describe("parseConfig childTransport block", () => {
   it("accepts an allowedUid pin and rejects negatives", () => {
     const config = parseConfig(
       SHARED.replace("path: ./child.sock", "path: ./child.sock\n    allowedUid: 1000"),
-      {
-        hasStoredToken: () => false,
-      },
+      {},
     );
     expect(config.childTransport?.socket.allowedUid).toBe(1000);
     expectKey(
@@ -469,13 +465,12 @@ describe("parseConfig child secret overlay", () => {
   it("OFAC_CHILD_SECRET mounts the shared child secret", () => {
     const config = parseConfig(SHARED, {
       env: { OFAC_CHILD_SECRET: "env-child" },
-      hasStoredToken: () => false,
     });
     expect(config.childSecret).toBe("env-child");
   });
 
   it("childSecret stays undefined without the env", () => {
-    const config = parseConfig(SHARED, { env: {}, hasStoredToken: () => false });
+    const config = parseConfig(SHARED, { env: {} });
     expect(config.childSecret).toBeUndefined();
   });
 });
@@ -484,38 +479,36 @@ describe("parseConfig env overlay", () => {
   it("OFAC_ENROLL_SECRET overrides the file", () => {
     const config = parseConfig(BASE, {
       env: { OFAC_ENROLL_SECRET: "env-secret" },
-      hasStoredToken: () => false,
     });
     expect(config.enrollmentSecret).toBe("env-secret");
   });
 
-  it("OFAC_LINK_TOKEN mounts a pre-minted token without a secret", () => {
+  it("OFAC_LINK_TOKEN is no longer a credential: the key or a code is required", () => {
     const yaml = BASE.replace("enrollmentSecret: enroll-dev\n", "");
-    const config = parseConfig(yaml, {
-      env: { OFAC_LINK_TOKEN: "tok-xyz" },
-      hasStoredToken: () => false,
-    });
-    expect(config.linkToken).toBe("tok-xyz");
-    expect(config.enrollmentSecret).toBeUndefined();
+    // The deleted bearer concept is an unknown key, not a silent mount.
+    expect(() =>
+      parseConfig(`${yaml}linkToken: tok-xyz\n`, { hasStoredIdentity: () => false }),
+    ).toThrow(/unknown key 'linkToken'/);
+    // And the env overlay alone buys nothing either.
+    expect(() =>
+      parseConfig(yaml, { env: { OFAC_LINK_TOKEN: "tok-xyz" }, hasStoredIdentity: () => false }),
+    ).toThrow(GatewayConfigError);
   });
 
   it("env secret rescues a file with no credential at all", () => {
     const yaml = BASE.replace("enrollmentSecret: enroll-dev\n", "");
-    expect(() =>
-      parseConfig(yaml, { env: { OFAC_ENROLL_SECRET: "s" }, hasStoredToken: () => false }),
-    ).not.toThrow();
+    expect(() => parseConfig(yaml, { env: { OFAC_ENROLL_SECRET: "s" } })).not.toThrow();
   });
 
   it("OFAC_KERNEL_URL repoints facilitatorUrl (the deployment origin wins)", () => {
     const config = parseConfig(BASE, {
       env: { OFAC_KERNEL_URL: "http://facilitator-lb" },
-      hasStoredToken: () => false,
     });
     expect(config.facilitatorUrl).toBe("http://facilitator-lb");
   });
 
   it("a file facilitatorUrl stands when the env is unset", () => {
-    const config = parseConfig(BASE, { env: {}, hasStoredToken: () => false });
+    const config = parseConfig(BASE, { env: {} });
     expect(config.facilitatorUrl).toBe("http://localhost:8088");
   });
 });
@@ -524,9 +517,7 @@ describe("parseConfig policy block", () => {
   const withPolicy = (block: string): string => `${BASE}${block}`;
 
   it("parses policy.inline with the confirm-timeout default", () => {
-    const config = parseConfig(withPolicy('policy:\n  inline: "owner: t\\npolicies: []"\n'), {
-      hasStoredToken: () => false,
-    });
+    const config = parseConfig(withPolicy('policy:\n  inline: "owner: t\\npolicies: []"\n'), {});
     expect(config.policy?.inline).toContain("owner: t");
     expect(config.policy?.path).toBeUndefined();
     expect(config.policy?.confirmTimeoutSeconds).toBe(900);
@@ -536,14 +527,13 @@ describe("parseConfig policy block", () => {
     const dir = stateDir();
     const file = join(dir, "gateway.yaml");
     writeFileSync(file, withPolicy("policy:\n  path: policy.yaml\n  confirmTimeoutSeconds: 600\n"));
-    const config = loadConfigFile(file, { hasStoredToken: () => false });
+    const config = loadConfigFile(file, {});
     expect(config.policy?.path).toBe(join(dir, "policy.yaml"));
     expect(config.policy?.confirmTimeoutSeconds).toBe(600);
   });
 
   it("an absolute policy.path survives untouched", () => {
     const config = parseConfig(withPolicy("policy:\n  path: /etc/ofac/policy.yaml\n"), {
-      hasStoredToken: () => false,
       configDir: "/srv",
     });
     expect(config.policy?.path).toBe("/etc/ofac/policy.yaml");
@@ -560,6 +550,6 @@ describe("parseConfig policy block", () => {
   });
 
   it("absent policy key parses to undefined", () => {
-    expect(parseConfig(BASE, { hasStoredToken: () => false }).policy).toBeUndefined();
+    expect(parseConfig(BASE, {}).policy).toBeUndefined();
   });
 });

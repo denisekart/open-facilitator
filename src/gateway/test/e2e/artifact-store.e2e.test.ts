@@ -39,7 +39,13 @@ describe.skipIf(!E2E)("artifact store e2e", () => {
       trustMode: "isolated-executor",
     });
     expect(enrolled.status).toBe(201);
-    const linkToken = String((enrolled.body as { linkToken: string }).linkToken);
+    // Class `oidc` buys its session at the SAME proof route: one POST of the
+    // workload token, the same 5-minute session shape a key proof mints.
+    const minted = await linkPost(harness.baseUrl, "/api/link/v1/proof", "", {
+      token: await workloadToken(),
+    });
+    expect(minted.status).toBe(200);
+    const linkToken = String((minted.body as { sessionToken: string }).sessionToken);
 
     // 1. Allocate: the ticket rides back in-band on the ack `data`.
     const commandId = `cmd-art-${randomUUID().slice(0, 8)}`;

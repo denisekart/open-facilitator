@@ -7,21 +7,16 @@
 //     command_id (outbox_command_id_key UNIQUE), so a re-seed cannot mint a
 //     second delivery — forcing the row back to `pending` via psql drives
 //     the exact redelivery path (the pump's 1 s safety-net poll re-pushes).
-// (b) As-built rotation law (conforms to reality; the premise "the
-//     gateway's next send 401s" does NOT hold over SignalR):
+// (b) Credential-law pair, rewritten for the session-JWT model:
 //     · Hub auth runs at WebSocket-upgrade time only (LinkBearerHandler);
-//       Context.User claims are FROZEN for the socket's lifetime and the
-//       hub never re-checks the token store per invocation. So an
-//       out-of-band re-enroll does not disturb a live session at all.
-//     · When the session does die (lease revoked ⇒ Heartbeat false +
-//       goodbye), the reconnect's upgrade-401 surfaces to mapHubError as a
-//       generic "WebSocket failed to connect" (no statusCode, no "401" in
-//       the text — proven against the dist/cjs transport), so
-//       TransportError.unauthorized never fires and the SDK cannot detect
-//       rotation mid-reconnect. Recorded SDK gap.
-//     · Recovery law: a restart re-enrolls at startup (workload block
-//       configured — mode (b)) and writes the token file BEFORE any
-//       connect, then flows.
+//       Context.User claims are FROZEN for the socket's lifetime. An
+//       out-of-band re-enroll therefore does not disturb a live session:
+//       there is no shared long-lived bearer left to invalidate.
+//     · When the SESSION dies (lease row deleted ⇒ Heartbeat false +
+//       goodbye), the reconnect re-PROVES and self-heals with no restart:
+//       the credential is re-derivable from the key/workload secret, which
+//       is exactly what the deleted bearer could not do. This is the
+//       behaviour the old token model could only reach by restarting.
 import { beforeAll, describe, expect, it } from "vitest";
 import {
   E2E,
@@ -29,7 +24,8 @@ import {
   assignEnvelope,
   gatewayConfig,
   gatewayStatus,
-  gatewayToken,
+  gatewayIdentity,
+  gatewaySession,
   linkRow,
   psql,
   seedDelivery,
@@ -123,15 +119,14 @@ describe.skipIf(!E2E)("gateway dedupe + rotation e2e", () => {
     }
   });
 
-  it("(b) rotation: live claims survive re-enroll; revoke forces a dead-token reconnect that cannot self-heal; a restart re-enrolls and flows", async () => {
+  it("(b) sessions: live claims survive re-enroll; a revoked session self-heals by re-proving; a restart re-proves too", async () => {
     const gateway = startGateway(gw.configPath);
     try {
       await gateway.ready();
-      const tokenBefore = gatewayToken(gw.stateDir);
-
-      // Out-of-band mode-(b) re-enroll, same endpointId: a fresh OIDC CC
-      // JWT for the bound client, the stored hash is replaced ⇒ the
-      // gateway's token is dead for any NEW authentication.
+      const keyBefore = gatewayIdentity(gw.stateDir);
+      // Out-of-band mode-(b) re-enroll, same endpointId: a fresh OIDC CC JWT for
+      // the bound client. Nothing about the live session changes — no bearer is
+      // shared between them any more.
       const rotated = await enroll({
         baseUrl: harness.baseUrl,
         token: await workloadToken(),
@@ -139,49 +134,49 @@ describe.skipIf(!E2E)("gateway dedupe + rotation e2e", () => {
         instanceId: `rotate-${Math.random().toString(36).slice(2, 10)}`,
         trustMode: "shared-runtime",
         team: TEAM,
+        publicKey: keyBefore.publicKeyBase64Url,
+        keyAlgorithm: "ed25519",
       });
-      expect(rotated.linkToken).toBeDefined();
-      expect(rotated.linkToken).not.toBe(tokenBefore);
+      expect(rotated.endpointKeyId).toBeTruthy();
+      expect(rotated.seq).toBeGreaterThanOrEqual(1);
 
-      // Frozen-claims law: the live hub socket keeps serving — a fresh
-      // assign completes even though the token behind it is already dead,
-      // and no mid-session refresh oracle exists (token file unchanged).
+      // Frozen-claims law: the live hub socket keeps serving across the
+      // re-enroll — a fresh assign completes with no reconnect at all.
       const flowing = `cmd-${Math.random().toString(36).slice(2, 10)}`;
       await seedAssign(flowing);
       await waitCompleted(flowing);
-      expect(gatewayToken(gw.stateDir)).toBe(tokenBefore);
+      expect(gatewayIdentity(gw.stateDir).keyId).toBe(keyBefore.keyId);
 
-      // Revoke the session lease server-side: the next hub Heartbeat finds
-      // no matching row ⇒ false + goodbye(session-superseded) ⇒ the SDK
-      // supervises a reconnect, whose upgrade 401 (dead token) is
-      // indistinguishable from a network failure ⇒ retry loop, no refresh.
+      // Kill the session row server-side: the next hub Heartbeat finds no
+      // matching row ⇒ false + goodbye(session-superseded) ⇒ the SDK reconnects.
+      // The reconnect now re-mints a session from the workload credential, so it
+      // SELF-HEALS — the recovery the deleted bearer model needed a restart for.
       await psql(
         harness.dbUrl,
         `DELETE FROM facilitator.link_sessions WHERE logical_endpoint_id = '${gw.gatewayId}'`,
       );
-      await waitFor(
-        "session down, reconnect retrying",
-        () => gateway.log().includes("link session down; retrying") || false,
-        30_000,
-      );
-      await new Promise((r) => setTimeout(r, 2_000)); // more backoff lapses
-      expect(gatewayToken(gw.stateDir)).toBe(tokenBefore); // no self-heal
-      const down = await gatewayStatus(gw.diagnosticsPort);
-      expect(down.session?.state).toBe("reconnecting");
+      const commandId = `cmd-${Math.random().toString(36).slice(2, 10)}`;
+      const outboxId = await seedAssign(commandId);
+      await waitCompleted(commandId);
+      expect(await waitAcked(outboxId)).toBe("accepted");
+      const up = await gatewayStatus(gw.diagnosticsPort);
+      expect(up.session?.state).toBe("connected");
 
-      // Recovery law: a restart re-enrolls at startup (secret configured) —
-      // the token file is rewritten BEFORE any connect — and delivery flows.
+      // A restart re-proves with the same key (the identity file is unchanged)
+      // and flows: no enrollment code, no stored bearer, no rotation needed.
       await gateway.kill("SIGKILL");
       const revived = startGateway(gw.configPath);
       try {
         await revived.ready();
-        const tokenAfter = gatewayToken(gw.stateDir);
-        expect(tokenAfter).not.toBe(tokenBefore);
-
-        const commandId = `cmd-${Math.random().toString(36).slice(2, 10)}`;
-        const outboxId = await seedAssign(commandId);
-        await waitCompleted(commandId);
-        expect(await waitAcked(outboxId)).toBe("accepted");
+        expect(gatewayIdentity(gw.stateDir).keyId).toBe(keyBefore.keyId);
+        // The harness can mint its own session from the same identity file:
+        // the key in that directory IS the endpoint's credential.
+        const session = await gatewaySession(gw.stateDir, harness.baseUrl, gw.gatewayId);
+        expect(session.split(".")).toHaveLength(3);
+        const second = `cmd-${Math.random().toString(36).slice(2, 10)}`;
+        const outbox2 = await seedAssign(second);
+        await waitCompleted(second);
+        expect(await waitAcked(outbox2)).toBe("accepted");
       } finally {
         await revived.kill("SIGTERM");
       }

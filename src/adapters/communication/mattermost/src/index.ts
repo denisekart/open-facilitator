@@ -6,9 +6,8 @@
 // command.communication.* execute over REST v4 under the post-ledger
 // idempotency law.
 import { createServer, type Server } from "node:http";
-import { randomBytes } from "node:crypto";
 import type { LinkClient, LinkLogger } from "@ofac/workspace-link";
-import { enroll } from "@ofac/workspace-link";
+import { createEndpointCredential, identityDirFor } from "@ofac/workspace-link";
 import type { NormalizedEvent as ProviderCoreEvent } from "@ofac/provider-core";
 import { runProviderAdapter } from "@ofac/provider-core/node";
 import { deriveTenant, type AdapterConfig } from "./config.js";
@@ -101,29 +100,19 @@ export async function run(
     tenantOrOrganizationId: tenant,
   };
   const source = `urn:ofac:provider:mattermost:${tenant}`;
-
-  // Our own link credential for the artifact client + content GETs (the
-  // telegram law): the adapter-face owns the CLIENT's token, so media rides
-  // an enrollment of its own (same secret/endpoint; 401 re-enrolls).
-  const linkToken = { value: "" };
-  const enrollSelf = async (): Promise<string> => {
-    const response = await enroll(
-      {
-        baseUrl: config.kernelUrl,
-        token: config.enrollSecret,
-        endpointId: config.endpointId,
-        instanceId: `mmm-${randomBytes(6).toString("hex")}`,
-        trustMode: "isolated-executor",
-        role: "child",
-        team: config.team,
-      },
-      ...(deps.fetchImpl === undefined ? [] : [deps.fetchImpl]),
-    );
-    linkToken.value = response.linkToken ?? "";
-    return linkToken.value;
-  };
-  const token = async (): Promise<string> =>
-    linkToken.value === "" ? await enrollSelf() : linkToken.value;
+  const { provider: session } = await createEndpointCredential({
+    stateDir: identityDirFor(config.statePath),
+    baseUrl: config.kernelUrl,
+    endpointId: config.endpointId,
+    team: config.team,
+    trustMode: "isolated-executor",
+    role: "child",
+    enrollSecret: config.enrollSecret,
+    logger,
+    ...(deps.fetchImpl === undefined ? {} : { fetchImpl: deps.fetchImpl }),
+    instancePrefix: "mmm",
+  });
+  const token = () => session.getToken();
 
   const media = new MediaPipeline({
     api,

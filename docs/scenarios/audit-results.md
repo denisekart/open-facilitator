@@ -15,7 +15,7 @@
 | A13 | partial | T1-gate | AssignRuleRoutingTests.MatchingLabelRoutesCodingCapabilityToRuleEndpoint · RoutingFunnelTests.SingleLiveCandidateRoutesOnceWithLedgerEffectAndAudit | routing codified; re-route-after-misroute rides the same funnel untested |
 | A14 | partial | T2-adapter | LinkIngressTests.UnknownCommandFailsClosedWithAuditRow · IngressValidationTests.OversizedBody_ReturnsPayloadTooLarge | fail-closed legs codified; nonsense classification is the AI plane |
 | A15 | covered | T2-adapter | DuplicateIngressTests.FixtureSteer_AcceptedOnce_DuplicateReplay_InvalidFixturesFailClosed · ProviderIngressTests.RenumberedRedeliveryNotesTheWork_NeverDoublesTheAsk | — |
-| B1 | covered | T1-gate | ProviderIngressTests.LinkMintChallengeRedeemFlowWithFences · EnrollmentTokenTests.MintThenEnrollMintsWorkingLinkToken | — |
+| B1 | covered | T1-gate | ProviderIngressTests.LinkMintChallengeRedeemFlowWithFences · EnrollmentTokenTests.MintThenEnrollBindsAKeyAndAnswersAsPrincipal | — |
 | B2 | covered | T2-adapter | ProviderIngressTests.UnlinkedMentionRepliesWithoutWork | — |
 | B3 | covered | T1-gate | SessionLossTests.DeadOwner_FailsAttemptOnceWithValidRetryableEvent · ContributorTests.RetirementMovesOpenWorkToTheTeamAndKeepsTheName | — |
 | B4 | covered | T2-adapter | NotificationLedgerTests.UnlinkedDmTargetFallsBackToTheTeamChannelAnonymized · NotificationLedgerTests.NoLadderLeftUndeliverableNamesTheReason | — |
@@ -57,7 +57,7 @@
 | H2 | unexpressible | T4-manual | — | T4 rubric |
 | H3 | covered | T1-gate | OpsSurfaceTests.AuditExportCoversTheWindowInBothFormats · OpsSurfaceTests.AuditRetentionPrunesOnlyAgedRows | — |
 | H5 | unexpressible | T4-manual | — | T4 rubric; the pruned-vs-absent API leg is the export's window law |
-| I1 | covered | T2-adapter | EnrollmentTests.EnrollReturnsTokenAndTrustModeAndSeedsDefaultTeam · TeamRosterTests.RosterSeedsFromConfigThenDbIsTruth | — |
+| I1 | covered | T2-adapter | EnrollmentTests.EnrollReturnsKeyIdAndTrustModeAndSeedsDefaultTeam · TeamRosterTests.RosterSeedsFromConfigThenDbIsTruth | — |
 | I2 | covered | T1-gate | TeamRosterTests.TeamSwitchOverridesTheSystemDefaultAndIsVersioned · AdminConfigStoreTests.ListReportsEveryRegisteredResourceWithExistence · AdminConfigStoreTests.NeverWrittenResourceGetsConfigNotSet404 | — |
 | I3 | unexpressible | T4-manual | — | T4 rubric; the machine leg is the audit export |
 | I4 | partial | T1-gate | AdminConfigStoreTests.MissingChangeReasonHeaderGets400 · AdminSurfaceTests.AuthzMatrixGatesTheSurfaceByRole · TeamRosterTests.TeamSwitchOverridesTheSystemDefaultAndIsVersioned | audited operator writes + role matrix codified; the per-team may-do matrix leg rides the rules engine |
@@ -85,7 +85,7 @@
 | N10 | partial | T1-gate | ArtifactUploadVerticalTests.LinkUploadHappyPathStoresVerifiesAndTimelines | artifact timeline-linked; the owner's-explanation leg is judgment |
 | N11 | covered | T1-gate | DuplicateIngressTests.FixtureSteer_AcceptedOnce_DuplicateReplay_InvalidFixturesFailClosed · WebhookSinkTests.RawDeliveryQueuesWebhookCommandOnceAndReplayDedupes | — |
 | N12 | covered | T1-gate | RestartSurvivalTests.RestartAfterAcceptedEvents_NoLossNoDuplicate · ConsentAuthorityTests.NudgeBeforeExpiryWritesTimelineAndStampsOnce · ScenarioWalks:RestartNoDoubleAskWalkTests.PendingAskReAsksOnceAcrossRestart_SettledStaysSettled | no double-ask across a restart: the nudge stamp is the row's, settled questions stay settled |
-| N13 | covered | T1-gate | WorkloadIdentityTests.ModeBRoundTripRotatesAndOldTokenDies · ContributorTests.HumanEvidenceAgainstContributorOnlyCapabilityIsRefusedNotRouted | — |
+| N13 | covered | T1-gate | WorkloadIdentityTests.ModeBRoundTripMintsSessionsAndReEnrollKeepsThemLive · ContributorTests.HumanEvidenceAgainstContributorOnlyCapabilityIsRefusedNotRouted | — |
 | N14 | covered | T1-gate | NotificationLedgerTests.VanishedChannelMarksTheAddressObsoleteAndTheItemEndures | work addresses the binding; the binding survives the channel |
 | N15 | covered | T1-gate | EnrollmentTokenTests.ListNeverLeaksTheRawLiteral | — |
 | N16 | partial | T1-gate | OpsSurfaceTests.CancelDisclosesIrreversibleEffects · ConsentAuthorityTests.NudgeBeforeExpiryWritesTimelineAndStampsOnce · ScenarioWalks:CapacityNudgeSagaWalkTests.StaleLaneReasonNudgedOnceThenAdminSeesStalled | why-legs per surface (the nudge+sweep leg walks); the completeness rubric rides I3 (T4) |

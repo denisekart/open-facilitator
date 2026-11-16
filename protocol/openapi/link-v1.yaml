@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Open Facilitator — Workspace Link HTTP surface (v1)
-  version: 1.0.2
+  version: 2.0.0
   description: |
     Provider-neutral HTTP fallback for the Workspace Link contract.
     SignalR is the default reference transport; these endpoints carry identical
@@ -14,9 +14,15 @@ info:
     scoped artifact storage and are referenced by digest
     (components ArtifactRefV1).
 
-    Authentication: bearer workload token (short-lived OIDC/mTLS-anchored
-    principal); the authenticated principal — not a JSON field —
-    determines allowed team/Gateway/workspace identity.
+    Authentication: on the link plane the bearer is a short-lived (5-minute)
+    kernel-signed session JWT, obtained by proving possession of the
+    endpoint's enrolled Ed25519 key against a kernel nonce
+    (`POST /challenge` then `POST /proof`); there is no long-lived link
+    bearer. The authenticated principal — not a JSON field — determines
+    allowed team/Gateway/workspace identity. `POST /api/link/v1/enroll`
+    itself is guarded by the one-time enrollment code, and
+    `POST /api/link/v1/challenge` by nothing at all: a challenge proves
+    nothing, so it cannot be guarded by what it is issuing.
 
     Served by the kernel Link server; the admin surface mirror lives in
     admin-v1.yaml.
@@ -40,7 +46,21 @@ info:
     inline `oidc:<jwt>` delegation evidence reference fits (every value valid
     under 1.0.1 stays valid). No existing field changed meaning or
     requiredness, so per the 1.0.1 precedent the minor bump is the only
-    compatibility action required.
+    compatibility signalled.
+
+    2.0.0 rationale (breaking — the credential becomes an identity): the
+    720-hour shared bearer is deleted. EnrollRequest now REQUIRES
+    `publicKey` (raw Ed25519, base64url) and `keyAlgorithm` (enum ed25519);
+    EnrollResponse drops `linkToken`/`expiresAt` and instead REQUIRES
+    `endpointKeyId` (the `sha256:<hex64>` fingerprint of the registered key)
+    and `seq` (the replay fence the endpoint starts from). Authentication for
+    every other path on this plane moves to the 5-minute session JWT described
+    above, minted by the new `POST /api/link/v1/challenge` and
+    `POST /api/link/v1/proof` pair; `POST /api/link/v1/enroll/{endpointId}/rotate`
+    lets an endpoint swap its own key under proof by both the old and the new
+    key. A 1.0.x client that posts no public key is now rejected with a
+    schema-violation problem rather than silently enrolled — one wire, no
+    legacy credential class.
 servers:
   - url: /
 security:
@@ -50,6 +70,13 @@ paths:
     post:
       operationId: enroll
       summary: Bootstrap enrollment for a Gateway/Workspace Link endpoint
+      description: |
+        Registers the endpoint's Ed25519 public key as its identity. The
+        request's `token` is the one-time enrollment code (or the configured
+        bootstrap secret) — it authorizes the join and retires. The response
+        carries no secret: an `endpointKeyId` fingerprint and the `seq` fence
+        to start from.
+      security: []
       requestBody:
         required: true
         content:
@@ -63,8 +90,155 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/EnrollResponse"
+        "400":
+          description: Body violates enroll-request.v1.json (a missing or malformed publicKey is a schema-violation)
         "401":
-          description: Missing or invalid bearer principal
+          description: Missing or invalid enrollment code
+  /api/link/v1/challenge:
+    post:
+      operationId: postChallenge
+      summary: Request a single-use nonce to sign a proof of possession against
+      description: |
+        Unauthenticated by design: a challenge proves nothing, so it cannot be
+        guarded by what it is issuing. An unknown `endpointId` gets the same
+        401 as a wrong proof — no existence oracle. The nonce is single-use and
+        expires after `Link:ChallengeLifetimeSeconds`.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [endpointId]
+              properties:
+                endpointId:
+                  $ref: "../json-schema/common.v1.json#/$defs/idToken"
+      responses:
+        "200":
+          description: Nonce issued
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [nonce, publicKeyRequired, algorithm, expiresAt]
+                properties:
+                  nonce:
+                    type: string
+                    minLength: 16
+                    maxLength: 128
+                  publicKeyRequired:
+                    type: boolean
+                  algorithm:
+                    type: string
+                    enum: [ed25519]
+                  expiresAt:
+                    type: string
+                    format: date-time
+        "401":
+          description: Unknown endpointId or unenrolled endpoint (no existence oracle)
+  /api/link/v1/proof:
+    post:
+      operationId: postProof
+      summary: Exchange a detached EdDSA proof of possession for a session JWT
+      description: |
+        The proof is a detached JWS (RFC 8037 subset, `alg: EdDSA`,
+        `typ: ofac-proof+jwt`) whose payload carries
+        `{iss, sub, jti, htm, htu, iat, nbf, exp, nonce, seq, epoch, cbh}` with
+        `htm = "POST"` and `htu = /api/link/v1/proof`. Every check fails closed:
+        signature by the enrollment's ACTIVE key, htm/htu match, clock inside
+        the configured skew, nonce present-and-unconsumed, `jti` unseen, `seq`
+        at or above the stored fence, `epoch` equal to the row's revocation
+        epoch, and a non-empty `cbh` when channel binding is required.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [proof]
+              properties:
+                proof:
+                  type: string
+                  minLength: 1
+                  maxLength: 8192
+      responses:
+        "200":
+          description: Session minted
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [sessionToken, expiresAt, seq]
+                properties:
+                  sessionToken:
+                    type: string
+                    minLength: 1
+                    maxLength: 8192
+                  expiresAt:
+                    type: string
+                    format: date-time
+                  seq:
+                    type: integer
+                    minimum: 0
+        "401":
+          description: proof-invalid, replay-suspect or key-rotation-grace-expired
+  /api/link/v1/enroll/{endpointId}/rotate:
+    post:
+      operationId: postKeyRotation
+      summary: Swap this endpoint's active key under proof by both keys
+      description: |
+        Arrives under the ordinary link auth path (a valid session JWT issued by
+        the current active key). `proofs` is exactly two detached JWSs, both
+        signing the SAME payload `{oldKid, newKid, nonce, seq}` — one by the old
+        key, one by the new — which is what makes the swap a mutual agreement
+        rather than a takeover. A proof by a key retired less than
+        `Link:RotateGraceMinutes` ago is accepted against a fresh challenge and
+        audits `link.rotate-grace-consumed`; the grace never authorizes a first
+        key. Outside the grace: 401, revoke-and-rejoin. `epoch` is untouched.
+      parameters:
+        - name: endpointId
+          in: path
+          required: true
+          schema:
+            $ref: "../json-schema/common.v1.json#/$defs/idToken"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [oldKeyId, newPublicKey, proofs]
+              properties:
+                oldKeyId:
+                  type: string
+                  pattern: "^sha256:[0-9a-f]{64}$"
+                newPublicKey:
+                  type: string
+                  pattern: "^[A-Za-z0-9_-]{43,44}$"
+                  minLength: 43
+                  maxLength: 44
+                proofs:
+                  type: array
+                  minItems: 2
+                  maxItems: 2
+                  items:
+                    type: string
+                    minLength: 1
+                    maxLength: 8192
+      responses:
+        "204":
+          description: Key swapped (link.key-rotated audited with both fingerprints)
+        "400":
+          description: Body violates the rotation shape (fewer than two proofs is a schema-violation)
+        "401":
+          description: Missing or invalid bearer principal, or key-rotation-grace-expired
   /api/link/v1/events:
     post:
       operationId: postEvent
@@ -219,7 +393,7 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: Bearer workload token; issuer/audience/claims validation is pinned by the kernel's OIDC identity configuration.
+      description: Kernel-signed EdDSA session JWT (5 minutes by default, `Link:SessionTokenLifetimeSeconds`) obtained by proving possession of the endpoint's enrolled public key; every replica verifies it from the shared kernel session key, and the `epoch` claim makes revocation effective inside the token's remaining lifetime without a session table.
   schemas:
     EnrollRequest:
       $ref: "../json-schema/enroll-request.v1.json"

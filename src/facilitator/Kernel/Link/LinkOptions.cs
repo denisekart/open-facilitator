@@ -7,8 +7,20 @@ namespace Facilitator.Kernel.Link;
 /// </summary>
 public sealed class LinkOptions
 {
-    /// <summary>Link-token lifetime in hours (Link:TokenLifetimeHours).</summary>
-    public required int TokenLifetimeHours { get; init; }
+    /// <summary>Session-JWT lifetime in seconds (Link:SessionTokenLifetimeSeconds) — the
+    /// only bearer on the link plane, minted by a verified proof of possession.</summary>
+    public required int SessionTokenLifetimeSeconds { get; init; }
+
+    /// <summary>Single-use proof nonce lifetime in seconds (Link:ChallengeLifetimeSeconds).</summary>
+    public required int ChallengeLifetimeSeconds { get; init; }
+
+    /// <summary>How long a retired key may still authorize the NEXT rotation
+    /// (Link:RotateGraceMinutes). Never authorizes a first key.</summary>
+    public required int RotateGraceMinutes { get; init; }
+
+    /// <summary>When true (Link:RequireChannelBinding), a proof whose channel-binding hash
+    /// is empty is fatal — the transport must expose a TLS exporter.</summary>
+    public required bool RequireChannelBinding { get; init; }
 
     /// <summary>Per-session in-flight window (Link:MaxInFlight).</summary>
     public required int MaxInFlight { get; init; }
@@ -63,7 +75,10 @@ public sealed class LinkOptions
 
         return new LinkOptions
         {
-            TokenLifetimeHours = configuration.GetValue("Link:TokenLifetimeHours", 720),
+            SessionTokenLifetimeSeconds = configuration.GetValue("Link:SessionTokenLifetimeSeconds", 300),
+            ChallengeLifetimeSeconds = configuration.GetValue("Link:ChallengeLifetimeSeconds", 30),
+            RotateGraceMinutes = configuration.GetValue("Link:RotateGraceMinutes", 60),
+            RequireChannelBinding = configuration.GetValue("Link:RequireChannelBinding", false),
             MaxInFlight = maxInFlight,
             HeartbeatSeconds = heartbeat,
             InFlightLeaseSeconds = configuration.GetValue("Link:InFlightLeaseSeconds", 120),

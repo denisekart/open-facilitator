@@ -245,7 +245,7 @@ flowchart TB
 
 | Runtime | Operated by | Exposes | Dials out to | Credential it holds |
 |---|---|---|---|---|
-| Kernel | Facilitator operator | human plane `/api/*` + admin SPA behind OIDC; link plane `/api/link/v1*` and the Link hub behind a per-endpoint link token; `POST /api/ingress/webhooks/{provider}` and `/health` — see section 24 for auth, and the exposure table in `docs/security.md` for the full matrix | Postgres, the artifact object store, the IdP's JWKS, optional model endpoints, optional telemetry export | OIDC issuer trust plus enrollment secrets it issued |
+| Kernel | Facilitator operator | human plane `/api/*` + admin SPA behind OIDC; link plane `/api/link/v1*` and the Link hub behind per-endpoint session credentials (a pinned Ed25519 key, proven per session); `POST /api/ingress/webhooks/{provider}` and `/health` — see section 24 for auth, and the exposure table in `docs/security.md` for the full matrix | Postgres, the artifact object store, the IdP's JWKS, optional model endpoints, optional telemetry export | OIDC issuer trust plus enrollment secrets it issued |
 | Communication adapter | Facilitator operator **as a placement, not as law** | nothing when it polls or streams; optionally one provider-facing listen port for webhook mode | Kernel link plane; the provider's own API | Provider bot or app credential — the only place that credential exists |
 | Team connector | Team | nothing | Kernel link plane; the forge's API | Forge token issued to the team by a forge admin |
 | Gateway | Team | a child-plane listener on a unix socket or loopback TCP, plus optional loopback diagnostics | Kernel link plane | Enrollment secret for its team, and the team's policy file |

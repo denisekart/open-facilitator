@@ -17,6 +17,7 @@ import type { LinkHandler, LinkTransport } from "@ofac/workspace-link";
 import type { EnvelopeAck, GoodbyeFrame, HelloFrame, WelcomeFrame } from "@ofac/workspace-link";
 import { SqliteLedger, digestOfManifest } from "@ofac/workspace-link/node";
 import { afterEach, describe, expect, it } from "vitest";
+import { fakeKernel as makeFakeKernel, type FakeKernel as BaseFakeKernel } from "../fake-kernel.js";
 import { parseConfig, type GatewayConfig } from "../../src/config.js";
 import { ExecutionLedger, type BindingRow, type GatewayPaths } from "../../src/ledger.js";
 import { createGatewayRuntime, type GatewayRuntime } from "../../src/runtime.js";
@@ -93,50 +94,28 @@ async function waitFor<T>(
   }
 }
 
-interface FakeKernel {
-  calls: string[];
-  fetchImpl: typeof fetch;
+// The link plane is the shared fake: enroll pins a key, sessions are bought with
+// proofs, and the OIDC token route rides its fallback.
+type FakeKernel = BaseFakeKernel & {
   capabilitiesBody: () => string;
   enrollBody: () => string;
-}
+};
 
 function fakeKernel(): FakeKernel {
-  const calls: string[] = [];
-  let capabilitiesBody = "";
-  let enrollBody = "";
-  const fetchImpl = (async (url: unknown, init?: RequestInit) => {
-    const path = String(url);
-    if (path.endsWith("/token")) {
-      calls.push("token");
-      return new Response(JSON.stringify({ access_token: "cc-jwt", expires_in: 300 }), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      });
-    }
-    if (path.endsWith("/api/link/v1/enroll")) {
-      calls.push("enroll");
-      enrollBody = String(init?.body ?? "");
-      return new Response(
-        JSON.stringify({
-          enrollmentId: "enr-1",
-          trustMode: "shared-runtime",
-          linkToken: "tok-1",
-        }),
-        { status: 201, headers: { "content-type": "application/json" } },
-      );
-    }
-    if (path.endsWith("/api/link/v1/capabilities")) {
-      calls.push("capabilities");
-      capabilitiesBody = String(init?.body ?? "");
-      return new Response(null, { status: 204 });
-    }
-    return new Response("no route", { status: 500 });
-  }) as typeof fetch;
+  const base = makeFakeKernel({
+    workload: { token: "cc-jwt" },
+    fallback: (path) =>
+      path.endsWith("/token")
+        ? new Response(JSON.stringify({ access_token: "cc-jwt", expires_in: 300 }), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          })
+        : undefined,
+  });
   return {
-    calls,
-    fetchImpl,
-    capabilitiesBody: () => capabilitiesBody,
-    enrollBody: () => enrollBody,
+    ...base,
+    capabilitiesBody: () => base.bodiesFor("capabilities").at(-1) ?? "",
+    enrollBody: () => base.bodiesFor("enroll").at(-1) ?? "",
   };
 }
 
@@ -254,7 +233,10 @@ afterEach(async () => {
 describe("GatewayRuntime startup", () => {
   it("enrolls, POSTs capabilities, hello carries the POSTed-bytes digest, ready after reconcile", async () => {
     const { rt, mock, server, paths } = await booted();
-    expect(server.calls).toEqual(["enroll", "capabilities"]);
+    // First boot: the probe 401s (no key on file), the key is enrolled, the
+    // session is bought with a proof, then the manifest is POSTed.
+    expect(server.business()).toEqual(["enroll", "capabilities"]);
+    expect(server.calls.slice(0, 4)).toEqual(["challenge", "enroll", "challenge", "proof"]);
 
     // Startup-order law: hello digest == digest over the EXACT POSTed bytes.
     const hello = mock.hellos[0];
@@ -297,7 +279,10 @@ child:
 heartbeatSeconds: 3600
 `,
     });
-    expect(server.calls.slice(0, 2)).toEqual(["token", "enroll"]);
+    // Mode (b): the CC JWT is minted for the enroll call; the session afterwards
+    // comes from the key, so the workload credential is a first-boot credential
+    // exactly like the mode-(a) code.
+    expect(server.calls.slice(0, 4)).toEqual(["token", "proof", "enroll", "proof"]);
     const body = JSON.parse(server.enrollBody()) as Record<string, unknown>;
     expect(body).toMatchObject({
       token: "cc-jwt",

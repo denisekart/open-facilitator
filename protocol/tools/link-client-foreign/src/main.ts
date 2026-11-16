@@ -5,16 +5,23 @@
 // protocol), and the HTTP receipt endpoint. No workspace module is imported
 // — that isolation is the point of this artifact.
 //
+// The credential law is demonstrated INDEPENDENTLY of every other package:
+// this client hand-rolls the detached EdDSA JWS (proof.ts) and the identity
+// keystore (identity.ts) on raw node:crypto, which is the point of the
+// cross-language conformance artifact.
+//
 // Lifecycle orchestrated across two processes by the conformance runner:
-//   phase1: enroll -> advertise caps -> WS hello -> report the delivered
-//           work -> drop the socket abruptly (no goodbye). The issued link
-//           token is written to --token-file so phase2 can prove rotation.
-//   phase2: re-enroll (the token rotates; the phase-1 token must stop
-//           working) -> WS hello carrying the lastKnownAck hint -> the
-//           kernel replays the pending ledger row -> ack via the HTTP
-//           receipt endpoint -> optionally wait for the dropped un-acked
-//           delivery to be re-offered (in-flight lease expiry) -> clean
-//           goodbye.
+//   phase1: enroll with a fresh public key -> challenge+proof for a session
+//           -> advertise caps -> WS hello carrying a channel proof -> report
+//           the delivered work -> drop the socket abruptly (no goodbye). The
+//           identity (the private half) is written to --identity-file so
+//           phase2 can prove key rotation.
+//   phase2: re-enroll with a NEW key (the phase-1 key is now retired and must
+//           stop authenticating — proven by attempting a proof with it) ->
+//           WS hello carrying the lastKnownAck hint -> the kernel replays the
+//           pending ledger row -> ack via the HTTP receipt endpoint ->
+//           optionally wait for the dropped un-acked delivery to be re-offered
+//           (in-flight lease expiry) -> clean goodbye.
 import { createHash, randomUUID } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
@@ -25,6 +32,8 @@ import {
   encodeInvocation,
   splitFrames,
 } from "./signalr.js";
+import { generateIdentity, identityFromFile, type EndpointIdentity, type IdentityFile } from "./identity.js";
+import { buildProof, parseChallengeNonce } from "./proof.js";
 
 interface Args {
   url: string;
@@ -33,7 +42,7 @@ interface Args {
   team: string;
   capability: string;
   mode: "phase1" | "phase2";
-  tokenFile?: string;
+  identityFile?: string;
   lastKnownAck?: string;
   timeoutMs: number;
   expectRedeliver?: string;
@@ -68,7 +77,7 @@ function parseArgs(argv: string[]): Args {
     team: required("team"),
     capability: required("capability"),
     mode,
-    ...optional("token-file"),
+    ...optional("identity-file"),
     ...optional("last-known-ack"),
     ...optional("expect-redeliver"),
     timeoutMs: Number(flags.get("timeout-ms") ?? "60000"),
@@ -80,21 +89,22 @@ function emit(event: string, fields: Record<string, unknown> = {}): void {
 }
 
 interface LiveArgs extends Args {
-  linkToken: string;
+  /** The 5-minute session JWT — the link plane's only bearer. */
+  sessionToken: string;
 }
 
 interface EnrollResponse {
   enrollmentId: string;
   trustMode: string;
-  linkToken: string;
-  expiresAt: string;
+  endpointKeyId: string;
+  seq: number;
 }
 
-async function enrollWith(args: Args, secret: string): Promise<EnrollResponse> {
+async function enrollWith(args: Args, secret: string, identity: EndpointIdentity): Promise<EnrollResponse> {
   const response = await fetch(`${args.url}/api/link/v1/enroll`, {
     method: "POST",
     headers: {
-      // The secret rides the Authorization header (bearer) AND the schema-
+      // The code rides the Authorization header (bearer) AND the schema-
       // mandated body token — both documented enrollment shapes.
       authorization: `Bearer ${secret}`,
       "content-type": "application/json",
@@ -106,6 +116,8 @@ async function enrollWith(args: Args, secret: string): Promise<EnrollResponse> {
       trustMode: "separate-process-same-host",
       team: args.team,
       role: "child",
+      publicKey: identity.publicKeyBase64Url,
+      keyAlgorithm: "ed25519",
     }),
   });
   if (!response.ok) {
@@ -114,15 +126,68 @@ async function enrollWith(args: Args, secret: string): Promise<EnrollResponse> {
   return (await response.json()) as EnrollResponse;
 }
 
+/**
+ * Challenge -> hand-rolled proof -> session JWT. Returns the session token,
+ * or the refusal status when the kernel rejects the proof (401), which is
+ * what phase 2 uses to PROVE a retired key is dead.
+ */
+async function sessionFor(
+  args: Args,
+  identity: EndpointIdentity,
+  proofPath = "/api/link/v1/proof",
+): Promise<{ sessionToken: string } | { status: number; keyId: string }> {
+  const challenge = await fetch(`${args.url}/api/link/v1/challenge`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ endpointId: args.endpointId }),
+  });
+  if (!challenge.ok) {
+    return { status: challenge.status, keyId: identity.keyId };
+  }
+  const { nonce } = (await challenge.json()) as { nonce: string };
+  const { epoch, seq } = parseChallengeNonce(nonce);
+  const proof = buildProof(identity, {
+    endpointId: args.endpointId,
+    htm: "POST",
+    htu: `${args.url}${proofPath}`,
+    nonce,
+    seq,
+    epoch,
+  });
+  const response = await fetch(`${args.url}${proofPath}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ proof }),
+  });
+  if (!response.ok) {
+    return { status: response.status, keyId: identity.keyId };
+  }
+  const body = (await response.json()) as { sessionToken: string };
+  return { sessionToken: body.sessionToken };
+}
+
 async function linkFetch(args: LiveArgs, path: string, init?: RequestInit): Promise<Response> {
   return fetch(`${args.url}${path}`, {
     ...init,
     headers: {
-      authorization: `Bearer ${args.linkToken}`,
+      authorization: `Bearer ${args.sessionToken}`,
       "content-type": "application/json",
       ...(init?.headers ?? {}),
     },
   });
+}
+
+function saveIdentity(file: string | undefined, identity: EndpointIdentity): void {
+  if (file) {
+    writeFileSync(file, JSON.stringify(identity.toFile()));
+  }
+}
+
+function loadIdentity(file: string | undefined): EndpointIdentity | undefined {
+  if (!file || !existsSync(file)) {
+    return undefined;
+  }
+  return identityFromFile(JSON.parse(readFileSync(file, "utf8")) as IdentityFile);
 }
 
 interface Welcome {
@@ -138,6 +203,11 @@ interface Delivery {
   workId?: string;
 }
 
+/** The channel URI as this client dials it: the base URL's http/https -> ws/wss. */
+function hubHtuOf(args: Args): string {
+  return `${args.url.replace(/^http/, "ws")}/hubs/link`;
+}
+
 interface Session {
   socket: WebSocket;
   welcome: Promise<Welcome>;
@@ -151,7 +221,7 @@ function connect(args: LiveArgs, helloFrame: Record<string, unknown>): Session {
   const wsUrl = `${args.url.replace(/^http/, "ws")}/hubs/link`;
   // @types/node types only the (url, protocols) overload; undici also
   // accepts an options bag carrying the upgrade headers.
-  const socket = new WebSocket(wsUrl, { headers: { authorization: `Bearer ${args.linkToken}` } } as unknown as string[]);
+  const socket = new WebSocket(wsUrl, { headers: { authorization: `Bearer ${args.sessionToken}` } } as unknown as string[]);
   const welcome = Promise.withResolvers<Welcome>();
   const closed = Promise.withResolvers<void>();
   const buffered: Delivery[] = [];
@@ -261,23 +331,32 @@ function connect(args: LiveArgs, helloFrame: Record<string, unknown>): Session {
 
 async function main(): Promise<number> {
   const args = parseArgs(process.argv.slice(2));
-  const priorToken =
-    args.mode === "phase2" && args.tokenFile && existsSync(args.tokenFile)
-      ? readFileSync(args.tokenFile, "utf8").trim()
-      : undefined;
-
-  const enrollment = await enrollWith(args, args.token);
-  const live: LiveArgs = { ...args, linkToken: enrollment.linkToken };
-  if (args.tokenFile) {
-    writeFileSync(args.tokenFile, enrollment.linkToken);
+  // phase2 presents a NEW key; the identity phase1 left behind is the retired
+  // one whose proof must now be refused. phase1 mints its own.
+  const priorIdentity = args.mode === "phase2" ? loadIdentity(args.identityFile) : undefined;
+  const identity = generateIdentity();
+  const enrollment = await enrollWith(args, args.token, identity);
+  const minted = await sessionFor(args, identity);
+  if (!("sessionToken" in minted)) {
+    throw new Error(`proof refused: ${minted.status} for ${minted.keyId}`);
   }
-  emit("enrolled", { enrollmentId: enrollment.enrollmentId, mode: args.mode });
+  const live: LiveArgs = { ...args, sessionToken: minted.sessionToken };
+  saveIdentity(args.identityFile, identity);
+  emit("enrolled", {
+    enrollmentId: enrollment.enrollmentId,
+    endpointKeyId: enrollment.endpointKeyId,
+    seq: enrollment.seq,
+    mode: args.mode,
+  });
 
-  if (args.mode === "phase2" && priorToken && priorToken !== enrollment.linkToken) {
-    // Rotation law: re-enrollment replaces the token — the phase-1 token
-    // must no longer authorize the link surface.
-    const stale = await linkFetch({ ...live, linkToken: priorToken }, "/api/link/v1/capabilities");
-    emit("old-token-rejected", { status: stale.status });
+  if (args.mode === "phase2" && priorIdentity && priorIdentity.keyId !== identity.keyId) {
+    // Rotation law: re-enrollment retires the previous KEY — a proof by it
+    // must no longer buy a session on the link surface.
+    const retired = await sessionFor(args, priorIdentity);
+    emit("old-token-rejected", {
+      status: "sessionToken" in retired ? 200 : retired.status,
+      keyId: priorIdentity.keyId,
+    });
   }
 
   const manifest = {
@@ -307,6 +386,29 @@ async function main(): Promise<number> {
   if (args.lastKnownAck) {
     helloFrame["lastKnownAck"] = args.lastKnownAck;
   }
+
+  // The handshake proof binds to the channel URI exactly as THIS client dials
+  // it (the base URL's http/https mapped to ws/wss). That is the point of a
+  // foreign implementation: the kernel must accept a proof it did not mint.
+  const hubChallenge = await fetch(`${args.url}/api/link/v1/challenge`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ endpointId: args.endpointId }),
+  });
+  if (!hubChallenge.ok) {
+    throw new Error(`challenge refused: ${hubChallenge.status}`);
+  }
+  const hubNonce = ((await hubChallenge.json()) as { nonce: string }).nonce;
+  const hubState = parseChallengeNonce(hubNonce);
+  helloFrame["publicKey"] = identity.publicKeyBase64Url;
+  helloFrame["proof"] = buildProof(identity, {
+    endpointId: args.endpointId,
+    htm: "WS",
+    htu: hubHtuOf(args),
+    nonce: hubNonce,
+    seq: hubState.seq,
+    epoch: hubState.epoch,
+  });
 
   const session = connect(live, helloFrame);
   const welcome = await session.welcome;

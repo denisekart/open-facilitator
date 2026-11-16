@@ -1,3 +1,6 @@
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 // E2E 1 — handshake. enroll → capabilities POST →
 // hello ⇒ welcome; capabilities GET returns the stored manifest; a
 // superseding hello over a LIVE session row bumps the epoch (law pinned in
@@ -5,7 +8,7 @@
 // the bump happens on ANY hello over a live row — proven here by client B —
 // while the first hello after a graceful goodbye re-INSERTs and restarts at 1.
 import { describe, expect, it } from "vitest";
-import { enroll } from "../../src/index.js";
+import { enroll, loadOrCreateIdentity, SessionProvider } from "../../src/index.js";
 import {
   ENROLL_SECRET,
   E2E,
@@ -32,6 +35,10 @@ describe.skipIf(!E2E)("link handshake", () => {
     });
 
     // An endpoint that enrolled but never POSTed gets capabilities-not-found.
+    // A bare enrollment: a key pinned, no manifest POSTed. The enroll response
+    // carries no credential at all any more, so the caller proves for its own
+    // session — which is the point of the 404 assertion below.
+    const bareIdentity = loadOrCreateIdentity(mkdtempSync(join(tmpdir(), "e2e-bare-")));
     const bare = await enroll({
       baseUrl: h.baseUrl,
       token: ENROLL_SECRET,
@@ -39,26 +46,34 @@ describe.skipIf(!E2E)("link handshake", () => {
       instanceId: "e2e-bare",
       trustMode: "shared-runtime",
       team: TEAM,
+      publicKey: bareIdentity.publicKeyBase64Url,
+      keyAlgorithm: "ed25519",
     });
-    const missing = await linkGet(h.baseUrl, "/api/link/v1/capabilities", bare.linkToken ?? "");
+    expect(bare.endpointKeyId).toBe(bareIdentity.keyId);
+    const bareSession = await new SessionProvider({
+      baseUrl: h.baseUrl,
+      endpointId: `${endpointId}-bare`,
+      identity: bareIdentity,
+    }).getToken();
+    const missing = await linkGet(h.baseUrl, "/api/link/v1/capabilities", bareSession);
     expect(missing.status).toBe(404);
     expect((missing.body as { type: string }).type).toContain("capabilities-not-found");
 
     // GET /capabilities returns the stored manifest, structurally identical
     // to the POSTed bytes. (Stored in Postgres jsonb, which normalizes key
     // order — hence canonical re-serialization, not raw byte equality.)
-    const got = await linkGet(h.baseUrl, "/api/link/v1/capabilities", a.token);
+    const got = await linkGet(h.baseUrl, "/api/link/v1/capabilities", await a.provider.getToken());
     expect(got.status).toBe(200);
     const canonical = (v: unknown) => JSON.stringify(JSON.parse(JSON.stringify(v)), stableReplacer);
     expect(canonical(got.body)).toBe(canonical(JSON.parse(a.manifestText)));
 
-    // Supersede: a second client on the SAME endpoint + token forces the
-    // first off, and the still-live row's epoch bumps 1 → 2.
+    // Supersede: a second client on the SAME endpoint (same key, same session
+    // route) forces the first off, and the still-live row's epoch bumps 1 → 2.
     const states: string[] = [];
     a.client.on("state", (s) => {
       states.push(s);
     });
-    const b = await sdkClient(h, { endpointId, token: a.token });
+    const b = await sdkClient(h, { endpointId, stateDir: a.stateDir });
     expect(b.client.session?.leaseEpoch).toBe(2);
     await waitFor("A superseded", () => a.client.state === "reconnecting" || null);
     // A's supervisor parks in a ≥1 s backoff (client.ts supervisorLoop); the

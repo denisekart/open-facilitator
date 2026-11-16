@@ -6,7 +6,7 @@
 // SIGTERM/exit → the process dies; the Gateway's lease + reconcile law does
 // the rest. No reconnect: the adapter owns restart policy.
 import { connectChild } from "@ofac/gateway";
-import { buildEvent } from "@ofac/workspace-link";
+import { buildEvent, loadOrCreateIdentity } from "@ofac/workspace-link";
 
 const args = process.argv.slice(2);
 const flag = (name) => {
@@ -16,6 +16,11 @@ const flag = (name) => {
 const childWorkspaceId = flag("--child");
 const socket = flag("--socket");
 const token = flag("--token") ?? "tok";
+// The child's identity: its own keystore, exactly as a real adapter's would be.
+// With a state dir the hello carries a public key + proof, so after the first
+// pin the token authenticates nothing.
+const stateDir = flag("--state-dir");
+const identity = stateDir === undefined ? undefined : loadOrCreateIdentity(stateDir);
 const mode = flag("--mode") ?? "silent";
 // Repeatable --capability so one child can advertise several ids.
 const capabilities = args.filter((_a, i) => args[i - 1] === "--capability");
@@ -44,6 +49,7 @@ let lastCommand = null;
 const conn = await connectChild({
   childWorkspaceId,
   token,
+  ...(identity === undefined ? {} : { identity }),
   manifest,
   path: socket,
   heartbeatSeconds: 2,

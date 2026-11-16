@@ -5,6 +5,7 @@
 // Exit codes (the worker idiom): 0 clean · 1 runtime failure · 2 config
 // error · 3 register-denied-then-exhausted (restartBackoffMs: []).
 import { parseArgs } from "node:util";
+import { identityDirFor, loadOrCreateIdentity } from "@ofac/workspace-link";
 import { createConsoleLogger } from "@ofac/workspace-link";
 import { startTelemetryFromEnv } from "@ofac/otel";
 import { createAdapter } from "@ofac/adapter";
@@ -51,6 +52,9 @@ export async function bootConnector(config: ConnectorConfig): Promise<ConnectorH
     telemetry,
     childWorkspaceId: config.childWorkspaceId,
     ...(config.token !== undefined ? { token: config.token } : {}),
+    // First-boot pairing secret + a key beside the ledger: after the Gateway
+    // pins the identity, reconnects prove possession and the secret retires.
+    identity: loadOrCreateIdentity(identityDirFor(config.statePath)),
     kernel: { baseUrl: config.kernelUrl },
     manifest: connectorManifest(config.team, config.flags),
     transport:

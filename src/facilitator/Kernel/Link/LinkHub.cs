@@ -32,6 +32,8 @@ public sealed class LinkHub(
     LinkDeliveryPump pump,
     ControlFrameValidator frames,
     LinkOptions options,
+    LinkProofVerifier proofs,
+    LinkEnrollmentStore store,
     ILogger<LinkHub> logger) : Hub
 {
     /// <summary>Claim types minted by <see cref="LinkBearerHandler"/>.</summary>
@@ -45,6 +47,15 @@ public sealed class LinkHub(
 
     /// <summary>Claim type carrying the team slug (minted by the enrollment-time validator join).</summary>
     public const string TeamSlugClaim = "facilitator.team_slug";
+
+    /// <summary>Claim type carrying the revocation epoch the session JWT was minted at.</summary>
+    public const string EpochClaim = "facilitator.epoch";
+
+    /// <summary>Claim type carrying the replay fence the session JWT carried.</summary>
+    public const string SeqClaim = "facilitator.seq";
+
+    /// <summary>Claim type carrying the credential class that authenticated (key | oidc).</summary>
+    public const string AuthSourceClaim = "facilitator.auth_source";
 
     /// <summary>
     /// Handshake: validate the hello frame, intersect
@@ -97,6 +108,28 @@ public sealed class LinkHub(
             return null;
         }
 
+        // The handshake proof rides the hello frame: same checks as the HTTP
+        // proof route (htm WS, htu the hub URL as the client sees it, cbh from
+        // this connection's TLS feature), verified BEFORE any session row is
+        // opened. A class-oidc principal was authenticated by issuer trust on
+        // the bearer itself and presents no key, so it carries no proof.
+        var authSource = Context.User?.FindFirstValue(AuthSourceClaim) ?? "key";
+        if (string.Equals(authSource, "key", StringComparison.Ordinal))
+        {
+            var proof = hello.TryGetProperty("proof", out var p) && p.ValueKind == JsonValueKind.String
+                ? p.GetString()
+                : null;
+            var htu = $"{Context.GetHttpContext()?.Request.Scheme ?? "https"}://{Context.GetHttpContext()?.Request.Host}/hubs/link";
+            var cbh = Context.GetHttpContext() is { } ctx ? LinkChannelBinding.HashOf(ctx.Features) : string.Empty;
+            var proofVerdict = await proofs.VerifyAsync(proof, "WS", htu, cbh, Context.ConnectionAborted, "/hubs/link");
+            if (!proofVerdict.Accepted)
+            {
+                await Clients.Caller.SendAsync("Disconnect",
+                    new GoodbyeFrame("goodbye", Guid.NewGuid().ToString("N"), "proof-failed"), Context.ConnectionAborted);
+                return null;
+            }
+        }
+
         var digest = hello.TryGetProperty("capabilityManifestDigest", out var d) && d.ValueKind == JsonValueKind.String
             ? d.GetString()
             : null;
@@ -120,7 +153,9 @@ public sealed class LinkHub(
         await pump.PumpEndpointAsync(endpointId, options.MaxInFlight, Context.ConnectionAborted);
         registry.Wake(endpointId);
 
-        return new WelcomeFrame("welcome", Guid.NewGuid().ToString("N"), epoch, options.MaxInFlight, options.HeartbeatSeconds, negotiated);
+        return new WelcomeFrame("welcome", Guid.NewGuid().ToString("N"), epoch, options.MaxInFlight, options.HeartbeatSeconds, negotiated,
+            SessionKeyId: Context.User?.FindFirstValue("facilitator.session_key_id"),
+            Seq: long.TryParse(Context.User?.FindFirstValue(SeqClaim), out var helloSeq) ? helloSeq : 0);
     }
 
     /// <summary>Link-originated CloudEvent — the SAME admission path as POST /api/link/v1/events.</summary>
@@ -170,6 +205,19 @@ public sealed class LinkHub(
 
         var epoch = heartbeat.GetProperty("leaseEpoch").GetInt64();
         var refreshed = await sessions.TouchSessionAsync(principal.EndpointId, epoch, options.HeartbeatSeconds, Context.ConnectionAborted);
+
+        // Revocation mid-socket needs no new machinery: the lease refresh is
+        // where the epoch comparison lives. A revoke bumped the row, so this
+        // live socket's credential is from a dead epoch — goodbye.
+        if (refreshed && long.TryParse(Context.User?.FindFirstValue(EpochClaim), out var mintedEpoch))
+        {
+            var subject = await store.GetSessionSubjectAsync(principal.EndpointId, Context.ConnectionAborted);
+            if (subject is null || subject.Dead || subject.Epoch != mintedEpoch)
+            {
+                refreshed = false;
+            }
+        }
+
         if (!refreshed)
         {
             await Clients.Caller.SendAsync("Disconnect",
@@ -215,6 +263,9 @@ public sealed class LinkHub(
         var trustMode = user.FindFirstValue(TrustModeClaim) ?? throw new HubException("missing trust mode claim");
         var role = user.FindFirstValue(RoleClaim) ?? throw new HubException("missing role claim");
         return new LinkPrincipal(endpointId, team,
-            user.FindFirstValue(TeamSlugClaim) ?? throw new HubException("missing team slug claim"), trustMode, role);
+            user.FindFirstValue(TeamSlugClaim) ?? throw new HubException("missing team slug claim"), trustMode, role,
+            long.TryParse(user.FindFirstValue(EpochClaim), out var ep) ? ep : 0,
+            long.TryParse(user.FindFirstValue(SeqClaim), out var sq) ? sq : 0,
+            user.FindFirstValue(AuthSourceClaim) ?? "key");
     }
 }

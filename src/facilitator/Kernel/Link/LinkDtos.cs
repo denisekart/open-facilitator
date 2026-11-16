@@ -21,25 +21,27 @@ public sealed record DeliveryDto(Guid DeliveryId, JsonElement Envelope, DateTime
 /// <param name="TrustMode">Declared trust mode (immutable for the session).</param>
 /// <param name="Role">gateway | child (mode (a) hint; must not contradict a mode-(b) binding).</param>
 /// <param name="Team">Team roster slug to bind (mode (b): binding wins).</param>
+/// <param name="PublicKey">Mode (a): raw Ed25519 public key (base64url) — the
+/// endpoint's identity; mode (b) ignores it (identity stays the issuer trust).</param>
+/// <param name="KeyAlgorithm">Mode (a): must be <c>ed25519</c>.</param>
 /// <param name="Contributor">Bind the enrollment to this contributor handle (K9):
 /// the workload then speaks AS the named non-human actor; several enrollments
 /// may share one contributor. The contributor must exist on the bound team.</param>
-public sealed record EnrollRequestDto(string Token, string EndpointId, string InstanceId, string TrustMode, string? Role, string? Team, string? Contributor);
+public sealed record EnrollRequestDto(string Token, string EndpointId, string InstanceId, string TrustMode, string? PublicKey, string? KeyAlgorithm, string? Role, string? Team, string? Contributor);
 
 /// <summary>
-/// Wire shape of the 201 enroll response (enroll-response.v1.json; the token
-/// fields are the OpenAPI 1.0.1 additive properties — this server ALWAYS
-/// returns both).
+/// Wire shape of the 201 enroll response (enroll-response.v1.json): identity,
+/// not secrets — the key fingerprint and the replay fence, nothing to steal.
 /// </summary>
 /// <param name="EnrollmentId">Enrollment record identity.</param>
 /// <param name="TrustMode">Echoed trust mode.</param>
-/// <param name="linkToken">Opaque 256-bit base64url bearer credential.</param>
-/// <param name="ExpiresAt">Token expiry (UTC).</param>
+/// <param name="EndpointKeyId">sha256: fingerprint of the registered identity.</param>
+/// <param name="Seq">Replay fence the endpoint starts from.</param>
 public sealed record EnrollResponseDto(
     string EnrollmentId,
     string TrustMode,
-    [property: JsonPropertyName("linkToken")] string LinkToken,
-    DateTime ExpiresAt);
+    [property: JsonPropertyName("endpointKeyId")] string EndpointKeyId,
+    [property: JsonPropertyName("seq")] long Seq);
 
 /// <summary>Server→client <c>welcome</c> frame (control.v1.json, exact fields).</summary>
 public sealed record WelcomeFrame(
@@ -48,7 +50,9 @@ public sealed record WelcomeFrame(
     [property: JsonPropertyName("leaseEpoch")] long LeaseEpoch,
     [property: JsonPropertyName("maxInFlight")] int MaxInFlight,
     [property: JsonPropertyName("heartbeatSeconds")] int HeartbeatSeconds,
-    [property: JsonPropertyName("protocolVersion")] string ProtocolVersion);
+    [property: JsonPropertyName("protocolVersion")] string ProtocolVersion,
+    [property: JsonPropertyName("sessionKeyId")] string? SessionKeyId = null,
+    [property: JsonPropertyName("seq")] long? Seq = null);
 
 /// <summary>Server→client <c>goodbye</c> frame (Disconnect client-method payload).</summary>
 public sealed record GoodbyeFrame(

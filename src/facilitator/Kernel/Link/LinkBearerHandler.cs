@@ -9,11 +9,15 @@ using Microsoft.Extensions.Options;
 namespace Facilitator.Kernel.Link;
 
 /// <summary>
-/// Hub authentication scheme "facilitator-link": bearer tokens (Authorization
-/// header on negotiate AND on the WebSocket upgrade; <c>?access_token=</c> is
-/// accepted only on a WebSocket upgrade — our TS clients send headers, and
-/// long-polling is not used in-repo). Resolves through the SAME
-/// <see cref="ILinkTokenValidator"/> seam as the HTTP surface.
+/// Hub authentication scheme "facilitator-link": one job now — validate the
+/// short-lived (5-minute) kernel-signed session JWT on the negotiate and
+/// upgrade request (Authorization header on negotiate AND on the WebSocket
+/// upgrade; <c>?access_token=</c> is accepted only on a WebSocket upgrade —
+/// our TS clients send headers, and long-polling is not used in-repo).
+/// Resolves through the SAME <see cref="ILinkTokenValidator"/> seam as the
+/// HTTP surface, and stamps <c>facilitator.epoch</c> / <c>facilitator.seq</c>
+/// so <see cref="LinkHub"/> can fence revocation and replay without a second
+/// query.
 /// </summary>
 public sealed class LinkBearerHandler(
     ILinkTokenValidator validator,
@@ -53,6 +57,10 @@ public sealed class LinkBearerHandler(
             new Claim(LinkHub.TeamSlugClaim, principal.TeamSlug),
             new Claim(LinkHub.TrustModeClaim, principal.TrustMode),
             new Claim(LinkHub.RoleClaim, principal.Role),
+            new Claim(LinkHub.EpochClaim, principal.Epoch.ToString()),
+            new Claim(LinkHub.SeqClaim, principal.Seq.ToString()),
+            new Claim(LinkHub.AuthSourceClaim, principal.AuthSource),
+            new Claim("facilitator.session_key_id", principal.SessionKeyId),
         ], SchemeName);
         return AuthenticateResult.Success(new AuthenticationTicket(new ClaimsPrincipal(identity), SchemeName));
     }

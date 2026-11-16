@@ -49,6 +49,7 @@ public sealed class AdminConfigStoreTests(PostgresFixture fixture) : IAsyncLifet
             {
                 "notifications", "retry-policy", "nudge-policy", "workload-scale", "routing-defaults", "llm",
                 "commands", "team-behavior", "consent-policy", "loop-budget", "escalation", "audit-policy",
+                "link-session-key",
             }, StringComparer.Ordinal),
             resources.Keys.ToHashSet(StringComparer.Ordinal));
         Assert.False(resources["retry-policy"].GetProperty("exists").GetBoolean(), "purged before the test run");

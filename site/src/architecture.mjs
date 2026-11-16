@@ -241,7 +241,7 @@ export const nodes = [
     what: "Terminates links that team environments dial OUT to the kernel. No inbound ports on team machines, ever.",
     bullets: [
       "SignalR with an HTTP long-poll fallback.",
-      "Per-team link tokens; revoke one team without touching others.",
+      "Per-team endpoint keys + sessions; revoke one team without touching others.",
     ],
     docs: "/docs/advanced",
   },
@@ -702,7 +702,7 @@ export const scenarios = [
       },
       {
         caption:
-          "Link plane: each gateway authenticates with its own link token. Revoke one team's token and its environments freeze — every other team is untouched.",
+          "Link plane: each gateway authenticates by proving its own pinned endpoint key. Revoke one team's token and its environments freeze — every other team is untouched.",
         nodes: ["hub", "gw", "teamb"],
         edges: ["e-link", "e-link-b"],
       },

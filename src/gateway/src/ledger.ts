@@ -15,7 +15,7 @@ export interface GatewayPaths {
   execution: ExecutionLedger;
 }
 
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
 
 const DDL_BINDINGS = `
 CREATE TABLE IF NOT EXISTS bindings (
@@ -75,6 +75,30 @@ CREATE TABLE IF NOT EXISTS pending_actions (
   updated_at             TEXT NOT NULL
 );
 `;
+
+// v5: the pinned child identity, one level below the kernel's enrollment row —
+// the Gateway is a mini-kernel for its fleet. The bootstrap token pins the key
+// on the first hello and then retires; every later hello authenticates with a
+// proof by the key in THIS table. Fingerprints only, never key material.
+const DDL_CHILD_KEYS = `
+CREATE TABLE IF NOT EXISTS child_keys (
+  child_id    TEXT PRIMARY KEY,
+  key_id      TEXT NOT NULL,               -- sha256: + hex of the raw public key
+  public_key  TEXT NOT NULL,               -- raw key, base64url (43 chars, no padding)
+  algorithm   TEXT NOT NULL,               -- the only v1 value: 'ed25519'
+  pinned_at   TEXT NOT NULL,
+  rotated_at  TEXT                         -- set when a re-pin replaced an earlier key
+);
+`;
+
+export interface ChildKeyRow {
+  childId: string;
+  keyId: string;
+  publicKey: string;
+  algorithm: string;
+  pinnedAt: string;
+  rotatedAt: string | null;
+}
 
 export type PendingState =
   "awaiting-approval" | "executing" | "completed" | "failed" | "expired" | "revoked";
@@ -253,6 +277,26 @@ interface DbChildRow {
   offline_at: string | null;
 }
 
+interface DbKeyRow {
+  child_id: string;
+  key_id: string;
+  public_key: string;
+  algorithm: string;
+  pinned_at: string;
+  rotated_at: string | null;
+}
+
+function toChildKey(row: DbKeyRow): ChildKeyRow {
+  return {
+    childId: row.child_id,
+    keyId: row.key_id,
+    publicKey: row.public_key,
+    algorithm: row.algorithm,
+    pinnedAt: row.pinned_at,
+    rotatedAt: row.rotated_at,
+  };
+}
+
 function toChildState(row: DbChildRow): ChildStateRow {
   return {
     childId: row.child_id,
@@ -279,7 +323,7 @@ export class ExecutionLedger {
     const version = this.db.pragma("user_version", { simple: true }) as number;
     if (version === 0) {
       this.db.exec(
-        `BEGIN IMMEDIATE;${DDL_BINDINGS}${DDL_CHILD_STATE}${DDL_PENDING}PRAGMA user_version = ${SCHEMA_VERSION};COMMIT;`,
+        `BEGIN IMMEDIATE;${DDL_BINDINGS}${DDL_CHILD_STATE}${DDL_PENDING}${DDL_CHILD_KEYS}PRAGMA user_version = ${SCHEMA_VERSION};COMMIT;`,
       );
     } else if (version === 1) {
       // v1 files carry bindings WITHOUT the child fence and no
@@ -296,7 +340,9 @@ export class ExecutionLedger {
       // v2 files gain only the pending side table.
       this.db.exec(`BEGIN IMMEDIATE;${DDL_PENDING}PRAGMA user_version = ${SCHEMA_VERSION};COMMIT;`);
     } else if (version === 3) {
-      // v3 files: the execution_generation ALTER below (idempotent).
+      // v3 files: the execution_generation ALTER and the v5 table, both below (idempotent).
+    } else if (version === 4) {
+      // v4 files gain only the pinned-key table, created idempotently below.
     } else if (version !== SCHEMA_VERSION) {
       throw new Error(
         `bindings: unsupported schema version ${version} (this build writes ${SCHEMA_VERSION})`,
@@ -313,6 +359,17 @@ export class ExecutionLedger {
         `BEGIN IMMEDIATE;` +
           `ALTER TABLE bindings ADD COLUMN execution_generation INTEGER NOT NULL DEFAULT 1;` +
           `PRAGMA user_version = ${SCHEMA_VERSION};COMMIT;`,
+      );
+    }
+    // v5's table, idempotent for every pre-v5 file the branch chain above lets
+    // through (v1/v2/v3/v4-era) — CREATE IF NOT EXISTS makes the upgrade a no-op
+    // on a fresh file, where the v0 branch already made it.
+    const tables = this.db
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'child_keys'")
+      .all();
+    if (tables.length === 0) {
+      this.db.exec(
+        `BEGIN IMMEDIATE;${DDL_CHILD_KEYS}PRAGMA user_version = ${SCHEMA_VERSION};COMMIT;`,
       );
     }
   }
@@ -536,6 +593,46 @@ export class ExecutionLedger {
       .prepare("SELECT child_generation FROM child_state WHERE child_id = @childId")
       .get({ childId }) as { child_generation: number } | undefined;
     return row === undefined ? 0 : row.child_generation;
+  }
+
+  /** The pinned identity of a child, when one exists. */
+  childKey(childId: string): ChildKeyRow | null {
+    const row = this.db
+      .prepare("SELECT * FROM child_keys WHERE child_id = @childId")
+      .get({ childId }) as DbKeyRow | undefined;
+    return row === undefined ? null : toChildKey(row);
+  }
+
+  /**
+   * Pin a child's key: the first hello inserts; a re-pin (a fresh bootstrap
+   * token after key loss/rebuild) keeps the row's `pinned_at` honest and stamps
+   * `rotated_at` so the audit trail can tell a first pin from a re-pin.
+   */
+  pinChildKey(childId: string, keyId: string, publicKey: string, algorithm: string): ChildKeyRow {
+    const now = new Date().toISOString();
+    const existing = this.childKey(childId);
+    if (existing === null) {
+      this.db
+        .prepare(
+          `INSERT INTO child_keys (child_id, key_id, public_key, algorithm, pinned_at, rotated_at)
+           VALUES (@childId, @keyId, @publicKey, @algorithm, @now, NULL)`,
+        )
+        .run({ childId, keyId, publicKey, algorithm, now });
+      return { childId, keyId, publicKey, algorithm, pinnedAt: now, rotatedAt: null };
+    }
+    this.db
+      .prepare(
+        `UPDATE child_keys SET key_id = @keyId, public_key = @publicKey, algorithm = @algorithm,
+                               rotated_at = @now WHERE child_id = @childId`,
+      )
+      .run({ childId, keyId, publicKey, algorithm, now });
+    return { childId, keyId, publicKey, algorithm, pinnedAt: existing.pinnedAt, rotatedAt: now };
+  }
+
+  /** Fleet-wide pinned keys (diagnostics; the fleet shadow's identity half). */
+  childKeys(): ChildKeyRow[] {
+    const rows = this.db.prepare("SELECT * FROM child_keys ORDER BY child_id").all() as DbKeyRow[];
+    return rows.map(toChildKey);
   }
 
   close(): void {

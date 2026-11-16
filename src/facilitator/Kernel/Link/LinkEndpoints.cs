@@ -34,6 +34,7 @@ public static partial class LinkEndpoints
         app.MapHub<LinkHub>("/hubs/link");
 
         MapEnroll(group);
+        MapProofApi(group);
         MapEvents(group);
         MapArtifactContent(group);
         MapArtifactRead(group);

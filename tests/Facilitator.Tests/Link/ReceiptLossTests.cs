@@ -23,7 +23,7 @@ public sealed class ReceiptLossTests(DispatchDbFixture fixture)
             fixture, noDispatcher: true, fakeClock: true, settings: new Dictionary<string, string?> { ["Link:InFlightLeaseSeconds"] = "1" });
         using var kernel = factory.CreateAuthedClient();
         var endpoint = "gw-rl-" + Guid.NewGuid().ToString("N")[..8];
-        var token = await LinkTestHarness.EnrollAsync(kernel, endpoint);
+        var token = await LinkTestHarness.EnrollAsync(kernel, endpoint, clock: factory.Clock);
         var link = factory.CreateLinkClient(token);
 
         // a live session row is the delivery-read precondition (locked rule):
@@ -71,7 +71,7 @@ public sealed class ReceiptLossTests(DispatchDbFixture fixture)
         using var factory = new KernelTestFactory(fixture, noDispatcher: true);
         using var kernel = factory.CreateAuthedClient();
         var endpoint = "gw-rl-" + Guid.NewGuid().ToString("N")[..8];
-        var token = await LinkTestHarness.EnrollAsync(kernel, endpoint);
+        var token = await LinkTestHarness.EnrollAsync(kernel, endpoint, clock: factory.Clock);
         var link = factory.CreateLinkClient(token);
         var sessions = factory.Services.GetRequiredService<Facilitator.Kernel.Shared.Persistence.LinkService>();
         await sessions.OpenSessionAsync(endpoint, "http-1", null, 300, CancellationToken.None);

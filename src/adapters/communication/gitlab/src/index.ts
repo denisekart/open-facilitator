@@ -11,7 +11,6 @@
 // comment-ledger idempotency law. Stateless apart from the SQLite comment
 // ledger — deployable anywhere the kernel link plane is dialable.
 import { createServer, type Server } from "node:http";
-import { randomBytes } from "node:crypto";
 import type {
   ArtifactRef,
   CapabilityDescriptor,
@@ -23,7 +22,7 @@ import type {
   EnvelopeCommand,
   Media,
 } from "@ofac/protocol";
-import { dataschemaFor, enroll } from "@ofac/workspace-link";
+import { createEndpointCredential, identityDirFor, dataschemaFor } from "@ofac/workspace-link";
 import type { LinkClient, LinkHandler, LinkLogger, CommandOutcome } from "@ofac/workspace-link";
 import { deriveTenant, type AdapterConfig } from "./config.js";
 import { AdapterState } from "./comment-ledger.js";
@@ -583,30 +582,19 @@ export async function run(
       ? undefined
       : new GitLabClient(config.gitlabUrl, config.botToken, deps.fetchImpl));
   const state = new AdapterState(config.statePath);
-
-  // Our own link credential for the artifact client + content GETs (the
-  // telegram law): the adapter-face owns the CLIENT's token, so media rides
-  // an enrollment of its own (same secret/endpoint — the kernel issues
-  // per-enrollment tokens; 401 re-enrolls).
-  const linkToken = { value: "" };
-  const enrollSelf = async (): Promise<string> => {
-    const response = await enroll(
-      {
-        baseUrl: config.kernelUrl,
-        token: config.enrollSecret,
-        endpointId: config.endpointId,
-        instanceId: `gl-${randomBytes(6).toString("hex")}`,
-        trustMode: "isolated-executor",
-        role: "child",
-        team: config.team,
-      },
-      ...(deps.fetchImpl === undefined ? [] : [deps.fetchImpl]),
-    );
-    linkToken.value = response.linkToken ?? "";
-    return linkToken.value;
-  };
-  const token = async (): Promise<string> =>
-    linkToken.value === "" ? await enrollSelf() : linkToken.value;
+  const { provider: session } = await createEndpointCredential({
+    stateDir: identityDirFor(config.statePath),
+    baseUrl: config.kernelUrl,
+    endpointId: config.endpointId,
+    team: config.team,
+    trustMode: "isolated-executor",
+    role: "child",
+    enrollSecret: config.enrollSecret,
+    logger,
+    ...(deps.fetchImpl === undefined ? {} : { fetchImpl: deps.fetchImpl }),
+    instancePrefix: "gl",
+  });
+  const token = () => session.getToken();
 
   // The media leg rides the bot token (the only GitLab identity) and the
   // facet's own caps: no token ⇒ no media, text-only events as before.

@@ -1,7 +1,7 @@
 // The full loop minus sockets: run() against a stubbed global fetch (enroll →
 // capabilities), a MockTransport link session, and the FakeEcs backend.
 // Pins: the enroll body shape (token/endpointId/instanceId/trustMode/role/
-// team — the contract's verbatim), capabilities POSTed Bearer-tokened with
+// team/publicKey/keyAlgorithm — the contract's verbatim), capabilities POSTed Bearer-tokened with
 // the two provision ids, a delivered provision.start whose spec env carries
 // the RAW `$NAME` on the wire (values never cross it) yields a RunTask with
 // the resolved value + an `accepted` receipt, and an unknown workloadId
@@ -77,14 +77,20 @@ afterAll(async () => {
 describe("launcher loop (fake kernel + fake ECS)", () => {
   it("enrolled with the contract's body and published capabilities Bearer-tokened", () => {
     const enrollCall = kernel.calls.find((c) => c.path.endsWith("/api/link/v1/enroll"));
-    expect(enrollCall?.body).toEqual({
+    const body = enrollCall?.body as Record<string, unknown>;
+    expect(body).toMatchObject({
       token: "enroll-token-1",
       endpointId: "launcher.team-alpha",
       instanceId: "lnk-fixed-1",
       trustMode: "isolated-executor",
       role: "child",
       team: "team-alpha",
+      // The key law: enrollment carries the public key, and only the key —
+      // the response carries no bearer, the session below proves the pin.
+      keyAlgorithm: "ed25519",
     });
+    expect(typeof body["publicKey"]).toBe("string");
+    expect((body["publicKey"] as string).length).toBeGreaterThanOrEqual(43);
     const caps = kernel.calls.find((c) => c.path.endsWith("/api/link/v1/capabilities"));
     expect(caps?.authorization).toBe("Bearer tok-fleet-1");
     const manifest = caps?.body as { capabilities: { id: string }[] };

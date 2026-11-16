@@ -83,6 +83,9 @@ public sealed class AdminConfigStore(
         "loop-budget",
         "escalation",
         "audit-policy",
+        // The kernel's link session-JWT signing key (minted by the kernel on
+        // first demand, operator-readable, rotation is an operator lever).
+        "link-session-key",
     ];
 
     /// <summary>Stored view, or null when the resource was never written.</summary>
@@ -289,6 +292,14 @@ public sealed class AdminConfigStore(
         // plus per-team entries; absent resource = today's behavior
         // (facet-only, 8 MB / 8 items). MediaPolicy reads the stored shape.
         ["media-policy"] = ValidateMediaPolicy,
+        // The kernel's link session-JWT key: minted by the kernel, PATCHed only
+        // on operator rotation — the shape check keeps a hand-edit honest.
+        ["link-session-key"] = payload => FirstError(
+            UnknownFields(payload, "kid", "privateKey", "publicKey", "createdAt"),
+            StringField(payload, "kid", 1, 64),
+            StringField(payload, "privateKey", 43, 44),
+            StringField(payload, "publicKey", 43, 44),
+            OptionalStringField(payload, "createdAt", 10, 64)),
     };
 
     private static string? FirstError(params string?[] errors) => errors.FirstOrDefault(static e => e is not null);

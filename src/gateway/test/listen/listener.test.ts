@@ -13,6 +13,9 @@ import { builtinChildManifest } from "../../src/child.js";
 import { ChildFleet } from "../../src/child-link.js";
 import { startChildListener, tokenMatches, type ChildListener } from "../../src/listen.js";
 import { connectChild } from "../../src/connect.js";
+import { childIdentity, memoryKeyStore, seededKey } from "./key-store.js";
+import { childChannelUri } from "../../src/childwire.js";
+import { signProofForGateway } from "@ofac/workspace-link";
 import { encodeFrame, type ChildWireFrame } from "../../src/childwire.js";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -45,6 +48,8 @@ async function listening(
     childSecret?: string;
     entries?: Record<string, { token?: string; maxInFlight: number; timeoutSeconds: number }>;
     tcp?: boolean;
+    /** Pre-pinned identities: the child then authenticates by proof only. */
+    pinned?: Record<string, ReturnType<typeof childIdentity>>;
   } = {},
 ): Promise<Harness> {
   const stateDir = mkdtempSync(tmpdir() + "/gw-lsn-");
@@ -69,13 +74,20 @@ async function listening(
     error: (m: string, f?: Record<string, unknown>) =>
       lines.push(`error ${m} ${JSON.stringify(f ?? {})}`),
   };
+  const keys = memoryKeyStore(
+    Object.entries(options.pinned ?? {}).map(([name, identity]) =>
+      seededKey(`${GATEWAY_ID}/${name}`, identity),
+    ),
+  );
   const listener = await startChildListener(config, {
     fleet,
     logger: tracking,
     gatewayId: GATEWAY_ID,
     heartbeatSeconds: options.heartbeatSeconds ?? 30,
+    keys,
     ...(options.childSecret !== undefined ? { childSecret: options.childSecret } : {}),
   });
+  harnessKeys = keys;
   live = { harness: { config, fleet, lines, listener }, closes: [] };
   return live.harness;
 }
@@ -91,10 +103,25 @@ async function freeTcpPort(): Promise<number> {
   return port;
 }
 
-async function child(h: Harness, name: string, manifest: CapabilityManifestV1, token = "t") {
+let harnessKeys: ReturnType<typeof memoryKeyStore> | null = null;
+
+/** The pins written so far (first-pin / rotation assertions). */
+export function pins(): ReturnType<typeof memoryKeyStore>["pins"] {
+  if (harnessKeys === null) throw new Error("no live listener");
+  return harnessKeys.pins;
+}
+
+async function child(
+  h: Harness,
+  name: string,
+  manifest: CapabilityManifestV1,
+  token = "t",
+  identity?: ReturnType<typeof childIdentity>,
+) {
   const conn = await connectChild({
     childWorkspaceId: `${GATEWAY_ID}/${name}`,
     token,
+    ...(identity === undefined ? {} : { identity }),
     manifest,
     path: h.config.socket.path,
     onCommand: async () => ({ kind: "accepted", executionId: "" }),
@@ -337,6 +364,147 @@ describe("child listener lease + offline", () => {
       online: false,
     });
     expect(h.fleet.generationOf(`${GATEWAY_ID}/killme`)).toBe(1);
+  });
+});
+
+describe("pinned-key law", () => {
+  it("first hello with the bootstrap token pins the key and logs child-key-pinned", async () => {
+    const identity = childIdentity();
+    const h = await listening({ childSecret: "pair" });
+    await child(h, "alpha", builtinChildManifest("echo"), "pair", identity);
+    expect(pins()).toHaveLength(1);
+    expect(pins()[0]).toMatchObject({
+      childId: `${GATEWAY_ID}/alpha`,
+      keyId: identity.keyId,
+      publicKey: identity.publicKeyBase64Url,
+      algorithm: "ed25519",
+    });
+    expect(h.lines.some((l) => l.includes("gateway.child-key-pinned"))).toBe(true);
+  });
+
+  it("after the pin the token is dead: an empty-token hello WITH a proof is admitted", async () => {
+    const identity = childIdentity();
+    const h = await listening({ childSecret: "pair", pinned: { alpha: identity } });
+    // The child presents NO token (retired) and proves possession instead.
+    await expect(
+      child(h, "alpha", builtinChildManifest("echo"), "", identity),
+    ).resolves.toBeTruthy();
+    expect(pins()).toHaveLength(0); // admitted, nothing new pinned
+  });
+
+  it("after the pin a missing or wrong proof is denied bad-token", async () => {
+    const identity = childIdentity();
+    const h = await listening({ childSecret: "pair", pinned: { alpha: identity } });
+    const socket = await rawConnect(h.config.socket.path);
+    const ack = readFrame(socket);
+    socket.write(
+      encodeFrame({
+        v: 1,
+        type: "hello",
+        childWorkspaceId: `${GATEWAY_ID}/alpha`,
+        token: "pair", // the retired token authenticates nothing
+        publicKey: identity.publicKeyBase64Url,
+        manifest: builtinChildManifest("echo"),
+      }),
+    );
+    expect(await ack).toMatchObject({ accepted: false, reason: "denied: bad-token" });
+    socket.destroy();
+  });
+
+  it("a proof by a different key is denied", async () => {
+    const identity = childIdentity();
+    const other = childIdentity();
+    const h = await listening({ childSecret: "pair", pinned: { alpha: identity } });
+    await expect(child(h, "alpha", builtinChildManifest("echo"), "", other)).rejects.toThrow(
+      /denied: bad-token/,
+    );
+  });
+
+  it("the same proof twice is a replay: the second hello is denied", async () => {
+    const identity = childIdentity();
+    const h = await listening({ childSecret: "pair", pinned: { alpha: identity } });
+    const proof = signProofForGateway(identity, {
+      childWorkspaceId: `${GATEWAY_ID}/alpha`,
+      htu: childChannelUri(`${GATEWAY_ID}/alpha`),
+      nonce: "captured-nonce",
+    });
+    const hello = {
+      v: 1 as const,
+      type: "hello" as const,
+      childWorkspaceId: `${GATEWAY_ID}/alpha`,
+      token: "",
+      publicKey: identity.publicKeyBase64Url,
+      proof,
+      manifest: builtinChildManifest("echo"),
+    };
+    const first = await rawConnect(h.config.socket.path);
+    const firstAck = readFrame(first);
+    first.write(encodeFrame(hello));
+    expect(await firstAck).toMatchObject({ accepted: true });
+    // The live holder denies a newcomer `duplicate-id` before auth is reached,
+    // so the replay arrives once the first connection is gone: the freshness
+    // law must outlive the connection that spent the proof.
+    first.destroy();
+    await waitFor("fleet marks offline", () => h.fleet.member(`${GATEWAY_ID}/alpha`) === undefined);
+    const second = await rawConnect(h.config.socket.path);
+    const secondAck = readFrame(second);
+    second.write(encodeFrame(hello));
+    const secondVerdict = await secondAck;
+    expect(secondVerdict).toMatchObject({ accepted: false, reason: "denied: bad-token" });
+    expect(h.lines.some((l) => l.includes("child-proof-replay"))).toBe(true);
+    first.destroy();
+    second.destroy();
+  });
+
+  it("a rotated bootstrap token re-pins a new key (loss/rebuild) and logs child-key-rotated", async () => {
+    const identity = childIdentity();
+    const replacement = childIdentity();
+    const h = await listening({ childSecret: "pair", pinned: { alpha: identity } });
+    await expect(
+      child(h, "alpha", builtinChildManifest("echo"), "pair", replacement),
+    ).resolves.toBeTruthy();
+    expect(pins()).toHaveLength(1);
+    expect(pins()[0]).toMatchObject({
+      keyId: replacement.keyId,
+      rotatedAt: expect.any(String),
+    });
+    expect(h.lines.some((l) => l.includes("gateway.child-key-rotated"))).toBe(true);
+  });
+
+  it("a hello denied for a manifest conflict does not spend the bootstrap token", async () => {
+    const identity = childIdentity();
+    const h = await listening({ childSecret: "pair" });
+    const socket = await rawConnect(h.config.socket.path);
+    const ack = readFrame(socket);
+    socket.write(
+      encodeFrame({
+        v: 1,
+        type: "hello",
+        childWorkspaceId: `${GATEWAY_ID}/zulu`,
+        token: "pair",
+        publicKey: identity.publicKeyBase64Url,
+        // Schema violation (the manifest `kind` const): a body that can never route.
+        manifest: {
+          ...builtinChildManifest("echo"),
+          kind: "NotACapabilityManifest",
+        } as unknown as CapabilityManifestV1,
+      }),
+    );
+    expect(await ack).toMatchObject({ accepted: false, reason: "manifest-conflict" });
+    expect(pins()).toHaveLength(0); // the token is still live
+    socket.destroy();
+    await expect(
+      child(h, "zulu", builtinChildManifest("echo"), "pair", identity),
+    ).resolves.toBeTruthy();
+    expect(pins()).toHaveLength(1);
+  });
+
+  it("an unauthenticated fleet still pins a presented key", async () => {
+    const identity = childIdentity();
+    const h = await listening(); // no secret at all
+    await child(h, "alpha", builtinChildManifest("echo"), "", identity);
+    expect(pins()).toHaveLength(1);
+    expect(h.lines.some((l) => l.includes("child-auth-disabled"))).toBe(true);
   });
 });
 

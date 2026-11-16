@@ -39,6 +39,8 @@ export class SignalrTransport implements LinkTransport {
     "signalr",
     "http-poll",
   ];
+  /** The channel a hello-carried proof binds to (htm "WS"), as this client dials it. */
+  readonly hubUrl: string;
   private readonly deliver = new FrameEmitter<LinkDeliveryV1>();
   private readonly flow = new FrameEmitter<FlowControlFrame>();
   private readonly disconnect = new FrameEmitter<GoodbyeFrame>();
@@ -47,6 +49,7 @@ export class SignalrTransport implements LinkTransport {
   private connection: HubConnection;
 
   constructor(private readonly options: SignalrTransportOptions) {
+    this.hubUrl = `${trimSlash(this.options.baseUrl)}/hubs/link`;
     this.connection = this.buildConnection();
   }
 
@@ -56,7 +59,7 @@ export class SignalrTransport implements LinkTransport {
 
   private buildConnection(): HubConnection {
     const connection = new HubConnectionBuilder()
-      .withUrl(`${trimSlash(this.options.baseUrl)}/hubs/link`, {
+      .withUrl(this.hubUrl, {
         accessTokenFactory: () => this.options.token.getToken(),
         skipNegotiation: true,
         transport: HttpTransportType.WebSockets,

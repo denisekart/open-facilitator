@@ -2,13 +2,16 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://schemas.openfacilitator.org/v1/enroll-request.v1.json",
   "title": "EnrollRequestV1",
+  "description": "Bootstrap enrollment request. `token` is the one-time enrollment code (or the configured bootstrap secret): it authorizes the join and is consumed as enrollment state, never as a standing credential. `publicKey`/`keyAlgorithm` are the endpoint's Ed25519 identity, required whenever the enrollment is keyed (as opposed to OIDC-asserted, where identity stays the issuer trust).",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "token",
     "endpointId",
     "instanceId",
-    "trustMode"
+    "trustMode",
+    "publicKey",
+    "keyAlgorithm"
   ],
   "properties": {
     "token": {
@@ -28,6 +31,19 @@
         "shared-runtime",
         "separate-process-same-host",
         "isolated-executor"
+      ]
+    },
+    "publicKey": {
+      "type": "string",
+      "description": "One raw Ed25519 public key, base64url without padding (32 bytes => 43 or 44 characters).",
+      "pattern": "^[A-Za-z0-9_-]{43,44}$",
+      "minLength": 43,
+      "maxLength": 44
+    },
+    "keyAlgorithm": {
+      "type": "string",
+      "enum": [
+        "ed25519"
       ]
     },
     "role": {

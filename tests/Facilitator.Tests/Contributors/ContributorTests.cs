@@ -188,6 +188,8 @@ public sealed class ContributorTests(PostgresFixture fixture) : IAsyncLifetime
             trustMode = "isolated-executor",
             team,
             contributor = "runner-bot",
+            publicKey = LinkTestHarness.NewEd25519().PublicKey,
+            keyAlgorithm = "ed25519",
         });
         await KernelOps.PostJsonAsync(_operator, "/api/link/v1/enroll", body, HttpStatusCode.Created);
         Assert.Equal("runner-bot", await fixture.Db.EnrollmentContributorHandle(
@@ -202,6 +204,8 @@ public sealed class ContributorTests(PostgresFixture fixture) : IAsyncLifetime
             trustMode = "isolated-executor",
             team,
             contributor = "worker-from-elsewhere",
+            publicKey = LinkTestHarness.NewEd25519().PublicKey,
+            keyAlgorithm = "ed25519",
         });
         using var refused = await _operator.PostAsync("/api/link/v1/enroll", new StringContent(foreign, Encoding.UTF8, "application/json"));
         Assert.Equal(HttpStatusCode.NotFound, refused.StatusCode);

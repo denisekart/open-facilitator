@@ -31,7 +31,7 @@ export interface WorkerConfig {
   /**
    * Bearer for the kernel link plane; OFAC_KERNEL_TOKEN overlay.
    * The Gateway-facing `token` is NOT a kernel credential unless it is one
-   * (mode-(a) enrollment issues a separate linkToken); unset ⇒ the worker's
+   * (enrollment registers a key, never hands back a bearer); unset ⇒ the worker's
    * own `token` is sent verbatim.
    */
   kernelToken?: string | undefined;

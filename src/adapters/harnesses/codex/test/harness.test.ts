@@ -94,6 +94,8 @@ function fakeContext(
       progress.push(note);
     },
     setSteered: () => undefined,
+    // Never called by this harness's script; loud if it ever is.
+    fetchContext: () => Promise.reject(new Error("unexpected fetchContext")),
     // Unset ⇒ these fakes never ask and a question is a bug; set ⇒ the
     // fake human answers immediately with `answer`.
     requestInput: askAnswer

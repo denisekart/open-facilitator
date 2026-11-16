@@ -136,6 +136,30 @@ public sealed class AdminSurfaceTests(DispatchDbFixture fixture)
     }
 
     [Fact]
+    public async Task LinksViewCarriesCredentialIdentityAndRevokeKillsTheRow()
+    {
+        using var factory = new KernelTestFactory(fixture, noDispatcher: true);
+        using var client = factory.CreateAuthedClient();
+        await fixture.Db.SeedGatewayEnrollment("gw.surface-cred", "team-alpha", "separate-process-same-host");
+
+        var view = await KernelOps.GetJsonAsync(client, "/api/admin/links", HttpStatusCode.OK);
+        var row = view.GetProperty("gateways").EnumerateArray()
+            .Single(g => g.GetProperty("endpointId").GetString() == "gw.surface-cred");
+        // The identity story, on the wire: class + the active pinned key + fences.
+        Assert.Equal("key", row.GetProperty("credentialClass").GetString());
+        Assert.StartsWith("sha256:", row.GetProperty("endpointKeyId").GetString());
+        Assert.Equal(1, row.GetProperty("epoch").GetInt64());
+        Assert.Equal(0, row.GetProperty("seq").GetInt64());
+        Assert.False(row.GetProperty("replaySuspect").GetBoolean());
+
+        using var revoke = await client.DeleteAsync("/api/admin/links/gw.surface-cred");
+        Assert.Equal(HttpStatusCode.NoContent, revoke.StatusCode);
+        Assert.True(await fixture.Db.AuditActionPresent("link.endpoint-revoked"));
+        using var gone = await client.DeleteAsync("/api/admin/links/gw.surface-cred");
+        Assert.Equal(HttpStatusCode.NotFound, gone.StatusCode);
+    }
+
+    [Fact]
     public async Task DeliveriesMergeKernelPlaneRowsNewestFirst()
     {
         using var factory = new KernelTestFactory(fixture, noDispatcher: true);

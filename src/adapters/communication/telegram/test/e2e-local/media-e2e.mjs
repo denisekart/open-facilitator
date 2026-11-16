@@ -14,8 +14,11 @@
 //     sendMessage/sendPhoto/setMessageReaction.
 //   fake kernel — the link-plane surfaces runProviderAdapter needs, mimicking
 //     @ofac/adapter/testing's startStubKernel (which has no enroll route and
-//     no hub, hence this): POST /api/link/v1/enroll ⇒ 201 + linkToken,
-//     POST /api/link/v1/capabilities ⇒ 204, POST /api/link/v1/events ⇒ 202 +
+//     no hub, hence this): POST /api/link/v1/challenge ⇒ 401 before the first
+//     enroll, then a nonce; POST /api/link/v1/enroll ⇒ 201 + endpointKeyId
+//     (no bearer — the key is the credential); POST /api/link/v1/proof ⇒ a
+//     session JWT shape, POST /api/link/v1/capabilities ⇒ 204,
+//     POST /api/link/v1/events ⇒ 202 +
 //     the request_upload ticket in-band on `data`, PUT/GET
 //     /api/link/v1/artifacts/<id>/content, and GET back the stored bytes.
 //     Plus the SignalR hub the transport dials (WS upgrade on /hubs/link):
@@ -190,6 +193,7 @@ function frameReader(onFrame) {
 
 function startKernel() {
   const artifacts = new Map(); // id → {bytes, mediaType, digest}
+  let enrolled = false; // the fake's whole link-session state
   const pending = new Map(); // commandId → id
   const events = []; // every envelope the fake kernel received (REST or hub)
   const sockets = new Set();
@@ -205,11 +209,36 @@ function startKernel() {
         response.end(JSON.stringify(obj));
       };
       const put = /^\/api\/link\/v1\/artifacts\/([0-9a-f-]+)\/content$/.exec(url);
+      if (request.method === "POST" && url === "/api/link/v1/challenge") {
+        // The first-boot law: nothing on file until the enroll lands.
+        if (!enrolled) {
+          send(401, { type: "proof-invalid", status: 401, detail: "No live enrollment." });
+          return;
+        }
+        send(200, {
+          nonce: "0.0.ZmFrZS1ub25jZS0wMDAwMDAwMDAwMDAwMDAwMDAwMDAw",
+          publicKeyRequired: true,
+          algorithm: "ed25519",
+          expiresAt: new Date(Date.now() + 60_000).toISOString(),
+        });
+        return;
+      }
+      if (request.method === "POST" && url === "/api/link/v1/proof") {
+        // The stub does not verify signatures; it mints the session shape.
+        send(200, {
+          sessionToken: "lnk-e2e",
+          expiresAt: new Date(Date.now() + 300_000).toISOString(),
+          seq: 0,
+        });
+        return;
+      }
       if (request.method === "POST" && url === "/api/link/v1/enroll") {
+        enrolled = true;
         send(201, {
           enrollmentId: "e2e-enrollment",
           trustMode: "isolated-executor",
-          linkToken: "lnk-e2e",
+          endpointKeyId: "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+          seq: 0,
         });
         return;
       }

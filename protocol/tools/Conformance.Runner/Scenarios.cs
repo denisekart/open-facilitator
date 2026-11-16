@@ -84,10 +84,32 @@ public sealed class Scenarios(RunnerConfig config, KernelClient kernel, string f
             ["law"] = "schema-violation and envelope-violation answer 400, unknown-command 422, payload-too-large 413 — the locked error contract",
         });
 
-        // An oversize envelope rides the 413 leg on the link plane too.
+        // The keyed credential plane: enroll posts a public key, gets no secret
+        // back, and every link call rides a session JWT minted by proof of
+        // possession (challenge -> detached EdDSA proof -> 5-minute bearer).
         var session = await kernel.EnrollAsync($"conf.kernel.{Guid.NewGuid():N}", ct);
+        var unproved = await kernel.GetAsync("/api/link/v1/capabilities", "not-a-session-jwt", ct);
+        var proved = await session.GetAsync("/api/link/v1/capabilities", ct);
+        Record(1, "keyed-enrollment-proof-of-possession-session",
+            Valid(unproved.Status == 401 && proved.Status == 404
+                  && session.EndpointKeyId.StartsWith("sha256:", StringComparison.Ordinal)
+                  && session.EndpointKeyId.Length == 71),
+            new JsonObject
+            {
+                ["enroll"] = new JsonObject
+                {
+                    ["endpointKeyId"] = session.EndpointKeyId,
+                    ["seq"] = session.Seq,
+                    ["carriedNoSecret"] = true,
+                },
+                ["withoutSession"] = new JsonObject { ["status"] = unproved.Status, ["error"] = unproved.ErrorType },
+                ["withMintedSession"] = new JsonObject { ["status"] = proved.Status, ["error"] = proved.ErrorType },
+                ["law"] = "no bearer comes back from enroll; the session JWT only a proof of possession buys authorizes the link surface (404 capabilities = enrolled, nothing advertised yet)",
+            });
+
+        // An oversize envelope rides the 413 leg on the link plane too.
         var oversize = BuildOversize(validText);
-        var link413 = await kernel.PostRawAsync("/api/link/v1/events", oversize, session.LinkToken, ct);
+        var link413 = await session.PostAsync("/api/link/v1/events", oversize, ct);
         Record(1, "payload-limit-413", Valid(link413.Status == 413 && link413.ErrorType == "payload-too-large"), new JsonObject
         {
             ["status"] = link413.Status,
@@ -98,7 +120,7 @@ public sealed class Scenarios(RunnerConfig config, KernelClient kernel, string f
 
         // Unknown COMMAND rejection: the same fixture refused on both planes.
         var unknownText = await File.ReadAllTextAsync(Path.Combine(fixturesDir, "invalid/command.unknown.v1.json"), ct);
-        var linkUnknown = await kernel.PostRawAsync("/api/link/v1/events", unknownText, session.LinkToken, ct);
+        var linkUnknown = await session.PostAsync("/api/link/v1/events", unknownText, ct);
         var adminUnknown = await kernel.PostRawAsync("/api/ingress/events", unknownText, kernel.OperatorToken, ct);
         var unknownOk = linkUnknown.Status == 422 && linkUnknown.ErrorType is "unknown-command" or "unsupported"
             && adminUnknown.Status == 422 && adminUnknown.ErrorType is "unknown-command" or "unsupported";
@@ -116,7 +138,10 @@ public sealed class Scenarios(RunnerConfig config, KernelClient kernel, string f
              "capabilityManifestDigest":"sha256:abababababababababababababababababababababababababababababababab"}
             """)!;
         hello["endpointId"] = session.EndpointId;
-        var probe = await SignalRProbe.HelloProbeAsync(config.BaseUrl, session.LinkToken, hello, 15, ct);
+        // A keyed endpoint's hello carries its own handshake proof (htm WS, htu
+        // the hub URL); the version refusal is decided before it is verified.
+        hello["proof"] = await session.ChannelProofAsync(kernel.HubUrl, ct);
+        var probe = await SignalRProbe.HelloProbeAsync(config.BaseUrl, await kernel.ChannelBearerAsync(session.EndpointId, ct), hello, 15, ct);
         var reason = probe.Goodbye?["reason"]?.GetValue<string>();
         Record(1, "major-version-negotiation-goodbye",
             Valid(reason == "no-compatible-protocol-version"),
@@ -139,11 +164,11 @@ public sealed class Scenarios(RunnerConfig config, KernelClient kernel, string f
         }
 
         var endpointId = $"conf.client.{Guid.NewGuid():N}";
-        var tokenFile = Path.Combine(Path.GetTempPath(), $"conf-link-{Guid.NewGuid():N}.token");
+        var identityFile = Path.Combine(Path.GetTempPath(), $"conf-link-{Guid.NewGuid():N}.identity.json");
         var capability = "conformance.probe";
 
         // Phase 1: client connects first, so the work create routes against a live session.
-        var phase1 = StartClient("phase1", endpointId, capability, tokenFile, lastKnownAck: null, redeliverOf: null);
+        var phase1 = StartClient("phase1", endpointId, capability, identityFile, lastKnownAck: null, redeliverOf: null);
         var ready = await ReadEventAsync(phase1, "handshaked", ct);
         var phase1Started = ready is not null && !phase1!.HasExited;
         if (!phase1Started)
@@ -206,7 +231,7 @@ public sealed class Scenarios(RunnerConfig config, KernelClient kernel, string f
         }, kernel.OperatorToken, ct);
         var workId2 = created2.Text("workId");
 
-        var phase2 = StartClient("phase2", endpointId, capability, tokenFile, deliveryId, deliveryId);
+        var phase2 = StartClient("phase2", endpointId, capability, identityFile, deliveryId, deliveryId);
         var phase2Events = await CollectEventsAsync(phase2, ["summary", "old-token-rejected"], ct);
         var summary = phase2Events.GetValueOrDefault("summary");
         var oldTokenRejected = phase2Events.GetValueOrDefault("old-token-rejected");
@@ -226,12 +251,12 @@ public sealed class Scenarios(RunnerConfig config, KernelClient kernel, string f
     }
 
     private Process StartClient(
-        string mode, string endpointId, string capability, string tokenFile,
+        string mode, string endpointId, string capability, string identityFile,
         string? lastKnownAck, string? redeliverOf)
     {
         var argList = $"{config.ForeignClient} --url {config.BaseUrl} --token {config.EnrollmentToken} " +
             $"--endpoint {endpointId} --team {config.Team} --capability {capability} " +
-            $"--mode {mode} --token-file {tokenFile} --timeout-ms {config.RedeliverWaitSeconds * 1000}";
+            $"--mode {mode} --identity-file {identityFile} --timeout-ms {config.RedeliverWaitSeconds * 1000}";
         if (lastKnownAck is not null)
         {
             argList += $" --last-known-ack {lastKnownAck}";

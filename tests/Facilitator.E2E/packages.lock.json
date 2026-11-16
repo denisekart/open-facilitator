@@ -87,11 +87,6 @@
         "resolved": "4.0.102.14",
         "contentHash": "pRYOOIyj40UdQ6G9iq8AOU30sFPqWS/umM/sFTmAl4n1S6AVbVa67DJpJTxD+9qJFqweHPcyVW7Qb4BbUBLJdg=="
       },
-      "BouncyCastle.Cryptography": {
-        "type": "Transitive",
-        "resolved": "2.7.0",
-        "contentHash": "U+12df8UEWHgBi04YVf/Lgi2dy3SItlIYvHjjEVa/BngCQIzDCDRBk50DDByCfDvSbe5pRNFr3b7UrVK2kMcLw=="
-      },
       "Docker.DotNet.Enhanced": {
         "type": "Transitive",
         "resolved": "4.3.3",
@@ -686,6 +681,7 @@
         "type": "Project",
         "dependencies": {
           "AWSSDK.S3": "[4.0.104.8, )",
+          "BouncyCastle.Cryptography": "[2.7.0, )",
           "Jcs.Net": "[0.1.1, )",
           "Microsoft.AspNetCore.Authentication.JwtBearer": "[10.0.13, )",
           "Microsoft.EntityFrameworkCore": "[10.0.13, )",
@@ -714,6 +710,12 @@
         "dependencies": {
           "AWSSDK.Core": "[4.0.102.14, 5.0.0)"
         }
+      },
+      "BouncyCastle.Cryptography": {
+        "type": "CentralTransitive",
+        "requested": "[2.7.0, )",
+        "resolved": "2.7.0",
+        "contentHash": "U+12df8UEWHgBi04YVf/Lgi2dy3SItlIYvHjjEVa/BngCQIzDCDRBk50DDByCfDvSbe5pRNFr3b7UrVK2kMcLw=="
       },
       "Jcs.Net": {
         "type": "CentralTransitive",

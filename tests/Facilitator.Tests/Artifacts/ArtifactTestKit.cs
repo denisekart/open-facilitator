@@ -59,8 +59,14 @@ internal static class ArtifactTestKit
     {
         var cc = await KeycloakFixture.TokenForClientAsync(clientId, secret);
         var body = JsonSerializer.Serialize(new { token = cc, endpointId, instanceId = "inst-1", trustMode = "isolated-executor" });
-        var json = await KernelOps.PostJsonAsync(kernel, "/api/link/v1/enroll", body, HttpStatusCode.Created);
-        return json.GetProperty("linkToken").GetString()!;
+        await KernelOps.PostJsonAsync(kernel, "/api/link/v1/enroll", body, HttpStatusCode.Created);
+
+        // Class oidc has no key, so it proves by issuer trust on the same proof
+        // route and rides the same 5-minute session JWT as a keyed endpoint.
+        var session = await KernelOps.PostJsonAsync(
+            kernel, "/api/link/v1/proof",
+            JsonSerializer.Serialize(new { token = cc }), HttpStatusCode.OK);
+        return session.GetProperty("sessionToken").GetString()!;
     }
 
     /// <summary>alice-minted evidence token (delegation claim present on the ofac-evidence client).</summary>

@@ -8,10 +8,10 @@
 // FORGEJO_TOKEN_FILE (the bot PAT file, read at every run), and
 // OFAC_GIT_AUTHOR_NAME / OFAC_GIT_AUTHOR_EMAIL (the commit identity).
 import { parseArgs } from "node:util";
-import { createConsoleLogger } from "@ofac/workspace-link";
+import { createConsoleLogger, loadOrCreateIdentity } from "@ofac/workspace-link";
 import type { LinkLogger } from "@ofac/workspace-link";
 import { startTelemetryFromEnv } from "@ofac/otel";
-import { createAdapter } from "@ofac/adapter";
+import { createAdapter, kernelLegFromEnv } from "@ofac/adapter";
 import { WorkerConfigError, loadWorkerConfigFile, type WorkerConfig } from "../config.js";
 import { createCodingHooks } from "../harness.js";
 
@@ -41,13 +41,26 @@ export async function bootWorker(config: WorkerConfig, log: LinkLogger): Promise
     meterName: "ofac.worker",
     instanceId: config.childWorkspaceId,
   });
+  const kernelLeg = await kernelLegFromEnv({
+    stateDir: config.workDir,
+    kernelUrl: config.kernelUrl,
+    logger: log,
+  });
   const handle = await createAdapter({
     telemetry,
     childWorkspaceId: config.childWorkspaceId,
     ...(config.token !== undefined ? { token: config.token } : {}),
+    // The child identity: a key in the worker's own state dir (workDir),
+    // presented in the hello. OFAC_CHILD_SECRET stays a first-boot pairing
+    // secret — after the Gateway pins the key, the proof is the credential.
+    identity: loadOrCreateIdentity(config.workDir),
     kernel: {
       baseUrl: config.kernelUrl,
-      ...(config.kernelToken !== undefined ? { token: config.kernelToken } : {}),
+      ...(kernelLeg === undefined
+        ? config.kernelToken === undefined
+          ? {}
+          : { token: config.kernelToken }
+        : { token: kernelLeg.getToken }),
     },
     manifest: config.manifest,
     transport:

@@ -39,7 +39,6 @@ import {
   type GatewayHandle,
   type GatewayHandleConfig,
 } from "../../../../gateway/test/e2e/gateway-harness.js";
-import { linkPost } from "../../../../workspace-link/test/e2e/harness.js";
 import { startFakeGithub, type FakeGithub } from "./fake-github.js";
 import {
   WEBHOOK_SECRET,
@@ -206,18 +205,10 @@ describe.skipIf(!E2E)("github provider e2e", () => {
     gateway = startGateway(gw.configPath);
     await gateway.ready();
 
-    // The worker's kernel credential (artifact upload) is a child enrollment;
-    // its gateway credential is the fleet token.
-    const enroll = await linkPost(kernel.baseUrl, "/api/link/v1/enroll", "enroll-dev", {
-      token: "enroll-dev",
-      endpointId: "coder-e2e",
-      instanceId: "e2e-scripted",
-      trustMode: "isolated-executor",
-      team: "team-alpha",
-      role: "child",
-    });
-    if (enroll.status !== 201) throw new Error(`worker enroll failed: ${String(enroll.status)}`);
-    const workerKernelToken = String((enroll.body as { linkToken: string }).linkToken);
+    // The worker's kernel credential (artifact upload) is its OWN child
+    // enrollment now: the scripted bin runs the first-boot law from env
+    // (OFAC_KERNEL_ENDPOINT + OFAC_ENROLL_SECRET, key in its stateDir) and
+    // rides live session JWTs. Its gateway credential is the fleet token.
 
     const connectorConfig = join(stateDir, "connector.yaml");
     writeFileSync(
@@ -254,11 +245,16 @@ heartbeatSeconds: 5
         childWorkspaceId: `${gw.gatewayId}/coder`,
         token: "tok",
         kernelUrl: kernel.baseUrl,
-        kernelToken: workerKernelToken,
+        stateDir,
         socket: gw.socketPath,
       }),
     );
     worker = spawn("node", [WORKER_SCRIPT, "--config", workerConfig], {
+      env: {
+        ...process.env,
+        OFAC_KERNEL_ENDPOINT: "coder-e2e",
+        OFAC_ENROLL_SECRET: "enroll-dev",
+      },
       stdio: ["ignore", "pipe", "pipe"],
     });
     await readyLine(worker, "worker ready", "worker");

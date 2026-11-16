@@ -191,7 +191,11 @@ public static class KernelServiceCollection
         // a live peer already stamps on advancing leases is a fail-closed
         // startup refusal, not a runtime surprise.
         builder.Services.AddHostedService<ReplicaIdentityCheck>();
-        builder.Services.AddSingleton<ILinkTokenValidator, StoreLinkTokenValidator>();
+        builder.Services.AddSingleton<LinkSessionKeys>();
+        builder.Services.AddSingleton<StoreLinkTokenValidator>();
+        builder.Services.AddSingleton<ILinkTokenValidator>(sp => sp.GetRequiredService<StoreLinkTokenValidator>());
+        builder.Services.AddSingleton<ILinkRevocationSink>(sp => sp.GetRequiredService<StoreLinkTokenValidator>());
+        builder.Services.AddSingleton<LinkProofVerifier>();
         builder.Services.AddSingleton<LinkService>();
         builder.Services.AddSingleton<LinkConnectionRegistry>();
         builder.Services.AddSingleton<LinkLedger>();

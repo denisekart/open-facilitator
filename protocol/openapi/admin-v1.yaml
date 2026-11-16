@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Facilitator Admin API
-  version: 1.0.0
+  version: 1.1.0
   description: >
     Hand-maintained mirror of the kernel /api/admin surface (spec section 17)
     — the operator read models plus the three mutations the embedded
@@ -126,6 +126,26 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/AdminLinksView" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/admin/links/{endpointId}:
+    delete:
+      operationId: revokeLink
+      tags: [mutate]
+      summary: >
+        Revoke an endpoint's credentials: the enrollment, every pinned key, every
+        outstanding proof and every live session die in one epoch bump. The
+        endpoint rejoins only via a fresh first-boot enrollment.
+      parameters:
+        - name: endpointId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "204": { description: Revoked (audit link.endpoint-revoked). }
+        "404":
+          description: No enrollment on file for the endpoint.
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
   /api/admin/deliveries:
@@ -1077,6 +1097,25 @@ components:
         lastHeartbeat: { type: [string, "null"], format: date-time }
         replicaId: { type: [string, "null"], description: Best-effort per-replica socket attribution. }
         liveSockets: { type: integer }
+        credentialClass:
+          type: [string, "null"]
+          enum: [oidc, key, "null"]
+          description: How the endpoint proved identity at enrollment.
+        endpointKeyId:
+          type: [string, "null"]
+          description: sha256 fingerprint of the ACTIVE pinned endpoint key (null when no key is on file).
+        epoch:
+          type: [integer, "null"]
+          format: int64
+          description: Revocation epoch; a revoke bumps it and sessions carry it.
+        seq:
+          type: [integer, "null"]
+          format: int64
+          description: Replay fence every proof of possession must reach.
+        replaySuspect:
+          type: boolean
+          default: false
+          description: The last fence check rejected a proof (audit link.replay-suspect newer than the enrollment).
     AdminAffectedAssignment:
       type: object
       additionalProperties: false

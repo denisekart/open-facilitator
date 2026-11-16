@@ -205,7 +205,7 @@
    "lane": "T1-gate",
    "evidence": [
     "ProviderIngressTests.LinkMintChallengeRedeemFlowWithFences",
-    "EnrollmentTokenTests.MintThenEnrollMintsWorkingLinkToken"
+    "EnrollmentTokenTests.MintThenEnrollBindsAKeyAndAnswersAsPrincipal"
    ],
    "note": ""
   },
@@ -738,7 +738,7 @@
    "verdict": "covered",
    "lane": "T2-adapter",
    "evidence": [
-    "EnrollmentTests.EnrollReturnsTokenAndTrustModeAndSeedsDefaultTeam",
+    "EnrollmentTests.EnrollReturnsKeyIdAndTrustModeAndSeedsDefaultTeam",
     "TeamRosterTests.RosterSeedsFromConfigThenDbIsTruth"
    ],
    "note": ""
@@ -1112,7 +1112,7 @@
    "verdict": "covered",
    "lane": "T1-gate",
    "evidence": [
-    "WorkloadIdentityTests.ModeBRoundTripRotatesAndOldTokenDies",
+    "WorkloadIdentityTests.ModeBRoundTripMintsSessionsAndReEnrollKeepsThemLive",
     "ContributorTests.HumanEvidenceAgainstContributorOnlyCapabilityIsRefusedNotRouted"
    ],
    "note": "",

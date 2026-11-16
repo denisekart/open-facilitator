@@ -11,7 +11,7 @@ namespace Facilitator.Tests.Link;
 /// Mintable enrollment tokens: mint (literal returned once, hash stored),
 /// first-use consumption binds the row's team/role and fences the endpoint
 /// (a foreign endpoint on a consumed token is 401), re-enroll on the
-/// consuming endpoint rotates the link token, expiry and revoke answer 401,
+/// consuming endpoint rotates the pinned key, expiry and revoke answer 401,
 /// revoke kills the issued link enrollment, the list never leaks the
 /// literal, DELETE is idempotent, and the <c>enrollment-tokens.manage</c>
 /// gate refuses a kernel-operator-only principal. Coexists with the
@@ -23,7 +23,7 @@ public sealed class EnrollmentTokenTests(DispatchDbFixture fixture)
     private const string ProblemBase = "https://errors.openfacilitator.org/v1/";
 
     [Fact]
-    public async Task MintThenEnrollMintsWorkingLinkToken()
+    public async Task MintThenEnrollBindsAKeyAndAnswersAsPrincipal()
     {
         using var factory = new KernelTestFactory(fixture, noDispatcher: true);
         var admin = await AdminClientAsync(factory);
@@ -38,14 +38,14 @@ public sealed class EnrollmentTokenTests(DispatchDbFixture fixture)
         Assert.True(minted.GetProperty("expiresAt").TryGetDateTime(out var expiresAt), "expiresAt is a timestamp");
         Assert.True(expiresAt > DateTime.UtcNow.AddMinutes(55), "default ttl is 60 minutes");
 
-        var enrolled = await KernelOps.PostJsonAsync(factory.CreateClient(), "/api/link/v1/enroll",
-            JsonSerializer.Serialize(new { token, endpointId, instanceId = "inst-1", trustMode = "isolated-executor", team = "team-alpha", role = "gateway" }),
-            HttpStatusCode.Created);
-        var linkToken = enrolled.GetProperty("linkToken").GetString()!;
-        Assert.True(linkToken.Length >= 43, "linkToken is 256-bit base64url");
+        // A minted code buys an identity, never a bearer: the response is the
+        // key's fingerprint plus the replay fence, and nothing else.
+        var enrolled = await LinkTestHarness.EnrollWithTokenAsync(factory.CreateClient(), token, endpointId, role: "gateway");
+        Assert.Matches(@"^sha256:[0-9a-f]{64}$", enrolled.KeyId);
+        Assert.Equal(4, enrolled.Enrollment.EnumerateObject().Count());
 
-        // The link token IS the principal: capabilities 404 capabilities-not-found, not 401.
-        using var probe = await factory.CreateLinkClient(linkToken).GetAsync("/api/link/v1/capabilities");
+        // The key IS the principal: capabilities 404 capabilities-not-found, not 401.
+        using var probe = await factory.CreateLinkClient(enrolled).GetAsync("/api/link/v1/capabilities");
         Assert.Equal(HttpStatusCode.NotFound, probe.StatusCode);
         Assert.Contains("capabilities-not-found", await probe.Content.ReadAsStringAsync());
     }
@@ -59,32 +59,34 @@ public sealed class EnrollmentTokenTests(DispatchDbFixture fixture)
 
         var minted = await MintAsync(admin, suffix, "team-alpha", "gateway");
         var token = minted.GetProperty("token").GetString()!;
-        await EnrollAsync(factory, token, $"gw-{suffix}", "team-alpha", "gateway");
+        await LinkTestHarness.EnrollWithTokenAsync(factory.CreateClient(), token, $"gw-{suffix}", role: "gateway");
 
         using var second = await factory.CreateClient().PostAsync("/api/link/v1/enroll", Json(
-            new { token, endpointId = $"gw-other-{suffix}", instanceId = "i", trustMode = "isolated-executor", team = "team-alpha", role = "gateway" }));
+            new { token, endpointId = $"gw-other-{suffix}", instanceId = "i", trustMode = "isolated-executor", team = "team-alpha", role = "gateway", publicKey = LinkTestHarness.NewEd25519().PublicKey, keyAlgorithm = "ed25519" }));
         Assert.Equal(HttpStatusCode.Unauthorized, second.StatusCode);
         Assert.Contains("enrollment-secret-invalid", await second.Content.ReadAsStringAsync());
     }
 
     [Fact]
-    public async Task ReEnrollOnConsumingEndpointRotatesLinkToken()
+    public async Task ReEnrollOnConsumingEndpointRotatesThePinnedKey()
     {
         using var factory = new KernelTestFactory(fixture, noDispatcher: true);
         var admin = await AdminClientAsync(factory);
         var endpointId = "gw-" + Guid.NewGuid().ToString("N")[..12];
 
         var token = (await MintAsync(admin, endpointId, "team-alpha", "gateway")).GetProperty("token").GetString()!;
-        var first = await EnrollAsync(factory, token, endpointId, "team-alpha", "gateway");
-        var second = await EnrollAsync(factory, token, endpointId, "team-alpha", "gateway");
-        var oldToken = first.GetProperty("linkToken").GetString()!;
-        var newToken = second.GetProperty("linkToken").GetString()!;
-        Assert.NotEqual(oldToken, newToken);
+        // The code is single-use, so the key-rotating re-enroll replays the
+        // CONSUMED code: first-use consumption is what authorizes it.
+        var first = await LinkTestHarness.EnrollWithTokenAsync(factory.CreateClient(), token, endpointId, role: "gateway");
+        var second = await LinkTestHarness.EnrollWithTokenAsync(factory.CreateClient(), token, endpointId, role: "gateway");
+        Assert.NotEqual(first.KeyId, second.KeyId);
 
-        // Lever: the rotated-away token stops validating immediately.
-        using var oldProbe = await factory.CreateLinkClient(oldToken).GetAsync("/api/link/v1/capabilities");
-        Assert.Equal(HttpStatusCode.Unauthorized, oldProbe.StatusCode);
-        using var newProbe = await factory.CreateLinkClient(newToken).GetAsync("/api/link/v1/capabilities");
+        // Lever: the retired key stops proving immediately — refused at the proof
+        // gate, so no session can be minted for it.
+        using var retired = await first.ProveRawAsync();
+        Assert.Equal(HttpStatusCode.Unauthorized, retired.StatusCode);
+        Assert.Contains("proof-invalid", await retired.Content.ReadAsStringAsync());
+        using var newProbe = await factory.CreateLinkClient(second).GetAsync("/api/link/v1/capabilities");
         Assert.Equal(HttpStatusCode.NotFound, newProbe.StatusCode); // capabilities-not-found, principal accepted
     }
 
@@ -105,13 +107,13 @@ public sealed class EnrollmentTokenTests(DispatchDbFixture fixture)
         Assert.Equal(1, affected);
 
         using var response = await factory.CreateClient().PostAsync("/api/link/v1/enroll", Json(
-            new { token, endpointId = "gw-expired-" + Guid.NewGuid().ToString("N")[..8], instanceId = "i", trustMode = "isolated-executor", team = "team-alpha", role = "gateway" }));
+            new { token, endpointId = "gw-expired-" + Guid.NewGuid().ToString("N")[..8], instanceId = "i", trustMode = "isolated-executor", team = "team-alpha", role = "gateway", publicKey = LinkTestHarness.NewEd25519().PublicKey, keyAlgorithm = "ed25519" }));
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.Contains("enrollment-secret-invalid", await response.Content.ReadAsStringAsync());
     }
 
     [Fact]
-    public async Task RevokeKillsTokenAndIssuedLinkToken()
+    public async Task RevokeKillsTokenAndIssuedKey()
     {
         using var factory = new KernelTestFactory(fixture, noDispatcher: true);
         var admin = await AdminClientAsync(factory);
@@ -119,21 +121,28 @@ public sealed class EnrollmentTokenTests(DispatchDbFixture fixture)
 
         var minted = await MintAsync(admin, endpointId, "team-alpha", "gateway");
         var token = minted.GetProperty("token").GetString()!;
-        var enrolled = await EnrollAsync(factory, token, endpointId, "team-alpha", "gateway");
-        var linkToken = enrolled.GetProperty("linkToken").GetString()!;
+        var enrolled = await LinkTestHarness.EnrollWithTokenAsync(factory.CreateClient(), token, endpointId, role: "gateway");
+
+        // A live session, minted BEFORE the revoke: the bearer under test is
+        // young enough to still pass its own expiry check.
+        var liveSession = await enrolled.SessionTokenAsync();
 
         using (var revoke = await admin.DeleteAsync($"/api/admin/enroll-tokens/{minted.GetProperty("id").GetString()}"))
         {
             Assert.Equal(HttpStatusCode.NoContent, revoke.StatusCode);
         }
 
-        // The issued link enrollment died with the token (401, not capabilities-not-found).
-        using var probe = await factory.CreateLinkClient(linkToken).GetAsync("/api/link/v1/capabilities");
+        // The issued key died with the token (401, not capabilities-not-found), and
+        // it dies MID-SESSION: this bearer was minted before the revoke and is
+        // nowhere near its 5-minute expiry, so only the enrollment-row check
+        // (the epoch law) can refuse it. A fresh proof is impossible too — the
+        // challenge itself now answers 401.
+        using var probe = await factory.CreateLinkClient(liveSession).GetAsync("/api/link/v1/capabilities");
         Assert.Equal(HttpStatusCode.Unauthorized, probe.StatusCode);
 
         // And the minted token itself no longer enrolls.
         using var reEnroll = await factory.CreateClient().PostAsync("/api/link/v1/enroll", Json(
-            new { token, endpointId, instanceId = "i2", trustMode = "isolated-executor", team = "team-alpha", role = "gateway" }));
+            new { token, endpointId, instanceId = "i2", trustMode = "isolated-executor", team = "team-alpha", role = "gateway", publicKey = LinkTestHarness.NewEd25519().PublicKey, keyAlgorithm = "ed25519" }));
         Assert.Equal(HttpStatusCode.Unauthorized, reEnroll.StatusCode);
     }
 

@@ -3,9 +3,8 @@
 ## Purpose
 The Facilitator kernel (.NET 10 / ASP.NET Core): durable coordination —
 ingress, work lifecycle, the workspace-Link server, dispatch — on PostgreSQL.
-One process, thin feature folders over one shared kernel
-(Storage, Memory broker, Auth, Dispatch, Persistence, CLI, metrics)
-plus the read-mostly Admin surface.
+One process, thin feature folders over one shared kernel (Storage, Memory
+broker, Auth, Dispatch, Persistence, CLI, metrics) + the read-mostly Admin surface.
 
 ## Truth anchors
 - `Kernel/Work/` — work lifecycle (endpoints, ingress pipeline, state machine,
@@ -20,10 +19,12 @@ plus the read-mostly Admin surface.
   `routing_decisions` audit ledger; intents are appended by Work/Provider
   writers as `routing:<base>:<key>` outbox rows.
 - `Kernel/Link/` — workspace-link server (enroll, hub, admission, deliveries,
-  receipts, ledger). Mode-(a) enroll accepts the static `Link:EnrollmentToken`
-  or an admin-minted token (`EnrollmentTokenEndpoints` +
-  `EnrollmentTokenStore`: hash-only rows, first-use consumption, revoke kills
-  the issued link enrollment).
+  receipts, ledger). Identity is an enrolled Ed25519 key (crypto only in
+  `LinkKeys`/`LinkProof`/`LinkSessionJwt`): enroll registers a `publicKey` against
+  static `Link:EnrollmentToken` (first-admin bootstrap) or a minted code
+  (`EnrollmentTokenStore`: hash-only, first-use, revoke kills it); later auth
+  is proof-of-possession — challenge → proof → 5-min session JWT
+  (`LinkProofEndpoints`, behind `ILinkTokenValidator`).
 - `Kernel/Ai/` — AiDeck: the AI decode plane. `CommandRegistry` (built-in verbs
   + admin_config `commands` row) is the single source of effects — the slash
   parser and the LLM's decode prompt read the SAME registry; the AI may only
@@ -35,12 +36,12 @@ plus the read-mostly Admin surface.
   Chat plane (`/api/chat/**`): actions are proposals executed under the
   confirming admin's own bearer via loopback (audit `aiInitiated`).
 - `Kernel/Teams/` — team roster + per-scope switches (`team_members`,
-  `team_settings`), team-scoped read authority, the built-in operator roles,
-  and the one system→team→channel switch resolver. Signpost: `Kernel/Teams/AGENTS.md`.
+  `team_settings`), team-scoped read authority, the built-in operator roles, one
+  system→team→channel switch resolver. Signpost: `Kernel/Teams/AGENTS.md`.
 - `Kernel/Notifications/` — the single notice path: `facilitator.notifications`
   + the egress ladder (reply target → binding → linked DM → team channel →
-  undeliverable-with-reason), the one cadence resolver, the receipt-side
-  address retirement. Signpost: `Kernel/Notifications/AGENTS.md`.
+  undeliverable-with-reason), one cadence resolver, receipt-side address
+  retirement. Signpost: `Kernel/Notifications/AGENTS.md`.
 - `Kernel/Admin/` — `/api/admin` operator surface (`/works` queue, read stores,
   config store with the If-Match/`X-Change-Reason` law, replay + re-mark mutations, the
   audit export + `audit-policy` retention, `POST /sweeps/{name}` forcing any
@@ -50,13 +51,12 @@ plus the read-mostly Admin surface.
   the static pipeline + `GET /ui-config`; browser tier in `tests/Facilitator.E2E`.
 - `Kernel/Shared/` — not a feature: Auth, Dispatch, Persistence, CLI, metrics,
   Storage (artifact byte port + ledgers), Memory (broker + provider port).
-- `Kernel/KernelServiceCollection.cs` — composition root; `AddSharedKernel` /
-  `AddWorkFeature` / `AddLinkFeature` / `AddStorageFeature` / `AddMemoryFeature`
-  / `AddAiFeature` (AiDeck: options + both gateway ports + renderer/registry/
-  ledger/policy + sinks/services).
-- `Migrations/` + `Kernel/Shared/Persistence/Configurations/` — schema truth,
-  one `IEntityTypeConfiguration<T>` per entity.
-- Wire truth lives outside: `../protocol/dotnet/Ofac.Protocol`.
+- `Kernel/KernelServiceCollection.cs` — composition root: `AddSharedKernel`,
+  `AddWorkFeature`, `AddLinkFeature`, `AddStorageFeature`, `AddMemoryFeature`,
+  `AddAiFeature` (options + both gateway ports + renderer/registry/ledger/
+  policy + sinks/services).
+- `Migrations/` + `Kernel/Shared/Persistence/Configurations/` — schema truth, one
+  `IEntityTypeConfiguration<T>` per entity. Wire truth: `../protocol/dotnet/Ofac.Protocol`.
 
 ## Develop here
 - `dotnet build OpenFacilitator.slnx -c Release` — 0 warnings is law

@@ -187,7 +187,9 @@ public sealed class ContextBuilder
 
                     sources.Add(new JsonObject
                     {
-                        ["path"] = path, ["key"] = "work", ["fields"] = fields,
+                        ["path"] = path,
+                        ["key"] = "work",
+                        ["fields"] = fields,
                     });
                     break;
 
@@ -211,7 +213,9 @@ public sealed class ContextBuilder
 
                     sources.Add(new JsonObject
                     {
-                        ["path"] = path, ["key"] = "timeline", ["events"] = timelineArray,
+                        ["path"] = path,
+                        ["key"] = "timeline",
+                        ["events"] = timelineArray,
                     });
                     break;
 
@@ -233,7 +237,9 @@ public sealed class ContextBuilder
                     {
                         sources.Add(new JsonObject
                         {
-                            ["path"] = path, ["key"] = "history", ["error"] = "no-bound-thread",
+                            ["path"] = path,
+                            ["key"] = "history",
+                            ["error"] = "no-bound-thread",
                         });
                         break;
                     }
@@ -251,7 +257,9 @@ public sealed class ContextBuilder
 
                         sources.Add(new JsonObject
                         {
-                            ["path"] = path, ["key"] = "history", ["uri"] = uri,
+                            ["path"] = path,
+                            ["key"] = "history",
+                            ["uri"] = uri,
                             ["error"] = "deadline",
                         });
                         break;
@@ -280,8 +288,11 @@ public sealed class ContextBuilder
 
                     sources.Add(new JsonObject
                     {
-                        ["path"] = path, ["key"] = "history", ["uri"] = uri,
-                        ["order"] = history.Order ?? "asc", ["answer"] = window,
+                        ["path"] = path,
+                        ["key"] = "history",
+                        ["uri"] = uri,
+                        ["order"] = history.Order ?? "asc",
+                        ["answer"] = window,
                     });
                     break;
             }
@@ -398,7 +409,10 @@ public sealed class ContextBuilder
 
         return new JsonObject
         {
-            ["path"] = path, ["key"] = "memory", ["entries"] = entries, ["truncated"] = response.Truncated,
+            ["path"] = path,
+            ["key"] = "memory",
+            ["entries"] = entries,
+            ["truncated"] = response.Truncated,
         };
     }
 
@@ -453,7 +467,11 @@ public sealed class ContextBuilder
 
         return new JsonObject
         {
-            ["path"] = path, ["key"] = "media", ["from"] = from, ["items"] = items, ["dropped"] = dropped,
+            ["path"] = path,
+            ["key"] = "media",
+            ["from"] = from,
+            ["items"] = items,
+            ["dropped"] = dropped,
         };
     }
 

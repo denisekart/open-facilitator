@@ -10,14 +10,19 @@
 // settles every in-flight handler run so the Gateway can answer receipts
 // truthfully (the reply simply never arrives → transport timeout).
 import { connect } from "node:net";
+import { connect as connectTls } from "node:tls";
+import { randomUUID } from "node:crypto";
 import type { CapabilityManifestV1, EnvelopeEvent } from "@ofac/protocol";
+import { signProofForGateway, type EndpointIdentity } from "@ofac/workspace-link";
 import type { ChildReply } from "./child.js";
 import {
   MAX_CHILD_FRAME_BYTES,
+  childChannelUri,
   createFrameParser,
   encodeFrame,
   type ChildWireFrame,
   type CommandFrame,
+  type HelloFrame,
   type GoawayReason,
   type ReplyFrame,
 } from "./childwire.js";
@@ -25,12 +30,27 @@ import {
 export interface ConnectChildOptions {
   /** `<gatewayId>/<name>` — must sit in the Gateway's namespace. */
   childWorkspaceId: string;
+  /**
+   * First-boot pairing secret only: it pins the identity below, then retires.
+   * Pass "" once the key is pinned (a re-pin needs the rotated token again).
+   */
   token: string;
+  /**
+   * The child's identity. With one, the hello carries `publicKey` + a proof of
+   * possession, and from the pin onwards that proof is the only credential.
+   * Without one, the hello is a pre-identity hello (the unauthenticated fleet).
+   */
+  identity?: EndpointIdentity | undefined;
   manifest: CapabilityManifestV1;
   /** unix socket path; omit with `port` for the TCP fallback. */
   path?: string | undefined;
   port?: number | undefined;
   host?: string | undefined;
+  /**
+   * Dial the Gateway's TLS listener (the remote-child leg, where the proof is
+   * the whole authentication). `servername` pins the certificate name.
+   */
+  tls?: boolean | { servername?: string; rejectUnauthorized?: boolean } | undefined;
   /** The child's own command handler: its answer IS the reply frame. */
   onCommand(frame: CommandFrame): Promise<ChildReply>;
   /** Gateway business cadence echoed from config; default 30s. */
@@ -57,7 +77,13 @@ export async function connectChild(options: ConnectChildOptions): Promise<ChildC
   const socket =
     options.path !== undefined
       ? connect({ path: options.path })
-      : connect({ port: options.port ?? 0, host: options.host ?? "127.0.0.1" });
+      : options.tls === undefined || options.tls === false
+        ? connect({ port: options.port ?? 0, host: options.host ?? "127.0.0.1" })
+        : connectTls({
+            port: options.port ?? 0,
+            host: options.host ?? "127.0.0.1",
+            ...(typeof options.tls === "object" ? options.tls : {}),
+          });
   const closed = Promise.withResolvers<void>();
   const ack = Promise.withResolvers<void>();
   let acked = false;
@@ -139,13 +165,26 @@ export async function connectChild(options: ConnectChildOptions): Promise<ChildC
     closed.resolve();
   });
 
-  send({
+  const hello: HelloFrame = {
     v: 1,
     type: "hello",
     childWorkspaceId: options.childWorkspaceId,
     token: options.token,
     manifest: options.manifest,
-  });
+  };
+  if (options.identity !== undefined) {
+    // The proof is minted per connection: a captured hello cannot be replayed,
+    // because its `jti` is single-use and `iat`/`exp` are already spent. The
+    // Gateway mints no challenge for its own fleet, so the nonce is the child's
+    // own freshness material (`cbh` stays empty on a non-TLS child transport).
+    hello.publicKey = options.identity.publicKeyBase64Url;
+    hello.proof = signProofForGateway(options.identity, {
+      childWorkspaceId: options.childWorkspaceId,
+      htu: childChannelUri(options.childWorkspaceId),
+      nonce: randomUUID(),
+    });
+  }
+  send(hello);
 
   try {
     await Promise.race([ack.promise, closed.promise]);

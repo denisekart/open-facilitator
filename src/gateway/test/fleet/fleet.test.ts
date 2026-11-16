@@ -64,31 +64,9 @@ class MockTransport implements LinkTransport {
   }
 }
 
-function fakeKernel(): {
-  calls: string[];
-  bodies: string[];
-  fetchImpl: typeof fetch;
-} {
-  const calls: string[] = [];
-  const bodies: string[] = [];
-  const fetchImpl = (async (url: unknown, init?: RequestInit) => {
-    const path = String(url);
-    if (path.endsWith("/api/link/v1/enroll")) {
-      calls.push("enroll");
-      return new Response(
-        JSON.stringify({ enrollmentId: "enr-1", trustMode: "shared-runtime", linkToken: "tok-1" }),
-        { status: 201, headers: { "content-type": "application/json" } },
-      );
-    }
-    if (path.endsWith("/api/link/v1/capabilities")) {
-      calls.push("capabilities");
-      bodies.push(String(init?.body ?? ""));
-      return new Response(null, { status: 204 });
-    }
-    return new Response("no route", { status: 500 });
-  }) as typeof fetch;
-  return { calls, bodies, fetchImpl };
-}
+// The link plane comes from the shared fake (test/fake-kernel.ts): enroll pins a
+// key, sessions are bought with proofs, and only a session bearer POSTs.
+import { fakeKernel, type FakeKernel } from "../fake-kernel.js";
 
 function manifestAdvert(capIds: string[], childName: string): CapabilityManifestV1 {
   const base = builtinChildManifest("echo");
@@ -203,7 +181,7 @@ interface Fleet {
   cfg: GatewayConfig;
   rt: GatewayRuntime;
   mock: MockTransport;
-  kernel: ReturnType<typeof fakeKernel>;
+  kernel: FakeKernel;
   lines: string[];
   paths: GatewayPaths;
   socketPath: string;
@@ -229,7 +207,7 @@ kind: Gateway
 gatewayId: gw.fleet-test
 team: default
 facilitatorUrl: http://kernel.test
-enrollmentSecret: enroll-dev
+enrollmentSecret: enroll-fleet-test
 trustMode: shared-runtime
 stateDir: ${stateDir}
 mode: shared
@@ -342,7 +320,19 @@ const TRANSPORT = `  socket:
 describe("shared-mode fleet routing", () => {
   it("boots with NO capabilities POST: hello carries the placeholder digest", async () => {
     const f = await fleetBoot(TWO_CHILDREN, TRANSPORT);
-    expect(f.kernel.calls).toEqual(["enroll"]); // no POST at boot
+    expect(f.kernel.business()).toEqual(["enroll"]); // no POST at boot
+    // The credential story: a first boot probes for a live enrollment (the
+    // 401 says "no key on file"), enrolls the key, then buys its session with a
+    // proof — the bearer every later call carries is a session JWT, never a
+    // long-lived credential.
+    expect(f.kernel.calls.slice(0, 4)).toEqual(["challenge", "enroll", "challenge", "proof"]);
+    const enrolled = JSON.parse(f.kernel.bodiesFor("enroll")[0]!) as Record<string, unknown>;
+    expect(enrolled.publicKey).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(enrolled.keyAlgorithm).toBe("ed25519");
+    // Nothing but a session JWT rides the link plane: the enrollment code is a
+    // body member of the one enroll call and never a bearer.
+    expect(f.kernel.bearers.every((b) => b === "" || b.startsWith("sess-"))).toBe(true);
+    expect(String(f.kernel.bodiesFor("enroll")[0])).toContain("enroll-fleet-test");
     const hello = f.mock.hellos[0];
     const placeholder = digestOfManifest(
       JSON.stringify({
@@ -368,7 +358,11 @@ describe("shared-mode fleet routing", () => {
     );
     // Debounce coalescing: churn settled into exactly ONE POST.
     await new Promise((r) => setTimeout(r, 300));
-    const posts = f.kernel.bodies.map((body) => JSON.parse(body) as CapabilityManifestV1);
+    const posts = f.kernel
+      .bodiesFor("capabilities")
+      .map((body) => JSON.parse(body) as CapabilityManifestV1);
+    // The union POST is authenticated by the session JWT the proof bought.
+    expect(f.kernel.sessionBearer()).toMatch(/^gw\.fleet-test\/gw\.fleet-test-|^sess-/);
     expect(posts).toHaveLength(1);
     expect(posts[0]?.ownerTeam).toBe("default");
     expect(posts[0]?.capabilities.map((c) => c.id).sort()).toEqual([
@@ -535,7 +529,9 @@ describe("multiplexing three workers over two adapter kinds", () => {
     );
     // Churn coalesces into exactly ONE POST of the FULL three-way union.
     await new Promise((r) => setTimeout(r, 300));
-    const posts = f.kernel.bodies.map((body) => JSON.parse(body) as CapabilityManifestV1);
+    const posts = f.kernel
+      .bodiesFor("capabilities")
+      .map((body) => JSON.parse(body) as CapabilityManifestV1);
     expect(posts).toHaveLength(1);
     expect(posts[0]?.ownerTeam).toBe("default");
     expect(posts[0]?.capabilities.map((cap) => cap.id).sort()).toEqual([
@@ -574,7 +570,8 @@ describe("multiplexing three workers over two adapter kinds", () => {
         ),
     );
     const shrunk = await waitFor("union re-POST", () => {
-      const manifest = f.kernel.bodies
+      const manifest = f.kernel
+        .bodiesFor("capabilities")
         .map((body) => JSON.parse(body) as CapabilityManifestV1)
         .find((m) => m.capabilities.length === 2);
       return manifest ?? false;
@@ -615,7 +612,7 @@ kind: Gateway
 gatewayId: gw.solo-test
 team: default
 facilitatorUrl: http://kernel.test
-enrollmentSecret: enroll-dev
+enrollmentSecret: enroll-fleet-test
 trustMode: shared-runtime
 stateDir: ${stateDir}
 mode: standalone
@@ -648,7 +645,7 @@ heartbeatSeconds: 3600
     };
     const ready = await rt.start();
     expect(ready.children).toBe(0);
-    expect(kernel.calls).toEqual(["enroll"]);
+    expect(kernel.business()).toEqual(["enroll"]);
     // A later-attaching child is accepted even though config named none.
     const conn = await connectChild({
       childWorkspaceId: "gw.solo-test/late",

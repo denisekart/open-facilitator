@@ -10,12 +10,21 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Jcs.Net" />
+    <!-- The kernel's Ed25519 provider: the link plane's identity is a public
+         key, so the runner needs the same primitive the kernel verifies with
+         (the net10.0 ref pack ships no Ed25519). -->
+    <PackageReference Include="BouncyCastle.Cryptography" />
   </ItemGroup>
   <ItemGroup>
     <!-- Compile the kernel's digest helper directly (source), mirroring the
          Validate.Fixtures harness: the runner must compute approval digests
          with the production implementation, and a ProjectReference to the
-         web app would drag EF Core into this harness. -->
+         web app would drag EF Core into this harness. The same argument holds
+         for the link credential surface: the runner enrolls, signs and
+         pre-checks its proofs with the production LinkKeys/LinkProof code, so
+         the harness and the kernel can never disagree on what a proof is. -->
     <Compile Include="../../../src/facilitator/Kernel/Shared/ApprovalDigest.cs" />
+    <Compile Include="../../../src/facilitator/Kernel/Link/LinkKeys.cs" />
+    <Compile Include="../../../src/facilitator/Kernel/Link/LinkProof.cs" />
   </ItemGroup>
 </Project>

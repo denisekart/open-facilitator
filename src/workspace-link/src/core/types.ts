@@ -41,6 +41,12 @@ export interface HelloFrame {
   instanceId: string;
   capabilityManifestDigest: string;
   lastKnownAck?: string;
+  /**
+   * Detached EdDSA JWS proof of possession of this endpoint's enrolled key for
+   * this socket (htm "WS", htu the hub URL). Required for key-class endpoints;
+   * a class-`oidc` principal was authenticated by issuer trust and sends none.
+   */
+  proof?: string;
 }
 
 export interface WelcomeFrame {
@@ -50,6 +56,10 @@ export interface WelcomeFrame {
   maxInFlight: number;
   heartbeatSeconds: number;
   protocolVersion: string;
+  /** kid of the kernel session key that signed the session JWT this socket rode. */
+  sessionKeyId?: string;
+  /** The replay fence this session starts from. */
+  seq?: number;
 }
 
 export interface HeartbeatFrame {
@@ -99,12 +109,24 @@ export interface LinkTransport {
   onDeliver(cb: (d: LinkDeliveryV1) => void): void;
   onFlow(cb: (f: FlowControlFrame) => void): void;
   onDisconnect(cb: (g: GoodbyeFrame) => void): void;
+  /**
+   * The channel URI a hello-carried proof binds to (htm "WS"), exactly as this
+   * client sees it — set by socket transports, absent for `http-poll`, which
+   * has no handshake to prove.
+   */
+  hubUrl?: string;
 }
 
-/** Bearer-token seam: `getToken` feeds every request; `refresh` runs on 401. */
+/**
+ * Bearer-token seam: `getToken` feeds every request; `refresh` runs on 401
+ * (re-proves — never re-enrolls). A session-JWT provider can additionally mint
+ * the hello-carried handshake proof for a channel (`proofForChannel`); a
+ * provider that cannot (a static token) simply omits it.
+ */
 export interface LinkTokenProvider {
   getToken(): Promise<string>;
   refresh?(): Promise<void>;
+  proofForChannel?(htm: "WS" | "POST", htu: string): Promise<string>;
 }
 
 // ── Handler contract (HarnessAdapter envelope-handling subset; embedders

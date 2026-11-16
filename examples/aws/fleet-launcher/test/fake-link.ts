@@ -1,6 +1,7 @@
 // The fake link plane: a MockTransport implementing the SDK's LinkTransport
 // seam (the gateway fleet test's precedent) plus a fetch stub serving
-// POST /enroll → 201 {linkToken} and POST /capabilities → 204, recording
+// POST /challenge + /proof + /enroll (the credential law) and POST
+// /capabilities → 204, recording
 // every wire body so the enroll-shape and $-name laws are pinned ON THE WIRE.
 import type { EnvelopeObject, LinkDeliveryV1, ReceiptV1 } from "@ofac/protocol";
 import type {
@@ -59,9 +60,18 @@ export interface FakeKernel {
   fetchImpl: typeof fetch;
 }
 
-/** enroll → 201 with a linkToken; capabilities → 204. Every body is recorded. */
-export function fakeKernel(linkToken = "tok-fleet-1"): FakeKernel {
+/**
+ * The credential-law fake: POST /challenge → a nonce, POST /proof (detached
+ * Ed25519 JWS) → a session JWT, POST /enroll → 201 identity receipt, POST
+ * /capabilities → 204. The signature itself is not verified here (the kernel
+ * suites own that law); the fake only requires a well-formed proof — a client
+ * that could not mint one fails the loop, which is what this file pins. Every
+ * wire body is recorded for the assertions.
+ */
+export function fakeKernel(sessionToken = "tok-fleet-1"): FakeKernel {
   const calls: FakeKernel["calls"] = [];
+  let seq = 0;
+  let enrolled = false;
   const fetchImpl = (async (input: string | URL | Request, init?: RequestInit) => {
     const path = String(input);
     const body = typeof init?.body === "string" ? JSON.parse(init.body) : undefined;
@@ -74,9 +84,42 @@ export function fakeKernel(linkToken = "tok-fleet-1"): FakeKernel {
         : { authorization: headers.get("authorization") ?? undefined }),
     });
     if (path.endsWith("/api/link/v1/enroll")) {
+      enrolled = true;
       return new Response(
-        JSON.stringify({ enrollmentId: "enr-fleet-1", trustMode: "isolated-executor", linkToken }),
+        JSON.stringify({
+          enrollmentId: "enr-fleet-1",
+          trustMode: "isolated-executor",
+          endpointKeyId: "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+          seq: 0,
+        }),
         { status: 201, headers: { "content-type": "application/json" } },
+      );
+    }
+    if (path.endsWith("/api/link/v1/challenge")) {
+      if (!enrolled) {
+        // The no-existence-oracle answer the first-boot law keys on.
+        return new Response(JSON.stringify({ detail: "No live enrollment for this endpoint." }), {
+          status: 401,
+          headers: { "content-type": "application/problem+json" },
+        });
+      }
+      seq += 1;
+      return new Response(JSON.stringify({ nonce: `1.${seq}.fake-nonce-${seq}`, epoch: 1, seq }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }
+    if (path.endsWith("/api/link/v1/proof")) {
+      if (typeof body?.["proof"] !== "string" || body["proof"].split(".").length !== 3) {
+        return new Response(JSON.stringify({ detail: "proof malformed" }), { status: 401 });
+      }
+      return new Response(
+        JSON.stringify({
+          sessionToken,
+          expiresAt: new Date(Date.now() + 300_000).toISOString(),
+          seq,
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
       );
     }
     if (path.endsWith("/api/link/v1/capabilities")) {

@@ -12,6 +12,19 @@ public static class PostgresNotifications
     /// <summary>The outbox wake channel every dispatcher/pump LISTENs on.</summary>
     public const string OutboxChannel = "facilitator_outbox";
 
+    /// <summary>The link-revocation channel: a revoke bumps an enrollment's
+    /// epoch, replicas LISTEN here to invalidate their per-endpoint auth cache
+    /// early. A hint like every other notify — the cache TTL is the
+    /// correctness floor, the wake only buys freshness.</summary>
+    public const string LinkRevocationChannel = "facilitator_link_revocation";
+
+    /// <summary>Send the link-revocation wake (payload: the endpointId).</summary>
+    public static Task NotifyRevocationAsync(DbContext db, string endpointId, CancellationToken ct)
+    {
+        object[] parameters = [endpointId];
+        return db.Database.ExecuteSqlRawAsync($"SELECT pg_notify('{LinkRevocationChannel}', {{0}})", parameters, ct);
+    }
+
     /// <summary>Send the outbox wake (optional payload, e.g. the aggregate id).</summary>
     public static Task NotifyOutboxAsync(DbContext db, string? payload, CancellationToken ct)
     {

@@ -133,8 +133,16 @@ function mapStartupError(error: unknown): number {
     return 2;
   }
   if (error instanceof EnrollmentError) {
-    process.stderr.write(`gateway enrollment refused: ${error.message}\n`);
-    return 4;
+    // A REFUSAL (4xx: bad code, unknown team, a proof the kernel will not
+    // accept no matter how often it is repeated) is terminal — restarting
+    // cannot change the answer. A kernel that is mid-restart answers 5xx (or
+    // not at all, which lands in the generic branch below as exit 1): that
+    // is the kernel catching up, and the restart loop is the retry.
+    const terminal = error.status >= 400 && error.status < 500;
+    process.stderr.write(
+      `gateway enrollment ${terminal ? "refused" : "deferred"}: ${error.message}\n`,
+    );
+    return terminal ? 4 : 1;
   }
   if (error instanceof ProtocolMismatchError) {
     process.stderr.write(`gateway protocol mismatch: ${error.message}\n`);

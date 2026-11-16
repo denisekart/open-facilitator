@@ -3,6 +3,8 @@
   "endpointId": "worker-team-alpha-1",
   "instanceId": "inst-02",
   "trustMode": "isolated-executor",
+  "publicKey": "n7JLV98eAAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBk",
+  "keyAlgorithm": "ed25519",
   "role": "child",
   "team": "team-alpha"
 }

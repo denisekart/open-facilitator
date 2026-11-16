@@ -39,8 +39,15 @@ export class SqliteLedger implements Ledger {
     // DDL is CREATE-IF-NOT-EXISTS, so it runs unconditionally: another
     // handle (e.g. an adapter's own state tables) may have stamped
     // user_version on this same file first, and co-tenancy must still work.
-    this.db.exec(`BEGIN IMMEDIATE;${DDL}PRAGMA user_version = ${SCHEMA_VERSION};COMMIT;`);
-    if (version !== 0 && version !== SCHEMA_VERSION) {
+    // A co-tenant stamp ABOVE this table's own version is that case (an
+    // adapter state file carries its own additive migrations): the ledger's
+    // tables are exactly the ones created here, so the richer stamp is kept
+    // and honored, never downgraded. Fail closed only on a LOWER version —
+    // one whose schema this build cannot read.
+    this.db.exec(
+      `BEGIN IMMEDIATE;${DDL}PRAGMA user_version = ${Math.max(version, SCHEMA_VERSION)};COMMIT;`,
+    );
+    if (version !== 0 && version < SCHEMA_VERSION) {
       throw new Error(
         `ledger: unsupported schema version ${version} (this build writes ${SCHEMA_VERSION})`,
       );

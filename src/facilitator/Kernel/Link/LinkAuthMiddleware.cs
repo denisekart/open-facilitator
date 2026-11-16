@@ -31,7 +31,12 @@ public sealed class LinkAuthMiddleware(RequestDelegate next, ILinkTokenValidator
         }
 
         if (HttpMethods.IsPost(context.Request.Method)
-            && context.Request.Path.Equals("/api/link/v1/enroll", StringComparison.OrdinalIgnoreCase))
+            && (context.Request.Path.Equals("/api/link/v1/enroll", StringComparison.OrdinalIgnoreCase)
+                // The challenge proves nothing, so it cannot be guarded by what
+                // it is issuing; the proof carries its own (detached JWS)
+                // authorization. The rotate route is an ordinary auth-path call.
+                || context.Request.Path.Equals("/api/link/v1/challenge", StringComparison.OrdinalIgnoreCase)
+                || context.Request.Path.Equals("/api/link/v1/proof", StringComparison.OrdinalIgnoreCase)))
         {
             await next(context);
             return;
@@ -53,7 +58,7 @@ public sealed class LinkAuthMiddleware(RequestDelegate next, ILinkTokenValidator
                 Type = "https://errors.openfacilitator.org/v1/unauthorized",
                 Title = "Unauthorized",
                 Status = StatusCodes.Status401Unauthorized,
-                Detail = "A valid 'Authorization: Bearer <linkToken>' header is required.",
+                Detail = "A valid 'Authorization: Bearer <session JWT>' header is required.",
             }, JsonOptions, context.RequestAborted);
             return;
         }

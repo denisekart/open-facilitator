@@ -19,7 +19,7 @@ public sealed class ReplayOnReconnectTests(DispatchDbFixture fixture)
             settings: new Dictionary<string, string?> { ["Link:InFlightLeaseSeconds"] = "5" });
         using var kernel = factory.CreateAuthedClient();
         var endpoint = "gw-rr-" + Guid.NewGuid().ToString("N")[..8];
-        var token = await LinkTestHarness.EnrollAsync(kernel, endpoint);
+        var token = await LinkTestHarness.EnrollAsync(kernel, endpoint, clock: factory.Clock);
 
         // two queued assignments; the first gets receipted, the second does not.
         var ackedEnvelope = LinkTestHarness.AssignEnvelopeFor(endpoint);
@@ -74,7 +74,7 @@ public sealed class ReplayOnReconnectTests(DispatchDbFixture fixture)
         using var factory = new KernelTestFactory(fixture, noDispatcher: true, useKestrel: true);
         using var kernel = factory.CreateAuthedClient();
         var endpoint = "gw-rr-" + Guid.NewGuid().ToString("N")[..8];
-        var token = await LinkTestHarness.EnrollAsync(kernel, endpoint);
+        var token = await LinkTestHarness.EnrollAsync(kernel, endpoint, clock: factory.Clock);
 
         await using var client = await FakeLinkClient.ConnectAsync(factory.ServerAddress, token);
         var welcome = await client.HelloAsync(LinkTestHarness.HelloFrame(endpoint));

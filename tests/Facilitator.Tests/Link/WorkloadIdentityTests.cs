@@ -21,7 +21,7 @@ public sealed class WorkloadIdentityTests(DispatchDbFixture fixture)
     private const string ProblemBase = "https://errors.openfacilitator.org/v1/";
 
     [Fact]
-    public async Task ModeBRoundTripRotatesAndOldTokenDies()
+    public async Task ModeBRoundTripMintsSessionsAndReEnrollKeepsThemLive()
     {
         using var factory = new KernelTestFactory(fixture, noDispatcher: true);
         var kernel = factory.CreateAuthedClient();
@@ -29,14 +29,16 @@ public sealed class WorkloadIdentityTests(DispatchDbFixture fixture)
 
         var first = await EnrollModeB(kernel, "gw.team-alpha", cc);
         var second = await EnrollModeB(kernel, "gw.team-alpha", cc);
-        Assert.NotEqual(first, second);
 
-        // Rotation kills the old token immediately: 401 unauthorized.
+        // Class oidc has no key to retire, so a re-enroll is not a revocation: the
+        // session minted before it stays a principal until its own 5-minute expiry.
+        // Only a revoke (the epoch bump) or the clock kills a session. (Both mints
+        // carry identical claims at the same instant, so equal strings are expected
+        // — what is proven below is that the FIRST one still authorizes.)
         var stale = factory.CreateLinkClient(first);
         using var probe = await stale.GetAsync("/api/link/v1/capabilities");
-        Assert.Equal(HttpStatusCode.Unauthorized, probe.StatusCode);
         var body = await probe.Content.ReadAsStringAsync();
-        Assert.Contains("unauthorized", body, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("capabilities-not-found", body);
 
         // The live token IS a principal (404 capabilities-not-found, not 401).
         var fresh = factory.CreateLinkClient(second);
@@ -189,8 +191,14 @@ public sealed class WorkloadIdentityTests(DispatchDbFixture fixture)
     {
         using var response = await EnrollRaw(kernel, endpointId, ccJwt, role);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        return json.RootElement.GetProperty("linkToken").GetString()!;
+
+        // Class oidc buys a session the same way a key does — the proof route —
+        // except its "proof" is the JWKS-verified workload token itself.
+        using var session = await kernel.PostAsync("/api/link/v1/proof",
+            new StringContent(JsonSerializer.Serialize(new { token = ccJwt }), Encoding.UTF8, "application/json"));
+        Assert.Equal(HttpStatusCode.OK, session.StatusCode);
+        using var json = JsonDocument.Parse(await session.Content.ReadAsStringAsync());
+        return json.RootElement.GetProperty("sessionToken").GetString()!;
     }
 
     private static async Task<HttpResponseMessage> EnrollRaw(HttpClient kernel, string endpointId, string ccJwt, string? role = null)

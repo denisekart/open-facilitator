@@ -11,7 +11,7 @@ import {
   childReady,
   gatewayConfig,
   gatewayStatus,
-  gatewayToken,
+  gatewaySession,
   inboxRowsByType,
   linkRow,
   seedDelivery,
@@ -67,7 +67,7 @@ describe.skipIf(!E2E)("gateway fleet assign e2e", () => {
       const before = await linkGet(
         harness.baseUrl,
         "/api/link/v1/capabilities",
-        gatewayToken(gw.stateDir),
+        await gatewaySession(gw.stateDir, harness.baseUrl),
       );
       expect(before.status).toBe(404);
 
@@ -93,7 +93,7 @@ describe.skipIf(!E2E)("gateway fleet assign e2e", () => {
         const r = await linkGet(
           harness.baseUrl,
           "/api/link/v1/capabilities",
-          gatewayToken(gw.stateDir),
+          await gatewaySession(gw.stateDir, harness.baseUrl),
         );
         if (r.status !== 200) return false;
         const m = r.body as { capabilities: { id: string }[]; ownerTeam: string };

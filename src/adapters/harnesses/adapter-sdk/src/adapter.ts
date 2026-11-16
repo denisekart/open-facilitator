@@ -111,6 +111,8 @@ class Adapter implements AdapterHandle {
   private generation = 0;
   private closedLocally = false;
   private firstAttempt = true;
+  /** True once a register-ack landed: the Gateway has the key, the secret retires. */
+  private pinned = false;
   private readonly loop: Promise<void>;
 
   constructor(private readonly opts: CreateAdapterOptions) {
@@ -167,7 +169,15 @@ class Adapter implements AdapterHandle {
       try {
         const conn = await connectChild({
           childWorkspaceId: this.opts.childWorkspaceId,
-          token: this.childToken(),
+          // The pairing secret retires the moment the Gateway acknowledges the
+          // first hello — every reconnect after that proves the pinned key.
+          token: this.pinned ? "" : this.childToken(),
+          ...(this.opts.identity === undefined
+            ? {}
+            : {
+                identity: this.opts.identity,
+                ...(this.opts.tls === undefined ? {} : { tls: this.opts.tls }),
+              }),
           manifest: this.opts.manifest,
           ...("socketPath" in transport
             ? { path: transport.socketPath }
@@ -179,6 +189,7 @@ class Adapter implements AdapterHandle {
         this.connection = conn;
         this.generation += 1;
         this.firstAttempt = false;
+        this.pinned = true;
         this.readyPromise.resolve();
         this.log.info("adapter connected", {
           childId: this.opts.childWorkspaceId,

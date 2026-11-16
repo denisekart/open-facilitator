@@ -15,6 +15,7 @@ import {
   buildResultManifest,
   buildCompletedEvent,
   artifactUri,
+  kernelLegFromEnv,
 } from "@ofac/adapter";
 import { createConsoleLogger } from "@ofac/workspace-link";
 
@@ -62,7 +63,7 @@ async function onExecute(ctx) {
   );
   const client = createArtifactClient({
     baseUrl: config.kernelUrl,
-    token: config.kernelToken ?? config.token,
+    token: kernelToken,
   });
   const createdAt = new Date().toISOString();
   const reportArtifact = await client.upload(report, {
@@ -133,10 +134,21 @@ async function onExecute(ctx) {
   return { kind: "completed" };
 }
 
+// The kernel leg (artifact byte path) is this worker's own endpoint
+// relationship: OFAC_KERNEL_ENDPOINT runs the credential law against the
+// kernel — a key in stateDir, the enrollment code spent on first boot,
+// 5-minute session JWTs after.
+const kernelLeg = await kernelLegFromEnv({
+  stateDir: config.stateDir ?? ".",
+  kernelUrl: config.kernelUrl,
+  logger: log,
+});
+const kernelToken = kernelLeg?.getToken ?? config.kernelToken ?? config.token;
+
 const handle = await createAdapter({
   childWorkspaceId: config.childWorkspaceId,
   token: config.token,
-  kernel: { baseUrl: config.kernelUrl, token: config.kernelToken ?? config.token },
+  kernel: { baseUrl: config.kernelUrl, token: kernelToken },
   manifest,
   transport: { socketPath: config.socket },
   descriptor: {

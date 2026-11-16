@@ -8,7 +8,7 @@ import {
   assignEnvelope,
   gatewayConfig,
   gatewayStatus,
-  gatewayToken,
+  gatewaySession,
   inboxRowsByType,
   linkRow,
   seedDelivery,
@@ -39,7 +39,7 @@ describe.skipIf(!E2E)("gateway assign e2e", () => {
       const caps = await linkGet(
         harness.baseUrl,
         "/api/link/v1/capabilities",
-        gatewayToken(gw.stateDir),
+        await gatewaySession(gw.stateDir, harness.baseUrl),
       );
       expect(caps.status).toBe(200);
       const manifest = caps.body as {

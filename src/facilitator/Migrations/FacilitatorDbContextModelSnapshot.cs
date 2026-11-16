@@ -1198,6 +1198,37 @@ namespace Facilitator.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.LinkChallengeEntity", b =>
+                {
+                    b.Property<string>("Nonce")
+                        .HasColumnType("text")
+                        .HasColumnName("nonce");
+
+                    b.Property<bool>("Consumed")
+                        .HasColumnType("boolean")
+                        .HasColumnName("consumed");
+
+                    b.Property<string>("EndpointId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("endpoint_id");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<DateTime>("IssuedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("issued_at");
+
+                    b.HasKey("Nonce");
+
+                    b.HasIndex("ExpiresAt")
+                        .HasDatabaseName("link_challenges_expires_idx");
+
+                    b.ToTable("link_challenges", "facilitator");
+                });
+
             modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.LinkDeliveryEntity", b =>
                 {
                     b.Property<Guid>("DeliveryId")
@@ -1249,6 +1280,59 @@ namespace Facilitator.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.LinkEndpointKeyEntity", b =>
+                {
+                    b.Property<Guid>("EnrollmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("enrollment_id");
+
+                    b.Property<string>("KeyId")
+                        .HasColumnType("text")
+                        .HasColumnName("key_id");
+
+                    b.Property<string>("KeyAlgorithm")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("key_algorithm");
+
+                    b.Property<string>("PublicKey")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("public_key");
+
+                    b.Property<DateTime>("RegisteredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("registered_at");
+
+                    b.Property<DateTime?>("RetiredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("retired_at");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("state");
+
+                    b.HasKey("EnrollmentId", "KeyId");
+
+                    b.HasIndex("EnrollmentId")
+                        .IsUnique()
+                        .HasDatabaseName("link_endpoint_keys_one_active_per_enrollment")
+                        .HasFilter("state = 'active'");
+
+                    b.HasIndex("KeyId")
+                        .HasDatabaseName("link_endpoint_keys_key_id_idx");
+
+                    b.ToTable("link_endpoint_keys", "facilitator", t =>
+                        {
+                            t.HasCheckConstraint("link_endpoint_keys_key_algorithm_check", "key_algorithm IN ('ed25519')");
+
+                            t.HasCheckConstraint("link_endpoint_keys_key_id_check", "key_id ~ '^sha256:[0-9a-f]{64}$'");
+
+                            t.HasCheckConstraint("link_endpoint_keys_state_check", "state IN ('active', 'retired')");
+                        });
+                });
+
             modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.LinkEnrollmentEntity", b =>
                 {
                     b.Property<Guid>("EnrollmentId")
@@ -1271,6 +1355,11 @@ namespace Facilitator.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("contributor_id");
 
+                    b.Property<string>("CredentialClass")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("credential_class");
+
                     b.Property<string>("EndpointId")
                         .IsRequired()
                         .HasColumnType("text")
@@ -1279,6 +1368,10 @@ namespace Facilitator.Migrations
                     b.Property<DateTime>("EnrolledAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("enrolled_at");
+
+                    b.Property<long>("Epoch")
+                        .HasColumnType("bigint")
+                        .HasColumnName("epoch");
 
                     b.Property<DateTime>("ExpiresAt")
                         .HasColumnType("timestamp with time zone")
@@ -1293,14 +1386,13 @@ namespace Facilitator.Migrations
                         .HasColumnType("text")
                         .HasColumnName("role");
 
+                    b.Property<long>("Seq")
+                        .HasColumnType("bigint")
+                        .HasColumnName("seq");
+
                     b.Property<Guid>("TeamId")
                         .HasColumnType("uuid")
                         .HasColumnName("team_id");
-
-                    b.Property<string>("TokenSha256")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("token_sha256");
 
                     b.Property<string>("TrustMode")
                         .IsRequired()
@@ -1325,6 +1417,8 @@ namespace Facilitator.Migrations
 
                     b.ToTable("link_enrollments", "facilitator", t =>
                         {
+                            t.HasCheckConstraint("link_enrollments_credential_class_check", "credential_class IN ('oidc', 'key')");
+
                             t.HasCheckConstraint("link_enrollments_role_check", "role IN ('gateway', 'child')");
 
                             t.HasCheckConstraint("link_enrollments_trust_mode_check", "trust_mode IN ('shared-runtime', 'separate-process-same-host', 'isolated-executor')");
@@ -2919,6 +3013,16 @@ namespace Facilitator.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("link_deliveries_delivery_id_fkey");
+                });
+
+            modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.LinkEndpointKeyEntity", b =>
+                {
+                    b.HasOne("Facilitator.Kernel.Shared.Persistence.LinkEnrollmentEntity", null)
+                        .WithMany()
+                        .HasForeignKey("EnrollmentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("link_endpoint_keys_enrollment_id_fkey");
                 });
 
             modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.LinkEnrollmentEntity", b =>

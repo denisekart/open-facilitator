@@ -175,10 +175,9 @@ export function unsupportedFor(
   cmd: EnvelopeCommand,
   caps: HarnessCapabilities,
 ): { kind: "unsupported"; reason?: string } | undefined {
-  return caps.commands.includes(cmd.type)
-    ? undefined
-    : {
-        kind: "unsupported" as const,
-        reason: caps.omittedCommands.find((o) => o.command === cmd.type)?.reason,
-      };
+  if (caps.commands.includes(cmd.type)) return undefined;
+  const reason = caps.omittedCommands.find((o) => o.command === cmd.type)?.reason;
+  // `exactOptionalPropertyTypes`: an absent omission reason is no reason at
+  // all, so the property is left off rather than set to undefined.
+  return { kind: "unsupported" as const, ...(reason === undefined ? {} : { reason }) };
 }

@@ -152,13 +152,13 @@ function seedV1(file: string): void {
 }
 
 describe("ExecutionLedger schema v2/v3", () => {
-  it("migrates a v1 file in place: version 4, child_state + pending_actions exist, old rows read with childGeneration 0", () => {
+  it("migrates a v1 file in place: version 5, child_state + pending_actions + child_keys exist, old rows read with childGeneration 0", () => {
     const file = join(mkdtempSync(join(tmpdir(), "gw-ledger-")), "gateway.sqlite3");
     seedV1(file);
 
     const l = open(file);
     const db = new Database(file, { readonly: true });
-    expect(db.pragma("user_version", { simple: true })).toBe(4);
+    expect(db.pragma("user_version", { simple: true })).toBe(5);
     const tables = db
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
       .all() as { name: string }[];
@@ -187,7 +187,7 @@ describe("ExecutionLedger schema v2/v3", () => {
     db.pragma("user_version = 7");
     db.close();
     expect(() => new ExecutionLedger(file)).toThrow(
-      "bindings: unsupported schema version 7 (this build writes 4)",
+      "bindings: unsupported schema version 7 (this build writes 5)",
     );
   });
 
@@ -200,7 +200,7 @@ describe("ExecutionLedger schema v2/v3", () => {
     v2.close();
     const l = open(file);
     const db = new Database(file, { readonly: true });
-    expect(db.pragma("user_version", { simple: true })).toBe(4);
+    expect(db.pragma("user_version", { simple: true })).toBe(5);
     const tables = db
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
       .all() as { name: string }[];

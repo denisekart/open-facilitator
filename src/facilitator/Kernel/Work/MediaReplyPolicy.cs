@@ -1,4 +1,5 @@
 using System.Text.Json;
+
 using Facilitator.Kernel.Shared.Persistence;
 
 using Microsoft.EntityFrameworkCore;

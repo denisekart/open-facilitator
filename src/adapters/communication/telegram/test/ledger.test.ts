@@ -71,6 +71,7 @@ function normalizer(state: ChatLedger) {
     },
     setMessageReaction: async () => undefined,
     answerCallbackQuery: async () => undefined,
+    getChatHistory: async () => [],
   } as const;
   const media = new MediaPipeline({
     api,

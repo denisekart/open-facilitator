@@ -41,7 +41,11 @@ public sealed record AdminSearchResults(
     IReadOnlyList<AdminSearchHit> Memories,
     IReadOnlyList<AdminSearchHit> Messages);
 
-/// <summary>GET /api/admin/links row (trustMode displayed; lease = online authority).</summary>
+/// <summary>GET /api/admin/links row (trustMode displayed; lease = online authority).
+/// The credential columns tell the identity story: which class of credential
+/// binds the endpoint, the active endpoint key it proves with, the revocation
+/// epoch, the replay fence it sits behind, and whether the last fence check
+/// rejected it (a newer `link.replay-suspect` denial than its own enrollment).</summary>
 public sealed record AdminLinkRow(
     string EndpointId,
     string Team,
@@ -52,7 +56,12 @@ public sealed record AdminLinkRow(
     DateTime? LeaseUntil,
     DateTime? LastHeartbeat,
     string? ReplicaId,
-    int LiveSockets);
+    int LiveSockets,
+    string? CredentialClass,
+    string? EndpointKeyId,
+    long? Epoch,
+    long? Seq,
+    bool ReplaySuspect);
 
 /// <summary>Assignment affected by an offline gateway (stale view).</summary>
 public sealed record AdminAffectedAssignment(Guid AssignmentId, Guid WorkId, string Status);
@@ -413,19 +422,68 @@ public sealed class AdminReadStores(
                                  join t in db.Teams.AsNoTracking() on e.TeamId equals t.TeamId into tj
                                  from t in tj.DefaultIfEmpty()
                                  where e.Role == "gateway"
-                                 select new { e.EndpointId, TeamSlug = t == null ? string.Empty : t.Slug, e.TrustMode, e.CapabilitiesDigest })
+                                 select new
+                                 {
+                                     e.EndpointId,
+                                     e.EnrollmentId,
+                                     TeamSlug = t == null ? string.Empty : t.Slug,
+                                     e.TrustMode,
+                                     e.CapabilitiesDigest,
+                                     e.CredentialClass,
+                                     e.Epoch,
+                                     e.Seq,
+                                     e.EnrolledAt
+                                 })
             .ToListAsync(ct);
         var sessions = await db.LinkSessions.AsNoTracking()
             .Where(s => s.LeaseUntil > now)
             .ToDictionaryAsync(s => s.LogicalEndpointId, ct);
+        var enrollmentIds = enrollments.Select(e => e.EnrollmentId).ToList();
+        var activeKeys = await db.LinkEndpointKeys.AsNoTracking()
+            .Where(k => k.State == "active" && enrollmentIds.Contains(k.EnrollmentId))
+            .ToDictionaryAsync(k => k.EnrollmentId, ct);
+        // Replay suspicion comes from the audit trail (the verifier writes
+        // link.replay-suspect on a below-fence proof): an endpoint is suspect
+        // when a denial landed AFTER its own enrollment, i.e. of the fence
+        // checks, the last one rejected it. Bounded scan, newest first.
+        var suspectByEndpoint = new Dictionary<string, DateTime>(StringComparer.Ordinal);
+        var replayRows = await db.Audit.AsNoTracking()
+            .Where(a => a.Action == "link.replay-suspect")
+            .OrderByDescending(a => a.OccurredAt)
+            .Take(2000)
+            .Select(a => new { a.OccurredAt, a.Detail })
+            .ToListAsync(ct);
+        foreach (var row in replayRows)
+        {
+            string? endpointId;
+            try
+            {
+                endpointId = JsonDocument.Parse(row.Detail).RootElement.TryGetProperty("endpointId", out var p)
+                    ? p.GetString()
+                    : null;
+            }
+            catch (System.Text.Json.JsonException)
+            {
+                continue;
+            }
+
+            if (endpointId is not null)
+            {
+                suspectByEndpoint.TryAdd(endpointId, row.OccurredAt); // newest first: first hit is last
+            }
+        }
 
         var gateways = enrollments
             .Select(r =>
             {
+                var keyId = activeKeys.TryGetValue(r.EnrollmentId, out var key) ? key.KeyId : null;
+                var suspect =
+                    suspectByEndpoint.TryGetValue(r.EndpointId, out var deniedAt) && deniedAt > r.EnrolledAt;
                 if (!sessions.TryGetValue(r.EndpointId, out var session))
                 {
                     return new AdminLinkRow(r.EndpointId, r.TeamSlug, r.TrustMode, r.CapabilitiesDigest,
-                        false, null, null, null, null, connections.ForEndpoint(r.EndpointId).Count);
+                        false, null, null, null, null, connections.ForEndpoint(r.EndpointId).Count,
+                        r.CredentialClass, keyId, r.Epoch, r.Seq, suspect);
                 }
 
                 return new AdminLinkRow(
@@ -438,7 +496,12 @@ public sealed class AdminReadStores(
                     session.LeaseUntil,
                     session.LastHeartbeat,
                     session.ReplicaId,
-                    connections.ForEndpoint(r.EndpointId).Count);
+                    connections.ForEndpoint(r.EndpointId).Count,
+                    r.CredentialClass,
+                    keyId,
+                    r.Epoch,
+                    r.Seq,
+                    suspect);
             })
             .OrderBy(g => g.EndpointId, StringComparer.Ordinal)
             .ToList();

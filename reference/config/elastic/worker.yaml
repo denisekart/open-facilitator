@@ -1,6 +1,7 @@
 # Deterministic worker for the launcher-managed elastic container. Mirrors
-# ../workspace/worker.yaml; the child wire + self-enrollment credentials ride
-# the launcher-provided env (OFAC_CHILD_SECRET / OFAC_ENROLL_SECRET).
+# ../workspace/worker.yaml; the child wire + the kernel-leg credentials ride
+# the launcher-provided env (OFAC_CHILD_SECRET / OFAC_ENROLL_SECRET; the bin
+# self-enrolls its kernel endpoint when OFAC_KERNEL_ENDPOINT is set).
 apiVersion: facilitator.framework/v1
 kind: HarnessAdapter
 childWorkspaceId: gw.team-beta/deterministic

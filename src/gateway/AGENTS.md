@@ -35,6 +35,14 @@ childwire).
   `manifest-conflict` (same (id,version), different JSON). Lease:
   `leaseMissedBeats` missed heartbeats kill the socket; close ⇒ offline,
   route survives so future assigns answer `child-disconnected` honestly.
+- **Child identity is a pinned key, not a token:** the first `hello`
+  authenticates with the configured token AND pins the child's
+  `publicKey` (audited `gateway.child-key-pinned`); every later hello
+  authenticates with a proof of possession by that key and the token is
+  empty. The gateway's own kernel credential is the same shape — the
+  `identity.key` in its `stateDir` plus challenge/proof for a 5-minute
+  session (the token-lifecycle anchor in `src/runtime.ts`); nothing
+  writes `<stateDir>/token` anymore.
 - **Union law:** the kernel holds ONE manifest per endpoint, so child churn
   debounces a re-POST of the fleet union (ownerTeam = config team;
   byte-identical duplicate capabilities dedupe). Fleet modes POST NOTHING
@@ -45,7 +53,7 @@ childwire).
 
 ## Anchors
 
-- Startup order + token lifecycle: `src/runtime.ts` (`start`, `acquireToken`)
+- Startup order + kernel session/key lifecycle: `src/runtime.ts` (`start`)
 - Binding table + dedupe keys + `child_state`: `src/ledger.ts`
 - Wire codec (NDJSON frames, size cap): `src/childwire.ts`
 - Listener (admission + lease): `src/listen.ts`; child-side client:

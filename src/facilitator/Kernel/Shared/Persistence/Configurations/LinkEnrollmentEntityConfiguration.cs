@@ -16,7 +16,9 @@ public sealed class LinkEnrollmentEntityConfiguration : IEntityTypeConfiguration
         e.Property(x => x.EnrollmentId).HasColumnName("enrollment_id").ValueGeneratedNever();
         e.Property(x => x.EndpointId).HasColumnName("endpoint_id").IsRequired();
         e.Property(x => x.TeamId).HasColumnName("team_id").IsRequired();
-        e.Property(x => x.TokenSha256).HasColumnName("token_sha256").IsRequired();
+        e.Property(x => x.CredentialClass).HasColumnName("credential_class").IsRequired();
+        e.Property(x => x.Epoch).HasColumnName("epoch").IsRequired();
+        e.Property(x => x.Seq).HasColumnName("seq").IsRequired();
         e.Property(x => x.TrustMode).HasColumnName("trust_mode").IsRequired();
         e.Property(x => x.CapabilityManifest).HasColumnName("capability_manifest").HasColumnType("jsonb");
         e.Property(x => x.CapabilitiesDigest).HasColumnName("capabilities_digest");
@@ -34,5 +36,7 @@ public sealed class LinkEnrollmentEntityConfiguration : IEntityTypeConfiguration
             CheckSql.InList("trust_mode", ["shared-runtime", "separate-process-same-host", "isolated-executor"])));
         e.ToTable(t => t.HasCheckConstraint("link_enrollments_role_check",
             CheckSql.InList("role", ["gateway", "child"])));
+        e.ToTable(t => t.HasCheckConstraint("link_enrollments_credential_class_check",
+            CheckSql.InList("credential_class", ["oidc", "key"])));
     }
 }

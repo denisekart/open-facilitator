@@ -1136,13 +1136,17 @@ public sealed class TestDbProbe : IAsyncDisposable
         return versions;
     }
 
-    /// <summary>Hand-mint a gateway enrollment row (link views seed enrollments without a live hub session).</summary>
+    /// <summary>Hand-mint a gateway enrollment row (link views seed enrollments without a live hub session).
+    /// The credential is a key, so the row carries a class and the endpoint carries one active key row.</summary>
     public Task SeedGatewayEnrollment(string endpointId, string teamSlug, string trustMode) =>
         NonQuery(
-            "INSERT INTO facilitator.link_enrollments (enrollment_id, endpoint_id, team_id, token_sha256, trust_mode, "
-            + "enrolled_at, expires_at, role, accepts_delegated_claims) "
-            + "VALUES (gen_random_uuid(), $1, (SELECT team_id FROM facilitator.teams WHERE slug = $2), 'seed', $3, "
-            + "now(), now() + interval '1 hour', 'gateway', false)",
+            "WITH seeded AS (INSERT INTO facilitator.link_enrollments (enrollment_id, endpoint_id, team_id, "
+            + "credential_class, epoch, seq, trust_mode, enrolled_at, expires_at, role, accepts_delegated_claims) "
+            + "VALUES (gen_random_uuid(), $1, (SELECT team_id FROM facilitator.teams WHERE slug = $2), 'key', 1, 0, $3, "
+            + "now(), now() + interval '1 hour', 'gateway', false) RETURNING enrollment_id) "
+            + "INSERT INTO facilitator.link_endpoint_keys (enrollment_id, key_id, public_key, key_algorithm, state, registered_at) "
+            + "SELECT enrollment_id, 'sha256:' || md5(gen_random_uuid()::text) || md5(gen_random_uuid()::text), "
+            + "'AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8', 'ed25519', 'active', now() FROM seeded",
             cmd =>
             {
                 cmd.Parameters.AddWithValue(endpointId);

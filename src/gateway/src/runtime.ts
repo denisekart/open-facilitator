@@ -30,7 +30,7 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { parse } from "yaml";
-import { chmodSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
 import type {
   AssignmentInputCommandV1Data,
   CapabilityDescriptor,
@@ -41,12 +41,12 @@ import type {
   WorkCancelCommandV1Data,
 } from "@ofac/protocol";
 import {
-  EnrollmentError,
   buildEvent,
   createConsoleLogger,
   createLinkClient,
-  enroll,
+  createEndpointCredential,
   oidcClientCredentialsTokenProvider,
+  SessionProvider,
   type CommandOutcome,
   type LinkClient,
   type LinkHandler,
@@ -57,7 +57,6 @@ import {
 } from "@ofac/workspace-link";
 import { SignalrTransport, SqliteLedger, postCapabilities } from "@ofac/workspace-link/node";
 import type { GatewayConfig, GatewayMode } from "./config.js";
-import { tokenFilePath } from "./config.js";
 import { EmbeddedChild, builtinChildManifest, newExecutionId, type ChildReply } from "./child.js";
 import {
   BindingConflictError,
@@ -93,6 +92,7 @@ import {
   type FleetMember,
 } from "./child-link.js";
 import { startChildListener, type ChildListener } from "./listen.js";
+import { keyStoreFromLedger } from "./child-keys.js";
 
 const ASSIGN = "org.facilitator.command.work.assign.v1";
 const STEER = "org.facilitator.command.work.steer.v1";
@@ -323,7 +323,7 @@ export class GatewayRuntime {
         "policy: no policy file configured — DefaultPolicy in effect (capability-advertence only)",
       );
     }
-    const token = await this.acquireToken();
+    const token = await this.acquireSession();
     this.tokenProvider = token;
     if (this.embedded !== null) {
       // 05 fleet-of-one: the single child's union POSTs before first hello.
@@ -363,6 +363,7 @@ export class GatewayRuntime {
         gatewayId: this.config.gatewayId,
         heartbeatSeconds: this.config.heartbeatSeconds,
         ...(this.config.childSecret !== undefined ? { childSecret: this.config.childSecret } : {}),
+        keys: keyStoreFromLedger(this.paths.execution),
         onRegistered: (link) => this.onChildRegistered(link),
         onDisconnected: (childId) => this.onChildDisconnected(childId),
       });
@@ -618,20 +619,19 @@ export class GatewayRuntime {
     }
   }
 
-  // ── token lifecycle ───────────────────────────────────────────────────────
-
+  // ── credential lifecycle ──────────────────────────────────────────────────
   /**
-   * linkToken/OFAC_LINK_TOKEN mounts a static provider (refresh re-enrolls
-   * only when a secret is ALSO configured — linkd's rule); else enroll at
-   * startup and persist <stateDir>/token. Rotation kills the old token
-   * immediately, so the file write happens BEFORE any retry. Neither secret
-   * nor token at first boot (config's hasStoredToken escape hatch lies) ⇒
-   * EnrollmentError, which the CLI maps to exit 4.
+   * The gateway is a link endpoint like any other, so it runs the fleet's one
+   * credential law (`createEndpointCredential`): an Ed25519 identity in
+   * `<stateDir>/identity.key`, one first-boot enrollment that pins the public
+   * key, then challenge→proof sessions for everything after. No token file, no
+   * static mount — a restart re-proves with the stored key, so a secret is only
+   * needed on first boot. Mode (b) (`workload:`) re-presents an OIDC
+   * client-credentials JWT per enrollment, which also lets a lost keystore be
+   * re-pinned. Failure surfaces as EnrollmentError, which the CLI maps to exit 4.
    */
-  private async acquireToken(): Promise<LinkTokenProvider> {
+  private async acquireSession(): Promise<SessionProvider> {
     const { config, deps, logger } = this;
-    const secret = config.enrollmentSecret;
-    const activeToken = { value: config.linkToken ?? readStoredToken(config.stateDir) ?? "" };
     const workload =
       config.workload === undefined
         ? undefined
@@ -639,41 +639,20 @@ export class GatewayRuntime {
     // Reconcile polls the kernel REST plane with the SAME workload
     // credential (audience facilitator-api via the realm's audience mapper).
     this.workloadToken = workload ?? null;
-    const refresh = async (): Promise<void> => {
-      // Mode (b): a fresh OIDC CC JWT per enroll; mode (a): the shared
-      // enrollment secret. Neither ⇒ static mount, nothing to rotate.
-      const credential = workload !== undefined ? await workload.getToken() : secret;
-      if (credential === undefined) return;
-      const response = await enroll(
-        {
-          baseUrl: config.facilitatorUrl,
-          token: credential,
-          endpointId: config.gatewayId,
-          instanceId: `gw-${randomBytes(8).toString("hex")}`,
-          trustMode: config.trustMode,
-          role: config.role ?? "gateway",
-          team: config.team,
-        },
-        deps.fetchImpl ?? fetch,
-      );
-      if (response.linkToken === undefined) {
-        throw new EnrollmentError(201, { detail: "server issued no linkToken" });
-      }
-      writeTokenFile(config.stateDir, response.linkToken);
-      activeToken.value = response.linkToken;
-    };
-    if (config.linkToken === undefined) {
-      if (secret === undefined && workload === undefined) {
-        if (activeToken.value === "") {
-          throw new EnrollmentError(401, { detail: "no token available at first boot" });
-        }
-        // Stored-token restart without a secret: static mount, no rotation.
-        return { getToken: async () => activeToken.value };
-      }
-      await refresh(); // enroll at startup, writes the token file
-      logger.info("link token enrolled", { endpointId: config.gatewayId });
-    }
-    return { getToken: async () => activeToken.value, refresh };
+    const { provider } = await createEndpointCredential({
+      stateDir: config.stateDir,
+      baseUrl: config.facilitatorUrl,
+      endpointId: config.gatewayId,
+      team: config.team,
+      trustMode: config.trustMode,
+      role: config.role ?? "gateway",
+      ...(config.enrollmentSecret === undefined ? {} : { enrollSecret: config.enrollmentSecret }),
+      ...(workload === undefined ? {} : { workloadToken: () => workload.getToken() }),
+      logger,
+      ...(deps.fetchImpl === undefined ? {} : { fetchImpl: deps.fetchImpl }),
+      instancePrefix: "gw",
+    });
+    return provider;
   }
 
   // ── command routing ───────────────────────────────────────────────────────
@@ -1799,21 +1778,6 @@ function loadChildManifest(config: GatewayConfig, logger: LinkLogger): Capabilit
     ownerTeam: `child-${config.child.name}`,
     capabilities: doc.capabilities,
   };
-}
-
-function writeTokenFile(stateDir: string, token: string): void {
-  const path = tokenFilePath(stateDir);
-  writeFileSync(path, token, { mode: 0o600 });
-  chmodSync(path, 0o600); // a pre-existing file keeps its old mode otherwise
-}
-
-function readStoredToken(stateDir: string): string | null {
-  try {
-    const value = readFileSync(tokenFilePath(stateDir), "utf8").trim();
-    return value.length > 0 ? value : null;
-  } catch {
-    return null;
-  }
 }
 
 /** The envelope as the child sees it: carrier re-stamped to the ACTIVE

@@ -4,9 +4,10 @@
 // so no fork (the sanctioned fallback stays unused).
 import { type ChildProcess, spawn } from "node:child_process";
 import { createServer } from "node:net";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { loadOrCreateIdentity, SessionProvider, type EndpointIdentity } from "@ofac/workspace-link";
 import { KEYCLOAK_URL, psql, waitExit } from "../../../workspace-link/test/e2e/harness.js";
 
 export {
@@ -186,9 +187,27 @@ export function startGateway(configPath: string): GatewayHandle {
   };
 }
 
-/** The link token the Gateway persisted at <stateDir>/token. */
-export function gatewayToken(stateDir: string): string {
-  return readFileSync(join(stateDir, "token"), "utf8").trim();
+/** The pinned identity the Gateway wrote at <stateDir>/identity.key. */
+export function gatewayIdentity(stateDir: string): EndpointIdentity {
+  return loadOrCreateIdentity(stateDir);
+}
+
+/**
+ * A link-plane session for the Gateway, minted by the harness from the key in
+ * the Gateway's OWN stateDir — the credential model's own story: the identity
+ * file is the credential, so anything that can read that file can prove. Tests
+ * use this where they used to read the persisted link token.
+ */
+export async function gatewaySession(
+  stateDir: string,
+  baseUrl: string,
+  endpointId = "gw.team-alpha",
+): Promise<string> {
+  return new SessionProvider({
+    baseUrl,
+    endpointId,
+    identity: loadOrCreateIdentity(stateDir),
+  }).getToken();
 }
 
 /** The /status document, as observed over HTTP (loose mirror of GatewayStatus). */
@@ -249,12 +268,21 @@ export function startChild(options: {
   childWorkspaceId: string;
   socket: string;
   token?: string;
+  /**
+   * The child's own keystore dir (identity.key). Omit for the pre-identity
+   * posture (token-only, nothing pinned).
+   */
+  stateDir?: string;
   mode?: "complete" | "silent";
   capability?: string;
   /** Several advertised ids for one child (overrides `capability`). */
   capabilities?: string[];
 }): ChildProcess {
   const runner = join(new URL(".", import.meta.url).pathname, "child-runner.mjs");
+  // Every e2e child gets a keystore: the pin-on-first-hello law then applies
+  // exactly as in production, and a restarted child proves rather than
+  // re-presenting a token that the first hello already retired.
+  const stateDir = options.stateDir ?? mkdtempSync(join(tmpdir(), "gw-e2e-child-"));
   const child = spawn(
     "node",
     [
@@ -265,6 +293,8 @@ export function startChild(options: {
       options.socket,
       "--token",
       options.token ?? "tok",
+      "--state-dir",
+      stateDir,
       "--mode",
       options.mode ?? "silent",
       ...(options.capabilities ?? [options.capability ?? "research.analyze"]).flatMap((c) => [

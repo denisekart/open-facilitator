@@ -112,6 +112,8 @@ function fakeContext(
     setSteered: () => undefined,
     // The coding script never asks; a question here is a bug, so fail loudly.
     requestInput: () => Promise.reject(new Error("unexpected requestInput")),
+    // Same law for the constructed-context fetch: never called, loud if it is.
+    fetchContext: () => Promise.reject(new Error("unexpected fetchContext")),
   };
   return { ctx, events, progress, controller };
 }

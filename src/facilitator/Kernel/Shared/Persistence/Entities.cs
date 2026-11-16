@@ -634,7 +634,16 @@ public sealed class LinkEnrollmentEntity
 
     public Guid TeamId { get; set; }
 
-    public required string TokenSha256 { get; set; }
+    /// <summary>oidc | key — how this enrollment is authenticated (closed set).</summary>
+    public required string CredentialClass { get; set; }
+
+    /// <summary>Revocation epoch. Every revoke increments it; proofs and session
+    /// JWTs must carry the current value, which is what kills a live session
+    /// inside the token's own lifetime without a session table.</summary>
+    public long Epoch { get; set; }
+
+    /// <summary>Last accepted replay fence. A claimed seq below it is a replay.</summary>
+    public long Seq { get; set; }
 
     /// <summary>shared-runtime | separate-process-same-host | isolated-executor</summary>
     public required string TrustMode { get; set; }
@@ -665,6 +674,46 @@ public sealed class LinkEnrollmentEntity
     /// <summary>Non-human actor binding (K9): when set, this enrollment speaks AS
     /// this contributor; several enrollments may share one contributor id.</summary>
     public Guid? ContributorId { get; set; }
+}
+
+/// <summary>facilitator.link_endpoint_keys — the enrolled public keys that ARE
+/// an endpoint's identity. Hash-only like enrollment codes: the fingerprint is
+/// the identity, the key bytes are not a secret and are stored raw for verification.</summary>
+public sealed class LinkEndpointKeyEntity
+{
+    public Guid EnrollmentId { get; set; }
+
+    /// <summary><c>sha256:</c> + lowercase hex of the raw 32-byte public key.</summary>
+    public required string KeyId { get; set; }
+
+    /// <summary>base64url raw Ed25519 public key (43/44 chars, no padding).</summary>
+    public required string PublicKey { get; set; }
+
+    /// <summary>ed25519 (closed set).</summary>
+    public required string KeyAlgorithm { get; set; }
+
+    /// <summary>active | retired — exactly one active key per enrollment, enforced by a unique index.</summary>
+    public required string State { get; set; }
+
+    public DateTime RegisteredAt { get; set; }
+
+    public DateTime? RetiredAt { get; set; }
+}
+
+/// <summary>facilitator.link_challenges — single-use nonces and proof jti
+/// replay records. Proof jti values ride the same table under a
+/// <c>link-proof:</c> nonce prefix: one mechanism, not two.</summary>
+public sealed class LinkChallengeEntity
+{
+    public required string Nonce { get; set; }
+
+    public required string EndpointId { get; set; }
+
+    public DateTime IssuedAt { get; set; }
+
+    public DateTime ExpiresAt { get; set; }
+
+    public bool Consumed { get; set; }
 }
 
 /// <summary>facilitator.enrollment_tokens — mintable, revocable enrollment tokens (admin-minted; consumed on first enroll).</summary>

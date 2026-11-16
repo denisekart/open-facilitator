@@ -22,7 +22,7 @@ kind: Gateway
 gatewayId: gw.diag-test
 team: default
 facilitatorUrl: http://kernel.test
-linkToken: tok-diag
+enrollmentSecret: enroll-diag
 trustMode: shared-runtime
 stateDir: ${mkdtempSync(join(tmpdir(), "gw-diag-"))}
 child:

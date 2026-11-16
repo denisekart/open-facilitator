@@ -7,7 +7,14 @@ import { validateControlFrame } from "@ofac/protocol";
 import { LinkError, ProtocolMismatchError } from "./errors.js";
 import type { LinkEventBus } from "./link-event-bus.js";
 import type { Ledger } from "./ledger.js";
-import type { HelloFrame, LinkLogger, LinkSession, LinkTransport, WelcomeFrame } from "./types.js";
+import type {
+  HelloFrame,
+  LinkLogger,
+  LinkSession,
+  LinkTokenProvider,
+  LinkTransport,
+  WelcomeFrame,
+} from "./types.js";
 
 export class Handshaker {
   constructor(
@@ -18,6 +25,8 @@ export class Handshaker {
       capabilityManifestDigest: string | (() => string);
       logger: LinkLogger;
       bus: LinkEventBus;
+      /** Feeds the hello-carried handshake proof (and the 401 refresh). */
+      token: LinkTokenProvider;
       /** Applied to the client's window/heartbeat inputs before `ready`. */
       onReady(welcome: WelcomeFrame): void;
     },
@@ -38,6 +47,12 @@ export class Handshaker {
     }
     bus.setState("handshaking");
     const lastKnownAck = this.deps.ledger.processedDeliveries(1)[0];
+    // A socket transport states the channel its proof binds to; http-poll has
+    // no handshake and therefore asks for no proof.
+    const channelProof =
+      this.deps.token.proofForChannel && transport.hubUrl !== undefined
+        ? { proof: await this.deps.token.proofForChannel("WS", transport.hubUrl) }
+        : {};
     const hello: HelloFrame = {
       kind: "hello",
       protocolVersions: ["v1"],
@@ -50,6 +65,7 @@ export class Handshaker {
           ? this.deps.capabilityManifestDigest()
           : this.deps.capabilityManifestDigest,
       ...(lastKnownAck !== undefined ? { lastKnownAck } : {}),
+      ...channelProof,
     };
     const verdict = validateControlFrame(hello);
     if (!verdict.ok) {

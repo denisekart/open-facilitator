@@ -1,12 +1,17 @@
 // The durable linkd configuration: argv parsing + the env fallback for the
-// enrollment secret (argv secrets are visible in `ps`; the env var is not).
+// enrollment CODE (argv secrets are visible in `ps`; the env var is not).
 // `bin/linkd.ts` and the SDK's public surface both consume this.
+//
+// The state dir is a required concept: the identity key lives in it, and the
+// keystore law says the state dir IS the logical instance (no backup, migration
+// is `mv`, loss is a rejoin). The delivery ledger lives inside it as sqlite.
 import { parseArgs } from "node:util";
+import { join } from "node:path";
 import type { TrustMode } from "@ofac/protocol";
 
 export interface LinkdConfig {
   url: string;
-  token?: string;
+  /** First-boot-only enrollment code (OFAC_ENROLL_SECRET or --secret). Not a credential. */
   secret?: string;
   endpointId: string;
   team: string;
@@ -15,6 +20,9 @@ export interface LinkdConfig {
   /** Workload role for enrollment; linkd is a standalone child workspace by default. */
   role: "gateway" | "child";
   transport: "signalr" | "http-poll";
+  /** Where identity.key + the delivery ledger live (default ./ofac-link-state). */
+  stateDir: string;
+  /** The sqlite ledger path — always inside `stateDir`. */
   statePath: string;
   mode: "echo" | "stub";
 }
@@ -23,8 +31,9 @@ export class ConfigError extends Error {}
 
 /**
  * Parse linkd CLI argv. `env` (default `process.env`) is consulted BEFORE
- * `--secret`: OFAC_ENROLL_SECRET keeps the enrollment secret out of the
- * process argument list.
+ * `--secret`: OFAC_ENROLL_SECRET keeps the enrollment code out of the
+ * process argument list. There is no token option anymore — the bearer is a
+ * 5-minute session JWT the client mints itself from the key in `--state-dir`.
  */
 export function parseArgv(
   argv: readonly string[],
@@ -35,7 +44,6 @@ export function parseArgv(
     allowPositionals: true,
     options: {
       url: { type: "string" },
-      token: { type: "string" },
       secret: { type: "string" },
       endpoint: { type: "string" },
       team: { type: "string" },
@@ -43,7 +51,7 @@ export function parseArgv(
       "trust-mode": { type: "string", default: "isolated-executor" },
       role: { type: "string", default: "child" },
       transport: { type: "string", default: "signalr" },
-      state: { type: "string" },
+      "state-dir": { type: "string" },
       mode: { type: "string", default: "echo" },
       help: { type: "boolean", short: "h" },
     },
@@ -59,7 +67,6 @@ export function parseArgv(
   };
   const url = values.url ?? missing("url");
   const secret = env["OFAC_ENROLL_SECRET"] ?? values.secret;
-  if (values.token === undefined && secret === undefined) missing("token | secret");
   const trustMode = values["trust-mode"] as TrustMode;
   if (!["shared-runtime", "separate-process-same-host", "isolated-executor"].includes(trustMode)) {
     throw new ConfigError(`unknown --trust-mode '${trustMode}'`);
@@ -72,9 +79,9 @@ export function parseArgv(
   if (!["echo", "stub"].includes(mode)) throw new ConfigError(`unknown --mode '${mode}'`);
   const role = values.role as LinkdConfig["role"];
   if (!["gateway", "child"].includes(role)) throw new ConfigError(`unknown --role '${role}'`);
+  const stateDir = values["state-dir"] ?? env["OFAC_LINK_STATE_DIR"] ?? "./ofac-link-state";
   return {
     url,
-    ...(values.token !== undefined ? { token: values.token } : {}),
     ...(secret !== undefined ? { secret } : {}),
     endpointId: values.endpoint ?? missing("endpoint"),
     team: values.team ?? missing("team"),
@@ -82,7 +89,8 @@ export function parseArgv(
     trustMode,
     role,
     transport,
-    statePath: values.state ?? "ofac-linkd.sqlite3",
+    stateDir,
+    statePath: join(stateDir, "ledger.sqlite3"),
     mode,
   };
 }

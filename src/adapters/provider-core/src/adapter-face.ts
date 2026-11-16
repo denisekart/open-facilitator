@@ -1,20 +1,19 @@
 // The provider adapter face: the link-plane run loop every forge adapter
-// repeats — enroll (secret mode, isolated-executor child, 401 re-enroll),
-// capability-manifest POST, SignalrTransport + SqliteLedger client wiring —
+// repeats — the fleet credential law (identity in the state dir, secret spent
+// once, session JWTs after), capability-manifest POST, SignalrTransport + SqliteLedger client wiring —
 // plus the webhook fan-out seam (the kernel sink delivers
 // `command.provider.webhook.v1`; signature verification stays in the
 // provider's normalizer). Provider-local stays outside: REST clients,
 // vendor→domain mapping, vendor webhook schemes, init seeding.
-import { randomBytes } from "node:crypto";
 import type { CapabilityManifestV1, EnvelopeEvent } from "@ofac/protocol";
 import {
   buildEvent,
   createLinkClient,
-  enroll,
+  createEndpointCredential,
+  identityDirFor,
   type LinkClient,
   type LinkHandler,
   type LinkLogger,
-  type LinkTokenProvider,
 } from "@ofac/workspace-link";
 import { SignalrTransport, SqliteLedger, postCapabilities } from "@ofac/workspace-link/node";
 import { startTelemetryFromEnv } from "@ofac/otel";
@@ -84,33 +83,21 @@ export async function runProviderAdapter(
     description: "Provider HTTP failures (labels: provider, status 429|403|5xx)",
   });
   setHttpErrorObserver((status) => httpErrors.add(1, { provider, status }));
-  // ── link plane: enroll (secret mode) → capabilities → client ───────────
-  const activeToken = { value: "" };
-  const enrollSelf = async (): Promise<void> => {
-    const response = await enroll(
-      {
-        baseUrl: opts.kernelUrl,
-        token: opts.enrollSecret,
-        endpointId: opts.endpointId,
-        instanceId: `lnk-${randomBytes(8).toString("hex")}`,
-        trustMode: "isolated-executor",
-        role: "child",
-        team: opts.team,
-      },
-      ...(opts.fetchImpl === undefined ? [] : [opts.fetchImpl]),
-    );
-    if (response.linkToken !== undefined) activeToken.value = response.linkToken;
-  };
-  const token: LinkTokenProvider = {
-    getToken: async () => activeToken.value,
-    // 401 ⇒ rotate: re-enrollment mints a fresh token (linkd's precedent).
-    refresh: enrollSelf,
-  };
-  await enrollSelf();
-  if (activeToken.value === "") {
-    throw new Error("enrollment issued no linkToken");
-  }
-
+  // ── link plane: identity → first-boot enroll → sessions → client ────────
+  // The fleet's one credential law (createEndpointCredential): the identity is
+  // `<statePath dir>/identity.key`, the enrollment secret is spent on the boot
+  // that has nothing on file, every later bearer is a short session JWT.
+  const { provider: token } = await createEndpointCredential({
+    stateDir: identityDirFor(opts.statePath),
+    baseUrl: opts.kernelUrl,
+    endpointId: opts.endpointId,
+    team: opts.team,
+    trustMode: "isolated-executor",
+    role: "child",
+    enrollSecret: opts.enrollSecret,
+    logger: opts.logger,
+    instancePrefix: "pf",
+  });
   const { digest } = await postCapabilities(opts.manifest, {
     baseUrl: opts.kernelUrl,
     getToken: token.getToken,

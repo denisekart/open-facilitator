@@ -13,6 +13,7 @@ import type { LinkTransport } from "@ofac/workspace-link";
 import type { EnvelopeAck, HelloFrame, WelcomeFrame } from "@ofac/workspace-link";
 import { SqliteLedger } from "@ofac/workspace-link/node";
 import { afterEach, describe, expect, it } from "vitest";
+import { fakeKernel as makeFakeKernel } from "../fake-kernel.js";
 import { parseConfig, type GatewayConfig } from "../../src/config.js";
 import { ExecutionLedger, type GatewayPaths } from "../../src/ledger.js";
 import { createGatewayRuntime, type GatewayRuntime } from "../../src/runtime.js";
@@ -141,20 +142,11 @@ describe("Gateway trace leg (endpoint set)", () => {
       };
       rt = createGatewayRuntime(cfg, {
         transportFactory: () => mock,
-        fetchImpl: (async (url: unknown) => {
-          const path = String(url);
-          if (path.endsWith("/api/link/v1/enroll")) {
-            return new Response(
-              JSON.stringify({
-                enrollmentId: "enr-tp",
-                trustMode: "shared-runtime",
-                linkToken: "tok-tp",
-              }),
-              { status: 201, headers: { "content-type": "application/json" } },
-            );
-          }
-          return new Response(null, { status: 204 });
-        }) as typeof fetch,
+        // The shared link plane: enroll pins the key, proofs buy sessions;
+        // everything else the gateway touches answers 204 here.
+        fetchImpl: makeFakeKernel({
+          fallback: () => new Response(null, { status: 204 }),
+        }).fetchImpl,
         ledgerFactory: () => paths,
         logger,
       });

@@ -37,6 +37,16 @@ export interface ChildEntryConfig {
   timeoutSeconds: number;
 }
 
+/** Optional TLS listener for REMOTE children (cert/key are node:tls PEM files). */
+export interface ChildTlsConfig {
+  /** Absolute path to the certificate chain PEM. */
+  cert: string;
+  /** Absolute path to the private key PEM. */
+  key: string;
+  /** Bind port; the listener speaks the identical child protocol over TLS. */
+  port: number;
+}
+
 /** Local child transport (unix socket primary, localhost TCP same-protocol fallback). */
 export interface ChildTransportConfig {
   socket: {
@@ -47,6 +57,8 @@ export interface ChildTransportConfig {
   };
   /** Optional 127.0.0.1 fallback listener carrying the identical frames. */
   tcp?: { port: number } | undefined;
+  /** Optional TLS listener for remote children; also where a non-empty `cbh` comes from. */
+  tls?: ChildTlsConfig | undefined;
   /** hello deadline. */
   handshakeTimeoutSeconds: number;
   /** Heartbeat cadences before a child connection is marked offline. */
@@ -71,12 +83,10 @@ export interface GatewayConfig {
       }
     | undefined;
   facilitatorUrl: string;
-  /** Present ⇒ the Gateway enrolls itself and rotates on 401. */
+  /** First-boot-only enrollment code (mode (a)); after the key is enrolled it is not needed. */
   enrollmentSecret?: string | undefined;
-  /** Pre-minted token; refresh only rotates when a secret is ALSO set. */
-  linkToken?: string | undefined;
   trustMode: TrustMode;
-  /** Ledger + token live here; created 0o700 when missing. */
+  /** Ledger + `identity.key` live here; created 0o700 when missing. */
   stateDir: string;
   /** Deployment mode; absent in the file ⇒ "embedded" (v1 back-compat). */
   mode: GatewayMode;
@@ -122,10 +132,14 @@ export class GatewayConfigError extends Error {
 }
 
 export interface ParseConfigOptions {
-  /** Env overlay (OFAC_ENROLL_SECRET / OFAC_LINK_TOKEN / OFAC_CHILD_SECRET win over the file). */
+  /** Env overlay (OFAC_ENROLL_SECRET / OFAC_CHILD_SECRET win over the file). */
   env?: Record<string, string | undefined>;
-  /** Test seam for the stored-token escape hatch (default: fs existence). */
-  hasStoredToken?: (stateDir: string) => boolean;
+  /**
+   * Test seam for the stored-identity escape hatch (default: fs existence of
+   * `<stateDir>/identity.key`). A gateway whose key is already enrolled needs no
+   * enrollment code to restart — the key IS the credential.
+   */
+  hasStoredIdentity?: (stateDir: string) => boolean;
   /** Dir `policy.path` resolves against — loadConfigFile passes dirname(config). */
   configDir?: string | undefined;
 }
@@ -143,7 +157,6 @@ const TOP_LEVEL_KEYS: Record<string, true> = {
   team: true,
   facilitatorUrl: true,
   enrollmentSecret: true,
-  linkToken: true,
   trustMode: true,
   stateDir: true,
   mode: true,
@@ -165,11 +178,13 @@ const CHILD_ENTRY_KEYS: Record<string, true> = {
 const CHILD_TRANSPORT_KEYS: Record<string, true> = {
   socket: true,
   tcp: true,
+  tls: true,
   handshakeTimeoutSeconds: true,
   leaseMissedBeats: true,
 };
 const CHILD_SOCKET_KEYS: Record<string, true> = { path: true, allowedUid: true };
 const CHILD_TCP_KEYS: Record<string, true> = { port: true };
+const CHILD_TLS_KEYS: Record<string, true> = { cert: true, key: true, port: true };
 const DIAGNOSTICS_KEYS: Record<string, true> = { port: true };
 
 function fail(key: string, message: string): never {
@@ -293,12 +308,23 @@ function parseChildTransport(doc: Record<string, unknown>, stateDir: string): Ch
     rejectUnknown(tcpDoc, CHILD_TCP_KEYS, "childTransport.tcp");
     tcp = { port: requireInt(tcpDoc, "port", 1, 65535, "childTransport.tcp.port") };
   }
+  let tls: ChildTlsConfig | undefined;
+  if (doc["tls"] !== undefined) {
+    const tlsDoc = asRecord(doc["tls"], "childTransport.tls");
+    rejectUnknown(tlsDoc, CHILD_TLS_KEYS, "childTransport.tls");
+    tls = {
+      cert: requireString(tlsDoc, "cert", "childTransport.tls.cert"),
+      key: requireString(tlsDoc, "key", "childTransport.tls.key"),
+      port: requireInt(tlsDoc, "port", 1, 65535, "childTransport.tls.port"),
+    };
+  }
   return {
     socket: {
       path: resolve(stateDir, path),
       ...(allowedUid !== undefined ? { allowedUid } : {}),
     },
     ...(tcp !== undefined ? { tcp } : {}),
+    ...(tls !== undefined ? { tls } : {}),
     handshakeTimeoutSeconds: optionalInt(
       doc,
       "handshakeTimeoutSeconds",
@@ -316,11 +342,6 @@ function parseChildTransport(doc: Record<string, unknown>, stateDir: string): Ch
       "childTransport.leaseMissedBeats",
     ),
   };
-}
-
-/** `<stateDir>/token` written by enrollment; a restart may mount it without a secret. */
-export function tokenFilePath(stateDir: string): string {
-  return join(stateDir, "token");
 }
 
 /** Parse + validate the YAML text; every failure names the offending key. */
@@ -505,19 +526,13 @@ export function parseConfig(yamlText: string, options: ParseConfigOptions = {}):
   // Env overlay: the env is the deployment-time truth (ps-visible argv/file
   // is the weaker carrier), same law as linkd's OFAC_* handling.
   const enrollmentSecret = env["OFAC_ENROLL_SECRET"] ?? optionalString(root, "enrollmentSecret");
-  const linkToken = env["OFAC_LINK_TOKEN"] ?? optionalString(root, "linkToken");
   const childSecret = env["OFAC_CHILD_SECRET"];
-  const hasStoredToken =
-    options.hasStoredToken ?? ((dir: string) => existsSync(tokenFilePath(dir)));
-  if (
-    linkToken === undefined &&
-    enrollmentSecret === undefined &&
-    workload === undefined &&
-    !hasStoredToken(stateDir)
-  ) {
+  const hasStoredIdentity =
+    options.hasStoredIdentity ?? ((dir: string) => existsSync(join(dir, "identity.key")));
+  if (enrollmentSecret === undefined && workload === undefined && !hasStoredIdentity(stateDir)) {
     fail(
       "enrollmentSecret",
-      `neither linkToken/OFAC_LINK_TOKEN nor enrollmentSecret/OFAC_ENROLL_SECRET is set and no token file exists in '${stateDir}'`,
+      "neither enrollmentSecret/OFAC_ENROLL_SECRET nor a workload block is set, and no identity key is stored in this stateDir (the code is first-boot only: a gateway that has already enrolled restarts on its key)",
     );
   }
 
@@ -530,7 +545,6 @@ export function parseConfig(yamlText: string, options: ParseConfigOptions = {}):
     team,
     facilitatorUrl,
     ...(enrollmentSecret !== undefined ? { enrollmentSecret } : {}),
-    ...(linkToken !== undefined ? { linkToken } : {}),
     trustMode: trustMode as TrustMode,
     stateDir,
     mode,

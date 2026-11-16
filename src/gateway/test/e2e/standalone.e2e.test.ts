@@ -9,7 +9,7 @@ import {
   childReady,
   gatewayConfig,
   gatewayStatus,
-  gatewayToken,
+  gatewaySession,
   startChild,
   startGateway,
   useFacilitator,
@@ -42,7 +42,7 @@ describe.skipIf(!E2E)("gateway standalone e2e", () => {
       const before = await linkGet(
         harness.baseUrl,
         "/api/link/v1/capabilities",
-        gatewayToken(gw.stateDir),
+        await gatewaySession(gw.stateDir, harness.baseUrl),
       );
       expect(before.status).toBe(404);
 
@@ -66,7 +66,7 @@ describe.skipIf(!E2E)("gateway standalone e2e", () => {
         const r = await linkGet(
           harness.baseUrl,
           "/api/link/v1/capabilities",
-          gatewayToken(gw.stateDir),
+          await gatewaySession(gw.stateDir, harness.baseUrl),
         );
         return r.status === 200 ? (r.body as { ownerTeam: string }) : false;
       });

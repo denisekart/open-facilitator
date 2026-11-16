@@ -9,6 +9,7 @@
 export const ADAPTER_PACKAGE_NAME = "@ofac/adapter";
 
 export { ADAPTER_PACKAGE, DEFAULT_RESTART_BACKOFF_MS, createAdapter } from "./adapter.js";
+export { kernelLegFromEnv, type KernelLegOptions } from "./kernel-leg.js";
 export {
   fullHarnessCapabilities,
   harnessCapabilityDescriptors,

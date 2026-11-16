@@ -311,20 +311,8 @@ public sealed class ApprovalPushConsumeTests(PostgresFixture fixture)
         });
     }
 
-    private static async Task<string> EnrollChildAsync(HttpClient client, string endpointId)
-    {
-        var body = JsonSerializer.Serialize(new
-        {
-            token = "enroll-dev",
-            endpointId,
-            instanceId = "inst-1",
-            trustMode = "isolated-executor",
-            team = "team-alpha",
-            role = "child",
-        });
-        var json = await KernelOps.PostJsonAsync(client, "/api/link/v1/enroll", body, HttpStatusCode.Created);
-        return json.GetProperty("linkToken").GetString()!;
-    }
+    private static async Task<LinkTestHarness.LinkEndpointCredential> EnrollChildAsync(HttpClient client, string endpointId) =>
+        await LinkTestHarness.EnrollAsync(client, endpointId, role: "child");
 
     private static async Task<HttpClient> CreateUserClientAsync(KernelTestFactory factory, string user)
     {

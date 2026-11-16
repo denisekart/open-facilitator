@@ -22,7 +22,7 @@
   "$defs": {
     "hello": {
       "title": "AdapterHelloFrame",
-      "description": "child -> Gateway: identity + token + manifest; the register-ack decides.",
+      "description": "child -> Gateway: identity + token + manifest; the register-ack decides. `token` stays required but is the first-boot bootstrap secret only: empty on every hello after the key is pinned, where authentication is the proof of possession.",
       "type": "object",
       "additionalProperties": false,
       "required": ["v", "type", "childWorkspaceId", "token", "manifest"],
@@ -31,6 +31,19 @@
         "type": { "const": "hello" },
         "childWorkspaceId": { "type": "string", "minLength": 1, "maxLength": 128 },
         "token": { "type": "string", "minLength": 0, "maxLength": 4096 },
+        "publicKey": {
+          "type": "string",
+          "description": "Raw Ed25519 public key, base64url without padding, presented for pinning on the first hello.",
+          "pattern": "^[A-Za-z0-9_-]{43,44}$",
+          "minLength": 43,
+          "maxLength": 44
+        },
+        "proof": {
+          "type": "string",
+          "description": "Detached EdDSA JWS proof of possession of `publicKey` for this hello (htm WS, htu the gateway channel). Absent only on the first hello, where `token` authenticates.",
+          "minLength": 1,
+          "maxLength": 8192
+        },
         "manifest": { "$ref": "capability-manifest.v1.json" }
       }
     },

@@ -3,5 +3,7 @@
   "endpointId": "gw-team-alpha",
   "instanceId": "inst-01",
   "trustMode": "separate-process-same-host",
+  "publicKey": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8",
+  "keyAlgorithm": "ed25519",
   "role": "admin"
 }

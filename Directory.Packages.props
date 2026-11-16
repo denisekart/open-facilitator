@@ -37,5 +37,8 @@
          GHSA-5wr9-m6jw-xx44, vulnerable < 7.0.0); 7.5.3 = latest stable, patched.
          Rendering stays sandboxed (see PromptRenderer): templates are data. -->
     <PackageVersion Include="Scriban" Version="7.5.3" />
+    <!-- Kernel Ed25519 (link credentials are public keys; the net10.0 ref pack
+         has no Ed25519 — only ML-DSA hybrids). Pure managed, no native assets. -->
+    <PackageVersion Include="BouncyCastle.Cryptography" Version="2.7.0" />
   </ItemGroup>
 </Project>

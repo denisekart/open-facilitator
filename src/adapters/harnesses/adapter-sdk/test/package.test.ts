@@ -3,7 +3,9 @@
 import { describe, expect, it } from "vitest";
 
 describe("adapter package surface", () => {
-  it("the built entry exports the locked API", async () => {
+  // The built entry pulls the whole @ofac/gateway + workspace-link graph; under
+  // a parallel `pnpm -r test` the cold import can outlast vitest's 5 s default.
+  it("the built entry exports the locked API", { timeout: 30_000 }, async () => {
     const mod = await import("../dist/index.js");
     expect(mod.ADAPTER_PACKAGE).toBe("@ofac/adapter");
     expect(typeof mod.createAdapter).toBe("function");
@@ -18,7 +20,7 @@ describe("adapter package surface", () => {
     expect(mod.artifactUri("w", "a", "art-1")).toBe("artifact://w/a/art-1");
   });
 
-  it("the ./testing entry exports the lifecycle contract kit", async () => {
+  it("the ./testing entry exports the lifecycle contract kit", { timeout: 30_000 }, async () => {
     const mod = await import("../dist/testing.js");
     expect(typeof mod.runAdapterLifecycleContract).toBe("function");
     expect(typeof mod.kitSocketPath).toBe("function");

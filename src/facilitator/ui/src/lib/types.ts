@@ -60,6 +60,13 @@ export interface AdminLinkRow {
   lastHeartbeat: string | null;
   replicaId: string | null;
   liveSockets: number;
+  /** Credential identity (the lifecycle plan's columns): class, active key, fences. */
+  credentialClass: string | null;
+  endpointKeyId: string | null;
+  epoch: number | null;
+  seq: number | null;
+  /** Last fence check rejected a proof (audit link.replay-suspect after enrollment). */
+  replaySuspect: boolean;
 }
 
 export interface AdminAffectedAssignment {

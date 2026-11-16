@@ -542,6 +542,9 @@ import {
   createLinkClient,
   createMemoryLogger,
   enroll,
+  loadOrCreateIdentity,
+  SessionProvider,
+  type EndpointIdentity,
   type LinkClient,
   type LinkHandler,
   type LinkLogger,
@@ -554,56 +557,81 @@ import type { CapabilityManifestV1 } from "@ofac/protocol";
 export interface SdkClient {
   client: LinkClient;
   ledger: SqliteLedger;
-  token: string;
+  /** The credential source: after enrollment, every bearer is a session JWT. */
+  provider: LinkTokenProvider;
+  /** The endpoint identity (the private half a keystore would hold). */
+  identity: EndpointIdentity;
+  /** The keystore dir: pass it back as `stateDir` to restart this endpoint. */
+  stateDir: string;
   endpointId: string;
   digest: string;
   manifestText: string;
 }
 
 /**
- * Enroll (or reuse a token) → POST capabilities → build a started SDK client
- * over SignalR by default. The manifest's ownerTeam is `default`: the
- * enrollment store binds every enrollment to the seeded `default` team, and
- * POST /capabilities rejects a manifest whose ownerTeam differs.
+ * Enroll a fresh key (or reuse a caller-supplied bearer) → POST capabilities →
+ * build a started SDK client over SignalR by default. After enrollment the only
+ * credential is a 5-minute session JWT bought with a proof, so a caller that
+ * needs a bearer asks `provider.getToken()` — there is no static token to hand
+ * round. The manifest's ownerTeam is `default`: the enrollment store binds every
+ * enrollment to the seeded `default` team, and POST /capabilities rejects a
+ * manifest whose ownerTeam differs.
  */
 export async function sdkClient(
   harness: Harness,
   options: {
     endpointId: string;
+    /** Reuse this bearer instead of enrolling (raw/stale-token tests). */
     token?: string;
+    /** Reuse the identity in this state dir (a restart of the same endpoint). */
+    stateDir?: string;
     handler?: LinkHandler;
     transport?: LinkTransport;
-    /** Builds the transport AFTER enrollment (needs the minted token). */
-    transportFactory?: (token: string) => LinkTransport;
+    /** Builds the transport once the credential exists. */
+    transportFactory?: (provider: LinkTokenProvider) => LinkTransport;
     stateFile?: string;
     logger?: LinkLogger;
     maxReconnectAttempts?: number;
   },
 ): Promise<SdkClient> {
-  const token =
-    options.token ??
-    (
-      await enroll({
-        baseUrl: harness.baseUrl,
-        token: ENROLL_SECRET,
-        endpointId: options.endpointId,
-        instanceId: `e2e-${Math.random().toString(36).slice(2, 10)}`,
-        trustMode: "isolated-executor",
-        team: TEAM,
-      })
-    ).linkToken;
-  if (token === undefined) throw new Error("enroll issued no linkToken");
-  const provider: LinkTokenProvider = { getToken: async () => token };
+  const stateDir = options.stateDir ?? mkdtempSync(join(tmpdir(), "link-e2e-id-"));
+  const identity = loadOrCreateIdentity(stateDir);
+  const session = new SessionProvider({
+    baseUrl: harness.baseUrl,
+    endpointId: options.endpointId,
+    identity,
+  });
+  if (options.token === undefined) {
+    await enroll({
+      baseUrl: harness.baseUrl,
+      token: ENROLL_SECRET,
+      endpointId: options.endpointId,
+      instanceId: `e2e-${Math.random().toString(36).slice(2, 10)}`,
+      trustMode: "isolated-executor",
+      team: TEAM,
+      publicKey: identity.publicKeyBase64Url,
+      keyAlgorithm: "ed25519",
+    });
+  }
+  // A caller-supplied bearer is served verbatim, with no proof and no re-enroll:
+  // that is exactly what the stale-token tests assert.
+  const provider: LinkTokenProvider =
+    options.token === undefined
+      ? session
+      : {
+          getToken: async () => options.token as string,
+          refresh: async () => undefined,
+        };
   const manifest = makeManifest(TEAM) as unknown as CapabilityManifestV1;
   const posted = await postCapabilities(manifest, {
     baseUrl: harness.baseUrl,
-    getToken: async () => token,
+    getToken: provider.getToken,
   });
   const ledger = new SqliteLedger(options.stateFile ?? tempFile("link-e2e.sqlite"));
   const client = createLinkClient({
     transport:
       options.transport ??
-      options.transportFactory?.(token) ??
+      options.transportFactory?.(provider) ??
       new SignalrTransport({ baseUrl: harness.baseUrl, token: provider }),
     ledger,
     endpointId: options.endpointId,
@@ -619,7 +647,9 @@ export async function sdkClient(
   return {
     client,
     ledger,
-    token,
+    provider,
+    identity,
+    stateDir,
     endpointId: options.endpointId,
     digest: posted.digest,
     manifestText: posted.body,

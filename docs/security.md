@@ -23,7 +23,7 @@ Anything that writes outside the framework runs under team-owned credentials beh
 | Identity | Carried by | Validated by |
 |---|---|---|
 | **Human/operator** (this doc) | OIDC access token (`Authorization: Bearer`) on `/api/*` except `/api/link/v1*` | JwtBearer: signature (JWKS from `identity:oidc:authority`), issuer, audience; RS256/ES256 only |
-| **Workspace Link endpoint** | Per-endpoint `linkToken` from enrollment — mode (a) shared secret or mode (b) OIDC workload identity | `LinkBearerHandler` — a fully separate seam (`/api/link/v1*`, `/hubs/link`) |
+| **Workspace Link endpoint** | Enrolled Ed25519 public key (mode (a): a minted enrollment code or the bootstrap secret registers it; mode (b): OIDC workload identity) — then a detached proof of possession against a kernel nonce, or a kernel-signed session JWT | `LinkBearerHandler` + the proof/session verifier behind `ILinkTokenValidator` — a fully separate seam (`/api/link/v1*`, `/hubs/link`); no long-lived link secret exists |
 | **Machine-to-machine ingress** (providers) | CloudEvents envelope identity (`event_source`/`event_id`, commandId, provider delivery id) | Dedupe + envelope validation, behind the same bearer gate |
 
 The kernel is **vendor-neutral**: it consumes OIDC discovery, bearer tokens,
@@ -102,7 +102,7 @@ deny ⇒ `403 forbidden` (both RFC 9457, camelCase).
 | `POST /api/works/{id}/approvals/{approvalId}/respond` | OIDC bearer; gated `approvals.respond` | Human decision; eligibility + single use below |
 | `/api/identity/roles*` | OIDC bearer; PUT/DELETE gated `identity.roles.manage` | runtime role rules |
 | `/api/admin/*` | OIDC bearer; gated `admin.read` (GETs) / `admin.mutate` (PATCH/POST) | Operator surface: roll-ups, search, detail, links, merged deliveries, metrics, runtime config (If-Match + `X-Change-Reason`; every PATCH audits `admin.config.patch` + a bounded history row), dead-letter replay, manifest re-mark |
-| `/api/link/v1*`, `/hubs/link` | link plane (`linkToken`) | enrollment + evidence, below |
+| `/api/link/v1*`, `/hubs/link` | link plane — enroll takes an enrollment code in the BODY; `/challenge` + `/proof` are unguarded; everything else a 5-minute session JWT | enrollment + proof of possession + evidence, below |
 
 The kernel refuses to boot at all with an invalid/incomplete `identity:`
 block (`IdentityStartupCheck`, fail closed in every environment).
@@ -115,9 +115,9 @@ block (`IdentityStartupCheck`, fail closed in every environment).
 
 ## Provider ingress
 
-Provider events ride the **link plane**: the adapter authenticates with its
-`linkToken` like any link endpoint, and the `AdmissionGate` provider arm
-admits a central provider domain type
+Provider events ride the **link plane**: the adapter authenticates with a
+session JWT of its own enrolled key like any link endpoint, and the
+`AdmissionGate` provider arm admits a central provider domain type
 (`org.facilitator.event.provider.<domain>.v1`) only when a
 `Providers:<provider>` section is enabled, the envelope's `data.provider`
 names it, `reference.provider` matches, and the sending link endpoint is the
@@ -155,20 +155,52 @@ audit row, never silent acceptance. Provider-specific rules:
 
 ## Workload plane: enrollment + delegation evidence
 
-**Enrollment** (`POST /api/link/v1/enroll`) minting a per-endpoint
-`linkToken` comes in two modes, told apart by the shape of the presented
-credential (`token` field):
+**Enrollment** (`POST /api/link/v1/enroll`) REGISTERS AN IDENTITY — mode (a)
+requires a `publicKey` (raw Ed25519, base64url) + `keyAlgorithm`, and the
+response carries no secret (`{enrollmentId, trustMode, endpointKeyId, seq}`:
+the key fingerprint and the replay fence). The `token` field only authorizes
+the join, and the kernel tells the two modes apart by that credential's
+shape:
 
-| Mode | Credential | Identity source |
+| Mode | Enrollment credential (body `token`) | Identity source |
 |---|---|---|
-| (a) shared secret | `Link:EnrollmentToken` | body must name `team` (roster `Link:Teams`; absent/unknown ⇒ `403 team-unknown` — no default-team fallback); `role` defaults to gateway |
-| (b) workload OIDC | an `aud`-`facilitator-link` access token | the `Link:WorkloadIdentities` binding matching `(azp, endpointId)` fixes team, role, and delegation acceptance; an unregistered pair ⇒ `403 workload-not-registered` |
+| (a) enrollment code | an admin-minted one-time code, or the bootstrap secret `Link:EnrollmentToken` | the posted `publicKey` (credential class `key`); body must name `team` (roster `Link:Teams`; absent/unknown ⇒ `403 team-unknown` — no default-team fallback); `role` defaults to gateway |
+| (b) workload OIDC | an `aud`-`facilitator-link` access token | the `Link:WorkloadIdentities` binding matching `(azp, endpointId)` (credential class `oidc` — issuer trust, no key); an unregistered pair ⇒ `403 workload-not-registered` |
+
+`Link:EnrollmentToken` (and the fail-closed `LinkEnrollmentStartupCheck` +
+`LinkEnrollmentSecret` around it) is therefore **what authenticates the FIRST
+admin** — the break-glass line that lets the first endpoint register, while
+the standing path is a minted, hash-only, first-use-consumed code. Nothing
+about a link credential outlives the session it authorizes.
+
+**Authentication after enrollment is proof, never a mounted secret.**
+`POST /api/link/v1/challenge` (unguarded — a challenge proves nothing, so it
+cannot be guarded by what it is issuing) hands out a single-use nonce
+(`Link:ChallengeLifetimeSeconds`); the endpoint signs a detached EdDSA JWS
+carrying `{iss, sub, jti, htm, htu, iat, nbf, exp, nonce, seq, epoch, cbh}`
+and `POST /api/link/v1/proof` returns a kernel-signed session JWT valid
+`Link:SessionTokenLifetimeSeconds` (300 s) that every other route and the hub
+upgrade carry as `Authorization: Bearer`. Every check fails closed and
+audits (`link.challenge-issued`, `link.proof-verified`, `link.proof-failed`,
+`link.session-issued`): signature by the ACTIVE key, `htm`/`htu` match,
+clock inside skew, nonce single-use, `jti` unseen, `seq` at or above the
+fence (else `replay-suspect`), `epoch` equal to the row's revocation epoch —
+which is how revocation lands inside a live 5-minute window without a session
+table — and a non-empty `cbh` when `Link:RequireChannelBinding` is true.
 
 Laws (both modes): the `gw.` endpointId prefix is reserved for `role:
 gateway` (`403 role-mismatch` otherwise); a body `role` that contradicts the
 mode-(b) binding also `403 role-mismatch`; **role is immutable across
-rotation** — re-role needs revoke + re-enroll; rotation replaces the stored
-hash, so the old link token stops validating immediately.
+rotation** — re-role needs revoke + re-enroll; re-enrolling with a new key
+retires the old one immediately (no grace — only the self-service
+`POST /api/link/v1/enroll/{endpointId}/rotate`, which needs a proof by BOTH
+keys, gives a retired key a `Link:RotateGraceMinutes` window for the NEXT
+rotation), and the epoch bump freezes any session minted before it. The
+operator's lever is the enrollment-token revoke
+(`DELETE /api/admin/enroll-tokens/{id}`, config-binding authorization, same
+law as every other admin verb), which kills the issued enrollment and retires
+its active keys. Audit details carry
+fingerprints only — key bytes never enter an audit row, a log, or a metric.
 
 **Delegation evidence**: a command may carry `actorEvidenceRef`. Validation
 is scheme-split — the deny-vs-unverified rule:

@@ -5,6 +5,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { EnvelopeCommand, EnvelopeEvent } from "@ofac/protocol";
+import type { CommandContext } from "@ofac/workspace-link";
 
 import { CONTEXT_FETCH_COMMAND, answerContextFetch, parseThreadUri } from "../src/context.js";
 import type { TelegramApi, TgMessage } from "../src/tg-client.js";
@@ -65,18 +66,17 @@ function fetchCommand(refs: unknown[], deadline?: string): EnvelopeCommand {
   } as unknown as EnvelopeCommand;
 }
 
-function capturingCtx(): {
-  ctx: { envelope: EnvelopeCommand; publishEvent(env: EnvelopeEvent): Promise<unknown> };
-  published: EnvelopeEvent[];
-} {
+function capturingCtx(): { ctx: CommandContext; published: EnvelopeEvent[] } {
   const published: EnvelopeEvent[] = [];
   return {
     published,
     ctx: {
+      deliveryId: "delivery-ctx-1",
+      signal: new AbortController().signal,
       envelope: fetchCommand([]),
       publishEvent: async (env) => {
         published.push(env);
-        return { status: "accepted" };
+        return { status: "accepted" as const };
       },
     },
   };
@@ -89,8 +89,8 @@ describe("parseThreadUri", () => {
       rootId: "456",
       limit: 20,
     });
-    expect(parseThreadUri("thread://telegram/123/456?limit=5").limit).toBe(5);
-    expect(parseThreadUri("thread://telegram/123/456?limit=999").limit).toBe(50);
+    expect(parseThreadUri("thread://telegram/123/456?limit=5")!.limit).toBe(5);
+    expect(parseThreadUri("thread://telegram/123/456?limit=999")!.limit).toBe(50);
     expect(parseThreadUri("artifact://w/a/b")).toBeUndefined();
     expect(parseThreadUri("thread://telegram/123")).toBeUndefined();
   });
@@ -121,7 +121,7 @@ describe("answerContextFetch", () => {
     expect(data["responder"]).toBe("telegram-inst-1");
     const items = data["items"] as ContextItemView[];
     expect(items).toHaveLength(1);
-    expect(items[0]!.content.messages.map((m) => m.text)).toEqual(["middle", "newest"]);
+    expect(items[0]!.content.messages!.map((m) => m.text)).toEqual(["middle", "newest"]);
   });
 
   it("answers a platform error and a foreign URI as honest error items", async () => {

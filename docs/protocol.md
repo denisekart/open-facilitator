@@ -112,7 +112,7 @@ Events carry identity in the envelope (`source` + `id` + `time`), so their `data
 
 ## Transport neutrality
 
-The contract is transport-independent: the same fixtures MUST validate identically over the SignalR reference transport and the HTTP long-poll fallback, both implemented in the Facilitator (Link transport below; `protocol/openapi/link-v1.yaml` 1.0.2 is the frozen HTTP surface — enroll, events, deliveries, receipts, capabilities GET+POST). Consumers should use the `@ofac/protocol` package (`src/protocol/`): `schemaById` resolves a `dataschema` URI to its schema, `KNOWN_COMMAND_TYPES` is the fail-closed command table, and `validateEnvelope` / `validateReceipt` / `validateControlFrame` return the same `errorClass` taxonomy as the fixtures index.
+The contract is transport-independent: the same fixtures MUST validate identically over the SignalR reference transport and the HTTP long-poll fallback, both implemented in the Facilitator (Link transport below; `protocol/openapi/link-v1.yaml` 2.0.0 is the frozen HTTP surface — enroll, challenge, proof, key rotation, events, deliveries, receipts, capabilities GET+POST). Consumers should use the `@ofac/protocol` package (`src/protocol/`): `schemaById` resolves a `dataschema` URI to its schema, `KNOWN_COMMAND_TYPES` is the fail-closed command table, and `validateEnvelope` / `validateReceipt` / `validateControlFrame` return the same `errorClass` taxonomy as the fixtures index.
 
 ## Kernel ingress
 
@@ -203,43 +203,104 @@ The kernel's own emission path builds outbox envelopes with the same validator b
 
 ## Link transport
 
-The Facilitator serves the Workspace Link contract over two transports with identical application semantics (`src/facilitator/Kernel/Link/`): the SignalR hub at `/hubs/link` (reference transport) and the HTTP surface frozen in `protocol/openapi/link-v1.yaml` 1.0.2 (fallback, every language first-class). Outbox rows addressed `link.<endpointId>` are materialized into the durable delivery ledger `facilitator.link_deliveries` and offered to the endpoint over whichever transport it is speaking.
+The Facilitator serves the Workspace Link contract over two transports with identical application semantics (`src/facilitator/Kernel/Link/`): the SignalR hub at `/hubs/link` (reference transport) and the HTTP surface frozen in `protocol/openapi/link-v1.yaml` 2.0.0 (fallback, every language first-class). Outbox rows addressed `link.<endpointId>` are materialized into the durable delivery ledger `facilitator.link_deliveries` and offered to the endpoint over whichever transport it is speaking.
 
-### Enrollment: dual modes
+### Enrollment: dual modes (identity, not secrets)
 
 `POST /api/link/v1/enroll` presents its credential in the request body
 (`token`), not a bearer header, and the kernel tells the two modes apart by
 the credential's shape:
 
-- **Mode (a) shared secret**: `token` = `Link:EnrollmentToken` (env
-  `Link__EnrollmentToken`); unset + Development accepts the literal
-  `enroll-dev`; unset + non-Development refuses startup (fail closed). The
-  body MUST name `team` — a roster slug (`Link:Teams`, seeded at startup);
-  absent or unknown ⇒ `403 team-unknown`, no on-demand default. `role`
-  (`gateway` | `child`) is optional, default `gateway`.
+- **Mode (a) enrollment code**: `token` = an admin-minted one-time code
+  (`EnrollmentTokenEndpoints` + `EnrollmentTokenStore`: hash-only rows,
+  first-use consumption, revoke kills the enrollment it issued) or the
+  configured bootstrap secret `Link:EnrollmentToken` (env
+  `Link__EnrollmentToken`) — which authenticates the **first admin**, not
+  every endpoint. Unset + Development accepts the literal `enroll-dev`;
+  unset + non-Development refuses startup (fail closed), so a kernel with
+  neither a static token nor a pre-seeded code boots degraded: it accepts
+  nothing and says so. The body MUST name `team` — a roster slug
+  (`Link:Teams`, seeded at startup); absent or unknown ⇒ `403 team-unknown`,
+  no on-demand default. `role` (`gateway` | `child`) is optional, default
+  `gateway`.
 - **Mode (b) workload OIDC**: `token` = an access token whose `aud` contains
   `Link:Evidence:Audience` (default `facilitator-link`), verified against the
   realm JWKS. The `Link:WorkloadIdentities` binding matching `(azp,
   endpointId)` fixes team, role, and delegation acceptance; no binding ⇒ `403
   workload-not-registered`; a body `role` contradicting the binding ⇒ `403
-  role-mismatch`.
+  role-mismatch`. Mode (b)'s identity stays the issuer trust, so its
+  `publicKey`/`keyAlgorithm` are ignored.
+
+Mode (a) also REQUIRES `publicKey` (one raw Ed25519 key, base64url, 43/44
+chars) and `keyAlgorithm` (`ed25519`) — the enrollment REGISTERS AN IDENTITY
+and takes no secret out: the `201` body is `{enrollmentId, trustMode,
+endpointKeyId, seq}`, a fingerprint plus the replay fence to start from
+(2.0.0 deleted `linkToken`/`expiresAt`). A 1.0.x body with no public key is
+a `400 schema-violation`, not a silent enrollment.
 
 Both modes: a `gw.`-prefixed `endpointId` requires `role: gateway` (`403
-role-mismatch`); every other `/api/link/v1/*` request and hub connection
-carries `Authorization: Bearer <linkToken>`; invalid/expired/revoked tokens
-yield `401 unauthorized` with no oracle for whether an enrollment exists.
-All resolution flows through the `ILinkTokenValidator` seam
-(`Kernel/Shared/Auth/ILinkTokenValidator.cs`).
+role-mismatch`).
 
-Enrollment is an upsert by `endpointId` and **rotates the token**: the
-previous `linkToken` stops validating immediately; **role is immutable
-across rotation** (re-role = revoke + re-enroll, else `403 role-mismatch`).
-The response always includes the additive 1.0.1 fields — `linkToken` (opaque
-256-bit base64url) and `expiresAt` (now + `Link:TokenLifetimeHours`, default
-720 h). `trustMode` (`shared-runtime` | `separate-process-same-host` |
-`isolated-executor`) is echoed and MUST be logged at enrollment and at every
-`hello`. The enrollment record (endpoint, team, role, workload
-subject, token hash, manifest + digest, timestamps) is stored server-side.
+### Proving possession: challenge → proof → session
+
+Every authentication after enrollment is a proof of possession, never a
+mounted secret:
+
+1. `POST /api/link/v1/challenge` `{endpointId}` → `{nonce,
+   publicKeyRequired, algorithm, expiresAt}` — **unauthenticated by design**
+   (a challenge proves nothing, so it cannot be guarded by what it is
+   issuing) and single-use for `Link:ChallengeLifetimeSeconds` (default 30
+   s). The nonce carries the row's epoch and fence, and an unknown
+   `endpointId` answers the same `401 unauthorized` a wrong proof does: no
+   existence oracle.
+2. `POST /api/link/v1/proof` `{proof}` — a detached EdDSA JWS (RFC 8037 /
+   7515 subset, `typ: ofac-proof+jwt`) whose payload is `{iss, sub, jti,
+   htm, htu, iat, nbf, exp, nonce, seq, epoch, cbh}` (`sub` = the key id,
+   `cbh` = the channel-binding hash — always present, the empty string when
+   the transport exposes no exporter). Every check fails closed and audits:
+   signature by the enrollment's ACTIVE key, `htm`/`htu` match this request,
+   clock inside the configured skew, nonce present-and-unconsumed, `jti`
+   unseen, `seq` at or above the stored fence (else `replay-suspect`),
+   `epoch` equal to the row's revocation epoch (revocation without a session
+   table), and a non-empty `cbh` when `Link:RequireChannelBinding` is true.
+   The same route accepts a class-`oidc` credential (`{token}`) and mints the
+   same session from JWKS-verified issuer trust.
+3. The `200` is `{sessionToken, expiresAt, seq}` — the session JWT, signed
+   by the kernel's session key (minted once into `admin_config`, so any
+   replica verifies from the shared row with no DB read), valid
+   `Link:SessionTokenLifetimeSeconds` (default **300**).
+
+Every `/api/link/v1/*` request other than `enroll`/`challenge`/`proof`, and
+every hub connection, carries `Authorization: Bearer <sessionToken>`;
+invalid/expired/revoked answers `401 unauthorized` with no oracle for
+whether an enrollment exists. All resolution flows through the
+`ILinkTokenValidator` seam (`Kernel/Shared/Auth/ILinkTokenValidator.cs`),
+whose single implementation is now a session-JWT verifier. Over SignalR the
+`hello` frame itself carries a `proof` (`htm: WS`, `htu` the hub URL,
+verified before any session row opens); a class-`oidc` principal was
+authenticated by issuer trust on the bearer and carries none. `welcome`
+gained the additive 2.0.0 fields `sessionKeyId` and `seq`.
+
+Enrollment is an upsert by `endpointId` and **rotates the key**: a re-enroll
+presenting a new `publicKey` retires the previous key immediately — its
+proofs stop validating, no grace — and the revocation `epoch` bumps so a
+session minted before the rotation dies inside its own 5-minute window.
+**Role is immutable across rotation** (re-role = revoke + re-enroll, else
+`403 role-mismatch`). An endpoint that wants to swap its key without
+re-enrolling calls `POST /api/link/v1/enroll/{endpointId}/rotate` under its
+own session with `{oldKeyId, newPublicKey, proofs: [<jws by the old key>,
+<jws by the new key>]}` — both proofs sign the SAME `{oldKid, newKid, nonce,
+seq}` payload, which is what makes the swap a mutual agreement rather than a
+takeover. A proof by a key retired less than `Link:RotateGraceMinutes`
+(default 60) ago is accepted against a fresh challenge and audits
+`rotate-grace-consumed`; the grace never authorizes a FIRST key, only the
+next rotation, and outside the window the answer is `401
+key-rotation-grace-expired` — revoke and rejoin. `trustMode`
+(`shared-runtime` | `separate-process-same-host` | `isolated-executor`) is
+echoed and MUST be logged at enrollment and at every `hello`. The enrollment
+record (endpoint, team, role, workload subject, credential class
+`oidc | key`, epoch, fence, registered + retired keys, manifest + digest,
+timestamps) is stored server-side.
 
 **Delegation evidence**: commands may carry `actorEvidenceRef` (schema
 `common.v1.json#evidenceRef`, ≤ 2048 chars — amended in 1.0.2 so an
@@ -265,6 +326,8 @@ The server validates the frame against `control.v1.json`, requires `endpointId` 
 ```
 
 **The resume cursor is a hint, the receipt ledger is truth**: `lastKnownAck` is accepted, logged, and never trusted as proof — replay always recomputes the un-acked set from `link_deliveries`.
+
+**A key-class hello without a valid `proof` never opens a session:** the hub verifies it before writing any `link_sessions` row and, on failure, pushes the goodbye (`reason: "proof-failed"`) and returns `null` — the same fail-closed posture as the HTTP proof route.
 
 **Version mismatch (null-return convention):** an empty intersection pushes the client method `Disconnect` carrying the frozen goodbye frame (fixture pair `invalid/control.hello.v9-only.json` → `valid/control.goodbye.incompatible.json`) and `Hello` **returns `null`** instead of a `WelcomeFrame` — the SignalR invocation simply has no result payload; no `link_sessions` row is written (the ephemeral `sessionId` in the goodbye is minted for the frame only):
 
@@ -296,19 +359,27 @@ Over SignalR the receipt posts via the `Receipt` method with the full `receipt.v
 
 **Redelivery:** an `in_flight` row whose `redeliver_after` (= claim + `Link:InFlightLeaseSeconds`, default 120 s) has passed is claimable again — that IS the dropped-receipt mechanism. Delivery identity = the outbox row id, so a receipt arriving for an already-`acked` delivery answers the latest attempt idempotently and the dropped-receipt loop terminates. A `duplicate` receipt terminates redelivery exactly like `accepted` — the client saw the command.
 
-### HTTP fallback surface (link-v1.yaml 1.0.2)
+### HTTP fallback surface (link-v1.yaml 2.0.0)
 
 |Endpoint|Auth|Success|Errors|
 |---|---|---|---|
-|`POST /api/link/v1/enroll`|enrollment secret or workload OIDC token in body|`201` `EnrollResponse {enrollmentId, trustMode, linkToken, expiresAt}`|`400 schema-violation` (missing field, bad JSON), `401 enrollment-secret-invalid` / `workload-token-invalid`, `403 workload-not-registered` / `role-mismatch` / `team-unknown`, `413`|
-|`POST /api/link/v1/artifacts/{id}/confirm`|link bearer|`200` `{artifactId, digest, size, state:"stored"}` (settle a direct-to-store upload: the kernel HEADs the digest-derived key, size-checks, re-hashes the bytes itself — provider ETags are never trusted)|`404 artifact-not-found` (foreign-team, unknown, or bytes-never-landed slot), `422 artifact-digest-mismatch` / `artifact-size-mismatch` (slot spent, deny-audited), `409 artifact-not-pending` / `artifact-not-confirmable`|
-|`PUT /api/link/v1/artifacts/{id}/content`|link bearer|`200` `{artifactId, digest, size, state:"stored"}` (byte push for a link-originated ticket; the kernel counts + SHA-256-hashes the stream; idempotent re-PUT of a stored row)|`404 artifact-not-found` (foreign-team, unknown, or spent row), `422 artifact-digest-mismatch` / `artifact-size-mismatch`, `413` applies to the envelope cap only — never the artifact bytes (see Artifacts)|
-|`GET /api/link/v1/deliveries?wait=0..60&limit=1..64`|link bearer|`200` array of `Delivery` (empty on poll timeout)|`404 session-not-found`, `400 schema-violation` (bad `wait`/`limit`)|
-|`POST /api/link/v1/deliveries/{deliveryId}/receipt`|link bearer|`204` (idempotent re-receipt answers `204` again, overwriting the stored receipt jsonb)|`404 delivery-not-found` (unknown id or another endpoint's delivery), `400 schema-violation`, `413`|
-|`GET /api/link/v1/capabilities`|link bearer|`200` stored CapabilityManifest|`404 capabilities-not-found`|
-|`POST /api/link/v1/capabilities`|link bearer|`204` (stores manifest + SHA-256 digest)|`400 schema-violation`, `403 team-mismatch` (`ownerTeam` ≠ principal's team)|
+|`POST /api/link/v1/enroll`|one-time enrollment code or workload OIDC token in BODY (`token`); mode (a) MUST also post `publicKey` + `keyAlgorithm`|`201` `EnrollResponse {enrollmentId, trustMode, endpointKeyId, seq}` — identity + fence, NO secret|`400 schema-violation` (missing field, missing/malformed `publicKey`, bad JSON), `401 enrollment-secret-invalid` / `workload-token-invalid`, `403 workload-not-registered` / `role-mismatch` / `team-unknown`, `413`|
+|`POST /api/link/v1/challenge`|NONE (a challenge proves nothing, so it cannot be guarded by what it is issuing; shares the `"enroll"` rate-limit budget)|`200` `{nonce, publicKeyRequired, algorithm:"ed25519", expiresAt}` (single-use, `Link:ChallengeLifetimeSeconds`)|`401 unauthorized` (unknown/unenrolled `endpointId` — the same answer a wrong proof gets), `400 schema-violation`, `413`|
+|`POST /api/link/v1/proof`|NONE (the proof authenticates itself; a class-`oidc` endpoint posts `{token}` here instead of `{proof}`)|`200` `{sessionToken, expiresAt, seq}` — the session JWT every other route wants|`401 proof-invalid` / `replay-suspect`, `400 schema-violation`, `413`|
+|`POST /api/link/v1/enroll/{endpointId}/rotate`|link session JWT issued by the CURRENT active key; path must be the authenticated endpoint|`204` (old key retired, new key active, `epoch` untouched, audits `link.key-rotated` ± `link.rotate-grace-consumed`)|`400 schema-violation` (not exactly two proofs, or the two proofs sign different payloads), `401 proof-invalid` / `replay-suspect` / `key-rotation-grace-expired`|
+|`DELETE /api/admin/links/{endpointId}`|admin surface (OIDC, `admin.mutate`)|`204` — the invalidation lever: enrollment revoked, every key retired, `epoch` bumped (live sessions die inside one token lifetime), audits `link.endpoint-revoked`|`404 endpoint-not-enrolled`|
+|`POST /api/link/v1/artifacts/{id}/confirm`|link session JWT|`200` `{artifactId, digest, size, state:"stored"}` (settle a direct-to-store upload: the kernel HEADs the digest-derived key, size-checks, re-hashes the bytes itself — provider ETags are never trusted)|`404 artifact-not-found` (foreign-team, unknown, or bytes-never-landed slot), `422 artifact-digest-mismatch` / `artifact-size-mismatch` (slot spent, deny-audited), `409 artifact-not-pending` / `artifact-not-confirmable`|
+|`PUT /api/link/v1/artifacts/{id}/content`|link session JWT|`200` `{artifactId, digest, size, state:"stored"}` (byte push for a link-originated ticket; the kernel counts + SHA-256-hashes the stream; idempotent re-PUT of a stored row)|`404 artifact-not-found` (foreign-team, unknown, or spent row), `422 artifact-digest-mismatch` / `artifact-size-mismatch`, `413` applies to the envelope cap only — never the artifact bytes (see Artifacts)|
+|`GET /api/link/v1/deliveries?wait=0..60&limit=1..64`|link session JWT|`200` array of `Delivery` (empty on poll timeout)|`404 session-not-found`, `400 schema-violation` (bad `wait`/`limit`)|
+|`POST /api/link/v1/deliveries/{deliveryId}/receipt`|link session JWT|`204` (idempotent re-receipt answers `204` again, overwriting the stored receipt jsonb)|`404 delivery-not-found` (unknown id or another endpoint's delivery), `400 schema-violation`, `413`|
+|`GET /api/link/v1/capabilities`|link session JWT|`200` stored CapabilityManifest|`404 capabilities-not-found`|
+|`POST /api/link/v1/capabilities`|link session JWT|`204` (stores manifest + SHA-256 digest)|`400 schema-violation`, `403 team-mismatch` (`ownerTeam` ≠ principal's team)|
 
-`wait` long-polls (per-endpoint wake channel + 1 s polling safety net + inline materialize/claim; NOTIFY `facilitator_outbox` is a wake hint only) and `limit` is additionally bounded by `maxInFlight − inFlight`. HTTP principals get no `WelcomeFrame`: enrollment + bearer token IS the session bootstrap, **but a live `link_sessions` row is still REQUIRED for the delivery read** (404 `session-not-found` — enroll-then-poll without a handshake gets the 404; as-built that row is minted by a hub `hello`). Every successful `GET /deliveries` refreshes that row's lease (long-poll IS the heartbeat for a socketless principal). `/capabilities` (GET and POST) needs no session at all. Body size gate (413 at 262144) and dedupe keys are identical to Kernel ingress above; a link-originated `work.steer` runs the same `ApplySteerAsync` path as kernel ingress.
+"link session JWT" is always the `Authorization: Bearer <sessionToken>` of a
+session minted by the challenge→proof pair above — since 2.0.0 it is the only
+bearer this plane carries.
+
+`wait` long-polls (per-endpoint wake channel + 1 s polling safety net + inline materialize/claim; NOTIFY `facilitator_outbox` is a wake hint only) and `limit` is additionally bounded by `maxInFlight − inFlight`. HTTP principals get no `WelcomeFrame`: a challenge→proof session IS the whole bootstrap, **but a live `link_sessions` row is still REQUIRED for the delivery read** (404 `session-not-found` — prove-then-poll without a handshake gets the 404; as-built that row is minted by a hub `hello`). Every successful `GET /deliveries` refreshes that row's lease (long-poll IS the heartbeat for a socketless principal). `/capabilities` (GET and POST) needs no session at all. Body size gate (413 at 262144) and dedupe keys are identical to Kernel ingress above; a link-originated `work.steer` runs the same `ApplySteerAsync` path as kernel ingress.
 
 ### Error URIs (extends the Kernel ingress table, same ProblemDetails shape)
 
@@ -319,7 +390,10 @@ Over SignalR the receipt posts via the `Receipt` method with the full `receipt.v
 |`delivery-not-found`|`404`|Unknown receipt `deliveryId` or a delivery of another endpoint|
 |`capabilities-not-found`|`404`|Enrollment never advertised a manifest|
 |`team-mismatch`|`403`|Manifest `ownerTeam` ≠ principal's team|
-|`enrollment-secret-invalid`|`401`|Mode-(a) enroll body `token` ≠ `Link:EnrollmentToken`|
+|`enrollment-secret-invalid`|`401`|Mode-(a) enroll body `token` is neither a live minted code nor `Link:EnrollmentToken`|
+|`proof-invalid`|`401`|Proof of possession failed a fail-closed check (signature not by the ACTIVE key, `htm`/`htu` mismatch, clock outside skew, nonce absent/expired/used, `jti` seen, `cbh` empty under `Link:RequireChannelBinding`); denial audited `link.proof-failed`|
+|`replay-suspect`|`401`|Proof's `seq` is below the stored fence, or the `epoch` disagrees with the row — replay or post-revocation session; audited `link.replay-suspect`|
+|`key-rotation-grace-expired`|`401`|Rotation presented by a key retired more than `Link:RotateGraceMinutes` ago — revoke and re-enroll (the grace authorizes only the NEXT rotation, and only the retired key it names)|
 |`workload-token-invalid`|`401`|Mode-(b) enroll credential fails JWKS/iss/aud/exp validation|
 |`workload-not-registered`|`403`|No `Link:WorkloadIdentities` binding for the token's `(azp, endpointId)`|
 |`role-mismatch`|`403`|Body `role` contradicts the binding, a `gw.` endpoint enrolled non-gateway, or rotation tried to re-role|
@@ -335,15 +409,18 @@ The receipt timestamp is the frozen `processedAt` — an early example's `accept
 - The pump (`LinkDeliveryPump : BackgroundService`) materializes `link.<endpointId>` outbox rows into the ledger **only while a live session exists**, then claims within the window and pushes `Deliver` — the claim phase runs ONLY for endpoints with a socket tracked on this replica; without one the pass is materialize-only. It runs after every `hello`/receipt, on every `NOTIFY facilitator_outbox`, on a 2 s safety poll, and inline (materialize-only) before an HTTP claim, which `GET /deliveries` then performs itself. Un-acked rows stay non-`delivered` in the outbox while the link is down — no outbox row is ever tied to a dead socket.
 - `LinkSink` (`Channel = "link"`) is a routing liveness probe only: live session ⇒ `true` (the pump owns the row via the DB); no session anywhere ⇒ `false` ⇒ the no-route requeue-with-backoff, unchanged.
 - The connection registry tracks THIS replica's sockets only; the DB lease is the cross-replica authority.
-- No secrets in WebSocket query strings for framework clients: the bearer header rides both the negotiate request and the WebSocket upgrade; `?access_token=` is accepted ONLY as the documented fallback for non-TypeScript clients that cannot set headers on the upgrade.
+- No secrets in WebSocket query strings for framework clients: the session-JWT bearer header rides both the negotiate request and the WebSocket upgrade; `?access_token=` is accepted ONLY as the documented fallback for non-TypeScript clients that cannot set headers on the upgrade. The proof of possession always travels in a body or a frame — never a query string.
 - Observability: span `link.handshake` on activity source `Facilitator.Kernel` (tags `facilitator.endpoint_id`, `facilitator.session_epoch`, `facilitator.protocol_version`); counter `facilitator.link.received`; gauge `facilitator.link.sessions`; link claims reuse `facilitator.delivery.attempts`.
 
 ### Config keys (defaults live in code, `LinkOptions.FromConfiguration`)
 
 |Key|Default|Meaning|
 |---|---|---|
-|`Link:EnrollmentToken`|dev: `enroll-dev`; else required|Bootstrap enrollment secret (fail-closed startup gate when unset outside Development)|
-|`Link:TokenLifetimeHours`|720|Link-token expiry issued at enroll|
+|`Link:EnrollmentToken`|dev: `enroll-dev`; else required|Bootstrap enrollment secret — what authenticates the FIRST admin (fail-closed startup gate when unset outside Development: no static token and no pre-seeded code ⇒ the kernel boots degraded, accepting nothing and saying so)|
+|`Link:SessionTokenLifetimeSeconds`|300|Life of the kernel-signed session JWT — the only bearer on the link plane, minted by a verified proof|
+|`Link:ChallengeLifetimeSeconds`|30|Life of a single-use proof nonce (`link_challenges`; `jti` replay records ride the same table)|
+|`Link:RotateGraceMinutes`|60|How long a RETIRED key may still authorize the next rotation; never authorizes a first key|
+|`Link:RequireChannelBinding`|false|When true, a proof whose channel-binding hash `cbh` is empty (transport exposes no TLS exporter) is fatal|
 |`Link:MaxInFlight`|16|Per-session in-flight window (≥1); advertised in `welcome`, enforced at claim|
 |`Link:HeartbeatSeconds`|30 (5..600)|Client heartbeat cadence in `welcome`; SignalR keepalive = this, client timeout = 2×|
 |`Link:LeaseSweeperEnabled`|true|Replica's link pump sweeps expired session leases (closes tracked sockets with a typed goodbye); fake-clock test hosts disable it|
@@ -355,7 +432,7 @@ The receipt timestamp is the frozen `processedAt` — an early example's `accept
 
 ## Client half — Workspace Link SDK
 
-`src/workspace-link` (`@ofac/workspace-link`) is the reference client of the surface above. Entry points: package root (stack-agnostic core: `createLinkClient`, `enroll`, handler/transport interfaces, `FaultInjector`), `/node` (`SignalrTransport`, `HttpPollTransport`, `SqliteLedger`, `postCapabilities`), and the `ofac-linkd` bin (headless supervisor: enroll → capabilities → connect → serve; exit codes 0 clean, 2 config, 3 protocol mismatch, 4 enrollment rejected).
+`src/workspace-link` (`@ofac/workspace-link`) is the reference client of the surface above. Entry points: package root (stack-agnostic core: `createLinkClient`, `enroll`, `loadOrCreateIdentity` + `buildProof` (the keystore + proof helpers), `SessionProvider`, handler/transport interfaces, `FaultInjector`), `/node` (`SignalrTransport`, `HttpPollTransport`, `SqliteLedger`, `postCapabilities`), and the `ofac-linkd` bin (headless supervisor: load-or-mint the identity key in `--state-dir` → enroll it on first boot → prove it for a session → capabilities → connect → serve; exit codes 0 clean, 2 config, 3 protocol mismatch, 4 enrollment rejected). There is no bearer credential to mount: the state dir holds the key, the 5-minute session JWT is minted per expiry, and the `--secret`/`OFAC_ENROLL_SECRET` enrollment code is consumed on first boot.
 
 Delivery pipeline law (enforced in `src/core/client.ts`): an inbound delivery is validated against the frozen schemas BEFORE persisting — an unknown COMMAND type enters the ledger and answers `unsupported`, any other violation answers `rejected` with no ledger row; a fresh, valid delivery is persisted to the durable ledger BEFORE its receipt leaves the process, and a failed receipt send never suppresses the handler result (redelivery converges on `duplicate` without re-running the handler). Outbound events sent while disconnected buffer in the same ledger (`ctx.publishEvent` resolves `accepted`; the buffer drains on the next `ready`).
 

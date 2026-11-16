@@ -23,7 +23,7 @@ public sealed class OutboxDispatcher(
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         using var wake = new SemaphoreSlim(0, 1);
-        var listenerTask = wakeListener.ListenAsync(wake, stoppingToken);
+        var listenerTask = wakeListener.ListenAsync(wake, ct: stoppingToken);
 
         var delay = MinDelay;
         while (!stoppingToken.IsCancellationRequested)

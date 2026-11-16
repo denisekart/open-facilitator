@@ -1,186 +1,296 @@
-# Link credentials after the join: one-time pairing, no standing secrets
+# Link credential lifecycle: identity, not secrets
 
-A design idea, not a decision — nothing below is chosen, and the numbers are
-proposals to argue with. The trigger is a contradiction we keep living with:
-the join ceremony is short-lived and console-gated, but what it mints becomes a
-permanent credential, and the laptop-fleet shape (`examples/local`,
-`examples/aws`) makes "standing bearer token on a laptop" the weakest link in
-an otherwise law-abiding posture.
+Status: decided design idea (not scheduled). All questions from the
+refinement rounds are resolved; what remains open is parked work, not
+undecided shape. Assumes the as-built enroll plane (mode (a) consumed
+enrollment codes, mode (b) JWKS-verified OIDC bound to
+`Link:WorkloadIdentities`, revocation killing the issued enrollment).
+No external consumers exist on the old path: the swap is big-bang, one
+release, no legacy credential class.
 
-## Law today (shipped)
+## The problem
 
-`POST /api/link/v1/enroll` takes its credential in the body (`token`), and the
-kernel tells two modes apart by shape:
+One credential today conflates four responsibilities: authorization to
+join, endpoint identity, endpoint authentication, and rotation. Mode (a)
+proves it — the enrollment code is lawfully single-use, yet the link
+token it issues (`Link:TokenLifetimeHours` = 720) is a permanent
+replayable bearer that also serves as the re-enrollment secret. The
+pairing credential became an endpoint password. The gateway has the
+same disease one level down: `children:` entries authenticate with a
+static shared token, a forever-password on the socket.
 
-- **Mode (a) shared secret** — `token` = `Link:EnrollmentToken`, one literal
-  trusted by every endpoint (`401 enrollment-secret-invalid`, fail-closed
-  startup gate outside Development, dev literal `enroll-dev`). The body names
-  the team; `role` defaults to `gateway`.
-- **Mode (b) workload OIDC** — an access token with `aud: facilitator-link`,
-  whose `(azp, endpointId)` binding in `Link:WorkloadIdentities` fixes team,
-  role, and delegation acceptance (`403 workload-not-registered`).
-- **Admin-minted tokens** (`/api/admin/enroll-tokens`, gated
-  `enrollment-tokens.manage`, TTL default 60 min, max 7 days) are a third
-  entry: hashed at rest, bound to label/team/role, consumed on first enroll.
+## The layer model
 
-The parts that bother me:
+Four concerns, four separate lifecycles:
 
-- **The pairing credential doesn't die.** `EnrollmentTokenEntity` marks
-  `ConsumedAt`/`ConsumedEndpointId` and then says the quiet part out loud:
-  *"afterwards the token is that endpoint's standing re-enroll secret."* The
-  console-gated, hour-scoped join code doubles as the endpoint's permanent
-  password.
-- **The minted credential is long-lived.** `linkToken` is an opaque 256-bit
-  bearer, expires at now + `Link:TokenLifetimeHours` = **720 h**, and re-enroll
-  (an upsert by `endpointId`) is the only rotation path.
-- **Rotation needs the old secret.** Enroll presents the mode-(a) secret again,
-  so an endpoint can rotate only for as long as it keeps that file. The
-  gateway's own rule encodes the dependency: a mounted `OFAC_LINK_TOKEN` with
-  no secret configured gets *no* rotation path at all (`runtime.ts`, the
-  linkd rule).
-- **A leaked token is full impersonation** until it expires or an operator
-  notices: bearer, replayable from anywhere that can reach the hub, with `401
-  unauthorized` leaking nothing about whether the enrollment exists.
-- **Every box in the fleet holds the shared secret** — the container unit
-  scripts, all nine adapter `config.ts` files, `features/src/*/install.sh`,
-  `examples/aws/fleet-launcher`. Leaking one worker leaks the thing that mints
-  new workers.
+| Layer | Mechanism | Lifetime |
+|---|---|---|
+| Authorization to join | one-time enrollment code (kernel) / config-declared bootstrap token (gateway) | minutes, or consumed at first hello |
+| Identity | OIDC workload identity **or** enrolled public key | until revoked |
+| Authentication | proof of possession (key) / issuer trust (OIDC) | per channel or per proof |
+| Session | the authenticated websocket, or a 5-minute kernel-signed token | minutes |
 
-Mode (b) already has the shape we want: a short, re-federated credential. This
-idea is about the other half.
+Both identity sources converge on the same authorization model —
+endpoint, team, role, capabilities, audit, revocation. Authentication
+source changes; authorization law does not. This is what keeps the
+AdmissionGate unchanged: it reads the enrollment row, not the credential
+class.
 
-## The laws the owner actually demands
+## Federated identity (unchanged, as-built — and now load-bearing)
 
-1. **One-time join token, only.** The pairing credential authenticates exactly
-   one enroll. Reuse after consumption is an anomaly, not a re-enrollment.
-2. **No long-lived secrets in steady state.** Whatever sits on an endpoint
-   disk-side is either a key that never leaves the box and is not replayable,
-   or a credential the kernel considers stale within hours.
-3. **Rejoin after arbitrary downtime, no human.** Laptop closed for six weeks
-   (past any TTL you can name) must reconnect using only on-disk material.
-   "Ask the operator to re-mint" is a *diagnosis*, not the rejoin path.
-4. **Proven mechanisms only.** We may adopt a documented scheme wholesale; we
-   may not invent a bespoke handshake.
-5. **No external CA, no mTLS authority.** No new PKI to operate, no cert
-   issuance in the reference stack.
-6. **Revocation semantics unchanged.** Revoke kills the enrollment (and the
-   issued enrollment of a minted token); rejoining after revoke needs a fresh
-   console mint. No new revocation surface.
-7. **Console-only control plane, two scopes.** Mint/revoke lives in the
-   console: an operator (`kernel-operator`/`framework-admin`) mints for any
-   team; a **team-operator** only for their own team, with credentials that
-   cannot out-rank them — no `gw.` binding for another team, no mint that
-   accepts delegated claims. Config-file fleet secrets are bootstrap
-   affordances, not the steady state.
+Mode (b) already exists: JWKS-verified client-credentials JWT, bound to
+a registered workload identity via `azp`. OIDC is **preferred** where an
+issuer exists (AWS, Azure, GHA, Kubernetes, future providers) — those
+endpoints never hold a standing secret. The v1 mapping (static
+registration keyed on `azp`) stands; a subject-pattern refinement is
+later work.
 
-## Candidates
+The split that organizes everything else: **an endpoint either has an
+issuer or it doesn't.** EC2/ECS/GHA/K8s have one (AWS signs instance/
+task identity documents verifiable the way mode (b) verifies OIDC
+JWTs); laptops, server PCs, on-prem boxes, and edge devices do not —
+they are *issuer-less*. Issuer present ⇒ re-attest per boot, zero
+standing secret, a replaced instance is a fresh enroll with no human.
+Issuer-less ⇒ enrolled public key, below. The dichotomy is
+self-consistent: wherever local key sealing would be unreliable (fresh
+task, new instance), an issuer exists; where no issuer exists, the
+machine is stable enough to hold a local key.
 
-**A. One-time pairing + a rotating credential chain** (OAuth 2.0 refresh-token
-rotation, RFC 6749 §10.4 + the reuse-detection rule of the OAuth Security BCP).
-Keep the bearer link token, change its semantics: the pairing token is single
-use and never authenticates anything again; the minted credential rotates with
-a short TTL, each re-enroll replacing it, superseded immediately. *Cost:* no
-new crypto, no new wire fields, fixtures barely move (`expiresAt` shrinks).
-*Weakness:* still a bearer secret at rest — requirement 2 holds only by TTL.
+## Enrolled identity (issuer-less endpoints)
 
-**B. Short access token + refresh chain, OAuth-shaped end to end.** Enroll
-returns `{accessToken (5–15 min), refreshToken}`; the link plane validates the
-access token, the endpoint silently renews (the `oidc-token-provider.ts` cache
-is the same shape, so the client-side pattern exists). *Cost:* two credential
-kinds, and both the HTTP fallback and the WS handshake need a fresh token at
-connect time. *Weakness:* most moving parts, and the at-rest problem is merely
-moved to the refresh token unless A's reuse rules apply to it too.
+`Enrollment code → public-key registration → proof-of-possession`.
 
-**C. Sender-constrained credentials** — DPoP (RFC 9449) or the SSH
-`authorized_keys` model: pin a public key at enroll, sign a server nonce per
-session. The endpoint holds a private key (useless alone to an attacker) and
-proves possession per connection; the kernel stores the pinned key the way it
-stores `TokenSha256` today. *Cost:* one signature per link session, a proof
-transport for both surfaces, a key-at-rest + fingerprint-attestation story.
-*Weakness:* per-*request* proof (true DPoP) is more than we need, and
-per-session is a deviation from the RFC to be honest about — but this is the
-only candidate that satisfies requirement 2 instead of managing it.
+The operator mints a code that is **authorization artifact only**:
+single-use, TTL-bounded, team- and role-bound, revocable before use —
+the as-built EnrollmentTokenStore law, kept verbatim. What changes is
+what the exchange yields:
 
-Excluded by rule 5, for the record: mTLS, a kernel-internal CA, and anything
-needing an out-of-band channel.
+```
+POST /enroll  { enrollmentCode, publicKey, keyAlgorithm, metadata }
+```
 
-## Proposed steady state (laws, not an implementation)
+The endpoint generates an Ed25519 keypair locally; the private key never
+leaves the device. The kernel validates and consumes the code, stores
+the public key, creates the enrollment. The endpoint identity is
+`EndpointId + PublicKey`, never `EndpointId + Secret`. SSH
+`authorized_keys` semantics — pinned key, possession proves identity —
+without SSH transport.
 
-- **Join law:** a pairing credential authenticates one successful enroll from
-  the endpoint that first consumed it. Any later present is `403
-  enrollment-token-consumed`, audited as a **reuse signal** against
-  `ConsumedEndpointId`; a reuse from a *different* source means someone else
-  has the code and is strong enough to grey out the enrollment.
-- **Pairing law:** console-initiated, TTL-bounded (60 min default, 7-day cap)
-  and team-/role-bound at mint as today, single-use, and it may not change the
-  team **or** the role of an existing endpoint.
-- **Credential law:** the steady-state credential is either a pinned key or a
-  credential with a server-side TTL in hours; `Link:TokenLifetimeHours: 720`
-  should stop existing.
-- **Rotation law (mostly unchanged):** rotation replaces the stored hash and
-  the previous token stops validating immediately; role is immutable across
-  rotation, re-role is revoke + re-enroll; team binding and stored capability
-  manifest survive an upsert.
-- **Rejoin law:** a credential may be replaced by an endpoint holding only
-  on-disk material, at any age, without an operator. Idempotency rides
-  machinery that exists — one `link_sessions` row per logical endpoint,
-  `session_epoch` bumped per re-open, lease reconciliation, outbox backoff —
-  so a rejoin after six weeks is a long outbox drain, not a new state.
-- **Reuse-detection law:** a superseded generation presenting itself denies,
-  audits `enrollment-token-reuse`, and flags rather than auto-revokes (two
-  gateway processes racing on one token file must be diagnosable, not bricked);
-  one generation of grace for in-flight requests.
-- **Revocation law (unchanged):** revoke kills the enrollment and the
-  enrollment its minted token issued; re-pairing needs a fresh mint.
-- **Audit law (unchanged in kind):** every enroll, rotation, denial and reuse
-  signal writes one `authorization.evaluated:link` row, hashes only, never a
-  literal; audit failure on an allow path still fails closed.
+The enrollment row stores a **key list**, each entry keyed by key id
+(the fingerprint) with state `active | retired`; exactly one
+`active`. Plus a monotonic `seq` fence (replay law, below). The root of
+trust is possession of the private key; the kernel never stores one.
 
-## What this breaks / open questions
+## Identity follows state (the keystore law)
 
-- **Bootstrap chicken-and-egg.** Rule 7 deletes the steady-state use of
-  `Link:EnrollmentToken`, so what mints the *first* credential on a headless
-  kernel whose console needs an OIDC login? `StartupChecks.cs`, `enroll-dev`
-  and the fail-closed gate need a replacement story (a first-run code printed
-  to the log is the obvious answer, and the obvious thing to argue about).
-- **Gateway child fan-out (biggest surface).** Today every child enrolls
-  itself with the shared secret. Under a one-time credential either a gateway
-  may mint child credentials (a delegated-mint verb scoped to `child` + own
-  team, hence a capability the operator can withhold) or each machine is
-  paired by hand — what `examples/local`'s per-box `localctl enroll` assumes,
-  and what does not scale to per-worker ephemerals.
-- **Client seams.** `token-rotation.ts` (401 ⇒ rotate ⇒ retry) splits into
-  rotate vs needs-repair; `reconnect-supervisor`'s unbounded retry becomes a
-  terminal state worth surfacing; the gateway's enroll-or-mount "static token,
-  no secret" mode has no rotation story today and would be illegal.
-- **HTTP fallback asymmetry.** The fallback has no WelcomeFrame and no lease
-  row — enrollment plus bearer is the whole bootstrap, so a proof-of-possession
-  scheme needs a home there (header) and on the hub (subprotocol or first
-  frame), plus a rule for which is authoritative.
-- **Blast radius.** Every artifact carrying the secret: adapter/harness
-  `config.ts`, `reference/compose.full.yaml` + `reference/config/facilitator.env`,
-  the container unit scripts, `features/src/*/install.sh`,
-  `examples/aws/fleet-launcher`, every `worker.e2e.test.ts` that enrolls as
-  setup. On the contract side: the `enroll.*` fixtures + `COVERAGE.md`, the
-  1.0.1 additive-field promise on `EnrollResponse` (new fields stay additive;
-  new error URIs — `enrollment-token-consumed`, `enrollment-token-reuse`,
-  `proof-invalid` — need rows in `docs/protocol.md`), `tools/scenario-plane`,
-  `docs/runbooks/gateway-offline.md` (401-storm diagnosis), `referencectl verify`.
-- **Should mode (b) just win?** Anything with an IdP already has a credential
-  that expires. The honest minimum may be: one-time pairing code as the only
-  mode-(a) form, workload OIDC as the default elsewhere, C reserved for laptops.
-- **Console surface.** The Links and EnrollmentTokens views
-  (`console-and-site-ux-overhaul`'s Team & Access group) gain a generation
-  lineage, a "needs re-pairing" state distinct from "revoked", a reuse badge,
-  and a mint dialog meaning different things to operator than team-operator.
-- **Doc + dev ergonomics.** `docs/security.md` §Workload plane gets rewritten
-  around the join/credential/rotation split, and the Deferred row
-  *"refresh-token / session lifecycle"* stops being a deferral for this plane.
-  Meanwhile HA, the devcontainer shape and every demo script hardcode one
-  secret for eight endpoints — the dev path must stay one-line after the
-  literal is gone.
+**The stateDir is the logical instance.** Every endpoint already has a
+persistent state directory (gateways: sockets + sqlite ledger resolve
+against it; adapters: their ledger + config). The identity file is
+`<stateDir>/identity.key` — a 32-byte Ed25519 seed plus a small JSON
+header, mode 0600, **plaintext: no sealing tiers.** DPAPI/TPM-class
+sealing derives from the machine, and exactly the machines where
+sealing breaks (fresh tasks, new instances) are the ones that have an
+issuer and hold no key at all. A read-only-root device that offers no
+persistent path is declared stateless: it must use an issuer, or accept
+re-enroll per boot.
 
-None of the above is decided. The decision worth having first is narrow: is
-the steady-state endpoint credential a short rotating bearer (A/B) or a pinned
-key with a proof (C)? The fan-out question, the fixtures, the console views and
-the runbook all follow from that answer, and are worth sequencing only after it.
+Consequences, stated as law:
+
+- **No-backup.** A copied stateDir is a second endpoint with the same
+  identity, admitted until replay detection or revocation says
+  otherwise; copying is not a backup strategy, it is re-introducing a
+  replayable secret.
+- **Migration is `mv`.** Move the stateDir, move the endpoint — ledger
+  and identity relocate together, which is what operators already do
+  when they relocate a gateway.
+- **Restore discipline needs the fence, and gets it** (below):
+  restoring a stale snapshot is a *detected* condition, not a silent
+  split-brain.
+- **Loss = rejoin.** A destroyed device is a new enrollment with a
+  fresh code, one admin PATCH + one mint. Correct posture for the
+  device-held root of trust; the rotation route below is what keeps
+  healthy devices from needing it.
+
+## Replay fence: identity + generation, like everything else in this repo
+
+The kernel fences work executions at a stale
+`current_execution_generation`; the enrollment gets the same pattern.
+Every proof and session token carries the endpoint's monotonic `seq`;
+the kernel stores last-seen per endpoint, **rejects lower**, audits
+`replay-suspect`, and surfaces it on the endpoint's admin view. This
+covers the two clone stories — VM snapshot/restore and stateDir
+copy-promote — without trusting hardware: the stale twin announces
+itself at its first proof. The DPoP `jti` law covers short-window proof
+replay; the `seq` fence covers long-window state replay. Revocation
+epoch and replay `seq` are distinct: epoch answers "is this identity
+still alive", seq answers "is this the freshest evidence of it".
+
+## Key rotation (first-class)
+
+Self-service, no operator, no code, no downtime:
+
+```
+POST /enroll/{endpointId}/rotate   (authenticated like any request)
+     proof by current key   over { oldKid, newKid, nonce, seq }
+     proof by new key       over { oldKid, newKid, nonce, seq }
+```
+
+- **Both keys sign the same payload.** The current key proves
+  authority; the new key proves possession — registering a stranger's
+  public key fails closed. The challenge nonce makes the pair
+  un-replayable.
+- **Atomic swap.** New key becomes the single `active`; old is
+  tombstoned `retired`, never authenticates again. No dual-active
+  window: rotation is proactive, keys do not expire.
+- **Sessions ride through.** HTTP session JWTs are kernel-signed (the
+  endpoint key is not involved mid-session) and the websocket was
+  authenticated at handshake. Only revocation cuts sessions.
+- **Grace window closes the bricked-device hole** (decided):
+  a rotation signed by a just-`retired` key is accepted within a
+  bounded grace period (default 1 h) against a fresh challenge — this
+  covers firmware rollbacks and rotation-crash mid-states, the
+  scenarios where an endpoint is stuck with a key the model considers
+  retired. The grace is a named, audited, time-boxed exception
+  (`rotate-grace-consumed`), not a second trust path: it never
+  authorizes a *first* key, only a next rotation, and only for the
+  specific retired key it names. There is no operator key-replacement
+  override: outside the grace, a stuck key is revoke-and-rejoin.
+- **Compromise is not rotation's job.** Self-rotation presumes a
+  healthy key. A compromised or lost key goes through revocation +
+  fresh code, same as any rejoin.
+- Audit: `key-rotated` with old/new fingerprints; epoch unchanged.
+
+## Authentication
+
+**Websocket (primary):** connect → kernel presents a nonce → endpoint
+returns a **DPoP-style proof** (RFC 9449 subset: `jti` single-use,
+`htm`/`htu`, `iat`, plus a channel-binding hash of the handshake's
+exported keying material) → the socket *is* the session. No bearer,
+no refresh, no standing secret on the primary path.
+
+**HTTP fallback:** proof at the edge → **5-minute kernel-signed JWT**
+`{sub, team, role, auth_source, epoch, seq, exp}` (the `exp` riding
+short, the `seq` fenced, the `epoch` live-checked) → bearer for the
+window. The token is a performance optimization, not an identity.
+Per-request signing stays available for endpoints that want it —
+DPoP proofs carry `htm`/`htu` naturally — but is not the law, because
+the delivery plane is already ledger-idempotent and the replay blast
+radius is small by construction.
+
+**Standards law, decided:** the proof is a **DPoP subset (RFC 9449)**
+carried as a detached EdDSA JWS (RFC 8037/7515). The spec already *is*
+proof-of-possession with channel binding; the kernel plane simply
+doesn't carry the OAuth parts. The spike may only replace it with
+another standard on the closed list (COSE Sign1), and only with
+evidence. Boring, citable crypto is a feature of the plane's
+credibility.
+
+**Revocation stays immediate without a session table** (decided):
+revocation bumps the enrollment's `epoch`; the AdmissionGate — which
+already caches enrollment state per singleton — compares the claim
+against the cache. No session table, no cleanup job, no per-request
+lookup. Cross-replica freshness rides the existing Postgres NOTIFY.
+The session signing key is a kernel asymmetric key in `admin_config`
+(shared across replicas, no external CA, verifiable by any replica
+without the DB). Epoch-per-enrollment is all-or-nothing by design;
+per-session kills are parked until an operator story demands the
+granularity.
+
+## The gateway is the principal — and a mini-kernel for its fleet
+
+Workers are execution resources, not security principals; the kernel
+trusts gateways, worker names (`gw/name`) are gateway-owned metadata.
+This ratifies as-built topology: the gateway holds one link enrollment,
+runs the child fleet over its own socket law (fleet-of-one, per-child
+quotas, lease/heartbeat, `goaway`).
+
+**The recursive law (decided): the gateway is a mini-kernel for its
+fleet, and no runtime minting is required.** The auth stack repeats one
+level down with the *same* shapes:
+
+- **Authorization:** the `children:` config block is the declaration —
+  a child listed with a bootstrap token (the as-built `token` /
+  `OFAC_CHILD_SECRET`) is exactly a minted code: authorization artifact
+  only. The operator spoke when writing the config, the same moment a
+  kernel code gets minted, just declaratively.
+- **Identity:** first `hello` from a declared child carries
+  `{name, token, publicKey}` — the token pins the key and retires
+  forever. Pinned key = child identity.
+- **Authentication:** every later `hello` is a DPoP-style proof by the
+  pinned key. The bootstrap token never authenticates anything again —
+  the forever-password is gone, demoted to first-boot pairing secret.
+- **Session:** the socket, under the unchanged lease/heartbeat law.
+
+Local children keep the unix-socket (and peer-uid pin) as physical
+reinforcement *under* the proof; remote children — already wire-legal
+on the identical-framing TCP fallback — gain a TLS listener mode on the
+gateway and lean entirely on the proof. Loss/rebuild: fresh token in
+the config, first hello re-pins — re-enrollment with a fresh code, the
+same story one level up. A gateway therefore needs no admin surface of
+its own for identity: config is its admin surface.
+
+## The big-bang swap
+
+No consumer ships against the old path: one release, one wire.
+
+- Enrollment token store, admin mint/revoke surface, OIDC leg:
+  unchanged.
+- `/enroll` mode (a) stops returning a bearer secret and starts taking
+  `{publicKey, keyAlgorithm}`; the bearer re-enroll path, the issued
+  link token, and `Link:TokenLifetimeHours` delete in the same
+  release. Credential classes on the enrollment row: `oidc | key`,
+  closed set.
+- `LinkBearerHandler` keeps one job: validating the 5-minute session
+  JWT. No long-lived-bearer branch survives.
+- Every in-repo endpoint — the five communication adapters, the
+  harnesses, the gateway — gains a stateDir keystore (law above) and a
+  first-boot flow: present the minted code, register the generated
+  public key. The self-enrollment law survives unchanged in shape:
+  enroll on boot, degraded-loud until enrolled.
+- Child wire: `hello` grows `publicKey`; `hello.token` becomes
+  first-boot-only; the gateway ledger grows the pinned-key table.
+- Conformance fixtures gain the new enroll shape; the old ones go.
+  Wire version bumps once.
+- Bootstrap: the static `Link:EnrollmentToken` retires from "what
+  enrolls endpoints" to "what authenticates the first admin", and the
+  first code is minted through the admin surface like every code after
+  it. A kernel with neither a static token nor a pre-seeded code boots
+  degraded (accepts nothing, says so) rather than implied-open.
+
+## Audit
+
+Lifecycle verbs, fingerprints only (key = SHA-256 of the public key,
+base64) — the hash-only rule the EnrollmentTokenStore already applies
+to codes extends to keys. No private material, no literal secrets,
+ever:
+
+`enrollment-issued`, `enrollment-consumed`, `enrollment-reuse-attempt`,
+`challenge-issued`, `proof-verified`, `proof-failed`, `session-issued`,
+`endpoint-revoked`, `key-rotated`, `rotate-grace-consumed`,
+`replay-suspect`, `child-key-pinned`.
+
+Revocation semantics are unchanged in force: revoke the endpoint and
+the enrollment, every active key, every derived proof, every issued
+session — and, for a gateway, its whole pinned fleet — die together;
+rejoin requires a fresh code (or a fresh config token, one level down).
+
+Everything the old plane earned stays earned: fail closed,
+audit-everything, no external CA, no mTLS requirement, self-hostable,
+immediate revocation, OIDC leg, versioned wire, operator-controlled
+enrollment.
+
+## Parked, not open
+
+Each of these has a decided default; a real deployment can reopen with
+evidence:
+
+- **OIDC subject-pattern binding** — the `azp` registration is the v1
+  mapping; narrower matching waits for a federation that needs it.
+- **Per-session revocation granularity** — epoch-per-enrollment is the
+  law; a jti deny-list appears only if an operator story demands
+  killing one session while sparing the endpoint.
+- **Challenge-endpoint DoS posture** — inherits the AdmissionGate's
+  existing per-endpoint budget law; the challenge leg gets the same
+  budget line, nothing bespoke.
+- **DPoP-subset → COSE Sign1** — allowed by the standards law only via
+  spike evidence.

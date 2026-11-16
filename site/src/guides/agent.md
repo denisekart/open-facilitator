@@ -14,7 +14,9 @@ well. If a human is at the keyboard, send them to the
   (`/api/*` human plane, `/api/link/v1/*` + `/hubs/link` link plane).
   There is no backdoor; even the console is a client of this API.
 - **Human-plane** calls need an OIDC bearer. **Link-plane** calls need a
-  per-endpoint `linkToken`. Never mix them.
+  per-endpoint **session token**: enroll once (your Ed25519 public key is
+  pinned), then buy short sessions by proving possession of the key. Never
+  mix them.
 - Writes are **at-least-once + idempotent**. Dedupe on `(event_source,
 event_id)` / `commandId` / `(provider, provider_delivery_id)`.
   Retrying is correct; double-applying is impossible by construction.
@@ -66,8 +68,10 @@ on those, not on message strings.
 sequenceDiagram
   participant A as Your agent (endpoint)
   participant F as Open Facilitator
-  A->>F: POST /api/link/v1/enroll (team secret)
-  F-->>A: 201 linkToken (old token dies now)
+  A->>F: POST /api/link/v1/enroll (team secret + your public key)
+  F-->>A: 201 { enrollmentId, endpointKeyId, seq } — no bearer, the key is pinned
+  A->>F: POST /api/link/v1/challenge → proof (signed by your key)
+  F-->>A: 200 { sessionToken (5 min), expiresAt, seq }
   A->>F: POST /api/link/v1/capabilities (your manifest)
   A->>F: hello (hub) — session opens
   F-->>A: Deliver: work.assign (durable ledger row)
@@ -78,12 +82,18 @@ sequenceDiagram
 ```http
 POST /api/link/v1/enroll
 { "token": "enroll-dev", "endpointId": "gw.my-team",
-  "team": "team-alpha", "role": "gateway", "trustMode": "shared-runtime" }
-→ 201 { "linkToken": "...", "expiresAt": "..." }
+  "team": "team-alpha", "role": "gateway", "trustMode": "shared-runtime",
+  "publicKey": "<raw ed25519, base64url>", "keyAlgorithm": "ed25519" }
+→ 201 { "enrollmentId": "...", "trustMode": "shared-runtime",
+        "endpointKeyId": "sha256:...", "seq": 0 }
 ```
 
-Store `linkToken` durably — enrollment is an upsert and the old token dies
-immediately. Then `POST /api/link/v1/capabilities` (your capability
+Store the **private key** durably (a plain file beside your state — enrollment
+is an upsert, and a restart re-proves the same key, so the enrollment code is
+needed only on first boot). Then buy a session: `POST /api/link/v1/challenge`
+gets a nonce, `POST /api/link/v1/proof` carries a detached Ed25519 JWS bound to
+it and answers `{ sessionToken, expiresAt, seq }` — a ~5-minute bearer you put
+in `Authorization` and re-mint before it lapses. Then `POST /api/link/v1/capabilities` (your capability
 manifest), open a session (`hello` on `/hubs/link`, or a `@ofac/
 workspace-link` transport), long-poll
 `GET /api/link/v1/deliveries?wait=30`, and answer each delivery with

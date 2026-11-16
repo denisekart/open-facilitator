@@ -402,6 +402,13 @@
       "errorClass": "schema-violation"
     },
     {
+      "file": "invalid/enroll.no-publickey.json",
+      "expect": "invalid",
+      "class": "enroll",
+      "schemaFile": "enroll-request.v1.json",
+      "errorClass": "schema-violation"
+    },
+    {
       "file": "valid/command.assign.oidc-evidence.json",
       "expect": "valid",
       "class": "command",

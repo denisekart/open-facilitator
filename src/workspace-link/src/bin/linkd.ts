@@ -1,5 +1,6 @@
 // ofac-linkd — the headless Link supervisor (spec §8.2 supervisor entrypoint).
-// Enroll (or reuse a token) → publish capabilities → connect → execute
+// Load-or-mint the identity key in --state-dir → enroll it (first boot only) →
+// prove it for a 5-minute session → publish capabilities → connect → execute
 // injected handlers → survive disconnect/restart with replay.
 //
 // Exit codes (locked): 0 clean · 2 config error · 3 protocol mismatch ·
@@ -15,8 +16,10 @@ import {
   createStubHandler,
   enroll,
   EnrollmentError,
+  loadOrCreateIdentity,
   parseArgv,
   ProtocolMismatchError,
+  SessionProvider,
   type LinkClient,
   type LinkdConfig,
   type LinkHandler,
@@ -32,19 +35,22 @@ import {
   SqliteLedger,
 } from "../node/index.js";
 
-const USAGE = `ofac-linkd run --url <facilitatorBaseUrl> (--token <linkToken> | --secret <enrollmentSecret>)
-                --endpoint <endpointId> --team <teamSlug> --manifest <path.json>
-                [--role child|gateway] [--trust-mode isolated-executor] [--transport signalr|http-poll]
-                [--state <sqlitePath>] [--mode echo|stub]
+const USAGE = `ofac-linkd run --url <facilitatorBaseUrl> --endpoint <endpointId> --team <teamSlug>
+                --manifest <path.json> [--role child|gateway]
+                [--trust-mode isolated-executor] [--transport signalr|http-poll]
+                [--state-dir <dir>] [--mode echo|stub]
 
 --team is the kernel team roster slug (Link:Teams) the enrollment binds to
 (403 team-unknown otherwise); --role must satisfy the gw. prefix law (a
 gw.-prefixed endpoint must enroll as gateway).
 
-Enroll with --secret or OFAC_ENROLL_SECRET (the env var is consulted first —
-argv is visible in ps; prints the minted link token to stderr; mount it as
-OFAC_LINK_TOKEN on the next start and pass it via --token), publish the
-capability manifest, connect outbound, and serve command deliveries.
+The identity is an Ed25519 key pair created in --state-dir on first boot
+(default ./ofac-link-state; identity.key is 0600, the state dir IS the logical
+instance: no backup, migration is \`mv\`, loss is a rejoin). --secret /
+OFAC_ENROLL_SECRET (env consulted first — argv is visible in ps) is the
+FIRST-BOOT-ONLY enrollment code: after the key is enrolled it is not needed,
+and every later authentication is a proof of possession. There is no bearer
+credential to mount: the 5-minute session JWT is minted per expiry.
 Exit codes: 0 clean, 2 config error, 3 protocol mismatch, 4 enrollment rejected.`;
 
 export interface RunHandle {
@@ -70,54 +76,44 @@ export async function run(
     throw new ConfigError(`manifest ownerTeam '${manifest.ownerTeam}' ≠ --team '${config.team}'`);
   }
 
-  // Rotatable credential: enroll rotates the old token, so refresh re-enrolls.
-  const activeToken = { value: config.token ?? "" };
-  const tokenProvider: LinkTokenProvider = {
-    getToken: async () => activeToken.value,
-    refresh: async () => {
-      if (config.secret === undefined) return; // static token: nothing to rotate
-      const response = await enroll({
+  // Identity, not secrets: the key lives in the state dir; a missing code means
+  // the endpoint already enrolled and boots straight into proof+session.
+  const identity = loadOrCreateIdentity(config.stateDir);
+  if (config.secret !== undefined) {
+    const response = await enroll(
+      {
         baseUrl: config.url,
         token: config.secret,
         endpointId: config.endpointId,
         instanceId: `lnk-${randomBytes(8).toString("hex")}`,
         trustMode: config.trustMode,
+        publicKey: identity.publicKeyBase64Url,
+        keyAlgorithm: "ed25519",
         role: config.role,
         team: config.team,
-      });
-      if (response.linkToken !== undefined) activeToken.value = response.linkToken;
-    },
-  };
-
-  if (config.secret !== undefined) {
-    const response = await enroll({
-      baseUrl: config.url,
-      token: config.secret,
-      endpointId: config.endpointId,
-      instanceId: `lnk-${randomBytes(8).toString("hex")}`,
-      trustMode: config.trustMode,
-      role: config.role,
-      team: config.team,
-    });
-    if (response.linkToken === undefined) {
-      throw new EnrollmentError(201, {
-        detail: "server issued no linkToken; restart with --token",
-      });
-    }
-    activeToken.value = response.linkToken;
+      },
+      fetch,
+    );
     process.stderr.write(
-      `linkd link token minted (mount as OFAC_LINK_TOKEN): ${response.linkToken}\n`,
+      `linkd enrolled endpointKeyId=${response.endpointKeyId} seq=${response.seq}\n`,
     );
   }
-  if (activeToken.value === "")
-    throw new ConfigError("no usable token (--token or --secret required)");
+
+  // The standing credential: challenge -> proof -> 5-minute session JWT,
+  // re-proved on 401 (never re-enrolled).
+  const tokenProvider: LinkTokenProvider = new SessionProvider({
+    baseUrl: config.url,
+    endpointId: config.endpointId,
+    identity,
+    logger,
+  });
 
   // Capabilities: postCapabilities serializes once and digests the POSTed
   // body, so hello's capabilityManifestDigest covers the exact bytes the
   // server stores.
   const { digest } = await postCapabilities(manifest, {
     baseUrl: config.url,
-    getToken: tokenProvider.getToken,
+    getToken: () => tokenProvider.getToken(),
   });
 
   const ledger = new SqliteLedger(config.statePath);
@@ -182,8 +178,13 @@ export async function main(argv: readonly string[]): Promise<number> {
       return 2;
     }
     if (error instanceof EnrollmentError) {
-      process.stderr.write(`linkd enrollment refused: ${error.message}\n`);
-      return 4;
+      // 4xx is a refusal the supervisor cannot retry around; 5xx is a kernel
+      // that is not ready yet — exit 1, the restart loop owns the retry.
+      const terminal = error.status >= 400 && error.status < 500;
+      process.stderr.write(
+        `linkd enrollment ${terminal ? "refused" : "deferred"}: ${error.message}\n`,
+      );
+      return terminal ? 4 : 1;
     }
     if (error instanceof ProtocolMismatchError) {
       process.stderr.write(`linkd protocol mismatch: ${error.message}\n`);

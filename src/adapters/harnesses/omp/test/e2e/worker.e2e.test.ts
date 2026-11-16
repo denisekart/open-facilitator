@@ -27,7 +27,7 @@ import {
   E2E,
   gatewayConfig,
   gatewayStatus,
-  gatewayToken,
+  gatewaySession,
   inboxRowsByType,
   kernelToken,
   psql,
@@ -59,6 +59,8 @@ function startWorker(options: {
   workDir: string;
   kernelUrl: string;
   token: string;
+  kernelEndpoint: string;
+  enrollSecret: string;
 }): WorkerHandle {
   const dir = mkdtempSync(join(tmpdir(), "omp-e2e-"));
   const configPath = join(dir, "worker.yaml");
@@ -85,6 +87,11 @@ interactivity: mcp
       OFAC_OMP_BIN: process.execPath, // the fake-CLI seam: node fake-omp.mjs
       OFAC_OMP_ARGS: JSON.stringify([FAKE_OMP]),
       OFAC_FAKE_OMP_HOLD_MS: "20000", // a wide steer/kill window
+      // The kernel leg is the bin's own endpoint relationship: a key in the
+      // worker's workDir, the enrollment code spent on the first boot that
+      // has nothing on file, 5-minute sessions after.
+      OFAC_KERNEL_ENDPOINT: options.kernelEndpoint,
+      OFAC_ENROLL_SECRET: options.enrollSecret,
     },
   });
   let log = "";
@@ -217,20 +224,12 @@ describe.skipIf(!E2E)("omp worker e2e", () => {
       });
       return Promise.race([p, guard]).finally(() => clearTimeout(timer!));
     };
-    // Same verbatim-token law as the deterministic e2e: a child enrollment,
-    // the link token rides the child wire AND the kernel artifact plane.
-    const childToken = await (async () => {
-      const r = await linkPost(harness.baseUrl, "/api/link/v1/enroll", "enroll-dev", {
-        token: "enroll-dev",
-        endpointId: "omp-e2e-child",
-        instanceId: "e2e-omp-worker",
-        trustMode: "isolated-executor",
-        team: "team-alpha",
-        role: "child",
-      });
-      if (r.status !== 201) throw new Error(`child enroll failed: ${r.status}`);
-      return String((r.body as { linkToken: string }).linkToken);
-    })();
+    // No harness-side enrollment any more: the worker bin runs the
+    // first-boot law itself (kernel-leg env, below) — a key in its own
+    // workDir, the dev enrollment code spent on the boot that has nothing
+    // on file. The child wire of the empty-fleet standalone Gateway admits
+    // any pairing token.
+    const childToken = "enroll-dev";
     const projectRows = await psql(
       harness.dbUrl,
       `INSERT INTO facilitator.projects (project_id, team_id, name, config, created_at)
@@ -287,13 +286,15 @@ describe.skipIf(!E2E)("omp worker e2e", () => {
         workDir,
         kernelUrl: harness.baseUrl,
         token: childToken,
+        kernelEndpoint: "omp-e2e-child",
+        enrollSecret: "enroll-dev",
       });
       await withDump(worker.ready(), "awaiting worker ready line");
       const caps = await waitFor("capability union POST", async () => {
         const r = await linkGet(
           harness.baseUrl,
           "/api/link/v1/capabilities",
-          gatewayToken(gw.stateDir),
+          await gatewaySession(gw.stateDir, harness.baseUrl),
         );
         if (r.status !== 200) return false;
         const m = r.body as { capabilities: { id: string }[]; ownerTeam: string };
@@ -417,6 +418,8 @@ describe.skipIf(!E2E)("omp worker e2e", () => {
         workDir,
         kernelUrl: harness.baseUrl,
         token: childToken,
+        kernelEndpoint: "omp-e2e-child",
+        enrollSecret: "enroll-dev",
       });
       await worker.ready();
       const lost = await waitFor("probe settles the row lost", async () => {

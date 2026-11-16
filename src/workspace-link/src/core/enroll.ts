@@ -7,11 +7,15 @@ import { EnrollmentError, type ProblemDetails } from "./errors.js";
 
 export interface EnrollOptions {
   baseUrl: string;
-  /** Mode (a): enrollment secret (config Link:EnrollmentToken; dev: `enroll-dev`). Mode (b): an OIDC client-credentials JWT. */
+  /** Mode (a): one-time enrollment code (config Link:EnrollmentToken or a minted code; dev: `enroll-dev`). Mode (b): an OIDC client-credentials JWT. */
   token: string;
   endpointId: string;
   instanceId: string;
   trustMode: EnrollRequestV1["trustMode"];
+  /** Mode (a): the endpoint's identity — raw Ed25519 public key, base64url (from the keystore). */
+  publicKey: string;
+  /** The only algorithm the v1 wire admits. */
+  keyAlgorithm: "ed25519";
   /** Workload role claim; the kernel rejects contradictions with a mode-(b) binding or the gw. prefix law. */
   role?: "gateway" | "child";
   /** Team roster slug to bind (required for mode (a); a mode-(b) binding's team wins). */
@@ -31,6 +35,8 @@ export async function enroll(
     endpointId: opts.endpointId,
     instanceId: opts.instanceId,
     trustMode: opts.trustMode,
+    publicKey: opts.publicKey,
+    keyAlgorithm: opts.keyAlgorithm,
     ...(opts.role ? { role: opts.role } : {}),
     ...(opts.team ? { team: opts.team } : {}),
   };

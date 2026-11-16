@@ -6,7 +6,7 @@
 //   · recovery = a fresh keeper handshake, after which un-acked work flows
 //     again (re-mint + drain).
 import { describe, expect, it } from "vitest";
-import { createStubHandler } from "../../src/index.js";
+import { createStubHandler, type LinkTokenProvider } from "../../src/index.js";
 import { HttpPollTransport } from "../../src/node/index.js";
 import {
   assignEnvelope,
@@ -27,11 +27,8 @@ describe.skipIf(!E2E)("http-poll transport", () => {
     const a = await sdkClient(h, {
       endpointId,
       handler: createStubHandler(),
-      transportFactory: (token: string) =>
-        new HttpPollTransport(
-          { baseUrl: h.baseUrl, waitSeconds: 2 },
-          { getToken: async () => token },
-        ),
+      transportFactory: (provider: LinkTokenProvider) =>
+        new HttpPollTransport({ baseUrl: h.baseUrl, waitSeconds: 2 }, provider),
     });
     expect(a.client.session?.protocolVersion).toBe("v1");
 
@@ -53,13 +50,21 @@ describe.skipIf(!E2E)("http-poll transport", () => {
     expect(a.client.counters.processed).toBe(1);
 
     // With a live session, an idle GET answers 200 + [].
-    const idle = await linkGet(h.baseUrl, "/api/link/v1/deliveries?wait=0", a.token);
+    const idle = await linkGet(
+      h.baseUrl,
+      "/api/link/v1/deliveries?wait=0",
+      await a.provider.getToken(),
+    );
     expect(idle.status).toBe(200);
     expect(idle.body).toEqual([]);
 
     // Graceful stop ⇒ goodbye ⇒ row deleted ⇒ frozen 404 rule on the surface.
     await a.client.stop("test-done");
-    const gone = await linkGet(h.baseUrl, "/api/link/v1/deliveries?wait=0", a.token);
+    const gone = await linkGet(
+      h.baseUrl,
+      "/api/link/v1/deliveries?wait=0",
+      await a.provider.getToken(),
+    );
     expect(gone.status).toBe(404);
     expect((gone.body as { type: string }).type).toContain("session-not-found");
 
@@ -67,13 +72,10 @@ describe.skipIf(!E2E)("http-poll transport", () => {
     // keeper; new work flows over the revived session.
     const c = await sdkClient(h, {
       endpointId,
-      token: a.token,
+      stateDir: a.stateDir,
       handler: createStubHandler(),
-      transportFactory: (token: string) =>
-        new HttpPollTransport(
-          { baseUrl: h.baseUrl, waitSeconds: 2 },
-          { getToken: async () => token },
-        ),
+      transportFactory: (provider: LinkTokenProvider) =>
+        new HttpPollTransport({ baseUrl: h.baseUrl, waitSeconds: 2 }, provider),
     });
     const d2 = await seedDelivery(
       h.baseUrl,

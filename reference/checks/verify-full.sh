@@ -334,8 +334,12 @@ FJ_PR_SHA=""
 
 step_forgejo_boot() {
   local health
-  health=$(curl -fs --max-time 5 "$VERIFY_FORGEJO_ADAPTER/healthz") \
+  # The previous tier restarts the facilitator mid-run, and the adapter's
+  # re-enroll/re-register rides that restart: one cold probe races it (the
+  # house law — waits ride poll_until, never a lucky instant).
+  poll_until 30 curl -fs --max-time 5 "$VERIFY_FORGEJO_ADAPTER/healthz" >/dev/null \
     || { step_fail "forgejo adapter /healthz unreachable on $VERIFY_FORGEJO_ADAPTER"; full_logs forgejo-adapter; return 1; }
+  health=$(curl -fs --max-time 5 "$VERIFY_FORGEJO_ADAPTER/healthz")
   echo "$health" | jq -e '.ok == true and .endpointId == "forgejo-adapter"' >/dev/null \
     || { step_fail "forgejo adapter not ready: $health"; full_logs forgejo-adapter; return 1; }
   full_psql "SELECT 1 FROM facilitator.link_sessions WHERE logical_endpoint_id = 'forgejo-adapter' LIMIT 1" | grep -q 1 \

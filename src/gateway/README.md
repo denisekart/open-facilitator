@@ -16,14 +16,14 @@ kind: Gateway
 gatewayId: gw.team-a          # ^gw\.[a-z0-9]([a-z0-9-]*[a-z0-9])?$
 team: team-alpha              # kernel roster slug (config Link:Teams); 403 team-unknown otherwise
 facilitatorUrl: http://localhost:8080   # or OFAC_KERNEL_URL (env wins — the deployment origin repoints it, e.g. at a kernel LB)
-enrollmentSecret: enroll-dev  # or OFAC_ENROLL_SECRET (env wins); optional once <stateDir>/token exists
+enrollmentSecret: enroll-dev  # or OFAC_ENROLL_SECRET (env wins); FIRST-BOOT-ONLY enrollment code — not needed once <stateDir>/identity.key exists
 role: gateway                 # sent at enrollment (default gateway; gw.* endpoints MUST be gateway)
-# workload:                     # mode-(b) enrollment: OIDC client-credentials instead of the secret
+# workload:                     # mode-(b) enrollment: OIDC client-credentials instead of the code
 #   tokenUrl: https://idp/realms/facilitator/protocol/openid-connect/token
 #   clientId: gw-team-a           # the kernel binds (azp, endpointId) via a Link:WorkloadIdentities entry
 #   clientSecret: s3cret        # OFAC_OIDC_TOKEN_URL/CLIENT_ID/CLIENT_SECRET env wins per-key
 trustMode: shared-runtime
-stateDir: ./gw-state          # link.sqlite3 + gateway.sqlite3 + token, mode 0700
+stateDir: ./gw-state          # identity.key (the credential) + link.sqlite3 + gateway.sqlite3, mode 0700
 mode: embedded                # embedded | shared | standalone (default: embedded)
 child:
   name: echo                  # embedded only: single in-process child
@@ -40,13 +40,14 @@ Fleet modes replace `child:` with a `children:` fleet list + a
 mode: shared
 children:
   - name: builder             # childWorkspaceId = gw.team-a/builder
-    token: s3cret             # per-child auth; fallback: OFAC_CHILD_SECRET
+    token: s3cret             # first-hello bootstrap only: the child's key is pinned then
     maxInFlight: 1            # quota: over-quota assigns answer child-busy
     timeoutSeconds: 120
 childTransport:
   socket:
     path: child.sock          # primary; allowedUid optional
   tcp: { port: 8899 }         # optional localhost fallback, same protocol
+  tls: { port: 8900, cert: cert.pem, key: key.pem }  # remote children; also the non-empty `cbh`
   handshakeTimeoutSeconds: 5  # hello deadline
   leaseMissedBeats: 2         # lease: N missed heartbeats ⇒ offline
 ```

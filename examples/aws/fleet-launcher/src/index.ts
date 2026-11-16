@@ -7,14 +7,13 @@
 // port: like every other workspace workload, the launcher dials the kernel
 // out. Stateless apart from the SQLite delivery ledger and the in-process
 // task map.
-import { randomBytes } from "node:crypto";
 import {
+  createEndpointCredential,
+  identityDirFor,
   createLinkClient,
-  enroll,
   type LinkClient,
   type LinkLogger,
   type LinkTransport,
-  type LinkTokenProvider,
 } from "@ofac/workspace-link";
 import { SignalrTransport, SqliteLedger, postCapabilities } from "@ofac/workspace-link/node";
 import { EcsClient, type EcsApi } from "./ecs.js";
@@ -81,34 +80,23 @@ export async function run(
   const ecs = deps.ecs ?? new EcsClient();
   const env = deps.env ?? process.env;
 
-  // ── link plane: enroll (secret mode) → capabilities → client ───────────
-  // The enrollment shape is the oci launcher's verbatim: secret-mode POST
-  // /enroll with an instanceId, trustMode isolated-executor, role child. The
-  // instanceId law is copied exactly: a fresh random id per launcher start
-  // (a fixed OFAC_INSTANCE_ID overrides it for operators who want one).
-  const activeToken = { value: "" };
-  const enrollSelf = async (): Promise<void> => {
-    const response = await enroll({
-      baseUrl: config.kernelUrl,
-      token: config.enrollToken,
-      endpointId: config.endpointId,
-      instanceId: config.instanceId ?? `lnk-${randomBytes(8).toString("hex")}`,
-      trustMode: "isolated-executor",
-      role: "child",
-      team: config.team,
-    });
-    if (response.linkToken !== undefined) activeToken.value = response.linkToken;
-  };
-  const token: LinkTokenProvider = {
-    getToken: async () => activeToken.value,
-    // 401 ⇒ rotate: re-enrollment mints a fresh token (the SDK law).
-    refresh: enrollSelf,
-  };
-  await enrollSelf();
-  if (activeToken.value === "") {
-    throw new Error("enrollment issued no linkToken");
-  }
-
+  // ── link plane: identity → first-boot enroll → sessions → client ────────
+  // The fleet's one credential law (see createEndpointCredential): an Ed25519
+  // identity beside the ledger, the enrollment code spent on the boot that has
+  // nothing on file, every later bearer a short session JWT.
+  const { provider: token } = await createEndpointCredential({
+    stateDir: identityDirFor(config.statePath),
+    baseUrl: config.kernelUrl,
+    endpointId: config.endpointId,
+    team: config.team,
+    trustMode: "isolated-executor",
+    role: "child",
+    enrollSecret: config.enrollToken,
+    logger,
+    ...(deps.fetchImpl === undefined ? {} : { fetchImpl: deps.fetchImpl }),
+    instancePrefix: "lnk",
+    ...(config.instanceId === undefined ? {} : { instanceId: config.instanceId }),
+  });
   const { digest } = await postCapabilities(launcherManifest(config.team), {
     baseUrl: config.kernelUrl,
     getToken: token.getToken,

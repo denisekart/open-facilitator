@@ -120,6 +120,11 @@ public static class ProblemErrors
         Create("session-not-found", "Session not found", StatusCodes.Status404NotFound,
             $"no live link session for '{endpointId}' (enroll + hello/handshake first)");
 
+    /// <summary>404 no enrollment of any era for the endpoint (DELETE admin links).</summary>
+    public static ProblemDetails EndpointNotEnrolled(string endpointId) =>
+        Create("endpoint-not-enrolled", "Endpoint not enrolled", StatusCodes.Status404NotFound,
+            $"no enrollment on file for '{endpointId}' — there is nothing to revoke");
+
     /// <summary>404 unknown deliveryId or a delivery of another endpoint.</summary>
     public static ProblemDetails DeliveryNotFound(Guid deliveryId) =>
         Create("delivery-not-found", "Delivery not found", StatusCodes.Status404NotFound,
@@ -139,6 +144,24 @@ public static class ProblemErrors
     public static ProblemDetails EnrollmentSecretInvalid() =>
         Create("enrollment-secret-invalid", "Enrollment secret invalid", StatusCodes.Status401Unauthorized,
             "the enrollment token did not match Link:EnrollmentToken");
+
+    /// <summary>401 a proof of possession failed a check (signature, nonce, jti,
+    /// htm/htu, clock, channel binding) — fail-closed, and the reason never
+    /// discriminates enough to become an oracle.</summary>
+    public static ProblemDetails ProofInvalid(string detail) =>
+        Create("proof-invalid", "Proof invalid", StatusCodes.Status401Unauthorized, detail);
+
+    /// <summary>401 a proof or session claimed a replay fence below the stored one.</summary>
+    public static ProblemDetails ReplaySuspect(string endpointId) =>
+        Create("replay-suspect", "Replay suspect", StatusCodes.Status401Unauthorized,
+            $"endpoint '{endpointId}' claimed a seq below the stored fence");
+
+    /// <summary>401 a rotation tried to authorize itself with a key retired
+    /// outside Link:RotateGraceMinutes — the grace covers one next rotation,
+    /// then it is revoke-and-rejoin.</summary>
+    public static ProblemDetails KeyRotationGraceExpired(string endpointId) =>
+        Create("key-rotation-grace-expired", "Key rotation grace expired", StatusCodes.Status401Unauthorized,
+            $"endpoint '{endpointId}' presented a key retired outside the rotation grace");
 
     /// <summary>403 enrollment named a team the roster (Link:Teams) lacks.</summary>
     public static ProblemDetails TeamUnknown(string team) =>

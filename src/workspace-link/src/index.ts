@@ -9,6 +9,31 @@ export * from "./core/errors.js";
 export { LinkClient, createLinkClient, type LinkClientOptions } from "./core/client.js";
 export { parseArgv, ConfigError, type LinkdConfig } from "./core/config.js";
 export {
+  loadOrCreateIdentity,
+  verifyWithPublicKey,
+  keyIdFromPublicKey,
+  type EndpointIdentity,
+} from "./core/keystore.js";
+export {
+  buildProof,
+  buildRotationProof,
+  signProofForGateway,
+  parseProof,
+  verifyProof,
+  type ProofClaims,
+  type ProofFields,
+  type ProofRejection,
+  type VerifyProofOptions,
+} from "./core/proof.js";
+export { SessionProvider, type SessionProviderOptions } from "./core/session.js";
+export {
+  createEndpointCredential,
+  identityDirFor,
+  isNotEnrolled,
+  type EndpointCredential,
+  type EndpointCredentialOptions,
+} from "./core/credential.js";
+export {
   dedupeKeyOf,
   type InsertResult,
   type Ledger,

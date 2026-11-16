@@ -64,6 +64,15 @@ public static class AdminEndpoints
         group.MapGet("/links", async (AdminReadStores stores, CancellationToken ct) =>
             Results.Ok(await stores.LinksAsync(ct)));
 
+        // The admin invalidation lever, for the rows the view above shows:
+        // revoking kills the enrollment, every pinned key, every outstanding
+        // proof and every live session (the epoch bump fences them all). The
+        // endpoint rejoins the way it first joined: a fresh first-boot enroll.
+        group.MapDelete("/links/{endpointId}", async (string endpointId, LinkEnrollmentStore enrollments, HttpContext http, CancellationToken ct) =>
+            await enrollments.RevokeAsync(endpointId, http.GetFacilitatorPrincipal()?.Actor, ct)
+                ? Results.NoContent()
+                : Results.Problem(ProblemErrors.EndpointNotEnrolled(endpointId)));
+
         group.MapGet("/deliveries", async (string? state, int? limit, AdminReadStores stores, CancellationToken ct) =>
             Results.Ok(new { items = await stores.DeliveriesAsync(state, limit ?? 50, ct) }));
 

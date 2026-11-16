@@ -3,6 +3,8 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
+using Facilitator.Kernel.Link;
+
 using Facilitator.Kernel.Shared;
 
 using Microsoft.Extensions.DependencyInjection;
@@ -48,20 +50,61 @@ internal static class WalkKit
         }
         """)!.AsObject();
 
-    /// <summary>Enroll a link endpoint (Development bootstrap secret) over the
-    /// raw route — the public-only twin of the internal LinkTestHarness.</summary>
+    /// <summary>
+    /// Enroll a link endpoint (Development bootstrap CODE) with a freshly minted
+    /// Ed25519 identity over the raw routes, then prove it for a session: the
+    /// public-only twin of the internal LinkTestHarness. What comes back is a
+    /// 5-minute session JWT — the key is the credential, so nothing long-lived
+    /// crosses the wire.
+    /// </summary>
     internal static async Task<string> EnrollAsync(HttpClient kernel, string endpointId, string team = "team-alpha")
     {
-        var body = JsonSerializer.Serialize(new { token = "enroll-dev", endpointId, instanceId = "inst-1", trustMode = "isolated-executor", team });
-        var json = await KernelOps.PostJsonAsync(kernel, "/api/link/v1/enroll", body, HttpStatusCode.Created);
-        return json.GetProperty("linkToken").GetString()!;
+        var seed = new byte[32];
+        System.Security.Cryptography.RandomNumberGenerator.Fill(seed);
+        var publicKey = LinkKeys.Base64Url(LinkKeys.PublicKeyFromSeed(seed));
+        var body = JsonSerializer.Serialize(new
+        {
+            token = "enroll-dev",
+            endpointId,
+            instanceId = "inst-1",
+            trustMode = "isolated-executor",
+            team,
+            publicKey,
+            keyAlgorithm = "ed25519",
+        });
+        await KernelOps.PostJsonAsync(kernel, "/api/link/v1/enroll", body, HttpStatusCode.Created);
+        return await ProveAsync(kernel, endpointId, seed);
     }
 
-    /// <summary>A client carrying a link token (not the kernel bearer).</summary>
-    internal static HttpClient LinkClient(this KernelTestFactory factory, string linkToken)
+    /// <summary>Challenge -> proof -> session JWT, for a caller that holds the key.</summary>
+    internal static async Task<string> ProveAsync(HttpClient kernel, string endpointId, byte[] seed)
+    {
+        var challenge = await KernelOps.PostJsonAsync(kernel, "/api/link/v1/challenge",
+            JsonSerializer.Serialize(new { endpointId }), HttpStatusCode.OK);
+        var nonce = challenge.GetProperty("nonce").GetString()!;
+        var parts = nonce.Split('.', 3);
+        var proof = LinkProof.Build(seed, LinkKeys.PublicKeyFromSeed(seed), new LinkProofClaims(
+            endpointId,
+            LinkKeys.KeyId(LinkKeys.PublicKeyFromSeed(seed)),
+            "jti-" + Guid.NewGuid().ToString("N"),
+            "POST",
+            new Uri(kernel.BaseAddress!, "/api/link/v1/proof").ToString(),
+            nonce,
+            long.Parse(parts[1]),
+            long.Parse(parts[0]),
+            string.Empty,
+            DateTime.UtcNow.AddSeconds(60),
+            DateTime.UtcNow));
+        var session = await KernelOps.PostJsonAsync(kernel, "/api/link/v1/proof",
+            JsonSerializer.Serialize(new { proof }), HttpStatusCode.OK);
+        return session.GetProperty("sessionToken").GetString()!;
+    }
+
+    /// <summary>A client carrying a link session JWT (not the kernel bearer).</summary>
+    internal static HttpClient LinkClient(this KernelTestFactory factory, string sessionToken)
     {
         var client = factory.CreateClient();
-        client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", linkToken);
+        client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", sessionToken);
         return client;
     }
 

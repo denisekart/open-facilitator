@@ -9,6 +9,7 @@
 import { describe, expect, it } from "vitest";
 import { createStubHandler, FaultInjector, buildEvent } from "../../src/index.js";
 import { SignalrTransport } from "../../src/node/index.js";
+import type { LinkTokenProvider } from "../../src/index.js";
 import { E2E, inboxState, sdkClient, useFacilitator, waitFor, type SdkClient } from "./harness.js";
 
 const h = useFacilitator();
@@ -21,10 +22,10 @@ describe.skipIf(!E2E)("partition buffering and supersede", () => {
     const a: SdkClient = await sdkClient(h, {
       endpointId,
       handler: createStubHandler(),
-      transportFactory: (token: string) => {
+      transportFactory: (provider: LinkTokenProvider) => {
         inner = new SignalrTransport({
           baseUrl: h.baseUrl,
-          token: { getToken: async () => token },
+          token: provider,
         });
         return new FaultInjector(inner, { partition: () => partitioned });
       },
@@ -55,7 +56,7 @@ describe.skipIf(!E2E)("partition buffering and supersede", () => {
     a.client.on("state", (s) => {
       states.push(s);
     });
-    const b: SdkClient = await sdkClient(h, { endpointId, token: a.token });
+    const b: SdkClient = await sdkClient(h, { endpointId, stateDir: a.stateDir });
     expect(b.client.session?.leaseEpoch).toBe(2);
     await waitFor("A sees supersede", () => (a.client.state === "reconnecting" ? true : null));
     expect(inner!.lastServerGoodbye?.reason).toBe("session-superseded");

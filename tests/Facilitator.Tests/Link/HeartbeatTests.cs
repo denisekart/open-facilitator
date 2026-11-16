@@ -23,7 +23,7 @@ public sealed class HeartbeatTests(DispatchDbFixture fixture)
         using var factory = new KernelTestFactory(fixture, noDispatcher: true, fakeClock: true, useKestrel: true, settings: Fast);
         using var kernel = factory.CreateAuthedClient();
         var endpoint = "gw-hbt-" + Guid.NewGuid().ToString("N")[..8];
-        var token = await LinkTestHarness.EnrollAsync(kernel, endpoint);
+        var token = await LinkTestHarness.EnrollAsync(kernel, endpoint, clock: factory.Clock);
         var sessions = factory.Services.GetRequiredService<LinkService>();
 
         await using var first = await FakeLinkClient.ConnectAsync(factory.ServerAddress, token);
@@ -56,7 +56,7 @@ public sealed class HeartbeatTests(DispatchDbFixture fixture)
         using var factory = new KernelTestFactory(fixture, noDispatcher: true, fakeClock: true, useKestrel: true, settings: Fast);
         using var kernel = factory.CreateAuthedClient();
         var endpoint = "gw-hbt-" + Guid.NewGuid().ToString("N")[..8];
-        var token = await LinkTestHarness.EnrollAsync(kernel, endpoint);
+        var token = await LinkTestHarness.EnrollAsync(kernel, endpoint, clock: factory.Clock);
         var sessions = factory.Services.GetRequiredService<LinkService>();
 
         await using var client = await FakeLinkClient.ConnectAsync(factory.ServerAddress, token);

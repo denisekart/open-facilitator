@@ -10,12 +10,15 @@ served, the dev IdP story per `reference/keycloak/realm.json`. The
 kernel assembly doubles as its own client riding the public HTTP API:
 `dotnet run --project src/facilitator -- cli work create --objective
 "kernel check"` (plus `work get|steer|timeline`). The Link client half is
-`@ofac/workspace-link` + the `ofac-linkd` supervisor — enroll, capabilities
-POST, connect, serve (echo-mode receipts), state file replay after a
-crash:
+`@ofac/workspace-link` + the `ofac-linkd` supervisor — mint the identity key
+in `--state-dir`, enroll it on first boot with the one-time enrollment code,
+then prove possession for a 5-minute session, capabilities POST, connect,
+serve (echo-mode receipts), ledger replay after a crash:
 `node src/workspace-link/dist/bin/linkd.js run --url http://localhost:8088
 --secret enroll-dev --endpoint gw-dev --team team-alpha --manifest
-manifest.json`. The full compose path (`./referencectl up slim`) is the
+manifest.json`. There is no token to copy anywhere: `--state-dir` IS the
+endpoint's identity, so a re-run with the same state dir needs no code at
+all. The full compose path (`./referencectl up slim`) is the
 supported demo environment; this section is the seam, not the gate.
 
 ## Gateway modes
@@ -26,7 +29,7 @@ supported demo environment; this section is the seam, not the gate.
 
 ### As-built: embedded child
 
-One process, one child: the Gateway enrolls (or mounts a stored token),
+One process, one child: the Gateway enrolls its key,
 POSTs the child's capability manifest rewritten to the team's ownership,
 connects, reconciles any `running` executions against the fresh child, and
 serves command deliveries. The child sits behind the `ChildExecutor` seam —
@@ -87,13 +90,12 @@ The locked YAML surface (`loadConfigFile` rejects any other key, naming it):
 |`gatewayId`|`^gw\.[a-z0-9]([a-z0-9-]*[a-z0-9])?$`, ≤128 chars — the Link endpoint id|
 |`team`|must equal the kernel's enrollment team slug (else capabilities POST 403s)|
 |`facilitatorUrl`|kernel base URL; `OFAC_KERNEL_URL` env wins (the deployment origin — e.g. a kernel LB in the two-replica shape)|
-|`enrollmentSecret`|bootstrap secret; `OFAC_ENROLL_SECRET` env wins; optional once `<stateDir>/token` exists|
-|`linkToken`|static mount; `OFAC_LINK_TOKEN` env wins|
+|`enrollmentSecret`|first-boot-only enrollment CODE (minted code or `Link:EnrollmentToken`); `OFAC_ENROLL_SECRET` env wins; not needed once `<stateDir>/identity.key` exists|
 |`trustMode`|see table above|
-|`stateDir`|created 0700; holds `link.sqlite3`, `gateway.sqlite3`, `token`|
+|`stateDir`|created 0700; holds `identity.key` (0600 — the endpoint's identity), `link.sqlite3`, `gateway.sqlite3`|
 |`mode`|`embedded` \| `shared` \| `standalone`; default `embedded`|
 |`child.name` `child.mode` `child.manifestFile`|embedded only: single in-process child: `echo` \| `stub`, or an advertised manifest file|
-|`children[]`|fleet only: `name` (`^[a-z0-9]([a-z0-9-]*[a-z0-9])?$`), optional `token`, `maxInFlight` (≥1), `timeoutSeconds` (1..86400, default 120)|
+|`children[]`|fleet only: `name` (`^[a-z0-9]([a-z0-9-]*[a-z0-9])?$`), optional `token` (first-hello bootstrap only — the child's key is pinned on that hello and the token retires), `maxInFlight` (≥1), `timeoutSeconds` (1..86400, default 120)|
 |`childTransport.socket.path`|fleet only; resolved against `stateDir`; optional `allowedUid`|
 |`childTransport.tcp.port`|optional localhost fallback, same wire protocol|
 |`childTransport.handshakeTimeoutSeconds` `childTransport.leaseMissedBeats`|hello deadline; lease (default 5 / 2)|

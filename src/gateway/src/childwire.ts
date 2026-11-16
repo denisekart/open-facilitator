@@ -37,13 +37,37 @@ export type RegisterDenyReason =
 /** `goaway` reasons (locked literals). */
 export type GoawayReason = "gateway-shutdown" | "replaced";
 
+/**
+ * The child channel's URI — the `htu` a hello proof binds to. A LOGICAL name,
+ * not a dial address: one child has one channel whether it arrives over the
+ * unix socket, the loopback fallback or TLS, and a physical address cannot say
+ * that (`cbh` is what records TLS). `iss` + `htu` together pin a proof to one
+ * child on one gateway, which is exactly the reuse a proof must prevent.
+ */
+export function childChannelUri(childWorkspaceId: string): string {
+  return `ws://gateway.local/child/${childWorkspaceId}`;
+}
+
 // ── child → Gateway ─────────────────────────────────────────────────────────
 
 export interface HelloFrame {
   v: 1;
   type: "hello";
   childWorkspaceId: string;
+  /**
+   * First-boot pairing secret only (config `children[].token` / OFAC_CHILD_SECRET):
+   * it pins the key below and then retires forever. Empty on every hello after
+   * the pin, where authentication is `proof`.
+   */
   token: string;
+  /** Raw Ed25519 public key (base64url, 43 chars), presented for pinning. */
+  publicKey?: string | undefined;
+  /**
+   * Detached EdDSA JWS proof of possession of the pinned key
+   * (`htm: "WS"`, `htu` the child channel). Required on every hello after the
+   * first, where `token` is empty.
+   */
+  proof?: string | undefined;
   manifest: CapabilityManifestV1;
 }
 

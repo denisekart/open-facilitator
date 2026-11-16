@@ -111,6 +111,6 @@ public sealed class LinkIngressTests(DispatchDbFixture fixture)
         Assert.Contains("262144", problem.GetProperty("detail").GetString());
     }
 
-    private static async Task<string> EnrollAsync(KernelTestFactory factory) =>
+    private static async Task<LinkTestHarness.LinkEndpointCredential> EnrollAsync(KernelTestFactory factory) =>
         await LinkTestHarness.EnrollAsync(factory.CreateAuthedClient(), "gw-li-" + Guid.NewGuid().ToString("N")[..8]);
 }

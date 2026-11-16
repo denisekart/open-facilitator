@@ -1,6 +1,6 @@
 {
   "enrollmentId": "enr-1",
   "trustMode": "separate-process-same-host",
-  "linkToken": "9fb2Kw7dQ1sXvR4mTNpLcZ8yHjUeAo0IgB6rEtxWuDs",
-  "expiresAt": "2026-10-25T18:00:00Z"
+  "endpointKeyId": "sha256:630dcd2966c4336691125448bbb25b4ff412a49c732db2c8abc1b8581bd710dd",
+  "seq": 0
 }

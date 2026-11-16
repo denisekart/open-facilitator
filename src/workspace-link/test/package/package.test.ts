@@ -66,8 +66,6 @@ describe("workspace-link package surface", () => {
       "run",
       "--url",
       "http://x",
-      "--token",
-      "t",
       "--endpoint",
       "gw",
       "--team",
@@ -81,7 +79,29 @@ describe("workspace-link package surface", () => {
       transport: "signalr",
       mode: "echo",
       trustMode: "isolated-executor",
-      statePath: "ofac-linkd.sqlite3",
+      // The state dir is where identity.key lives; the ledger sits inside it.
+      stateDir: "./ofac-link-state",
+      statePath: "ofac-link-state/ledger.sqlite3",
+    });
+    const keyed = parseArgv([
+      "run",
+      "--url",
+      "http://x",
+      "--secret",
+      "s",
+      "--endpoint",
+      "gw",
+      "--team",
+      "alpha",
+      "--manifest",
+      "m.json",
+      "--state-dir",
+      "/var/lib/linkd",
+    ]);
+    expect(keyed).toMatchObject({
+      secret: "s",
+      stateDir: "/var/lib/linkd",
+      statePath: "/var/lib/linkd/ledger.sqlite3",
     });
   });
 });

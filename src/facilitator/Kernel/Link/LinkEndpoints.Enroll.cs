@@ -59,6 +59,14 @@ public static partial class LinkEndpoints
             Guid? mintedId = null;
             (string Issuer, string Subject)? workload = null;
             var modeB = jwks.IsOidcCandidate(dto.Token, options.EvidenceAudience);
+
+            // The key guard applies to the keyed class only (mode (b) keeps the
+            // issuer as identity). The schema already requires both fields; this
+            // is the server-side parse + closed-set check behind it.
+            if (!modeB && dto.KeyAlgorithm is not null && !string.Equals(dto.KeyAlgorithm, "ed25519", StringComparison.Ordinal))
+            {
+                return Results.Problem(ProblemErrors.SchemaViolation("keyAlgorithm must be ed25519"));
+            }
             if (modeB)
             {
                 var verified = await jwks.ValidateAsync(dto.Token, options.EvidenceAudience, ct);
@@ -145,10 +153,17 @@ public static partial class LinkEndpoints
                     $"endpointId '{dto.EndpointId}' is on the gw. Gateway channel and requires role gateway"));
             }
 
+            var publicKey = modeB ? null : dto.PublicKey;
+            if (!modeB && !LinkKeys.TryParsePublicKey(publicKey, out _))
+            {
+                return Results.Problem(ProblemErrors.SchemaViolation(
+                    "publicKey must be one raw Ed25519 key in base64url (43 or 44 characters)"));
+            }
+
             EnrollmentResult? result;
             async Task<EnrollmentResult?> Enroll() => await store.EnrollAsync(
                 dto.EndpointId, dto.InstanceId, dto.TrustMode, enrollSecret,
-                team, role, acceptsDelegated, workload, ct);
+                team, role, acceptsDelegated, workload, publicKey, ct);
             try
             {
                 try
@@ -206,7 +221,7 @@ public static partial class LinkEndpoints
             }
 
             return Results.Created($"/api/link/v1/capabilities",
-                new EnrollResponseDto(result.EnrollmentId.ToString("N"), result.TrustMode, result.LinkToken, result.ExpiresAt));
+                new EnrollResponseDto(result.EnrollmentId.ToString("N"), result.TrustMode, result.EndpointKeyId, result.Seq));
         })
         .RequireRateLimiting("enroll");
 

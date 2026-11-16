@@ -26,6 +26,7 @@ public sealed class LinkDeliveryPump(
     PgWakeListener wakeListener,
     KernelMetrics metrics,
     LinkOptions options,
+    LinkEnrollmentStore enrollments,
     ILogger<LinkDeliveryPump> logger) : BackgroundService
 {
     private static readonly TimeSpan SafetyPoll = TimeSpan.FromSeconds(2);
@@ -105,7 +106,7 @@ public sealed class LinkDeliveryPump(
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         using var wake = new SemaphoreSlim(0, 1);
-        var listenerTask = wakeListener.ListenAsync(wake, stoppingToken);
+        var listenerTask = wakeListener.ListenAsync(wake, ct: stoppingToken);
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -169,6 +170,10 @@ public sealed class LinkDeliveryPump(
         {
             return;
         }
+
+        // Credential-surface growth is bounded here too: expired challenge/jti
+        // rows (link_challenges) are dead weight the moment they pass expiry.
+        await enrollments.SweepChallengesAsync(ct);
 
         var expired = await sessions.SweepExpiredAsync(ct);
         foreach (var session in expired)

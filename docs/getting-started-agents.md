@@ -13,8 +13,10 @@ machine-readable contract lives, and how to fail well. Read
   coordination authority. Everything else — Gateways, Workspaces, adapters —
   is a client of its public APIs. There is no backdoor.
 - **Human-plane** calls carry an OIDC bearer to `/api/*`; **link-plane**
-  endpoints (`/api/link/v1/*`, `/hubs/link`) carry a per-endpoint
-  `linkToken`. The two planes never share credentials.
+  endpoints (`/api/link/v1/*`, `/hubs/link`) carry a 5-minute session JWT
+  that an endpoint mints itself by proving possession of its enrolled
+  Ed25519 key — there is no link secret to store or mount. The two planes
+  never share credentials.
 - Writes are **at-least-once + idempotent**: dedupe on
   `(event_source, event_id)`, `commandId`, or `(provider,
   provider_delivery_id)`. Replay is cheap; retries are safe.
@@ -88,34 +90,61 @@ create --objective "…" | work get|timeline <id> | work steer <id>
 
 ## Become a link endpoint (execute work)
 
-A Workspace/Gateway joins with one enrollment call:
+You join by registering an identity, not by collecting a secret. Generate one
+Ed25519 key pair, keep the seed private, and post the public half:
 
 ```bash
+# 1. enroll — the token authorizes the join and retires; the response carries
+#    NO secret, just your key's fingerprint and the replay fence.
 curl -s -X POST http://localhost:8088/api/link/v1/enroll -H 'content-type: application/json' -d '{
-  "token": "enroll-dev",            # Link__EnrollmentToken; or a workload-OIDC token
+  "token": "enroll-dev",            # a minted enrollment code, or Link__EnrollmentToken (first-admin bootstrap); or a workload-OIDC token
   "endpointId": "gw.my-team",       # gw.* requires role "gateway"
+  "publicKey": "<43-44-char base64url raw ed25519 key>",   # required in mode (a); ignored in mode (b)
+  "keyAlgorithm": "ed25519",        # the only algorithm the wire admits
   "team": "team-alpha",             # must be a kernel roster slug (Link:Teams)
-  "role": "gateway",                # default; immutable across token rotation
+  "role": "gateway",                # default; immutable across key rotation
   "trustMode": "shared-runtime"     # shared-runtime | separate-process-same-host | isolated-executor
 }'
-# → 201 { enrollmentId, trustMode, linkToken, expiresAt }
+# → 201 { "enrollmentId": "…", "trustMode": "…", "endpointKeyId": "sha256:…", "seq": 0 }
+
+# 2. ask for a single-use nonce (unguarded; 30 s; an unknown endpointId gets
+#    the same 401 a wrong proof gets)
+curl -s -X POST http://localhost:8088/api/link/v1/challenge -H 'content-type: application/json' \
+  -d '{"endpointId":"gw.my-team"}'
+# → 200 { "nonce": "…", "publicKeyRequired": true, "algorithm": "ed25519", "expiresAt": "…" }
+
+# 3. sign a detached EdDSA JWS over {iss,sub,jti,htm:"POST",
+#    htu:"http://localhost:8088/api/link/v1/proof",iat,nbf,exp,nonce,seq,epoch,cbh:""}
+#    with your PRIVATE key and trade it for a session
+curl -s -X POST http://localhost:8088/api/link/v1/proof -H 'content-type: application/json' \
+  -d '{"proof":"<b64header>.<b64payload>.<b64signature>"}'
+# → 200 { "sessionToken": "<5-minute JWT>", "expiresAt": "…", "seq": 1 }
 ```
 
-Store `linkToken` durably; enrollment is an upsert and **rotates** the
-previous token immediately. Then: `POST /api/link/v1/capabilities` with
+Nothing needs storing except the key itself — the session JWT is disposable
+(mint a fresh one whenever it expires or a call answers `401`). Then:
+`POST /api/link/v1/capabilities` with
 your capability manifest (`capability-manifest.v1.json`), open a session
-(hub `hello` on `/hubs/link`, or via the HTTP surface below), and consume
+(hub `hello` on `/hubs/link` — the frame carries a `proof` of the same shape,
+`htm: "WS"` — or via the HTTP surface below), and consume
 deliveries: long-poll `GET /api/link/v1/deliveries?wait=0..60&limit=1..64`
 and answer each with `POST /api/link/v1/deliveries/{deliveryId}/receipt`
 (`accepted|duplicate|rejected|unsupported` referencing `deliveryId`);
-send your own envelopes with `POST /api/link/v1/events`. The full frozen
-fallback surface is `protocol/openapi/link-v1.yaml`. Note: a deliveries
+send your own envelopes with `POST /api/link/v1/events`. Every one of those
+rides `Authorization: Bearer <sessionToken>`. The full frozen
+fallback surface is `protocol/openapi/link-v1.yaml` 2.0.0. Enrollment is an
+upsert, so re-enrolling a `endpointId` with a NEW key retires the old one
+immediately (role is immutable — re-role needs revoke + re-enroll); an
+endpoint that wants to rotate without re-enrolling signs
+`POST /api/link/v1/enroll/{endpointId}/rotate` with BOTH keys.
+Note: a deliveries
 read REQUIRES a live session row (minted by a hub `hello`; each successful
 poll refreshes its lease) — a pure-HTTP client that never speaks SignalR
 needs the session-keeper trick `@ofac/workspace-link` uses, so prefer the
 SDK. Un-acked deliveries are re-offered after the in-flight lease
 (default 120 s) — dedupe on `commandId` before acting.
-`@ofac/workspace-link` implements all of this, including a durable state
+`@ofac/workspace-link` implements all of this — keystore, challenge/proof,
+session refresh, capability POST — including a durable state
 file that replays after a crash.
 
 ## The contract, where to read it mechanically

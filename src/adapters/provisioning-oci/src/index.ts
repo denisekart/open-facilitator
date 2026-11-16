@@ -5,13 +5,12 @@
 // the same assignment at a new generation. Stateless apart from the SQLite
 // delivery ledger — deployable wherever a docker socket is reachable and the
 // kernel link plane is dialable.
-import { randomBytes } from "node:crypto";
 import {
+  createEndpointCredential,
+  identityDirFor,
   createLinkClient,
-  enroll,
   type LinkClient,
   type LinkLogger,
-  type LinkTokenProvider,
 } from "@ofac/workspace-link";
 import { SignalrTransport, SqliteLedger, postCapabilities } from "@ofac/workspace-link/node";
 import { startTelemetryFromEnv } from "@ofac/otel";
@@ -85,32 +84,21 @@ export async function run(
     resourceAttributes: { "ofac.team": config.team, "ofac.endpoint_id": config.endpointId },
   });
 
-  // ── link plane: enroll (secret mode) → capabilities → client ───────────
-  // The enrollment shape is forgejo's verbatim: secret-mode POST /enroll with
-  // a random instanceId, trustMode isolated-executor, role child.
-  const activeToken = { value: "" };
-  const enrollSelf = async (): Promise<void> => {
-    const response = await enroll({
-      baseUrl: config.kernelUrl,
-      token: config.enrollSecret,
-      endpointId: config.endpointId,
-      instanceId: `lnk-${randomBytes(8).toString("hex")}`,
-      trustMode: "isolated-executor",
-      role: "child",
-      team: config.team,
-    });
-    if (response.linkToken !== undefined) activeToken.value = response.linkToken;
-  };
-  const token: LinkTokenProvider = {
-    getToken: async () => activeToken.value,
-    // 401 ⇒ rotate: re-enrollment mints a fresh token (linkd's precedent).
-    refresh: enrollSelf,
-  };
-  await enrollSelf();
-  if (activeToken.value === "") {
-    throw new Error("enrollment issued no linkToken");
-  }
-
+  // ── link plane: identity → first-boot enroll → sessions → client ────────
+  // The fleet's one credential law: the identity lives beside the ledger, the
+  // enrollment code is spent on the boot that has nothing on file, and every
+  // later bearer is a session JWT the provider re-mints.
+  const { provider: token } = await createEndpointCredential({
+    stateDir: identityDirFor(config.statePath),
+    baseUrl: config.kernelUrl,
+    endpointId: config.endpointId,
+    team: config.team,
+    trustMode: "isolated-executor",
+    role: "child",
+    ...(config.enrollSecret === undefined ? {} : { enrollSecret: config.enrollSecret }),
+    logger,
+    instancePrefix: "lnk",
+  });
   const { digest } = await postCapabilities(launcherManifest(config.team), {
     baseUrl: config.kernelUrl,
     getToken: token.getToken,

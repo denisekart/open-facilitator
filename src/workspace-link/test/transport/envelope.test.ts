@@ -1,7 +1,17 @@
 // Outbound envelope builder + enrollment helper (mock fetch) proofs.
 import { describe, expect, it } from "vitest";
 import { validateEnvelope } from "@ofac/protocol";
-import { buildEvent, dataschemaFor, enroll, EnrollmentError } from "../../src/index.js";
+import {
+  buildEvent,
+  dataschemaFor,
+  enroll,
+  EnrollmentError,
+  keyIdFromPublicKey,
+} from "../../src/index.js";
+
+/** One raw Ed25519 key (base64url) and its fingerprint, as the wire demands. */
+const PUB = "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8";
+const KEY_ID = keyIdFromPublicKey(PUB);
 
 describe("buildEvent", () => {
   it("produces a schema-valid CloudEvent with derived dataschema", () => {
@@ -44,6 +54,8 @@ describe("enroll", () => {
         endpointId: "gw-1",
         instanceId: "inst-1",
         trustMode: "isolated-executor",
+        publicKey: PUB,
+        keyAlgorithm: "ed25519",
       },
       (async (url, init) => {
         calls.push({
@@ -54,8 +66,8 @@ describe("enroll", () => {
           JSON.stringify({
             enrollmentId: "enr-1",
             trustMode: "isolated-executor",
-            linkToken: "tok-1",
-            expiresAt: "2026-11-01T00:00:00Z",
+            endpointKeyId: KEY_ID,
+            seq: 0,
           }),
           { status: 201, headers: { "content-type": "application/json" } },
         );
@@ -67,8 +79,12 @@ describe("enroll", () => {
       endpointId: "gw-1",
       instanceId: "inst-1",
       trustMode: "isolated-executor",
+      publicKey: PUB,
+      keyAlgorithm: "ed25519",
     });
-    expect(response.linkToken).toBe("tok-1");
+    // Identity, not secrets: the response fingerprints the key and starts the fence.
+    expect(response.endpointKeyId).toBe(KEY_ID);
+    expect(response.seq).toBe(0);
   });
 
   it("401 becomes a typed EnrollmentError carrying the ProblemDetails", async () => {
@@ -80,6 +96,8 @@ describe("enroll", () => {
           endpointId: "gw",
           instanceId: "i",
           trustMode: "shared-runtime",
+          publicKey: PUB,
+          keyAlgorithm: "ed25519",
         },
         (async () =>
           new Response(
@@ -103,6 +121,8 @@ describe("enroll", () => {
           endpointId: "gw",
           instanceId: "i",
           trustMode: "shared-runtime",
+          publicKey: PUB,
+          keyAlgorithm: "ed25519",
         },
         (async () => new Response("", { status: 401 })) as typeof fetch,
       ),

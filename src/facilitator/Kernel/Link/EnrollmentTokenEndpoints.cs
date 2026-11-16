@@ -88,7 +88,7 @@ public static class EnrollmentTokenEndpoints
             // The invalidation lever: the issued link token dies with the token.
             if (outcome == RevokeTokenOutcome.Revoked && consumedEndpointId is not null)
             {
-                await enrollments.RevokeAsync(consumedEndpointId, ct);
+                await enrollments.RevokeAsync(consumedEndpointId, http.GetFacilitatorPrincipal()?.Actor, ct);
             }
 
             return Results.NoContent();

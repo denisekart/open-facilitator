@@ -12,7 +12,6 @@ export {
   GatewayConfigError,
   loadConfigFile,
   parseConfig,
-  tokenFilePath,
   type ChildEntryConfig,
   type ChildMode,
   type ChildTransportConfig,
@@ -23,6 +22,7 @@ export {
 } from "./config.js";
 export {
   MAX_CHILD_FRAME_BYTES,
+  childChannelUri,
   createFrameParser,
   encodeFrame,
   type ChildWireFrame,
@@ -49,6 +49,13 @@ export {
   type ChildListener,
   type ChildListenerDeps,
 } from "./listen.js";
+export {
+  channelBindingOf,
+  keyStoreFromLedger,
+  memoryChildKeyStore,
+  isTlsSocket,
+  type ChildKeyStore,
+} from "./child-keys.js";
 export { connectChild, type ConnectChildOptions, type ChildConnection } from "./connect.js";
 export {
   DefaultPolicy,
@@ -61,6 +68,7 @@ export {
   ExecutionLedger,
   type BindingRow,
   type BindingState,
+  type ChildKeyRow,
   type NewBinding,
 } from "./ledger.js";
 export {

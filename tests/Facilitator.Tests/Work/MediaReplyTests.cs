@@ -194,57 +194,57 @@ public sealed class MediaReplyTests(PostgresFixture fixture)
             await CompletedWorkWithImageAsync(facetAllowsImage: true, "https://kernel.example");
         try
         {
-        using (factory)
-        using (var kernel = factory.CreateAuthedClient())
-        {
-            using var patch = new HttpRequestMessage(HttpMethod.Patch, "/api/admin/config/media-policy")
+            using (factory)
+            using (var kernel = factory.CreateAuthedClient())
             {
-                Content = new StringContent(
-                    """{"teams":[{"team":"team-alpha","forbidKinds":["image/*"]}]}""",
-                    Encoding.UTF8, "application/json"),
-            };
-            patch.Headers.IfMatch.Add(EntityTagHeaderValue.Any);
-            patch.Headers.Add("X-Change-Reason", "policy consulted scenario");
-            using (var written = await kernel.SendAsync(patch))
-            {
-                Assert.Equal(HttpStatusCode.OK, written.StatusCode);
+                using var patch = new HttpRequestMessage(HttpMethod.Patch, "/api/admin/config/media-policy")
+                {
+                    Content = new StringContent(
+                        """{"teams":[{"team":"team-alpha","forbidKinds":["image/*"]}]}""",
+                        Encoding.UTF8, "application/json"),
+                };
+                patch.Headers.IfMatch.Add(EntityTagHeaderValue.Any);
+                patch.Headers.Add("X-Change-Reason", "policy consulted scenario");
+                using (var written = await kernel.SendAsync(patch))
+                {
+                    Assert.Equal(HttpStatusCode.OK, written.StatusCode);
+                }
+
+                // The arm consults the policy per completion reply: a second
+                // bound work completed under the now-forbidding policy degrades.
+                var workId = await fixture.Db.SeedWorkOwned(
+                    await fixture.Db.SeedProject("team-alpha"), null, "review", "team-alpha");
+                var artifactId = Guid.NewGuid();
+                await fixture.Db.SeedStoredArtifact(
+                    artifactId, "image/png", 40960, workId, "team-alpha", endpoint);
+                await fixture.Db.SeedResultManifest(
+                    $"manifest-{workId:N}", workId, artifactId, [artifactId.ToString("N")], "recorded", "validated");
+                await fixture.Db.SeedBinding("mattermost", $"chan-{workId:N}", $"root-{workId:N}", workId);
+                using var scope = factory.Services.CreateScope();
+                var store = scope.ServiceProvider.GetRequiredService<ICoordinationStore>();
+                var transition = await store.ApplyTransitionAsync(
+                    workId, WorkState.Completed, 1, "oidc:https://issuer.test|media-tester", "done",
+                    CancellationToken.None);
+                Assert.IsType<TransitionResult.Ok>(transition);
+                var reply = (await fixture.Db.OutboxEnvelopes(workId))
+                    .FirstOrDefault(e => e.Contains("command.communication.reply.v1", StringComparison.Ordinal));
+                Assert.NotNull(reply);
+                var commandId = JsonDocument.Parse(reply!).RootElement
+                    .GetProperty("data").GetProperty("idempotencyKey").GetString();
+                Assert.NotNull(commandId);
+
+                using var doc = JsonDocument.Parse(
+                    await fixture.Db.OutboxEnvelopeByCommand(commandId!) ?? reply!);
+                var data = doc.RootElement.GetProperty("data");
+                Assert.False(data.TryGetProperty("artifacts", out _));
+                Assert.Contains(
+                    $"attachment available: https://kernel.example/api/artifacts/{artifactId:N}/content",
+                    data.GetProperty("text").GetString(),
+                    StringComparison.Ordinal);
+                var degrade = await fixture.Db.AuditDetailByCorrelation("media.degrade", commandId!);
+                Assert.NotNull(degrade);
+                Assert.Contains("kind-forbidden", degrade, StringComparison.Ordinal);
             }
-
-            // The arm consults the policy per completion reply: a second
-            // bound work completed under the now-forbidding policy degrades.
-            var workId = await fixture.Db.SeedWorkOwned(
-                await fixture.Db.SeedProject("team-alpha"), null, "review", "team-alpha");
-            var artifactId = Guid.NewGuid();
-            await fixture.Db.SeedStoredArtifact(
-                artifactId, "image/png", 40960, workId, "team-alpha", endpoint);
-            await fixture.Db.SeedResultManifest(
-                $"manifest-{workId:N}", workId, artifactId, [artifactId.ToString("N")], "recorded", "validated");
-            await fixture.Db.SeedBinding("mattermost", $"chan-{workId:N}", $"root-{workId:N}", workId);
-            using var scope = factory.Services.CreateScope();
-            var store = scope.ServiceProvider.GetRequiredService<ICoordinationStore>();
-            var transition = await store.ApplyTransitionAsync(
-                workId, WorkState.Completed, 1, "oidc:https://issuer.test|media-tester", "done",
-                CancellationToken.None);
-            Assert.IsType<TransitionResult.Ok>(transition);
-            var reply = (await fixture.Db.OutboxEnvelopes(workId))
-                .FirstOrDefault(e => e.Contains("command.communication.reply.v1", StringComparison.Ordinal));
-            Assert.NotNull(reply);
-            var commandId = JsonDocument.Parse(reply!).RootElement
-                .GetProperty("data").GetProperty("idempotencyKey").GetString();
-            Assert.NotNull(commandId);
-
-            using var doc = JsonDocument.Parse(
-                await fixture.Db.OutboxEnvelopeByCommand(commandId!) ?? reply!);
-            var data = doc.RootElement.GetProperty("data");
-            Assert.False(data.TryGetProperty("artifacts", out _));
-            Assert.Contains(
-                $"attachment available: https://kernel.example/api/artifacts/{artifactId:N}/content",
-                data.GetProperty("text").GetString(),
-                StringComparison.Ordinal);
-            var degrade = await fixture.Db.AuditDetailByCorrelation("media.degrade", commandId!);
-            Assert.NotNull(degrade);
-            Assert.Contains("kind-forbidden", degrade, StringComparison.Ordinal);
-        }
         }
         finally
         {

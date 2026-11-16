@@ -30,12 +30,13 @@ import {
   createArtifactClient,
 } from "@ofac/adapter";
 import { describe, expect, it } from "vitest";
+import { SessionProvider, loadOrCreateIdentity } from "@ofac/workspace-link";
 import {
   E2E,
   assignEnvelope,
   gatewayConfig,
   gatewayStatus,
-  gatewayToken,
+  gatewaySession,
   inboxRowsByType,
   kernelToken,
   psql,
@@ -68,6 +69,8 @@ function startWorker(options: {
   stepMs: number;
   kernelUrl: string;
   token: string;
+  kernelEndpoint: string;
+  enrollSecret: string;
 }): WorkerHandle {
   const dir = mkdtempSync(join(tmpdir(), "worker-e2e-"));
   const configPath = join(dir, "worker.yaml");
@@ -89,6 +92,11 @@ heartbeatSeconds: 1
   );
   const child = spawn("node", [WORKER_BIN, "run", "--config", configPath], {
     stdio: ["ignore", "pipe", "pipe"],
+    env: {
+      ...process.env,
+      OFAC_KERNEL_ENDPOINT: options.kernelEndpoint,
+      OFAC_ENROLL_SECRET: options.enrollSecret,
+    },
   });
   let log = "";
   child.stdout?.on("data", (c: Buffer) => {
@@ -169,11 +177,16 @@ describe.skipIf(!E2E)("deterministic worker e2e", () => {
       });
       return Promise.race([p, guard]).finally(() => clearTimeout(timer!));
     };
-    // The worker's kernel credential is a CHILD enrollment — mode
-    // (a) with the dev enrollment secret. The empty-fleet standalone Gateway
-    // admits any hello token, so the SAME link token rides both the child
-    // wire and the kernel link-plane HTTP (the verbatim-token law).
-    const childToken = await (async () => {
+    // The worker's kernel credential is a CHILD enrollment — mode (a) with
+    // the dev enrollment secret, which now REGISTERS A KEY (no bearer comes
+    // back). The empty-fleet standalone Gateway admits any hello token, so the
+    // enrollment code still rides the child wire; the kernel link-plane HTTP
+    // rides live session JWTs proved by the key in a harness-owned state dir.
+    // The identity lives in the worker's OWN workDir: the bin's kernel leg
+    // loads it from there, so harness and worker prove as one key — the
+    // gatewaySession law (whatever can read the identity file can prove).
+    const childIdentity = loadOrCreateIdentity(workDir);
+    await (async () => {
       const r = await linkPost(harness.baseUrl, "/api/link/v1/enroll", "enroll-dev", {
         token: "enroll-dev",
         endpointId: "det-e2e-child",
@@ -181,10 +194,17 @@ describe.skipIf(!E2E)("deterministic worker e2e", () => {
         trustMode: "isolated-executor",
         team: "team-alpha",
         role: "child",
+        publicKey: childIdentity.publicKeyBase64Url,
+        keyAlgorithm: "ed25519",
       });
       if (r.status !== 201) throw new Error(`child enroll failed: ${r.status}`);
-      return String((r.body as { linkToken: string }).linkToken);
     })();
+    const childSession = new SessionProvider({
+      baseUrl: harness.baseUrl,
+      endpointId: "det-e2e-child",
+      identity: childIdentity,
+    });
+    const childToken = (): Promise<string> => childSession.getToken();
     // Real works on a team-alpha PROJECT (the ledger resolves team scope via
     // work → project → team; a projectless work answers manifest-not-found):
     // seed the project row over psql, create works over kernel REST. GUID
@@ -236,14 +256,16 @@ describe.skipIf(!E2E)("deterministic worker e2e", () => {
         workDir,
         stepMs: 4000, // a wide steer/kill window per step
         kernelUrl: harness.baseUrl,
-        token: childToken,
+        token: "enroll-dev",
+        kernelEndpoint: "det-e2e-child",
+        enrollSecret: "enroll-dev",
       });
       await withDump(worker.ready(), "awaiting worker ready line");
       const caps = await waitFor("capability union POST", async () => {
         const r = await linkGet(
           harness.baseUrl,
           "/api/link/v1/capabilities",
-          gatewayToken(gw.stateDir),
+          await gatewaySession(gw.stateDir, harness.baseUrl),
         );
         if (r.status !== 200) return false;
         const m = r.body as { capabilities: { id: string }[]; ownerTeam: string };
@@ -392,7 +414,7 @@ describe.skipIf(!E2E)("deterministic worker e2e", () => {
       const reposted = await linkPost(
         harness.baseUrl,
         "/api/link/v1/events",
-        childToken,
+        await childToken(),
         correctionEvent,
       );
       expect(reposted.status).toBe(202);
@@ -493,7 +515,9 @@ describe.skipIf(!E2E)("deterministic worker e2e", () => {
         workDir,
         stepMs: 4000,
         kernelUrl: harness.baseUrl,
-        token: childToken,
+        token: "enroll-dev",
+        kernelEndpoint: "det-e2e-child",
+        enrollSecret: "enroll-dev",
       });
       await worker.ready();
       const lost = await waitFor("probe settles the row lost", async () => {

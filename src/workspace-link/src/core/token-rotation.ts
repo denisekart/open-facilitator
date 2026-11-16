@@ -1,7 +1,9 @@
-// On an unauthorized transport failure, run the token refresh hook once.
+// On an unauthorized transport failure, run the session refresh hook once.
 // Shared by every send path (connect, hello, receipt, event publish, outbox
-// drain): the 401 answer is always "rotate, then let the caller's retry
-// ladder re-issue", never an inline resend.
+// drain): the 401 answer is always "re-prove (challenge + proof), then let the
+// caller's retry ladder re-issue", never an inline resend. The enrollment is
+// NOT a re-auth path — re-enrolling on a 401 would silently mint a new identity
+// every time a session expired mid-flight.
 import { TransportError } from "./errors.js";
 import type { LinkLogger, LinkTokenProvider } from "./types.js";
 

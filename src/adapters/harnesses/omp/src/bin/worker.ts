@@ -12,10 +12,10 @@
 // Exit codes (the Gateway bin idiom): 0 clean · 1 runtime failure ·
 // 2 config error · 3 register-denied-then-exhausted (restartBackoffMs: []).
 import { parseArgs } from "node:util";
-import { createConsoleLogger } from "@ofac/workspace-link";
+import { createConsoleLogger, loadOrCreateIdentity } from "@ofac/workspace-link";
 import type { LinkLogger } from "@ofac/workspace-link";
 import { startTelemetryFromEnv } from "@ofac/otel";
-import { createAdapter } from "@ofac/adapter";
+import { createAdapter, kernelLegFromEnv } from "@ofac/adapter";
 import { WorkerConfigError, loadWorkerConfigFile, type WorkerConfig } from "../config.js";
 import { createOmpHooks } from "../harness.js";
 import { FileSessionStore } from "../session-store.js";
@@ -63,13 +63,30 @@ export async function bootWorker(config: WorkerConfig, log: LinkLogger): Promise
     meterName: "ofac.worker",
     instanceId: config.childWorkspaceId,
   });
+  // The kernel leg (artifact byte path) is its own endpoint relationship:
+  // OFAC_KERNEL_ENDPOINT runs the credential law against the kernel with a key
+  // in the worker's own state dir, and every kernel call rides the live
+  // session factory. Without it, the configured static bearer (if any) stands.
+  const kernelLeg = await kernelLegFromEnv({
+    stateDir: config.workDir,
+    kernelUrl: config.kernelUrl,
+    logger: log,
+  });
   const handle = await createAdapter({
     telemetry,
     childWorkspaceId: config.childWorkspaceId,
     ...(config.token !== undefined ? { token: config.token } : {}),
+    // The child identity: a key in the worker's own state dir (workDir),
+    // presented in the hello. OFAC_CHILD_SECRET stays a first-boot pairing
+    // secret — after the Gateway pins the key, the proof is the credential.
+    identity: loadOrCreateIdentity(config.workDir),
     kernel: {
       baseUrl: config.kernelUrl,
-      ...(config.kernelToken !== undefined ? { kernelToken: config.kernelToken } : {}),
+      ...(kernelLeg === undefined
+        ? config.kernelToken === undefined
+          ? {}
+          : { token: config.kernelToken }
+        : { token: kernelLeg.getToken }),
     },
     manifest: config.manifest,
     transport:

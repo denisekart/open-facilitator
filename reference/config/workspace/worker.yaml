@@ -1,8 +1,9 @@
 # Deterministic worker for the compose demo-workspace container. Over the
 # localhost child leg it attaches to the in-container Gateway (mode (b)
 # standalone fleet). No tokens in this file: OFAC_CHILD_SECRET supplies the
-# child-wire token and the unit's self-enrollment exports OFAC_KERNEL_TOKEN
-# (the worker's kernel credential for the artifact byte path).
+# child-wire token and, with OFAC_KERNEL_ENDPOINT set, the worker
+# self-enrolls a kernel endpoint of its own (the artifact byte path runs on
+# fresh 5-minute sessions it mints itself).
 apiVersion: facilitator.framework/v1
 kind: HarnessAdapter
 childWorkspaceId: gw.team-alpha/deterministic

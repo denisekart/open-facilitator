@@ -1,9 +1,19 @@
 # Security posture
 
-Covers the OIDC identity foundation, workload identity, and the
-artifact-store and result-manifest laws below.
-The human plane federates to any OIDC IdP; roles are operator-defined claim
-rules; every gate decision audits.
+This page answers one question for an operator: *who may do what to this
+system, and how is it enforced?* It covers the OIDC identity foundation,
+workload identity, the operation gates, the approval lifecycle, the team
+policy engine, and the artifact-store and memory laws. The human plane
+federates to any OIDC IdP; roles are operator-defined claim rules; every
+gate decision — allow and deny — audits.
+
+The reading order follows the shape of an attack: how an identity is
+established ([identities](#three-identities)), what it may
+do ([gates](#operation-gates--audit)), how privileged actions wait for
+humans ([approvals](#approval-lifecycle), [team
+policy](#team-policy-engine--the-confirm-round-trip)), and what the kernel
+may hold at all ([artifact](#artifact-store-laws) and [memory
+laws](#memory-broker-laws)).
 
 ## Trust vs data-plane split
 
@@ -227,6 +237,27 @@ authorizes against.
 
 `facilitator.approvals` is the lifecycle authority:
 `pending → approved|denied|expired|revoked → consumed`.
+
+```mermaid title="The approval lifecycle: only pending can move, once"
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#EAF1F9",
+"primaryBorderColor": "#0B5FBF", "primaryTextColor": "#1F2328",
+"lineColor": "#5B6B7C", "secondaryColor": "#FDF0DC"}}}%%
+stateDiagram-v2
+    [*] --> pending: approval.required recorded (digest verified)
+    pending --> approved: eligible human decides
+    pending --> denied: eligible human decides
+    pending --> expired: lazy flip on next read (no timer)
+    pending --> revoked: approval.revoked arrives
+    approved --> consumed: the gated action applies
+    denied --> [*]
+    expired --> [*]
+    revoked --> [*]
+    consumed --> [*]
+```
+
+*Only `pending` can move, and only once: every transition is one
+conditional UPDATE, so exactly one decider wins from any number of
+replays. Expired and revoked are terminal — they never come back.*
 
 - **Digest law**: when `approval.required` carries an `action`, the kernel
   recomputes the record digest (RFC 8785 over

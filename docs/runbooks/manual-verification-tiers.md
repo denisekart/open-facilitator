@@ -1,20 +1,27 @@
 # Manual verification tiers (the legs outside CI)
 
-**Why this exists.** The scenario gate (`make scenario-gate`) runs in CI
-without a single external container, so the legs that need the compose
-stack, the dev IdP port-map, or a clean working tree are run manually,
-against this recorded plan. Manual is not optional: **the law still binds
-for any change that touches the reference env inputs**
-(`reference/config/*`, `reference/keycloak/*`, `examples/**`,
-`src/facilitator/Migrations/**`, the Dockerfiles, and the compose files).
-Before landing such a change, run the legs below and record the date here.
+**Symptom.** You are about to land a change that touches the reference env
+inputs, and CI is green — which proves nothing about this surface. The
+scenario gate (`make scenario-gate`) runs without a single external container,
+so the legs that need the compose stack, the dev IdP port-map, or a clean
+working tree are run manually, against this recorded plan.
+
+## Law
+
+Manual is not optional: **the law still binds for any change that touches the
+reference env inputs** (`reference/config/*`, `reference/keycloak/*`,
+`examples/**`, `src/facilitator/Migrations/**`, the Dockerfiles, and the
+compose files). Before landing such a change, run the legs below and record
+the date here. The separation is the point: a failed leg blocks the landing of
+the change that broke it (the leg is the gate for that input surface); the
+scenario gate stays green regardless.
 
 ## The legs
 
-1. **Slim compose acceptance** — `make compose-slim`, then from a clean
-   tree `./referencectl up slim --no-seed && ./referencectl verify`.
-   Proves the full hop chain (`reference/checks/verify.sh`) against the
-   real stack: no product-code hooks, waits ride timeline kinds.
+1. **Slim compose acceptance** — `make compose-slim`, then from a clean tree
+   `./referencectl up slim --no-seed && ./referencectl verify`. Proves the
+   full hop chain (`reference/checks/verify.sh`) against the real stack: no
+   product-code hooks, waits ride timeline kinds.
 2. **Full compose provider legs** — `make compose-full`, then
    `make provider-e2e` (runs `reference/checks/verify-full.sh`: Mattermost +
    Forgejo + coding-worker + provisioning legs) and, with GitLab booted
@@ -27,11 +34,14 @@ Before landing such a change, run the legs below and record the date here.
 
 ## Recording a run
 
-Append one line per leg: date, tree SHA, leg, outcome, notes. A failed leg
-blocks the landing of the change that broke it (the leg is the gate for
-that input surface); the scenario gate stays green regardless — that
-separation is the point of this file.
+Append one line per leg: date, tree SHA, leg, outcome, notes.
 
 | Date | Tree SHA | Leg | Outcome | Notes |
 |---|---|---|---|---|
 | _(run the legs against a clean tree and record here)_ | | | | |
+
+## Durable facts
+
+- A leg that is in this file is a gate for its input surface, and only that
+  surface.
+- The record here is the evidence: an unrecorded leg is an unrun leg.

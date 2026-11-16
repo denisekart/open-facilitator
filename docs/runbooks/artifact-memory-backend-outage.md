@@ -1,25 +1,25 @@
 # Artifact / memory backend outage
 
-**Symptom.** Artifact uploads or recall calls fail or hang while works
-keep running: `artifacts` rows park in `requested`, `POST`/`GET` on the
-artifact endpoints 5xx or 404-absent, `/api/memory/recall` returns empty
-or a degraded status. Works that don't touch the artifact/memory plane
-must be unaffected — if they are, this is a different scene.
+**Symptom.** Artifact uploads or recall calls fail or hang while works keep
+running: `artifacts` rows park in `requested`, `POST`/`GET` on the artifact
+endpoints 5xx or 404-absent, `/api/memory/recall` returns empty or a
+degraded status. Works that don't touch the artifact/memory plane must be
+unaffected — if they are, this is a different scene.
 
-## Law (from shipped code)
+## Law
 
 Artifact state is a row in `facilitator.artifacts`
 (`state, storage_uri, digest, size, verification, expires_at`) with the
 blob in the S3-compatible store (SeaweedFS `:8333`, bucket
 `facilitator-artifacts`). The kernel claims a slot (`requested`), the
 gateway/worker PUTs the blob, finalize moves the row to `stored` after
-verification; a store that is down surfaces as a failed request or a row
-stuck in `requested` — never as a `stored` row with a missing blob
-(artifact reads 404-absent honestly — degrade, don't fake).
-Memory recall goes through the kernel's brokered scopes
-(`memory_scopes`/`memory_usages` ledger); a backend failure returns a
-degraded response, and assignment context assembly proceeds without the
-entries. Work operations not requiring the degraded capability continue.
+verification. A store that is down surfaces as a failed request or a row
+stuck in `requested` — never as a `stored` row with a missing blob:
+artifact reads 404-absent honestly (degrade, don't fake). Memory recall
+goes through the kernel's brokered scopes (`memory_scopes`/`memory_usages`
+ledger); a backend failure returns a degraded response and assignment
+context assembly proceeds without the entries. Work operations not
+requiring the degraded capability continue.
 
 ## Diagnosis
 
@@ -46,16 +46,21 @@ curl -s -X POST -H "Authorization: Bearer $HUMANTOK" -H 'content-type: applicati
 
 ## Action
 
-Restore the store (`docker compose ... up -d --no-deps artifacts` in
-`reference/`); in-flight `requested` slots either finalize when the
-PUT/retry resumes or expire per `expires_at` — no queue clearing, the
-digest-verified finalize is the commit point. Verify with the
-`stored`-state count and a download round-trip through
-`GET /api/works/<work-id>/artifacts/<artifact-id>`. For the memory
-backend, recall scope grants (`memory_scopes`) and usage audit
-(`memory_usages`) survive the outage because they're in the kernel's own
-store; only recall *content* degrades. If works *did* stall during the
-artifact outage, that is a bug worth a defect note — this plane is
-required to be non-blocking for work paths that don't reference it.
-This scene has not yet been rehearsed on the conformance env; the queries
-above are the standing entry point.
+1. Restore the store: `docker compose ... up -d --no-deps artifacts` in
+   `reference/`.
+2. Leave the queue alone: in-flight `requested` slots either finalize when
+   the PUT/retry resumes or expire per `expires_at` — no queue clearing;
+   the digest-verified finalize is the commit point.
+3. Verify with the `stored`-state count and a download round-trip through
+   `GET /api/works/<work-id>/artifacts/<artifact-id>`.
+
+## Durable facts
+
+- Recall scope grants (`memory_scopes`) and usage audit (`memory_usages`)
+  survive the outage — they live in the kernel's own store; only recall
+  *content* degrades.
+- If works *did* stall during the artifact outage, that is a bug worth a
+  defect note: this plane is required to be non-blocking for work paths
+  that don't reference it.
+- This scene has not yet been rehearsed on the conformance env; the queries
+  above are the standing entry point.

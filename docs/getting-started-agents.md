@@ -3,9 +3,11 @@
 You are an AI agent asked to run, drive, or extend an Open Facilitator
 deployment. This page is the dense, machine-friendly orientation: what to
 start, how to authenticate, which endpoints answer what, where the exact
-machine-readable contract lives, and how to fail well. Read
-[overview.md](overview.md) first if the vocabulary is new to you; read
-[protocol.md](protocol.md) when you need exact schemas.
+machine-readable contract lives, and how to fail well. Every section names
+concrete endpoints, headers, files, and the exact failure shape — nothing
+here needs inference. Read [overview.md](overview.md) first if the
+vocabulary is new to you; read [protocol.md](protocol.md) when you need
+exact schemas.
 
 ## Orientation in one screen
 
@@ -58,13 +60,19 @@ TOKEN=$(./referencectl token --user alice --password alice | tail -1)
 curl -s http://localhost:8088/api/works -H "Authorization: Bearer $TOKEN"
 ```
 
-Bearers live ~5 minutes (realm default) — re-mint liberally. Missing or
-invalid bearer ⇒ `401 unauthorized` (RFC 9457, camelCase). Bearer passes
-the gate but the role rules don't ⇒ `403 forbidden`. Raw grant equivalent:
-`POST http://localhost:8080/realms/facilitator/protocol/openid-connect/token`
+Bearers live ~5 minutes (realm default) — re-mint liberally. Failure
+shapes: missing or invalid bearer ⇒ `401 unauthorized` (RFC 9457,
+camelCase); bearer passes the gate but the role rules don't ⇒ `403
+forbidden` (`rolesAnyOf` in the endpoint's policy); a token whose team
+doesn't own the resource reads back as `404`, never `403`. Raw grant
+equivalent: `POST
+http://localhost:8080/realms/facilitator/protocol/openid-connect/token`
 with `client_id=facilitator-cli`, `client_secret=e2e-cli-secret`.
 
 ## Drive a Work over REST
+
+You will have: any Work created, steered, approved, and read back through
+its audit trail, all on one bearer.
 
 | Do this | Call |
 |---|---|
@@ -119,6 +127,25 @@ curl -s -X POST http://localhost:8088/api/link/v1/challenge -H 'content-type: ap
 curl -s -X POST http://localhost:8088/api/link/v1/proof -H 'content-type: application/json' \
   -d '{"proof":"<b64header>.<b64payload>.<b64signature>"}'
 # → 200 { "sessionToken": "<5-minute JWT>", "expiresAt": "…", "seq": 1 }
+```
+
+The three calls as one picture — after this, nothing but the private key is
+state worth keeping:
+
+```mermaid title="Enroll once, then buy sessions with the key"
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#EAF1F9",
+"primaryBorderColor": "#0B5FBF", "primaryTextColor": "#1F2328",
+"lineColor": "#5B6B7C", "secondaryColor": "#FDF0DC"}}}%%
+sequenceDiagram
+    participant E as Endpoint (you)
+    participant K as Kernel link plane
+    E->>K: POST /api/link/v1/enroll (public half + enrollment token)
+    K-->>E: 201 enrollmentId + endpointKeyId + seq (token retired)
+    E->>K: POST /api/link/v1/challenge (endpointId)
+    K-->>E: 200 single-use nonce, 30 s
+    E->>K: POST /api/link/v1/proof (detached EdDSA JWS)
+    K-->>E: 200 sessionToken, 5-minute JWT, seq bumped
+    Note over E,K: repeat challenge+proof whenever the session expires<br/>or any call answers 401
 ```
 
 Nothing needs storing except the key itself — the session JWT is disposable
@@ -178,3 +205,15 @@ RFC 3339; approval digests are RFC 8785 canonicalization + SHA-256.
 - Zero warnings is a build requirement on both stacks; do not add
   suppressions without calling them out.
 - Never commit `.env` or `secrets/`; demo credentials only.
+
+## Failing well
+
+| You see | It means | Do |
+|---|---|---|
+| `401 unauthorized` on `/api/*` | bearer missing/expired/invalid | re-mint the token; human and service grants are not interchangeable |
+| `403 forbidden` | role rules (`rolesAnyOf`) reject the token's claims | act through a role the subject holds; never retry |
+| `404` for an id you know exists | the row belongs to another team (non-disclosure) | stop; do not probe variants |
+| `409 version-conflict` | optimistic concurrency lost | re-read, carry `currentVersion` from the problem body, retry once |
+| `422 invalid-state-transition` | the lifecycle forbids the move from the current state | read the timeline, pick a legal transition |
+| `401` on `/api/link/v1/*` | session JWT expired or epoch moved | re-run challenge → proof |
+| Duplicate delivery of the same `commandId` | at-least-once redelivery after lease expiry | answer `duplicate`; never re-execute |

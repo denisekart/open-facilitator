@@ -1,16 +1,23 @@
 # Dev Container Feature: ofac-gateway
 
-Installs the team-owned **Gateway** (`ofac-gateway`) into any container: a
+Installs the team-owned **Gateway** (`ofac-gateway`) into any container; read
+this when you add the Gateway to a workspace/devcontainer image. You get a
 self-contained Node runtime bundle (no npm registry, no network, no toolchain
 at install time), the headless supervisor entrypoint, and a supervisor unit
 that runs the Gateway with restart-with-backoff.
 
-## Prerequisites
+## Quickest path
 
-- Node **>= 22** on PATH (hard-fails otherwise). A Node-shipping base image
-  (`mcr.microsoft.com/devcontainers/typescript-node`) or the official
-  `ghcr.io/devcontainers/features/node` Feature satisfies this; the Feature
-  deliberately does not download a Node runtime itself.
+1. Base image with Node **>= 22** on PATH: `mcr.microsoft.com/devcontainers/typescript-node`
+   or the official `ghcr.io/devcontainers/features/node` Feature — the Feature
+   deliberately does not download a Node runtime itself, and hard-fails
+   without one.
+2. Point `stateDir` in the Gateway config at the workspace mount and supply a
+   credential (`OFAC_ENROLL_SECRET` / `OFAC_LINK_TOKEN`, or an existing
+   `<stateDir>/token` file).
+3. Start the container; the supervisor runs unit `10-gateway.sh`.
+   `grep 'gateway ready' "$OFAC_LOG_DIR/10-gateway.sh.log"` shows
+   `gateway ready endpointId=<id> epoch=<n> children=<k>`.
 
 ## Options (startup-time defaults only)
 
@@ -24,13 +31,13 @@ the truth. Secrets are **never** options.
 
 ## Runtime env surface (1:1 with the binary)
 
-- `GATEWAY_CONFIG` — config path (beats the baked `configPath`).
-- `OFAC_ENROLL_SECRET` / `OFAC_LINK_TOKEN` / `OFAC_CHILD_SECRET` —
-  credentials; one of them, or an existing `<stateDir>/token` file, is
-  required.
-- `OFAC_GATEWAY_LOG=debug` — debug logging.
-- `OFAC_LOG_DIR` — supervisor log dir (default `/tmp/openfacilitator/logs`).
-- `OFAC_SUPERVISOR_MAX_RESTARTS` — per-unit restart budget (default 10).
+|Variable|Meaning|
+|---|---|
+|`GATEWAY_CONFIG`|config path (beats the baked `configPath`)|
+|`OFAC_ENROLL_SECRET` / `OFAC_LINK_TOKEN` / `OFAC_CHILD_SECRET`|credentials; one of them, or an existing `<statePath>/token` file, is required|
+|`OFAC_GATEWAY_LOG=debug`|debug logging|
+|`OFAC_LOG_DIR`|supervisor log dir (default `/tmp/openfacilitator/logs`)|
+|`OFAC_SUPERVISOR_MAX_RESTARTS`|per-unit restart budget (default 10)|
 
 Logs: `$OFAC_LOG_DIR/10-gateway.sh.log`. Ready signal:
 `gateway ready endpointId=<id> epoch=<n> children=<k>`.

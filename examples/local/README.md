@@ -1,14 +1,46 @@
 # Local home deployment (`examples/local`)
 
-A fork-me, fully self-hosted deployment reference: the Facilitator kernel
-on one box, persistent gateways + launchers on the others, no cloud
-services anywhere. Like `examples/aws`, it is an **example to copy**, not
-a product — but unlike the AWS example its automated gate (`make
-example-local-smoke`) runs the whole topology on one host, AI-free.
+A fork-me, fully self-hosted deployment reference — the Facilitator kernel on
+one box, persistent gateways + launchers on the others, no cloud services
+anywhere — read by whoever runs this at home or forks it onto their own
+boxes. Like `examples/aws`, it is an **example to copy**, not a product —
+but unlike the AWS example its automated gate (`make example-local-smoke`)
+runs the whole topology on one host, AI-free.
 
 Non-goals: HA/multi-replica kernel, ACME-by-default (Caddy `tls internal`
 is), hosted IdP (Keycloak is the pre-Google bootstrap stub), and shipping
 the platforms you talk to — GitHub/Mattermost are docs-only recipes.
+
+## Quickest bring-up
+
+```bash
+cd examples/local
+pnpm -C tools/localctl build
+
+./localctl init --env example          # generate secrets/example.env (0600)
+$EDITOR envs/example.json              # hosts, teams, images, tls, backups
+./localctl render --env example        # .out/example/<box>/ bundles + lock
+
+./localctl up kernel --env example     # kernel box: compose up (ssh push)
+./localctl enroll-token --node pc1 --env example   # mint + write into bundle
+./localctl up pc1 --env example        # node box: gateway + launcher
+./localctl status --env example        # per-box ps + links table
+```
+
+You should now see: per-box `ps` output plus a links table from `status`
+listing the node gateway as online. For the single-host simulation everything
+is the same with `--env sim`, plus `127.0.0.1 id.localhost` in `/etc/hosts`
+(the issuer alias law — `localctl status` reminds you). `localctl down [-v]`
+tears down (and sweeps kernel-provisioned worker containers; `-v` drops
+volumes).
+
+The `lan`/`tailscale` up path tars each rendered bundle and pushes it to
+`sshUser@host:<remoteDir>/<env>/<box>` over ssh. A `"local"` image on a
+multi-box env also pushes a `git archive` of HEAD so the box can build
+(it warns); the zero-dependency path for real installs is registry
+digests.
+
+Then walk the [day one](#day-one-walkthrough) legs.
 
 ## Shape
 
@@ -80,34 +112,6 @@ for the launcher's socket mount):
 
 **Build host** (where you run `localctl`): node ≥ 22, pnpm, Docker
 (same host in sim; anywhere with ssh access otherwise).
-
-## Bring-up order
-
-```bash
-cd examples/local
-pnpm -C tools/localctl build
-
-./localctl init --env example          # generate secrets/example.env (0600)
-$EDITOR envs/example.json              # hosts, teams, images, tls, backups
-./localctl render --env example        # .out/example/<box>/ bundles + lock
-
-./localctl up kernel --env example     # kernel box: compose up (ssh push)
-./localctl enroll-token --node pc1 --env example   # mint + write into bundle
-./localctl up pc1 --env example        # node box: gateway + launcher
-./localctl status --env example        # per-box ps + links table
-```
-
-For the single-host simulation everything is the same with
-`--env sim`, plus `127.0.0.1 id.localhost` in `/etc/hosts` (the issuer
-alias law — `localctl status` reminds you). `localctl down [-v]`
-tears down (and sweeps kernel-provisioned worker containers; `-v` drops
-volumes).
-
-The `lan`/`tailscale` up path tars each rendered bundle and pushes it to
-`sshUser@host:<remoteDir>/<env>/<box>` over ssh. A `"local"` image on a
-multi-box env also pushes a `git archive` of HEAD so the box can build
-(it warns); the zero-dependency path for real installs is registry
-digests.
 
 ## Enrollment hand-off (static secret vs minted token)
 
@@ -201,8 +205,9 @@ verification run.
 
 ## Day-one walkthrough
 
-1. Bring up per [Bring-up order](#bring-up-order); open
-   `https://<kernelHost>/` (sim: `http://localhost:7488/`).
+1. Bring up per [Quickest bring-up](#quickest-bring-up); open
+   `https://<kernelHost>/` (sim: `http://localhost:7488/`). You should now
+   see the SPA's login page.
 2. Sign in with Google (or `admin`/`admin` on the Keycloak stub before
    the switch); find your `sub`; add the admin role rule.
 3. Browse the **Links** panel: your node gateways are online; the

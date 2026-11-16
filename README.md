@@ -40,21 +40,30 @@ documents, and test evidence are first-class outputs.
 
 ## How it works
 
-```mermaid
+The one claim the picture makes: the kernel sits in the middle, the team
+plane connects only through an outbound link, and privileged writes to the
+outside world happen team-side.
+
+```mermaid title="One kernel, teams dial out, execution stays team-side"
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#EAF1F9",
+"primaryBorderColor": "#0B5FBF", "primaryTextColor": "#1F2328",
+"lineColor": "#5B6B7C", "secondaryColor": "#FDF0DC"}}}%%
 flowchart TB
-  CHAT[Chat / Issues / Webhooks] -->|events| FAC
-  subgraph FAC[Facilitator - deploy once]
-    ING[Ingress + adapters] --> ROUTE[Routing + decisions]
-    ROUTE --> WORK[Work coordinator]
-    WORK <--> DB[(PostgreSQL - durable state)]
-    WORK --> MEM[Memory + artifact broker]
-    WORK --> HUB[Link hub + admin SPA]
+  CHAT["Chat / Issues / Webhooks"] -->|events| ING
+  subgraph FAC["Facilitator - deploy once"]
+    ING["Ingress + adapters"] --> ROUTE["Routing + decisions"]
+    ROUTE --> WORK["Work coordinator"]
+    WORK --> DB[("PostgreSQL - durable state")]
+    DB --> WORK
+    WORK --> MEM["Memory + artifact broker"]
+    WORK --> HUB["Link hub + admin SPA"]
   end
-  HUB <--"outbound link (SignalR / HTTP)"--- GW[Team Gateway]
-  HUB <---direct link--- W2[Direct workspace]
-  GW --> W1[Workspace + harness adapter]
-  GW --> W3[Workspace + different harness]
-  GW -->|team-owned credentials| SCM[Git / issues / deploys]
+  GW["Team Gateway"] -->|"outbound link (SignalR / HTTP)"| HUB
+  W2["Direct workspace"] -->|direct link| HUB
+  HUB -->|assignments over the open link| GW
+  GW --> W1["Workspace + harness adapter"]
+  GW --> W3["Workspace + different harness"]
+  GW -->|team-owned credentials| SCM["Git / issues / deploys"]
 ```
 
 1. An event (chat mention, issue label, API call) creates a **Work** — a
@@ -73,7 +82,7 @@ flowchart TB
 
 ```bash
 ./referencectl up slim      # build + boot + seed the demo path
-./referencectl verify       # acceptance run: every hop, 11 steps
+./referencectl verify       # acceptance run: every hop, 12 steps
 open http://localhost:8088  # admin SPA (Keycloak login: alice/alice)
 ./referencectl down -v
 ```
@@ -94,7 +103,7 @@ tokens, Works, approvals, artifacts, traces:
 | **Harness adapters** | Thin translators from Gateway child wire to one execution harness; `@ofac/adapter` SDK + deterministic / oh-my-pi / Codex reference workers | `src/adapters/harnesses/` |
 | **Communication adapters** | Chat/forge legs (Mattermost, Telegram, Forgejo/GitHub/GitLab pairs, Kafka) normalizing into provider domain events | `src/adapters/communication/` |
 | **Dev Container Features** | One-Feature onboarding: any team container becomes a linked workspace by adding a single feature | `features/` |
-| **Reference environment** | Compose slim/full stacks, `referencectl` lifecycle + acceptance scripts | `reference/` |
+| **Reference environment** | Compose slim/full stacks, `referencectl` lifecycle + acceptance scripts | `reference/` (`./referencectl`) |
 
 ## Documentation
 

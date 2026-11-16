@@ -25,7 +25,7 @@ export const hero = {
   kicker: "Open-source orchestration for human + agent teams",
   tagline: "Your agents do the work. Open Facilitator remembers it.",
   oneLiner:
-    "A coordination kernel for teams of humans and AI agents. Hand it a piece of work — it tracks who is doing what, waits for the humans who must approve, files the evidence, and survives every crash, restart, and reorg along the way.",
+    "A coordination kernel for teams of humans and AI agents. Hand it a piece of work — it tracks who has it, waits for the humans who must approve, files the evidence, and stays standing through every crash and restart, because the record lives in your database.",
 };
 
 // The interactive hero scene: a work item crossing four stations, with the
@@ -37,28 +37,28 @@ export const relay = {
       x: 75,
       who: "You or an agent",
       title: "A Work is created",
-      body: "One POST to the API — or a message in chat. An objective, nothing else required. The kernel records it durably: it now outlives every process involved.",
+      body: "One POST to the API — or a message in chat. An objective, nothing else required. It lands as a row in your database, so from that moment it outlives every process involved.",
       log: "work opened: refresh billing docs — via chat",
     },
     {
       x: 225,
       who: "The kernel",
       title: "Routing decides who acts",
-      body: "Deterministic policy — never a model — picks a team by capability, mints an assignment, and pushes it out over an always-outbound link. If that team is offline, the work simply waits.",
+      body: "Policy picks a team by capability, mints an assignment, and pushes it out over an always-outbound link. A model may propose a route; only policy takes one, and the decision is written to the audit trail. If that team is offline, the work simply waits.",
       log: "routed to team-alpha by policy (audited)",
     },
     {
       x: 375,
       who: "A team's environment",
       title: "Agents execute, humans approve",
-      body: "Execution happens in the team's own environment, with the team's own credentials. The agent proposes; a human gate decides. Neither the kernel nor any other team can reach in.",
+      body: "Execution happens in the team's own environment, on the team's own credentials. The agent proposes; a human gate decides. Neither the kernel nor any other team can reach in.",
       log: "agent proposed merge → alice approved (identity kept)",
     },
     {
       x: 525,
       who: "The record",
       title: "Evidence is filed",
-      body: "Every output becomes a content-addressed artifact, every decision an audit entry, every lesson a memory candidate. Six months later you can still answer: who did what, when, and why.",
+      body: "Every output becomes a digest-verified artifact, every decision an audit entry, every lesson a memory candidate. Six months later you can still answer: who did what, when, and who allowed it.",
       log: "evidence filed · status: done",
     },
   ],
@@ -105,7 +105,7 @@ export const components = [
   {
     name: "The Gateway",
     tag: "npm · @ofac/gateway",
-    body: "The team-side runtime. One outbound connection to the kernel, N workspaces behind it, a durable local ledger. Runs as a CLI process, a container, or inside your existing CI fleet.",
+    body: "The team-side runtime. One outbound connection to the kernel, N workspaces behind it, a durable local ledger. One process on any host your team already runs — a container, a VM, a worker box.",
     docs: "/artifacts",
   },
   {
@@ -157,8 +157,8 @@ export const benefits = [
     body: "CloudEvents + JSON Schema + OpenAPI, with a cross-language conformance suite. Swap harnesses, swap chat providers, write your own adapter in any language — or implement the whole side from the contract alone.",
   },
   {
-    title: "Boring, replaceable infrastructure",
-    body: "Required: PostgreSQL, an OIDC provider, an object store. Everything else — message buses, schedulers, vector databases, even the model providers — is optional. Small enough to audit, standard enough to keep.",
+    title: "Replaceable infrastructure",
+    body: "Three things beside the kernel: your PostgreSQL, your OIDC provider, and somewhere to put artifact bytes — S3-compatible in production, a plain folder for a trial. Everything else — message buses, schedulers, vector databases, even the model providers — is optional. Small enough to audit, standard enough to keep.",
   },
 ];
 
@@ -265,13 +265,13 @@ export const docs = [
         route: "/docs/getting-started",
         src: "docs/getting-started.md",
         title: "Guided tour (reference environment)",
-        body: "A self-contained laptop tour of the whole system, end to end, with every hop proved.",
+        body: "A self-contained laptop tour of the whole system, end to end, closed out by the same twelve-leg acceptance run that gates each release.",
       },
       {
         route: "/docs/getting-started-agents",
         src: "docs/getting-started-agents.md",
-        title: "Agent orientation (in-repo)",
-        body: "Agent-facing orientation for humans working inside the source repository.",
+        title: "Getting started (AI agents)",
+        body: "Orientation for an agent that will run, drive, or extend the system from source: the layout, the gates, the document that owns each rule.",
       },
       {
         route: "/docs/contributing",

@@ -3,7 +3,7 @@
 These scenarios are `unexpressible` in the automated gate by conviction, not
 by laziness: the check is a human judgment about experience, and no
 in-process test can render it. The T4 lane is **recorded only and never a
-gate** (plan 11's lane law). Score each run 0-3:
+gate**. Score each run 0-3:
 
 - **0** absent - the behaviour does not exist
 - **1** silent-absent / divergent - exists but misleads, or fails the check

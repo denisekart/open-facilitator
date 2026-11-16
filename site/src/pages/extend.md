@@ -1,10 +1,35 @@
 # Extend it yourself
 
-The framework's core promise to implementers: **the same contract the
-shipped components obey is the contract you get.** Nothing a first-party
-adapter can do is closed to you.
+You can write your own piece of this system: the components that ship are
+built on a published contract, and that contract is the same one handed to
+you. Nothing a first-party package can do is closed to an outside one.
 
 ## Three ways to extend, cheapest first
+
+The three seams differ in how much of the system you take responsibility
+for, not in how much authority you get:
+
+```mermaid title="The three seams, from cheapest to deepest"
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#EAF1F9",
+"primaryBorderColor": "#0B5FBF", "primaryTextColor": "#1F2328",
+"lineColor": "#5B6B7C", "secondaryColor": "#FDF0DC"}}}%%
+flowchart LR
+  subgraph S1["1. a harness"]
+    AD["@ofac/adapter - your executor behind a line-oriented stdio protocol"]
+  end
+  subgraph S2["2. a provider"]
+    PR["webhook in, approval-gated writes out"]
+  end
+  subgraph S3["3. a whole component"]
+    IM["your Gateway / service / console against the published schemas"]
+  end
+  S1 --> S2 --> S3
+```
+
+_Left to right, the surface you own grows and the parts you depend on
+shrink: a harness is a child process the shipped Gateway spawns, a
+provider is a service you run beside it, a component replaces one of them
+entirely — and all three are judged by the same published contract._
 
 ### 1. Write a harness (execute work your way)
 
@@ -48,11 +73,11 @@ Because the wire is the product, you can replace any side:
 
 ## What makes this tractable
 
-- **Frozen contract, versioned forever.** Event type names carry their
-  version (`org.facilitator.event.work.progress.v1`). Compatible
-  changes add fields; breaking ones get a new version segment. Your
-  adapter can hold its ground across kernel upgrades.
-- **Fixtures, not vibes.** Every protocol change ships with
+- **The version is in the name.** Event type names carry their version
+  (`org.facilitator.event.work.progress.v1`). Compatible changes add
+  fields; breaking ones get a new version segment and the old name keeps
+  its meaning, so an adapter holds its ground across kernel upgrades.
+- **Fixtures, not assertions.** Every protocol change ships with
   cross-language conformance fixtures that two independent stacks
   parse and emit identically. “It works against my kernel” is not a
   claim you have to take on faith.
@@ -61,11 +86,14 @@ Because the wire is the product, you can replace any side:
   it needs, and which events it can cause — so adding an integration
   is a reviewable decision, not a black box.
 
-## Where to read the details
+## Where to go next
 
-- [Wire protocol (v1)](/docs/protocol) — envelopes, type registry,
-  ingress, link transport.
-- [Advanced topics](/docs/advanced) — Gateway modes, the full
-  HarnessAdapter contract, provider plumbing, the memory broker.
-- [Security posture](/docs/security) — identities, gates, approval
-  lifecycle, team-side policy: the rules your adapter must respect.
+- The grammar your piece must satisfy: [Wire protocol (v1)](/docs/protocol) —
+  envelopes, type registry, ingress, link transport.
+- Gateway modes, the full HarnessAdapter contract, provider plumbing, the
+  memory broker: [Advanced topics](/docs/advanced).
+- The rules your piece must respect (identities, gates, approval
+  lifecycle, team-side policy): [Security posture](/docs/security).
+- Where your piece sits among the shipped ones:
+  [Explore the architecture](/architecture), and the coordinates you
+  publish beside: [Artifacts & installation](/artifacts).

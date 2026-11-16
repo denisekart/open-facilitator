@@ -1,9 +1,11 @@
 # What Open Facilitator is
 
-You run work with a mix of AI agents, humans, and scripts. Some of that
-work matters enough to audit, to approve, to hand over a wall between
-teams, or to still understand in six months. Open Facilitator is the
-durable record and coordinator for exactly that work — and nothing else.
+Open Facilitator is the durable record of work your team shares between AI
+agents, humans, and scripts: it holds who has a piece of work, what
+happened to it, what a human was asked to allow, and what evidence came
+out. It runs no workload, holds none of your credentials, and covers only
+the work that matters enough to audit, to approve, to hand across a wall
+between teams, or to still understand in six months.
 
 ## The system at a glance
 

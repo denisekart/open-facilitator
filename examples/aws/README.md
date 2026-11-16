@@ -1,15 +1,35 @@
 # AWS reference deployment (`examples/aws`)
 
 A fork-me AWS deployment reference for the open-facilitator kernel, gateways,
-and workspaces: one CDK v2 app (`example-aws-deploy`), one stack per workload,
-driven by an env file (`envs/<name>.json`). It is an **example to copy**, not
-a product: there is no live pipeline that runs `cdk deploy` anywhere — a
-human runs `./deployctl deploy` with named profiles (see
+and workspaces, read by whoever copies this example into their own account:
+one CDK v2 app (`example-aws-deploy`), one stack per workload, driven by an
+env file (`envs/<name>.json`). It is an **example to copy**, not a product:
+there is no live pipeline that runs `cdk deploy` anywhere — a human runs
+`./deployctl deploy` with named profiles (see
 [Deploy approach](#deploy-approach)).
 
 Non-goals: EKS, multi-region, Terraform, and self-hosted forge stacks (we
 never ship the platforms we interact with — GitLab.com SaaS is the example
 provider below).
+
+## Quickest bring-up
+
+```bash
+cp envs/example.json envs/mycorp.json   # edit accounts, domains, images
+./deployctl deploy --env mycorp --account platform   # network → data → identity → kernel → observability
+./deployctl deploy --env mycorp --account team:team-alpha
+```
+
+You should now see: the platform stacks `CREATE_COMPLETE` in that order, the
+SPA behind the ALB at `https://<kernelDomain>`, and the team's gateway online
+in the Links panel after its enrollment secret is filled in ([hand-off
+below](#enrollment-and-webhooks)).
+
+`deployctl` resolves `envs/<name>.json` and names the stacks per account
+class; pass explicit stack names (or `--profile`) to go narrower. Bring-up
+order within an account is `network → data → identity → kernel →
+observability`, then team plane, then fleet — the one-way stack graph in
+`bin/app.ts` matches that order.
 
 ## Shape
 
@@ -102,19 +122,7 @@ link-plane rules are never infra-authed.
 |VPC / Route53 zone|created|referenced (`vpc.id`, zone pre-exists)|
 |IdP|Cognito managed logins|`federation: {type: oidc\|saml, …}`|
 
-## Bring-up order
-
-```bash
-cp envs/example.json envs/mycorp.json   # edit accounts, domains, images
-./deployctl deploy --env mycorp --account platform   # network → data → identity → kernel → observability
-./deployctl deploy --env mycorp --account team:team-alpha
-```
-
-`deployctl` resolves `envs/<name>.json` and names the stacks per account
-class; pass explicit stack names (or `--profile`) to go narrower. Bring-up
-order within an account is `network → data → identity → kernel →
-observability`, then team plane, then fleet — the one-way stack graph in
-`bin/app.ts` matches that order.
+## Enrollment and webhooks
 
 **Enrollment-secret hand-off** (manual by design, no rotation Lambda): the
 team plane creates `facilitator/team/<name>/enrollment` with a placeholder.
@@ -144,35 +152,13 @@ launcher's own env). The kernel never opens a connection toward the team.
 `TeamFleetStack` exists only when the team entry sets `"fleet": true`; with
 no launcher, the kernel records provisioning ops and sends no envelopes.
 
-## LocalStack smoke
-
-Local-only, no credentials, not CI:
-
-```bash
-./deployctl smoke
-```
-
-Brings up `localstack/compose.yaml` (free image, edge :4566), deploys
-`ofac-smoke-network`, `-data`, `-identity` against a single fake account,
-and asserts: VPC + ≥2 private subnets + endpoints, versioned bucket,
-serverless-v2 DB + the DB master secret (resolved through the stack's
-resource inventory — the name is env-scoped), Cognito pool + domain.
-**Documented exclusions:** ALB+WAF and ECS have only partial LocalStack
-coverage — those stacks are synth/snapshot-tested only, never smoke-deployed.
-The smoke env sets `platform.natMode: "none"` (LocalStack 4's CFN cannot
-provision a `AWS::EC2::NatGateway`: its EIP wiring hands back an unusable
-allocation id), and Cognito resources are asserted as `CREATE_COMPLETE`
-on the stack — LocalStack's CFN provider does not wire pools into the
-cognito-idp API mock.
-
 ## Deploy approach
 
 No live pipeline runs `cdk deploy`. Humans run `./deployctl deploy` (or bare
 `pnpm exec cdk -c envFile=envs/<name>.json deploy …`) with named AWS
 profiles; `--account platform|team:<name>` selects the stack set for the
-credentials you have. The future path (sketched, not wired): a
-GitHub-Actions-OIDC workflow assuming a per-account deploy role, calling the
-same `deployctl` verbs — nothing here blocks it.
+credentials you have. A GitHub-Actions-OIDC workflow assuming a per-account
+deploy role can call the same `deployctl` verbs — nothing here blocks it.
 
 ## Tests & gates
 
@@ -190,7 +176,28 @@ same `deployctl` verbs — nothing here blocks it.
   `cdk synth` once credentials exist).
 - `pnpm -C examples/aws/fleet-launcher test` — mocked-ECS launcher contract
   tests (RunTask on known workloadId, `rejected` receipt on unknown).
-- `./deployctl smoke` — see above.
+- `./deployctl smoke` — see below.
+
+## LocalStack smoke
+
+Local-only, no credentials, not CI:
+
+```bash
+./deployctl smoke
+```
+
+Brings up `localstack/compose.yaml` (free image, edge :4566), deploys
+`ofac-smoke-network`, `-data`, `-identity` against a single fake account, and
+asserts: VPC + ≥2 private subnets + endpoints, versioned bucket,
+serverless-v2 DB + the DB master secret (resolved through the stack's
+resource inventory — the name is env-scoped), Cognito pool + domain.
+**Documented exclusions:** ALB+WAF and ECS have only partial LocalStack
+coverage — those stacks are synth/snapshot-tested only, never smoke-deployed.
+The smoke env sets `platform.natMode: "none"` (LocalStack 4's CFN cannot
+provision a `AWS::EC2::NatGateway`: its EIP wiring hands back an unusable
+allocation id), and Cognito resources are asserted as `CREATE_COMPLETE`
+on the stack — LocalStack's CFN provider does not wire pools into the
+cognito-idp API mock.
 
 ## Cost posture per stack
 

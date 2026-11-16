@@ -1,5 +1,22 @@
 # Advanced Topics
 
+This page covers running the pieces apart. Each section is a standalone
+how-to for one component: the kernel without Compose, a Gateway configured
+by hand, a harness you write, a provider you connect, the memory broker
+under load. Nothing here is required for the guided tour in
+[getting-started.md](getting-started.md) — that path boots everything
+together — but every configuration law the composed stack relies on is
+stated here, so a hand-rolled deployment can be checked against the same
+rules.
+
+| You want to | Go to |
+|---|---|
+| Run just the kernel, against your own Postgres | [Kernel without Compose](#kernel-without-compose) |
+| Configure a Gateway: modes, children, the locked YAML surface | [Gateway modes](#gateway-modes) |
+| Write or debug a harness adapter | [HarnessAdapter contract](#harnessadapter-contract) |
+| Connect or operate a chat/forge provider | [Provider adapters](#provider-communication-adapters) |
+| Understand memory scopes, profiles, retention | [Memory broker](#memory-broker) |
+
 ## Kernel without Compose
 
 The transactional kernel runs bare for focused work: boot Postgres 17
@@ -27,7 +44,30 @@ supported demo environment; this section is the seam, not the gate.
 (`@ofac/workspace-link`): one Link endpoint per team gateway
 (`gatewayId: gw.<slug>`), the execution ledger between kernel and children.
 
-### As-built: embedded child
+The Gateway ships three shapes, differing only in where the executing child
+lives. Pick by who is trusted to run code on the host:
+
+| Shape | Children | Use when |
+|---|---|---|
+| `embedded` | one in-process child | single-team devcontainer, simplest deployment |
+| `shared` | several out-of-process children over a unix socket | one team, several harnesses, same host |
+| `standalone` | several, workspace-isolated | the Gateway owns no work itself; children are the workspaces |
+
+```mermaid title="Gateway shapes: the kernel sees one endpoint"
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#EAF1F9",
+"primaryBorderColor": "#0B5FBF", "primaryTextColor": "#1F2328",
+"lineColor": "#5B6B7C", "secondaryColor": "#FDF0DC"}}}%%
+flowchart LR
+  K["Kernel - sees ONE endpoint"] --> GW["Gateway - policy + execution ledger"]
+  GW -->|"embedded: in-process call"| C1["single child"]
+  GW -->|"fleet: unix socket, NDJSON frames"| C2["child A"]
+  GW -->|"fleet: unix socket, NDJSON frames"| C3["child B"]
+```
+
+*The kernel's view is identical in both shapes: one endpoint with one
+advertised capability union. What changes is who owns process isolation.*
+
+### Embedded child
 
 One process, one child: the Gateway enrolls its key,
 POSTs the child's capability manifest rewritten to the team's ownership,
@@ -38,7 +78,7 @@ JSON replies, in-process today. Modes `echo` and `stub` are the builtin
 child manifests; `child.manifestFile` advertises any other capability set
 while the builtin handlers answer.
 
-### As-built: shared + standalone fleets
+### Shared + standalone fleets
 
 `mode: shared` and `mode: standalone` replace the single `child:` with a
 `children:` list and a `childTransport:` block. Children are separate
@@ -112,7 +152,7 @@ is `@ofac/harness-deterministic`.
 
 ### Lifecycle
 
-```mermaid
+```mermaid title="An assignment through the adapter: accept, execute detached, complete"
 sequenceDiagram
     participant K as Kernel
     participant G as Gateway
@@ -292,7 +332,7 @@ Authoring law, as both adapters prove it:
   change the head-branch resolver must see (a connector-minted PR would else
   strand unbound) and nothing answers it, so it runs the arm instead.
 
-### Operation semantics (as-built — Mattermost)
+### Operation semantics (Mattermost)
 
 The Forgejo adapter advertises only `communication.reply.v1` (issue/PR
 comment as the bot, ledger-keyed the same way).
@@ -328,7 +368,7 @@ is worth remembering. Extraction, consolidation, and reflection live
 team-side (harness or provider); the kernel's `reflect` answer is a typed
 `unsupported`.
 
-### Provider profiles (as fact)
+### Provider profiles
 
 |`Memory:Provider`|State|
 |---|---|

@@ -2,9 +2,15 @@
 
 This page builds the mental model of Open Facilitator from zero: the problem
 it solves, the objects it works with, and the rules it plays by. It assumes
-no prior knowledge of the project. For commands and screens, go to
-[getting-started.md](getting-started.md); for the exact wire shapes,
+no prior knowledge of the project, and it is the canonical home of the
+vocabulary — every other page links back to these definitions rather than
+restating them. For commands and screens, go to
+[getting-started.md](getting-started.md); for exact wire shapes,
 [protocol.md](protocol.md).
+
+After reading this page you can: name every object the system moves, predict
+what happens to a piece of work end to end, and know which rules the design
+never breaks.
 
 ## The problem
 
@@ -84,6 +90,33 @@ anyone polling chat.
 `research.report.v1` with these limits"). Routing matches work needs to
 advertised capabilities; the kernel routes only to what is declared.
 
+The ownership lines are the point of the whole model:
+
+```mermaid title="Ownership boundaries: only outbound links cross"
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#EAF1F9",
+"primaryBorderColor": "#0B5FBF", "primaryTextColor": "#1F2328",
+"lineColor": "#5B6B7C", "secondaryColor": "#FDF0DC"}}}%%
+flowchart TB
+  subgraph TEAM["Team boundary (your network, your credentials)"]
+    GW["Gateway - policy file + execution ledger"]
+    GW --> WS["Workspace + harness child"]
+    GW --> EXT["SCM / issue tracker / deploys"]
+  end
+  subgraph KER["Facilitator (deploy once)"]
+    WK["Work state + timeline + approvals"]
+    RT["Routing over capability manifests"]
+    BR["Artifact + memory broker"]
+  end
+  PROV["Chat / forge via adapters"] -->|normalized events| KER
+  GW -->|"outbound Link only"| KER
+  KER -.->|"nothing crosses inbound"| TEAM
+```
+
+*What the picture states: the only edge from the kernel into a team is an
+assignment pushed down a link the team itself opened, and the only way team
+work reaches the outside world is team-owned credentials. The kernel never
+holds them.*
+
 ## How a piece of work flows
 
 1. **Ingress.** A provider event (a chat mention, a labeled issue) or a
@@ -107,6 +140,36 @@ advertised capabilities; the kernel routes only to what is declared.
    assignment exactly once; the timeline and read models reflect it; a
    chat reply, PR, or other external side effect happens team-side, under
    team credentials, through the adapter that owns the provider.
+
+The same six legs as one hop diagram, with the human gate drawn where it
+actually appears:
+
+```mermaid title="One piece of work, hop by hop"
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#EAF1F9",
+"primaryBorderColor": "#0B5FBF", "primaryTextColor": "#1F2328",
+"lineColor": "#5B6B7C", "secondaryColor": "#FDF0DC"}}}%%
+sequenceDiagram
+    participant P as Provider event / API
+    participant K as Kernel
+    participant G as Team Gateway
+    participant W as Harness child
+    participant H as Human
+    P->>K: event or POST /api/works (idempotent admission)
+    K->>K: route by capability manifest (audited)
+    K->>G: work.assign over the open outbound link
+    G->>G: team policy: allow | deny | confirm
+    G->>W: start the run
+    W-->>K: progress, artifacts (re-hashed), memory candidates
+    G->>K: approval request (confirm leg, digest-pinned)
+    H->>K: decide (exactly one decision wins)
+    K->>G: decision push
+    W->>K: result manifest + assignment.completed
+    K->>K: settle once: timeline, read models, evidence
+```
+
+*What the picture states: every arrow into the kernel is either an
+idempotent event or a decision; the kernel's one outbound act is pushing a
+command down a link the team opened. Dashed arrows are at-least-once.*
 
 ## The rules the design holds itself to
 

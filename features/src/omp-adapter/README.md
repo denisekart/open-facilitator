@@ -1,20 +1,25 @@
 # Dev Container Feature: ofac-omp-adapter
 
 Installs the **omp harness worker** (`ofac-omp-worker`) — the oh-my-pi CLI
-stand-in — as a self-contained Node bundle plus a supervisor unit. The worker
-is a Gateway *child*: it attaches over the child transport (unix socket or
-127.0.0.1 TCP), registers its `coding.omp` capability manifest, and executes
-assignments the Gateway routes to it by spawning `omp --mode rpc` per
-execution.
+stand-in — as a self-contained Node bundle plus a supervisor unit; read this
+when a container runs omp assignments as a Gateway child. The worker attaches
+over the child transport (unix socket or 127.0.0.1 TCP), registers its
+`coding.omp` capability manifest, and executes assignments the Gateway routes
+to it by spawning `omp --mode rpc` per execution.
 
-## Prerequisites
+## Quickest path
 
-- Node **>= 22** on PATH (hard-fails otherwise; a Node-shipping base image or
-  the official `ghcr.io/devcontainers/features/node` Feature satisfies this).
-- The native **`omp` CLI on PATH** — the Feature does NOT install it. The
-  install hard-fails with an ERROR naming the base-image hint when
-  `omp` is missing; set `requireCli: false` to install the worker bundle
-  anyway (e.g. for feature scenario tests).
+1. Base image with Node **>= 22** on PATH (hard-fails otherwise; a
+   Node-shipping base image or the official
+   `ghcr.io/devcontainers/features/node` Feature satisfies this).
+2. The native **`omp` CLI on PATH** — the Feature does NOT install it. The
+   install hard-fails with an ERROR naming the base-image hint when
+   `omp` is missing; set `requireCli: false` to install the worker bundle
+   anyway (e.g. for feature scenario tests).
+3. A Gateway's child socket at the config's transport path, and
+   `OFAC_CHILD_SECRET` equal to the Gateway's.
+4. Start the container: `grep 'worker ready' "$OFAC_LOG_DIR/31-omp-adapter.sh.log"`
+   shows `worker ready childId=<gatewayId>/<child> socket=...`.
 
 ## Options (startup-time defaults only)
 
@@ -22,6 +27,11 @@ execution.
 |---|---|---|
 |`configPath`|`.facilitator/omp-harness.yaml`|Worker config the unit starts with; `WORKER_CONFIG` env overrides|
 |`requireCli`|`true`|Fail the install when `omp` is not on PATH; `false` skips the CLI gate|
+
+Socket coupling follows ofac-harness-adapter: the worker resolves relative
+paths against its config file's directory, so with a Gateway `stateDir`
+outside the config dir, point `transport.socket.path` at the absolute
+`<stateDir>/child.sock`.
 
 ## Agentic-mode law
 
@@ -36,11 +46,12 @@ run resumes when the answer arrives.
 
 ## Runtime env surface (1:1 with the binary)
 
-- `WORKER_CONFIG` — config path (beats the baked `configPath`).
-- `OFAC_CHILD_SECRET` — beats the config file's `token:`; must equal the
-  Gateway's `OFAC_CHILD_SECRET`.
-- `OFAC_ADAPTER_LOG` — log level (debug|info|warn|error).
-- `OFAC_LOG_DIR` / `OFAC_SUPERVISOR_MAX_RESTARTS` — supervisor surface.
+|Variable|Meaning|
+|---|---|
+|`WORKER_CONFIG`|config path (beats the baked `configPath`)|
+|`OFAC_CHILD_SECRET`|beats the config file's `token:`; must equal the Gateway's `OFAC_CHILD_SECRET`|
+|`OFAC_ADAPTER_LOG`|log level — one of `debug`, `info`, `warn`, `error`|
+|`OFAC_LOG_DIR` / `OFAC_SUPERVISOR_MAX_RESTARTS`|supervisor surface|
 
 Logs: `$OFAC_LOG_DIR/31-omp-adapter.sh.log`. Ready signal:
 `worker ready childId=<gatewayId>/<child> socket=...`.

@@ -6,7 +6,17 @@ repo's deployment pipeline consumes. Targets: `release.yml` (tag-triggered:
 `ci.yml` (merge gate; consumes `reference/versions.env` keys). Every secret and
 variable name below appears verbatim in the workflow files.
 
-```mermaid
+Work the sections in order: 1 decides the account layout (everything else
+inherits from it), 2–4 provision each registry family, 5 inventories the
+Actions surface, 6–7 cover digest pinning and SBOM publication, and 8 proves
+the whole setup with a throwaway tag before any real version is burned.
+
+The pipeline's shape, end to end:
+
+```mermaid title="The release pipeline end to end"
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#EAF1F9",
+"primaryBorderColor": "#0B5FBF", "primaryTextColor": "#1F2328",
+"lineColor": "#5B6B7C", "secondaryColor": "#FDF0DC"}}}%%
 flowchart LR
     TAG[push v* tag] --> C[containers job]
     TAG --> F[features job]
@@ -279,8 +289,8 @@ docker buildx imagetools inspect postgres:17-alpine --format '{{json .Manifest.D
 The `digest-pin` job (pipeline target) resolves digests of the images it just
 pushed — plus the third-party tags, so upstream retagging can't move a
 reference env under a release — and commits/PRs them back to
-`reference/versions.env`. `ci.yml`'s `meta` job currently enforces key
-presence; per the milestone it flips to enforcing non-empty values, so the
+`reference/versions.env`. `ci.yml`'s `meta` job enforces key
+presence; it flips to enforcing non-empty values, so the
 first real release must land all pins in one commit or CI goes red. Verify
 locally:
 
@@ -363,19 +373,22 @@ grep '^FACILITATOR_DIGEST=sha256' reference/versions.env
 gh release delete v0.0.0-smoketest --cleanup-tag --yes
 ```
 
-## Gap checklist before the first real tag
+## Verified setup facts
 
-Derived from reading the pipeline files as they stand; each item is a one-line
-change owned by the workflow/features code, not by this runbook's registry
-setup:
+Each item below was once an open gap in the pipeline; each is now law,
+enforced by the workflow/features code (not by this runbook's registry
+setup). A fresh setup can rely on all five:
 
-| # | Gap | Fix owner | Section |
+| # | Fact | Verified by | Section |
 |---|---|---|---|
-| 1 | ~~Feature `id` fields (`ofac-*`) differ from folder names~~ **closed**: every manifest's `id` now equals its folder name | — | 1.5, 2 |
-| 2 | ~~`features publish` line passed the path as one `--registry` token~~ **closed**: now `--registry ghcr.io --namespace denisekart/open-facilitator/features` | — | 2 |
-| 3 | ~~`tag majors` loop omitted `forgejo-provider`~~ **closed**: loop covers all six features | — | 2 |
-| 4 | ~~npm scope `@ofac` vs GitHub Packages owner rule~~ **closed**: route (c) npmjs.org, org `ofac`, OIDC trusted publisher | — | 3 |
-| 5 | ~~digest-pin lacked `contents: write`~~ **closed**: both `sbom` and `digest-pin` declare `contents: write` (a PAT is only needed if branch protection requires PRs) | — | 5, 6 |
+| 1 | Every feature manifest's `id` equals its folder name | `features` install-contract matrix | 1.5, 2 |
+| 2 | `features publish` takes `--registry ghcr.io --namespace denisekart/open-facilitator/features` (two tokens, not one path) | smoke run §8.3 | 2 |
+| 3 | The `tag majors` loop covers all six features, `forgejo-provider` included | smoke run §8.3 | 2 |
+| 4 | npm route: npmjs.org, org `ofac`, OIDC trusted publisher (GitHub Packages' owner rule excluded the alternatives) | smoke run §8.4 | 3 |
+| 5 | Both `sbom` and `digest-pin` declare `contents: write` (a PAT is only needed if branch protection requires PRs) | first pinned release commit | 5, 6 |
+
+Before the first real tag, walk [section 8](#8-smoke-test-a-fresh-setup-without-burning-a-real-version)
+end to end against a throwaway tag.
 
 Cross-references: `.github/workflows/README.md` (job-by-job scope),
 `docs/getting-started.md` (registry coordinates table),

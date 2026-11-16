@@ -1882,7 +1882,7 @@ sequenceDiagram
   participant Git as Forgejo
   U->>F: Chat event referencing issue WORK-123
   F->>F: Verify author, resolve thread/project, classify intent
-  F->>DB: Insert inbox; create Work and Assignment; outbox command
+  F->>DB: Insert inbox, create Work and Assignment, outbox command
   F-->>U: React to original request
   F-->>G: Deliver assignment on outbound-established link
   G->>G: Verify actor provenance, team ownership, capability, policy
@@ -1991,7 +1991,7 @@ sequenceDiagram
   participant G as Gateway
   participant W as Workspace / Adapter
   participant U as Team Owner
-  Note over F,W: Assignment active; link heartbeat healthy; no native progress
+  Note over F,W: Assignment active, link heartbeat healthy, no native progress
   F-->>G: work.status.request
   G-->>W: get native run status
   W-->>F: running, no progress timestamp change

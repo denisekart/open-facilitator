@@ -23,11 +23,36 @@ site/
     ├── styles.css         # the site theme: quiet chrome, one accent (light + dark parity with the console)
     ├── pages/index.mjs    # landing/404 template (interactive pipeline scene)
     ├── pages/architecture.mjs  # /architecture page shell around the explorer
-    ├── pages/*.md         # site-only product pages (what/integrations/console/artifacts/extend)
+    ├── pages/*.md         # site-only product pages (what/integrations/console/workflows/artifacts/extend):
+    │                      # each opens with one plain "what is this", builds up in place, and ends with a
+    │                      # "Where to go next" strip pointing at its successors on this site
     ├── js/app.js          # hash router, doc viewer, live search, snapshot explorer (no deps)
     ├── guides/*.md        # site-only getting-started guides
     └── assets/            # the mark + product screenshots (light + dark, produced by the e2e run)
 ```
+
+Pages reference screenshots as `../assets/<name>.png` — the build rewrites
+those to the flat `dist/` filenames, so the source stays resolvable to a
+plain markdown reader and a link checker.
+
+## Site pages
+
+`src/pages/*.md` and `src/guides/*.md` are the consumer surface, and they
+follow one shape: a first sentence that answers "what is this, in the
+reader's terms", detail that deepens in place, then a "Where to go next"
+list of the routes a reader naturally wants next (all of them in
+`config.mjs`, so the router and the sidebar know them too). Written copy
+names published coordinates rather than repo paths, ships no licensing or
+toolchain chatter, uses one word for the human actor, and claims only what
+`docs/` can back up.
+
+Concepts a reader cannot see in a screenshot are drawn instead:
+` ```mermaid ` fences with the site theme in an `%%{init …}%%` block and a
+`title="…"` info-string, which the build turns into the figure caption.
+Every diagram carries a lead-in sentence and one claim. `/workflows` also
+gets a generated tail from the wire schema
+(`src/schema-ref.mjs`), so its palette table and the validator cannot
+drift apart.
 
 ## The architecture explorer
 

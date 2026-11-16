@@ -1,8 +1,8 @@
 # Operational runbooks
 
-One page per operational scene. Each scene carries a symptom, exact
-diagnosis queries (psql, curl, admin surfaces), the action, and the
-durable behavioral facts an operator can rely on.
+One page per operational scene, one shape on every page: what you observe,
+the law that decides it, verbatim diagnosis queries (psql, curl, admin
+surfaces), concrete action, and the durable facts you can always rely on.
 
 **The reference environment is a conformance environment, not proof of
 production hardening.** Backup/restore, workload token rotation,
@@ -20,18 +20,18 @@ before a shared deployment is production-eligible.
 
 ## Scenes
 
-| Scene | Start here |
+| Scene | When to reach for this |
 |---|---|
-| Link leg (gateway/adapter) down, sessions/leases, reconcile-before-work | [gateway-offline.md](gateway-offline.md) |
-| Assignment silent: heartbeat vs harness progress, nudge budget, stalled | [work-stuck.md](work-stuck.md) |
-| Suspected double-processing: CloudEvents dedupe, action ledgers, readback | [duplicate-event-suspicion.md](duplicate-event-suspicion.md) |
-| Postgres unavailable: fail-safe ingress, lease reclaim, no phantom acks | [database-outage.md](database-outage.md) |
-| Artifact store (S3) / memory backend down: degrade, don't fake | [artifact-memory-backend-outage.md](artifact-memory-backend-outage.md) |
-| Provider API rejecting writes: backoff, budgets, dead-letter + replay | [provider-api-rate-limit.md](provider-api-rate-limit.md) |
-| Token accepted but permissions wrong: claim pointers, role rules | [identity-claim-mapper-error.md](identity-claim-mapper-error.md) |
-| Two+ replicas behaving oddly: epochs, SKIP LOCKED leases, fleet view | [horizontal-scale-anomalies.md](horizontal-scale-anomalies.md) |
-| Held action denied `expired`: lazy flip, response window, re-ask law | [consent-expired.md](consent-expired.md) |
-| Notice ended `undeliverable`: the egress ladder and its named reason | [notification-undeliverable.md](notification-undeliverable.md) |
-| An automation left the roster: name reserved, work with the team, audit trail | [contributor-retired.md](contributor-retired.md) |
-| A work id 303s: merge law, loser history stands, no unmerge | [work-merged.md](work-merged.md) |
-| The verification tiers outside CI and the law that binds them | [manual-verification-tiers.md](manual-verification-tiers.md) |
+| [gateway-offline.md](gateway-offline.md) | Assignments unassigned or intents unrouted, an endpoint greyed in Links, deliveries piling up `pending` — reconcile before accepting work. |
+| [work-stuck.md](work-stuck.md) | Live link but a silent harness: heartbeat vs harness progress, nudge budget spent, when `stalled` is honest. |
+| [duplicate-event-suspicion.md](duplicate-event-suspicion.md) | A message looks processed twice: prove it against the inbox row, the ledgers, and provider readback. |
+| [database-outage.md](database-outage.md) | Postgres unavailable: fail-safe ingress (no phantom acks), then lease reclaim does the rest. |
+| [artifact-memory-backend-outage.md](artifact-memory-backend-outage.md) | Uploads/recall fail while works run: the artifact/memory plane degrades, it never fakes. |
+| [provider-api-rate-limit.md](provider-api-rate-limit.md) | Provider rejecting writes: the 5-attempt budget, what lands in `dead_letters`, replay per row. |
+| [identity-claim-mapper-error.md](identity-claim-mapper-error.md) | Token validates but permissions are wrong: 401 vs 403, claim pointers, role rules. |
+| [horizontal-scale-anomalies.md](horizontal-scale-anomalies.md) | 2+ replicas behaving oddly: epochs, SKIP LOCKED leases, failover timing, fleet view. |
+| [consent-expired.md](consent-expired.md) | A held action denied `expired`: lazy flip, the response window, why re-ask is a new row. |
+| [notification-undeliverable.md](notification-undeliverable.md) | A notice ended `undeliverable`: read the reason, find the rung that failed. |
+| [contributor-retired.md](contributor-retired.md) | An automation left the roster: name reserved, work with the team, every trail ends at a human. |
+| [work-merged.md](work-merged.md) | A work id 303s: merge law, loser history stands, there is no unmerge. |
+| [manual-verification-tiers.md](manual-verification-tiers.md) | About to land a change that touches reference-env inputs: the legs outside CI and how to record them. |

@@ -54,6 +54,42 @@ tip(
   "Result manifest available, artifacts verified. The timeline is complete and immutable.",
 );
 tip("cancelled", "Closed without a result; the reason is on the timeline.");
+tip(
+  "your agent (endpoint)",
+  "Any language: enroll an Ed25519 key, prove possession per session, and the link plane treats you as a first-class endpoint.",
+);
+tip(
+  "open facilitator",
+  "The kernel's link plane: admission, durable delivery ledger, session leases. Every step is a schema-validated message.",
+);
+tip(
+  "your team's gateway",
+  "The team-side runtime: npm-installed, dialing out, spawning a harness per assignment.",
+);
+tip(
+  "enroll (public key + code)",
+  "One-time join: the enrollment code authorizes it and retires. No secret comes back — the key fingerprint is the identity.",
+);
+tip(
+  "challenge + proof",
+  "A single-use nonce, then a detached Ed25519 signature: the session token you get is disposable, the private key is not.",
+);
+tip(
+  "adapter - normalizes to work events",
+  "Read-only by construction: it turns webhooks into schema-validated events and holds no write credential.",
+);
+tip(
+  "connector - team-side, bot token",
+  "The only path back to your forge: it performs the single write an approval allowed, under the team's own bot token.",
+);
+tip(
+  "kernel image - stateless, any container host",
+  "One published image, multi-arch. All state lives in the Postgres beside it — restart, replace, or run several.",
+);
+tip(
+  "@ofac/adapter - your executor behind 3 lifecycle messages",
+  "Accept, progress, complete: the harness contract is small enough to audit in an afternoon, strict enough to gate releases.",
+);
 
 export function tooltipFor(label) {
   return tooltips[norm(label)] || null;

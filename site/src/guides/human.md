@@ -24,9 +24,10 @@ flowchart LR
 
 Either road ends at the same API: everything below works against both.
 
-## Road A: your own kernel, three containers
+## Road A: your own kernel, two containers
 
-You need PostgreSQL and a container runtime. Everything else is one
+You need PostgreSQL and a container runtime — your login provider stays
+outside (any standards-compliant OIDC service). Everything else is one
 image.
 
 ```bash
@@ -107,7 +108,7 @@ the work routes, executes, and files its evidence.
 
 If you want to see the _whole_ system — kernel, login provider,
 artifact store, a demo team with a worker, and an acceptance suite that
-proves all eleven hops unattended — run the tour instead:
+proves all twelve hops unattended — run the tour instead:
 
 ```bash
 git clone https://github.com/denisekart/open-facilitator.git

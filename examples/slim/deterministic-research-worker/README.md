@@ -1,11 +1,11 @@
 # Deterministic research worker — no-Docker walkthrough
 
-The smallest real deployment: dev Facilitator + standalone Gateway + the
-deterministic harness worker, driven end-to-end by hand. This is the
-third-party implementability proof for the HarnessAdapter contract
-(`protocol/json-schema/adapter.v1.json`). The `.devcontainer/` in this
-directory composes the same wiring from the OFAC Features — see "Devcontainer
-path" at the bottom; this file stays as the manual no-Docker path.
+The smallest real deployment — dev Facilitator + standalone Gateway + the
+deterministic harness worker, driven end-to-end by hand — read by anyone
+porting or verifying the HarnessAdapter contract
+(`protocol/json-schema/adapter.v1.json`) without Docker. The `.devcontainer/`
+in this directory composes the same wiring from the OFAC Features — see
+"Devcontainer path" at the bottom; this page is the manual no-Docker path.
 
 All commands run from this directory and the repo root as marked. Prereqs:
 PostgreSQL 17 + .NET 10 + Node 22 (as `docs/getting-started.md`).
@@ -19,6 +19,9 @@ docker run -d --name ofac-pg -e POSTGRES_USER=demo -e POSTGRES_PASSWORD=demo \
 ConnectionStrings__Facilitator="Host=localhost;Database=facilitator;Username=demo;Password=demo" \
   dotnet run --project src/facilitator   # Development: OIDC IdP + enroll-dev
 ```
+
+You should now see the kernel listening on `:8088` with the dev OIDC IdP on
+`:8480` and enrollment secret `enroll-dev`.
 
 ## 2. Build the worker + Gateway, then boot both
 
@@ -44,12 +47,16 @@ its own team. `OFAC_CHILD_SECRET` must match `token:` in `worker.yaml`;
 spawn order doesn't matter — the worker retries with backoff until the socket
 exists, and the Gateway leases + re-probes a child that drops.
 
+You should now see both ready lines, in either spawn order.
+
 ## 3. Verify registration
 
 ```bash
 curl -s http://127.0.0.1:8099/status | jq .children
 # → [{"childWorkspaceId":"gw.demo/deterministic","state":"online","inFlight":0,...}]
 ```
+
+You should now see the child `online`.
 
 ## 4. Seed an assignment
 
@@ -90,6 +97,8 @@ curl -s -X POST localhost:8088/api/dev/link-outbox \
 # → 202 {"outboxId":"..."}
 ```
 
+You should now see `202` with an `outboxId`.
+
 ## 5. Watch it run
 
 The worker logs each lifecycle step (`worker-step` ×2, `worker-completed`
@@ -102,7 +111,9 @@ curl -s http://127.0.0.1:8099/status | jq .bindings   # while running: the execu
 # the Gateway's linkStats (same document) count the relayed receipts
 ```
 
-With `stepMs: 800` the run completes ~1.6s after the assign.
+You should now see the execution row, then `/status`
+`executions.completed` at 1. With `stepMs: 800` the run completes ~1.6s after
+the assign.
 
 ## 5b. The confirm round-trip
 
@@ -134,10 +145,11 @@ curl -s -X POST "localhost:8088/api/works/$WORK_ID/approvals/$APPROVAL_ID/respon
   -d '{"decision":"approved","comment":"ship it"}' | jq .   # 200, evidenceRef kernel:...
 ```
 
-The kernel's decided-push (`link.gw.demo` outbox row → the Gateway's
-session) wakes the Gateway: it re-evaluates, consumes the approval over the
-Link plane (row flips `consumed`), and the child runs the SAME deterministic
-script — the artifact lands as `*-published.md`. `/status`
+You should now see `200` with an `evidenceRef` of the form
+`kernel:...`. The kernel's decided-push (`link.gw.demo` outbox row → the
+Gateway's session) wakes the Gateway: it re-evaluates, consumes the approval
+over the Link plane (row flips `consumed`), and the child runs the SAME
+deterministic script — the artifact lands as `*-published.md`. `/status`
 `executions.completed` ticks to 1; a second respond answers `409
 approval-already-consumed`.
 
@@ -167,6 +179,18 @@ The `manifest.json` bytes are canonical RFC 8785 — rehashing the file IS
 the digest check; the report's own digest is the manifest's
 `outputs[0].digest`, verifiable the same way through
 `/api/artifacts/{outputs[0].artifactId}/content`.
+
+## Configuration surface
+
+|Item|Value here|Rule|
+|---|---|---|
+|`ConnectionStrings__Facilitator`|`Host=localhost;Database=facilitator;Username=demo;Password=demo`|kernel DB; the dev container above publishes 5432|
+|`OFAC_CHILD_SECRET`|`child-secret-demo`|worker↔Gateway child credential; must equal `token:` in `worker.yaml`|
+|`enrollmentSecret` (`gateway.yaml`)|`enroll-dev`|Gateway self-enrollment; the dev kernel seeds `team-alpha` and `team-beta`|
+|`team` (`gateway.yaml`)|`team-alpha`|must equal a kernel team slug, or the capabilities POST is 403|
+|`policy.path` (`gateway.yaml`)|`./policy.yaml`|`research.analyze` allow, `research.publish` confirm|
+|`stepMs` (`worker.yaml`)|`800`|two steps ⇒ ~1.6 s per run|
+|state paths|`.ofac-gateway/`, `.ofac-worker/`, `.ofac-logs/`, `.ofac-linkd.sqlite3`|all gitignored|
 
 ## Troubleshooting
 

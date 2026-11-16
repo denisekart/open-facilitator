@@ -1,14 +1,9 @@
 # Reference environment
 
-Slim/full Docker Compose deployment inputs. `./referencectl up slim`
-from the repo root boots and seeds the demo path: PostgreSQL, Keycloak (realm
-`facilitator`), SeaweedFS (S3 artifact store), the Aspire dashboard (OTLP),
-the Facilitator kernel container, and `demo-workspace` — a team-owned
-workspace container running a standalone Gateway (`gw.team-alpha`) plus the
-deterministic worker over an in-container unix child leg, enrolled and
-policy-gated. One seeded `work.assign` then dispatches end-to-end.
+Slim/full Docker Compose deployment inputs for the whole plane; read this
+before starting, changing, or accepting a change to the stack.
 
-## Bring up / tear down
+## Quickest working path
 
 ```bash
 ./referencectl up slim        # build + wait healthy + seed the demo path
@@ -18,6 +13,18 @@ policy-gated. One seeded `work.assign` then dispatches end-to-end.
 ./referencectl down           # down -v with -v; FULL=1 adds the overlay
 make compose-slim / compose-full / compose-down   # raw compose path
 ```
+
+`up slim` boots and seeds the demo path: PostgreSQL, Keycloak (realm
+`facilitator`), SeaweedFS (S3 artifact store), the Aspire dashboard (OTLP),
+the Facilitator kernel container, and `demo-workspace` — a team-owned
+workspace container running a standalone Gateway (`gw.team-alpha`) plus the
+deterministic worker over an in-container unix child leg, enrolled and
+policy-gated. One seeded `work.assign` then dispatches end-to-end.
+
+You should now see: a healthy service table from `status`, a 0 exit from
+`verify`, and the seeded work completed.
+
+## Configuration inputs
 
 The first `up` copies `.env.example` to `.env`; **edit `.env` for real use** —
 it holds the Postgres password, Keycloak admin password, S3 credentials, and
@@ -38,16 +45,6 @@ both verbatim and fail hard on a missing key.
 |`8099`|Gateway diagnostics|**not published** — binds the workspace container's loopback; `./referencectl status` probes it via `compose exec`|
 |`3000`/`8065`/`9092`/`11434`|full overlay|forgejo / mattermost / kafka / ollama|
 |`8066`|full overlay|mattermost-adapter `GET /healthz` (no inbound provider port — D1)|
-
-**Telemetry silence law** (manual leg, run outside a normal `verify`):
-telemetry must be pure decoration — with the collector target emptied the
-stack still works. `./referencectl down -v && OTEL_TARGET= ./referencectl up slim && ./referencectl verify --only dead-letters-empty`
-must exit 0, and `docker compose logs` must contain no
-`[Oo]pen[Tt]elemetry|OTLP` error line (no exporter starts, so there is
-nothing to fail — the OTel env all interpolates from `OTEL_TARGET`, which
-defaults to the dashboard's OTLP port). `trace-correlation`'s stamp +
-echo halves still pass in silence; only its dashboard-span half needs a
-collector.
 
 ## What the kernel runs with
 
@@ -107,9 +104,20 @@ Then `tg-adapter` runs the `@ofac/telegram-adapter` (poll mode,
 `TELEGRAM_CHATS` and the bot answers once with the chat id and the line to
 add — the onboarding path, no kernel involvement.
 
-## Security profile
+## Limits and manual checks
 
-`start-dev` Keycloak, non-TLS loopback ports and plaintext local secrets are
+**Telemetry silence law**: telemetry must be pure decoration — with the
+collector target emptied the stack still works. The manual leg runs outside a
+normal `verify`:
+`./referencectl down -v && OTEL_TARGET= ./referencectl up slim && ./referencectl verify --only dead-letters-empty`
+must exit 0, and `docker compose logs` must contain no
+`[Oo]pen[Tt]elemetry|OTLP` error line (no exporter starts, so there is
+nothing to fail — the OTel env all interpolates from `OTEL_TARGET`, which
+defaults to the dashboard's OTLP port). `trace-correlation`'s stamp +
+echo halves still pass in silence; only its dashboard-span half needs a
+collector.
+
+**Security profile.** `start-dev` Keycloak, non-TLS loopback ports and plaintext local secrets are
 **reference-only**: real deployments use Keycloak production
 mode, HTTPS, secret injection, hardened S3 credentials, restricted OTLP
 endpoints, and tenant isolation.

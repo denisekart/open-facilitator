@@ -2,16 +2,21 @@
 
 Installs a **harness worker** — today the deterministic reference adapter
 (`ofac-deterministic-worker`) — as a self-contained Node bundle plus a
-supervisor unit. The worker is a Gateway *child*: it attaches over the child
-transport (unix socket or 127.0.0.1 TCP), registers its capability manifest,
-and executes assignments the Gateway routes to it.
+supervisor unit; read this when a container runs a Gateway child. The worker
+attaches over the child transport (unix socket or 127.0.0.1 TCP), registers
+its capability manifest, and executes assignments the Gateway routes to it.
 
-## Prerequisites
+## Quickest path
 
-- Node **>= 22** on PATH (hard-fails otherwise; a Node-shipping base image or
-  the official `ghcr.io/devcontainers/features/node` Feature satisfies this).
-- `adapter: deterministic` — the only adapter binary that exists; any other
-  option value fails the install with exit 1.
+1. Base image with Node **>= 22** on PATH (hard-fails otherwise; a
+   Node-shipping base image or the official
+   `ghcr.io/devcontainers/features/node` Feature satisfies this).
+2. `adapter: deterministic` — the only adapter binary that exists; any other
+   option value fails the install with exit 1.
+3. A Gateway's child socket reachable at the config's transport path, and
+   `OFAC_CHILD_SECRET` equal to the Gateway's.
+4. Start the container: `grep 'worker ready' "$OFAC_LOG_DIR/30-harness-adapter.sh.log"`
+   shows `worker ready childId=<gatewayId>/<child> socket=...`.
 
 ## Options (startup-time defaults only)
 
@@ -19,6 +24,9 @@ and executes assignments the Gateway routes to it.
 |---|---|---|
 |`adapter`|`deterministic`|Which adapter binary to install (only value accepted)|
 |`configPath`|`.facilitator/harness.yaml`|Worker config the unit starts with; `WORKER_CONFIG` env overrides|
+
+Options bake the unit script's defaults; the runtime env surface is the truth.
+Secrets are **never** options.
 
 ## Socket coupling (the common mistake)
 
@@ -33,11 +41,12 @@ config file's directory**, the Gateway resolves its socket against
 
 ## Runtime env surface (1:1 with the binary)
 
-- `WORKER_CONFIG` — config path (beats the baked `configPath`).
-- `OFAC_CHILD_SECRET` — beats the config file's `token:`; must equal the
-  Gateway's `OFAC_CHILD_SECRET`.
-- `OFAC_ADAPTER_LOG` — log level (debug|info|warn|error).
-- `OFAC_LOG_DIR` / `OFAC_SUPERVISOR_MAX_RESTARTS` — supervisor surface.
+|Variable|Meaning|
+|---|---|
+|`WORKER_CONFIG`|config path (beats the baked `configPath`)|
+|`OFAC_CHILD_SECRET`|beats the config file's `token:`; must equal the Gateway's `OFAC_CHILD_SECRET`|
+|`OFAC_ADAPTER_LOG`|log level — one of `debug`, `info`, `warn`, `error`|
+|`OFAC_LOG_DIR` / `OFAC_SUPERVISOR_MAX_RESTARTS`|supervisor surface|
 
 Logs: `$OFAC_LOG_DIR/30-harness-adapter.sh.log`. Ready signal:
 `worker ready childId=<gatewayId>/<child> socket=...`.

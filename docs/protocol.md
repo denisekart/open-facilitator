@@ -1,6 +1,27 @@
 # Wire protocol (v1)
 
-This document describes the implemented wire contract: the JSON Schemas under `protocol/`, the conformance fixtures, and the rules both endpoints MUST follow. It is the as-built companion to the target design in `docs/specs/`; where that design proposes and this document records, this document reflects the shipped artifacts. The framework runtime consumes the contract on both sides: the transactional kernel (Kernel ingress below), the Link server (Link transport below), and the Workspace Link SDK (client half below).
+This document is the complete v1 wire contract as implemented: the JSON
+Schemas under `protocol/`, the conformance fixtures, and the rules both
+endpoints MUST follow. Implementing a client, adapter, or replacement
+component from this page alone is the goal — two independent runtime stacks
+already do exactly that against the fixtures. Where the target design in
+`docs/specs/` proposes and this document records, this document reflects the
+shipped artifacts. The framework runtime consumes the contract on both
+sides: the transactional kernel ([Kernel ingress](#kernel-ingress)), the
+Link server ([Link transport](#link-transport)), and the Workspace Link SDK
+([client half](#client-half--workspace-link-sdk)).
+
+What lives where, mechanically:
+
+| You need | Read here | Machine-readable source |
+|---|---|---|
+| The four message classes and the envelope | [Message classes and envelopes](#message-classes-and-envelopes) | `protocol/cloudevents-schemas/` |
+| Every legal type string + its payload schema | [Type registry](#type-registry) | `protocol/json-schema/` |
+| Size limits, timestamps, approval digests | [Payload limits](#payload-limits-and-canonical-serialization) | `protocol/conformance-fixtures/` |
+| Proof that your implementation agrees | [Conformance fixtures](#conformance-fixtures) | `protocol/conformance-fixtures/index.json` |
+| Creating/reading work over HTTP | [Kernel ingress](#kernel-ingress) | `protocol/openapi/admin-v1.yaml` |
+| Being a link endpoint (execute work) | [Link transport](#link-transport) | `protocol/openapi/link-v1.yaml` |
+| Storing and recalling bytes/notes | [Artifacts](#artifacts-kernel-artifact-store), [Context plane](#context-plane) | schema files named in each section |
 
 ## Message classes and envelopes
 
@@ -506,3 +527,14 @@ A completed event's completion truth is an immutable, digest-verifiable **Result
 **Revision law:** the kernel chains revisions per assignment — a second completed event for the same assignment records revision N+1 with `revision_of` = the chain tip, flips the tip `superseded` (+ `manifest.superseded` timeline), and releases the superseded manifest's artifact pins. Rows are immutable; `UNIQUE(assignment_id, revision)`. `structuredResult` (when present) is additionally digested on its own (`structured_digest`) for future output-schema validation.
 
 **Pull surface:** `GET /api/works/{id:guid}/manifests` — the work's chain, newest revision first; gated `manifests.read` (binding mirrors `artifacts.read`, includes `team-member`) + work-scope 404 non-disclosure. The manifest document itself rides the artifact content path: `GET /api/artifacts/{ref-last-segment}/content`. Timeline kinds `manifest.recorded`/`manifest.superseded` are legal `work_events.kind` values. Metrics: `facilitator.manifest.recorded` (tag `origin: link|rest`), `.superseded`, `.digest_mismatch`.
+
+## Next
+
+- Who may call what on these surfaces: [security.md](security.md)
+- Operating the components that speak this contract:
+  [advanced.md](advanced.md)
+- Adding your own component to the wire: the harness/provider how-tos in
+  [advanced.md](advanced.md), then a fixture-driven loop against
+  `protocol/conformance-fixtures/index.json`
+- Change workflow (codegen, drift gate, commit rules):
+  [contributing.md](contributing.md#protocol-changes)

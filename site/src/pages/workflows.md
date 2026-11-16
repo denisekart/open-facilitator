@@ -1,14 +1,14 @@
 # Authoring flows
 
-The kernel already decides *who* does a piece of work. The workflow plane
-decides *what happens next* — and you author that, in the console,
-without redeploying anything.
+A flow is the rules you write for what happens next: one trigger, up to
+twenty steps, each step one verb from a closed list. The kernel already
+decides *who* does a piece of work; the workflow plane decides *what
+follows*, and you author that in the console without redeploying anything.
 
-A flow is a small JSON (or YAML, if you prefer) document: one trigger,
-up to twenty steps, each step one verb from a closed palette. That is the
-whole language. Because the vocabulary is closed, the kernel can validate
-your flow before it stores it, draw it before it runs it, and tell you
-exactly which rule it broke when it refuses.
+A flow is a small JSON (or YAML, if you prefer) document. Because the
+vocabulary is closed, the kernel can validate your flow before it stores
+it, draw it before it runs it, and tell you exactly which rule it broke
+when it refuses.
 
 ## Triggers
 
@@ -49,7 +49,23 @@ duration is refused by the validator.
 
 Steps chain through edges: `always` (the next step), `<stepId>:completed`,
 `timeout`, `failed`. That is the entire control flow — a DAG you can
-read off the picture the editor draws while you type.
+read off the picture the editor draws while you type. The shipped nudge
+ladder is the smallest real one: four steps, entered on `always` and
+chained by three `completed` edges.
+
+```mermaid title="The nudge ladder as the editor draws it"
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#EAF1F9",
+"primaryBorderColor": "#0B5FBF", "primaryTextColor": "#1F2328",
+"lineColor": "#5B6B7C", "secondaryColor": "#FDF0DC"}}}%%
+flowchart LR
+  T["timer - PT30M"] -->|"first-pause:completed"| N["emit work.nudge"]
+  N -->|"nudge:completed"| S["timer - PT2H"]
+  S -->|"second-pause:completed"| E["escalate to the owner"]
+```
+
+_The claim: patience is data. Both parks are durable timer rows, each step
+is one command the kernel itself records, and the flow ships disabled
+until someone chooses to enable it._
 
 ## The laws you can lean on
 
@@ -75,7 +91,7 @@ capability ids from what your gateways advertise right now — so you
 cannot type an id the kernel will refuse. The picture above the form is
 the flow you are authoring, redrawn on every keystroke.
 
-![The flow editor](console-editor.png)
+![The flow editor](../assets/console-editor.png)
 _A cloned gallery entry under edit: the step graph mirrors the form
 live, every picker speaks the live registry, and the save button says
 exactly what it will do — land a new version. Below the fold, a diff
@@ -88,7 +104,7 @@ pause, skip a parked leg, retry a failed one, cancel the subtree — act
 on the leg the picture shows, and every action carries a reason into
 the audit trail.
 
-![A running flow instance](console-instance.png)
+![A running flow instance](../assets/console-instance.png)
 _The console's instance view: a run parked on its first timer — the
 graph wears the run (the amber outline is where it stands, dashed
 nodes are legs not yet taken), the step log underneath shows the leg
@@ -99,3 +115,10 @@ Start from the gallery. The kernel ships six definitions — a review
 fork, a PR-on-manifest pipeline, assign-rule forging, a nudge ladder,
 an agentic-research composition, and a callable capacity component.
 Clone one, bend it to your team, and the audit line will say so.
+
+## Where to go next
+
+- Author one against the live registry: **Flows** in [the admin console](/console).
+- See which event types can start a flow: [Supported integrations](/integrations).
+- Read the trigger and step grammar field by field: [Wire protocol (v1)](/docs/protocol).
+- Or stop reading and [get running](/guide/human).

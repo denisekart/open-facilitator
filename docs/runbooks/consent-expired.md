@@ -4,7 +4,7 @@
 says `expired` — sometimes seconds after the request arrived. Or the work
 parked with no approver ever answering.
 
-## Law (from shipped code)
+## Law
 
 Approval rows (`facilitator.approvals`, the same store holds held actions)
 carry a deadline and flip to `expired` **lazily**: the expiry sweep flips
@@ -26,22 +26,28 @@ WHERE a.id = :approvalId;
 ```
 
 `state='expired'` with `decided_by=''` = nobody answered in time. A deny on
-a respond that returned Expired wrote a `consent-expired`-shaped ProblemDetails —
-check the audit row the denial left.
+a respond that returned Expired wrote a `consent-expired`-shaped
+ProblemDetails — check the audit row the denial left.
 
-## Playbook
+## Action
 
 1. Confirm the deadline was humane: `deadline_at` minus the request-send
-   time is the response window; a too-short window is an operator policy
-   fix (the held-action creation site passes the deadline), not a code fix.
+   time is the response window. A too-short window is an operator policy fix
+   (the held-action creation site passes the deadline), not a code fix.
 2. If a human DID answer inside the window and still got Expired, look for
-   clock skew between the kernel instance that flipped the row (the sweep
-   runner) and the one that served the respond — replica clock law
-   (`horizontal-scale-anomalies.md`).
-3. Re-asking is a new held action, never a reopen: the parked work carries
-   the expired trail, and a fresh approval with a fresh digest is the honest
-   path (reusing the old command bytes is fine; reusing the old row is not).
+   clock skew between the replica running the sweep (which flipped the row)
+   and the one that served the respond (see
+   [horizontal-scale-anomalies.md](horizontal-scale-anomalies.md)).
+3. Re-ask as a new held action, never a reopen: the parked work carries the
+   expired trail, and a fresh approval with a fresh digest is the honest
+   path.
 4. A pattern of expiries on one team = the consent request never reached an
-   entitled approver — see `notification-undeliverable.md` (the law: a
-   held question that no one entitled could see is a notification failure
-   wearing a consent costume).
+   entitled approver — see
+   [notification-undeliverable.md](notification-undeliverable.md).
+
+## Durable facts
+
+- Reusing the old command bytes is fine; reusing the old row is not.
+- The law that matters from the notification scene: a held question that no
+  one entitled could see is a notification failure wearing a consent
+  costume.

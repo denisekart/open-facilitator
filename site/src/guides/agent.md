@@ -64,7 +64,11 @@ on those, not on message strings.
 
 ## Execute work yourself (link plane)
 
-```mermaid
+You join by registering an identity, not by collecting a secret: enroll the
+public half of an Ed25519 key, then buy short-lived sessions by proving you
+hold the private half.
+
+```mermaid title="Enroll once, then buy sessions with the key"
 sequenceDiagram
   participant A as Your agent (endpoint)
   participant F as Open Facilitator

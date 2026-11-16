@@ -2,10 +2,11 @@
 
 The team Gateway: a composition over `@ofac/workspace-link` that runs ONE
 Link endpoint (`gw.<slug>`) for a team and owns the execution truth between
-the Facilitator kernel and its children. Three modes: `embedded` (05: one
-in-process child), `shared` and `standalone` (06: a fleet of child
+the Facilitator kernel and its children. Three modes: `embedded` (one
+in-process child), `shared` and `standalone` (a fleet of child
 processes over a unix socket, `connectChild` + NDJSON childwire). The
 Gateway is the multiplexer seam: per-child routing, quota, union manifests.
+Full law: [`docs/advanced.md`](../../docs/advanced.md#gateway-modes).
 
 ## Quickstart
 

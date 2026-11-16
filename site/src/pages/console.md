@@ -1,10 +1,12 @@
 # The admin console
 
-Every kernel serves a small operator console at its own root URL — no
-separate deployment, no separate login. It talks to the same public API
-you do, which means anything you can see here, an agent can query too.
+The console is the operator screen built into the kernel: one page served
+by the kernel itself, at the kernel's own address, for the humans who run
+it — answering "what is stuck, and who allowed it". No separate
+deployment, no separate login: it talks to the same public API you do, so
+anything visible here an agent can query too.
 
-It opens on a sign-in gate: any account from your OIDC provider with an
+It opens on a sign-in gate: any account from your login provider with an
 operator role gets in.
 
 Every view is a URL. `#/works?state=blocked,review` opens the triage
@@ -25,18 +27,20 @@ fencing generations, its approvals, its result manifests, and the
 complete event timeline — every state change with actor, timestamp, and
 payload.
 
-![Searching the console](console-explorer.png)
+![Searching the console](../assets/console-explorer.png)
 _Search an objective, and the hit opens the Work it belongs to —
 artifacts, memories, and messages are the other search sections. The
 left rail switches surfaces; every one of them is a URL._
 
-![The Work inspector](console-work.png)
+![The Work inspector](../assets/console-work.png)
 _The same Work opened: a pending approval names its approver, the
 timeline rows carry actor and timestamp, and the approve button is the
 same audited write the API would take._
 
-This is the “who did what, when, and who allowed it” view — it is why
-teams keep the kernel around after the novelty of agents fades.
+This is the “who did what, when, and who allowed it” view, and it is the
+screen you live in once agents start touching production. Below: what
+every entry on the rail opens, and what the console deliberately leaves
+out.
 
 ## Every surface on the rail
 
@@ -64,7 +68,7 @@ Under the search box, what each rail entry opens:
   manual sweeps: forcing a sweeper demands a change reason and audits
   the trigger, like every other human act on live state.
 - **Team** — every team Gateway dialled in: endpoint id, session age,
-  last acknowledged event, enrollment and link-token revocation.
+  last acknowledged event, enrollment and identity-key revocation.
 - **Config** — the live routing policy: stored operator intents, edited
   with versioned `If-Match` writes, each change audited with a reason.
   Includes `media-policy`: the media plane's federation law — size and
@@ -85,8 +89,11 @@ counters, and timelines come from the same queries the API exposes. If
 you want Grafana, the API and the database underneath will feed it —
 both are yours.
 
-## See it yourself
+## Where to go next
 
-The [guided tour](/docs/getting-started) boots a full environment on one
-laptop — kernel, console, a demo team, and works already executed —
-without you installing anything beyond Docker.
+- See it live: the [guided tour](/docs/getting-started) boots a full
+  environment on one laptop — kernel, console, a demo team, and works
+  already executed — with Docker the only thing you install.
+- Author what the Flows rail shows: [Authoring flows](/workflows).
+- See what feeds the record: [Supported integrations](/integrations).
+- Run your own kernel and open this console on it: [Get running](/guide/human).

@@ -554,5 +554,17 @@
     {/key}
   </div>
 
+  {#if !deck.state.open}
+    <button
+      class="fixed bottom-4 right-4 z-30 flex items-center gap-1.5 rounded-full border border-border-primary bg-surface px-3 py-2 text-accent shadow-overlay hover:border-accent hover:bg-surface-raise transition-all cursor-pointer"
+      data-testid="floating-ai-deck-toggle"
+      title="Open AiDeck assistant (or click rail)"
+      aria-label="Open AiDeck"
+      onclick={() => deck.setOpen(true)}>
+      <Sparkles class="size-4 shrink-0 text-accent" strokeWidth={1.5} aria-hidden="true" />
+      <span class="text-xs font-semibold text-ink max-sm:hidden">AiDeck</span>
+    </button>
+  {/if}
+
   <AiDeck onclose={closeDeck} />
 {/if}

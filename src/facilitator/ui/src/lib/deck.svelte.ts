@@ -17,6 +17,7 @@ export interface ScreenContext {
 
 interface DeckState {
   open: boolean;
+  expanded: boolean;
   sessionId: string | null;
 }
 
@@ -36,7 +37,7 @@ export interface ExecutedChange {
 }
 
 class Deck {
-  state = $state<DeckState>({ open: false, sessionId: null });
+  state = $state<DeckState>({ open: false, expanded: false, sessionId: null });
   context = $state<ScreenContext | null>(null);
   // One handler map per action id; the inner map is keyed by the mounting
   // view instance, so two mounts never steal each other's handlers.
@@ -53,6 +54,14 @@ class Deck {
 
   setOpen(open: boolean): void {
     this.state.open = open;
+  }
+
+  setExpanded(expanded: boolean): void {
+    this.state.expanded = expanded;
+  }
+
+  toggleExpanded(): void {
+    this.state.expanded = !this.state.expanded;
   }
 
   setSession(sessionId: string | null): void {

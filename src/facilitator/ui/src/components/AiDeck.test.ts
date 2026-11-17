@@ -195,4 +195,37 @@ describe("AiDeck drawer", () => {
     flushSync();
     expect(byTestId("ai-deck")).toBeTruthy();
   });
+
+  it("expand button toggles between docked companion mode and expanded foreground window", async () => {
+    stubChat();
+    mountDeck();
+    deck.setOpen(true);
+    flushSync();
+    await vi.waitFor(() => expect(byTestId("chat-input")).toBeTruthy());
+
+    expect(deck.state.expanded).toBe(false);
+    const expandBtn = byTestId<HTMLButtonElement>("ai-deck-expand");
+    expect(expandBtn.getAttribute("aria-label")).toBe("expand to foreground");
+
+    expandBtn.click();
+    flushSync();
+    expect(deck.state.expanded).toBe(true);
+    expect(expandBtn.getAttribute("aria-label")).toBe("dock to side");
+
+    expandBtn.click();
+    flushSync();
+    expect(deck.state.expanded).toBe(false);
+  });
+
+  it("displays screen context badge when briefed on a route", async () => {
+    stubChat();
+    mountDeck();
+    deck.setContext({ route: "#/works", label: "works queue", ids: ["0194f0a0"] });
+    deck.setOpen(true);
+    flushSync();
+    await vi.waitFor(() => expect(byTestId("chat-input")).toBeTruthy());
+
+    const badge = byTestId("ai-deck").querySelector(".badge");
+    expect(badge?.textContent).toContain("works queue");
+  });
 });

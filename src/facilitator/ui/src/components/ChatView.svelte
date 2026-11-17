@@ -1,4 +1,15 @@
 <script lang="ts">
+  import {
+    ArrowDown,
+    Compass,
+    History,
+    MessageSquare,
+    Plus,
+    Send,
+    Sparkles,
+    User,
+    X,
+  } from "lucide-svelte";
   import { ApiError, getJson, toApiError, type Fetcher } from "../lib/api.js";
   import { apiFetch } from "../lib/auth.svelte.js";
   import { deck } from "../lib/deck.svelte.js";
@@ -25,10 +36,12 @@
     fetcher: api = apiFetch,
     screenContext = null,
     initialSession = null,
+    expanded = false,
   }: {
     fetcher?: Fetcher;
     screenContext?: ScreenContext | null;
     initialSession?: string | null;
+    expanded?: boolean;
   } = $props();
 
   const VERBOSITIES: ChatVerbosity[] = ["terse", "balanced", "proactive"];
@@ -67,6 +80,8 @@
   // Session hygiene: which row shows the inline rename input.
   let editingId = $state<string | null>(null);
   let editTitle = $state("");
+  // History panel visibility toggle: keeps conversation thread as primary focus.
+  let historyOpen = $state(false);
   // Per-session "I have seen it this recently" stamps, for the updated chip;
   // a session never opened in this panel is measured against the mount.
   let openedAt = $state<Record<string, string>>({});
@@ -440,290 +455,473 @@
       return [String(body)];
     }
   }
+
+  const currentSession = $derived(sessions.find((s) => s.sessionId === sessionId));
+  const currentSessionTitle = $derived(
+    currentSession?.title || (sessionId ? "Active Session" : "New Conversation"),
+  );
+
+  const contextualPrompts = $derived.by(() => {
+    const route = screenContext?.route ?? "";
+    if (route.includes("/works") || route.includes("/work")) {
+      return [
+        { title: "Summarize Works", query: "Summarize active work items and stalled steps" },
+        { title: "Dead-Letter Queue", query: "Check dead-letter queue status and recent failures" },
+        { title: "Pending Policy Gates", query: "List all works waiting for policy gate approval" },
+        { title: "Available Commands", query: "/help" },
+      ];
+    }
+    if (route.includes("/flows") || route.includes("/flow")) {
+      return [
+        { title: "Explain Workflow", query: "Explain active workflow definitions and their steps" },
+        { title: "Shadow Mode Runs", query: "Show workflows currently running in shadow mode" },
+        { title: "Step Failure Audit", query: "Check if any workflow steps have recent errors" },
+        { title: "Available Commands", query: "/help" },
+      ];
+    }
+    if (route.includes("/monitor") || route.includes("/audit") || route.includes("/deliveries")) {
+      return [
+        { title: "Kernel Health", query: "Check kernel health, metrics roll-up, and replicas" },
+        { title: "Recent Audit Events", query: "Summarize recent audit log entries and changes" },
+        { title: "Delivery Backlog", query: "Inspect delivery queue backlog and link statuses" },
+        { title: "Available Commands", query: "/help" },
+      ];
+    }
+    return [
+      { title: "Kernel Roll-Up", query: "Summarize current facilitator kernel state and active works" },
+      { title: "Connected Links", query: "Show connected workspace links and gateways" },
+      { title: "Dead-Letters", query: "Check dead-letter queue for failed deliveries" },
+      { title: "Available Commands", query: "/help" },
+    ];
+  });
+
+  function applyPrompt(query: string): void {
+    draft = query;
+    input?.focus();
+  }
 </script>
 
-<section class="card flex flex-col gap-4 md:flex-row" data-testid="chat-view">
-  <aside class="w-full shrink-0 border-b border-edge pb-3 md:w-60 md:border-b-0 md:border-r md:pb-0 md:pr-3">
-    <div class="mb-2 flex items-center justify-between">
-      <h2 class="text-sm font-medium">Sessions</h2>
-      <button class="btn" data-testid="chat-new-session" onclick={newSession}>new</button>
-    </div>
-    <div class="mb-3 md:max-w-40">
-      <label class="mb-1 block text-xs uppercase text-ink-2" for="chat-verbosity">verbosity</label>
-      <select
-        id="chat-verbosity"
-        class="input"
-        data-testid="chat-verbosity"
-        value={verbosity}
-        onchange={(e) => void setVerbosity(e.currentTarget.value as ChatVerbosity)}>
-        {#each VERBOSITIES as level}
-          <option value={level}>{level}</option>
-        {/each}
-      </select>
-    </div>
-    <ul class="flex gap-1 overflow-x-auto md:grid" data-testid="chat-sessions">
-      {#each sessions as s}
-        {@const seen = ago(s.lastMessageAt)}
-        <li class="min-w-40 shrink-0 md:min-w-0">
-          {#if editingId === s.sessionId}
-            <div class="flex gap-1">
-              <input
-                class="input min-w-0 grow"
-                aria-label="session title"
-                data-testid={`chat-session-rename-${s.sessionId}`}
-                maxlength={120}
-                bind:value={editTitle}
-                onkeydown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    void renameSession(s.sessionId);
-                  }
-                  if (e.key === "Escape") {
-                    editingId = null;
-                  }
-                }} />
-              <button
-                class="chip chip-active"
-                data-testid={`chat-session-rename-save-${s.sessionId}`}
-                disabled={!renameValid}
-                onclick={() => void renameSession(s.sessionId)}>save</button>
-            </div>
-          {:else}
-            <div class="flex items-start gap-1">
-              <button
-                class="w-full min-w-0 rounded px-2 py-1 text-left hover:bg-surface {sessionId === s.sessionId
-                  ? 'bg-sunken'
-                  : ''}"
-                data-testid={`chat-session-${s.sessionId}`}
-                onclick={() => void openSession(s.sessionId)}>
-                <span class="flex items-center gap-1">
-                  <span class="block truncate text-xs">{s.title || "(untitled)"}</span>
-                  {#if updatedSinceOpen(s)}
-                    <span
-                      class="badge bg-accent-veil text-accent shrink-0 px-1 py-0 text-xs"
-                      data-testid="chat-session-updated">new</span>
-                  {/if}
-                </span>
-                <span class="mono text-xs text-ink-2" title={seen.title}>{seen.text}</span>
-              </button>
-              <button
-                class="chip shrink-0"
-                aria-label="rename session"
-                title="rename"
-                data-testid={`chat-session-rename-open-${s.sessionId}`}
-                onclick={() => startRename(s)}>✎</button>
-              <button
-                class="chip shrink-0"
-                aria-label="delete session"
-                title="delete"
-                data-testid={`chat-session-delete-${s.sessionId}`}
-                onclick={() => void deleteSession(s.sessionId)}>×</button>
-            </div>
-          {/if}
-        </li>
-      {:else}
-        <li class="text-xs text-ink-2">No conversations yet — start one below.</li>
-      {/each}
-    </ul>
-  </aside>
+<section class="relative flex h-full min-h-0 grow flex-col overflow-hidden" data-testid="chat-view">
+  <!-- Top Control Bar: Chat title, History drawer toggle, verbosity, and New Chat -->
+  <header class="flex shrink-0 items-center justify-between gap-2 border-b border-edge bg-surface pb-2 pt-1 px-1">
+    <div class="flex items-center gap-1.5 min-w-0">
+      <button
+        class="chip flex items-center gap-1 text-xs"
+        class:chip-active={historyOpen}
+        data-testid="chat-toggle-history"
+        aria-expanded={historyOpen}
+        title="Toggle conversation history"
+        onclick={() => (historyOpen = !historyOpen)}>
+        <History class="size-3.5 text-ink-2" strokeWidth={1.5} aria-hidden="true" />
+        <span class="font-medium">History</span>
+        {#if sessions.length > 0}
+          <span class="mono rounded bg-surface-alt px-1 text-[11px] text-ink-2">{sessions.length}</span>
+        {/if}
+      </button>
 
-  <div class="flex min-h-96 grow flex-col">
-    <ProblemNote {error} />
-    <div
-      class="flex grow flex-col gap-2 overflow-y-auto py-2"
-      bind:this={thread}
-      onscroll={onThreadScroll}>
-      {#each messages as m, i}
-        <div
-          class="max-w-full rounded border border-edge p-3 {m.role === 'user' ? 'bg-sunken' : ''}"
-          data-testid={`chat-message-${i}`}>
-          <p class="mb-1 flex items-center gap-2 text-xs uppercase text-ink-2">
-            {m.role}
-            <span
-              class="badge px-1.5 py-0 text-xs {TONE_CLASS[BASIS_TONE[m.basis] ?? 'neutral']}"
-              data-testid={`chat-basis-${i}`}>{BASIS_LABEL[m.basis] ?? m.basis}</span>
-          </p>
-          {#if m.role === "assistant"}
-            <div class="chat-prose break-words whitespace-pre-wrap text-sm leading-relaxed" data-testid="chat-md">{@html renderChatMarkdown(fallbackProse(m))}</div>
-            {#if m.basis === "fallback" && catalog && catalog.verbs.length > 0}
-              <!-- the canned verb list: the palette's trigger, not prose -->
-              <details class="mt-1" data-testid={`chat-fallback-verbs-${i}`}>
-                <summary class="cursor-pointer text-xs text-ink-2">available commands</summary>
-                <div class="mt-1 flex flex-wrap gap-1">
-                  {#each catalog.verbs as v}
-                    <button class="chip" data-testid={`chat-fallback-verb-${v.verb}`} onclick={() => useVerb(v.verb)}>
-                      <span class="mono">/{v.verb}</span>
-                      {#if v.args.length}
-                        <span class="text-ink-2">{v.args.map((a) => (a.required ? `<${a.name}>` : `[${a.name}]`)).join(" ")}</span>
-                      {/if}
-                      — {v.description}
-                    </button>
-                  {/each}
-                </div>
-              </details>
-            {/if}
-            {#if readTrail(m).length}
-              <details class="mt-1" data-testid={`chat-reads-${i}`}>
-                <summary class="cursor-pointer text-xs text-ink-2">looked at {readTrail(m).length} endpoint{readTrail(m).length === 1 ? "" : "s"}</summary>
-                <ul class="mt-1 space-y-0.5">
-                  {#each readTrail(m) as r}
-                    <li class="mono text-xs text-ink-2">looked at: {r.method} {r.path} ({r.status})</li>
-                  {/each}
-                </ul>
-              </details>
-            {/if}
-          {:else}
-            <p class="break-words whitespace-pre-wrap text-sm">{m.text}</p>
-          {/if}
-          {#if actionsByMessage[m.messageId]?.length}
-            {@const proposal = actionsByMessage[m.messageId]}
-            <div
-              class="mt-2 rounded border border-edge bg-sunken p-2"
-              data-testid="chat-option-card">
-              <div class="mb-1 flex items-center justify-between gap-2">
-                <h3 class="text-xs font-medium text-ink-2">
-                  proposal · {proposal.length} action{proposal.length === 1 ? "" : "s"}
-                </h3>
-                {#if pendingActions(proposal).length}
-                  <div class="flex gap-1">
-                    {#if canRunAll(proposal)}
-                      <button
-                        class="chip chip-active"
-                        data-testid="chat-option-confirm-all"
-                        onclick={() => void confirmAll(proposal)}>
-                        run all
-                      </button>
-                    {/if}
-                    <button
-                      class="chip"
-                      data-testid="chat-option-cancel-all"
-                      onclick={() => void Promise.all(
-                        pendingActions(proposal).map((a) => cancelAction(a.actionId)))}>
-                      dismiss
-                    </button>
-                  </div>
-                {/if}
+      <div class="flex items-center gap-1 truncate text-xs text-ink-2 max-w-44 sm:max-w-72">
+        <span class="text-ink-3">/</span>
+        <span class="font-medium text-ink truncate" title={currentSessionTitle}>{currentSessionTitle}</span>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-1.5 shrink-0">
+      <div class="flex items-center gap-1">
+        <label class="sr-only" for="chat-verbosity">verbosity</label>
+        <select
+          id="chat-verbosity"
+          class="input py-0.5 px-2 text-xs font-medium cursor-pointer"
+          data-testid="chat-verbosity"
+          value={verbosity}
+          title="Response detail verbosity"
+          onchange={(e) => void setVerbosity(e.currentTarget.value as ChatVerbosity)}>
+          {#each VERBOSITIES as level}
+            <option value={level}>{level}</option>
+          {/each}
+        </select>
+      </div>
+
+      <button
+        class="chip chip-active flex items-center gap-1 text-xs font-semibold"
+        data-testid="chat-new-session"
+        title="Start a new conversation"
+        onclick={() => {
+          newSession();
+          historyOpen = false;
+        }}>
+        <Plus class="size-3.5" strokeWidth={2} aria-hidden="true" />
+        <span>New Chat</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="relative flex min-h-0 grow overflow-hidden">
+    <!-- Collapsible History Drawer / Flyout: Stays accessible, hidden when focused on chat -->
+    <aside
+      class="history-drawer absolute inset-y-0 left-0 z-20 flex w-72 flex-col border-r border-edge bg-surface shadow-overlay transition-transform duration-180 ease-out {historyOpen
+        ? 'translate-x-0'
+        : '-translate-x-full pointer-events-none opacity-0 md:opacity-100'}"
+      class:hidden={!historyOpen}
+      aria-label="chat history"
+      data-testid="chat-history-sidebar">
+      <div class="flex items-center justify-between border-b border-edge px-3 py-2 bg-surface-alt">
+        <div class="flex items-center gap-1.5 text-xs font-semibold text-ink">
+          <History class="size-3.5 text-ink-2" strokeWidth={1.5} aria-hidden="true" />
+          <span>Conversations</span>
+          <span class="mono text-[11px] text-ink-2">({sessions.length})</span>
+        </div>
+        <button
+          class="btn px-1.5 py-0.5 text-xs"
+          aria-label="close history"
+          onclick={() => (historyOpen = false)}>
+          <X class="size-3.5" strokeWidth={1.5} />
+        </button>
+      </div>
+
+      <ul class="grid gap-1 overflow-y-auto grow p-2" data-testid="chat-sessions">
+        {#each sessions as s (s.sessionId)}
+          {@const seen = ago(s.lastMessageAt)}
+          <li class="relative">
+            {#if editingId === s.sessionId}
+              <div class="flex items-center gap-1 p-1 rounded border border-accent bg-surface-alt">
+                <input
+                  class="input min-w-0 grow py-0.5 text-xs"
+                  aria-label="session title"
+                  data-testid={`chat-session-rename-${s.sessionId}`}
+                  maxlength={120}
+                  bind:value={editTitle}
+                  onkeydown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      void renameSession(s.sessionId);
+                    }
+                    if (e.key === "Escape") {
+                      editingId = null;
+                    }
+                  }} />
+                <button
+                  class="chip chip-active shrink-0 text-xs"
+                  data-testid={`chat-session-rename-save-${s.sessionId}`}
+                  disabled={!renameValid}
+                  onclick={() => void renameSession(s.sessionId)}>save</button>
+                <button
+                  class="chip shrink-0 text-xs"
+                  onclick={() => (editingId = null)}>cancel</button>
               </div>
-              {#each proposal as action}
-                {@const live = current(action)}
-                {@const lines = bodyLines(action.body)}
-                <div
-                  class="border-t border-edge/50 py-1 first:border-t-0"
-                  data-testid={`chat-action-${action.method.toLowerCase()}`}>
-                  <div class="flex items-baseline justify-between gap-2">
-                    <p class="text-xs font-medium">{live.summary || action.description}</p>
-                    <span class="text-xs uppercase text-ink-2" data-testid={`chat-action-effect-${action.actionId}`}>
-                      {effectFor(action)}
-                    </span>
-                  </div>
-                  <p class="mono mt-1 break-all text-xs text-ink-2">
-                    {action.method} {action.path}
-                    <span class={badgeClass(live.status)} data-testid={`chat-action-status-${action.actionId}`}>
-                      {live.status}{#if live.statusCode !== null && live.statusCode !== undefined}
-                        {" "}{live.statusCode}{/if}
-                    </span>
-                    {#if live.expiresAt}
-                      {@const exp = ago(live.expiresAt)}
+            {:else}
+              <div class="group flex items-center justify-between gap-1 rounded px-2 py-1.5 hover:bg-surface-alt transition-colors {sessionId === s.sessionId ? 'bg-sunken border-l-2 border-accent' : ''}">
+                <button
+                  class="min-w-0 grow text-left cursor-pointer"
+                  data-testid={`chat-session-${s.sessionId}`}
+                  onclick={() => {
+                    void openSession(s.sessionId);
+                    historyOpen = false;
+                  }}>
+                  <span class="flex items-center gap-1">
+                    <span class="block truncate text-xs font-medium text-ink">{s.title || "(untitled)"}</span>
+                    {#if updatedSinceOpen(s)}
                       <span
-                        class="text-xs text-ink-2"
-                        title={stamp(live.expiresAt)}
-                        data-testid="chat-action-expires">expires {exp.text}</span>
+                        class="badge bg-accent-veil text-accent shrink-0 px-1 py-0 text-[10px]"
+                        data-testid="chat-session-updated">new</span>
                     {/if}
-                  </p>
-                  {#if lines.length}
-                    <details class="mt-1" data-testid="chat-action-body">
-                      <summary class="mono cursor-pointer whitespace-pre text-xs text-ink-2">body · {lines.length} line{lines.length === 1 ? "" : "s"}
-{lines.length > 5 ? `${lines.slice(0, 5).join("\n")}\n…` : lines.join("\n")}</summary>
-                      <pre class="mono overflow-x-auto rounded bg-bg p-2 text-xs">{lines.join("\n")}</pre>
-                    </details>
-                  {/if}
-                  {#if live.status === "failed"}
-                    <p class="mono mt-1 break-all text-xs text-danger" data-testid={`chat-action-result-${action.actionId}`}>
-                      {live.statusCode ?? "no status"}
-                      {#if live.result !== null && live.result !== undefined}
-                        — {typeof live.result === "string" ? live.result : JSON.stringify(live.result)}
-                      {/if}
-                    </p>
-                  {/if}
-                  {#if live.status === "executed"}
-                    <a
-                      class="text-xs text-accent underline"
-                      href={`#/monitor/audit?correlation=${action.actionId}`}
-                      data-testid="chat-action-audit-link"
-                      onclick={(e) => {
-                        e.preventDefault();
-                        go(`#/monitor/audit?correlation=${action.actionId}`);
-                      }}>audit trail</a>
-                  {/if}
-                  {#if live.status === "pending"}
-                    <div class="mt-1 flex flex-wrap items-center gap-1">
-                      <input
-                        class="input min-w-0 grow basis-32 py-0.5 text-xs"
-                        placeholder="note (optional)"
-                        aria-label="decision note"
-                        maxlength={1024}
-                        bind:value={notes[action.actionId]}
-                        data-testid={`chat-action-note-${action.actionId}`} />
-                      <button
-                        class="chip chip-active"
-                        data-testid={`chat-action-confirm-${action.actionId}`}
-                        onclick={() => void confirmAction(action.actionId)}>confirm</button>
-                      <button
-                        class="chip"
-                        data-testid={`chat-action-cancel-${action.actionId}`}
-                        onclick={() => void cancelAction(action.actionId)}>cancel</button>
-                    </div>
-                  {/if}
+                  </span>
+                  <span class="mono text-[11px] text-ink-2" title={seen.title}>{seen.text}</span>
+                </button>
+                <div class="flex items-center gap-0.5 opacity-80 group-hover:opacity-100">
+                  <button
+                    class="chip shrink-0 px-1.5 py-0.5 text-[11px]"
+                    aria-label="rename session"
+                    title="rename"
+                    data-testid={`chat-session-rename-open-${s.sessionId}`}
+                    onclick={() => startRename(s)}>✎</button>
+                  <button
+                    class="chip shrink-0 px-1.5 py-0.5 text-[11px]"
+                    aria-label="delete session"
+                    title="delete"
+                    data-testid={`chat-session-delete-${s.sessionId}`}
+                    onclick={() => void deleteSession(s.sessionId)}>×</button>
                 </div>
+              </div>
+            {/if}
+          </li>
+        {:else}
+          <li class="px-2 py-4 text-xs text-ink-2 text-center">No conversations yet — start one below.</li>
+        {/each}
+      </ul>
+    </aside>
+
+    <!-- Main Conversational Thread Area: Pure ChatGPT-like Focus -->
+    <div class="flex min-w-0 grow flex-col justify-between overflow-hidden {expanded ? 'max-w-4xl mx-auto w-full' : ''}">
+      <ProblemNote {error} />
+
+      <!-- Scrollable Message Stream -->
+      <div
+        class="flex grow flex-col gap-3 overflow-y-auto px-1 py-3"
+        bind:this={thread}
+        onscroll={onThreadScroll}>
+        {#if messages.length === 0}
+          <!-- Empty State: ChatGPT-style Welcome Hero & Contextual Starter Cards -->
+          <div class="my-auto flex flex-col items-center justify-center p-4 text-center max-w-lg mx-auto">
+            <div class="mb-2.5 flex size-10 items-center justify-center rounded-full bg-accent-veil border border-border-primary text-accent">
+              <Sparkles class="size-5" strokeWidth={1.5} />
+            </div>
+            <h2 class="text-sm font-semibold text-ink">Open Facilitator Assistant</h2>
+            <p class="mt-0.5 text-xs text-ink-2 max-w-sm">
+              Ask about active works, workflow execution, dead-letters, or kernel health.
+            </p>
+
+            {#if screenContext}
+              <div class="mt-3 flex items-center gap-1.5 rounded border border-border-primary bg-accent-veil px-2.5 py-1 text-xs text-accent">
+                <Compass class="size-3.5 shrink-0" strokeWidth={1.5} />
+                <span class="font-medium truncate">Briefed on: {screenContext.label}</span>
+              </div>
+            {/if}
+
+            <div class="mt-4 grid w-full grid-cols-1 sm:grid-cols-2 gap-1.5 text-left">
+              {#each contextualPrompts as prompt}
+                <button
+                  class="card p-2 hover:border-accent hover:bg-surface-alt transition-colors text-left cursor-pointer group"
+                  onclick={() => applyPrompt(prompt.query)}>
+                  <div class="flex items-center gap-1.5 text-xs font-semibold text-ink group-hover:text-accent">
+                    <MessageSquare class="size-3.5 text-accent shrink-0" strokeWidth={1.5} />
+                    <span class="truncate">{prompt.title}</span>
+                  </div>
+                  <p class="mt-0.5 text-[11px] text-ink-2 truncate">{prompt.query}</p>
+                </button>
               {/each}
             </div>
+          </div>
+        {/if}
+
+        {#each messages as m, i}
+          {#if m.role === "user"}
+            <!-- User Message: High contrast elevated card -->
+            <div
+              class="ml-auto max-w-[88%] rounded-lg border border-border-primary bg-accent-veil p-3 text-ink shadow-sm"
+              data-testid={`chat-message-${i}`}>
+              <div class="mb-1 flex items-center justify-end gap-1.5 text-[11px] uppercase text-ink-2 font-medium">
+                <User class="size-3" strokeWidth={1.5} aria-hidden="true" />
+                <span>you</span>
+                <span
+                  class="badge px-1.5 py-0 text-[10px] {TONE_CLASS[BASIS_TONE[m.basis] ?? 'neutral']}"
+                  data-testid={`chat-basis-${i}`}>{BASIS_LABEL[m.basis] ?? m.basis}</span>
+              </div>
+              <p class="break-words whitespace-pre-wrap text-sm leading-relaxed">{m.text}</p>
+            </div>
+          {:else}
+            <!-- Assistant Message: Modern prose card with tools and proposals -->
+            <div
+              class="mr-auto w-full max-w-full rounded-lg border border-edge bg-surface p-3.5 text-ink shadow-sm"
+              data-testid={`chat-message-${i}`}>
+              <div class="mb-1.5 flex items-center gap-1.5 text-[11px] uppercase text-ink-2 font-medium">
+                <Sparkles class="size-3.5 text-accent" strokeWidth={1.5} aria-hidden="true" />
+                <span class="font-semibold text-ink">assistant</span>
+                <span
+                  class="badge px-1.5 py-0 text-[10px] {TONE_CLASS[BASIS_TONE[m.basis] ?? 'neutral']}"
+                  data-testid={`chat-basis-${i}`}>{BASIS_LABEL[m.basis] ?? m.basis}</span>
+              </div>
+
+              <div class="chat-prose break-words whitespace-pre-wrap text-sm leading-relaxed" data-testid="chat-md">{@html renderChatMarkdown(fallbackProse(m))}</div>
+
+              {#if m.basis === "fallback" && catalog && catalog.verbs.length > 0}
+                <!-- Canned verb list: the palette trigger -->
+                <details class="mt-2 rounded border border-edge bg-surface-alt p-2 text-xs" data-testid={`chat-fallback-verbs-${i}`}>
+                  <summary class="cursor-pointer font-medium text-ink-2 hover:text-ink">Available commands ({catalog.verbs.length})</summary>
+                  <div class="mt-1.5 flex flex-wrap gap-1">
+                    {#each catalog.verbs as v}
+                      <button class="chip text-xs" data-testid={`chat-fallback-verb-${v.verb}`} onclick={() => useVerb(v.verb)}>
+                        <span class="mono font-semibold text-accent">/{v.verb}</span>
+                        {#if v.args.length}
+                          <span class="text-ink-2">{v.args.map((a) => (a.required ? `<${a.name}>` : `[${a.name}]`)).join(" ")}</span>
+                        {/if}
+                        — {v.description}
+                      </button>
+                    {/each}
+                  </div>
+                </details>
+              {/if}
+
+              {#if readTrail(m).length}
+                <details class="mt-2 rounded border border-edge bg-surface-alt p-2 text-xs" data-testid={`chat-reads-${i}`}>
+                  <summary class="cursor-pointer font-medium text-ink-2 hover:text-ink">Looked at {readTrail(m).length} endpoint{readTrail(m).length === 1 ? "" : "s"}</summary>
+                  <ul class="mt-1 space-y-0.5">
+                    {#each readTrail(m) as r}
+                      <li class="mono text-[11px] text-ink-2">looked at: {r.method} {r.path} ({r.status})</li>
+                    {/each}
+                  </ul>
+                </details>
+              {/if}
+
+              {#if actionsByMessage[m.messageId]?.length}
+                {@const proposal = actionsByMessage[m.messageId]}
+                <div
+                  class="mt-3 rounded-lg border border-edge bg-surface-alt p-3"
+                  data-testid="chat-option-card">
+                  <div class="mb-2 flex items-center justify-between gap-2 border-b border-edge pb-1.5">
+                    <h3 class="text-xs font-semibold uppercase tracking-wider text-ink-2">
+                      proposal · {proposal.length} action{proposal.length === 1 ? "" : "s"}
+                    </h3>
+                    {#if pendingActions(proposal).length}
+                      <div class="flex gap-1">
+                        {#if canRunAll(proposal)}
+                          <button
+                            class="chip chip-active text-xs font-semibold"
+                            data-testid="chat-option-confirm-all"
+                            onclick={() => void confirmAll(proposal)}>
+                            run all
+                          </button>
+                        {/if}
+                        <button
+                          class="chip text-xs"
+                          data-testid="chat-option-cancel-all"
+                          onclick={() => void Promise.all(
+                            pendingActions(proposal).map((a) => cancelAction(a.actionId)))}>
+                          dismiss
+                        </button>
+                      </div>
+                    {/if}
+                  </div>
+                  {#each proposal as action}
+                    {@const live = current(action)}
+                    {@const lines = bodyLines(action.body)}
+                    <div
+                      class="border-t border-edge/60 py-2 first:border-t-0"
+                      data-testid={`chat-action-${action.method.toLowerCase()}`}>
+                      <div class="flex items-baseline justify-between gap-2">
+                        <p class="text-xs font-semibold text-ink">{live.summary || action.description}</p>
+                        <span class="text-[11px] font-semibold uppercase text-ink-2" data-testid={`chat-action-effect-${action.actionId}`}>
+                          {effectFor(action)}
+                        </span>
+                      </div>
+                      <p class="mono mt-1 break-all text-xs text-ink-2">
+                        <span class="font-semibold text-ink">{action.method}</span> {action.path}
+                        <span class={badgeClass(live.status)} data-testid={`chat-action-status-${action.actionId}`}>
+                          {live.status}{#if live.statusCode !== null && live.statusCode !== undefined}
+                            {" "}{live.statusCode}{/if}
+                        </span>
+                        {#if live.expiresAt}
+                          {@const exp = ago(live.expiresAt)}
+                          <span
+                            class="text-[11px] text-ink-2"
+                            title={stamp(live.expiresAt)}
+                            data-testid="chat-action-expires">expires {exp.text}</span>
+                        {/if}
+                      </p>
+                      {#if lines.length}
+                        <details class="mt-1" data-testid="chat-action-body">
+                          <summary class="mono cursor-pointer whitespace-pre text-[11px] text-ink-2">body · {lines.length} line{lines.length === 1 ? "" : "s"}
+{lines.length > 5 ? `${lines.slice(0, 5).join("\n")}\n…` : lines.join("\n")}</summary>
+                          <pre class="mono mt-1 overflow-x-auto rounded bg-bg p-2 text-xs">{lines.join("\n")}</pre>
+                        </details>
+                      {/if}
+                      {#if live.status === "failed"}
+                        <p class="mono mt-1 break-all text-xs text-danger" data-testid={`chat-action-result-${action.actionId}`}>
+                          {live.statusCode ?? "no status"}
+                          {#if live.result !== null && live.result !== undefined}
+                            — {typeof live.result === "string" ? live.result : JSON.stringify(live.result)}
+                          {/if}
+                        </p>
+                      {/if}
+                      {#if live.status === "executed"}
+                        <a
+                          class="mt-1 inline-block text-xs text-accent underline font-medium"
+                          href={`#/monitor/audit?correlation=${action.actionId}`}
+                          data-testid="chat-action-audit-link"
+                          onclick={(e) => {
+                            e.preventDefault();
+                            go(`#/monitor/audit?correlation=${action.actionId}`);
+                          }}>audit trail</a>
+                      {/if}
+                      {#if live.status === "pending"}
+                        <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
+                          <input
+                            class="input min-w-0 grow basis-32 py-1 text-xs"
+                            placeholder="note (optional)"
+                            aria-label="decision note"
+                            maxlength={1024}
+                            bind:value={notes[action.actionId]}
+                            data-testid={`chat-action-note-${action.actionId}`} />
+                          <button
+                            class="chip chip-active text-xs font-semibold"
+                            data-testid={`chat-action-confirm-${action.actionId}`}
+                            onclick={() => void confirmAction(action.actionId)}>confirm</button>
+                          <button
+                            class="chip text-xs"
+                            data-testid={`chat-action-cancel-${action.actionId}`}
+                            onclick={() => void cancelAction(action.actionId)}>cancel</button>
+                        </div>
+                      {/if}
+                    </div>
+                  {/each}
+                </div>
+              {/if}
+            </div>
           {/if}
-        </div>
-      {/each}
-      {#if pending}
-        <p class="badge w-fit bg-amber-veil text-amber" data-testid="chat-pending">thinking…</p>
-      {/if}
-    </div>
-    {#if !atBottom}
-      <button
-        class="chip chip-active mt-1 self-center"
-        data-testid="chat-jump-latest"
-        onclick={jumpLatest}>jump to latest</button>
-    {/if}
-    {#if paletteOpen && catalog && catalog.verbs.length > 0}
-      <div class="mt-1 flex flex-wrap gap-1" data-testid="chat-verb-palette">
-        {#each paletteVerbs as v}
-          <button class="chip" data-testid={`chat-verb-${v.verb}`} onclick={() => useVerb(v.verb)}>
-            <span class="mono">/{v.verb}</span>
-            {#if v.args.length}
-              <span class="text-ink-2">{v.args.map((a) => (a.required ? `<${a.name}>` : `[${a.name}]`)).join(" ")}</span>
-            {/if}
-            — {v.description}
-          </button>
         {/each}
-        {#if paletteVerbs.length === 0}
-          <p class="text-xs text-ink-2">no matching command</p>
+
+        {#if pending}
+          <div class="flex items-center gap-2 text-xs text-accent px-3 py-2 rounded-md bg-accent-veil border border-border-primary w-fit shadow-sm" data-testid="chat-pending">
+            <Sparkles class="size-3.5 animate-spin" strokeWidth={1.5} />
+            <span class="font-medium">Thinking & querying kernel state…</span>
+          </div>
         {/if}
       </div>
-    {/if}
-    <div class="mt-2 flex gap-2">
-      <input
-        class="input min-w-0 grow"
-        placeholder="ask the AiDeck…"
-        bind:this={input}
-        bind:value={draft}
-        data-testid="chat-input"
-        onkeydown={(e) => {
-          if (e.key === "Enter" && !e.shiftKey) {
-            e.preventDefault();
-            void send();
-          }
-        }} />
-      <button
-        class="btn btn-primary shrink-0"
-        data-testid="chat-send"
-        disabled={pending || !draft.trim()}
-        onclick={() => void send()}>send</button>
+
+      {#if !atBottom}
+        <button
+          class="chip chip-active self-center my-1 shadow-overlay flex items-center gap-1 text-xs font-semibold"
+          data-testid="chat-jump-latest"
+          onclick={jumpLatest}>
+          <ArrowDown class="size-3" /> jump to latest
+        </button>
+      {/if}
+
+      {#if paletteOpen && catalog && catalog.verbs.length > 0}
+        <div class="mt-1 flex flex-wrap gap-1 border-t border-edge bg-surface-alt p-2 rounded-t" data-testid="chat-verb-palette">
+          {#each paletteVerbs as v}
+            <button class="chip text-xs" data-testid={`chat-verb-${v.verb}`} onclick={() => useVerb(v.verb)}>
+              <span class="mono font-semibold text-accent">/{v.verb}</span>
+              {#if v.args.length}
+                <span class="text-ink-2">{v.args.map((a) => (a.required ? `<${a.name}>` : `[${a.name}]`)).join(" ")}</span>
+              {/if}
+              — {v.description}
+            </button>
+          {/each}
+          {#if paletteVerbs.length === 0}
+            <p class="text-xs text-ink-2">no matching command</p>
+          {/if}
+        </div>
+      {/if}
+
+      <!-- Composer Input Box -->
+      <div class="mt-1.5 relative flex items-center gap-2 rounded-lg border border-edge bg-surface p-1.5 focus-within:border-accent shadow-sm">
+        <input
+          class="input min-w-0 grow border-0 bg-transparent px-2.5 py-1 text-sm focus:outline-none"
+          placeholder="Ask the AiDeck or type / for commands…"
+          bind:this={input}
+          bind:value={draft}
+          data-testid="chat-input"
+          onkeydown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              void send();
+            }
+          }} />
+        <button
+          class="btn btn-primary shrink-0 py-1.5 px-3 flex items-center gap-1.5 text-xs font-semibold"
+          disabled={pending || !draft.trim()}
+          data-testid="chat-send"
+          onclick={() => void send()}>
+          <Send class="size-3.5" strokeWidth={1.5} />
+          <span>send</span>
+        </button>
+      </div>
     </div>
   </div>
 </section>
+
+<style>
+  .history-drawer {
+    transition: transform 180ms cubic-bezier(0.2, 0, 0, 1), opacity 180ms ease;
+  }
+</style>

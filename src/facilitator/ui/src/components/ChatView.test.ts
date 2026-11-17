@@ -343,4 +343,57 @@ describe("ChatView", () => {
       ).length,
     ).toBe(0);
   });
+
+  it("toggles conversation history drawer", async () => {
+    stub({});
+    await vi.waitFor(() => expect(hasTestId("chat-toggle-history")).toBe(true));
+
+    const toggle = byTestId<HTMLButtonElement>("chat-toggle-history");
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+
+    toggle.click();
+    flushSync();
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+
+    toggle.click();
+    flushSync();
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("renders contextual prompt starters on welcome screen and populates input", async () => {
+    const fetcher: Fetcher = async (path) => {
+      if (path === "/api/chat/catalog") return json(catalog());
+      if (path === "/api/chat/sessions") return json([]);
+      return json({}, 404);
+    };
+    mountComponent(ChatView, {
+      fetcher,
+      screenContext: { route: "#/works", label: "works queue", ids: ["0194f0a0"] },
+    });
+
+    await vi.waitFor(() => expect(hasTestId("chat-input")).toBe(true));
+    expect(container?.textContent).toContain("Open Facilitator Assistant");
+    expect(container?.textContent).toContain("Briefed on: works queue");
+
+    const starterBtn = Array.from(container?.querySelectorAll("button.card") ?? []).find((b) =>
+      b.textContent?.includes("Summarize Works"),
+    ) as HTMLButtonElement | undefined;
+    expect(starterBtn).toBeTruthy();
+
+    starterBtn?.click();
+    flushSync();
+    expect(byTestId<HTMLInputElement>("chat-input").value).toContain("Summarize active work items");
+  });
+
+  it("new chat button resets active session", async () => {
+    stub({ messages: [message()] });
+    await opened();
+
+    expect(hasTestId("chat-message-0")).toBe(true);
+    byTestId<HTMLButtonElement>("chat-new-session").click();
+    flushSync();
+
+    expect(hasTestId("chat-message-0")).toBe(false);
+    expect(container?.textContent).toContain("Open Facilitator Assistant");
+  });
 });

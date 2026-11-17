@@ -42,7 +42,7 @@
     <div>
       <h2 class="mb-1 text-xl font-semibold">Flows</h2>
       <p class="text-sm text-ink-2">
-        Every definition, latest version. Runs and their progress live under
+        Active and stored workflow definitions. Execution runs appear under
         <a class="text-accent underline" href="#/monitor/runs">Monitor</a>.
         {#if canMutate}
           <a class="mono text-accent underline" href="#/flows/new" data-testid="new-flow">author a flow</a>

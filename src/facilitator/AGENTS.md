@@ -76,5 +76,4 @@ broker, Auth, Dispatch, Persistence, CLI, metrics) + the read-mostly Admin surfa
   never an ad-hoc UPDATE of `facilitator.works`.
 - Delivery-receipt parity: SignalR `Ack` and HTTP receipts both go through
   `CommitAsync` in `Kernel/Link/LinkReceipts.cs`.
-- Test classes live in `../../tests/Facilitator.Tests/<Feature>` mirroring
-  `Kernel/<Feature>`.
+- Test classes live in `../../tests/Facilitator.Tests/<Feature>` mirroring `Kernel/<Feature>`.

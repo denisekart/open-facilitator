@@ -67,7 +67,7 @@
     <h2 class="text-sm font-medium">
       Deliveries
       <span class="ml-1 text-xs font-normal text-ink-2"
-        >— every message the kernel sent out, and what became of it</span
+        >— outbox message delivery statuses</span
       >
     </h2>
     <button class="btn" onclick={() => void load()}>refresh</button>

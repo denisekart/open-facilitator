@@ -138,7 +138,7 @@ rerunning `make scenario-gate`.
 A new source area under `src/` also lands its own `AGENTS.md` signpost in
 the same commit (`make docs-check` enforces this).
 
-## Next
+## Where to go next
 
 - Publishing a release: [release-setup.md](release-setup.md)
 - The behavioral conformance system behind the `scenarios` job:

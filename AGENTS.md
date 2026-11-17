@@ -75,6 +75,4 @@ you touch — the nearest file wins.
   after meaningful edits to indexed content.
 - **Doc-sync rule:** an AGENTS.md change rides in the same commit as the
   change it describes; `make docs-check` fails on dangling references,
-  oversized signposts, plan-status prose, or an area that grew without a
-  signpost. Area docs are ≤ 40-line indexes: purpose, invariants invisible in
-  code, anchors — never restated behavior.
+  oversized signposts, or plan-status prose. Area docs are ≤ 40-line indexes.

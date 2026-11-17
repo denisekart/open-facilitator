@@ -1,4 +1,4 @@
-# Advanced Topics
+# Advanced topics
 
 This page covers running the pieces apart. Each section is a standalone
 how-to for one component: the kernel without Compose, a Gateway configured

@@ -45,9 +45,7 @@ plane connects only through an outbound link, and privileged writes to the
 outside world happen team-side.
 
 ```mermaid title="One kernel, teams dial out, execution stays team-side"
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#EAF1F9",
-"primaryBorderColor": "#0B5FBF", "primaryTextColor": "#1F2328",
-"lineColor": "#5B6B7C", "secondaryColor": "#FDF0DC"}}}%%
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#f7f9fb", "primaryBorderColor": "#ab8612", "primaryTextColor": "#21262e", "lineColor": "#676f7c", "secondaryColor": "#faf2d6"}}}%%
 flowchart TB
   CHAT["Chat / Issues / Webhooks"] -->|events| ING
   subgraph FAC["Facilitator - deploy once"]

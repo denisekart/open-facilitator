@@ -174,7 +174,7 @@
     <h2 class="text-sm font-medium">
       Config
       <span class="ml-1 text-xs font-normal text-ink-2"
-        >— stored intent, versioned; features read it, you write it</span
+        >— runtime policy resources and change history</span
       >
     </h2>
     <button class="btn" data-testid="config-close" onclick={() => (open = null)}>close</button>

@@ -72,7 +72,7 @@
     {
       key: "works",
       label: "Works",
-      hint: "the queue — everything, newest first",
+      hint: "Active and completed work items, ordered by creation date",
       icon: LayoutDashboard,
       hash: "#/works",
       active: ["works", "work"],
@@ -80,7 +80,7 @@
     {
       key: "flows",
       label: "Flows",
-      hint: "workflow definitions: author, version, enable",
+      hint: "Workflow definitions: author, version, and enable trigger rules",
       icon: GitBranch,
       hash: "#/flows",
       active: ["flows"],
@@ -88,7 +88,7 @@
     {
       key: "monitor",
       label: "Monitor",
-      hint: "runs, deliveries, audit, runtime — what the kernel is doing",
+      hint: "Runs, deliveries, audit logs, and runtime metrics",
       icon: Activity,
       hash: "#/monitor/runs",
       active: ["monitor-runs", "monitor-run"],
@@ -96,7 +96,7 @@
     {
       key: "deliveries",
       label: "Deliveries",
-      hint: "every message the kernel sent, and its fate",
+      hint: "Outbox deliveries, destinations, and receipt statuses",
       icon: Send,
       hash: "#/monitor/deliveries",
       active: ["monitor-deliveries"],
@@ -104,7 +104,7 @@
     {
       key: "audit",
       label: "Audit",
-      hint: "every allow and deny the kernel recorded",
+      hint: "Audit trail of authorization decisions, allows, and denies",
       icon: ScrollText,
       hash: "#/monitor/audit",
       active: ["monitor-audit"],
@@ -112,7 +112,7 @@
     {
       key: "runtime",
       label: "Runtime",
-      hint: "replicas, provisioning, manual sweeps",
+      hint: "Kernel replicas, dead-letter queue, metrics, and sweeper tasks",
       icon: Server,
       hash: "#/monitor/runtime",
       active: ["monitor-runtime"],
@@ -120,7 +120,7 @@
     {
       key: "team",
       label: "Team",
-      hint: "gateways, links, enrollment",
+      hint: "Teams and workspaces connected over outbound links",
       icon: Users,
       hash: "#/team",
       active: ["team"],
@@ -128,7 +128,7 @@
     {
       key: "config",
       label: "Config",
-      hint: "the live routing policy",
+      hint: "Runtime configuration resources and change history",
       icon: Settings,
       hash: "#/config",
       active: ["config"],
@@ -136,7 +136,7 @@
     {
       key: "chat",
       label: "AiDeck",
-      hint: "talk to the kernel's assistant",
+      hint: "Ask the kernel for work status, dead-letter inspections, or diagnostics",
       icon: Sparkles,
       drawer: true,
       needsChatRole: true,

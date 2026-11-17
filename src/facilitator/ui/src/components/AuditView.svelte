@@ -87,7 +87,7 @@
     <h2 class="text-sm font-medium">
       Audit
       <span class="ml-1 text-xs font-normal text-ink-2"
-        >— every allow and deny the kernel recorded</span
+        >— authorization decisions recorded by the kernel</span
       >
     </h2>
     <div class="flex items-center gap-2">

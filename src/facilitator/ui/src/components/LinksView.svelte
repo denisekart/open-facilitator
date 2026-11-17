@@ -61,7 +61,7 @@
     <h2 class="text-sm font-medium">
       Team environments
       <span class="ml-1 text-xs font-normal text-ink-2"
-        >— gateways dial out to this kernel; nothing dials in</span
+        >— team gateways connected over outbound links</span
       >
     </h2>
     <button class="btn" onclick={() => void load()}>refresh</button>

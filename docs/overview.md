@@ -206,7 +206,7 @@ command down a link the team opened. Dashed arrows are at-least-once.*
 | Dev Container Features (one-step workspace onboarding) | `features/` |
 | Compose deployments + acceptance scripts | `reference/` (`./referencectl`) |
 
-## Next
+## Where to go next
 
 - Run it: [getting-started.md](getting-started.md)
 - Drive it from an agent: [getting-started-agents.md](getting-started-agents.md)

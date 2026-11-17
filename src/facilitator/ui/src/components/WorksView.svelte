@@ -64,7 +64,7 @@
     <h2 class="text-sm font-medium">
       Works
       <span class="ml-1 text-xs font-normal text-ink-2"
-        >— everything the kernel is holding, newest first</span
+        >— active and completed work items</span
       >
     </h2>
     <button class="btn" onclick={() => void load()}>refresh</button>

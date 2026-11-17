@@ -3,8 +3,9 @@
 // Run from repo root: node protocol/tools/agents-docs-check.mjs
 import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { join, dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const ROOT = resolve(new URL("../..", import.meta.url).pathname);
+const ROOT = fileURLToPath(new URL("../..", import.meta.url));
 const SKIP = new Set(["node_modules", "dist", "bin", "obj", "docs", ".git"]);
 // Areas without their own signpost file; remove an entry once a source file lands.
 const EXEMPT = new Set([]);

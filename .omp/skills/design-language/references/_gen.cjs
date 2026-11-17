@@ -16,12 +16,12 @@ const mix = (a, b, p) => {
 };
 
 const T = {
-  L: { name: 'light', bg: '#eef2f6', surface: '#f7f9fb', raise: '#ffffff', work: '#eef2f6', ink: '#21262e',
-       muted: '#676f7c', faint: '#8690a0', line: '#d5dbe3', accent: '#e6bf34', on: '#14171a', tx: '#8d6e0e', rt: '#ab8612',
-       danger: '#d54e4e', dtx: '#b03a3a', dark: false },
-  D: { name: 'dark', bg: '#2b2e33', surface: '#33373d', raise: '#3b4046', work: '#24272b', ink: '#d6dae0',
-       muted: '#99a1ab', faint: '#767d85', line: '#464c54', accent: '#e6bf34', on: '#1b1e22', tx: '#e6bf34', rt: '#e6bf34',
-       danger: '#ff8f99', dtx: '#ff8f99', dark: true },
+  L: { name: 'light', bg: '#f1f3f5', surface: '#ffffff', raise: '#ffffff', work: '#f1f3f5', ink: '#1a202c',
+       muted: '#505a69', faint: '#7a8699', line: '#cfd6e0', accent: '#c96a2d', on: '#ffffff', tx: '#ac531c', rt: '#c96a2d',
+       danger: '#ba3c3c', dtx: '#ba3c3c', dark: false },
+  D: { name: 'dark', bg: '#232831', surface: '#2b313b', raise: '#323944', work: '#232831', ink: '#f3f4f6',
+       muted: '#9ca3af', faint: '#6b7280', line: '#3f4754', accent: '#c96a2d', on: '#ffffff', tx: '#e58a45', rt: '#c96a2d',
+       danger: '#c75454', dtx: '#c75454', dark: true },
 };
 for (const t of Object.values(T)) {
   t.soft = mix(t.line, t.work, 0.45);                       /* 45% toward the ground it floats on */

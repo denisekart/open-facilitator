@@ -4,6 +4,8 @@
 // prefixes its next message with it so the assistant knows what the operator
 // is looking at, without a protocol change.
 
+import { untrack } from "svelte";
+
 export interface ScreenContext {
   /** Canonical hash of the screen, e.g. "#/monitor/runs/<id>". */
   route: string;
@@ -69,7 +71,10 @@ class Deck {
       this.handlers.set(id, map);
     }
     map.set(owner, handler);
-    this.version++;
+    // Bump untracked: register runs inside a caller's $effect (onAction),
+    // and a tracked read of the version here would make that effect depend
+    // on its own write — an update loop. available() keeps the tracked read.
+    this.version = untrack(() => this.version) + 1;
   }
 
   unregister(id: string, owner: object): void {
@@ -79,7 +84,7 @@ class Deck {
       if (map.size === 0) {
         this.handlers.delete(id);
       }
-      this.version++;
+      this.version = untrack(() => this.version) + 1;
     }
   }
 

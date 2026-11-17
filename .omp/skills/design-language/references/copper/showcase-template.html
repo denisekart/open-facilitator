@@ -1,0 +1,2798 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Open Facilitator — Refined Copper Theme</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      background: #15181E;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      width: 2880px;
+      height: 1800px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .showcase-banner {
+      height: 80px;
+      background: #1C2028;
+      border-bottom: 2px solid #2B313E;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 32px;
+      flex-shrink: 0;
+    }
+
+    .banner-title {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .banner-logo {
+      width: 40px;
+      height: 40px;
+      background: #C96A2D;
+      border-radius: 9px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+
+    .banner-heading {
+      font-size: 20px;
+      font-weight: 800;
+      color: #FFFFFF;
+      letter-spacing: -0.4px;
+    }
+
+    .banner-subheading {
+      font-size: 13px;
+      color: #9CA3AF;
+      margin-top: 2px;
+    }
+
+    .banner-specs {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .spec-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 11px;
+      background: #252B35;
+      border: 1px solid #363E4D;
+      border-radius: 6px;
+      font-size: 11.5px;
+      font-family: ui-monospace, Menlo, monospace;
+      color: #D1D5DB;
+    }
+
+    .spec-color-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+    }
+
+    .showcase-stage {
+      flex: 1;
+      display: flex;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stage-half {
+      flex: 1;
+      height: 100%;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .stage-divider {
+      position: absolute;
+      left: 50%;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: #3F4754;
+      z-index: 50;
+      transform: translateX(-50%);
+    }
+
+    .theme-label-badge {
+      position: absolute;
+      top: 14px;
+      padding: 5px 14px;
+      background: #1C2028;
+      border: 1px solid #363E4D;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.6px;
+      color: #F3F4F6;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+      z-index: 40;
+    }
+
+    .theme-label-left {
+      left: 20px;
+    }
+
+    .theme-label-right {
+      right: 20px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Top Showcase Banner -->
+  <div class="showcase-banner">
+    <div class="banner-title">
+      <div class="banner-logo">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+          <polyline points="2 17 12 22 22 17"></polyline>
+          <polyline points="2 12 12 17 22 12"></polyline>
+        </svg>
+      </div>
+      <div>
+        <div class="banner-heading">Open Facilitator — Refined Copper Theme</div>
+        <div class="banner-subheading">Industrial precision copper (#C96A2D) and rich dark teal (#168B90) aesthetic with crisp surface hierarchy, solid opaque token palettes, and cool technical grounds</div>
+      </div>
+    </div>
+
+    <!-- Color Tokens Pill Strip -->
+    <div class="banner-specs">
+      <div class="spec-pill">
+        <span class="spec-color-dot" style="background: #C96A2D;"></span>
+        <span>Primary: #C96A2D</span>
+      </div>
+
+      <div class="spec-pill">
+        <span class="spec-color-dot" style="background: #168B90;"></span>
+        <span>Info: #168B90</span>
+      </div>
+
+      <div class="spec-pill">
+        <span class="spec-color-dot" style="background: #58894C;"></span>
+        <span>Success: #58894C</span>
+      </div>
+
+      <div class="spec-pill">
+        <span class="spec-color-dot" style="background: #C48A00;"></span>
+        <span>Warning: #C48A00</span>
+      </div>
+
+      <div class="spec-pill">
+        <span class="spec-color-dot" style="background: #C75454;"></span>
+        <span>Error: #C75454</span>
+      </div>
+
+      <div class="spec-pill" style="border-color: #C96A2D; color: #FFFFFF; background: #C96A2D22;">
+        <span>REFINED COPPER & TEAL DESIGN SYSTEM</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Showcase Stage: Split Left (Light) & Right (Dark) -->
+  <div class="showcase-stage">
+    <!-- Left Half: Light Theme -->
+    <div class="stage-half">
+      <div class="theme-label-badge theme-label-left">
+        <span style="width: 8px; height: 8px; border-radius: 50%; background: #C96A2D;"></span>
+        <span>OPEN FACILITATOR — LIGHT THEME (#F1F3F5)</span>
+      </div>
+      
+    <div class="ui-container light-mode" style="
+      background-color: #F1F3F5;
+      color: #1A202C;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-sizing: border-box;
+      position: relative;
+    ">
+      <!-- 1. Top Navigation Header -->
+      <header style="
+        height: 52px;
+        background: #FFFFFF;
+        border-bottom: 1px solid #CFD6E0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 18px;
+        flex-shrink: 0;
+        z-index: 20;
+      ">
+        <!-- Logo & Environment Switcher -->
+        <div style="display: flex; align-items: center; gap: 14px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="
+              width: 30px;
+              height: 30px;
+              background: #C96A2D;
+              border-radius: 7px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              box-shadow: 0 1px 3px rgba(0,0,0,0.18);
+            ">
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                <polyline points="2 17 12 22 22 17"></polyline>
+                <polyline points="2 12 12 17 22 12"></polyline>
+              </svg>
+            </div>
+            <div>
+              <div style="font-size: 13px; font-weight: 800; letter-spacing: 0.5px; line-height: 1.1; color: #1A202C;">
+                OPEN FACILITATOR
+              </div>
+              <div style="font-size: 10px; color: #505A69; font-weight: 500;">
+                Autonomous Orchestration Kernel
+              </div>
+            </div>
+          </div>
+
+          <div style="height: 18px; width: 1px; background: #CFD6E0;"></div>
+
+          <!-- Environment Badge -->
+          <div style="
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 3px 8px;
+            background: #E8ECF0;
+            border: 1px solid #CFD6E0;
+            border-radius: 5px;
+            font-size: 11px;
+            font-family: ui-monospace, Menlo, monospace;
+            color: #505A69;
+          ">
+            <span style="width: 7px; height: 7px; border-radius: 50%; background: #127377;"></span>
+            <span style="font-weight: 600; color: #1A202C;">us-east-prod</span>
+            <span style="color: #7A8699;">·</span>
+            <span style="color: #127377;">18 Gateways</span>
+          </div>
+        </div>
+
+        <!-- Center Navigation Tabs with Primary Active States -->
+        <nav style="display: flex; align-items: center; gap: 4px; height: 100%;">
+          <div style="
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            font-size: 12.5px;
+            font-weight: 500;
+            color: #505A69;
+            border-radius: 6px;
+            cursor: pointer;
+          ">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+            <span>Works</span>
+            <span style="
+              padding: 1px 6px;
+              background: #E8ECF0;
+              color: #505A69;
+              border-radius: 10px;
+              font-size: 10px;
+              font-weight: 700;
+            ">14</span>
+          </div>
+
+          <!-- Active Flows Tab with Theme Primary Indicator -->
+          <div style="
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            font-size: 12.5px;
+            font-weight: 600;
+            color: #AC531C;
+            background: #F8EFE8;
+            border: 1px solid #E2B696;
+            border-radius: 6px;
+            cursor: pointer;
+          ">
+            <div style="color: #C96A2D; display: flex; align-items: center;"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="3" x2="6" y2="15"></line><circle cx="18" cy="6" r="3"></circle><circle cx="6" cy="18" r="3"></circle><path d="M18 9a9 9 0 0 1-9 9"></path></svg></div>
+            <span>Flows</span>
+            <span style="
+              width: 5px;
+              height: 5px;
+              border-radius: 50%;
+              background: #C96A2D;
+            "></span>
+          </div>
+
+          <div style="
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            font-size: 12.5px;
+            font-weight: 500;
+            color: #505A69;
+            border-radius: 6px;
+          ">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+            <span>Deliveries</span>
+          </div>
+
+          <div style="
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            font-size: 12.5px;
+            font-weight: 500;
+            color: #505A69;
+            border-radius: 6px;
+          ">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+            <span>Audit</span>
+          </div>
+
+          <div style="
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            font-size: 12.5px;
+            font-weight: 500;
+            color: #505A69;
+            border-radius: 6px;
+          ">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+            <span>Link Hub</span>
+          </div>
+
+          <div style="
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            font-size: 12.5px;
+            font-weight: 500;
+            color: #505A69;
+            border-radius: 6px;
+          ">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+            <span>Config</span>
+          </div>
+
+          <!-- AiDeck Drawer Tab in Secondary Info Accent -->
+          <div style="
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            font-size: 12.5px;
+            font-weight: 500;
+            color: #127377;
+            background: #E5F3F4;
+            border: 1px solid #92CAD0;
+            border-radius: 6px;
+          ">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"></path></svg>
+            <span>AiDeck</span>
+          </div>
+        </nav>
+
+        <!-- Right Quick Actions & Search -->
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <!-- Search Bar -->
+          <div style="
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 10px;
+            background: #E8ECF0;
+            border: 1px solid #CFD6E0;
+            border-radius: 6px;
+            font-size: 11.5px;
+            color: #505A69;
+            width: 170px;
+          ">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <span>⌘K Search flows...</span>
+          </div>
+
+          <!-- Outbound Links Pill (Info State) -->
+          <div style="
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            padding: 4px 9px;
+            background: #E5F3F4;
+            border: 1px solid #92CAD0;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #127377;
+          ">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+            <span>Link Hub: 18 Gateways</span>
+          </div>
+
+          <!-- Theme & Bell -->
+          <div style="
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            background: #E8ECF0;
+            border: 1px solid #CFD6E0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #505A69;
+          ">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+          </div>
+
+          <div style="
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            background: #E8ECF0;
+            border: 1px solid #CFD6E0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #505A69;
+            position: relative;
+          ">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+            <span style="position: absolute; top: 4px; right: 4px; width: 6px; height: 6px; border-radius: 50%; background: #C96A2D;"></span>
+          </div>
+
+          <!-- User Avatar -->
+          <div style="
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: #C96A2D;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 700;
+            color: #FFFFFF;
+            border: 1px solid #CFD6E0;
+          ">
+            OF
+          </div>
+        </div>
+      </header>
+
+      <!-- 2. Sub-Header: Active Workflow Meta & Action Bar -->
+      <div style="
+        height: 46px;
+        background: #E8ECF0;
+        border-bottom: 1px solid #CFD6E0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 18px;
+        flex-shrink: 0;
+        z-index: 10;
+      ">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 12px; color: #505A69;">Workflows /</span>
+          <span style="font-size: 13.5px; font-weight: 700; color: #1A202C;">sec-incident-auto-triage</span>
+
+          <span style="
+            padding: 2px 8px;
+            background: #E5F3F4;
+            color: #127377;
+            border: 1px solid #92CAD0;
+            border-radius: 4px;
+            font-size: 10.5px;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+          ">v2.4.1 · ACTIVE</span>
+
+          <span style="font-size: 11.5px; color: #505A69;">
+            Trigger: <span style="color: #C96A2D; font-weight: 600;">webhook.security.alert</span>
+          </span>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <!-- Secondary Action: Validate Schema -->
+          <button style="
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 12px;
+            background: #FFFFFF;
+            border: 1px solid #CFD6E0;
+            border-radius: 6px;
+            font-size: 11.5px;
+            font-weight: 600;
+            color: #505A69;
+            cursor: pointer;
+          ">
+            <span style="color: #127377;"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+            <span>Validate Schema</span>
+          </button>
+
+          <!-- Secondary Action: Test Execution -->
+          <button style="
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 12px;
+            background: #FFFFFF;
+            border: 1px solid #CFD6E0;
+            border-radius: 6px;
+            font-size: 11.5px;
+            font-weight: 600;
+            color: #1A202C;
+            cursor: pointer;
+          ">
+            <span style="color: #C96A2D;"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" stroke="none"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg></span>
+            <span>Test Execution</span>
+          </button>
+
+          <!-- Primary Save Button with Refined Copper Accent & Hover -->
+          <button style="
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            padding: 5px 14px;
+            background: #C96A2D;
+            border: 1px solid #E2B696;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 700;
+            color: #FFFFFF;
+            cursor: pointer;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+          ">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+            <span>Save Flow</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 3. Workflow Editor Main Area (DAG Visualizer on Left + YAML Code on Right) -->
+      <div style="
+        display: flex;
+        flex: 1.35;
+        border-bottom: 1px solid #CFD6E0;
+        overflow: hidden;
+      ">
+        <!-- 3A. Left: DAG Workflow Graph Canvas -->
+        <div style="
+          flex: 1.05;
+          background-color: #FFFFFF;
+          background-image: radial-gradient(rgba(0, 0, 0, 0.04) 1px, transparent 1px);
+          background-size: 20px 20px;
+          position: relative;
+          border-right: 1px solid #CFD6E0;
+          overflow: hidden;
+        ">
+          <!-- Canvas Top Tag -->
+          <div style="
+            position: absolute;
+            top: 14px;
+            left: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #FFFFFF;
+            border: 1px solid #CFD6E0;
+            border-radius: 8px;
+            padding: 5px 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            z-index: 10;
+          ">
+            <span style="font-size: 11.5px; font-weight: 700; color: #C96A2D;">Active DAG Runtime</span>
+            <span style="height: 14px; width: 1px; background: #CFD6E0;"></span>
+            <span style="font-size: 11px; color: #127377; font-family: ui-monospace, Menlo, monospace;">6 Nodes · 5 Active Paths · Latency: 0.8ms</span>
+          </div>
+
+          <!-- Canvas Bottom Zoom & Controls -->
+          <div style="
+            position: absolute;
+            bottom: 14px;
+            right: 16px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: #FFFFFF;
+            border: 1px solid #CFD6E0;
+            border-radius: 8px;
+            padding: 4px 10px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            z-index: 10;
+            font-size: 11.5px;
+            color: #505A69;
+          ">
+            <span>Canvas: <strong>100%</strong></span>
+            <span style="padding: 1px 5px; background: #E8ECF0; border-radius: 4px; font-weight: 600;">Fit View</span>
+          </div>
+
+          <!-- SVG Visual Connections & Highlighted Workflow Paths (Crisp Vector, No Glows) -->
+          <div style="position: absolute; inset: 0;">
+            <svg style="width: 100%; height: 100%; position: absolute; inset: 0; pointer-events: none;">
+              <defs>
+                <marker id="marker-primary-light" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                  <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#C96A2D" />
+                </marker>
+                <marker id="marker-info-light" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                  <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#127377" />
+                </marker>
+                <marker id="marker-success-light" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                  <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#447A38" />
+                </marker>
+                <marker id="marker-faint-light" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                  <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#7A8699" />
+                </marker>
+              </defs>
+
+              <!-- Path 1: Trigger -> Policy Gate (Crisp Primary Copper Stroke) -->
+              <path d="M 215 130 C 265 130, 275 130, 310 130"
+                fill="none"
+                stroke="#C96A2D"
+                stroke-width="2.5"
+                marker-end="url(#marker-primary-light)"
+              />
+
+              <!-- Path 2: Policy Gate -> LLM Triage Agent (Crisp Primary Copper Flow) -->
+              <path d="M 505 130 C 545 130, 555 220, 595 220"
+                fill="none"
+                stroke="#C96A2D"
+                stroke-width="2.5"
+                marker-end="url(#marker-primary-light)"
+              />
+
+              <!-- Path 3: LLM Triage Agent -> Deterministic Patch Tool (Teal Secondary) -->
+              <path d="M 595 330 C 550 330, 480 370, 400 395"
+                fill="none"
+                stroke="#127377"
+                stroke-width="2"
+                stroke-dasharray="6,4"
+                marker-end="url(#marker-info-light)"
+              />
+
+              <!-- Path 4: Patch Tool -> Test Verifier (Success Green) -->
+              <path d="M 400 485 C 450 510, 530 520, 595 520"
+                fill="none"
+                stroke="#447A38"
+                stroke-width="2"
+                marker-end="url(#marker-success-light)"
+              />
+
+              <!-- Path 5: Verifier -> Slack Notification Sink (Copper) -->
+              <path d="M 785 520 C 825 520, 845 420, 845 320"
+                fill="none"
+                stroke="#C96A2D"
+                stroke-width="2.5"
+                marker-end="url(#marker-primary-light)"
+              />
+            </svg>
+          </div>
+
+          <!-- NODE 1: Trigger Node -->
+          <div style="
+            position: absolute;
+            top: 70px;
+            left: 30px;
+            width: 185px;
+            background: #FFFFFF;
+            border: 1px solid #E2B696;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+            z-index: 5;
+            overflow: hidden;
+          ">
+            <!-- Node Header -->
+            <div style="
+              padding: 7px 12px;
+              background: #F8EFE8;
+              border-bottom: 1px solid #E2B696;
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+            ">
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span style="color: #C96A2D; display: flex;"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg></span>
+                <span style="font-size: 11px; font-weight: 800; color: #AC531C; letter-spacing: 0.3px;">EVENT TRIGGER</span>
+              </div>
+              <span style="width: 7px; height: 7px; border-radius: 50%; background: #C96A2D;"></span>
+            </div>
+            <!-- Node Body -->
+            <div style="padding: 10px 12px;">
+              <div style="font-size: 12px; font-weight: 700; color: #1A202C; margin-bottom: 4px;">Security Alert Ingress</div>
+              <div style="font-size: 10.5px; font-family: ui-monospace, Menlo, monospace; color: #505A69; word-break: break-all;">
+                POST /ingress/webhook
+              </div>
+              <div style="
+                margin-top: 8px;
+                padding: 3px 6px;
+                background: #E8ECF0;
+                border: 1px solid #DEE3EB;
+                border-radius: 4px;
+                font-size: 10px;
+                color: #AC531C;
+                font-weight: 600;
+                display: inline-block;
+              ">
+                filter: provider == 'datadog'
+              </div>
+            </div>
+          </div>
+
+          <!-- NODE 2: Policy Gate Node -->
+          <div style="
+            position: absolute;
+            top: 75px;
+            left: 310px;
+            width: 195px;
+            background: #FFFFFF;
+            border: 1px solid #CFD6E0;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            z-index: 5;
+            overflow: hidden;
+          ">
+            <div style="
+              padding: 7px 12px;
+              background: #E8ECF0;
+              border-bottom: 1px solid #CFD6E0;
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+            ">
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span style="color: #127377; display: flex;"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg></span>
+                <span style="font-size: 11px; font-weight: 700; color: #127377;">POLICY GATE</span>
+              </div>
+              <span style="font-size: 10px; font-family: ui-monospace, Menlo, monospace; color: #447A38; font-weight: 700;">ALLOW</span>
+            </div>
+            <div style="padding: 10px 12px;">
+              <div style="font-size: 12px; font-weight: 700; color: #1A202C; margin-bottom: 4px;">Admission & Quota</div>
+              <div style="font-size: 10.5px; color: #505A69;">Rule: verify-signature-v2</div>
+              <div style="
+                margin-top: 8px;
+                display: flex;
+                align-items: center;
+                gap: 5px;
+                font-size: 10.5px;
+                color: #7A8699;
+              ">
+                <span>Evaluated in <strong>0.34ms</strong></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- NODE 3: Autonomous LLM Triage Agent Node -->
+          <div style="
+            position: absolute;
+            top: 175px;
+            left: 595px;
+            width: 230px;
+            background: #FFFFFF;
+            border: 1px solid #E2B696;
+            border-radius: 8px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+            z-index: 6;
+            overflow: hidden;
+          ">
+            <div style="
+              padding: 8px 12px;
+              background: #F8EFE8;
+              border-bottom: 1px solid #E2B696;
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+            ">
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span style="color: #C96A2D; display: flex;"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"></rect><circle cx="12" cy="5" r="2"></circle><path d="M12 7v4"></path><line x1="8" y1="16" x2="8" y2="16"></line><line x1="16" y1="16" x2="16" y2="16"></line></svg></span>
+                <span style="font-size: 11px; font-weight: 800; color: #AC531C;">AI TRIAGE AGENT</span>
+              </div>
+              <span style="
+                padding: 1px 6px;
+                background: #C96A2D;
+                color: #FFFFFF;
+                border-radius: 4px;
+                font-size: 9.5px;
+                font-weight: 800;
+              ">ACTIVE</span>
+            </div>
+            <div style="padding: 10px 12px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+                <span style="font-size: 12px; font-weight: 700; color: #1A202C;">Gemini 2.5 Flash</span>
+                <span style="font-size: 10px; font-family: ui-monospace, Menlo, monospace; color: #127377; font-weight: 600;">temp: 0.1</span>
+              </div>
+              <div style="font-size: 11px; color: #505A69; margin-bottom: 8px; line-height: 1.4;">
+                Analyzes CVE stacktrace, synthesizes root cause hypothesis & generates remediation diff.
+              </div>
+              <div style="
+                padding: 6px 8px;
+                background: #E8ECF0;
+                border: 1px solid #DEE3EB;
+                border-radius: 6px;
+                font-size: 10.5px;
+                font-family: ui-monospace, Menlo, monospace;
+              ">
+                <div style="color: #AC531C; font-weight: 600;">Outputs:</div>
+                <div style="color: #505A69;">1. RootCauseAnalysis.md</div>
+                <div style="color: #505A69;">2. patch-payload.diff</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- NODE 4: Deterministic Patch Tool -->
+          <div style="
+            position: absolute;
+            top: 360px;
+            left: 200px;
+            width: 200px;
+            background: #FFFFFF;
+            border: 1px solid #CFD6E0;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            z-index: 5;
+            overflow: hidden;
+          ">
+            <div style="
+              padding: 7px 12px;
+              background: #E8ECF0;
+              border-bottom: 1px solid #CFD6E0;
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+            ">
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span style="color: #127377; display: flex;"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line><line x1="20" y1="9" x2="23" y2="9"></line><line x1="20" y1="14" x2="23" y2="14"></line><line x1="1" y1="9" x2="4" y2="9"></line><line x1="1" y1="14" x2="4" y2="14"></line></svg></span>
+                <span style="font-size: 11px; font-weight: 700; color: #127377;">TOOL EXECUTION</span>
+              </div>
+              <span style="font-size: 10px; color: #7A8699;">Workspace</span>
+            </div>
+            <div style="padding: 10px 12px;">
+              <div style="font-size: 12px; font-weight: 700; color: #1A202C; margin-bottom: 4px;">Git Patch Applicator</div>
+              <div style="font-size: 10.5px; font-family: ui-monospace, Menlo, monospace; color: #505A69;">
+                tool: git.apply_diff
+              </div>
+              <div style="
+                margin-top: 8px;
+                display: flex;
+                align-items: center;
+                gap: 5px;
+                font-size: 10.5px;
+                color: #447A38;
+                font-weight: 600;
+              ">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> <span>0 Merge Conflicts</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- NODE 5: Test & Harness Verifier -->
+          <div style="
+            position: absolute;
+            top: 470px;
+            left: 595px;
+            width: 190px;
+            background: #FFFFFF;
+            border: 1px solid #CFD6E0;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            z-index: 5;
+            overflow: hidden;
+          ">
+            <div style="
+              padding: 7px 12px;
+              background: #E8ECF0;
+              border-bottom: 1px solid #CFD6E0;
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+            ">
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span style="color: #447A38; display: flex;"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+                <span style="font-size: 11px; font-weight: 700; color: #447A38;">VERIFICATION</span>
+              </div>
+              <span style="font-size: 10px; color: #447A38; font-weight: 700;">PASSED</span>
+            </div>
+            <div style="padding: 10px 12px;">
+              <div style="font-size: 12px; font-weight: 700; color: #1A202C; margin-bottom: 4px;">Test Runner Suite</div>
+              <div style="font-size: 10.5px; color: #505A69;">42 Unit & Scenario Tests</div>
+              <div style="
+                margin-top: 6px;
+                font-size: 10.5px;
+                font-family: ui-monospace, Menlo, monospace;
+                color: #127377;
+                font-weight: 600;
+              ">
+                exitCode: 0 (14.2s)
+              </div>
+            </div>
+          </div>
+
+          <!-- NODE 6: Outbox Notification Sink -->
+          <div style="
+            position: absolute;
+            top: 250px;
+            left: 845px;
+            width: 175px;
+            background: #FFFFFF;
+            border: 1px solid #CFD6E0;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            z-index: 5;
+            overflow: hidden;
+          ">
+            <div style="
+              padding: 7px 12px;
+              background: #E8ECF0;
+              border-bottom: 1px solid #CFD6E0;
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+            ">
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span style="color: #C96A2D; display: flex;"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg></span>
+                <span style="font-size: 11px; font-weight: 700; color: #AC531C;">OUTBOX SINK</span>
+              </div>
+            </div>
+            <div style="padding: 10px 12px;">
+              <div style="font-size: 12px; font-weight: 700; color: #1A202C; margin-bottom: 4px;">Slack & PagerDuty</div>
+              <div style="font-size: 10.5px; color: #505A69;">#sec-ops-triage</div>
+              <div style="
+                margin-top: 8px;
+                padding: 3px 6px;
+                background: #E5F3F4;
+                border: 1px solid #92CAD0;
+                border-radius: 4px;
+                font-size: 10px;
+                color: #127377;
+                font-weight: 600;
+              ">
+                PR #4892 Created
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3B. Right: Monaco Code Editor (YAML Definition) -->
+        <div style="
+          flex: 0.95;
+          background: #FFFFFF;
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+        ">
+          <!-- Editor Sub-header -->
+          <div style="
+            height: 38px;
+            background: #E8ECF0;
+            border-bottom: 1px solid #CFD6E0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 14px;
+            font-size: 11.5px;
+            color: #505A69;
+          ">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-weight: 600; color: #1A202C;">Workflow Spec (Open Facilitator DSL v1)</span>
+              <span style="padding: 1px 6px; background: #FFFFFF; border: 1px solid #CFD6E0; border-radius: 4px; font-size: 10px; font-family: ui-monospace, Menlo, monospace;">schema: flow.v1.json</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span style="color: #127377; font-size: 11px; font-weight: 600;">● Ready</span>
+              <span style="font-family: ui-monospace, Menlo, monospace; color: #7A8699;">UTF-8</span>
+            </div>
+          </div>
+
+          <!-- Code Lines Window -->
+          <div style="
+            flex: 1;
+            padding: 14px 10px;
+            font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace;
+            font-size: 12px;
+            line-height: 1.6;
+            overflow-y: auto;
+            color: #1A202C;
+          ">
+            <div style="display: flex; gap: 14px;">
+              <div style="color: #7A8699; text-align: right; user-select: none; width: 24px;">
+                1<br>2<br>3<br>4<br>5<br>6<br>7<br>8<br>9<br>10<br>11<br>12<br>13<br>14<br>15<br>16<br>17<br>18<br>19<br>20<br>21<br>22<br>23<br>24
+              </div>
+              <div style="flex: 1;">
+                <div><span style="color: #C96A2D; font-weight: 700;">id</span>: <span style="color: #127377; font-weight: 600;">incident-auto-triage-remediation</span></div>
+                <div><span style="color: #C96A2D; font-weight: 700;">version</span>: <span style="color: #127377;">"2.4.1"</span></div>
+                <div><span style="color: #C96A2D; font-weight: 700;">name</span>: <span style="color: #505A69;">"Automated Security Incident Triage"</span></div>
+                <div><span style="color: #C96A2D; font-weight: 700;">schema</span>: <span style="color: #7A8699;">"https://open-facilitator.dev/schemas/flow.v1.json"</span></div>
+                <div style="height: 6px;"></div>
+                <div><span style="color: #C96A2D; font-weight: 700;">trigger</span>:</div>
+                <div style="padding-left: 16px;"><span style="color: #C96A2D;">type</span>: <span style="color: #127377; font-weight: 600;">webhook</span></div>
+                <div style="padding-left: 16px;"><span style="color: #C96A2D;">path</span>: <span style="color: #505A69;">"/ingress/webhook/security"</span></div>
+                <div style="padding-left: 16px;"><span style="color: #C96A2D;">filter</span>: <span style="color: #AC531C;">"headers['x-event-type'] == 'cve.alert'"</span></div>
+                <div style="height: 6px;"></div>
+                <div><span style="color: #C96A2D; font-weight: 700;">nodes</span>:</div>
+                <div style="padding-left: 16px;">- <span style="color: #C96A2D; font-weight: 600;">id</span>: <span style="color: #127377;">admission_gate</span></div>
+                <div style="padding-left: 32px;"><span style="color: #C96A2D;">type</span>: <span style="color: #505A69;">policy</span></div>
+                <div style="padding-left: 32px;"><span style="color: #C96A2D;">rule</span>: <span style="color: #505A69;">"verify-signature-v2"</span></div>
+                <div style="height: 4px;"></div>
+                <div style="padding-left: 16px;">- <span style="color: #C96A2D; font-weight: 600;">id</span>: <span style="color: #127377;">ai_triage_agent</span></div>
+                <div style="padding-left: 32px;"><span style="color: #C96A2D;">type</span>: <span style="color: #C96A2D; font-weight: 600;">agent.llm</span></div>
+                <div style="padding-left: 32px;"><span style="color: #C96A2D;">provider</span>: <span style="color: #127377;">google-gemini-2.5-flash</span></div>
+                <div style="padding-left: 32px;"><span style="color: #C96A2D;">temperature</span>: <span style="color: #AC531C;">0.1</span></div>
+                <div style="padding-left: 32px;"><span style="color: #C96A2D;">system_prompt</span>: <span style="color: #7A8699;">"skills/security-triage.md"</span></div>
+                <div style="height: 4px;"></div>
+                <div style="padding-left: 16px;">- <span style="color: #C96A2D; font-weight: 600;">id</span>: <span style="color: #127377;">harness_verifier</span></div>
+                <div style="padding-left: 32px;"><span style="color: #C96A2D;">type</span>: <span style="color: #505A69;">executor.harness</span></div>
+                <div style="padding-left: 32px;"><span style="color: #C96A2D;">command</span>: <span style="color: #447A38;">"make test-slice"</span></div>
+                <div style="padding-left: 32px;"><span style="color: #C96A2D;">timeout</span>: <span style="color: #AC531C;">120s</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. High-Density KPI & Telemetry Strip with Solid Token Indicators -->
+      <div style="
+        height: 64px;
+        background: #FFFFFF;
+        border-bottom: 1px solid #CFD6E0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 20px;
+        flex-shrink: 0;
+      ">
+        <!-- KPI 1: Live Work Throughput -->
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            background: #F8EFE8;
+            border: 1px solid #E2B696;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #C96A2D;
+          ">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+          </div>
+          <div>
+            <div style="font-size: 11px; font-weight: 600; color: #505A69; text-transform: uppercase; letter-spacing: 0.5px;">Work Ingress Rate</div>
+            <div style="display: flex; align-items: baseline; gap: 6px;">
+              <span style="font-size: 18px; font-weight: 800; color: #1A202C; font-family: ui-monospace, Menlo, monospace;">428</span>
+              <span style="font-size: 11px; color: #AC531C; font-weight: 600;">works/min</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="height: 28px; width: 1px; background: #CFD6E0;"></div>
+
+        <!-- KPI 2: Connected Gateways -->
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            background: #E5F3F4;
+            border: 1px solid #92CAD0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #127377;
+          ">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+          </div>
+          <div>
+            <div style="font-size: 11px; font-weight: 600; color: #505A69; text-transform: uppercase; letter-spacing: 0.5px;">Link Hub Gateways</div>
+            <div style="display: flex; align-items: baseline; gap: 6px;">
+              <span style="font-size: 18px; font-weight: 800; color: #1A202C; font-family: ui-monospace, Menlo, monospace;">18 / 18</span>
+              <span style="font-size: 11px; color: #447A38; font-weight: 600;">100% healthy</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="height: 28px; width: 1px; background: #CFD6E0;"></div>
+
+        <!-- KPI 3: Outbox P99 Latency -->
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            background: #E8ECF0;
+            border: 1px solid #CFD6E0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #505A69;
+          ">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+          </div>
+          <div>
+            <div style="font-size: 11px; font-weight: 600; color: #505A69; text-transform: uppercase; letter-spacing: 0.5px;">Outbox P99 Latency</div>
+            <div style="display: flex; align-items: baseline; gap: 6px;">
+              <span style="font-size: 18px; font-weight: 800; color: #1A202C; font-family: ui-monospace, Menlo, monospace;">1.2</span>
+              <span style="font-size: 11px; color: #505A69;">ms</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="height: 28px; width: 1px; background: #CFD6E0;"></div>
+
+        <!-- KPI 4: Policy Pass Rate -->
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            background: #EAF3E8;
+            border: 1px solid #9FC497;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #447A38;
+          ">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+          </div>
+          <div>
+            <div style="font-size: 11px; font-weight: 600; color: #505A69; text-transform: uppercase; letter-spacing: 0.5px;">Policy Admission Gate</div>
+            <div style="display: flex; align-items: baseline; gap: 6px;">
+              <span style="font-size: 18px; font-weight: 800; color: #1A202C; font-family: ui-monospace, Menlo, monospace;">99.8%</span>
+              <span style="font-size: 11px; color: #447A38; font-weight: 600;">compliant</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="height: 28px; width: 1px; background: #CFD6E0;"></div>
+
+        <!-- KPI 5: Active Leases -->
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            background: #F8EFE8;
+            border: 1px solid #E2B696;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #C96A2D;
+          ">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line><line x1="20" y1="9" x2="23" y2="9"></line><line x1="20" y1="14" x2="23" y2="14"></line><line x1="1" y1="9" x2="4" y2="9"></line><line x1="1" y1="14" x2="4" y2="14"></line></svg>
+          </div>
+          <div>
+            <div style="font-size: 11px; font-weight: 600; color: #505A69; text-transform: uppercase; letter-spacing: 0.5px;">Active Leases</div>
+            <div style="display: flex; align-items: baseline; gap: 6px;">
+              <span style="font-size: 18px; font-weight: 800; color: #AC531C; font-family: ui-monospace, Menlo, monospace;">34</span>
+              <span style="font-size: 11px; color: #505A69;">claimed</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5. Works Dashboard & Live Queue Table -->
+      <div style="
+        flex: 1;
+        background: #E8ECF0;
+        padding: 16px 20px;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      ">
+        <!-- Table Control Toolbar -->
+        <div style="
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 12px;
+          flex-shrink: 0;
+        ">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 14px; font-weight: 800; color: #1A202C;">Live Work Requests</span>
+
+            <!-- Filter Pills with Theme Primary Selected State -->
+            <div style="display: flex; align-items: center; gap: 4px; margin-left: 8px;">
+              <span style="
+                padding: 3px 10px;
+                background: #C96A2D;
+                color: #FFFFFF;
+                border-radius: 6px;
+                font-size: 11.5px;
+                font-weight: 700;
+                cursor: pointer;
+              ">All Works (14)</span>
+
+              <span style="
+                padding: 3px 10px;
+                background: #FFFFFF;
+                border: 1px solid #CFD6E0;
+                color: #505A69;
+                border-radius: 6px;
+                font-size: 11.5px;
+                font-weight: 500;
+              ">Running (4)</span>
+
+              <span style="
+                padding: 3px 10px;
+                background: #FFFFFF;
+                border: 1px solid #CFD6E0;
+                color: #505A69;
+                border-radius: 6px;
+                font-size: 11.5px;
+                font-weight: 500;
+              ">Awaiting Lease (2)</span>
+
+              <span style="
+                padding: 3px 10px;
+                background: #FFFFFF;
+                border: 1px solid #CFD6E0;
+                color: #505A69;
+                border-radius: 6px;
+                font-size: 11.5px;
+                font-weight: 500;
+              ">Failed (0)</span>
+            </div>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="
+              display: flex;
+              align-items: center;
+              gap: 6px;
+              padding: 4px 10px;
+              background: #FFFFFF;
+              border: 1px solid #CFD6E0;
+              border-radius: 6px;
+              font-size: 11.5px;
+              color: #505A69;
+            ">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
+              <span>Filter: <strong>Provider = GitHub</strong></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Work Items Table Container -->
+        <div style="
+          flex: 1;
+          background: #FFFFFF;
+          border: 1px solid #CFD6E0;
+          border-radius: 8px;
+          overflow: hidden;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+          display: flex;
+          flex-direction: column;
+        ">
+          <!-- Table Header -->
+          <div style="
+            display: grid;
+            grid-template-columns: 140px 2.2fr 1.8fr 1.3fr 130px 100px 90px;
+            padding: 9px 14px;
+            background: #E8ECF0;
+            border-bottom: 1px solid #CFD6E0;
+            font-size: 11px;
+            font-weight: 700;
+            color: #505A69;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+          ">
+            <div>Work ID</div>
+            <div>Work Descriptor / Title</div>
+            <div>Workflow Pipeline</div>
+            <div>Gateway / Link</div>
+            <div>State</div>
+            <div>Duration</div>
+            <div style="text-align: right;">Action</div>
+          </div>
+
+          <!-- Table Row 1 (Running with Theme Primary Accent Pill) -->
+          <div style="
+            display: grid;
+            grid-template-columns: 140px 2.2fr 1.8fr 1.3fr 130px 100px 90px;
+            padding: 10px 14px;
+            border-bottom: 1px solid #DEE3EB;
+            align-items: center;
+            font-size: 12px;
+            background: #F8EFE8;
+          ">
+            <div style="font-family: ui-monospace, Menlo, monospace; font-weight: 700; color: #C96A2D;">
+              wrk_01HZX89
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-weight: 600; color: #1A202C;">Security Remediation: CVE-2026-4418</span>
+              <span style="padding: 1px 5px; background: #FFFFFF; border: 1px solid #E2B696; color: #AC531C; border-radius: 4px; font-size: 10px; font-weight: 700;">HIGH</span>
+            </div>
+            <div style="color: #505A69; font-family: ui-monospace, Menlo, monospace; font-size: 11px;">
+              incident-auto-triage-remediation
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px; color: #127377; font-family: ui-monospace, Menlo, monospace; font-size: 11px;">
+              <span style="width: 6px; height: 6px; border-radius: 50%; background: #127377;"></span>
+              <span>gw-us-east-1a</span>
+            </div>
+            <div>
+              <span style="
+                padding: 3px 8px;
+                background: #C96A2D;
+                color: #FFFFFF;
+                border-radius: 12px;
+                font-size: 10.5px;
+                font-weight: 800;
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
+              ">
+                <span style="width: 5px; height: 5px; border-radius: 50%; background: #FFFFFF;"></span>
+                RUNNING
+              </span>
+            </div>
+            <div style="font-family: ui-monospace, Menlo, monospace; color: #505A69; font-size: 11.5px;">
+              14.2s
+            </div>
+            <div style="text-align: right;">
+              <span style="color: #AC531C; font-weight: 600; cursor: pointer; font-size: 11.5px;">View Live ▶</span>
+            </div>
+          </div>
+
+          <!-- Table Row 2 (Admitted State) -->
+          <div style="
+            display: grid;
+            grid-template-columns: 140px 2.2fr 1.8fr 1.3fr 130px 100px 90px;
+            padding: 10px 14px;
+            border-bottom: 1px solid #DEE3EB;
+            align-items: center;
+            font-size: 12px;
+            background: #FFFFFF;
+          ">
+            <div style="font-family: ui-monospace, Menlo, monospace; font-weight: 700; color: #1A202C;">
+              wrk_01HZX87
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-weight: 500; color: #1A202C;">Release Chore: Bump Dependencies Net10</span>
+              <span style="padding: 1px 5px; background: #E8ECF0; color: #505A69; border-radius: 4px; font-size: 10px;">CHORE</span>
+            </div>
+            <div style="color: #505A69; font-family: ui-monospace, Menlo, monospace; font-size: 11px;">
+              deps-auto-upgrade-pipeline
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px; color: #127377; font-family: ui-monospace, Menlo, monospace; font-size: 11px;">
+              <span style="width: 6px; height: 6px; border-radius: 50%; background: #127377;"></span>
+              <span>gw-eu-west-2b</span>
+            </div>
+            <div>
+              <span style="
+                padding: 3px 8px;
+                background: #E5F3F4;
+                color: #127377;
+                border: 1px solid #92CAD0;
+                border-radius: 12px;
+                font-size: 10.5px;
+                font-weight: 700;
+              ">
+                ADMITTED
+              </span>
+            </div>
+            <div style="font-family: ui-monospace, Menlo, monospace; color: #505A69; font-size: 11.5px;">
+              2.1s
+            </div>
+            <div style="text-align: right;">
+              <span style="color: #505A69; font-weight: 500; font-size: 11.5px;">Inspect</span>
+            </div>
+          </div>
+
+          <!-- Table Row 3 (Succeeded State) -->
+          <div style="
+            display: grid;
+            grid-template-columns: 140px 2.2fr 1.8fr 1.3fr 130px 100px 90px;
+            padding: 10px 14px;
+            border-bottom: 1px solid #DEE3EB;
+            align-items: center;
+            font-size: 12px;
+            background: #FFFFFF;
+          ">
+            <div style="font-family: ui-monospace, Menlo, monospace; font-weight: 700; color: #1A202C;">
+              wrk_01HZX80
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-weight: 500; color: #1A202C;">Contract Codegen: Schema v1.8 Sync</span>
+              <span style="padding: 1px 5px; background: #E8ECF0; color: #505A69; border-radius: 4px; font-size: 10px;">AUTO</span>
+            </div>
+            <div style="color: #505A69; font-family: ui-monospace, Menlo, monospace; font-size: 11px;">
+              protocol-codegen-verify
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px; color: #127377; font-family: ui-monospace, Menlo, monospace; font-size: 11px;">
+              <span style="width: 6px; height: 6px; border-radius: 50%; background: #127377;"></span>
+              <span>gw-us-east-1a</span>
+            </div>
+            <div>
+              <span style="
+                padding: 3px 8px;
+                background: #EAF3E8;
+                color: #447A38;
+                border: 1px solid #9FC497;
+                border-radius: 12px;
+                font-size: 10.5px;
+                font-weight: 700;
+              ">
+                SUCCEEDED
+              </span>
+            </div>
+            <div style="font-family: ui-monospace, Menlo, monospace; color: #505A69; font-size: 11.5px;">
+              48.6s
+            </div>
+            <div style="text-align: right;">
+              <span style="color: #505A69; font-weight: 500; font-size: 11.5px;">Logs</span>
+            </div>
+          </div>
+
+          <!-- Table Row 4 (Streaming Deliveries State) -->
+          <div style="
+            display: grid;
+            grid-template-columns: 140px 2.2fr 1.8fr 1.3fr 130px 100px 90px;
+            padding: 10px 14px;
+            align-items: center;
+            font-size: 12px;
+            background: #FFFFFF;
+          ">
+            <div style="font-family: ui-monospace, Menlo, monospace; font-weight: 700; color: #1A202C;">
+              wrk_01HZX75
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-weight: 500; color: #1A202C;">Scenario Gate: Run Manifest Walk #884</span>
+            </div>
+            <div style="color: #505A69; font-family: ui-monospace, Menlo, monospace; font-size: 11px;">
+              scenario-gate-runner
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px; color: #127377; font-family: ui-monospace, Menlo, monospace; font-size: 11px;">
+              <span style="width: 6px; height: 6px; border-radius: 50%; background: #127377;"></span>
+              <span>gw-ap-south-1</span>
+            </div>
+            <div>
+              <span style="
+                padding: 3px 8px;
+                background: #F8EFE8;
+                color: #AC531C;
+                border: 1px solid #E2B696;
+                border-radius: 12px;
+                font-size: 10.5px;
+                font-weight: 700;
+              ">
+                STREAMING
+              </span>
+            </div>
+            <div style="font-family: ui-monospace, Menlo, monospace; color: #505A69; font-size: 11.5px;">
+              1m 04s
+            </div>
+            <div style="text-align: right;">
+              <span style="color: #AC531C; font-weight: 600; font-size: 11.5px;">Tail Log</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  
+    </div>
+
+    <!-- Center Precision Divider -->
+    <div class="stage-divider"></div>
+
+    <!-- Right Half: Dark Theme -->
+    <div class="stage-half">
+      <div class="theme-label-badge theme-label-right">
+        <span style="width: 8px; height: 8px; border-radius: 50%; background: #C96A2D;"></span>
+        <span>OPEN FACILITATOR — DARK THEME (#232831)</span>
+      </div>
+      
+    <div class="ui-container dark-mode" style="
+      background-color: #232831;
+      color: #F3F4F6;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-sizing: border-box;
+      position: relative;
+    ">
+      <!-- 1. Top Navigation Header -->
+      <header style="
+        height: 52px;
+        background: #2B313B;
+        border-bottom: 1px solid #3F4754;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 18px;
+        flex-shrink: 0;
+        z-index: 20;
+      ">
+        <!-- Logo & Environment Switcher -->
+        <div style="display: flex; align-items: center; gap: 14px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="
+              width: 30px;
+              height: 30px;
+              background: #C96A2D;
+              border-radius: 7px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              box-shadow: 0 1px 3px rgba(0,0,0,0.18);
+            ">
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                <polyline points="2 17 12 22 22 17"></polyline>
+                <polyline points="2 12 12 17 22 12"></polyline>
+              </svg>
+            </div>
+            <div>
+              <div style="font-size: 13px; font-weight: 800; letter-spacing: 0.5px; line-height: 1.1; color: #F3F4F6;">
+                OPEN FACILITATOR
+              </div>
+              <div style="font-size: 10px; color: #9CA3AF; font-weight: 500;">
+                Autonomous Orchestration Kernel
+              </div>
+            </div>
+          </div>
+
+          <div style="height: 18px; width: 1px; background: #3F4754;"></div>
+
+          <!-- Environment Badge -->
+          <div style="
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 3px 8px;
+            background: #323944;
+            border: 1px solid #3F4754;
+            border-radius: 5px;
+            font-size: 11px;
+            font-family: ui-monospace, Menlo, monospace;
+            color: #9CA3AF;
+          ">
+            <span style="width: 7px; height: 7px; border-radius: 50%; background: #168B90;"></span>
+            <span style="font-weight: 600; color: #F3F4F6;">us-east-prod</span>
+            <span style="color: #6B7280;">·</span>
+            <span style="color: #168B90;">18 Gateways</span>
+          </div>
+        </div>
+
+        <!-- Center Navigation Tabs with Primary Active States -->
+        <nav style="display: flex; align-items: center; gap: 4px; height: 100%;">
+          <div style="
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            font-size: 12.5px;
+            font-weight: 500;
+            color: #9CA3AF;
+            border-radius: 6px;
+            cursor: pointer;
+          ">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+            <span>Works</span>
+            <span style="
+              padding: 1px 6px;
+              background: #323944;
+              color: #9CA3AF;
+              border-radius: 10px;
+              font-size: 10px;
+              font-weight: 700;
+            ">14</span>
+          </div>
+
+          <!-- Active Flows Tab with Theme Primary Indicator -->
+          <div style="
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            font-size: 12.5px;
+            font-weight: 600;
+            color: #E58A45;
+            background: #3D332D;
+            border: 1px solid #8A4820;
+            border-radius: 6px;
+            cursor: pointer;
+          ">
+            <div style="color: #C96A2D; display: flex; align-items: center;"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="3" x2="6" y2="15"></line><circle cx="18" cy="6" r="3"></circle><circle cx="6" cy="18" r="3"></circle><path d="M18 9a9 9 0 0 1-9 9"></path></svg></div>
+            <span>Flows</span>
+            <span style="
+              width: 5px;
+              height: 5px;
+              border-radius: 50%;
+              background: #C96A2D;
+            "></span>
+          </div>
+
+          <div style="
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            font-size: 12.5px;
+            font-weight: 500;
+            color: #9CA3AF;
+            border-radius: 6px;
+          ">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+            <span>Deliveries</span>
+          </div>
+
+          <div style="
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            font-size: 12.5px;
+            font-weight: 500;
+            color: #9CA3AF;
+            border-radius: 6px;
+          ">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+            <span>Audit</span>
+          </div>
+
+          <div style="
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            font-size: 12.5px;
+            font-weight: 500;
+            color: #9CA3AF;
+            border-radius: 6px;
+          ">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+            <span>Link Hub</span>
+          </div>
+
+          <div style="
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            font-size: 12.5px;
+            font-weight: 500;
+            color: #9CA3AF;
+            border-radius: 6px;
+          ">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+            <span>Config</span>
+          </div>
+
+          <!-- AiDeck Drawer Tab in Secondary Info Accent -->
+          <div style="
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            font-size: 12.5px;
+            font-weight: 500;
+            color: #168B90;
+            background: #223538;
+            border: 1px solid #175B5F;
+            border-radius: 6px;
+          ">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"></path></svg>
+            <span>AiDeck</span>
+          </div>
+        </nav>
+
+        <!-- Right Quick Actions & Search -->
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <!-- Search Bar -->
+          <div style="
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 10px;
+            background: #323944;
+            border: 1px solid #3F4754;
+            border-radius: 6px;
+            font-size: 11.5px;
+            color: #9CA3AF;
+            width: 170px;
+          ">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <span>⌘K Search flows...</span>
+          </div>
+
+          <!-- Outbound Links Pill (Info State) -->
+          <div style="
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            padding: 4px 9px;
+            background: #223538;
+            border: 1px solid #175B5F;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #168B90;
+          ">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+            <span>Link Hub: 18 Gateways</span>
+          </div>
+
+          <!-- Theme & Bell -->
+          <div style="
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            background: #323944;
+            border: 1px solid #3F4754;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #9CA3AF;
+          ">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+          </div>
+
+          <div style="
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            background: #323944;
+            border: 1px solid #3F4754;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #9CA3AF;
+            position: relative;
+          ">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+            <span style="position: absolute; top: 4px; right: 4px; width: 6px; height: 6px; border-radius: 50%; background: #C96A2D;"></span>
+          </div>
+
+          <!-- User Avatar -->
+          <div style="
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: #C96A2D;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 700;
+            color: #FFFFFF;
+            border: 1px solid #3F4754;
+          ">
+            OF
+          </div>
+        </div>
+      </header>
+
+      <!-- 2. Sub-Header: Active Workflow Meta & Action Bar -->
+      <div style="
+        height: 46px;
+        background: #323944;
+        border-bottom: 1px solid #3F4754;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 18px;
+        flex-shrink: 0;
+        z-index: 10;
+      ">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 12px; color: #9CA3AF;">Workflows /</span>
+          <span style="font-size: 13.5px; font-weight: 700; color: #F3F4F6;">sec-incident-auto-triage</span>
+
+          <span style="
+            padding: 2px 8px;
+            background: #223538;
+            color: #168B90;
+            border: 1px solid #175B5F;
+            border-radius: 4px;
+            font-size: 10.5px;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+          ">v2.4.1 · ACTIVE</span>
+
+          <span style="font-size: 11.5px; color: #9CA3AF;">
+            Trigger: <span style="color: #C96A2D; font-weight: 600;">webhook.security.alert</span>
+          </span>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <!-- Secondary Action: Validate Schema -->
+          <button style="
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 12px;
+            background: #2B313B;
+            border: 1px solid #3F4754;
+            border-radius: 6px;
+            font-size: 11.5px;
+            font-weight: 600;
+            color: #9CA3AF;
+            cursor: pointer;
+          ">
+            <span style="color: #168B90;"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+            <span>Validate Schema</span>
+          </button>
+
+          <!-- Secondary Action: Test Execution -->
+          <button style="
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 12px;
+            background: #2B313B;
+            border: 1px solid #3F4754;
+            border-radius: 6px;
+            font-size: 11.5px;
+            font-weight: 600;
+            color: #F3F4F6;
+            cursor: pointer;
+          ">
+            <span style="color: #C96A2D;"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" stroke="none"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg></span>
+            <span>Test Execution</span>
+          </button>
+
+          <!-- Primary Save Button with Refined Copper Accent & Hover -->
+          <button style="
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            padding: 5px 14px;
+            background: #C96A2D;
+            border: 1px solid #8A4820;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 700;
+            color: #FFFFFF;
+            cursor: pointer;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+          ">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+            <span>Save Flow</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 3. Workflow Editor Main Area (DAG Visualizer on Left + YAML Code on Right) -->
+      <div style="
+        display: flex;
+        flex: 1.35;
+        border-bottom: 1px solid #3F4754;
+        overflow: hidden;
+      ">
+        <!-- 3A. Left: DAG Workflow Graph Canvas -->
+        <div style="
+          flex: 1.05;
+          background-color: #2B313B;
+          background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+          background-size: 20px 20px;
+          position: relative;
+          border-right: 1px solid #3F4754;
+          overflow: hidden;
+        ">
+          <!-- Canvas Top Tag -->
+          <div style="
+            position: absolute;
+            top: 14px;
+            left: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #2B313B;
+            border: 1px solid #3F4754;
+            border-radius: 8px;
+            padding: 5px 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            z-index: 10;
+          ">
+            <span style="font-size: 11.5px; font-weight: 700; color: #C96A2D;">Active DAG Runtime</span>
+            <span style="height: 14px; width: 1px; background: #3F4754;"></span>
+            <span style="font-size: 11px; color: #168B90; font-family: ui-monospace, Menlo, monospace;">6 Nodes · 5 Active Paths · Latency: 0.8ms</span>
+          </div>
+
+          <!-- Canvas Bottom Zoom & Controls -->
+          <div style="
+            position: absolute;
+            bottom: 14px;
+            right: 16px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: #2B313B;
+            border: 1px solid #3F4754;
+            border-radius: 8px;
+            padding: 4px 10px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            z-index: 10;
+            font-size: 11.5px;
+            color: #9CA3AF;
+          ">
+            <span>Canvas: <strong>100%</strong></span>
+            <span style="padding: 1px 5px; background: #323944; border-radius: 4px; font-weight: 600;">Fit View</span>
+          </div>
+
+          <!-- SVG Visual Connections & Highlighted Workflow Paths (Crisp Vector, No Glows) -->
+          <div style="position: absolute; inset: 0;">
+            <svg style="width: 100%; height: 100%; position: absolute; inset: 0; pointer-events: none;">
+              <defs>
+                <marker id="marker-primary-dark" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                  <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#C96A2D" />
+                </marker>
+                <marker id="marker-info-dark" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                  <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#168B90" />
+                </marker>
+                <marker id="marker-success-dark" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                  <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#58894C" />
+                </marker>
+                <marker id="marker-faint-dark" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                  <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#6B7280" />
+                </marker>
+              </defs>
+
+              <!-- Path 1: Trigger -> Policy Gate (Crisp Primary Copper Stroke) -->
+              <path d="M 215 130 C 265 130, 275 130, 310 130"
+                fill="none"
+                stroke="#C96A2D"
+                stroke-width="2.5"
+                marker-end="url(#marker-primary-dark)"
+              />
+
+              <!-- Path 2: Policy Gate -> LLM Triage Agent (Crisp Primary Copper Flow) -->
+              <path d="M 505 130 C 545 130, 555 220, 595 220"
+                fill="none"
+                stroke="#C96A2D"
+                stroke-width="2.5"
+                marker-end="url(#marker-primary-dark)"
+              />
+
+              <!-- Path 3: LLM Triage Agent -> Deterministic Patch Tool (Teal Secondary) -->
+              <path d="M 595 330 C 550 330, 480 370, 400 395"
+                fill="none"
+                stroke="#168B90"
+                stroke-width="2"
+                stroke-dasharray="6,4"
+                marker-end="url(#marker-info-dark)"
+              />
+
+              <!-- Path 4: Patch Tool -> Test Verifier (Success Green) -->
+              <path d="M 400 485 C 450 510, 530 520, 595 520"
+                fill="none"
+                stroke="#58894C"
+                stroke-width="2"
+                marker-end="url(#marker-success-dark)"
+              />
+
+              <!-- Path 5: Verifier -> Slack Notification Sink (Copper) -->
+              <path d="M 785 520 C 825 520, 845 420, 845 320"
+                fill="none"
+                stroke="#C96A2D"
+                stroke-width="2.5"
+                marker-end="url(#marker-primary-dark)"
+              />
+            </svg>
+          </div>
+
+          <!-- NODE 1: Trigger Node -->
+          <div style="
+            position: absolute;
+            top: 70px;
+            left: 30px;
+            width: 185px;
+            background: #2B313B;
+            border: 1px solid #8A4820;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+            z-index: 5;
+            overflow: hidden;
+          ">
+            <!-- Node Header -->
+            <div style="
+              padding: 7px 12px;
+              background: #3D332D;
+              border-bottom: 1px solid #8A4820;
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+            ">
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span style="color: #C96A2D; display: flex;"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg></span>
+                <span style="font-size: 11px; font-weight: 800; color: #E58A45; letter-spacing: 0.3px;">EVENT TRIGGER</span>
+              </div>
+              <span style="width: 7px; height: 7px; border-radius: 50%; background: #C96A2D;"></span>
+            </div>
+            <!-- Node Body -->
+            <div style="padding: 10px 12px;">
+              <div style="font-size: 12px; font-weight: 700; color: #F3F4F6; margin-bottom: 4px;">Security Alert Ingress</div>
+              <div style="font-size: 10.5px; font-family: ui-monospace, Menlo, monospace; color: #9CA3AF; word-break: break-all;">
+                POST /ingress/webhook
+              </div>
+              <div style="
+                margin-top: 8px;
+                padding: 3px 6px;
+                background: #323944;
+                border: 1px solid #343B47;
+                border-radius: 4px;
+                font-size: 10px;
+                color: #E58A45;
+                font-weight: 600;
+                display: inline-block;
+              ">
+                filter: provider == 'datadog'
+              </div>
+            </div>
+          </div>
+
+          <!-- NODE 2: Policy Gate Node -->
+          <div style="
+            position: absolute;
+            top: 75px;
+            left: 310px;
+            width: 195px;
+            background: #2B313B;
+            border: 1px solid #3F4754;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            z-index: 5;
+            overflow: hidden;
+          ">
+            <div style="
+              padding: 7px 12px;
+              background: #323944;
+              border-bottom: 1px solid #3F4754;
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+            ">
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span style="color: #168B90; display: flex;"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg></span>
+                <span style="font-size: 11px; font-weight: 700; color: #168B90;">POLICY GATE</span>
+              </div>
+              <span style="font-size: 10px; font-family: ui-monospace, Menlo, monospace; color: #58894C; font-weight: 700;">ALLOW</span>
+            </div>
+            <div style="padding: 10px 12px;">
+              <div style="font-size: 12px; font-weight: 700; color: #F3F4F6; margin-bottom: 4px;">Admission & Quota</div>
+              <div style="font-size: 10.5px; color: #9CA3AF;">Rule: verify-signature-v2</div>
+              <div style="
+                margin-top: 8px;
+                display: flex;
+                align-items: center;
+                gap: 5px;
+                font-size: 10.5px;
+                color: #6B7280;
+              ">
+                <span>Evaluated in <strong>0.34ms</strong></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- NODE 3: Autonomous LLM Triage Agent Node -->
+          <div style="
+            position: absolute;
+            top: 175px;
+            left: 595px;
+            width: 230px;
+            background: #2B313B;
+            border: 1px solid #8A4820;
+            border-radius: 8px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+            z-index: 6;
+            overflow: hidden;
+          ">
+            <div style="
+              padding: 8px 12px;
+              background: #3D332D;
+              border-bottom: 1px solid #8A4820;
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+            ">
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span style="color: #C96A2D; display: flex;"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"></rect><circle cx="12" cy="5" r="2"></circle><path d="M12 7v4"></path><line x1="8" y1="16" x2="8" y2="16"></line><line x1="16" y1="16" x2="16" y2="16"></line></svg></span>
+                <span style="font-size: 11px; font-weight: 800; color: #E58A45;">AI TRIAGE AGENT</span>
+              </div>
+              <span style="
+                padding: 1px 6px;
+                background: #C96A2D;
+                color: #FFFFFF;
+                border-radius: 4px;
+                font-size: 9.5px;
+                font-weight: 800;
+              ">ACTIVE</span>
+            </div>
+            <div style="padding: 10px 12px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+                <span style="font-size: 12px; font-weight: 700; color: #F3F4F6;">Gemini 2.5 Flash</span>
+                <span style="font-size: 10px; font-family: ui-monospace, Menlo, monospace; color: #168B90; font-weight: 600;">temp: 0.1</span>
+              </div>
+              <div style="font-size: 11px; color: #9CA3AF; margin-bottom: 8px; line-height: 1.4;">
+                Analyzes CVE stacktrace, synthesizes root cause hypothesis & generates remediation diff.
+              </div>
+              <div style="
+                padding: 6px 8px;
+                background: #323944;
+                border: 1px solid #343B47;
+                border-radius: 6px;
+                font-size: 10.5px;
+                font-family: ui-monospace, Menlo, monospace;
+              ">
+                <div style="color: #E58A45; font-weight: 600;">Outputs:</div>
+                <div style="color: #9CA3AF;">1. RootCauseAnalysis.md</div>
+                <div style="color: #9CA3AF;">2. patch-payload.diff</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- NODE 4: Deterministic Patch Tool -->
+          <div style="
+            position: absolute;
+            top: 360px;
+            left: 200px;
+            width: 200px;
+            background: #2B313B;
+            border: 1px solid #3F4754;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            z-index: 5;
+            overflow: hidden;
+          ">
+            <div style="
+              padding: 7px 12px;
+              background: #323944;
+              border-bottom: 1px solid #3F4754;
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+            ">
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span style="color: #168B90; display: flex;"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line><line x1="20" y1="9" x2="23" y2="9"></line><line x1="20" y1="14" x2="23" y2="14"></line><line x1="1" y1="9" x2="4" y2="9"></line><line x1="1" y1="14" x2="4" y2="14"></line></svg></span>
+                <span style="font-size: 11px; font-weight: 700; color: #168B90;">TOOL EXECUTION</span>
+              </div>
+              <span style="font-size: 10px; color: #6B7280;">Workspace</span>
+            </div>
+            <div style="padding: 10px 12px;">
+              <div style="font-size: 12px; font-weight: 700; color: #F3F4F6; margin-bottom: 4px;">Git Patch Applicator</div>
+              <div style="font-size: 10.5px; font-family: ui-monospace, Menlo, monospace; color: #9CA3AF;">
+                tool: git.apply_diff
+              </div>
+              <div style="
+                margin-top: 8px;
+                display: flex;
+                align-items: center;
+                gap: 5px;
+                font-size: 10.5px;
+                color: #58894C;
+                font-weight: 600;
+              ">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> <span>0 Merge Conflicts</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- NODE 5: Test & Harness Verifier -->
+          <div style="
+            position: absolute;
+            top: 470px;
+            left: 595px;
+            width: 190px;
+            background: #2B313B;
+            border: 1px solid #3F4754;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            z-index: 5;
+            overflow: hidden;
+          ">
+            <div style="
+              padding: 7px 12px;
+              background: #323944;
+              border-bottom: 1px solid #3F4754;
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+            ">
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span style="color: #58894C; display: flex;"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+                <span style="font-size: 11px; font-weight: 700; color: #58894C;">VERIFICATION</span>
+              </div>
+              <span style="font-size: 10px; color: #58894C; font-weight: 700;">PASSED</span>
+            </div>
+            <div style="padding: 10px 12px;">
+              <div style="font-size: 12px; font-weight: 700; color: #F3F4F6; margin-bottom: 4px;">Test Runner Suite</div>
+              <div style="font-size: 10.5px; color: #9CA3AF;">42 Unit & Scenario Tests</div>
+              <div style="
+                margin-top: 6px;
+                font-size: 10.5px;
+                font-family: ui-monospace, Menlo, monospace;
+                color: #168B90;
+                font-weight: 600;
+              ">
+                exitCode: 0 (14.2s)
+              </div>
+            </div>
+          </div>
+
+          <!-- NODE 6: Outbox Notification Sink -->
+          <div style="
+            position: absolute;
+            top: 250px;
+            left: 845px;
+            width: 175px;
+            background: #2B313B;
+            border: 1px solid #3F4754;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            z-index: 5;
+            overflow: hidden;
+          ">
+            <div style="
+              padding: 7px 12px;
+              background: #323944;
+              border-bottom: 1px solid #3F4754;
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+            ">
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span style="color: #C96A2D; display: flex;"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg></span>
+                <span style="font-size: 11px; font-weight: 700; color: #E58A45;">OUTBOX SINK</span>
+              </div>
+            </div>
+            <div style="padding: 10px 12px;">
+              <div style="font-size: 12px; font-weight: 700; color: #F3F4F6; margin-bottom: 4px;">Slack & PagerDuty</div>
+              <div style="font-size: 10.5px; color: #9CA3AF;">#sec-ops-triage</div>
+              <div style="
+                margin-top: 8px;
+                padding: 3px 6px;
+                background: #223538;
+                border: 1px solid #175B5F;
+                border-radius: 4px;
+                font-size: 10px;
+                color: #168B90;
+                font-weight: 600;
+              ">
+                PR #4892 Created
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3B. Right: Monaco Code Editor (YAML Definition) -->
+        <div style="
+          flex: 0.95;
+          background: #2B313B;
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+        ">
+          <!-- Editor Sub-header -->
+          <div style="
+            height: 38px;
+            background: #323944;
+            border-bottom: 1px solid #3F4754;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 14px;
+            font-size: 11.5px;
+            color: #9CA3AF;
+          ">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-weight: 600; color: #F3F4F6;">Workflow Spec (Open Facilitator DSL v1)</span>
+              <span style="padding: 1px 6px; background: #2B313B; border: 1px solid #3F4754; border-radius: 4px; font-size: 10px; font-family: ui-monospace, Menlo, monospace;">schema: flow.v1.json</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span style="color: #168B90; font-size: 11px; font-weight: 600;">● Ready</span>
+              <span style="font-family: ui-monospace, Menlo, monospace; color: #6B7280;">UTF-8</span>
+            </div>
+          </div>
+
+          <!-- Code Lines Window -->
+          <div style="
+            flex: 1;
+            padding: 14px 10px;
+            font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace;
+            font-size: 12px;
+            line-height: 1.6;
+            overflow-y: auto;
+            color: #F3F4F6;
+          ">
+            <div style="display: flex; gap: 14px;">
+              <div style="color: #6B7280; text-align: right; user-select: none; width: 24px;">
+                1<br>2<br>3<br>4<br>5<br>6<br>7<br>8<br>9<br>10<br>11<br>12<br>13<br>14<br>15<br>16<br>17<br>18<br>19<br>20<br>21<br>22<br>23<br>24
+              </div>
+              <div style="flex: 1;">
+                <div><span style="color: #C96A2D; font-weight: 700;">id</span>: <span style="color: #168B90; font-weight: 600;">incident-auto-triage-remediation</span></div>
+                <div><span style="color: #C96A2D; font-weight: 700;">version</span>: <span style="color: #168B90;">"2.4.1"</span></div>
+                <div><span style="color: #C96A2D; font-weight: 700;">name</span>: <span style="color: #9CA3AF;">"Automated Security Incident Triage"</span></div>
+                <div><span style="color: #C96A2D; font-weight: 700;">schema</span>: <span style="color: #6B7280;">"https://open-facilitator.dev/schemas/flow.v1.json"</span></div>
+                <div style="height: 6px;"></div>
+                <div><span style="color: #C96A2D; font-weight: 700;">trigger</span>:</div>
+                <div style="padding-left: 16px;"><span style="color: #C96A2D;">type</span>: <span style="color: #168B90; font-weight: 600;">webhook</span></div>
+                <div style="padding-left: 16px;"><span style="color: #C96A2D;">path</span>: <span style="color: #9CA3AF;">"/ingress/webhook/security"</span></div>
+                <div style="padding-left: 16px;"><span style="color: #C96A2D;">filter</span>: <span style="color: #E58A45;">"headers['x-event-type'] == 'cve.alert'"</span></div>
+                <div style="height: 6px;"></div>
+                <div><span style="color: #C96A2D; font-weight: 700;">nodes</span>:</div>
+                <div style="padding-left: 16px;">- <span style="color: #C96A2D; font-weight: 600;">id</span>: <span style="color: #168B90;">admission_gate</span></div>
+                <div style="padding-left: 32px;"><span style="color: #C96A2D;">type</span>: <span style="color: #9CA3AF;">policy</span></div>
+                <div style="padding-left: 32px;"><span style="color: #C96A2D;">rule</span>: <span style="color: #9CA3AF;">"verify-signature-v2"</span></div>
+                <div style="height: 4px;"></div>
+                <div style="padding-left: 16px;">- <span style="color: #C96A2D; font-weight: 600;">id</span>: <span style="color: #168B90;">ai_triage_agent</span></div>
+                <div style="padding-left: 32px;"><span style="color: #C96A2D;">type</span>: <span style="color: #C96A2D; font-weight: 600;">agent.llm</span></div>
+                <div style="padding-left: 32px;"><span style="color: #C96A2D;">provider</span>: <span style="color: #168B90;">google-gemini-2.5-flash</span></div>
+                <div style="padding-left: 32px;"><span style="color: #C96A2D;">temperature</span>: <span style="color: #E58A45;">0.1</span></div>
+                <div style="padding-left: 32px;"><span style="color: #C96A2D;">system_prompt</span>: <span style="color: #6B7280;">"skills/security-triage.md"</span></div>
+                <div style="height: 4px;"></div>
+                <div style="padding-left: 16px;">- <span style="color: #C96A2D; font-weight: 600;">id</span>: <span style="color: #168B90;">harness_verifier</span></div>
+                <div style="padding-left: 32px;"><span style="color: #C96A2D;">type</span>: <span style="color: #9CA3AF;">executor.harness</span></div>
+                <div style="padding-left: 32px;"><span style="color: #C96A2D;">command</span>: <span style="color: #58894C;">"make test-slice"</span></div>
+                <div style="padding-left: 32px;"><span style="color: #C96A2D;">timeout</span>: <span style="color: #E58A45;">120s</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. High-Density KPI & Telemetry Strip with Solid Token Indicators -->
+      <div style="
+        height: 64px;
+        background: #2B313B;
+        border-bottom: 1px solid #3F4754;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 20px;
+        flex-shrink: 0;
+      ">
+        <!-- KPI 1: Live Work Throughput -->
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            background: #3D332D;
+            border: 1px solid #8A4820;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #C96A2D;
+          ">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+          </div>
+          <div>
+            <div style="font-size: 11px; font-weight: 600; color: #9CA3AF; text-transform: uppercase; letter-spacing: 0.5px;">Work Ingress Rate</div>
+            <div style="display: flex; align-items: baseline; gap: 6px;">
+              <span style="font-size: 18px; font-weight: 800; color: #F3F4F6; font-family: ui-monospace, Menlo, monospace;">428</span>
+              <span style="font-size: 11px; color: #E58A45; font-weight: 600;">works/min</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="height: 28px; width: 1px; background: #3F4754;"></div>
+
+        <!-- KPI 2: Connected Gateways -->
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            background: #223538;
+            border: 1px solid #175B5F;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #168B90;
+          ">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+          </div>
+          <div>
+            <div style="font-size: 11px; font-weight: 600; color: #9CA3AF; text-transform: uppercase; letter-spacing: 0.5px;">Link Hub Gateways</div>
+            <div style="display: flex; align-items: baseline; gap: 6px;">
+              <span style="font-size: 18px; font-weight: 800; color: #F3F4F6; font-family: ui-monospace, Menlo, monospace;">18 / 18</span>
+              <span style="font-size: 11px; color: #58894C; font-weight: 600;">100% healthy</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="height: 28px; width: 1px; background: #3F4754;"></div>
+
+        <!-- KPI 3: Outbox P99 Latency -->
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            background: #323944;
+            border: 1px solid #3F4754;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #9CA3AF;
+          ">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+          </div>
+          <div>
+            <div style="font-size: 11px; font-weight: 600; color: #9CA3AF; text-transform: uppercase; letter-spacing: 0.5px;">Outbox P99 Latency</div>
+            <div style="display: flex; align-items: baseline; gap: 6px;">
+              <span style="font-size: 18px; font-weight: 800; color: #F3F4F6; font-family: ui-monospace, Menlo, monospace;">1.2</span>
+              <span style="font-size: 11px; color: #9CA3AF;">ms</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="height: 28px; width: 1px; background: #3F4754;"></div>
+
+        <!-- KPI 4: Policy Pass Rate -->
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            background: #273426;
+            border: 1px solid #3B5832;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #58894C;
+          ">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+          </div>
+          <div>
+            <div style="font-size: 11px; font-weight: 600; color: #9CA3AF; text-transform: uppercase; letter-spacing: 0.5px;">Policy Admission Gate</div>
+            <div style="display: flex; align-items: baseline; gap: 6px;">
+              <span style="font-size: 18px; font-weight: 800; color: #F3F4F6; font-family: ui-monospace, Menlo, monospace;">99.8%</span>
+              <span style="font-size: 11px; color: #58894C; font-weight: 600;">compliant</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="height: 28px; width: 1px; background: #3F4754;"></div>
+
+        <!-- KPI 5: Active Leases -->
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            background: #3D332D;
+            border: 1px solid #8A4820;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #C96A2D;
+          ">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line><line x1="20" y1="9" x2="23" y2="9"></line><line x1="20" y1="14" x2="23" y2="14"></line><line x1="1" y1="9" x2="4" y2="9"></line><line x1="1" y1="14" x2="4" y2="14"></line></svg>
+          </div>
+          <div>
+            <div style="font-size: 11px; font-weight: 600; color: #9CA3AF; text-transform: uppercase; letter-spacing: 0.5px;">Active Leases</div>
+            <div style="display: flex; align-items: baseline; gap: 6px;">
+              <span style="font-size: 18px; font-weight: 800; color: #E58A45; font-family: ui-monospace, Menlo, monospace;">34</span>
+              <span style="font-size: 11px; color: #9CA3AF;">claimed</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5. Works Dashboard & Live Queue Table -->
+      <div style="
+        flex: 1;
+        background: #323944;
+        padding: 16px 20px;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      ">
+        <!-- Table Control Toolbar -->
+        <div style="
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 12px;
+          flex-shrink: 0;
+        ">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 14px; font-weight: 800; color: #F3F4F6;">Live Work Requests</span>
+
+            <!-- Filter Pills with Theme Primary Selected State -->
+            <div style="display: flex; align-items: center; gap: 4px; margin-left: 8px;">
+              <span style="
+                padding: 3px 10px;
+                background: #C96A2D;
+                color: #FFFFFF;
+                border-radius: 6px;
+                font-size: 11.5px;
+                font-weight: 700;
+                cursor: pointer;
+              ">All Works (14)</span>
+
+              <span style="
+                padding: 3px 10px;
+                background: #2B313B;
+                border: 1px solid #3F4754;
+                color: #9CA3AF;
+                border-radius: 6px;
+                font-size: 11.5px;
+                font-weight: 500;
+              ">Running (4)</span>
+
+              <span style="
+                padding: 3px 10px;
+                background: #2B313B;
+                border: 1px solid #3F4754;
+                color: #9CA3AF;
+                border-radius: 6px;
+                font-size: 11.5px;
+                font-weight: 500;
+              ">Awaiting Lease (2)</span>
+
+              <span style="
+                padding: 3px 10px;
+                background: #2B313B;
+                border: 1px solid #3F4754;
+                color: #9CA3AF;
+                border-radius: 6px;
+                font-size: 11.5px;
+                font-weight: 500;
+              ">Failed (0)</span>
+            </div>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="
+              display: flex;
+              align-items: center;
+              gap: 6px;
+              padding: 4px 10px;
+              background: #2B313B;
+              border: 1px solid #3F4754;
+              border-radius: 6px;
+              font-size: 11.5px;
+              color: #9CA3AF;
+            ">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
+              <span>Filter: <strong>Provider = GitHub</strong></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Work Items Table Container -->
+        <div style="
+          flex: 1;
+          background: #2B313B;
+          border: 1px solid #3F4754;
+          border-radius: 8px;
+          overflow: hidden;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+          display: flex;
+          flex-direction: column;
+        ">
+          <!-- Table Header -->
+          <div style="
+            display: grid;
+            grid-template-columns: 140px 2.2fr 1.8fr 1.3fr 130px 100px 90px;
+            padding: 9px 14px;
+            background: #323944;
+            border-bottom: 1px solid #3F4754;
+            font-size: 11px;
+            font-weight: 700;
+            color: #9CA3AF;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+          ">
+            <div>Work ID</div>
+            <div>Work Descriptor / Title</div>
+            <div>Workflow Pipeline</div>
+            <div>Gateway / Link</div>
+            <div>State</div>
+            <div>Duration</div>
+            <div style="text-align: right;">Action</div>
+          </div>
+
+          <!-- Table Row 1 (Running with Theme Primary Accent Pill) -->
+          <div style="
+            display: grid;
+            grid-template-columns: 140px 2.2fr 1.8fr 1.3fr 130px 100px 90px;
+            padding: 10px 14px;
+            border-bottom: 1px solid #343B47;
+            align-items: center;
+            font-size: 12px;
+            background: #3D332D;
+          ">
+            <div style="font-family: ui-monospace, Menlo, monospace; font-weight: 700; color: #C96A2D;">
+              wrk_01HZX89
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-weight: 600; color: #F3F4F6;">Security Remediation: CVE-2026-4418</span>
+              <span style="padding: 1px 5px; background: #2B313B; border: 1px solid #8A4820; color: #E58A45; border-radius: 4px; font-size: 10px; font-weight: 700;">HIGH</span>
+            </div>
+            <div style="color: #9CA3AF; font-family: ui-monospace, Menlo, monospace; font-size: 11px;">
+              incident-auto-triage-remediation
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px; color: #168B90; font-family: ui-monospace, Menlo, monospace; font-size: 11px;">
+              <span style="width: 6px; height: 6px; border-radius: 50%; background: #168B90;"></span>
+              <span>gw-us-east-1a</span>
+            </div>
+            <div>
+              <span style="
+                padding: 3px 8px;
+                background: #C96A2D;
+                color: #FFFFFF;
+                border-radius: 12px;
+                font-size: 10.5px;
+                font-weight: 800;
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
+              ">
+                <span style="width: 5px; height: 5px; border-radius: 50%; background: #FFFFFF;"></span>
+                RUNNING
+              </span>
+            </div>
+            <div style="font-family: ui-monospace, Menlo, monospace; color: #9CA3AF; font-size: 11.5px;">
+              14.2s
+            </div>
+            <div style="text-align: right;">
+              <span style="color: #E58A45; font-weight: 600; cursor: pointer; font-size: 11.5px;">View Live ▶</span>
+            </div>
+          </div>
+
+          <!-- Table Row 2 (Admitted State) -->
+          <div style="
+            display: grid;
+            grid-template-columns: 140px 2.2fr 1.8fr 1.3fr 130px 100px 90px;
+            padding: 10px 14px;
+            border-bottom: 1px solid #343B47;
+            align-items: center;
+            font-size: 12px;
+            background: #2B313B;
+          ">
+            <div style="font-family: ui-monospace, Menlo, monospace; font-weight: 700; color: #F3F4F6;">
+              wrk_01HZX87
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-weight: 500; color: #F3F4F6;">Release Chore: Bump Dependencies Net10</span>
+              <span style="padding: 1px 5px; background: #323944; color: #9CA3AF; border-radius: 4px; font-size: 10px;">CHORE</span>
+            </div>
+            <div style="color: #9CA3AF; font-family: ui-monospace, Menlo, monospace; font-size: 11px;">
+              deps-auto-upgrade-pipeline
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px; color: #168B90; font-family: ui-monospace, Menlo, monospace; font-size: 11px;">
+              <span style="width: 6px; height: 6px; border-radius: 50%; background: #168B90;"></span>
+              <span>gw-eu-west-2b</span>
+            </div>
+            <div>
+              <span style="
+                padding: 3px 8px;
+                background: #223538;
+                color: #168B90;
+                border: 1px solid #175B5F;
+                border-radius: 12px;
+                font-size: 10.5px;
+                font-weight: 700;
+              ">
+                ADMITTED
+              </span>
+            </div>
+            <div style="font-family: ui-monospace, Menlo, monospace; color: #9CA3AF; font-size: 11.5px;">
+              2.1s
+            </div>
+            <div style="text-align: right;">
+              <span style="color: #9CA3AF; font-weight: 500; font-size: 11.5px;">Inspect</span>
+            </div>
+          </div>
+
+          <!-- Table Row 3 (Succeeded State) -->
+          <div style="
+            display: grid;
+            grid-template-columns: 140px 2.2fr 1.8fr 1.3fr 130px 100px 90px;
+            padding: 10px 14px;
+            border-bottom: 1px solid #343B47;
+            align-items: center;
+            font-size: 12px;
+            background: #2B313B;
+          ">
+            <div style="font-family: ui-monospace, Menlo, monospace; font-weight: 700; color: #F3F4F6;">
+              wrk_01HZX80
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-weight: 500; color: #F3F4F6;">Contract Codegen: Schema v1.8 Sync</span>
+              <span style="padding: 1px 5px; background: #323944; color: #9CA3AF; border-radius: 4px; font-size: 10px;">AUTO</span>
+            </div>
+            <div style="color: #9CA3AF; font-family: ui-monospace, Menlo, monospace; font-size: 11px;">
+              protocol-codegen-verify
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px; color: #168B90; font-family: ui-monospace, Menlo, monospace; font-size: 11px;">
+              <span style="width: 6px; height: 6px; border-radius: 50%; background: #168B90;"></span>
+              <span>gw-us-east-1a</span>
+            </div>
+            <div>
+              <span style="
+                padding: 3px 8px;
+                background: #273426;
+                color: #58894C;
+                border: 1px solid #3B5832;
+                border-radius: 12px;
+                font-size: 10.5px;
+                font-weight: 700;
+              ">
+                SUCCEEDED
+              </span>
+            </div>
+            <div style="font-family: ui-monospace, Menlo, monospace; color: #9CA3AF; font-size: 11.5px;">
+              48.6s
+            </div>
+            <div style="text-align: right;">
+              <span style="color: #9CA3AF; font-weight: 500; font-size: 11.5px;">Logs</span>
+            </div>
+          </div>
+
+          <!-- Table Row 4 (Streaming Deliveries State) -->
+          <div style="
+            display: grid;
+            grid-template-columns: 140px 2.2fr 1.8fr 1.3fr 130px 100px 90px;
+            padding: 10px 14px;
+            align-items: center;
+            font-size: 12px;
+            background: #2B313B;
+          ">
+            <div style="font-family: ui-monospace, Menlo, monospace; font-weight: 700; color: #F3F4F6;">
+              wrk_01HZX75
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-weight: 500; color: #F3F4F6;">Scenario Gate: Run Manifest Walk #884</span>
+            </div>
+            <div style="color: #9CA3AF; font-family: ui-monospace, Menlo, monospace; font-size: 11px;">
+              scenario-gate-runner
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px; color: #168B90; font-family: ui-monospace, Menlo, monospace; font-size: 11px;">
+              <span style="width: 6px; height: 6px; border-radius: 50%; background: #168B90;"></span>
+              <span>gw-ap-south-1</span>
+            </div>
+            <div>
+              <span style="
+                padding: 3px 8px;
+                background: #3D332D;
+                color: #E58A45;
+                border: 1px solid #8A4820;
+                border-radius: 12px;
+                font-size: 10.5px;
+                font-weight: 700;
+              ">
+                STREAMING
+              </span>
+            </div>
+            <div style="font-family: ui-monospace, Menlo, monospace; color: #9CA3AF; font-size: 11.5px;">
+              1m 04s
+            </div>
+            <div style="text-align: right;">
+              <span style="color: #E58A45; font-weight: 600; font-size: 11.5px;">Tail Log</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  
+    </div>
+  </div>
+</body>
+</html>

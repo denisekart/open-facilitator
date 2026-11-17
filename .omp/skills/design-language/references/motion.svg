@@ -1,67 +1,67 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 588" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">
 <defs><filter id="sh" x="-40%" y="-40%" width="180%" height="180%"><feDropShadow dx="0" dy="1" stdDeviation="1.5" flood-color="#000" flood-opacity="0.14"/></filter></defs>
 <rect width="1200" height="588" fill="#e9ecef"/>
-<text x="24" y="34" font-size="20" font-weight="600" fill="#21262e">Motion — two properties, three durations, one curve</text>
-<text x="24" y="56" font-size="12" font-weight="400" fill="#676f7c">opacity and transform only. Hover and focus are instant: a control that must feel immediate cannot spend 150ms saying so.</text>
-<text x="24" y="104" font-size="13" font-weight="500" fill="#21262e">fade</text>
-<rect x="96" y="92" width="100" height="16" rx="2" fill="#ab8612"/>
-<text x="212" y="104" font-size="12" font-weight="400" fill="#676f7c">100ms — menu · popover · modal · notice · inspector · bulk bar</text>
-<text x="24" y="136" font-size="13" font-weight="500" fill="#21262e">exit</text>
-<rect x="96" y="124" width="120" height="16" rx="2" fill="#676f7c"/>
-<text x="232" y="136" font-size="12" font-weight="400" fill="#676f7c">120ms — every exit · detail-level crossfade · result swap</text>
-<text x="24" y="168" font-size="13" font-weight="500" fill="#21262e">move</text>
-<rect x="96" y="156" width="180" height="16" rx="2" fill="#21262e"/>
-<text x="292" y="168" font-size="12" font-weight="400" fill="#676f7c">180ms — FLIP re-layout · route crossfade · drawer in · ornament</text>
-<text x="24" y="194" font-size="11" font-weight="400" fill="#8690a0">1px = 1ms. Under 100ms reads as instant, past 180ms delays the next input.</text>
-<text x="596" y="80" font-size="11" font-weight="500" letter-spacing="0.6" fill="#8690a0">THE ONLY EASING: CUBIC-BEZIER(0.2, 0, 0, 1)</text>
-<rect x="596" y="88" width="200" height="140" rx="0" fill="#f7f9fb" stroke="#d5dbe3"/>
-<line x1="596" y1="123" x2="796" y2="123" stroke="#e0e5ec"/><line x1="646" y1="88" x2="646" y2="228" stroke="#e0e5ec"/>
-<line x1="596" y1="158" x2="796" y2="158" stroke="#e0e5ec"/><line x1="696" y1="88" x2="696" y2="228" stroke="#e0e5ec"/>
-<line x1="596" y1="193" x2="796" y2="193" stroke="#e0e5ec"/><line x1="746" y1="88" x2="746" y2="228" stroke="#e0e5ec"/>
-<path d="M596 228 C636 228 596 88 796 88" fill="none" stroke="#ab8612" stroke-width="2"/>
-<line x1="596" y1="228" x2="796" y2="88" stroke="#d5dbe3" stroke-dasharray="3 3"/>
-<text x="596" y="244" font-size="10" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#8690a0">time →</text>
-<text x="596" y="262" font-size="11" font-weight="400" fill="#676f7c">Fast start, long settle. No overshoot:</text>
-<text x="596" y="278" font-size="11" font-weight="400" fill="#676f7c">a UI that wobbles reads as a toy.</text>
-<rect x="584" y="300" width="604" height="208" rx="6" fill="#2b2e33"/>
-<text x="600" y="328" font-size="11" font-weight="500" letter-spacing="0.6" fill="#767d85">REDUCED MOTION IS A REQUIREMENT</text>
-<text x="600" y="352" font-size="12" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#e6bf34">@media (prefers-reduced-motion: reduce)</text>
-<text x="600" y="370" font-size="12" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#d6dae0">{ * { animation: none; transition: none; } }</text>
-<text x="600" y="394" font-size="12" font-weight="400" fill="#99a1ab">State stays correct, motion is absent, a backdrop</text>
-<text x="600" y="412" font-size="12" font-weight="400" fill="#99a1ab">paints one frame.</text>
-<text x="600" y="440" font-size="11" font-weight="500" letter-spacing="0.6" fill="#767d85">THE ONE ORNAMENT + THE BUDGET</text>
-<text x="600" y="462" font-size="14" font-weight="500" fill="#d6dae0">Library</text>
-<rect x="600" y="470" width="50" height="2" fill="#e6bf34"/>
-<text x="700" y="462" font-size="11" font-weight="400" fill="#99a1ab">scaleX(0.4→1) + fade, 180ms, once</text>
-<text x="600" y="490" font-size="11" font-weight="400" fill="#99a1ab">will-change only on what animates · never width, height, top, left ·</text>
-<text x="600" y="506" font-size="11" font-weight="400" fill="#99a1ab">holds 55fps on a mid-tier laptop, or the motion is cut</text>
-<text x="24" y="220" font-size="11" font-weight="500" letter-spacing="0.6" fill="#8690a0">FLIP: THE FOCUSED ROW KEEPS ITS POSITION, THE CONTAINER MOVES</text>
-<rect x="24" y="232" width="228" height="136" rx="4" fill="#f7f9fb" stroke="#d5dbe3"/>
-<text x="40" y="254" font-size="13" font-weight="400" fill="#676f7c">row a</text>
-<text x="40" y="286" font-size="13" font-weight="400" fill="#676f7c">row b</text>
-<rect x="28" y="300" width="220" height="28" fill="#faf2d6"/>
-<text x="40" y="318" font-size="13" font-weight="500" fill="#21262e">focused</text>
-<text x="40" y="350" font-size="13" font-weight="400" fill="#676f7c">row c</text>
-<path d="M264 298 h40" stroke="#676f7c" stroke-dasharray="4 3"/><path d="m296 294 8 4-8 4z" fill="#676f7c"/>
-<rect x="316" y="232" width="228" height="136" rx="4" fill="#f7f9fb" stroke="#d5dbe3"/>
-<rect x="320" y="236" width="220" height="28" fill="#faf2d6"/>
-<text x="332" y="254" font-size="13" font-weight="500" fill="#21262e">focused</text>
-<text x="332" y="286" font-size="13" font-weight="400" fill="#676f7c">row a</text>
-<text x="332" y="318" font-size="13" font-weight="400" fill="#676f7c">row b</text>
-<rect x="320" y="332" width="220" height="28" rx="2" fill="none" stroke="#e0e5ec" stroke-dasharray="4 3"/>
-<text x="332" y="350" font-size="13" font-weight="400" fill="#676f7c">row c</text>
-<text x="24" y="384" font-size="10" font-weight="400" fill="#8690a0">measure → reorder → interpolate to identity</text>
-<text x="316" y="384" font-size="10" font-weight="400" fill="#8690a0">a new row fades + scales 0.96→1, ≤12ms stagger, 120ms cap</text>
-<text x="24" y="432" font-size="11" font-weight="500" letter-spacing="0.6" fill="#8690a0">SLIDES VERSUS FADES</text>
-<rect x="24" y="444" width="268" height="96" rx="4" fill="#f7f9fb" stroke="#d5dbe3"/>
-<text x="36" y="466" font-size="13" font-weight="500" fill="#21262e">FADE, 100 in / 120 out</text>
-<text x="36" y="486" font-size="12" font-weight="400" fill="#676f7c">menu · popover · modal · notice ·</text>
-<text x="36" y="504" font-size="12" font-weight="400" fill="#676f7c">inspector · bulk bar · palette</text>
-<text x="36" y="526" font-size="10" font-weight="500" fill="#21262e">a route change crossfades at 180ms</text>
-<rect x="312" y="444" width="268" height="96" rx="4" fill="#f7f9fb" stroke="#d5dbe3"/>
-<text x="324" y="466" font-size="13" font-weight="500" fill="#21262e">SLIDE 180 in / 120 out</text>
-<text x="324" y="486" font-size="12" font-weight="400" fill="#676f7c">drawer ≤400px · sheet ≤70vh, over a</text>
-<text x="324" y="504" font-size="12" font-weight="400" fill="#676f7c">28% scrim, focus trapped, scroll locked</text>
-<text x="324" y="526" font-size="10" font-weight="500" fill="#21262e">a slide claims spatial movement; a fade does not</text>
-<text x="24" y="560" font-size="11" font-weight="400" fill="#676f7c">Skeletons are static and shaped like the incoming content. Anything that resolves under 200ms shows nothing at all.</text>
+<text x="24" y="34" font-size="20" font-weight="600" fill="#1a202c">Motion — two properties, three durations, one curve</text>
+<text x="24" y="56" font-size="12" font-weight="400" fill="#505a69">opacity and transform only. Hover and focus are instant: a control that must feel immediate cannot spend 150ms saying so.</text>
+<text x="24" y="104" font-size="13" font-weight="500" fill="#1a202c">fade</text>
+<rect x="96" y="92" width="100" height="16" rx="2" fill="#c96a2d"/>
+<text x="212" y="104" font-size="12" font-weight="400" fill="#505a69">100ms — menu · popover · modal · notice · inspector · bulk bar</text>
+<text x="24" y="136" font-size="13" font-weight="500" fill="#1a202c">exit</text>
+<rect x="96" y="124" width="120" height="16" rx="2" fill="#505a69"/>
+<text x="232" y="136" font-size="12" font-weight="400" fill="#505a69">120ms — every exit · detail-level crossfade · result swap</text>
+<text x="24" y="168" font-size="13" font-weight="500" fill="#1a202c">move</text>
+<rect x="96" y="156" width="180" height="16" rx="2" fill="#1a202c"/>
+<text x="292" y="168" font-size="12" font-weight="400" fill="#505a69">180ms — FLIP re-layout · route crossfade · drawer in · ornament</text>
+<text x="24" y="194" font-size="11" font-weight="400" fill="#7a8699">1px = 1ms. Under 100ms reads as instant, past 180ms delays the next input.</text>
+<text x="596" y="80" font-size="11" font-weight="500" letter-spacing="0.6" fill="#7a8699">THE ONLY EASING: CUBIC-BEZIER(0.2, 0, 0, 1)</text>
+<rect x="596" y="88" width="200" height="140" rx="0" fill="#ffffff" stroke="#cfd6e0"/>
+<line x1="596" y1="123" x2="796" y2="123" stroke="#dee3e9"/><line x1="646" y1="88" x2="646" y2="228" stroke="#dee3e9"/>
+<line x1="596" y1="158" x2="796" y2="158" stroke="#dee3e9"/><line x1="696" y1="88" x2="696" y2="228" stroke="#dee3e9"/>
+<line x1="596" y1="193" x2="796" y2="193" stroke="#dee3e9"/><line x1="746" y1="88" x2="746" y2="228" stroke="#dee3e9"/>
+<path d="M596 228 C636 228 596 88 796 88" fill="none" stroke="#c96a2d" stroke-width="2"/>
+<line x1="596" y1="228" x2="796" y2="88" stroke="#cfd6e0" stroke-dasharray="3 3"/>
+<text x="596" y="244" font-size="10" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#7a8699">time →</text>
+<text x="596" y="262" font-size="11" font-weight="400" fill="#505a69">Fast start, long settle. No overshoot:</text>
+<text x="596" y="278" font-size="11" font-weight="400" fill="#505a69">a UI that wobbles reads as a toy.</text>
+<rect x="584" y="300" width="604" height="208" rx="6" fill="#232831"/>
+<text x="600" y="328" font-size="11" font-weight="500" letter-spacing="0.6" fill="#6b7280">REDUCED MOTION IS A REQUIREMENT</text>
+<text x="600" y="352" font-size="12" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#e58a45">@media (prefers-reduced-motion: reduce)</text>
+<text x="600" y="370" font-size="12" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#f3f4f6">{ * { animation: none; transition: none; } }</text>
+<text x="600" y="394" font-size="12" font-weight="400" fill="#9ca3af">State stays correct, motion is absent, a backdrop</text>
+<text x="600" y="412" font-size="12" font-weight="400" fill="#9ca3af">paints one frame.</text>
+<text x="600" y="440" font-size="11" font-weight="500" letter-spacing="0.6" fill="#6b7280">THE ONE ORNAMENT + THE BUDGET</text>
+<text x="600" y="462" font-size="14" font-weight="500" fill="#f3f4f6">Library</text>
+<rect x="600" y="470" width="50" height="2" fill="#c96a2d"/>
+<text x="700" y="462" font-size="11" font-weight="400" fill="#9ca3af">scaleX(0.4→1) + fade, 180ms, once</text>
+<text x="600" y="490" font-size="11" font-weight="400" fill="#9ca3af">will-change only on what animates · never width, height, top, left ·</text>
+<text x="600" y="506" font-size="11" font-weight="400" fill="#9ca3af">holds 55fps on a mid-tier laptop, or the motion is cut</text>
+<text x="24" y="220" font-size="11" font-weight="500" letter-spacing="0.6" fill="#7a8699">FLIP: THE FOCUSED ROW KEEPS ITS POSITION, THE CONTAINER MOVES</text>
+<rect x="24" y="232" width="228" height="136" rx="4" fill="#ffffff" stroke="#cfd6e0"/>
+<text x="40" y="254" font-size="13" font-weight="400" fill="#505a69">row a</text>
+<text x="40" y="286" font-size="13" font-weight="400" fill="#505a69">row b</text>
+<rect x="28" y="300" width="220" height="28" fill="#f4e1d5"/>
+<text x="40" y="318" font-size="13" font-weight="500" fill="#1a202c">focused</text>
+<text x="40" y="350" font-size="13" font-weight="400" fill="#505a69">row c</text>
+<path d="M264 298 h40" stroke="#505a69" stroke-dasharray="4 3"/><path d="m296 294 8 4-8 4z" fill="#505a69"/>
+<rect x="316" y="232" width="228" height="136" rx="4" fill="#ffffff" stroke="#cfd6e0"/>
+<rect x="320" y="236" width="220" height="28" fill="#f4e1d5"/>
+<text x="332" y="254" font-size="13" font-weight="500" fill="#1a202c">focused</text>
+<text x="332" y="286" font-size="13" font-weight="400" fill="#505a69">row a</text>
+<text x="332" y="318" font-size="13" font-weight="400" fill="#505a69">row b</text>
+<rect x="320" y="332" width="220" height="28" rx="2" fill="none" stroke="#dee3e9" stroke-dasharray="4 3"/>
+<text x="332" y="350" font-size="13" font-weight="400" fill="#505a69">row c</text>
+<text x="24" y="384" font-size="10" font-weight="400" fill="#7a8699">measure → reorder → interpolate to identity</text>
+<text x="316" y="384" font-size="10" font-weight="400" fill="#7a8699">a new row fades + scales 0.96→1, ≤12ms stagger, 120ms cap</text>
+<text x="24" y="432" font-size="11" font-weight="500" letter-spacing="0.6" fill="#7a8699">SLIDES VERSUS FADES</text>
+<rect x="24" y="444" width="268" height="96" rx="4" fill="#ffffff" stroke="#cfd6e0"/>
+<text x="36" y="466" font-size="13" font-weight="500" fill="#1a202c">FADE, 100 in / 120 out</text>
+<text x="36" y="486" font-size="12" font-weight="400" fill="#505a69">menu · popover · modal · notice ·</text>
+<text x="36" y="504" font-size="12" font-weight="400" fill="#505a69">inspector · bulk bar · palette</text>
+<text x="36" y="526" font-size="10" font-weight="500" fill="#1a202c">a route change crossfades at 180ms</text>
+<rect x="312" y="444" width="268" height="96" rx="4" fill="#ffffff" stroke="#cfd6e0"/>
+<text x="324" y="466" font-size="13" font-weight="500" fill="#1a202c">SLIDE 180 in / 120 out</text>
+<text x="324" y="486" font-size="12" font-weight="400" fill="#505a69">drawer ≤400px · sheet ≤70vh, over a</text>
+<text x="324" y="504" font-size="12" font-weight="400" fill="#505a69">28% scrim, focus trapped, scroll locked</text>
+<text x="324" y="526" font-size="10" font-weight="500" fill="#1a202c">a slide claims spatial movement; a fade does not</text>
+<text x="24" y="560" font-size="11" font-weight="400" fill="#505a69">Skeletons are static and shaped like the incoming content. Anything that resolves under 200ms shows nothing at all.</text>
 </svg>

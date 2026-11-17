@@ -1,133 +1,133 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 642" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">
 <defs><filter id="sh" x="-40%" y="-40%" width="180%" height="180%"><feDropShadow dx="0" dy="1" stdDeviation="1.5" flood-color="#000" flood-opacity="0.14"/></filter></defs>
 <rect width="1200" height="642" fill="#e9ecef"/>
-<text x="24" y="34" font-size="20" font-weight="600" fill="#21262e">One frame — chrome geometry never moves between views</text>
-<text x="24" y="56" font-size="12" font-weight="400" fill="#676f7c">Header 44px with six controls, a fixed-width band, published slot heights. Frame drift reads as a broken app.</text>
-<rect x="24" y="84" width="1152" height="392" rx="6" fill="#f7f9fb" stroke="#d5dbe3"/>
+<text x="24" y="34" font-size="20" font-weight="600" fill="#1a202c">One frame — chrome geometry never moves between views</text>
+<text x="24" y="56" font-size="12" font-weight="400" fill="#505a69">Header 44px with six controls, a fixed-width band, published slot heights. Frame drift reads as a broken app.</text>
+<rect x="24" y="84" width="1152" height="392" rx="6" fill="#ffffff" stroke="#cfd6e0"/>
 <clipPath id="frame"><rect x="24" y="84" width="1152" height="392" rx="6"/></clipPath><g clip-path="url(#frame)">
-<rect x="24" y="84" width="1152" height="44" fill="#f7f9fb"/><line x1="24" y1="128" x2="1176" y2="128" stroke="#d5dbe3"/>
-<g transform="translate(36,96) scale(0.833)"><svg width="24" height="24" viewBox="0 0 24 24"><g stroke="#21262e" stroke-width="1.5"><circle cx="8" cy="8" r="3" fill="none"/><circle cx="16.5" cy="11" r="2.2" fill="none"/><circle cx="10" cy="17" r="2.6" fill="none"/><path d="M10.6 9.2 14.6 10.2M8.6 10.9l1.1 3.8M14.7 13l-2.6 2.9" fill="none" stroke-linecap="round"/></g><circle cx="16.5" cy="11" r="1" fill="#ab8612"/></svg></g>
-<text x="64" y="112" font-size="16" font-weight="600" fill="#21262e">mind</text>
-<text x="120" y="111" font-size="14" font-weight="500" fill="#21262e">Library</text>
-<rect x="120" y="118" width="50" height="2" fill="#ab8612"/>
-<text x="202" y="111" font-size="14" font-weight="400" fill="#676f7c">Graph</text>
-<text x="269" y="111" font-size="14" font-weight="400" fill="#676f7c">Settings</text>
+<rect x="24" y="84" width="1152" height="44" fill="#ffffff"/><line x1="24" y1="128" x2="1176" y2="128" stroke="#cfd6e0"/>
+<g transform="translate(36,96) scale(0.833)"><svg width="24" height="24" viewBox="0 0 24 24"><g stroke="#1a202c" stroke-width="1.5"><circle cx="8" cy="8" r="3" fill="none"/><circle cx="16.5" cy="11" r="2.2" fill="none"/><circle cx="10" cy="17" r="2.6" fill="none"/><path d="M10.6 9.2 14.6 10.2M8.6 10.9l1.1 3.8M14.7 13l-2.6 2.9" fill="none" stroke-linecap="round"/></g><circle cx="16.5" cy="11" r="1" fill="#c96a2d"/></svg></g>
+<text x="64" y="112" font-size="16" font-weight="600" fill="#1a202c">mind</text>
+<text x="120" y="111" font-size="14" font-weight="500" fill="#1a202c">Library</text>
+<rect x="120" y="118" width="50" height="2" fill="#c96a2d"/>
+<text x="202" y="111" font-size="14" font-weight="400" fill="#505a69">Graph</text>
+<text x="269" y="111" font-size="14" font-weight="400" fill="#505a69">Settings</text>
 <rect x="361" y="88" width="320" height="36" fill="#ffffff"/>
-<text x="369" y="110" font-size="11" font-weight="400" fill="#8690a0">band: fixed width, painted once</text>
-<svg x="1148" y="98" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#676f7c" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 12h.01M12 12h.01M18.5 12h.01"/></g></svg>
-<g transform="translate(1000,94)"><rect x="0" y="0" width="124" height="20" rx="4" fill="#ffffff" stroke="#e0e5ec" stroke-width="1"/><circle cx="11" cy="10" r="3" fill="#676f7c"/><text x="20" y="14" font-size="12" font-weight="400" fill="#676f7c">Saved</text><line x1="65" y1="4" x2="65" y2="16" stroke="#e0e5ec"/><text x="73" y="14" font-size="12" font-weight="400" fill="#676f7c">Offline</text></g>
-<g transform="translate(908,92)"><rect width="76" height="28" rx="4" fill="#ffffff" stroke="#e0e5ec"/><line x1="38" y1="4" x2="38" y2="24" stroke="#e0e5ec"/><svg x="14" y="6" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#21262e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 5.5 8 12l6.5 6.5"/></g></svg><svg x="52" y="6" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#8690a0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 5.5 16 12l-6.5 6.5"/></g></svg></g>
-<g transform="translate(792,92)"><rect x="0" y="0" width="100" height="28" rx="4" fill="#e6bf34"/><text x="50" y="19" font-size="13" font-weight="600" text-anchor="middle" letter-spacing="0.5" fill="#14171a">CAPTURE</text></g>
-<svg x="768" y="98" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#21262e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="M15.8 15.8 20 20"/></g></svg>
+<text x="369" y="110" font-size="11" font-weight="400" fill="#7a8699">band: fixed width, painted once</text>
+<svg x="1148" y="98" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#505a69" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 12h.01M12 12h.01M18.5 12h.01"/></g></svg>
+<g transform="translate(1000,94)"><rect x="0" y="0" width="124" height="20" rx="4" fill="#ffffff" stroke="#dee3e9" stroke-width="1"/><circle cx="11" cy="10" r="3" fill="#505a69"/><text x="20" y="14" font-size="12" font-weight="400" fill="#505a69">Saved</text><line x1="65" y1="4" x2="65" y2="16" stroke="#dee3e9"/><text x="73" y="14" font-size="12" font-weight="400" fill="#505a69">Offline</text></g>
+<g transform="translate(908,92)"><rect width="76" height="28" rx="4" fill="#ffffff" stroke="#dee3e9"/><line x1="38" y1="4" x2="38" y2="24" stroke="#dee3e9"/><svg x="14" y="6" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#1a202c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 5.5 8 12l6.5 6.5"/></g></svg><svg x="52" y="6" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#7a8699" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 5.5 16 12l-6.5 6.5"/></g></svg></g>
+<g transform="translate(792,92)"><rect x="0" y="0" width="100" height="28" rx="4" fill="#c96a2d"/><text x="50" y="19" font-size="13" font-weight="600" text-anchor="middle" letter-spacing="0.5" fill="#ffffff">CAPTURE</text></g>
+<svg x="768" y="98" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#1a202c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="M15.8 15.8 20 20"/></g></svg>
 </g>
-<text x="1164" y="146" font-size="10" font-weight="400" text-anchor="end" fill="#8690a0">six controls, a cap</text>
-<text x="40" y="150" font-size="13" font-weight="400" fill="#676f7c">Library</text>
-<text x="94" y="150" font-size="13" font-weight="400" fill="#8690a0">/</text>
-<text x="104" y="150" font-size="13" font-weight="400" fill="#676f7c">Field notes</text>
-<text x="192" y="150" font-size="13" font-weight="400" fill="#8690a0">/</text>
-<text x="202" y="150" font-size="13" font-weight="400" fill="#21262e">Atom</text>
-<text x="48" y="178" font-size="11" font-weight="500" letter-spacing="0.5" fill="#8690a0">NAME</text>
-<text x="268" y="178" font-size="11" font-weight="500" letter-spacing="0.5" fill="#8690a0">OWNER</text>
-<text x="380" y="178" font-size="11" font-weight="500" letter-spacing="0.5" fill="#8690a0">UPDATED</text>
-<text x="512" y="178" font-size="11" font-weight="500" letter-spacing="0.5" fill="#8690a0">STATUS</text>
-<line x1="40" y1="218" x2="916" y2="218" stroke="#e0e5ec"/>
-<text x="48" y="207" font-size="13" font-weight="400" fill="#21262e">Determinism notes 1</text>
-<text x="268" y="207" font-size="13" font-weight="400" fill="#676f7c">km</text>
-<text x="380" y="207" font-size="12" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#676f7c">2026-11-10</text>
-<text x="512" y="207" font-size="12" font-weight="400" fill="#676f7c">review</text>
-<svg x="892" y="195" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#8690a0" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 12h.01M12 12h.01M18.5 12h.01"/></g></svg>
-<line x1="40" y1="248" x2="916" y2="248" stroke="#e0e5ec"/>
-<text x="48" y="237" font-size="13" font-weight="400" fill="#21262e">Determinism notes 2</text>
-<text x="268" y="237" font-size="13" font-weight="400" fill="#676f7c">ra</text>
-<text x="380" y="237" font-size="12" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#676f7c">2026-11-11</text>
-<text x="512" y="237" font-size="12" font-weight="400" fill="#676f7c">review</text>
-<svg x="892" y="225" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#8690a0" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 12h.01M12 12h.01M18.5 12h.01"/></g></svg>
-<rect x="40" y="248" width="892" height="30" fill="#faf2d6"/>
-<text x="48" y="267" font-size="13" font-weight="400" fill="#21262e">Determinism notes 3</text>
-<text x="268" y="267" font-size="13" font-weight="400" fill="#676f7c">jd</text>
-<text x="380" y="267" font-size="12" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#676f7c">2026-11-12</text>
-<text x="512" y="267" font-size="12" font-weight="400" fill="#676f7c">live</text>
-<svg x="892" y="255" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#676f7c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 19.5h4L20 8l-4-4L4.5 19.5z" fill="none"/><path d="m14.6 5.4 4 4"/></g></svg>
-<line x1="40" y1="308" x2="916" y2="308" stroke="#e0e5ec"/>
-<text x="48" y="297" font-size="13" font-weight="400" fill="#21262e">Determinism notes 4</text>
-<text x="268" y="297" font-size="13" font-weight="400" fill="#676f7c">km</text>
-<text x="380" y="297" font-size="12" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#676f7c">2026-11-13</text>
-<text x="512" y="297" font-size="12" font-weight="400" fill="#676f7c">live</text>
-<svg x="892" y="285" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#8690a0" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 12h.01M12 12h.01M18.5 12h.01"/></g></svg>
-<line x1="40" y1="338" x2="916" y2="338" stroke="#e0e5ec"/>
-<text x="48" y="327" font-size="13" font-weight="400" fill="#21262e">Determinism notes 5</text>
-<text x="268" y="327" font-size="13" font-weight="400" fill="#676f7c">tt</text>
-<text x="380" y="327" font-size="12" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#676f7c">2026-11-14</text>
-<text x="512" y="327" font-size="12" font-weight="400" fill="#676f7c">live</text>
-<svg x="892" y="315" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#8690a0" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 12h.01M12 12h.01M18.5 12h.01"/></g></svg>
-<line x1="40" y1="368" x2="916" y2="368" stroke="#e0e5ec"/>
-<text x="48" y="357" font-size="13" font-weight="400" fill="#21262e">Determinism notes 6</text>
-<text x="268" y="357" font-size="13" font-weight="400" fill="#676f7c">ra</text>
-<text x="380" y="357" font-size="12" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#676f7c">2026-11-15</text>
-<text x="512" y="357" font-size="12" font-weight="400" fill="#676f7c">draft</text>
-<svg x="892" y="345" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#8690a0" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 12h.01M12 12h.01M18.5 12h.01"/></g></svg>
-<line x1="40" y1="398" x2="916" y2="398" stroke="#e0e5ec"/>
-<text x="48" y="387" font-size="13" font-weight="400" fill="#21262e">Determinism notes 7</text>
-<text x="268" y="387" font-size="13" font-weight="400" fill="#676f7c">jd</text>
-<text x="380" y="387" font-size="12" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#676f7c">2026-11-16</text>
-<text x="512" y="387" font-size="12" font-weight="400" fill="#676f7c">draft</text>
-<svg x="892" y="375" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#8690a0" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 12h.01M12 12h.01M18.5 12h.01"/></g></svg>
-<rect x="40" y="406" width="248" height="32" rx="6" fill="#ffffff" stroke="#d5dbe3" filter="url(#sh)"/>
-<text x="52" y="426" font-size="13" font-weight="500" fill="#21262e">3 selected</text>
-<g transform="translate(140,408)"><text x="28" y="19" font-size="13" font-weight="600" text-anchor="middle" letter-spacing="0.5" fill="#21262e">TAG</text></g>
-<g transform="translate(192,408)"><text x="44" y="19" font-size="13" font-weight="600" text-anchor="middle" letter-spacing="0.5" fill="#676f7c">EXPORT</text></g>
-<svg x="264" y="414" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#676f7c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></g></svg>
-<text x="308" y="426" font-size="10" font-weight="400" fill="#8690a0">tier 1, only with a selection, at a fixed edge</text>
-<rect x="944" y="140" width="216" height="220" rx="6" fill="#ffffff" stroke="#d5dbe3" filter="url(#sh)"/>
-<text x="956" y="162" font-size="16" font-weight="500" fill="#21262e">Atom</text>
-<svg x="1136" y="148" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#676f7c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></g></svg>
-<text x="956" y="180" font-size="11" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#8690a0">atom-7f3c19</text>
-<line x1="952" y1="192" x2="1152" y2="192" stroke="#e0e5ec"/>
-<text x="956" y="210" font-size="11" font-weight="500" letter-spacing="0.6" fill="#8690a0">LINKS</text>
-<text x="956" y="230" font-size="12" font-weight="400" fill="#8d6e0e">Determinism notes</text>
-<svg x="1136" y="218" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#8690a0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 1 0-5.6l2-2a4 4 0 0 1 5.6 5.6l-1.2 1.2"/><path d="M14 10a4 4 0 0 1 0 5.6l-2 2A4 4 0 0 1 6.4 12l1.2-1.2"/></g></svg>
-<text x="956" y="252" font-size="12" font-weight="400" fill="#8d6e0e">Zoom research</text>
-<svg x="1136" y="240" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#8690a0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 1 0-5.6l2-2a4 4 0 0 1 5.6 5.6l-1.2 1.2"/><path d="M14 10a4 4 0 0 1 0 5.6l-2 2A4 4 0 0 1 6.4 12l1.2-1.2"/></g></svg>
-<text x="956" y="274" font-size="12" font-weight="400" fill="#8d6e0e">Semantic zoom</text>
-<svg x="1136" y="262" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#8690a0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 1 0-5.6l2-2a4 4 0 0 1 5.6 5.6l-1.2 1.2"/><path d="M14 10a4 4 0 0 1 0 5.6l-2 2A4 4 0 0 1 6.4 12l1.2-1.2"/></g></svg>
-<line x1="952" y1="302" x2="1152" y2="302" stroke="#e0e5ec"/>
-<text x="956" y="320" font-size="11" font-weight="500" letter-spacing="0.6" fill="#8690a0">META</text>
-<text x="956" y="338" font-size="11" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#676f7c">created 2026-11-02</text>
-<text x="956" y="352" font-size="11" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#676f7c">edited 2 minutes ago</text>
-<text x="944" y="376" font-size="10" font-weight="400" fill="#8690a0">inspector: 100ms fade, no scrim</text>
-<text x="24" y="500" font-size="11" font-weight="500" letter-spacing="0.6" fill="#8690a0">DISCLOSURE TIERS: NO ACTION LIVES TWICE, ALL FOUR VIEW ONE REGISTRY ID</text>
-<rect x="24" y="512" width="150" height="60" rx="4" fill="#f7f9fb" stroke="#d5dbe3"/>
-<text x="34" y="530" font-size="12" font-weight="600" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#8d6e0e">tier 0</text>
-<text x="34" y="545" font-size="12" font-weight="500" fill="#21262e">header, always</text>
-<text x="34" y="560" font-size="9" font-weight="400" fill="#676f7c">nav search capture pair chip ⋯</text>
-<text x="164" y="530" font-size="9" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" text-anchor="end" fill="#8690a0">6 max</text>
-<rect x="182" y="512" width="150" height="60" rx="4" fill="#f7f9fb" stroke="#d5dbe3"/>
-<text x="192" y="530" font-size="12" font-weight="600" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#8d6e0e">tier 1</text>
-<text x="192" y="545" font-size="12" font-weight="500" fill="#21262e">contextual bar</text>
-<text x="192" y="560" font-size="9" font-weight="400" fill="#676f7c">2–4 verbs for the selection</text>
-<text x="322" y="530" font-size="9" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" text-anchor="end" fill="#8690a0">4 + ⋯</text>
-<rect x="340" y="512" width="150" height="60" rx="4" fill="#f7f9fb" stroke="#d5dbe3"/>
-<text x="350" y="530" font-size="12" font-weight="600" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#8d6e0e">tier 2</text>
-<text x="350" y="545" font-size="12" font-weight="500" fill="#21262e">context menu</text>
-<text x="350" y="560" font-size="9" font-weight="400" fill="#676f7c">every action for that target</text>
-<text x="480" y="530" font-size="9" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" text-anchor="end" fill="#8690a0">9 · 2 sub</text>
-<rect x="498" y="512" width="150" height="60" rx="4" fill="#f7f9fb" stroke="#d5dbe3"/>
-<text x="508" y="530" font-size="12" font-weight="600" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#8d6e0e">tier 3</text>
-<text x="508" y="545" font-size="12" font-weight="500" fill="#21262e">Ctrl+K</text>
-<text x="508" y="560" font-size="9" font-weight="400" fill="#676f7c">everything typed, &gt; commands</text>
-<text x="638" y="530" font-size="9" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" text-anchor="end" fill="#8690a0">1 input</text>
-<text x="692" y="500" font-size="11" font-weight="500" letter-spacing="0.6" fill="#8690a0">Z LADDER, FIXED INTEGERS</text>
-<text x="692" y="526" font-size="10" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#676f7c">0 surface</text>
-<text x="792" y="526" font-size="10" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#676f7c">5 strips</text>
-<text x="892" y="526" font-size="10" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#676f7c">6 members</text>
-<text x="992" y="526" font-size="10" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#676f7c">7 menus</text>
-<text x="1092" y="526" font-size="10" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#676f7c">20 island</text>
-<text x="692" y="544" font-size="10" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#676f7c">30 notice</text>
-<text x="792" y="544" font-size="10" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#676f7c">40 inspector</text>
-<text x="892" y="544" font-size="10" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#676f7c">45 capture</text>
-<text x="992" y="544" font-size="10" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#676f7c">50 modal</text>
-<text x="1092" y="544" font-size="10" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#676f7c">60 ctx menu</text>
-<text x="692" y="562" font-size="10" font-weight="400" fill="#8690a0">a frame member outranks every transient</text>
-<text x="24" y="596" font-size="11" font-weight="400" fill="#676f7c">Compact ≤720px: drop the wordmark, hints, and chip words. Tap targets reach 44px on an invisible pseudo-box, so the painted layout never moves.</text>
-<text x="24" y="614" font-size="11" font-weight="400" fill="#676f7c">Density is a dial, not a default: 30px data rows, 44px touch rows, 76px of chrome total. On a 900px viewport, 88% holds content.</text>
+<text x="1164" y="146" font-size="10" font-weight="400" text-anchor="end" fill="#7a8699">six controls, a cap</text>
+<text x="40" y="150" font-size="13" font-weight="400" fill="#505a69">Library</text>
+<text x="94" y="150" font-size="13" font-weight="400" fill="#7a8699">/</text>
+<text x="104" y="150" font-size="13" font-weight="400" fill="#505a69">Field notes</text>
+<text x="192" y="150" font-size="13" font-weight="400" fill="#7a8699">/</text>
+<text x="202" y="150" font-size="13" font-weight="400" fill="#1a202c">Atom</text>
+<text x="48" y="178" font-size="11" font-weight="500" letter-spacing="0.5" fill="#7a8699">NAME</text>
+<text x="268" y="178" font-size="11" font-weight="500" letter-spacing="0.5" fill="#7a8699">OWNER</text>
+<text x="380" y="178" font-size="11" font-weight="500" letter-spacing="0.5" fill="#7a8699">UPDATED</text>
+<text x="512" y="178" font-size="11" font-weight="500" letter-spacing="0.5" fill="#7a8699">STATUS</text>
+<line x1="40" y1="218" x2="916" y2="218" stroke="#dee3e9"/>
+<text x="48" y="207" font-size="13" font-weight="400" fill="#1a202c">Determinism notes 1</text>
+<text x="268" y="207" font-size="13" font-weight="400" fill="#505a69">km</text>
+<text x="380" y="207" font-size="12" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#505a69">2026-11-10</text>
+<text x="512" y="207" font-size="12" font-weight="400" fill="#505a69">review</text>
+<svg x="892" y="195" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#7a8699" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 12h.01M12 12h.01M18.5 12h.01"/></g></svg>
+<line x1="40" y1="248" x2="916" y2="248" stroke="#dee3e9"/>
+<text x="48" y="237" font-size="13" font-weight="400" fill="#1a202c">Determinism notes 2</text>
+<text x="268" y="237" font-size="13" font-weight="400" fill="#505a69">ra</text>
+<text x="380" y="237" font-size="12" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#505a69">2026-11-11</text>
+<text x="512" y="237" font-size="12" font-weight="400" fill="#505a69">review</text>
+<svg x="892" y="225" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#7a8699" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 12h.01M12 12h.01M18.5 12h.01"/></g></svg>
+<rect x="40" y="248" width="892" height="30" fill="#f4e1d5"/>
+<text x="48" y="267" font-size="13" font-weight="400" fill="#1a202c">Determinism notes 3</text>
+<text x="268" y="267" font-size="13" font-weight="400" fill="#505a69">jd</text>
+<text x="380" y="267" font-size="12" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#505a69">2026-11-12</text>
+<text x="512" y="267" font-size="12" font-weight="400" fill="#505a69">live</text>
+<svg x="892" y="255" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#505a69" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 19.5h4L20 8l-4-4L4.5 19.5z" fill="none"/><path d="m14.6 5.4 4 4"/></g></svg>
+<line x1="40" y1="308" x2="916" y2="308" stroke="#dee3e9"/>
+<text x="48" y="297" font-size="13" font-weight="400" fill="#1a202c">Determinism notes 4</text>
+<text x="268" y="297" font-size="13" font-weight="400" fill="#505a69">km</text>
+<text x="380" y="297" font-size="12" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#505a69">2026-11-13</text>
+<text x="512" y="297" font-size="12" font-weight="400" fill="#505a69">live</text>
+<svg x="892" y="285" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#7a8699" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 12h.01M12 12h.01M18.5 12h.01"/></g></svg>
+<line x1="40" y1="338" x2="916" y2="338" stroke="#dee3e9"/>
+<text x="48" y="327" font-size="13" font-weight="400" fill="#1a202c">Determinism notes 5</text>
+<text x="268" y="327" font-size="13" font-weight="400" fill="#505a69">tt</text>
+<text x="380" y="327" font-size="12" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#505a69">2026-11-14</text>
+<text x="512" y="327" font-size="12" font-weight="400" fill="#505a69">live</text>
+<svg x="892" y="315" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#7a8699" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 12h.01M12 12h.01M18.5 12h.01"/></g></svg>
+<line x1="40" y1="368" x2="916" y2="368" stroke="#dee3e9"/>
+<text x="48" y="357" font-size="13" font-weight="400" fill="#1a202c">Determinism notes 6</text>
+<text x="268" y="357" font-size="13" font-weight="400" fill="#505a69">ra</text>
+<text x="380" y="357" font-size="12" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#505a69">2026-11-15</text>
+<text x="512" y="357" font-size="12" font-weight="400" fill="#505a69">draft</text>
+<svg x="892" y="345" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#7a8699" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 12h.01M12 12h.01M18.5 12h.01"/></g></svg>
+<line x1="40" y1="398" x2="916" y2="398" stroke="#dee3e9"/>
+<text x="48" y="387" font-size="13" font-weight="400" fill="#1a202c">Determinism notes 7</text>
+<text x="268" y="387" font-size="13" font-weight="400" fill="#505a69">jd</text>
+<text x="380" y="387" font-size="12" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#505a69">2026-11-16</text>
+<text x="512" y="387" font-size="12" font-weight="400" fill="#505a69">draft</text>
+<svg x="892" y="375" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#7a8699" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 12h.01M12 12h.01M18.5 12h.01"/></g></svg>
+<rect x="40" y="406" width="248" height="32" rx="6" fill="#ffffff" stroke="#cfd6e0" filter="url(#sh)"/>
+<text x="52" y="426" font-size="13" font-weight="500" fill="#1a202c">3 selected</text>
+<g transform="translate(140,408)"><text x="28" y="19" font-size="13" font-weight="600" text-anchor="middle" letter-spacing="0.5" fill="#1a202c">TAG</text></g>
+<g transform="translate(192,408)"><text x="44" y="19" font-size="13" font-weight="600" text-anchor="middle" letter-spacing="0.5" fill="#505a69">EXPORT</text></g>
+<svg x="264" y="414" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#505a69" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></g></svg>
+<text x="308" y="426" font-size="10" font-weight="400" fill="#7a8699">tier 1, only with a selection, at a fixed edge</text>
+<rect x="944" y="140" width="216" height="220" rx="6" fill="#ffffff" stroke="#cfd6e0" filter="url(#sh)"/>
+<text x="956" y="162" font-size="16" font-weight="500" fill="#1a202c">Atom</text>
+<svg x="1136" y="148" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#505a69" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></g></svg>
+<text x="956" y="180" font-size="11" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#7a8699">atom-7f3c19</text>
+<line x1="952" y1="192" x2="1152" y2="192" stroke="#dee3e9"/>
+<text x="956" y="210" font-size="11" font-weight="500" letter-spacing="0.6" fill="#7a8699">LINKS</text>
+<text x="956" y="230" font-size="12" font-weight="400" fill="#ac531c">Determinism notes</text>
+<svg x="1136" y="218" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#7a8699" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 1 0-5.6l2-2a4 4 0 0 1 5.6 5.6l-1.2 1.2"/><path d="M14 10a4 4 0 0 1 0 5.6l-2 2A4 4 0 0 1 6.4 12l1.2-1.2"/></g></svg>
+<text x="956" y="252" font-size="12" font-weight="400" fill="#ac531c">Zoom research</text>
+<svg x="1136" y="240" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#7a8699" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 1 0-5.6l2-2a4 4 0 0 1 5.6 5.6l-1.2 1.2"/><path d="M14 10a4 4 0 0 1 0 5.6l-2 2A4 4 0 0 1 6.4 12l1.2-1.2"/></g></svg>
+<text x="956" y="274" font-size="12" font-weight="400" fill="#ac531c">Semantic zoom</text>
+<svg x="1136" y="262" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#7a8699" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 1 0-5.6l2-2a4 4 0 0 1 5.6 5.6l-1.2 1.2"/><path d="M14 10a4 4 0 0 1 0 5.6l-2 2A4 4 0 0 1 6.4 12l1.2-1.2"/></g></svg>
+<line x1="952" y1="302" x2="1152" y2="302" stroke="#dee3e9"/>
+<text x="956" y="320" font-size="11" font-weight="500" letter-spacing="0.6" fill="#7a8699">META</text>
+<text x="956" y="338" font-size="11" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#505a69">created 2026-11-02</text>
+<text x="956" y="352" font-size="11" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#505a69">edited 2 minutes ago</text>
+<text x="944" y="376" font-size="10" font-weight="400" fill="#7a8699">inspector: 100ms fade, no scrim</text>
+<text x="24" y="500" font-size="11" font-weight="500" letter-spacing="0.6" fill="#7a8699">DISCLOSURE TIERS: NO ACTION LIVES TWICE, ALL FOUR VIEW ONE REGISTRY ID</text>
+<rect x="24" y="512" width="150" height="60" rx="4" fill="#ffffff" stroke="#cfd6e0"/>
+<text x="34" y="530" font-size="12" font-weight="600" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#ac531c">tier 0</text>
+<text x="34" y="545" font-size="12" font-weight="500" fill="#1a202c">header, always</text>
+<text x="34" y="560" font-size="9" font-weight="400" fill="#505a69">nav search capture pair chip ⋯</text>
+<text x="164" y="530" font-size="9" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" text-anchor="end" fill="#7a8699">6 max</text>
+<rect x="182" y="512" width="150" height="60" rx="4" fill="#ffffff" stroke="#cfd6e0"/>
+<text x="192" y="530" font-size="12" font-weight="600" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#ac531c">tier 1</text>
+<text x="192" y="545" font-size="12" font-weight="500" fill="#1a202c">contextual bar</text>
+<text x="192" y="560" font-size="9" font-weight="400" fill="#505a69">2–4 verbs for the selection</text>
+<text x="322" y="530" font-size="9" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" text-anchor="end" fill="#7a8699">4 + ⋯</text>
+<rect x="340" y="512" width="150" height="60" rx="4" fill="#ffffff" stroke="#cfd6e0"/>
+<text x="350" y="530" font-size="12" font-weight="600" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#ac531c">tier 2</text>
+<text x="350" y="545" font-size="12" font-weight="500" fill="#1a202c">context menu</text>
+<text x="350" y="560" font-size="9" font-weight="400" fill="#505a69">every action for that target</text>
+<text x="480" y="530" font-size="9" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" text-anchor="end" fill="#7a8699">9 · 2 sub</text>
+<rect x="498" y="512" width="150" height="60" rx="4" fill="#ffffff" stroke="#cfd6e0"/>
+<text x="508" y="530" font-size="12" font-weight="600" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#ac531c">tier 3</text>
+<text x="508" y="545" font-size="12" font-weight="500" fill="#1a202c">Ctrl+K</text>
+<text x="508" y="560" font-size="9" font-weight="400" fill="#505a69">everything typed, &gt; commands</text>
+<text x="638" y="530" font-size="9" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" text-anchor="end" fill="#7a8699">1 input</text>
+<text x="692" y="500" font-size="11" font-weight="500" letter-spacing="0.6" fill="#7a8699">Z LADDER, FIXED INTEGERS</text>
+<text x="692" y="526" font-size="10" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#505a69">0 surface</text>
+<text x="792" y="526" font-size="10" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#505a69">5 strips</text>
+<text x="892" y="526" font-size="10" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#505a69">6 members</text>
+<text x="992" y="526" font-size="10" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#505a69">7 menus</text>
+<text x="1092" y="526" font-size="10" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#505a69">20 island</text>
+<text x="692" y="544" font-size="10" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#505a69">30 notice</text>
+<text x="792" y="544" font-size="10" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#505a69">40 inspector</text>
+<text x="892" y="544" font-size="10" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#505a69">45 capture</text>
+<text x="992" y="544" font-size="10" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#505a69">50 modal</text>
+<text x="1092" y="544" font-size="10" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#505a69">60 ctx menu</text>
+<text x="692" y="562" font-size="10" font-weight="400" fill="#7a8699">a frame member outranks every transient</text>
+<text x="24" y="596" font-size="11" font-weight="400" fill="#505a69">Compact ≤720px: drop the wordmark, hints, and chip words. Tap targets reach 44px on an invisible pseudo-box, so the painted layout never moves.</text>
+<text x="24" y="614" font-size="11" font-weight="400" fill="#505a69">Density is a dial, not a default: 30px data rows, 44px touch rows, 76px of chrome total. On a 900px viewport, 88% holds content.</text>
 </svg>

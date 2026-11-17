@@ -1,59 +1,59 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 670" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">
 <defs><filter id="sh" x="-40%" y="-40%" width="180%" height="180%"><feDropShadow dx="0" dy="1" stdDeviation="1.5" flood-color="#000" flood-opacity="0.14"/></filter></defs>
 <rect width="1200" height="670" fill="#e9ecef"/>
-<text x="24" y="34" font-size="20" font-weight="600" fill="#21262e">Type — system stack, locked scale</text>
-<text x="24" y="56" font-size="12" font-weight="400" fill="#676f7c">Nothing fetches, so nothing reflows. Six sizes, three weights, 1.45 leading, prose capped near 70ch.</text>
-<text x="24" y="88" font-size="11" font-weight="500" letter-spacing="0.6" fill="#8690a0">LIGHT SCALE</text>
-<text x="24" y="146" font-size="24" font-weight="600" fill="#21262e">display, one per screen at most</text>
-<text x="576" y="146" font-size="10" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" text-anchor="end" fill="#8690a0">24 / 600</text>
-<text x="24" y="182" font-size="20" font-weight="500" fill="#21262e">empty-state and page titles</text>
-<text x="576" y="182" font-size="10" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" text-anchor="end" fill="#8690a0">20 / 500</text>
-<text x="24" y="218" font-size="16" font-weight="500" fill="#21262e">panel and modal titles</text>
-<text x="576" y="218" font-size="10" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" text-anchor="end" fill="#8690a0">16 / 500</text>
-<text x="24" y="254" font-size="14" font-weight="400" fill="#21262e">body: paragraphs, inputs, rows</text>
-<text x="576" y="254" font-size="10" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" text-anchor="end" fill="#8690a0">14 / 400</text>
-<text x="24" y="290" font-size="13" font-weight="500" fill="#21262e">controls, menu items, dense rows</text>
-<text x="576" y="290" font-size="10" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" text-anchor="end" fill="#8690a0">13 / 500</text>
-<text x="24" y="326" font-size="12" font-weight="400" fill="#21262e">meta, chips, micro-labels</text>
-<text x="576" y="326" font-size="10" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" text-anchor="end" fill="#8690a0">12 / 400</text>
-<line x1="24" y1="342" x2="576" y2="342" stroke="#d5dbe3"/>
-<text x="24" y="356" font-size="11" font-weight="500" letter-spacing="0.6" fill="#8690a0">WEIGHTS: EMPHASIS COMES FROM INK, NOT FROM BOLD</text>
-<text x="24" y="382" font-size="12" font-weight="400" fill="#21262e">400 running text, secondary lines in muted</text>
-<text x="24" y="406" font-size="14" font-weight="500" fill="#21262e">500 labels, controls, active nav</text>
-<text x="24" y="430" font-size="14" font-weight="600" fill="#21262e">600 brand and titles only</text>
-<text x="24" y="462" font-size="11" font-weight="500" letter-spacing="0.6" fill="#8690a0">MICRO-LABEL: 12 / 500 / UPPERCASE / +0.04EM</text>
-<text x="24" y="484" font-size="12" font-weight="500" letter-spacing="0.5" fill="#8690a0">SECTION HEADING IN A PANEL</text>
-<text x="252" y="484" font-size="10" font-weight="400" fill="#8690a0">one per group, never nested</text>
-<text x="24" y="520" font-size="11" font-weight="500" letter-spacing="0.6" fill="#8690a0">MONO = MACHINE-ASSIGNED VALUES</text>
-<text x="24" y="542" font-size="12" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#676f7c">atom-7f3c19 · 2026-11-16T09:14Z · src/main.ts</text>
-<text x="24" y="564" font-size="12" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#676f7c">1,204 · 87 · 9,000,312</text>
-<text x="192" y="564" font-size="10" font-weight="400" fill="#8690a0">tabular-nums, right-aligned in columns</text>
-<text x="24" y="598" font-size="11" font-weight="500" letter-spacing="0.6" fill="#8690a0">CONTRAST: A HINT IS TEXT, SO IT MUST PASS AA</text>
-<text x="24" y="620" font-size="13" font-weight="400" fill="#676f7c">Keyboard hint Ctrl+K in muted</text>
-<text x="248" y="620" font-size="11" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#676f7c">4.8:1 passes</text>
-<text x="24" y="642" font-size="13" font-weight="400" fill="#8690a0">Keyboard hint Ctrl+K in faint</text>
-<text x="248" y="642" font-size="11" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#d54e4e">3.06:1 fails, so never a hint</text>
-<rect x="608" y="72" width="580" height="452" rx="6" fill="#2b2e33"/>
-<text x="620" y="92" font-size="11" font-weight="500" letter-spacing="0.6" fill="#767d85">DARK SCALE</text>
-<text x="620" y="150" font-size="24" font-weight="600" fill="#d6dae0">display, one per screen at most</text>
-<text x="1168" y="150" font-size="10" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" text-anchor="end" fill="#767d85">24 / 600</text>
-<text x="620" y="186" font-size="20" font-weight="500" fill="#d6dae0">empty-state and page titles</text>
-<text x="1168" y="186" font-size="10" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" text-anchor="end" fill="#767d85">20 / 500</text>
-<text x="620" y="222" font-size="16" font-weight="500" fill="#d6dae0">panel and modal titles</text>
-<text x="1168" y="222" font-size="10" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" text-anchor="end" fill="#767d85">16 / 500</text>
-<text x="620" y="258" font-size="14" font-weight="400" fill="#d6dae0">body: paragraphs, inputs, rows</text>
-<text x="1168" y="258" font-size="10" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" text-anchor="end" fill="#767d85">14 / 400</text>
-<text x="620" y="294" font-size="13" font-weight="500" fill="#d6dae0">controls, menu items, dense rows</text>
-<text x="1168" y="294" font-size="10" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" text-anchor="end" fill="#767d85">13 / 500</text>
-<text x="620" y="330" font-size="12" font-weight="400" fill="#d6dae0">meta, chips, micro-labels</text>
-<text x="1168" y="330" font-size="10" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" text-anchor="end" fill="#767d85">12 / 400</text>
-<text x="620" y="358" font-size="11" font-weight="500" letter-spacing="0.6" fill="#767d85">LINKS, SELECTION, MEASURE</text>
-<text x="620" y="382" font-size="13" font-weight="400" fill="#e6bf34">accent link, 1px underline, 2px offset</text>
-<rect x="1099" y="368" width="69" height="19" rx="2" fill="#e6bf34"/><text x="1115" y="382" font-size="12" fill="#1b1e22">selection</text>
-<rect x="620" y="402" width="548" height="50" rx="4" fill="#33373d" stroke="#464c54"/>
-<text x="632" y="423" font-size="13" font-weight="400" fill="#d6dae0">A 14px line that runs the full measure is the fastest</text>
-<text x="632" y="441" font-size="13" font-weight="400" fill="#d6dae0">way to look un-designed. Cap it near 70ch.</text>
-<rect x="620" y="468" width="548" height="56" rx="4" fill="#24272b" stroke="#464c54"/>
-<text x="632" y="490" font-size="11" font-weight="500" letter-spacing="0.6" fill="#767d85">REJECTED</text>
-<text x="632" y="514" font-size="14" font-weight="700" fill="#ff8f99">700 · 15px · −0.02em · UPPERCASE BUTTON LABELS</text>
+<text x="24" y="34" font-size="20" font-weight="600" fill="#1a202c">Type — system stack, locked scale</text>
+<text x="24" y="56" font-size="12" font-weight="400" fill="#505a69">Nothing fetches, so nothing reflows. Six sizes, three weights, 1.45 leading, prose capped near 70ch.</text>
+<text x="24" y="88" font-size="11" font-weight="500" letter-spacing="0.6" fill="#7a8699">LIGHT SCALE</text>
+<text x="24" y="146" font-size="24" font-weight="600" fill="#1a202c">display, one per screen at most</text>
+<text x="576" y="146" font-size="10" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" text-anchor="end" fill="#7a8699">24 / 600</text>
+<text x="24" y="182" font-size="20" font-weight="500" fill="#1a202c">empty-state and page titles</text>
+<text x="576" y="182" font-size="10" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" text-anchor="end" fill="#7a8699">20 / 500</text>
+<text x="24" y="218" font-size="16" font-weight="500" fill="#1a202c">panel and modal titles</text>
+<text x="576" y="218" font-size="10" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" text-anchor="end" fill="#7a8699">16 / 500</text>
+<text x="24" y="254" font-size="14" font-weight="400" fill="#1a202c">body: paragraphs, inputs, rows</text>
+<text x="576" y="254" font-size="10" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" text-anchor="end" fill="#7a8699">14 / 400</text>
+<text x="24" y="290" font-size="13" font-weight="500" fill="#1a202c">controls, menu items, dense rows</text>
+<text x="576" y="290" font-size="10" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" text-anchor="end" fill="#7a8699">13 / 500</text>
+<text x="24" y="326" font-size="12" font-weight="400" fill="#1a202c">meta, chips, micro-labels</text>
+<text x="576" y="326" font-size="10" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" text-anchor="end" fill="#7a8699">12 / 400</text>
+<line x1="24" y1="342" x2="576" y2="342" stroke="#cfd6e0"/>
+<text x="24" y="356" font-size="11" font-weight="500" letter-spacing="0.6" fill="#7a8699">WEIGHTS: EMPHASIS COMES FROM INK, NOT FROM BOLD</text>
+<text x="24" y="382" font-size="12" font-weight="400" fill="#1a202c">400 running text, secondary lines in muted</text>
+<text x="24" y="406" font-size="14" font-weight="500" fill="#1a202c">500 labels, controls, active nav</text>
+<text x="24" y="430" font-size="14" font-weight="600" fill="#1a202c">600 brand and titles only</text>
+<text x="24" y="462" font-size="11" font-weight="500" letter-spacing="0.6" fill="#7a8699">MICRO-LABEL: 12 / 500 / UPPERCASE / +0.04EM</text>
+<text x="24" y="484" font-size="12" font-weight="500" letter-spacing="0.5" fill="#7a8699">SECTION HEADING IN A PANEL</text>
+<text x="252" y="484" font-size="10" font-weight="400" fill="#7a8699">one per group, never nested</text>
+<text x="24" y="520" font-size="11" font-weight="500" letter-spacing="0.6" fill="#7a8699">MONO = MACHINE-ASSIGNED VALUES</text>
+<text x="24" y="542" font-size="12" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#505a69">atom-7f3c19 · 2026-11-16T09:14Z · src/main.ts</text>
+<text x="24" y="564" font-size="12" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#505a69">1,204 · 87 · 9,000,312</text>
+<text x="192" y="564" font-size="10" font-weight="400" fill="#7a8699">tabular-nums, right-aligned in columns</text>
+<text x="24" y="598" font-size="11" font-weight="500" letter-spacing="0.6" fill="#7a8699">CONTRAST: A HINT IS TEXT, SO IT MUST PASS AA</text>
+<text x="24" y="620" font-size="13" font-weight="400" fill="#505a69">Keyboard hint Ctrl+K in muted</text>
+<text x="248" y="620" font-size="11" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#505a69">6.98:1 passes</text>
+<text x="24" y="642" font-size="13" font-weight="400" fill="#7a8699">Keyboard hint Ctrl+K in faint</text>
+<text x="248" y="642" font-size="11" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#ba3c3c">3.69:1 fails, so never a hint</text>
+<rect x="608" y="72" width="580" height="452" rx="6" fill="#232831"/>
+<text x="620" y="92" font-size="11" font-weight="500" letter-spacing="0.6" fill="#6b7280">DARK SCALE</text>
+<text x="620" y="150" font-size="24" font-weight="600" fill="#f3f4f6">display, one per screen at most</text>
+<text x="1168" y="150" font-size="10" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" text-anchor="end" fill="#6b7280">24 / 600</text>
+<text x="620" y="186" font-size="20" font-weight="500" fill="#f3f4f6">empty-state and page titles</text>
+<text x="1168" y="186" font-size="10" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" text-anchor="end" fill="#6b7280">20 / 500</text>
+<text x="620" y="222" font-size="16" font-weight="500" fill="#f3f4f6">panel and modal titles</text>
+<text x="1168" y="222" font-size="10" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" text-anchor="end" fill="#6b7280">16 / 500</text>
+<text x="620" y="258" font-size="14" font-weight="400" fill="#f3f4f6">body: paragraphs, inputs, rows</text>
+<text x="1168" y="258" font-size="10" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" text-anchor="end" fill="#6b7280">14 / 400</text>
+<text x="620" y="294" font-size="13" font-weight="500" fill="#f3f4f6">controls, menu items, dense rows</text>
+<text x="1168" y="294" font-size="10" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" text-anchor="end" fill="#6b7280">13 / 500</text>
+<text x="620" y="330" font-size="12" font-weight="400" fill="#f3f4f6">meta, chips, micro-labels</text>
+<text x="1168" y="330" font-size="10" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" text-anchor="end" fill="#6b7280">12 / 400</text>
+<text x="620" y="358" font-size="11" font-weight="500" letter-spacing="0.6" fill="#6b7280">LINKS, SELECTION, MEASURE</text>
+<text x="620" y="382" font-size="13" font-weight="400" fill="#e58a45">accent link, 1px underline, 2px offset</text>
+<rect x="1099" y="368" width="69" height="19" rx="2" fill="#c96a2d"/><text x="1115" y="382" font-size="12" fill="#ffffff">selection</text>
+<rect x="620" y="402" width="548" height="50" rx="4" fill="#2b313b" stroke="#3f4754"/>
+<text x="632" y="423" font-size="13" font-weight="400" fill="#f3f4f6">A 14px line that runs the full measure is the fastest</text>
+<text x="632" y="441" font-size="13" font-weight="400" fill="#f3f4f6">way to look un-designed. Cap it near 70ch.</text>
+<rect x="620" y="468" width="548" height="56" rx="4" fill="#232831" stroke="#3f4754"/>
+<text x="632" y="490" font-size="11" font-weight="500" letter-spacing="0.6" fill="#6b7280">REJECTED</text>
+<text x="632" y="514" font-size="14" font-weight="700" fill="#c75454">700 · 15px · −0.02em · UPPERCASE BUTTON LABELS</text>
 </svg>

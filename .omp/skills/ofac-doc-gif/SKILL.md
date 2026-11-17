@@ -50,8 +50,8 @@ Design laws per frame:
 ## Terminal recipe (VHS)
 
 `.tape` beside the page's assets; theme the TypeSet block to the house
-code surface (`Set Theme "Demo"` with background `#3b4046`, the
-`--surface-raise` token of the Ink dark theme, ink `#d6dae0`) and
+code surface (`Set Theme "Demo"` with background `#323944`, the
+`--surface-alt` token of the Refined Copper dark theme, ink `#F3F4F6`) and
 `Set Width 1200 / Height 400`. Keep tapes
 re-runnable against the local stack — a tape is a test: `vhs demo.tape`
 must succeed from a clean tree, else the GIF rots silently.

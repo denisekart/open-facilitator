@@ -1,223 +1,223 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 514" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">
 <defs><filter id="sh" x="-40%" y="-40%" width="180%" height="180%"><feDropShadow dx="0" dy="1" stdDeviation="1.5" flood-color="#000" flood-opacity="0.14"/></filter></defs>
 <rect width="1200" height="514" fill="#e9ecef"/>
-<text x="24" y="34" font-size="20" font-weight="600" fill="#21262e">Icons — 24-grid, currentColor, 1.5 stroke</text>
-<text x="24" y="56" font-size="12" font-weight="400" fill="#676f7c">Round caps and joins, unfilled shapes, aria-hidden. Words label actions; a glyph stands alone only for a universal verb.</text>
-<rect x="604" y="68" width="584" height="142" rx="6" fill="#2b2e33"/>
-<text x="24" y="84" font-size="11" font-weight="500" letter-spacing="0.6" fill="#8690a0">LIGHT</text>
-<rect x="24" y="98" width="32" height="32" rx="4" fill="#f7f9fb" stroke="#e0e5ec"/>
-<svg x="32" y="106" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#21262e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="M15.8 15.8 20 20"/></g></svg>
-<text x="40" y="140" font-size="9" font-weight="400" text-anchor="middle" fill="#8690a0">search</text>
-<rect x="66" y="98" width="32" height="32" rx="4" fill="#f7f9fb" stroke="#e0e5ec"/>
-<svg x="74" y="106" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#21262e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></g></svg>
-<text x="82" y="140" font-size="9" font-weight="400" text-anchor="middle" fill="#8690a0">plus</text>
-<rect x="108" y="98" width="32" height="32" rx="4" fill="#f7f9fb" stroke="#e0e5ec"/>
-<svg x="116" y="106" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#21262e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 5.5 8 12l6.5 6.5"/></g></svg>
-<text x="124" y="140" font-size="9" font-weight="400" text-anchor="middle" fill="#8690a0">back</text>
-<rect x="150" y="98" width="32" height="32" rx="4" fill="#f7f9fb" stroke="#e0e5ec"/>
-<svg x="158" y="106" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#21262e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 5.5 16 12l-6.5 6.5"/></g></svg>
-<text x="166" y="140" font-size="9" font-weight="400" text-anchor="middle" fill="#8690a0">fwd</text>
-<rect x="192" y="98" width="32" height="32" rx="4" fill="#f7f9fb" stroke="#e0e5ec"/>
-<svg x="200" y="106" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#21262e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9.5 6 6 6-6"/></g></svg>
-<text x="208" y="140" font-size="9" font-weight="400" text-anchor="middle" fill="#8690a0">chev</text>
-<rect x="234" y="98" width="32" height="32" rx="4" fill="#f7f9fb" stroke="#e0e5ec"/>
-<svg x="242" y="106" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#21262e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.8 4.6 4.6L19 7"/></g></svg>
-<text x="250" y="140" font-size="9" font-weight="400" text-anchor="middle" fill="#8690a0">check</text>
-<rect x="276" y="98" width="32" height="32" rx="4" fill="#f7f9fb" stroke="#e0e5ec"/>
-<svg x="284" y="106" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#21262e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 12h13"/></g></svg>
-<text x="292" y="140" font-size="9" font-weight="400" text-anchor="middle" fill="#8690a0">dash</text>
-<rect x="318" y="98" width="32" height="32" rx="4" fill="#f7f9fb" stroke="#e0e5ec"/>
-<svg x="326" y="106" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#21262e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></g></svg>
-<text x="334" y="140" font-size="9" font-weight="400" text-anchor="middle" fill="#8690a0">close</text>
-<rect x="360" y="98" width="32" height="32" rx="4" fill="#f7f9fb" stroke="#e0e5ec"/>
-<svg x="368" y="106" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#21262e" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 12h.01M12 12h.01M18.5 12h.01"/></g></svg>
-<text x="376" y="140" font-size="9" font-weight="400" text-anchor="middle" fill="#8690a0">dots</text>
-<rect x="402" y="98" width="32" height="32" rx="4" fill="#f7f9fb" stroke="#e0e5ec"/>
-<svg x="410" y="106" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#21262e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.5v15M7 19.5l-2.8-2.8M7 19.5l2.8-2.8M17 19.5v-15M17 4.5l-2.8 2.8M17 4.5l2.8 2.8"/></g></svg>
-<text x="418" y="140" font-size="9" font-weight="400" text-anchor="middle" fill="#8690a0">sort</text>
-<rect x="444" y="98" width="32" height="32" rx="4" fill="#f7f9fb" stroke="#e0e5ec"/>
-<svg x="452" y="106" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#21262e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6.5h16M7 12h10M10 17.5h4"/></g></svg>
-<text x="460" y="140" font-size="9" font-weight="400" text-anchor="middle" fill="#8690a0">filter</text>
-<rect x="486" y="98" width="32" height="32" rx="4" fill="#f7f9fb" stroke="#e0e5ec"/>
-<svg x="494" y="106" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#21262e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="14" rx="2" fill="none"/><path d="M14 5v14"/></g></svg>
-<text x="502" y="140" font-size="9" font-weight="400" text-anchor="middle" fill="#8690a0">panel</text>
-<rect x="24" y="146" width="32" height="32" rx="4" fill="#f7f9fb" stroke="#e0e5ec"/>
-<svg x="32" y="154" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#21262e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 19.5h4L20 8l-4-4L4.5 19.5z" fill="none"/><path d="m14.6 5.4 4 4"/></g></svg>
-<text x="40" y="188" font-size="9" font-weight="400" text-anchor="middle" fill="#8690a0">pencil</text>
-<rect x="66" y="146" width="32" height="32" rx="4" fill="#f7f9fb" stroke="#e0e5ec"/>
-<svg x="74" y="154" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#21262e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 3.5h7l4 4v13h-11z" fill="none"/><path d="M13.5 3.5v4h4"/></g></svg>
-<text x="82" y="188" font-size="9" font-weight="400" text-anchor="middle" fill="#8690a0">file</text>
-<rect x="108" y="146" width="32" height="32" rx="4" fill="#f7f9fb" stroke="#e0e5ec"/>
-<svg x="116" y="154" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#21262e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 6.5h6l2 2.5h9v10.5h-17z" fill="none"/></g></svg>
-<text x="124" y="188" font-size="9" font-weight="400" text-anchor="middle" fill="#8690a0">folder</text>
-<rect x="150" y="146" width="32" height="32" rx="4" fill="#f7f9fb" stroke="#e0e5ec"/>
-<svg x="158" y="154" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#21262e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 1 0-5.6l2-2a4 4 0 0 1 5.6 5.6l-1.2 1.2"/><path d="M14 10a4 4 0 0 1 0 5.6l-2 2A4 4 0 0 1 6.4 12l1.2-1.2"/></g></svg>
-<text x="166" y="188" font-size="9" font-weight="400" text-anchor="middle" fill="#8690a0">link</text>
-<rect x="192" y="146" width="32" height="32" rx="4" fill="#f7f9fb" stroke="#e0e5ec"/>
-<svg x="200" y="154" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#21262e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h7l9 9-7 7-9-9z" fill="none"/><circle cx="8" cy="8" r="1.2" fill="none"/></g></svg>
-<text x="208" y="188" font-size="9" font-weight="400" text-anchor="middle" fill="#8690a0">tag</text>
-<rect x="234" y="146" width="32" height="32" rx="4" fill="#f7f9fb" stroke="#e0e5ec"/>
-<svg x="242" y="154" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#21262e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7.5" fill="none"/><path d="M12 7.5V12l3 2.5"/></g></svg>
-<text x="250" y="188" font-size="9" font-weight="400" text-anchor="middle" fill="#8690a0">clock</text>
-<rect x="276" y="146" width="32" height="32" rx="4" fill="#f7f9fb" stroke="#e0e5ec"/>
-<svg x="284" y="154" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#21262e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8.5" r="3.5" fill="none"/><path d="M5.5 20c1.3-3.4 3.7-5 6.5-5s5.2 1.6 6.5 5"/></g></svg>
-<text x="292" y="188" font-size="9" font-weight="400" text-anchor="middle" fill="#8690a0">user</text>
-<rect x="318" y="146" width="32" height="32" rx="4" fill="#f7f9fb" stroke="#e0e5ec"/>
-<svg x="326" y="154" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#21262e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.2l2.4 4.9 5.4.8-3.9 3.8.9 5.4-4.8-2.6-4.8 2.6.9-5.4L4.2 9.9l5.4-.8z" fill="none"/></g></svg>
-<text x="334" y="188" font-size="9" font-weight="400" text-anchor="middle" fill="#8690a0">star</text>
-<rect x="360" y="146" width="32" height="32" rx="4" fill="#f7f9fb" stroke="#e0e5ec"/>
-<svg x="368" y="154" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#21262e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12S6 6.5 12 6.5 21.5 12 21.5 12 18 17.5 12 17.5 2.5 12 2.5 12z" fill="none"/><circle cx="12" cy="12" r="2.6" fill="none"/></g></svg>
-<text x="376" y="188" font-size="9" font-weight="400" text-anchor="middle" fill="#8690a0">eye</text>
-<rect x="402" y="146" width="32" height="32" rx="4" fill="#f7f9fb" stroke="#e0e5ec"/>
-<svg x="410" y="154" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#21262e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4l16 16"/><path d="M9.7 6.9A9.9 9.9 0 0 1 12 6.5c6 0 9.5 5.5 9.5 5.5a17.6 17.6 0 0 1-2.8 3.3M6.3 8.4A16.9 16.9 0 0 0 2.5 12S6 17.5 12 17.5c1 0 2-.2 2.9-.5"/></g></svg>
-<text x="418" y="188" font-size="9" font-weight="400" text-anchor="middle" fill="#8690a0">eyeoff</text>
-<rect x="444" y="146" width="32" height="32" rx="4" fill="#f7f9fb" stroke="#e0e5ec"/>
-<svg x="452" y="154" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#21262e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 10.5a5.5 5.5 0 0 1 11 0c0 3.8 1.5 5.3 1.5 5.3H5s1.5-1.5 1.5-5.3z" fill="none"/><path d="M10 18.6a2 2 0 0 0 4 0"/></g></svg>
-<text x="460" y="188" font-size="9" font-weight="400" text-anchor="middle" fill="#8690a0">bell</text>
-<rect x="486" y="146" width="32" height="32" rx="4" fill="#f7f9fb" stroke="#e0e5ec"/>
-<svg x="494" y="154" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#21262e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5.5" y="10.5" width="13" height="9" rx="2" fill="none"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></g></svg>
-<text x="502" y="188" font-size="9" font-weight="400" text-anchor="middle" fill="#8690a0">lock</text>
-<rect x="24" y="194" width="32" height="32" rx="4" fill="#f7f9fb" stroke="#e0e5ec"/>
-<svg x="32" y="202" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#21262e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 8.5H4.2V4.7"/><path d="M4.6 8.7a7.4 7.4 0 1 1 1.2 6.6"/></g></svg>
-<text x="40" y="236" font-size="9" font-weight="400" text-anchor="middle" fill="#8690a0">undo</text>
-<rect x="66" y="194" width="32" height="32" rx="4" fill="#f7f9fb" stroke="#e0e5ec"/>
-<svg x="74" y="202" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#21262e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 8.5h3.8V4.7"/><path d="M19.4 8.7a7.4 7.4 0 1 0-1.2 6.6"/></g></svg>
-<text x="82" y="236" font-size="9" font-weight="400" text-anchor="middle" fill="#8690a0">redo</text>
-<rect x="108" y="194" width="32" height="32" rx="4" fill="#f7f9fb" stroke="#e0e5ec"/>
-<svg x="116" y="202" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#21262e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.5v10.5M7.8 11.2 12 15.4l4.2-4.2M4.5 19.5h15"/></g></svg>
-<text x="124" y="236" font-size="9" font-weight="400" text-anchor="middle" fill="#8690a0">down</text>
-<rect x="150" y="194" width="32" height="32" rx="4" fill="#f7f9fb" stroke="#e0e5ec"/>
-<svg x="158" y="202" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#21262e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="8.5" y="8.5" width="11" height="11" rx="2" fill="none"/><path d="M5.5 15.5H5a1 1 0 0 1-1-1V5.5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v.5"/></g></svg>
-<text x="166" y="236" font-size="9" font-weight="400" text-anchor="middle" fill="#8690a0">copy</text>
-<rect x="192" y="194" width="32" height="32" rx="4" fill="#f7f9fb" stroke="#e0e5ec"/>
-<svg x="200" y="202" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#21262e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5v17M3.5 12h17M12 3.5 9.6 5.9M12 3.5l2.4 2.4M12 20.5l-2.4-2.4M12 20.5l2.4-2.4M3.5 12l2.4-2.4M3.5 12l2.4 2.4M20.5 12l-2.4-2.4M20.5 12l-2.4 2.4"/></g></svg>
-<text x="208" y="236" font-size="9" font-weight="400" text-anchor="middle" fill="#8690a0">move</text>
-<rect x="234" y="194" width="32" height="32" rx="4" fill="#f7f9fb" stroke="#e0e5ec"/>
-<svg x="242" y="202" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#21262e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3" fill="none"/><path d="M12 3.4v2.3M12 18.3v2.3M4.7 7.6l2 1.1M17.3 15.3l2 1.1M4.7 16.4l2-1.1M17.3 8.7l2-1.1"/></g></svg>
-<text x="250" y="236" font-size="9" font-weight="400" text-anchor="middle" fill="#8690a0">gear</text>
-<rect x="276" y="194" width="32" height="32" rx="4" fill="#f7f9fb" stroke="#e0e5ec"/>
-<svg x="284" y="202" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#21262e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.8" fill="none"/><path d="M12 2.6v2.2M12 19.2v2.2M3.6 12h2.2M18.2 12h2.2M6.1 6.1l1.6 1.6M16.3 16.3l1.6 1.6M6.1 17.9l1.6-1.6M16.3 7.7l1.6-1.6"/></g></svg>
-<text x="292" y="236" font-size="9" font-weight="400" text-anchor="middle" fill="#8690a0">sun</text>
-<rect x="318" y="194" width="32" height="32" rx="4" fill="#f7f9fb" stroke="#e0e5ec"/>
-<svg x="326" y="202" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#21262e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.6A8.4 8.4 0 1 1 9.6 4.2 7 7 0 0 0 20 14.6z" fill="none"/></g></svg>
-<text x="334" y="236" font-size="9" font-weight="400" text-anchor="middle" fill="#8690a0">moon</text>
-<rect x="360" y="194" width="32" height="32" rx="4" fill="#f7f9fb" stroke="#e0e5ec"/>
-<svg x="368" y="202" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#21262e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 5.2 18.8 12 7.5 18.8z" fill="none"/></g></svg>
-<text x="376" y="236" font-size="9" font-weight="400" text-anchor="middle" fill="#8690a0">play</text>
-<rect x="402" y="194" width="32" height="32" rx="4" fill="#f7f9fb" stroke="#e0e5ec"/>
-<svg x="410" y="202" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#21262e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6.5" width="19" height="11" rx="2" fill="none"/><path d="M6 10h.01M9 10h.01M12 10h.01M15 10h.01M18 10h.01M8 14h8"/></g></svg>
-<text x="418" y="236" font-size="9" font-weight="400" text-anchor="middle" fill="#8690a0">keyboard</text>
-<rect x="444" y="194" width="32" height="32" rx="4" fill="#f7f9fb" stroke="#e0e5ec"/>
-<svg x="452" y="202" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#21262e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3.5" fill="none"/><path d="M8.5 8.5v7h7"/></g></svg>
-<text x="460" y="236" font-size="9" font-weight="400" text-anchor="middle" fill="#8690a0">cmd</text>
-<rect x="486" y="194" width="32" height="32" rx="4" fill="#f7f9fb" stroke="#e0e5ec"/>
-<svg x="494" y="202" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#21262e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 6.5h15M9 6.5V4h6v2.5M6.6 6.5 7.7 20h8.6l1.1-13.5M10.5 10v6M13.5 10v6"/></g></svg>
-<text x="502" y="236" font-size="9" font-weight="400" text-anchor="middle" fill="#8690a0">trash</text>
-<text x="620" y="84" font-size="11" font-weight="500" letter-spacing="0.6" fill="#767d85">DARK</text>
-<rect x="620" y="98" width="32" height="32" rx="4" fill="#33373d" stroke="#373b42"/>
-<svg x="628" y="106" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#d6dae0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="M15.8 15.8 20 20"/></g></svg>
-<text x="636" y="140" font-size="9" font-weight="400" text-anchor="middle" fill="#767d85">search</text>
-<rect x="662" y="98" width="32" height="32" rx="4" fill="#33373d" stroke="#373b42"/>
-<svg x="670" y="106" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#d6dae0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></g></svg>
-<text x="678" y="140" font-size="9" font-weight="400" text-anchor="middle" fill="#767d85">plus</text>
-<rect x="704" y="98" width="32" height="32" rx="4" fill="#33373d" stroke="#373b42"/>
-<svg x="712" y="106" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#d6dae0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 5.5 8 12l6.5 6.5"/></g></svg>
-<text x="720" y="140" font-size="9" font-weight="400" text-anchor="middle" fill="#767d85">back</text>
-<rect x="746" y="98" width="32" height="32" rx="4" fill="#33373d" stroke="#373b42"/>
-<svg x="754" y="106" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#d6dae0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 5.5 16 12l-6.5 6.5"/></g></svg>
-<text x="762" y="140" font-size="9" font-weight="400" text-anchor="middle" fill="#767d85">fwd</text>
-<rect x="788" y="98" width="32" height="32" rx="4" fill="#33373d" stroke="#373b42"/>
-<svg x="796" y="106" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#d6dae0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9.5 6 6 6-6"/></g></svg>
-<text x="804" y="140" font-size="9" font-weight="400" text-anchor="middle" fill="#767d85">chev</text>
-<rect x="830" y="98" width="32" height="32" rx="4" fill="#33373d" stroke="#373b42"/>
-<svg x="838" y="106" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#d6dae0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.8 4.6 4.6L19 7"/></g></svg>
-<text x="846" y="140" font-size="9" font-weight="400" text-anchor="middle" fill="#767d85">check</text>
-<rect x="872" y="98" width="32" height="32" rx="4" fill="#33373d" stroke="#373b42"/>
-<svg x="880" y="106" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#d6dae0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 12h13"/></g></svg>
-<text x="888" y="140" font-size="9" font-weight="400" text-anchor="middle" fill="#767d85">dash</text>
-<rect x="914" y="98" width="32" height="32" rx="4" fill="#33373d" stroke="#373b42"/>
-<svg x="922" y="106" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#d6dae0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></g></svg>
-<text x="930" y="140" font-size="9" font-weight="400" text-anchor="middle" fill="#767d85">close</text>
-<rect x="956" y="98" width="32" height="32" rx="4" fill="#33373d" stroke="#373b42"/>
-<svg x="964" y="106" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#d6dae0" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 12h.01M12 12h.01M18.5 12h.01"/></g></svg>
-<text x="972" y="140" font-size="9" font-weight="400" text-anchor="middle" fill="#767d85">dots</text>
-<rect x="998" y="98" width="32" height="32" rx="4" fill="#33373d" stroke="#373b42"/>
-<svg x="1006" y="106" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#d6dae0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.5v15M7 19.5l-2.8-2.8M7 19.5l2.8-2.8M17 19.5v-15M17 4.5l-2.8 2.8M17 4.5l2.8 2.8"/></g></svg>
-<text x="1014" y="140" font-size="9" font-weight="400" text-anchor="middle" fill="#767d85">sort</text>
-<rect x="1040" y="98" width="32" height="32" rx="4" fill="#33373d" stroke="#373b42"/>
-<svg x="1048" y="106" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#d6dae0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6.5h16M7 12h10M10 17.5h4"/></g></svg>
-<text x="1056" y="140" font-size="9" font-weight="400" text-anchor="middle" fill="#767d85">filter</text>
-<rect x="1082" y="98" width="32" height="32" rx="4" fill="#33373d" stroke="#373b42"/>
-<svg x="1090" y="106" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#d6dae0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="14" rx="2" fill="none"/><path d="M14 5v14"/></g></svg>
-<text x="1098" y="140" font-size="9" font-weight="400" text-anchor="middle" fill="#767d85">panel</text>
-<rect x="620" y="146" width="32" height="32" rx="4" fill="#33373d" stroke="#373b42"/>
-<svg x="628" y="154" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#d6dae0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 19.5h4L20 8l-4-4L4.5 19.5z" fill="none"/><path d="m14.6 5.4 4 4"/></g></svg>
-<text x="636" y="188" font-size="9" font-weight="400" text-anchor="middle" fill="#767d85">pencil</text>
-<rect x="662" y="146" width="32" height="32" rx="4" fill="#33373d" stroke="#373b42"/>
-<svg x="670" y="154" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#d6dae0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 3.5h7l4 4v13h-11z" fill="none"/><path d="M13.5 3.5v4h4"/></g></svg>
-<text x="678" y="188" font-size="9" font-weight="400" text-anchor="middle" fill="#767d85">file</text>
-<rect x="704" y="146" width="32" height="32" rx="4" fill="#33373d" stroke="#373b42"/>
-<svg x="712" y="154" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#d6dae0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 6.5h6l2 2.5h9v10.5h-17z" fill="none"/></g></svg>
-<text x="720" y="188" font-size="9" font-weight="400" text-anchor="middle" fill="#767d85">folder</text>
-<rect x="746" y="146" width="32" height="32" rx="4" fill="#33373d" stroke="#373b42"/>
-<svg x="754" y="154" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#d6dae0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 1 0-5.6l2-2a4 4 0 0 1 5.6 5.6l-1.2 1.2"/><path d="M14 10a4 4 0 0 1 0 5.6l-2 2A4 4 0 0 1 6.4 12l1.2-1.2"/></g></svg>
-<text x="762" y="188" font-size="9" font-weight="400" text-anchor="middle" fill="#767d85">link</text>
-<rect x="788" y="146" width="32" height="32" rx="4" fill="#33373d" stroke="#373b42"/>
-<svg x="796" y="154" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#d6dae0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h7l9 9-7 7-9-9z" fill="none"/><circle cx="8" cy="8" r="1.2" fill="none"/></g></svg>
-<text x="804" y="188" font-size="9" font-weight="400" text-anchor="middle" fill="#767d85">tag</text>
-<rect x="830" y="146" width="32" height="32" rx="4" fill="#33373d" stroke="#373b42"/>
-<svg x="838" y="154" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#d6dae0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7.5" fill="none"/><path d="M12 7.5V12l3 2.5"/></g></svg>
-<text x="846" y="188" font-size="9" font-weight="400" text-anchor="middle" fill="#767d85">clock</text>
-<rect x="872" y="146" width="32" height="32" rx="4" fill="#33373d" stroke="#373b42"/>
-<svg x="880" y="154" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#d6dae0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8.5" r="3.5" fill="none"/><path d="M5.5 20c1.3-3.4 3.7-5 6.5-5s5.2 1.6 6.5 5"/></g></svg>
-<text x="888" y="188" font-size="9" font-weight="400" text-anchor="middle" fill="#767d85">user</text>
-<rect x="914" y="146" width="32" height="32" rx="4" fill="#33373d" stroke="#373b42"/>
-<svg x="922" y="154" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#d6dae0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.2l2.4 4.9 5.4.8-3.9 3.8.9 5.4-4.8-2.6-4.8 2.6.9-5.4L4.2 9.9l5.4-.8z" fill="none"/></g></svg>
-<text x="930" y="188" font-size="9" font-weight="400" text-anchor="middle" fill="#767d85">star</text>
-<rect x="956" y="146" width="32" height="32" rx="4" fill="#33373d" stroke="#373b42"/>
-<svg x="964" y="154" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#d6dae0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12S6 6.5 12 6.5 21.5 12 21.5 12 18 17.5 12 17.5 2.5 12 2.5 12z" fill="none"/><circle cx="12" cy="12" r="2.6" fill="none"/></g></svg>
-<text x="972" y="188" font-size="9" font-weight="400" text-anchor="middle" fill="#767d85">eye</text>
-<rect x="998" y="146" width="32" height="32" rx="4" fill="#33373d" stroke="#373b42"/>
-<svg x="1006" y="154" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#d6dae0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4l16 16"/><path d="M9.7 6.9A9.9 9.9 0 0 1 12 6.5c6 0 9.5 5.5 9.5 5.5a17.6 17.6 0 0 1-2.8 3.3M6.3 8.4A16.9 16.9 0 0 0 2.5 12S6 17.5 12 17.5c1 0 2-.2 2.9-.5"/></g></svg>
-<text x="1014" y="188" font-size="9" font-weight="400" text-anchor="middle" fill="#767d85">eyeoff</text>
-<rect x="1040" y="146" width="32" height="32" rx="4" fill="#33373d" stroke="#373b42"/>
-<svg x="1048" y="154" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#d6dae0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 10.5a5.5 5.5 0 0 1 11 0c0 3.8 1.5 5.3 1.5 5.3H5s1.5-1.5 1.5-5.3z" fill="none"/><path d="M10 18.6a2 2 0 0 0 4 0"/></g></svg>
-<text x="1056" y="188" font-size="9" font-weight="400" text-anchor="middle" fill="#767d85">bell</text>
-<rect x="1082" y="146" width="32" height="32" rx="4" fill="#33373d" stroke="#373b42"/>
-<svg x="1090" y="154" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#d6dae0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5.5" y="10.5" width="13" height="9" rx="2" fill="none"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></g></svg>
-<text x="1098" y="188" font-size="9" font-weight="400" text-anchor="middle" fill="#767d85">lock</text>
-<text x="620" y="202" font-size="10" font-weight="400" fill="#99a1ab">same paths, ink from tokens. State glyphs are shapes, so greyscale survives.</text>
-<line x1="24" y1="246" x2="1176" y2="246" stroke="#d5dbe3"/>
-<text x="24" y="266" font-size="11" font-weight="500" letter-spacing="0.6" fill="#8690a0">ACTIVE INDICATOR: A 2PX RULE, LABEL WIDTH, NO ORNAMENT</text>
-<text x="24" y="292" font-size="14" font-weight="500" fill="#21262e">Library</text>
-<rect x="24" y="300" width="50" height="2" fill="#ab8612"/>
-<text x="106" y="292" font-size="14" font-weight="400" fill="#676f7c">Graph</text>
-<text x="173" y="292" font-size="14" font-weight="400" fill="#676f7c">Settings</text>
-<text x="24" y="322" font-size="10" font-weight="400" fill="#8690a0">a rule survives forced-colors, a tint would not</text>
-<text x="470" y="266" font-size="11" font-weight="500" letter-spacing="0.6" fill="#8690a0">LOGO RULES: 24-GRID, ONE WEIGHT, ≤4 SHAPES, ≤2 COLOURS, A CIRCLE + LINE VOCABULARY</text>
-<g transform="translate(470,280)"><rect width="88" height="88" rx="4" fill="#f7f9fb" stroke="#d5dbe3"/><g transform="translate(8,8) scale(3)"><svg width="24" height="24" viewBox="0 0 24 24"><path d="M0 6h24M0 12h24M0 18h24M6 0v24M12 0v24M18 0v24" stroke="#e0e5ec" stroke-width="0.2"/><g stroke="#21262e" stroke-width="1.5"><circle cx="8" cy="8" r="3" fill="none"/><circle cx="16.5" cy="11" r="2.2" fill="none"/><circle cx="10" cy="17" r="2.6" fill="none"/><path d="M10.6 9.2 14.6 10.2M8.6 10.9l1.1 3.8M14.7 13l-2.6 2.9" fill="none" stroke-linecap="round"/></g><circle cx="16.5" cy="11" r="1" fill="#ab8612"/></svg></g></g>
-<text x="574" y="298" font-size="10" font-weight="400" fill="#676f7c">at 16px:</text>
-<g transform="translate(574,306) scale(0.67)"><svg width="24" height="24" viewBox="0 0 24 24"><g stroke="#21262e" stroke-width="1.5"><circle cx="8" cy="8" r="3" fill="none"/><circle cx="16.5" cy="11" r="2.2" fill="none"/><circle cx="10" cy="17" r="2.6" fill="none"/><path d="M10.6 9.2 14.6 10.2M8.6 10.9l1.1 3.8M14.7 13l-2.6 2.9" fill="none" stroke-linecap="round"/></g></svg></g>
-<text x="598" y="318" font-size="10" font-weight="400" fill="#8690a0">the mark holds</text>
-<g transform="translate(686,280)"><rect width="32" height="32" rx="5" fill="#e6bf34"/><g transform="translate(4,4) scale(1)"><svg width="24" height="24" viewBox="0 0 24 24"><g stroke="#ffffff" stroke-width="1.5"><circle cx="8" cy="8" r="3" fill="none"/><circle cx="16.5" cy="11" r="2.2" fill="none"/><circle cx="10" cy="17" r="2.6" fill="none"/><path d="M10.6 9.2 14.6 10.2M8.6 10.9l1.1 3.8M14.7 13l-2.6 2.9" fill="none" stroke-linecap="round"/></g></svg></g></g>
-<text x="726" y="294" font-size="10" font-weight="400" fill="#676f7c">app tile: reversed on accent</text>
-<text x="726" y="308" font-size="10" font-weight="400" fill="#676f7c">wordmark 16/600, +0.01em,</text>
-<text x="726" y="322" font-size="10" font-weight="400" fill="#676f7c">dropped under 720px</text>
-<line x1="24" y1="384" x2="1176" y2="384" stroke="#d5dbe3"/>
-<text x="24" y="402" font-size="11" font-weight="500" letter-spacing="0.6" fill="#8690a0">REJECTED</text>
-<rect x="24" y="414" width="470" height="64" rx="4" fill="#f7f9fb" stroke="#d5dbe3"/>
+<text x="24" y="34" font-size="20" font-weight="600" fill="#1a202c">Icons — 24-grid, currentColor, 1.5 stroke</text>
+<text x="24" y="56" font-size="12" font-weight="400" fill="#505a69">Round caps and joins, unfilled shapes, aria-hidden. Words label actions; a glyph stands alone only for a universal verb.</text>
+<rect x="604" y="68" width="584" height="142" rx="6" fill="#232831"/>
+<text x="24" y="84" font-size="11" font-weight="500" letter-spacing="0.6" fill="#7a8699">LIGHT</text>
+<rect x="24" y="98" width="32" height="32" rx="4" fill="#ffffff" stroke="#dee3e9"/>
+<svg x="32" y="106" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#1a202c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="M15.8 15.8 20 20"/></g></svg>
+<text x="40" y="140" font-size="9" font-weight="400" text-anchor="middle" fill="#7a8699">search</text>
+<rect x="66" y="98" width="32" height="32" rx="4" fill="#ffffff" stroke="#dee3e9"/>
+<svg x="74" y="106" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#1a202c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></g></svg>
+<text x="82" y="140" font-size="9" font-weight="400" text-anchor="middle" fill="#7a8699">plus</text>
+<rect x="108" y="98" width="32" height="32" rx="4" fill="#ffffff" stroke="#dee3e9"/>
+<svg x="116" y="106" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#1a202c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 5.5 8 12l6.5 6.5"/></g></svg>
+<text x="124" y="140" font-size="9" font-weight="400" text-anchor="middle" fill="#7a8699">back</text>
+<rect x="150" y="98" width="32" height="32" rx="4" fill="#ffffff" stroke="#dee3e9"/>
+<svg x="158" y="106" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#1a202c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 5.5 16 12l-6.5 6.5"/></g></svg>
+<text x="166" y="140" font-size="9" font-weight="400" text-anchor="middle" fill="#7a8699">fwd</text>
+<rect x="192" y="98" width="32" height="32" rx="4" fill="#ffffff" stroke="#dee3e9"/>
+<svg x="200" y="106" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#1a202c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9.5 6 6 6-6"/></g></svg>
+<text x="208" y="140" font-size="9" font-weight="400" text-anchor="middle" fill="#7a8699">chev</text>
+<rect x="234" y="98" width="32" height="32" rx="4" fill="#ffffff" stroke="#dee3e9"/>
+<svg x="242" y="106" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#1a202c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.8 4.6 4.6L19 7"/></g></svg>
+<text x="250" y="140" font-size="9" font-weight="400" text-anchor="middle" fill="#7a8699">check</text>
+<rect x="276" y="98" width="32" height="32" rx="4" fill="#ffffff" stroke="#dee3e9"/>
+<svg x="284" y="106" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#1a202c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 12h13"/></g></svg>
+<text x="292" y="140" font-size="9" font-weight="400" text-anchor="middle" fill="#7a8699">dash</text>
+<rect x="318" y="98" width="32" height="32" rx="4" fill="#ffffff" stroke="#dee3e9"/>
+<svg x="326" y="106" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#1a202c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></g></svg>
+<text x="334" y="140" font-size="9" font-weight="400" text-anchor="middle" fill="#7a8699">close</text>
+<rect x="360" y="98" width="32" height="32" rx="4" fill="#ffffff" stroke="#dee3e9"/>
+<svg x="368" y="106" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#1a202c" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 12h.01M12 12h.01M18.5 12h.01"/></g></svg>
+<text x="376" y="140" font-size="9" font-weight="400" text-anchor="middle" fill="#7a8699">dots</text>
+<rect x="402" y="98" width="32" height="32" rx="4" fill="#ffffff" stroke="#dee3e9"/>
+<svg x="410" y="106" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#1a202c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.5v15M7 19.5l-2.8-2.8M7 19.5l2.8-2.8M17 19.5v-15M17 4.5l-2.8 2.8M17 4.5l2.8 2.8"/></g></svg>
+<text x="418" y="140" font-size="9" font-weight="400" text-anchor="middle" fill="#7a8699">sort</text>
+<rect x="444" y="98" width="32" height="32" rx="4" fill="#ffffff" stroke="#dee3e9"/>
+<svg x="452" y="106" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#1a202c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6.5h16M7 12h10M10 17.5h4"/></g></svg>
+<text x="460" y="140" font-size="9" font-weight="400" text-anchor="middle" fill="#7a8699">filter</text>
+<rect x="486" y="98" width="32" height="32" rx="4" fill="#ffffff" stroke="#dee3e9"/>
+<svg x="494" y="106" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#1a202c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="14" rx="2" fill="none"/><path d="M14 5v14"/></g></svg>
+<text x="502" y="140" font-size="9" font-weight="400" text-anchor="middle" fill="#7a8699">panel</text>
+<rect x="24" y="146" width="32" height="32" rx="4" fill="#ffffff" stroke="#dee3e9"/>
+<svg x="32" y="154" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#1a202c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 19.5h4L20 8l-4-4L4.5 19.5z" fill="none"/><path d="m14.6 5.4 4 4"/></g></svg>
+<text x="40" y="188" font-size="9" font-weight="400" text-anchor="middle" fill="#7a8699">pencil</text>
+<rect x="66" y="146" width="32" height="32" rx="4" fill="#ffffff" stroke="#dee3e9"/>
+<svg x="74" y="154" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#1a202c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 3.5h7l4 4v13h-11z" fill="none"/><path d="M13.5 3.5v4h4"/></g></svg>
+<text x="82" y="188" font-size="9" font-weight="400" text-anchor="middle" fill="#7a8699">file</text>
+<rect x="108" y="146" width="32" height="32" rx="4" fill="#ffffff" stroke="#dee3e9"/>
+<svg x="116" y="154" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#1a202c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 6.5h6l2 2.5h9v10.5h-17z" fill="none"/></g></svg>
+<text x="124" y="188" font-size="9" font-weight="400" text-anchor="middle" fill="#7a8699">folder</text>
+<rect x="150" y="146" width="32" height="32" rx="4" fill="#ffffff" stroke="#dee3e9"/>
+<svg x="158" y="154" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#1a202c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 1 0-5.6l2-2a4 4 0 0 1 5.6 5.6l-1.2 1.2"/><path d="M14 10a4 4 0 0 1 0 5.6l-2 2A4 4 0 0 1 6.4 12l1.2-1.2"/></g></svg>
+<text x="166" y="188" font-size="9" font-weight="400" text-anchor="middle" fill="#7a8699">link</text>
+<rect x="192" y="146" width="32" height="32" rx="4" fill="#ffffff" stroke="#dee3e9"/>
+<svg x="200" y="154" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#1a202c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h7l9 9-7 7-9-9z" fill="none"/><circle cx="8" cy="8" r="1.2" fill="none"/></g></svg>
+<text x="208" y="188" font-size="9" font-weight="400" text-anchor="middle" fill="#7a8699">tag</text>
+<rect x="234" y="146" width="32" height="32" rx="4" fill="#ffffff" stroke="#dee3e9"/>
+<svg x="242" y="154" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#1a202c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7.5" fill="none"/><path d="M12 7.5V12l3 2.5"/></g></svg>
+<text x="250" y="188" font-size="9" font-weight="400" text-anchor="middle" fill="#7a8699">clock</text>
+<rect x="276" y="146" width="32" height="32" rx="4" fill="#ffffff" stroke="#dee3e9"/>
+<svg x="284" y="154" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#1a202c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8.5" r="3.5" fill="none"/><path d="M5.5 20c1.3-3.4 3.7-5 6.5-5s5.2 1.6 6.5 5"/></g></svg>
+<text x="292" y="188" font-size="9" font-weight="400" text-anchor="middle" fill="#7a8699">user</text>
+<rect x="318" y="146" width="32" height="32" rx="4" fill="#ffffff" stroke="#dee3e9"/>
+<svg x="326" y="154" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#1a202c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.2l2.4 4.9 5.4.8-3.9 3.8.9 5.4-4.8-2.6-4.8 2.6.9-5.4L4.2 9.9l5.4-.8z" fill="none"/></g></svg>
+<text x="334" y="188" font-size="9" font-weight="400" text-anchor="middle" fill="#7a8699">star</text>
+<rect x="360" y="146" width="32" height="32" rx="4" fill="#ffffff" stroke="#dee3e9"/>
+<svg x="368" y="154" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#1a202c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12S6 6.5 12 6.5 21.5 12 21.5 12 18 17.5 12 17.5 2.5 12 2.5 12z" fill="none"/><circle cx="12" cy="12" r="2.6" fill="none"/></g></svg>
+<text x="376" y="188" font-size="9" font-weight="400" text-anchor="middle" fill="#7a8699">eye</text>
+<rect x="402" y="146" width="32" height="32" rx="4" fill="#ffffff" stroke="#dee3e9"/>
+<svg x="410" y="154" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#1a202c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4l16 16"/><path d="M9.7 6.9A9.9 9.9 0 0 1 12 6.5c6 0 9.5 5.5 9.5 5.5a17.6 17.6 0 0 1-2.8 3.3M6.3 8.4A16.9 16.9 0 0 0 2.5 12S6 17.5 12 17.5c1 0 2-.2 2.9-.5"/></g></svg>
+<text x="418" y="188" font-size="9" font-weight="400" text-anchor="middle" fill="#7a8699">eyeoff</text>
+<rect x="444" y="146" width="32" height="32" rx="4" fill="#ffffff" stroke="#dee3e9"/>
+<svg x="452" y="154" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#1a202c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 10.5a5.5 5.5 0 0 1 11 0c0 3.8 1.5 5.3 1.5 5.3H5s1.5-1.5 1.5-5.3z" fill="none"/><path d="M10 18.6a2 2 0 0 0 4 0"/></g></svg>
+<text x="460" y="188" font-size="9" font-weight="400" text-anchor="middle" fill="#7a8699">bell</text>
+<rect x="486" y="146" width="32" height="32" rx="4" fill="#ffffff" stroke="#dee3e9"/>
+<svg x="494" y="154" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#1a202c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5.5" y="10.5" width="13" height="9" rx="2" fill="none"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></g></svg>
+<text x="502" y="188" font-size="9" font-weight="400" text-anchor="middle" fill="#7a8699">lock</text>
+<rect x="24" y="194" width="32" height="32" rx="4" fill="#ffffff" stroke="#dee3e9"/>
+<svg x="32" y="202" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#1a202c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 8.5H4.2V4.7"/><path d="M4.6 8.7a7.4 7.4 0 1 1 1.2 6.6"/></g></svg>
+<text x="40" y="236" font-size="9" font-weight="400" text-anchor="middle" fill="#7a8699">undo</text>
+<rect x="66" y="194" width="32" height="32" rx="4" fill="#ffffff" stroke="#dee3e9"/>
+<svg x="74" y="202" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#1a202c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 8.5h3.8V4.7"/><path d="M19.4 8.7a7.4 7.4 0 1 0-1.2 6.6"/></g></svg>
+<text x="82" y="236" font-size="9" font-weight="400" text-anchor="middle" fill="#7a8699">redo</text>
+<rect x="108" y="194" width="32" height="32" rx="4" fill="#ffffff" stroke="#dee3e9"/>
+<svg x="116" y="202" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#1a202c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.5v10.5M7.8 11.2 12 15.4l4.2-4.2M4.5 19.5h15"/></g></svg>
+<text x="124" y="236" font-size="9" font-weight="400" text-anchor="middle" fill="#7a8699">down</text>
+<rect x="150" y="194" width="32" height="32" rx="4" fill="#ffffff" stroke="#dee3e9"/>
+<svg x="158" y="202" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#1a202c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="8.5" y="8.5" width="11" height="11" rx="2" fill="none"/><path d="M5.5 15.5H5a1 1 0 0 1-1-1V5.5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v.5"/></g></svg>
+<text x="166" y="236" font-size="9" font-weight="400" text-anchor="middle" fill="#7a8699">copy</text>
+<rect x="192" y="194" width="32" height="32" rx="4" fill="#ffffff" stroke="#dee3e9"/>
+<svg x="200" y="202" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#1a202c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5v17M3.5 12h17M12 3.5 9.6 5.9M12 3.5l2.4 2.4M12 20.5l-2.4-2.4M12 20.5l2.4-2.4M3.5 12l2.4-2.4M3.5 12l2.4 2.4M20.5 12l-2.4-2.4M20.5 12l-2.4 2.4"/></g></svg>
+<text x="208" y="236" font-size="9" font-weight="400" text-anchor="middle" fill="#7a8699">move</text>
+<rect x="234" y="194" width="32" height="32" rx="4" fill="#ffffff" stroke="#dee3e9"/>
+<svg x="242" y="202" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#1a202c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3" fill="none"/><path d="M12 3.4v2.3M12 18.3v2.3M4.7 7.6l2 1.1M17.3 15.3l2 1.1M4.7 16.4l2-1.1M17.3 8.7l2-1.1"/></g></svg>
+<text x="250" y="236" font-size="9" font-weight="400" text-anchor="middle" fill="#7a8699">gear</text>
+<rect x="276" y="194" width="32" height="32" rx="4" fill="#ffffff" stroke="#dee3e9"/>
+<svg x="284" y="202" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#1a202c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.8" fill="none"/><path d="M12 2.6v2.2M12 19.2v2.2M3.6 12h2.2M18.2 12h2.2M6.1 6.1l1.6 1.6M16.3 16.3l1.6 1.6M6.1 17.9l1.6-1.6M16.3 7.7l1.6-1.6"/></g></svg>
+<text x="292" y="236" font-size="9" font-weight="400" text-anchor="middle" fill="#7a8699">sun</text>
+<rect x="318" y="194" width="32" height="32" rx="4" fill="#ffffff" stroke="#dee3e9"/>
+<svg x="326" y="202" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#1a202c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.6A8.4 8.4 0 1 1 9.6 4.2 7 7 0 0 0 20 14.6z" fill="none"/></g></svg>
+<text x="334" y="236" font-size="9" font-weight="400" text-anchor="middle" fill="#7a8699">moon</text>
+<rect x="360" y="194" width="32" height="32" rx="4" fill="#ffffff" stroke="#dee3e9"/>
+<svg x="368" y="202" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#1a202c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 5.2 18.8 12 7.5 18.8z" fill="none"/></g></svg>
+<text x="376" y="236" font-size="9" font-weight="400" text-anchor="middle" fill="#7a8699">play</text>
+<rect x="402" y="194" width="32" height="32" rx="4" fill="#ffffff" stroke="#dee3e9"/>
+<svg x="410" y="202" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#1a202c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6.5" width="19" height="11" rx="2" fill="none"/><path d="M6 10h.01M9 10h.01M12 10h.01M15 10h.01M18 10h.01M8 14h8"/></g></svg>
+<text x="418" y="236" font-size="9" font-weight="400" text-anchor="middle" fill="#7a8699">keyboard</text>
+<rect x="444" y="194" width="32" height="32" rx="4" fill="#ffffff" stroke="#dee3e9"/>
+<svg x="452" y="202" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#1a202c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3.5" fill="none"/><path d="M8.5 8.5v7h7"/></g></svg>
+<text x="460" y="236" font-size="9" font-weight="400" text-anchor="middle" fill="#7a8699">cmd</text>
+<rect x="486" y="194" width="32" height="32" rx="4" fill="#ffffff" stroke="#dee3e9"/>
+<svg x="494" y="202" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#1a202c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 6.5h15M9 6.5V4h6v2.5M6.6 6.5 7.7 20h8.6l1.1-13.5M10.5 10v6M13.5 10v6"/></g></svg>
+<text x="502" y="236" font-size="9" font-weight="400" text-anchor="middle" fill="#7a8699">trash</text>
+<text x="620" y="84" font-size="11" font-weight="500" letter-spacing="0.6" fill="#6b7280">DARK</text>
+<rect x="620" y="98" width="32" height="32" rx="4" fill="#2b313b" stroke="#323944"/>
+<svg x="628" y="106" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#f3f4f6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="M15.8 15.8 20 20"/></g></svg>
+<text x="636" y="140" font-size="9" font-weight="400" text-anchor="middle" fill="#6b7280">search</text>
+<rect x="662" y="98" width="32" height="32" rx="4" fill="#2b313b" stroke="#323944"/>
+<svg x="670" y="106" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#f3f4f6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></g></svg>
+<text x="678" y="140" font-size="9" font-weight="400" text-anchor="middle" fill="#6b7280">plus</text>
+<rect x="704" y="98" width="32" height="32" rx="4" fill="#2b313b" stroke="#323944"/>
+<svg x="712" y="106" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#f3f4f6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 5.5 8 12l6.5 6.5"/></g></svg>
+<text x="720" y="140" font-size="9" font-weight="400" text-anchor="middle" fill="#6b7280">back</text>
+<rect x="746" y="98" width="32" height="32" rx="4" fill="#2b313b" stroke="#323944"/>
+<svg x="754" y="106" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#f3f4f6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 5.5 16 12l-6.5 6.5"/></g></svg>
+<text x="762" y="140" font-size="9" font-weight="400" text-anchor="middle" fill="#6b7280">fwd</text>
+<rect x="788" y="98" width="32" height="32" rx="4" fill="#2b313b" stroke="#323944"/>
+<svg x="796" y="106" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#f3f4f6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9.5 6 6 6-6"/></g></svg>
+<text x="804" y="140" font-size="9" font-weight="400" text-anchor="middle" fill="#6b7280">chev</text>
+<rect x="830" y="98" width="32" height="32" rx="4" fill="#2b313b" stroke="#323944"/>
+<svg x="838" y="106" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#f3f4f6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.8 4.6 4.6L19 7"/></g></svg>
+<text x="846" y="140" font-size="9" font-weight="400" text-anchor="middle" fill="#6b7280">check</text>
+<rect x="872" y="98" width="32" height="32" rx="4" fill="#2b313b" stroke="#323944"/>
+<svg x="880" y="106" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#f3f4f6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 12h13"/></g></svg>
+<text x="888" y="140" font-size="9" font-weight="400" text-anchor="middle" fill="#6b7280">dash</text>
+<rect x="914" y="98" width="32" height="32" rx="4" fill="#2b313b" stroke="#323944"/>
+<svg x="922" y="106" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#f3f4f6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></g></svg>
+<text x="930" y="140" font-size="9" font-weight="400" text-anchor="middle" fill="#6b7280">close</text>
+<rect x="956" y="98" width="32" height="32" rx="4" fill="#2b313b" stroke="#323944"/>
+<svg x="964" y="106" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#f3f4f6" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 12h.01M12 12h.01M18.5 12h.01"/></g></svg>
+<text x="972" y="140" font-size="9" font-weight="400" text-anchor="middle" fill="#6b7280">dots</text>
+<rect x="998" y="98" width="32" height="32" rx="4" fill="#2b313b" stroke="#323944"/>
+<svg x="1006" y="106" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#f3f4f6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.5v15M7 19.5l-2.8-2.8M7 19.5l2.8-2.8M17 19.5v-15M17 4.5l-2.8 2.8M17 4.5l2.8 2.8"/></g></svg>
+<text x="1014" y="140" font-size="9" font-weight="400" text-anchor="middle" fill="#6b7280">sort</text>
+<rect x="1040" y="98" width="32" height="32" rx="4" fill="#2b313b" stroke="#323944"/>
+<svg x="1048" y="106" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#f3f4f6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6.5h16M7 12h10M10 17.5h4"/></g></svg>
+<text x="1056" y="140" font-size="9" font-weight="400" text-anchor="middle" fill="#6b7280">filter</text>
+<rect x="1082" y="98" width="32" height="32" rx="4" fill="#2b313b" stroke="#323944"/>
+<svg x="1090" y="106" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#f3f4f6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="14" rx="2" fill="none"/><path d="M14 5v14"/></g></svg>
+<text x="1098" y="140" font-size="9" font-weight="400" text-anchor="middle" fill="#6b7280">panel</text>
+<rect x="620" y="146" width="32" height="32" rx="4" fill="#2b313b" stroke="#323944"/>
+<svg x="628" y="154" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#f3f4f6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 19.5h4L20 8l-4-4L4.5 19.5z" fill="none"/><path d="m14.6 5.4 4 4"/></g></svg>
+<text x="636" y="188" font-size="9" font-weight="400" text-anchor="middle" fill="#6b7280">pencil</text>
+<rect x="662" y="146" width="32" height="32" rx="4" fill="#2b313b" stroke="#323944"/>
+<svg x="670" y="154" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#f3f4f6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 3.5h7l4 4v13h-11z" fill="none"/><path d="M13.5 3.5v4h4"/></g></svg>
+<text x="678" y="188" font-size="9" font-weight="400" text-anchor="middle" fill="#6b7280">file</text>
+<rect x="704" y="146" width="32" height="32" rx="4" fill="#2b313b" stroke="#323944"/>
+<svg x="712" y="154" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#f3f4f6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 6.5h6l2 2.5h9v10.5h-17z" fill="none"/></g></svg>
+<text x="720" y="188" font-size="9" font-weight="400" text-anchor="middle" fill="#6b7280">folder</text>
+<rect x="746" y="146" width="32" height="32" rx="4" fill="#2b313b" stroke="#323944"/>
+<svg x="754" y="154" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#f3f4f6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 1 0-5.6l2-2a4 4 0 0 1 5.6 5.6l-1.2 1.2"/><path d="M14 10a4 4 0 0 1 0 5.6l-2 2A4 4 0 0 1 6.4 12l1.2-1.2"/></g></svg>
+<text x="762" y="188" font-size="9" font-weight="400" text-anchor="middle" fill="#6b7280">link</text>
+<rect x="788" y="146" width="32" height="32" rx="4" fill="#2b313b" stroke="#323944"/>
+<svg x="796" y="154" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#f3f4f6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h7l9 9-7 7-9-9z" fill="none"/><circle cx="8" cy="8" r="1.2" fill="none"/></g></svg>
+<text x="804" y="188" font-size="9" font-weight="400" text-anchor="middle" fill="#6b7280">tag</text>
+<rect x="830" y="146" width="32" height="32" rx="4" fill="#2b313b" stroke="#323944"/>
+<svg x="838" y="154" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#f3f4f6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7.5" fill="none"/><path d="M12 7.5V12l3 2.5"/></g></svg>
+<text x="846" y="188" font-size="9" font-weight="400" text-anchor="middle" fill="#6b7280">clock</text>
+<rect x="872" y="146" width="32" height="32" rx="4" fill="#2b313b" stroke="#323944"/>
+<svg x="880" y="154" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#f3f4f6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8.5" r="3.5" fill="none"/><path d="M5.5 20c1.3-3.4 3.7-5 6.5-5s5.2 1.6 6.5 5"/></g></svg>
+<text x="888" y="188" font-size="9" font-weight="400" text-anchor="middle" fill="#6b7280">user</text>
+<rect x="914" y="146" width="32" height="32" rx="4" fill="#2b313b" stroke="#323944"/>
+<svg x="922" y="154" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#f3f4f6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.2l2.4 4.9 5.4.8-3.9 3.8.9 5.4-4.8-2.6-4.8 2.6.9-5.4L4.2 9.9l5.4-.8z" fill="none"/></g></svg>
+<text x="930" y="188" font-size="9" font-weight="400" text-anchor="middle" fill="#6b7280">star</text>
+<rect x="956" y="146" width="32" height="32" rx="4" fill="#2b313b" stroke="#323944"/>
+<svg x="964" y="154" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#f3f4f6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12S6 6.5 12 6.5 21.5 12 21.5 12 18 17.5 12 17.5 2.5 12 2.5 12z" fill="none"/><circle cx="12" cy="12" r="2.6" fill="none"/></g></svg>
+<text x="972" y="188" font-size="9" font-weight="400" text-anchor="middle" fill="#6b7280">eye</text>
+<rect x="998" y="146" width="32" height="32" rx="4" fill="#2b313b" stroke="#323944"/>
+<svg x="1006" y="154" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#f3f4f6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4l16 16"/><path d="M9.7 6.9A9.9 9.9 0 0 1 12 6.5c6 0 9.5 5.5 9.5 5.5a17.6 17.6 0 0 1-2.8 3.3M6.3 8.4A16.9 16.9 0 0 0 2.5 12S6 17.5 12 17.5c1 0 2-.2 2.9-.5"/></g></svg>
+<text x="1014" y="188" font-size="9" font-weight="400" text-anchor="middle" fill="#6b7280">eyeoff</text>
+<rect x="1040" y="146" width="32" height="32" rx="4" fill="#2b313b" stroke="#323944"/>
+<svg x="1048" y="154" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#f3f4f6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 10.5a5.5 5.5 0 0 1 11 0c0 3.8 1.5 5.3 1.5 5.3H5s1.5-1.5 1.5-5.3z" fill="none"/><path d="M10 18.6a2 2 0 0 0 4 0"/></g></svg>
+<text x="1056" y="188" font-size="9" font-weight="400" text-anchor="middle" fill="#6b7280">bell</text>
+<rect x="1082" y="146" width="32" height="32" rx="4" fill="#2b313b" stroke="#323944"/>
+<svg x="1090" y="154" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#f3f4f6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5.5" y="10.5" width="13" height="9" rx="2" fill="none"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></g></svg>
+<text x="1098" y="188" font-size="9" font-weight="400" text-anchor="middle" fill="#6b7280">lock</text>
+<text x="620" y="202" font-size="10" font-weight="400" fill="#9ca3af">same paths, ink from tokens. State glyphs are shapes, so greyscale survives.</text>
+<line x1="24" y1="246" x2="1176" y2="246" stroke="#cfd6e0"/>
+<text x="24" y="266" font-size="11" font-weight="500" letter-spacing="0.6" fill="#7a8699">ACTIVE INDICATOR: A 2PX RULE, LABEL WIDTH, NO ORNAMENT</text>
+<text x="24" y="292" font-size="14" font-weight="500" fill="#1a202c">Library</text>
+<rect x="24" y="300" width="50" height="2" fill="#c96a2d"/>
+<text x="106" y="292" font-size="14" font-weight="400" fill="#505a69">Graph</text>
+<text x="173" y="292" font-size="14" font-weight="400" fill="#505a69">Settings</text>
+<text x="24" y="322" font-size="10" font-weight="400" fill="#7a8699">a rule survives forced-colors, a tint would not</text>
+<text x="470" y="266" font-size="11" font-weight="500" letter-spacing="0.6" fill="#7a8699">LOGO RULES: 24-GRID, ONE WEIGHT, ≤4 SHAPES, ≤2 COLOURS, A CIRCLE + LINE VOCABULARY</text>
+<g transform="translate(470,280)"><rect width="88" height="88" rx="4" fill="#ffffff" stroke="#cfd6e0"/><g transform="translate(8,8) scale(3)"><svg width="24" height="24" viewBox="0 0 24 24"><path d="M0 6h24M0 12h24M0 18h24M6 0v24M12 0v24M18 0v24" stroke="#dee3e9" stroke-width="0.2"/><g stroke="#1a202c" stroke-width="1.5"><circle cx="8" cy="8" r="3" fill="none"/><circle cx="16.5" cy="11" r="2.2" fill="none"/><circle cx="10" cy="17" r="2.6" fill="none"/><path d="M10.6 9.2 14.6 10.2M8.6 10.9l1.1 3.8M14.7 13l-2.6 2.9" fill="none" stroke-linecap="round"/></g><circle cx="16.5" cy="11" r="1" fill="#c96a2d"/></svg></g></g>
+<text x="574" y="298" font-size="10" font-weight="400" fill="#505a69">at 16px:</text>
+<g transform="translate(574,306) scale(0.67)"><svg width="24" height="24" viewBox="0 0 24 24"><g stroke="#1a202c" stroke-width="1.5"><circle cx="8" cy="8" r="3" fill="none"/><circle cx="16.5" cy="11" r="2.2" fill="none"/><circle cx="10" cy="17" r="2.6" fill="none"/><path d="M10.6 9.2 14.6 10.2M8.6 10.9l1.1 3.8M14.7 13l-2.6 2.9" fill="none" stroke-linecap="round"/></g></svg></g>
+<text x="598" y="318" font-size="10" font-weight="400" fill="#7a8699">the mark holds</text>
+<g transform="translate(686,280)"><rect width="32" height="32" rx="5" fill="#c96a2d"/><g transform="translate(4,4) scale(1)"><svg width="24" height="24" viewBox="0 0 24 24"><g stroke="#ffffff" stroke-width="1.5"><circle cx="8" cy="8" r="3" fill="none"/><circle cx="16.5" cy="11" r="2.2" fill="none"/><circle cx="10" cy="17" r="2.6" fill="none"/><path d="M10.6 9.2 14.6 10.2M8.6 10.9l1.1 3.8M14.7 13l-2.6 2.9" fill="none" stroke-linecap="round"/></g></svg></g></g>
+<text x="726" y="294" font-size="10" font-weight="400" fill="#505a69">app tile: reversed on accent</text>
+<text x="726" y="308" font-size="10" font-weight="400" fill="#505a69">wordmark 16/600, +0.01em,</text>
+<text x="726" y="322" font-size="10" font-weight="400" fill="#505a69">dropped under 720px</text>
+<line x1="24" y1="384" x2="1176" y2="384" stroke="#cfd6e0"/>
+<text x="24" y="402" font-size="11" font-weight="500" letter-spacing="0.6" fill="#7a8699">REJECTED</text>
+<rect x="24" y="414" width="470" height="64" rx="4" fill="#ffffff" stroke="#cfd6e0"/>
 <g transform="translate(40,426)"><rect width="24" height="24" rx="6" fill="#4b7bd8"/><circle cx="11" cy="11" r="6.5" fill="none" stroke="#fff" stroke-width="1.5"/><path d="M15.8 15.8 20 20" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/></g>
-<text x="76" y="440" font-size="12" font-weight="400" fill="#676f7c">a glyph inside a vendor-blue tile</text>
-<g transform="translate(40,452)"><g stroke="#e6bf34" stroke-width="3" fill="none" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></g></g>
-<text x="76" y="466" font-size="12" font-weight="400" fill="#676f7c">a 3px hamburger where a ⋯ belongs</text>
-<text x="286" y="440" font-size="11" font-weight="400" fill="#676f7c">a tile is a second palette, a 24-grid icon</text>
-<text x="286" y="458" font-size="11" font-weight="400" fill="#676f7c">degrades past 2px, and a glyph that needs</text>
-<text x="286" y="474" font-size="11" font-weight="400" fill="#676f7c">a tooltip is not shipped.</text>
-<text x="620" y="440" font-size="11" font-weight="400" fill="#676f7c">Universal verbs get icon-only controls, each with an aria-label:</text>
-<g transform="translate(620,450)"><rect width="32" height="32" rx="4" fill="#f7f9fb" stroke="#e0e5ec"/><svg x="8" y="8" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#21262e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></g></svg></g>
-<g transform="translate(660,450)"><rect width="32" height="32" rx="4" fill="#f7f9fb" stroke="#e0e5ec"/><svg x="8" y="8" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#21262e" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 12h.01M12 12h.01M18.5 12h.01"/></g></svg></g>
-<g transform="translate(700,450)"><rect width="32" height="32" rx="4" fill="#f7f9fb" stroke="#e0e5ec"/><svg x="8" y="8" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#21262e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></g></svg></g>
-<g transform="translate(740,450)"><rect width="32" height="32" rx="4" fill="#f7f9fb" stroke="#e0e5ec"/><svg x="8" y="8" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#21262e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 5.5 8 12l6.5 6.5"/></g></svg></g>
-<g transform="translate(780,450)"><rect width="32" height="32" rx="4" fill="#f7f9fb" stroke="#e0e5ec"/><svg x="8" y="8" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#21262e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 5.5 16 12l-6.5 6.5"/></g></svg></g>
-<g transform="translate(820,450)"><rect width="32" height="32" rx="4" fill="#f7f9fb" stroke="#e0e5ec"/><svg x="8" y="8" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#21262e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9.5 6 6 6-6"/></g></svg></g>
+<text x="76" y="440" font-size="12" font-weight="400" fill="#505a69">a glyph inside a vendor-blue tile</text>
+<g transform="translate(40,452)"><g stroke="#c96a2d" stroke-width="3" fill="none" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></g></g>
+<text x="76" y="466" font-size="12" font-weight="400" fill="#505a69">a 3px hamburger where a ⋯ belongs</text>
+<text x="286" y="440" font-size="11" font-weight="400" fill="#505a69">a tile is a second palette, a 24-grid icon</text>
+<text x="286" y="458" font-size="11" font-weight="400" fill="#505a69">degrades past 2px, and a glyph that needs</text>
+<text x="286" y="474" font-size="11" font-weight="400" fill="#505a69">a tooltip is not shipped.</text>
+<text x="620" y="440" font-size="11" font-weight="400" fill="#505a69">Universal verbs get icon-only controls, each with an aria-label:</text>
+<g transform="translate(620,450)"><rect width="32" height="32" rx="4" fill="#ffffff" stroke="#dee3e9"/><svg x="8" y="8" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#1a202c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></g></svg></g>
+<g transform="translate(660,450)"><rect width="32" height="32" rx="4" fill="#ffffff" stroke="#dee3e9"/><svg x="8" y="8" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#1a202c" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 12h.01M12 12h.01M18.5 12h.01"/></g></svg></g>
+<g transform="translate(700,450)"><rect width="32" height="32" rx="4" fill="#ffffff" stroke="#dee3e9"/><svg x="8" y="8" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#1a202c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></g></svg></g>
+<g transform="translate(740,450)"><rect width="32" height="32" rx="4" fill="#ffffff" stroke="#dee3e9"/><svg x="8" y="8" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#1a202c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 5.5 8 12l6.5 6.5"/></g></svg></g>
+<g transform="translate(780,450)"><rect width="32" height="32" rx="4" fill="#ffffff" stroke="#dee3e9"/><svg x="8" y="8" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#1a202c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 5.5 16 12l-6.5 6.5"/></g></svg></g>
+<g transform="translate(820,450)"><rect width="32" height="32" rx="4" fill="#ffffff" stroke="#dee3e9"/><svg x="8" y="8" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="#1a202c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9.5 6 6 6-6"/></g></svg></g>
 </svg>

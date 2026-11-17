@@ -13,8 +13,24 @@
   let definitions = $state<WorkflowDefinitionRow[]>([]);
   let error = $state<ApiError | null>(null);
   let loaded = $state(false);
+  let postureFilter = $state<"all" | "live" | "shadow" | "off">("all");
 
   const canMutate = $derived(session.canMutate);
+
+  const totalFlows = $derived(definitions.length);
+  const liveCount = $derived(definitions.filter((d) => d.enabled && !d.shadow).length);
+  const shadowCount = $derived(definitions.filter((d) => d.enabled && d.shadow).length);
+  const offCount = $derived(definitions.filter((d) => !d.enabled).length);
+  const runningCount = $derived(definitions.reduce((sum, d) => sum + (d.instancesRunning ?? 0), 0));
+
+  const filteredDefinitions = $derived(
+    definitions.filter((d) => {
+      if (postureFilter === "live") return d.enabled && !d.shadow;
+      if (postureFilter === "shadow") return d.enabled && d.shadow;
+      if (postureFilter === "off") return !d.enabled;
+      return true;
+    }),
+  );
 
   async function load(): Promise<void> {
     try {
@@ -38,18 +54,63 @@
 </script>
 
 <section class="card" data-testid="flows-view" aria-label="flows">
-  <div class="mb-4 flex items-start justify-between gap-4">
+  <div class="mb-4 flex flex-wrap items-start justify-between gap-4">
     <div>
       <h2 class="mb-1 text-xl font-semibold">Flows</h2>
       <p class="text-sm text-ink-2">
         Active and stored workflow definitions. Execution runs appear under
         <a class="text-accent underline" href="#/monitor/runs">Monitor</a>.
         {#if canMutate}
-          <a class="mono text-accent underline" href="#/flows/new" data-testid="new-flow">author a flow</a>
+          <a class="mono text-accent underline ml-1" href="#/flows/new" data-testid="new-flow">author a flow</a>
         {/if}
       </p>
     </div>
-    <button class="btn" data-testid="flows-definitions-refresh" onclick={() => void load()}>refresh</button>
+    <div class="flex items-center gap-2">
+      {#if canMutate}
+        <a class="btn btn-primary" href="#/flows/new">new flow</a>
+      {/if}
+      <button class="btn" data-testid="flows-definitions-refresh" onclick={() => void load()}>refresh</button>
+    </div>
+  </div>
+
+  <!-- KPI Strip matching the theme showcase -->
+  <div class="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
+    <div class="card bg-sunken p-2.5">
+      <div class="micro-label">Total Flows</div>
+      <div class="mono text-lg font-semibold text-ink mt-0.5">{totalFlows}</div>
+    </div>
+    <div class="card bg-ok-veil/40 p-2.5 border-border-success">
+      <div class="micro-label text-ok">Live Rules</div>
+      <div class="mono text-lg font-semibold text-ok mt-0.5">{liveCount}</div>
+    </div>
+    <div class="card bg-amber-veil/40 p-2.5 border-border-warning">
+      <div class="micro-label text-warn">Shadow</div>
+      <div class="mono text-lg font-semibold text-warn mt-0.5">{shadowCount}</div>
+    </div>
+    <div class="card bg-sunken p-2.5">
+      <div class="micro-label">Inactive</div>
+      <div class="mono text-lg font-semibold text-ink-2 mt-0.5">{offCount}</div>
+    </div>
+    <div class="card bg-accent-veil/40 p-2.5 border-border-primary">
+      <div class="micro-label text-accent-text">Running Instances</div>
+      <div class="mono text-lg font-semibold text-accent mt-0.5">{runningCount}</div>
+    </div>
+  </div>
+
+  <div class="mb-3 flex items-center gap-2">
+    <span class="micro-label">Filter:</span>
+    <button
+      class="chip {postureFilter === 'all' ? 'chip-active' : ''}"
+      onclick={() => (postureFilter = "all")}>all</button>
+    <button
+      class="chip {postureFilter === 'live' ? 'chip-active' : ''}"
+      onclick={() => (postureFilter = "live")}>live</button>
+    <button
+      class="chip {postureFilter === 'shadow' ? 'chip-active' : ''}"
+      onclick={() => (postureFilter = "shadow")}>shadow</button>
+    <button
+      class="chip {postureFilter === 'off' ? 'chip-active' : ''}"
+      onclick={() => (postureFilter = "off")}>off</button>
   </div>
 
   {#if error}
@@ -73,10 +134,10 @@
         </tr>
       </thead>
       <tbody>
-        {#each definitions as d (d.id)}
+        {#each filteredDefinitions as d (d.id)}
           <tr>
-            <td class="font-mono">{d.id}</td>
-            <td>{d.version}</td>
+            <td class="font-mono font-medium">{d.id}</td>
+            <td class="mono text-ink-2">v{d.version}</td>
             <td>{d.title}</td>
             <td>
               {#if !d.enabled}
@@ -87,13 +148,13 @@
                 <span class="badge bg-ok-veil text-ok">live</span>
               {/if}
             </td>
-            <td>{d.team ?? "—"}</td>
+            <td class="mono text-xs">{d.team ?? "—"}</td>
             <td>
               <a class="mono text-accent underline" href={`#/monitor/runs?def=${encodeURIComponent(d.id)}`}>
                 {d.instancesRunning}
               </a>
             </td>
-            <td class="whitespace-nowrap">
+            <td class="whitespace-nowrap text-right">
               <a class="mono text-accent underline" href={`#/monitor/runs?def=${encodeURIComponent(d.id)}`}
                 >runs</a
               >

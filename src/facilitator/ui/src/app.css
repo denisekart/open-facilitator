@@ -2,11 +2,10 @@
 
 /* Operator console — "Ink on Paper" (the design-language skill is the law).
    This file is the only place hex colours live; components consume the
-   semantic aliases below. Cool blue-grey grounds, one gold signal for
-   state, borders are real borders, one shadow on floats only. Light is
-   the default (it lives under office lights all day); dark follows the OS
-   unless the toggle says otherwise; index.html applies the choice before
-   first paint and the choice persists.
+   semantic aliases below. Industrial copper and deep teal accents over
+   cool slate dark and cool-neutral light grounds. Light is the default;
+   dark follows the OS unless the toggle says otherwise; index.html applies
+   the choice before first paint and the choice persists.
 
    Icons: lucide-svelte only, strokeWidth={1.5}, currentColor. Typography:
    the 12/13/14/16/20/24 scale and the weights 400/500/600; button labels
@@ -17,24 +16,41 @@
   --color-canvas: var(--bg);
   --color-bg: var(--surface);
   --color-surface: var(--surface);
-  --color-sunken: var(--surface);
+  --color-surface-alt: var(--surface-alt);
+  --color-sunken: var(--surface-alt);
   --color-raised: var(--surface-raise);
   --color-edge: var(--line);
-  --color-edge-2: var(--line-2);
+  --color-edge-2: var(--line-soft);
+  --color-edge-soft: var(--line-soft);
   --color-ink: var(--ink);
   --color-ink-2: var(--ink-muted);
   --color-ink-3: var(--ink-faint);
-  /* Components read `accent` as a WORD (links, hover, badge labels): the
-     text role, never the bare fill — the fill is for btn-primary only. */
+
   --color-accent: var(--accent-text);
-  --color-accent-veil: var(--tint-selected);
-  --color-amber: var(--accent-text);
-  --color-amber-veil: var(--tint-selected);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-text: var(--accent-text);
+  --color-accent-veil: var(--tint-primary);
+  --color-border-primary: var(--border-primary);
+
+  --color-amber: var(--warning);
+  --color-amber-veil: var(--warning-tint);
+
+  --color-info: var(--info);
+  --color-info-text: var(--info-text);
+  --color-info-veil: var(--info-tint);
+  --color-border-info: var(--info-border);
+
+  --color-ok: var(--success);
+  --color-ok-veil: var(--success-tint);
+  --color-border-success: var(--success-border);
+
+  --color-warn: var(--warning);
+  --color-warn-veil: var(--warning-tint);
+  --color-border-warning: var(--warning-border);
+
   --color-danger: var(--danger-text);
-  --color-danger-veil: var(--danger-veil);
-  --color-ok: var(--ok);
-  --color-ok-veil: var(--ok-veil);
-  --color-warn: var(--accent-text);
+  --color-danger-veil: var(--danger-tint);
+  --color-border-danger: var(--danger-border);
 
   --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-mono: ui-monospace, "Cascadia Mono", "JetBrains Mono", Menlo, monospace;
@@ -42,55 +58,100 @@
 
 :root,
 [data-theme="light"] {
-  --bg: #eef2f6;
-  --surface: #f7f9fb;
+  --bg: #f1f3f5;
+  --surface: #ffffff;
+  --surface-alt: #e8ecf0;
   --surface-raise: #ffffff;
-  --ink: #21262e;
-  --ink-muted: #676f7c;
-  --ink-faint: #8690a0;
-  --line: #d5dbe3;
-  --accent: #e6bf34;
-  --accent-rule: #ab8612;
-  --accent-text: #8d6e0e;
-  --accent-on: #14171a;
-  --danger: #d54e4e;
-  --danger-text: #b03a3a;
-  --line-soft: #e0e5ec;
-  --tint-selected: #faf2d6;
+  --ink: #1a202c;
+  --ink-muted: #505a69;
+  --ink-faint: #7a8699;
+  --line: #cfd6e0;
+  --line-soft: #dee3eb;
+
+  --accent: #c96a2d;
+  --accent-hover: #b3581e;
+  --accent-rule: #c96a2d;
+  --accent-text: #ac531c;
+  --accent-on: #ffffff;
+  --tint-primary: #f8efe8;
+  --border-primary: #e2b696;
+  --tint-selected: #f8efe8;
+
+  --info: #127377;
+  --info-text: #127377;
+  --info-tint: #e5f3f4;
+  --info-border: #92cad0;
+
+  --success: #447a38;
+  --success-tint: #eaf3e8;
+  --success-border: #9fc497;
+  --ok: #447a38;
+  --ok-veil: #eaf3e8;
+
+  --warning: #a87400;
+  --warning-tint: #faf2de;
+  --warning-border: #dec177;
+
+  --danger: #ba3c3c;
+  --danger-text: #ba3c3c;
+  --danger-tint: #f9e8e8;
+  --danger-border: #df9e9e;
+  --danger-veil: #f9e8e8;
+
+  --grid-dot: #cbd5e1;
   color-scheme: light;
 }
 
 [data-theme="dark"] {
-  --bg: #2b2e33;
-  --surface: #33373d;
-  --surface-raise: #3b4046;
-  --ink: #d6dae0;
-  --ink-muted: #99a1ab;
-  --ink-faint: #767d85;
-  --line: #464c54;
-  --accent: #e6bf34;
-  --accent-rule: #e6bf34;
-  --accent-text: #e6bf34;
-  --accent-on: #1b1e22;
-  --danger: #ff8f99;
-  --danger-text: #ff8f99;
-  --line-soft: #373b42;
-  --tint-selected: #57523b;
+  --bg: #232831;
+  --surface: #2b313b;
+  --surface-alt: #323944;
+  --surface-raise: #3b4350;
+  --ink: #f3f4f6;
+  --ink-muted: #9ca3af;
+  --ink-faint: #6b7280;
+  --line: #3f4754;
+  --line-soft: #343b47;
+
+  --accent: #c96a2d;
+  --accent-hover: #e58a45;
+  --accent-rule: #c96a2d;
+  --accent-text: #e58a45;
+  --accent-on: #ffffff;
+  --tint-primary: #3d332d;
+  --border-primary: #8a4820;
+  --tint-selected: #3d332d;
+
+  --info: #168b90;
+  --info-text: #168b90;
+  --info-tint: #223538;
+  --info-border: #175b5f;
+
+  --success: #58894c;
+  --success-tint: #273426;
+  --success-border: #3b5832;
+  --ok: #58894c;
+  --ok-veil: #273426;
+
+  --warning: #c48a00;
+  --warning-tint: #373121;
+  --warning-border: #7a5b0b;
+
+  --danger: #c75454;
+  --danger-text: #c75454;
+  --danger-tint: #382626;
+  --danger-border: #7d2e2e;
+  --danger-veil: #382626;
+
+  --grid-dot: #3f4754;
   color-scheme: dark;
 }
 
-/* Derived tokens: computed, never new hex (§1, §2). One formula, both
-   themes — each theme feeds its own accent-text/ink pair, so
-   `--ok` lands olive (8.9:1 on light raise) and sand-gold (6.7:1 on
-   dark raise): a success WORD, not a second accent. Veils are 12-16%
-   washes behind those words, never a frame. */
 :root {
-  --line-2: color-mix(in oklab, var(--ink) 18%, var(--line));
+  --line-2: var(--line-soft);
   --hover: color-mix(in oklab, var(--ink) 6%, var(--surface-raise));
-  --danger-veil: color-mix(in oklab, var(--danger-text) 14%, var(--surface-raise));
-  --ok: color-mix(in oklab, var(--accent-text) 50%, var(--ink) 50%);
-  --ok-veil: color-mix(in oklab, var(--ok) 14%, var(--surface-raise));
   --shadow-1: 0 1px 3px rgb(0 0 0 / 12%);
+  --shadow-overlay: 0 4px 12px rgb(0 0 0 / 18%), 0 1px 3px rgb(0 0 0 / 12%);
   --radius-control: 4px;
   --radius-overlay: 6px;
   --chrome-h: 44px;

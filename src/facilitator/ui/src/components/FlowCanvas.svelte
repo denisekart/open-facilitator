@@ -56,8 +56,8 @@
       type: "smoothstep" as const,
       ...(e.label ? { label: e.label } : {}),
       style:
-        "stroke:var(--color-edge-2)" + (e.dashed ? ";stroke-dasharray:5 4" : ""),
-      labelStyle: "fill:var(--color-ink-3);font-size:11px",
+        "stroke:var(--color-edge-2);stroke-width:1.5px" + (e.dashed ? ";stroke-dasharray:5 4" : ""),
+      labelStyle: "fill:var(--color-ink-3);font-size:11px;font-family:var(--font-mono)",
       markerEnd: { type: MarkerType.ArrowClosed, color: "var(--color-edge-2)" },
     })),
   );
@@ -95,12 +95,17 @@
     text-overflow: clip !important;
     white-space: nowrap;
     border-radius: 4px;
+    background: var(--surface);
+    padding: 1px 4px;
+    border: 1px solid var(--line-soft);
   }
   .flow-canvas {
-    height: 420px;
+    height: 440px;
     overflow: hidden;
     border: 1px solid var(--line);
-    border-radius: var(--radius-control);
-    background: var(--surface);
+    border-radius: var(--radius-overlay, 6px);
+    background-color: var(--bg);
+    background-image: radial-gradient(var(--grid-dot) 1px, transparent 1px);
+    background-size: 16px 16px;
   }
 </style>

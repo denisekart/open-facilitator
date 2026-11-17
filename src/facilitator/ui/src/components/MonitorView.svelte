@@ -4,7 +4,7 @@
   import { apiFetch } from "../lib/auth.svelte.js";
   import { deckChanged } from "../lib/deck.svelte.js";
   import { go, href, parse } from "../lib/route.svelte.js";
-  import { ago, flowTone, stamp } from "../lib/status.js";
+  import { ago, flowTone, stamp, TONE_CLASS } from "../lib/status.js";
   import type { WorkflowInstanceRow } from "../lib/types.js";
   import EmptyState from "./EmptyState.svelte";
   import ProblemNote from "./ProblemNote.svelte";
@@ -143,7 +143,7 @@
             <td title={stamp(row.startedAt)}>{ago(row.startedAt).text}</td>
             <td class="font-mono">{row.definitionId}@{row.definitionVersion}</td>
             <td>
-              <span class="badge {flowTone(row.status)}">
+              <span class="badge {TONE_CLASS[flowTone(row.status)]}">
                 {row.status}
                 {#if row.status === "running" || row.status === "waiting"}
                   <span class="ml-1 opacity-70">· {row.currentStep ?? "start"}</span>

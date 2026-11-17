@@ -120,7 +120,7 @@
         >
         <h2 class="text-xl font-semibold">
           <span class="font-mono">{detail.definitionId}</span>@{detail.definitionVersion}
-          <span class="badge {flowTone(detail.status)} ml-1">
+          <span class="badge {TONE_CLASS[flowTone(detail.status)]} ml-1">
             {detail.status}
             {#if detail.status === "running" || detail.status === "waiting"}
               <span class="ml-1 opacity-70">· {detail.currentStep ?? "start"}</span>
@@ -187,7 +187,7 @@
               <button class="mono text-accent underline" onclick={() => go(`#/monitor/runs/${c.instanceId}`)}
                 >{c.definitionId}</button
               >
-              <span class="badge {flowTone(c.status)} ml-1">{c.status}</span>
+              <span class="badge {TONE_CLASS[flowTone(c.status)]} ml-1">{c.status}</span>
             </li>
           {/each}
         </ul>

@@ -40,9 +40,20 @@
       : [],
   );
 
-  function bars(bucket: AdminHourBucket[]): string[] {
+  function lineGraph(bucket: AdminHourBucket[], width = 140, height = 36): { line: string; area: string; points: { x: number; y: number }[] } {
+    if (!bucket || bucket.length === 0) {
+      return { line: `M 0 ${height} L ${width} ${height}`, area: `M 0 ${height} L ${width} ${height} Z`, points: [] };
+    }
     const max = Math.max(1, ...bucket.map((b) => b.count));
-    return bucket.map((b) => `height:${Math.max(2, Math.round((b.count / max) * 100))}%`);
+    const step = bucket.length > 1 ? width / (bucket.length - 1) : width;
+    const points = bucket.map((b, i) => {
+      const x = Math.round(i * step * 10) / 10;
+      const y = Math.round((height - 4 - ((b.count / max) * (height - 8))) * 10) / 10;
+      return { x, y };
+    });
+    const line = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
+    const area = `${line} L ${width} ${height} L 0 ${height} Z`;
+    return { line, area, points };
   }
 </script>
 
@@ -52,7 +63,7 @@
     {#if health.summary}
       {@const s = health.summary}
       <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
-        <dt class="text-ink-2">Works</dt>
+        <dt class="text-ink-2">Activities</dt>
         <dd class="flex flex-wrap gap-1">
           {#each Object.entries(s.workByState) as [state, n]}
             <span class="badge {TONE_CLASS[stateTone(state)]}"
@@ -139,7 +150,7 @@
       </div>
       <div class="mt-3 grid grid-cols-2 gap-4">
         {#each sparks as { label, hint, bad, bucket, link }}
-          {@const heights = bars(bucket)}
+          {@const graph = lineGraph(bucket)}
           {@const total = bucket.reduce((a, b) => a + b.count, 0)}
           <div>
             <p class="mb-1 flex justify-between text-xs">
@@ -153,12 +164,22 @@
               <span class="mono {total > 0 && bad ? 'text-danger' : 'text-ink-2'}">{total}</span>
             </p>
             <div
-              class="flex h-10 items-end gap-0.5"
+              class="h-9 w-full rounded bg-surface-raise border border-edge/60 p-1 flex items-center"
               role="img"
               aria-label={`${label}: ${total} in the window`}>
-              {#each heights as style}
-                <div class="w-2 rounded-sm {bad ? 'bg-danger/60' : 'bg-accent/60'}" {style}></div>
-              {/each}
+              <svg viewBox="0 0 140 36" class="w-full h-full overflow-visible" preserveAspectRatio="none">
+                <defs>
+                  <linearGradient id={`grad-${label.replace(/\s+/g, "-")}`} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color={bad ? "var(--danger)" : "var(--accent)"} stop-opacity="0.25" />
+                    <stop offset="100%" stop-color={bad ? "var(--danger)" : "var(--accent)"} stop-opacity="0.0" />
+                  </linearGradient>
+                </defs>
+                <path d={graph.area} fill={`url(#grad-${label.replace(/\s+/g, "-")})`} />
+                <path d={graph.line} fill="none" stroke={bad ? "var(--danger)" : "var(--accent)"} stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" />
+                {#each graph.points as pt}
+                  <circle cx={pt.x} cy={pt.y} r="1.5" fill={bad ? "var(--danger)" : "var(--accent)"} />
+                {/each}
+              </svg>
             </div>
           </div>
         {/each}

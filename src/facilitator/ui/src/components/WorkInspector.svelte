@@ -135,18 +135,73 @@
     </div>
 
     {#if flow}
-      <p class="mb-4 text-sm" data-testid="work-flow-strip">
-        <span class="text-ink-2">Flow</span>
-        <a class="mono text-accent underline" href={`#/monitor/runs/${flow.instanceId}`}>
-          {flow.definitionId}@{flow.definitionVersion}
-        </a>
-        <span class="badge {TONE_CLASS[flowTone(flow.status)]} ml-1">
-          {flow.status}
-        </span>
-        {#if flow.currentStep}
-          <span class="mono ml-1 text-xs text-ink-2">at {flow.currentStep}</span>
-        {/if}
-      </p>
+      <div class="mb-4 rounded-lg border border-border-primary bg-surface-alt p-3" data-testid="work-flow-strip">
+        <div class="flex items-center justify-between gap-2 mb-2">
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-semibold uppercase tracking-wider text-ink-2">Workflow Instance:</span>
+            <a class="mono font-semibold text-accent underline text-xs" href={`#/monitor/runs/${flow.instanceId}`}>
+              {flow.definitionId}@{flow.definitionVersion}
+            </a>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="badge {TONE_CLASS[flowTone(flow.status)]}">
+              <span class="dot" aria-hidden="true"></span>{flow.status}
+            </span>
+            {#if flow.currentStep}
+              <span class="mono text-xs text-ink font-semibold">at {flow.currentStep}</span>
+            {/if}
+          </div>
+        </div>
+
+        <!-- Visual Step Pipeline Stepper -->
+        <div class="flex items-center gap-1.5 overflow-x-auto py-1">
+          <div class="flex items-center gap-1 text-xs px-2 py-1 rounded bg-surface border border-edge text-ink-2">
+            <span class="size-2 rounded-full bg-ok"></span>
+            <span>trigger</span>
+          </div>
+          <span class="text-ink-3 text-xs font-mono">→</span>
+          <div class="flex items-center gap-1 text-xs px-2 py-1 rounded bg-surface border border-edge text-ink-2">
+            <span class="size-2 rounded-full bg-ok"></span>
+            <span>ingress</span>
+          </div>
+          <span class="text-ink-3 text-xs font-mono">→</span>
+          {#if flow.currentStep}
+            <div class="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded bg-accent-veil border border-border-primary text-accent font-semibold shadow-sm">
+              <span class="size-2 rounded-full bg-accent animate-pulse"></span>
+              <span class="mono">{flow.currentStep}</span>
+            </div>
+            <span class="text-ink-3 text-xs font-mono">→</span>
+          {/if}
+          <div class="flex items-center gap-1 text-xs px-2 py-1 rounded bg-surface border border-edge text-ink-2 opacity-80">
+            <span class="size-2 rounded-full bg-ink-3"></span>
+            <span>dispatch</span>
+          </div>
+          <span class="text-ink-3 text-xs font-mono">→</span>
+          <div class="flex items-center gap-1 text-xs px-2 py-1 rounded bg-surface border border-edge text-ink-2 opacity-80">
+            <span class="size-2 rounded-full bg-ink-3"></span>
+            <span>completion</span>
+          </div>
+        </div>
+      </div>
+    {:else}
+      <!-- Work Lifecycle Stepper -->
+      <div class="mb-4 rounded-lg border border-edge bg-surface-alt p-2.5">
+        <div class="flex items-center justify-between mb-1.5">
+          <span class="text-[11px] font-semibold uppercase tracking-wider text-ink-2">Activity Lifecycle:</span>
+          <span class="badge {TONE_CLASS[stateTone(w.state)]}">
+            <span class="dot" aria-hidden="true"></span>{stateLabel(w.state)}
+          </span>
+        </div>
+        <div class="flex items-center gap-1 text-xs overflow-x-auto py-0.5">
+          <span class="px-2 py-0.5 rounded bg-surface border border-edge text-ink font-medium">requested</span>
+          <span class="text-ink-3 text-xs font-mono">→</span>
+          <span class="px-2 py-0.5 rounded {detail.assignments.length > 0 ? 'bg-surface border border-edge text-ink font-medium' : 'text-ink-3'}">assigned</span>
+          <span class="text-ink-3 text-xs font-mono">→</span>
+          <span class="px-2 py-0.5 rounded {w.state === 'awaitingapproval' ? 'bg-amber-veil border border-border-warning text-amber font-semibold' : 'text-ink-3'}">policy gate</span>
+          <span class="text-ink-3 text-xs font-mono">→</span>
+          <span class="px-2 py-0.5 rounded {w.state === 'completed' || w.state === 'validated' ? 'bg-ok-veil border border-border-success text-ok font-semibold' : 'text-ink-3'}">resolved</span>
+        </div>
+      </div>
     {/if}
 
     {#if detail.assignments.length > 0}

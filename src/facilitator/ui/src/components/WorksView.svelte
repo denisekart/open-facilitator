@@ -62,9 +62,9 @@
 <section class="card" data-testid="works-view">
   <div class="mb-3 flex items-center justify-between">
     <h2 class="text-sm font-medium">
-      Works
+      Activities
       <span class="ml-1 text-xs font-normal text-ink-2"
-        >— active and completed work items</span
+        >— active and completed activity items</span
       >
     </h2>
     <button class="btn" onclick={() => void load()}>refresh</button>

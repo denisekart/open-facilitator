@@ -89,7 +89,7 @@
   // Scroll pin: stick to the bottom only while the operator is at the bottom.
   let thread = $state<HTMLDivElement | null>(null);
   let atBottom = $state(true);
-  let input = $state<HTMLInputElement | null>(null);
+  let input = $state<HTMLInputElement | HTMLTextAreaElement | null>(null);
 
   async function postJson<T>(path: string, body?: unknown): Promise<T> {
     const response = await api(path, {
@@ -502,20 +502,20 @@
 </script>
 
 <section class="relative flex h-full min-h-0 grow flex-col overflow-hidden" data-testid="chat-view">
-  <!-- Top Control Bar: Chat title, History drawer toggle, verbosity, and New Chat -->
+  <!-- Top Control Bar: Chat title, History drawer toggle, and New Chat -->
   <header class="flex shrink-0 items-center justify-between gap-2 border-b border-edge bg-surface pb-2 pt-1 px-1">
     <div class="flex items-center gap-1.5 min-w-0">
       <button
-        class="chip flex items-center gap-1 text-xs"
+        class="chip flex items-center gap-1.5 text-xs h-8 min-h-8 px-2.5"
         class:chip-active={historyOpen}
         data-testid="chat-toggle-history"
         aria-expanded={historyOpen}
         title="Toggle conversation history"
         onclick={() => (historyOpen = !historyOpen)}>
-        <History class="size-3.5 text-ink-2" strokeWidth={1.5} aria-hidden="true" />
+        <History class="size-4 text-ink-2" strokeWidth={1.5} aria-hidden="true" />
         <span class="font-medium">History</span>
         {#if sessions.length > 0}
-          <span class="mono rounded bg-surface-alt px-1 text-[11px] text-ink-2">{sessions.length}</span>
+          <span class="mono rounded bg-surface-alt px-1.5 py-0.5 text-[11px] text-ink-2">{sessions.length}</span>
         {/if}
       </button>
 
@@ -526,59 +526,44 @@
     </div>
 
     <div class="flex items-center gap-1.5 shrink-0">
-      <div class="flex items-center gap-1">
-        <label class="sr-only" for="chat-verbosity">verbosity</label>
-        <select
-          id="chat-verbosity"
-          class="input py-0.5 px-2 text-xs font-medium cursor-pointer"
-          data-testid="chat-verbosity"
-          value={verbosity}
-          title="Response detail verbosity"
-          onchange={(e) => void setVerbosity(e.currentTarget.value as ChatVerbosity)}>
-          {#each VERBOSITIES as level}
-            <option value={level}>{level}</option>
-          {/each}
-        </select>
-      </div>
-
       <button
-        class="chip chip-active flex items-center gap-1 text-xs font-semibold"
+        class="chip chip-active flex items-center gap-1.5 text-xs font-semibold h-8 min-h-8 px-3"
         data-testid="chat-new-session"
         title="Start a new conversation"
         onclick={() => {
           newSession();
           historyOpen = false;
         }}>
-        <Plus class="size-3.5" strokeWidth={2} aria-hidden="true" />
+        <Plus class="size-4" strokeWidth={2} aria-hidden="true" />
         <span>New Chat</span>
       </button>
     </div>
   </header>
 
   <div class="relative flex min-h-0 grow overflow-hidden">
-    <!-- Collapsible History Drawer / Flyout: Stays accessible, hidden when focused on chat -->
+    <!-- Collapsible History Drawer / Flyout: Top-aligned and clean -->
     <aside
-      class="history-drawer absolute inset-y-0 left-0 z-20 flex w-72 flex-col border-r border-edge bg-surface shadow-overlay transition-transform duration-180 ease-out {historyOpen
+      class="history-drawer absolute inset-y-0 left-0 z-20 flex w-72 flex-col justify-start border-r border-edge bg-surface shadow-overlay transition-transform duration-180 ease-out {historyOpen
         ? 'translate-x-0'
         : '-translate-x-full pointer-events-none opacity-0 md:opacity-100'}"
       class:hidden={!historyOpen}
       aria-label="chat history"
       data-testid="chat-history-sidebar">
-      <div class="flex items-center justify-between border-b border-edge px-3 py-2 bg-surface-alt">
+      <div class="flex items-center justify-between border-b border-edge px-3 py-2 bg-surface-alt shrink-0">
         <div class="flex items-center gap-1.5 text-xs font-semibold text-ink">
-          <History class="size-3.5 text-ink-2" strokeWidth={1.5} aria-hidden="true" />
+          <History class="size-4 text-ink-2" strokeWidth={1.5} aria-hidden="true" />
           <span>Conversations</span>
           <span class="mono text-[11px] text-ink-2">({sessions.length})</span>
         </div>
         <button
-          class="btn px-1.5 py-0.5 text-xs"
+          class="btn px-1.5 py-0.5 text-xs h-7 min-h-7"
           aria-label="close history"
           onclick={() => (historyOpen = false)}>
-          <X class="size-3.5" strokeWidth={1.5} />
+          <X class="size-4" strokeWidth={1.5} />
         </button>
       </div>
 
-      <ul class="grid gap-1 overflow-y-auto grow p-2" data-testid="chat-sessions">
+      <ul class="flex flex-col justify-start content-start items-stretch gap-1 overflow-y-auto grow p-2" data-testid="chat-sessions">
         {#each sessions as s (s.sessionId)}
           {@const seen = ago(s.lastMessageAt)}
           <li class="relative">
@@ -894,10 +879,12 @@
       {/if}
 
       <!-- Composer Input Box -->
-      <div class="mt-1.5 relative flex items-center gap-2 rounded-lg border border-edge bg-surface p-1.5 focus-within:border-accent shadow-sm">
-        <input
-          class="input min-w-0 grow border-0 bg-transparent px-2.5 py-1 text-sm focus:outline-none"
-          placeholder="Ask the AiDeck or type / for commands…"
+      <div class="mt-1.5 relative flex flex-col rounded-lg border border-edge bg-surface p-1.5 focus-within:border-accent shadow-sm">
+        <textarea
+          class="input min-w-0 grow border-0 bg-transparent px-2.5 py-1 text-xs focus:outline-none resize-none leading-relaxed"
+          rows={2}
+          style="min-height: 48px; max-height: 160px;"
+          placeholder="Ask the Assistant or type / for commands…"
           bind:this={input}
           bind:value={draft}
           data-testid="chat-input"
@@ -906,15 +893,32 @@
               e.preventDefault();
               void send();
             }
-          }} />
-        <button
-          class="btn btn-primary shrink-0 py-1.5 px-3 flex items-center gap-1.5 text-xs font-semibold"
-          disabled={pending || !draft.trim()}
-          data-testid="chat-send"
-          onclick={() => void send()}>
-          <Send class="size-3.5" strokeWidth={1.5} />
-          <span>send</span>
-        </button>
+          }}></textarea>
+        <div class="flex items-center justify-between pt-1 border-t border-edge/40 px-1 mt-0.5">
+          <div class="flex items-center gap-1.5 text-[11px] text-ink-3">
+            <label for="chat-verbosity" class="font-medium text-ink-2">Mode:</label>
+            <select
+              id="chat-verbosity"
+              class="bg-transparent text-xs font-semibold text-accent cursor-pointer border-0 p-0 focus:outline-none"
+              data-testid="chat-verbosity"
+              value={verbosity}
+              title="Response detail verbosity"
+              onchange={(e) => void setVerbosity(e.currentTarget.value as ChatVerbosity)}>
+              {#each VERBOSITIES as level}
+                <option value={level}>{level}</option>
+              {/each}
+            </select>
+          </div>
+          <button
+            class="btn btn-primary shrink-0 size-8 min-h-8 p-0 rounded-full flex items-center justify-center cursor-pointer shadow-sm"
+            disabled={pending || !draft.trim()}
+            title="Send message"
+            aria-label="Send message"
+            data-testid="chat-send"
+            onclick={() => void send()}>
+            <Send class="size-4" strokeWidth={2} />
+          </button>
+        </div>
       </div>
     </div>
   </div>

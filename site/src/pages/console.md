@@ -22,7 +22,7 @@ _The Work inspector displays timeline events, approver assignments, and state tr
 
 The navigation menu provides access to nine operational areas:
 
-- **Works** — The active queue, sorted newest first, filterable by state. Team-scoped operators see only works belonging to their assigned teams.
+- **Activities** — The active queue (code: `works`), sorted newest first, filterable by state. Team-scoped operators see only activities belonging to their assigned teams.
 - **Flows** — The workflow plane. Displays active, shadow, and inactive definitions alongside visual execution graphs and step-level retry controls.
 - **Monitor** — Real-time workflow instances, replica status, queue depth, and link health based on active database leases.
 - **Deliveries** — The outbound delivery ledger tracking dispatched messages, acknowledgments, poison queues, and retry attempts.
@@ -30,7 +30,7 @@ The navigation menu provides access to nine operational areas:
 - **Runtime** — Active replica nodes, provisioning records, and manual sweeper triggers requiring mandatory change reasons.
 - **Team** — Connected team Gateways displaying endpoint identifiers, session durations, last acknowledged sequence numbers, and revocation controls.
 - **Config** — Runtime routing policies and media rules edited via optimistic concurrency (`If-Match`) with required audit reasons.
-- **AiDeck** — An operator assistant drawer. Queries live state using the operator's permissions and presents structured proposals for human confirmation.
+- **Assistant** — An operator assistant drawer. Queries live state using the operator's permissions and presents structured proposals for human confirmation.
 
 ## What the console is not
 

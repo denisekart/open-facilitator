@@ -70,13 +70,26 @@ Modals are strictly reserved for blocking confirmation (destructive actions, mer
 ## 7. Forms & Inputs
 
 - **Field Layout:** 13px/500 label positioned above input (4px gap). Optional help text 12px `--ink-muted` below.
-- **Input Styling:** 14px type, 8×12 padding, 4px radius, 1px `--line-soft` border, `--surface` fill.
+- **Input Styling:** 13px type, 32px standard height, 4px radius, 1px `--line-soft` border, `--surface-raise` fill. Multi-line textareas expand dynamically with vertical scroll bounds.
+- **Inlined Input Icons:** All icons directly tied to an input action (search glass, clear action, slash prompt, composer send button) must be inlined inside the input container frame rather than floating outside or stacked on separate rows.
+- **Action Buttons & Send Controls:** Primary action buttons (`.btn-primary`) feature high-contrast `#ffffff` text on copper background across all themes. In chat composers, send renders as a circular inlined paper airplane icon button.
 - **Focus Cue:** 2px outline in `--accent-rule` at 2px offset on `:focus-visible`.
 - **Error State:** 1px `--danger` border accompanied by 12px `--danger-text` explanatory message.
 - **Validation:** Triggered on blur, never per keystroke.
 - **Segmented Controls:** Quiet container with 13px segments, 28px height, 1px separators. Active segment takes `--tint-primary` fill and 2px copper underline.
 
-## 8. Status Chip & System Readouts
+## 8. Time-Series Metric Graphs (Line Graphs)
+
+Metric sparklines and telemetry rollups (Monitor, Deliveries, Runtime) render as smooth continuous SVG line graphs with subtle area gradient fills and vector data points, replacing discrete vertical bar charts.
+
+## 9. Assistant Drawer (AI Deck)
+
+The operator assistant operates as a universal side companion across all screens:
+- **Docked Mode (400–440px):** Displaces main content to the left via smooth right-margin transition. Undimmed, fully interactive background.
+- **Expanded Mode (80vw / 880px):** Expands as a wide drawer from the right, partially overlaying the screen with a semi-transparent backdrop scrim.
+- **Transitions:** 180ms ease-out transitions between docked, expanded, and closed states.
+
+## 10. Status Chip & System Readouts
 
 A single status chip in the header communicates background sync and engine health:
 

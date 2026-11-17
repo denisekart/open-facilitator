@@ -54,31 +54,31 @@
     class="fixed inset-0 z-40 flex {modal
       ? 'scrim items-end justify-center'
       : deck.state.expanded
-        ? 'pointer-events-none items-center justify-center p-4 md:p-6'
+        ? 'scrim items-stretch justify-end pointer-events-auto'
         : 'pointer-events-none items-stretch justify-end'}"
     role="dialog"
-    aria-modal={modal}
-    aria-label="AiDeck"
+    aria-modal={modal || deck.state.expanded}
+    aria-label="Assistant"
     data-testid="ai-deck">
-    {#if modal}
+    {#if modal || deck.state.expanded}
       <button
         class="absolute inset-0 cursor-default"
-        aria-label="close AiDeck"
+        aria-label="close Assistant"
         data-testid="ai-deck-scrim"
         onclick={onclose}></button>
     {/if}
     <div
-      class="deck-panel pointer-events-auto relative flex flex-col bg-surface shadow-overlay {modal
-        ? 'h-[82vh] w-full border-t border-edge rounded-t-lg'
+      class="deck-panel pointer-events-auto relative flex flex-col bg-surface shadow-overlay border-l border-edge {modal
+        ? 'h-[84vh] w-full border-t border-l-0 rounded-t-lg'
         : deck.state.expanded
-          ? 'h-[88vh] max-h-[920px] w-[min(1040px,94vw)] rounded-lg border border-edge'
-          : 'h-full w-[min(440px,100%)] border-l border-edge'}">
+          ? 'h-full w-[min(880px,85vw)]'
+          : 'h-full w-[min(440px,100vw)]'}">
       <div class="flex items-center justify-between border-b border-edge px-3.5 py-2">
         <div class="flex items-center gap-2 min-w-0">
-          <div class="flex size-6 items-center justify-center rounded bg-accent-veil border border-border-primary text-accent">
-            <Sparkles class="size-3.5" strokeWidth={1.5} aria-hidden="true" />
+          <div class="flex size-7 items-center justify-center rounded bg-accent-veil border border-border-primary text-accent">
+            <Sparkles class="size-4" strokeWidth={1.5} aria-hidden="true" />
           </div>
-          <span class="text-sm font-semibold tracking-tight text-ink">AiDeck</span>
+          <span class="text-sm font-semibold tracking-tight text-ink">Assistant</span>
           {#if deck.context}
             <span
               class="badge bg-accent-veil text-accent border border-border-primary max-w-40 sm:max-w-64 truncate text-[11px] font-medium"
@@ -87,13 +87,13 @@
             </span>
           {/if}
         </div>
-        <div class="flex items-center gap-1">
+        <div class="flex items-center gap-1.5">
           {#if !modal}
             <button
-              class="btn px-2"
+              class="btn px-2.5 h-8 min-h-8 text-xs flex items-center gap-1"
               data-testid="ai-deck-expand"
               aria-label={deck.state.expanded ? "dock to side" : "expand to foreground"}
-              title={deck.state.expanded ? "Dock to side companion panel" : "Expand to foreground chat window"}
+              title={deck.state.expanded ? "Dock to companion drawer" : "Expand to wider drawer"}
               onclick={() => deck.toggleExpanded()}>
               {#if deck.state.expanded}
                 <Minimize2 class="size-4" strokeWidth={1.5} aria-hidden="true" />
@@ -104,8 +104,9 @@
               {/if}
             </button>
           {/if}
-          <button class="btn px-2" data-testid="ai-deck-close" onclick={onclose}>
-            <X class="size-4" strokeWidth={1.5} aria-hidden="true" />close
+          <button class="btn px-2.5 h-8 min-h-8 text-xs flex items-center gap-1" data-testid="ai-deck-close" onclick={onclose}>
+            <X class="size-4" strokeWidth={1.5} />
+            <span>close</span>
           </button>
         </div>
       </div>
@@ -134,9 +135,10 @@
 {/if}
 
 <style>
-  /* A drawer takes over a region on purpose (§13): the one place sliding
-     belongs — 180ms in, 120ms out, standard easing. Desktop keeps it
-     non-modal: content stays interactive beside it, so no scrim there. */
+  .deck-panel {
+    background-color: var(--surface);
+    box-shadow: var(--shadow-overlay);
+  }
   @media (prefers-reduced-motion: no-preference) {
     .deck-panel {
       transition: transform 180ms cubic-bezier(0.2, 0, 0, 1),

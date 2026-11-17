@@ -148,7 +148,7 @@
     </div>
     <div class="sm:col-span-2">
       <button class="btn btn-primary" disabled={!mintEnabled} data-testid="token-mint" onclick={() => void mint()}>
-        mint
+        mint enrollment token
       </button>
     </div>
   </div>

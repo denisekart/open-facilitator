@@ -138,8 +138,8 @@
   }
 
   :global(.node-icon) {
-    width: 13px;
-    height: 13px;
+    width: 14px;
+    height: 14px;
     flex-shrink: 0;
     color: currentColor;
   }

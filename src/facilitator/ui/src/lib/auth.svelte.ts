@@ -66,7 +66,7 @@ export class AuthSession {
   }
 
   get canChat(): boolean {
-    return this.roles.some((role) => AI_OPERATOR_ROLES.includes(role));
+    return this.roles.some((role) => AI_OPERATOR_ROLES.includes(role) || OPERATOR_ROLES.includes(role));
   }
 
   get displayName(): string {

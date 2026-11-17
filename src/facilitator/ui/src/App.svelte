@@ -1,15 +1,21 @@
 <script lang="ts">
   import {
     Activity,
+    ChevronDown,
     GitBranch,
     LayoutDashboard,
+    LogOut,
     Menu,
+    Moon,
     ScrollText,
+    Search,
     Send,
     Server,
     Settings,
     Sparkles,
+    Sun,
     Users,
+    X,
   } from "lucide-svelte";
   import AiDeck from "./components/AiDeck.svelte";
   import AuditView from "./components/AuditView.svelte";
@@ -45,9 +51,10 @@
   let searchError = $state<ApiError | null>(null);
   let searching = $state(false);
   let searchBox = $state<HTMLInputElement | null>(null);
+  let userMenuOpen = $state(false);
 
   const SECTIONS: { key: SearchSection; label: string }[] = [
-    { key: "works", label: "works" },
+    { key: "works", label: "activities" },
     { key: "projects", label: "projects" },
     { key: "assignments", label: "assignments" },
     { key: "artifacts", label: "artifacts" },
@@ -56,7 +63,7 @@
   ];
 
   // The category rail. Every entry keeps its historical testid; monitor
-  // sub-entries point at the new #/monitor/* routes, and AiDeck is a drawer
+  // sub-entries point at the new #/monitor/* routes, and Assistant is a drawer
   // toggle, not a screen (the assistant law: available from every screen).
   type RailEntry = {
     key: string;
@@ -71,8 +78,8 @@
   const RAIL: RailEntry[] = [
     {
       key: "works",
-      label: "Works",
-      hint: "Active and completed work items, ordered by creation date",
+      label: "Activities",
+      hint: "Active and completed activity items, ordered by creation date",
       icon: LayoutDashboard,
       hash: "#/works",
       active: ["works", "work"],
@@ -135,8 +142,8 @@
     },
     {
       key: "chat",
-      label: "AiDeck",
-      hint: "Ask the kernel for work status, dead-letter inspections, or diagnostics",
+      label: "Assistant",
+      hint: "Ask the kernel for activity status, dead-letter inspections, or diagnostics",
       icon: Sparkles,
       drawer: true,
       needsChatRole: true,
@@ -160,9 +167,22 @@
     );
   });
 
-  // '/' or ⌘K/Ctrl-K focuses search from anywhere (except while typing);
-  // Esc leaves it.
   function onKeydown(ev: KeyboardEvent): void {
+    if (ev.key === "Escape") {
+      if (userMenuOpen) {
+        userMenuOpen = false;
+        return;
+      }
+      if (results) {
+        results = null;
+        query = "";
+        return;
+      }
+      if (document.activeElement === searchBox) {
+        searchBox?.blur();
+      }
+      return;
+    }
     const typing =
       ev.target instanceof HTMLElement &&
       ["INPUT", "TEXTAREA", "SELECT"].includes(ev.target.tagName);
@@ -172,8 +192,6 @@
     if (focusCombo && !(typing && ev.key === "/")) {
       ev.preventDefault();
       searchBox?.focus();
-    } else if (ev.key === "Escape" && document.activeElement === searchBox) {
-      searchBox?.blur();
     }
   }
 
@@ -234,7 +252,10 @@
     results ? visibleSections.reduce((n, s) => n + (results![s.key] as unknown[]).length, 0) : 0,
   );
   const operatorRoles = $derived(
-    session.roles.filter((role) => role.startsWith("framework-") || role.startsWith("kernel-")),
+    session.roles.filter((role) => role.startsWith("framework-") || role.startsWith("kernel-") || role.startsWith("ai-") || role.startsWith("team-")),
+  );
+  const userInitials = $derived(
+    (session.displayName || "OP").slice(0, 2).toUpperCase(),
   );
   const railEntries = $derived(RAIL.filter((b) => !b.needsChatRole || session.canChat));
   const isMonitor = $derived(route.route.view.startsWith("monitor"));
@@ -345,69 +366,156 @@
 {:else if !booted}
   <main class="p-4 text-ink-2" data-testid="booting">loading…</main>
 {:else if !authenticated}
-  <main class="flex min-h-screen flex-col items-center justify-center gap-3" data-testid="login-gate">
-    <Logo class="size-12 text-ink" />
-    <h1 class="text-xl font-semibold">Open Facilitator — operator console</h1>
-    <p class="max-w-sm text-center text-ink-2">
-      The live view of one facilitator kernel: works, decisions, links, evidence.
+  <main class="flex min-h-screen flex-col items-center justify-center gap-3 p-4 text-center" data-testid="login-gate">
+    <Logo class="size-12 text-ink mx-auto" />
+    <h1 class="text-xl font-semibold text-center">Open Facilitator — operator console</h1>
+    <p class="max-w-sm text-center text-ink-2 mx-auto">
+      The live view of one facilitator kernel: activities, decisions, links, evidence.
     </p>
-    <p class="text-xs text-ink-2">sign in with a kernel-operator or framework-admin identity</p>
-    <button class="btn btn-primary" data-testid="login" onclick={() => void session.login()}>
+    <p class="text-xs text-ink-2 text-center">sign in with a kernel-operator or framework-admin identity</p>
+    <button class="btn btn-primary mx-auto" data-testid="login" onclick={() => void session.login()}>
       sign in
     </button>
   </main>
 {:else}
-  <header class="chrome sticky top-0 z-5 flex items-center gap-3">
-    <button
-      class="nav-item hamburger"
-      data-testid="menu-toggle"
-      aria-label="open the view menu"
-      aria-expanded={menuOpen}
-      onclick={() => (menuOpen = !menuOpen)}>
-      <Menu class="size-5" strokeWidth={1.5} aria-hidden="true" />
-    </button>
-    <span class="flex min-w-0 items-center gap-2">
-      <Logo class="size-6 shrink-0 text-ink" />
-      <h1 class="truncate text-sm font-semibold tracking-[0.01em]">Open Facilitator</h1>
-      <span class="chip max-md:hidden">operator console</span>
-    </span>
-    <div class="chrome-search relative">
+  <header class="chrome sticky top-0 z-20 flex h-11 items-center justify-between gap-2.5 px-3 bg-surface border-b border-edge">
+    <div class="flex items-center gap-2 min-w-0 shrink-0">
+      <button
+        class="nav-item hamburger p-1 text-ink"
+        data-testid="menu-toggle"
+        aria-label="open the view menu"
+        aria-expanded={menuOpen}
+        onclick={() => (menuOpen = !menuOpen)}>
+        <Menu class="size-5" strokeWidth={1.5} aria-hidden="true" />
+      </button>
+      <a href="#/works" class="flex items-center gap-2 min-w-0" aria-label="Open Facilitator home">
+        <Logo class="size-6 shrink-0 text-ink" />
+        <h1 class="truncate text-sm font-semibold tracking-tight text-ink max-sm:hidden">Open Facilitator</h1>
+      </a>
+
+      <!-- Desktop Nav Rail inlined into the single header row -->
+      <nav class="nav-desktop flex items-center gap-0.5 ml-2" aria-label="desktop views">
+        {#each railEntries as entry (entry.key)}
+          {@const Icon = entry.icon}
+          <button
+            class="nav-item"
+            title={entry.hint}
+            data-testid={`view-${entry.key}`}
+            aria-current={railActive(entry) ? "page" : entry.drawer && deck.state.open ? "true" : undefined}
+            onclick={() => railClick(entry)}>
+            <Icon class="size-4 shrink-0" strokeWidth={1.5} aria-hidden="true" />
+            <span>{entry.label}</span>
+          </button>
+        {/each}
+      </nav>
+    </div>
+
+    <!-- Centered Search Box -->
+    <div class="chrome-search relative mx-auto max-w-sm w-full min-w-0">
+      <Search class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-ink-3" strokeWidth={1.5} />
       <input
-        class="input pr-16"
+        class="input pl-8 pr-14 text-xs h-8"
         type="search"
-        placeholder="search works, projects, artifacts, memories…"
+        placeholder="search activities, projects, artifacts…"
         aria-label="search"
         bind:this={searchBox}
         bind:value={query}
         oninput={onQuery}
         data-testid="search-input" />
+      <button class="sr-only" data-testid="search-go" onclick={() => void runSearch()}>
+        search
+      </button>
       {#if !query}
         <kbd
-          class="mono pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 border border-edge px-1 text-xs text-ink-2 max-md:hidden"
+          class="mono pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 border border-edge rounded px-1 text-[10px] text-ink-2 max-md:hidden"
           >/ or ⌘K</kbd
         >
       {/if}
     </div>
-    <button class="btn hide-compact" data-testid="search-go" onclick={() => void runSearch()}>
-      search
-    </button>
-    <span
-      class="badge identity-chip"
-      title="your identity, as the kernel sees it"
-      data-testid="identity-chip">
-      {[session.displayName, ...operatorRoles].join(" · ")}
-    </span>
-    <button
-      class="nav-item"
-      data-testid="theme-toggle"
-      title={theme.value === "dark" ? "Switch to light theme" : "Switch to dark theme"}
-      aria-pressed={theme.value === "dark"}
-      onclick={toggleTheme}>
-      {theme.value === "dark" ? "light" : "dark"}
-    </button>
-    <button class="btn" data-testid="logout" onclick={() => void session.logout()}>
-      sign out
-    </button>
+
+    <!-- Right Controls: Theme Toggle & User Profile Popover -->
+    <div class="flex items-center gap-1.5 shrink-0">
+      <button
+        class="btn p-1 size-8 rounded border border-edge hover:bg-hover flex items-center justify-center cursor-pointer"
+        data-testid="theme-toggle"
+        title={theme.value === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+        aria-pressed={theme.value === "dark"}
+        aria-label="Toggle theme"
+        onclick={toggleTheme}>
+        {#if theme.value === "dark"}
+          <Sun class="size-4 text-ink" strokeWidth={1.5} aria-hidden="true" />
+          <span class="sr-only">light</span>
+        {:else}
+          <Moon class="size-4 text-ink" strokeWidth={1.5} aria-hidden="true" />
+          <span class="sr-only">dark</span>
+        {/if}
+      </button>
+
+      <!-- User Profile Avatar & Popover -->
+      <div
+        class="relative"
+        onfocusout={(ev) => {
+          if (!ev.currentTarget.contains(ev.relatedTarget as Node | null)) {
+            userMenuOpen = false;
+          }
+        }}>
+        <button
+          class="flex items-center gap-1.5 h-8 pl-1 pr-2 rounded-full border border-edge bg-surface-alt hover:bg-surface-raise hover:border-line text-ink transition-colors cursor-pointer"
+          data-testid="user-menu-toggle"
+          title="Account menu"
+          aria-label="Account menu"
+          aria-expanded={userMenuOpen}
+          onclick={() => (userMenuOpen = !userMenuOpen)}>
+          <span class="size-6 rounded-full bg-accent-veil border border-border-primary text-accent flex items-center justify-center font-bold text-xs shrink-0">
+            {userInitials}
+          </span>
+          <span class="text-xs font-semibold text-ink truncate max-w-24 max-md:hidden" data-testid="identity-chip">
+            {session.displayName || "Operator"}
+          </span>
+          <ChevronDown class="size-3.5 text-ink-2 shrink-0 transition-transform {userMenuOpen ? 'rotate-180' : ''}" strokeWidth={1.5} />
+        </button>
+
+        {#if userMenuOpen}
+          <button
+            class="fixed inset-0 z-40 bg-transparent cursor-default"
+            aria-label="close account menu"
+            onclick={() => (userMenuOpen = false)}></button>
+          <div
+            class="absolute right-0 top-full mt-1.5 z-50 w-64 rounded-lg border border-edge bg-surface-raise p-3 shadow-overlay"
+            style="background-color: var(--surface-raise);"
+            role="menu"
+            aria-label="User account details">
+            <div class="mb-3 border-b border-edge pb-2.5 flex items-center gap-2.5">
+              <div class="size-10 rounded-full bg-accent-veil border border-border-primary text-accent flex items-center justify-center font-bold text-sm shrink-0">
+                {userInitials}
+              </div>
+              <div class="min-w-0 grow">
+                <p class="text-sm font-semibold text-ink truncate">{session.displayName || "Kernel Operator"}</p>
+                <div class="mt-1 flex flex-wrap gap-1">
+                  {#if operatorRoles.length > 0}
+                    {#each operatorRoles as r}
+                      <span class="badge text-[11px] font-mono text-ink-2 bg-surface border border-edge">{r}</span>
+                    {/each}
+                  {:else}
+                    <span class="badge text-[11px] font-mono text-ink-2 bg-surface border border-edge">operator</span>
+                  {/if}
+                </div>
+              </div>
+            </div>
+            <button
+              class="btn btn-danger w-full justify-start text-xs font-semibold h-8"
+              data-testid="logout"
+              onclick={() => {
+                userMenuOpen = false;
+                void session.logout();
+              }}>
+              <LogOut class="size-4 shrink-0 mr-1.5" strokeWidth={1.5} />
+              sign out
+            </button>
+          </div>
+        {/if}
+      </div>
+    </div>
   </header>
 
   {#if menuOpen}
@@ -422,6 +530,12 @@
     class:open={menuOpen}
     aria-label="views"
     data-testid="rail">
+    <div class="mb-2 flex items-center justify-between border-b border-edge pb-2 md:hidden">
+      <span class="text-xs font-semibold text-ink">Navigation</span>
+      <button class="btn p-1 size-7" aria-label="close navigation" onclick={() => (menuOpen = false)}>
+        <X class="size-4" strokeWidth={1.5} />
+      </button>
+    </div>
     {#each railEntries as entry (entry.key)}
       {@const Icon = entry.icon}
       <button
@@ -436,7 +550,9 @@
     {/each}
   </nav>
 
-  <div class="mx-auto w-full max-w-7xl p-3">
+  <div
+    class="mx-auto w-full max-w-7xl p-3 transition-[margin-right] duration-180 ease-out"
+    style={deck.state.open && !deck.state.expanded ? "margin-right: min(420px, 32vw);" : ""}>
     {#if query}
       <div class="mb-2 flex flex-wrap items-center gap-2">
         <span class="sr-only" role="status" aria-live="polite">
@@ -558,11 +674,11 @@
     <button
       class="fixed bottom-4 right-4 z-30 flex items-center gap-1.5 rounded-full border border-border-primary bg-surface px-3 py-2 text-accent shadow-overlay hover:border-accent hover:bg-surface-raise transition-all cursor-pointer"
       data-testid="floating-ai-deck-toggle"
-      title="Open AiDeck assistant (or click rail)"
-      aria-label="Open AiDeck"
+      title="Open Assistant"
+      aria-label="Open Assistant"
       onclick={() => deck.setOpen(true)}>
       <Sparkles class="size-4 shrink-0 text-accent" strokeWidth={1.5} aria-hidden="true" />
-      <span class="text-xs font-semibold text-ink max-sm:hidden">AiDeck</span>
+      <span class="text-xs font-semibold text-ink max-sm:hidden">Assistant</span>
     </button>
   {/if}
 

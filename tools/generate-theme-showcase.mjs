@@ -1,12 +1,12 @@
-﻿import fs from 'node:fs';
-import path from 'node:path';
-import { execFileSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+﻿import fs from "node:fs";
+import path from "node:path";
+import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.resolve(__dirname, '..');
-const THEMES_BASE_DIR = path.join(ROOT, '.omp', 'evidence', 'theme');
-const COPPER_DIR = path.join(THEMES_BASE_DIR, 'copper');
+const ROOT = path.resolve(__dirname, "..");
+const THEMES_BASE_DIR = path.join(ROOT, ".omp", "evidence", "theme");
+const COPPER_DIR = path.join(THEMES_BASE_DIR, "copper");
 
 if (!fs.existsSync(COPPER_DIR)) {
   fs.mkdirSync(COPPER_DIR, { recursive: true });
@@ -14,7 +14,8 @@ if (!fs.existsSync(COPPER_DIR)) {
 
 // Crisp SVG Icons (Strictly Vector, No Blurs/Hazy Filters)
 const icons = {
-  logo: (accent) => `<svg viewBox="0 0 24 24" class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="${accent}"/></svg>`,
+  logo: (accent) =>
+    `<svg viewBox="0 0 24 24" class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="${accent}"/></svg>`,
   works: `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>`,
   flows: `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="3" x2="6" y2="15"></line><circle cx="18" cy="6" r="3"></circle><circle cx="6" cy="18" r="3"></circle><path d="M18 9a9 9 0 0 1-9 9"></path></svg>`,
   monitor: `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>`,
@@ -34,86 +35,86 @@ const icons = {
   moon: `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>`,
   filter: `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>`,
   cpu: `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line><line x1="20" y1="9" x2="23" y2="9"></line><line x1="20" y1="14" x2="23" y2="14"></line><line x1="1" y1="9" x2="4" y2="9"></line><line x1="1" y1="14" x2="4" y2="14"></line></svg>`,
-  gitCommit: `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><line x1="1.05" y1="12" x2="7" y2="12"></line><line x1="17.01" y1="12" x2="22.96" y2="12"></line></svg>`
+  gitCommit: `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><line x1="1.05" y1="12" x2="7" y2="12"></line><line x1="17.01" y1="12" x2="22.96" y2="12"></line></svg>`,
 };
 
 // Refined Copper Design System
 export const THEME = {
-  id: 'copper',
-  name: 'Copper & Teal',
-  title: 'Open Facilitator — Refined Copper Theme',
-  subtitle: 'Industrial precision copper (#C96A2D) and rich dark teal (#168B90) aesthetic with crisp surface hierarchy, solid opaque token palettes, and cool technical grounds',
-  badgeText: 'REFINED COPPER & TEAL DESIGN SYSTEM',
+  id: "copper",
+  name: "Copper & Teal",
+  title: "Open Facilitator — Refined Copper Theme",
+  subtitle:
+    "Industrial precision copper (#C96A2D) and rich dark teal (#168B90) aesthetic with crisp surface hierarchy, solid opaque token palettes, and cool technical grounds",
+  badgeText: "REFINED COPPER & TEAL DESIGN SYSTEM",
   dark: {
-    bg: '#232831',
-    surface: '#2B313B',
-    surfaceAlt: '#323944',
-    surfaceHighlight: '#3B4350',
-    border: '#3F4754',
-    borderSubtle: '#343B47',
-    ink: '#F3F4F6',
-    inkMuted: '#9CA3AF',
-    inkFaint: '#6B7280',
-    primary: '#C96A2D',
-    primaryHover: '#E58A45',
-    primaryText: '#E58A45',
-    primaryTint: '#3D332D',
-    primaryBorder: '#8A4820',
-    info: '#168B90',
-    infoHover: '#1DA4A9',
-    infoTint: '#223538',
-    infoBorder: '#175B5F',
-    success: '#58894C',
-    successTint: '#273426',
-    successBorder: '#3B5832',
-    warning: '#C48A00',
-    warningTint: '#373121',
-    warningBorder: '#7A5B0B',
-    error: '#C75454',
-    errorTint: '#382626',
-    errorBorder: '#7D2E2E',
-    gridDot: 'rgba(255, 255, 255, 0.05)'
+    bg: "#232831",
+    surface: "#2B313B",
+    surfaceAlt: "#323944",
+    surfaceHighlight: "#3B4350",
+    border: "#3F4754",
+    borderSubtle: "#343B47",
+    ink: "#F3F4F6",
+    inkMuted: "#9CA3AF",
+    inkFaint: "#6B7280",
+    primary: "#C96A2D",
+    primaryHover: "#E58A45",
+    primaryText: "#E58A45",
+    primaryTint: "#3D332D",
+    primaryBorder: "#8A4820",
+    info: "#168B90",
+    infoHover: "#1DA4A9",
+    infoTint: "#223538",
+    infoBorder: "#175B5F",
+    success: "#58894C",
+    successTint: "#273426",
+    successBorder: "#3B5832",
+    warning: "#C48A00",
+    warningTint: "#373121",
+    warningBorder: "#7A5B0B",
+    error: "#C75454",
+    errorTint: "#382626",
+    errorBorder: "#7D2E2E",
+    gridDot: "rgba(255, 255, 255, 0.05)",
   },
   light: {
-    bg: '#F1F3F5',
-    surface: '#FFFFFF',
-    surfaceAlt: '#E8ECF0',
-    surfaceHighlight: '#DFE4EA',
-    border: '#CFD6E0',
-    borderSubtle: '#DEE3EB',
-    ink: '#1A202C',
-    inkMuted: '#505A69',
-    inkFaint: '#7A8699',
-    primary: '#C96A2D',
-    primaryHover: '#B3581E',
-    primaryText: '#AC531C',
-    primaryTint: '#F8EFE8',
-    primaryBorder: '#E2B696',
-    info: '#127377',
-    infoHover: '#0E5C5F',
-    infoTint: '#E5F3F4',
-    infoBorder: '#92CAD0',
-    success: '#447A38',
-    successTint: '#EAF3E8',
-    successBorder: '#9FC497',
-    warning: '#A87400',
-    warningTint: '#FAF2DE',
-    warningBorder: '#DEC177',
-    error: '#BA3C3C',
-    errorTint: '#F9E8E8',
-    errorBorder: '#DF9E9E',
-    gridDot: 'rgba(0, 0, 0, 0.04)'
-  }
+    bg: "#F1F3F5",
+    surface: "#FFFFFF",
+    surfaceAlt: "#E8ECF0",
+    surfaceHighlight: "#DFE4EA",
+    border: "#CFD6E0",
+    borderSubtle: "#DEE3EB",
+    ink: "#1A202C",
+    inkMuted: "#505A69",
+    inkFaint: "#7A8699",
+    primary: "#C96A2D",
+    primaryHover: "#B3581E",
+    primaryText: "#AC531C",
+    primaryTint: "#F8EFE8",
+    primaryBorder: "#E2B696",
+    info: "#127377",
+    infoHover: "#0E5C5F",
+    infoTint: "#E5F3F4",
+    infoBorder: "#92CAD0",
+    success: "#447A38",
+    successTint: "#EAF3E8",
+    successBorder: "#9FC497",
+    warning: "#A87400",
+    warningTint: "#FAF2DE",
+    warningBorder: "#DEC177",
+    error: "#BA3C3C",
+    errorTint: "#F9E8E8",
+    errorBorder: "#DF9E9E",
+    gridDot: "rgba(0, 0, 0, 0.04)",
+  },
 };
 
-function generateFullUI(themeConfig, mode = 'dark') {
-  const isDark = mode === 'dark';
+function generateFullUI(themeConfig, mode = "dark") {
+  const isDark = mode === "dark";
   const tokens = isDark ? themeConfig.dark : themeConfig.light;
 
   const bg = tokens.bg;
   const surface = tokens.surface;
   const surfaceAlt = tokens.surfaceAlt;
-  const surfaceHighlight = tokens.surfaceHighlight;
   const border = tokens.border;
   const borderSubtle = tokens.borderSubtle;
 
@@ -134,14 +135,6 @@ function generateFullUI(themeConfig, mode = 'dark') {
   const success = tokens.success;
   const successTint = tokens.successTint;
   const successBorder = tokens.successBorder;
-
-  const warning = tokens.warning;
-  const warningTint = tokens.warningTint;
-  const warningBorder = tokens.warningBorder;
-
-  const error = tokens.error;
-  const errorTint = tokens.errorTint;
-  const errorBorder = tokens.errorBorder;
 
   const gridDot = tokens.gridDot;
 
@@ -1441,11 +1434,10 @@ function generateFullUI(themeConfig, mode = 'dark') {
 
 // Generate Side-by-Side Presentation Mockup HTML
 function generateSideBySideShowcaseHTML(themeConfig) {
-  const lightUI = generateFullUI(themeConfig, 'light');
-  const darkUI = generateFullUI(themeConfig, 'dark');
+  const lightUI = generateFullUI(themeConfig, "light");
+  const darkUI = generateFullUI(themeConfig, "dark");
 
   const primary = themeConfig.dark.primary;
-  const primaryHover = themeConfig.dark.primaryHover;
   const info = themeConfig.dark.info;
   const success = themeConfig.dark.success;
   const warning = themeConfig.dark.warning;
@@ -1673,16 +1665,16 @@ function generateSideBySideShowcaseHTML(themeConfig) {
 }
 
 // Generate Standalone Full Theme HTML (Light or Dark)
-function generateStandaloneThemeHTML(themeConfig, mode = 'dark') {
+function generateStandaloneThemeHTML(themeConfig, mode = "dark") {
   const ui = generateFullUI(themeConfig, mode);
-  const isDark = mode === 'dark';
+  const isDark = mode === "dark";
   const tokens = isDark ? themeConfig.dark : themeConfig.light;
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>${themeConfig.name} - ${isDark ? 'Dark' : 'Light'} Theme (${tokens.primary})</title>
+  <title>${themeConfig.name} - ${isDark ? "Dark" : "Light"} Theme (${tokens.primary})</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -1778,10 +1770,10 @@ This theme provides a high-contrast, developer-tool aesthetic influenced by stud
 
 // Main execution function
 async function main() {
-  const edgePath = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
+  const edgePath = "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe";
 
   if (!fs.existsSync(edgePath)) {
-    console.error('Edge executable not found at:', edgePath);
+    console.error("Edge executable not found at:", edgePath);
     process.exit(1);
   }
 
@@ -1795,62 +1787,62 @@ async function main() {
   console.log(`Target Directory: ${targetDir}`);
   console.log(`========================================`);
 
-  const showcaseHTMLPath = path.join(targetDir, 'showcase-template.html');
-  const lightHTMLPath = path.join(targetDir, 'light-theme-template.html');
-  const darkHTMLPath = path.join(targetDir, 'dark-theme-template.html');
-  const specMDPath = path.join(targetDir, 'THEME_SPEC.md');
+  const showcaseHTMLPath = path.join(targetDir, "showcase-template.html");
+  const lightHTMLPath = path.join(targetDir, "light-theme-template.html");
+  const darkHTMLPath = path.join(targetDir, "dark-theme-template.html");
+  const specMDPath = path.join(targetDir, "THEME_SPEC.md");
 
-  fs.writeFileSync(showcaseHTMLPath, generateSideBySideShowcaseHTML(THEME), 'utf8');
-  fs.writeFileSync(lightHTMLPath, generateStandaloneThemeHTML(THEME, 'light'), 'utf8');
-  fs.writeFileSync(darkHTMLPath, generateStandaloneThemeHTML(THEME, 'dark'), 'utf8');
-  fs.writeFileSync(specMDPath, generateThemeSpecMarkdown(THEME), 'utf8');
+  fs.writeFileSync(showcaseHTMLPath, generateSideBySideShowcaseHTML(THEME), "utf8");
+  fs.writeFileSync(lightHTMLPath, generateStandaloneThemeHTML(THEME, "light"), "utf8");
+  fs.writeFileSync(darkHTMLPath, generateStandaloneThemeHTML(THEME, "dark"), "utf8");
+  fs.writeFileSync(specMDPath, generateThemeSpecMarkdown(THEME), "utf8");
 
-  console.log('HTML templates and THEME_SPEC.md written.');
+  console.log("HTML templates and THEME_SPEC.md written.");
 
   // 1. Render Side-by-side Showcase Image
   const showcasePNG = path.join(targetDir, `open-facilitator-${THEME.id}-theme-showcase.png`);
   console.log(`Rendering side-by-side showcase image: ${showcasePNG}`);
   execFileSync(edgePath, [
-    '--headless',
-    '--disable-gpu',
+    "--headless",
+    "--disable-gpu",
     `--screenshot=${showcasePNG}`,
-    '--window-size=2880,1800',
-    '--hide-scrollbars',
-    `file:///${showcaseHTMLPath.replace(/\\/g, '/')}`
+    "--window-size=2880,1800",
+    "--hide-scrollbars",
+    `file:///${showcaseHTMLPath.replace(/\\/g, "/")}`,
   ]);
 
   // Copy aliases
-  fs.copyFileSync(showcasePNG, path.join(targetDir, 'theme-showcase.png'));
-  fs.copyFileSync(showcasePNG, path.join(targetDir, 'showcase-side-by-side.png'));
+  fs.copyFileSync(showcasePNG, path.join(targetDir, "theme-showcase.png"));
+  fs.copyFileSync(showcasePNG, path.join(targetDir, "showcase-side-by-side.png"));
 
   // 2. Render Standalone Light Theme
-  const lightPNG = path.join(targetDir, 'open-facilitator-light-theme.png');
+  const lightPNG = path.join(targetDir, "open-facilitator-light-theme.png");
   console.log(`Rendering light theme image: ${lightPNG}`);
   execFileSync(edgePath, [
-    '--headless',
-    '--disable-gpu',
+    "--headless",
+    "--disable-gpu",
     `--screenshot=${lightPNG}`,
-    '--window-size=2560,1440',
-    '--hide-scrollbars',
-    `file:///${lightHTMLPath.replace(/\\/g, '/')}`
+    "--window-size=2560,1440",
+    "--hide-scrollbars",
+    `file:///${lightHTMLPath.replace(/\\/g, "/")}`,
   ]);
 
   // 3. Render Standalone Dark Theme
-  const darkPNG = path.join(targetDir, 'open-facilitator-dark-theme.png');
+  const darkPNG = path.join(targetDir, "open-facilitator-dark-theme.png");
   console.log(`Rendering dark theme image: ${darkPNG}`);
   execFileSync(edgePath, [
-    '--headless',
-    '--disable-gpu',
+    "--headless",
+    "--disable-gpu",
     `--screenshot=${darkPNG}`,
-    '--window-size=2560,1440',
-    '--hide-scrollbars',
-    `file:///${darkHTMLPath.replace(/\\/g, '/')}`
+    "--window-size=2560,1440",
+    "--hide-scrollbars",
+    `file:///${darkHTMLPath.replace(/\\/g, "/")}`,
   ]);
 
   console.log(`\nRefined Copper Theme generated successfully!`);
 }
 
-main().catch(err => {
+main().catch((err) => {
   console.error(err);
   process.exit(1);
 });

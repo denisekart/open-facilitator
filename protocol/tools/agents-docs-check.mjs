@@ -2,7 +2,7 @@
 // exist and every area of the tree must have (or explicitly exempt) a signpost.
 // Run from repo root: node protocol/tools/agents-docs-check.mjs
 import { readdirSync, readFileSync, existsSync } from "node:fs";
-import { join, dirname, resolve } from "node:path";
+import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));

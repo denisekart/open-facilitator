@@ -1,99 +1,59 @@
 # Extend it yourself
 
-You can write your own piece of this system: the components that ship are
-built on a published contract, and that contract is the same one handed to
-you. Nothing a first-party package can do is closed to an outside one.
+You can extend any part of the system. First-party and third-party components operate against the same published wire contract.
 
-## Three ways to extend, cheapest first
+## Three extension seams
 
-The three seams differ in how much of the system you take responsibility
-for, not in how much authority you get:
+Extension points vary by operational responsibility:
 
 ```mermaid title="The three seams, from cheapest to deepest"
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#f7f9fb",
-"primaryBorderColor": "#ab8612", "primaryTextColor": "#21262e",
-"lineColor": "#676f7c", "secondaryColor": "#faf2d6"}}}%%
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#f7f9fb", "primaryBorderColor": "#ab8612", "primaryTextColor": "#21262e", "lineColor": "#676f7c", "secondaryColor": "#faf2d6"}}}%%
 flowchart LR
-  subgraph S1["1. a harness"]
-    AD["@ofac/adapter - your executor behind a line-oriented stdio protocol"]
+  subgraph S1["1. Harness"]
+    AD["@ofac/adapter - child process communicating via line-oriented stdio"]
   end
-  subgraph S2["2. a provider"]
-    PR["webhook in, approval-gated writes out"]
+  subgraph S2["2. Provider"]
+    PR["Webhook ingress and approval-gated outbound writes"]
   end
-  subgraph S3["3. a whole component"]
-    IM["your Gateway / service / console against the published schemas"]
+  subgraph S3["3. Full component"]
+    IM["Custom Gateway or service implementing wire schemas"]
   end
   S1 --> S2 --> S3
 ```
 
-_Left to right, the surface you own grows and the parts you depend on
-shrink: a harness is a child process the shipped Gateway spawns, a
-provider is a service you run beside it, a component replaces one of them
-entirely — and all three are judged by the same published contract._
+_Moving from left to right increases control over the runtime environment while reducing dependencies on shipped packages._
 
-### 1. Write a harness (execute work your way)
+### 1. Write a harness
 
-A harness is the component that receives an assignment and does it. The
-shipped ones drive LLM agents, deterministic scripts, and coding agents;
-yours might drive a data pipeline, a RPA bot, or a human checklist.
+A harness executes assigned work. Shipped harnesses support LLM agents, deterministic scripts, and coding tools. Custom harnesses can wrap data pipelines, batch jobs, or manual checklists.
 
-- Depend on `@ofac/adapter` — the SDK defines the child-protocol:
-  accept, progress, propose (optional privileged writes), complete with
-  a result manifest.
-- The **conformance kit** in the same package runs the exact suite the
-  shipped harnesses run. Green means the kernel, the Gateway, and every
-  runbook treat your harness as first-class.
-- Your harness can be any language: the child protocol is line-oriented
-  JSON over stdio.
+- Depend on `@ofac/adapter` to implement the child lifecycle: accept, report progress, propose privileged writes, and return result manifests.
+- Use the included **conformance kit** to validate that your harness passes the same test suite as shipped implementations.
+- Write in any programming language using standard line-oriented JSON over stdin and stdout.
 
-### 2. Write a provider (connect a new system of record)
+### 2. Write a provider
 
-A provider adapter normalizes some external system's webhooks into the
-published event types; a connector performs privileged outbound writes
-under approval policy. Provider-core carries the shared scaffolding:
-signature envelopes, cursorization, idempotent admission, the
-connector's approval roundtrip. Chat platforms, ticket systems, CRMs,
-home-grown internal tools — if it can post a webhook, it can feed
-Works; if it has an API, its writes can ride approvals.
+A provider adapter normalizes external webhooks into standard CloudEvents. A paired connector executes privileged outbound writes under human approval policy.
 
-### 3. Implement a whole component (own a side of the wire)
+The `@ofac/provider-core` package provides shared utilities for cryptographic signature verification, cursor management, idempotent admission, and approval callbacks. Use providers to integrate ticketing systems, custom chat platforms, and internal developer tools.
 
-Because the wire is the product, you can replace any side:
+### 3. Implement a whole component
 
-- **A Gateway in another language** — implement the Link protocol
-  (enroll, connect, acknowledge-by-cursor, dispatch, ledger) against
-  the published schemas. The conformance fixtures are the spec;
-  `@ofac/protocol` mirrors them for typed builders and validators.
-- **Your own kernel-compatible service** — the admin API, ingress, and
-  link transport are fully specified (OpenAPI 3.1 + JSON Schema). The
-  two implementations that exist today already interoperate only
-  through that contract.
-- **Your own console or bot** — the console is just a client of the
-  public API. Anything it shows, your tooling can query.
+Because the protocol is open, you can replace any system component:
 
-## What makes this tractable
+- **Custom Gateway.** Implement the Link protocol (enrollment, challenge-response auth, ledger acknowledgments, and capability advertisement) against published JSON Schemas.
+- **Custom kernel services.** Build custom ingress or coordination services targeting the OpenAPI 3.1 and JSON Schema specifications.
+- **Custom consoles and tools.** The console is a client of the public HTTP API. Custom dashboards and CLI tools consume the same endpoints.
 
-- **The version is in the name.** Event type names carry their version
-  (`org.facilitator.event.work.progress.v1`). Compatible changes add
-  fields; breaking ones get a new version segment and the old name keeps
-  its meaning, so an adapter holds its ground across kernel upgrades.
-- **Fixtures, not assertions.** Every protocol change ships with
-  cross-language conformance fixtures that two independent stacks
-  parse and emit identically. “It works against my kernel” is not a
-  claim you have to take on faith.
-- **Security posture per adapter.** Each connector and harness ships a
-  short statement of which tokens it holds, which network directions
-  it needs, and which events it can cause — so adding an integration
-  is a reviewable decision, not a black box.
+## Contract guarantees
+
+- **Explicit versioning.** Event type names include explicit version segments (`org.facilitator.event.work.progress.v1`). Breaking changes introduce new types without altering existing schemas.
+- **Conformance fixtures.** Protocol changes include cross-language JSON fixtures verified across multiple independent stacks.
+- **Explicit security boundaries.** Adapters and harnesses document token scopes, required network egress, and emitted events for security review.
 
 ## Where to go next
 
-- The grammar your piece must satisfy: [Wire protocol (v1)](/docs/protocol) —
-  envelopes, type registry, ingress, link transport.
-- Gateway modes, the full HarnessAdapter contract, provider plumbing, the
-  memory broker: [Advanced topics](/docs/advanced).
-- The rules your piece must respect (identities, gates, approval
-  lifecycle, team-side policy): [Security posture](/docs/security).
-- Where your piece sits among the shipped ones:
-  [Explore the architecture](/architecture), and the coordinates you
-  publish beside: [Artifacts & installation](/artifacts).
+- Review message envelope schemas: [Wire protocol (v1)](/docs/protocol).
+- Explore advanced Gateway patterns and memory brokers: [Advanced topics](/docs/advanced).
+- Inspect authentication and approval lifecycle rules: [Security posture](/docs/security).
+- Review published package coordinates: [Artifacts & installation](/artifacts).

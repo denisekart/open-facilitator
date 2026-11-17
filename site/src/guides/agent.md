@@ -1,145 +1,101 @@
 # Getting started for AI agents
 
-This page assumes **you are an agent** — an LLM worker asked to run,
-drive, integrate with, or extend an Open Facilitator deployment. It is the
-dense orientation: what to start, how to authenticate, which endpoints
-answer what, where the computer-readable contract lives, and how to fail
-well. If a human is at the keyboard, send them to the
-[human guide](#/guide/human) instead.
+This guide provides technical orientation for autonomous agents interacting with an Open Facilitator kernel. It details authentication mechanisms, API contracts, link plane protocols, and error handling. For human operator instructions, consult the [human guide](/guide/human).
 
-## Read this first
+## Operational constraints
 
-- You are pointed at a **kernel base URL** (e.g. `https://facilitator.example`).
-  The **only** coordination authority is that kernel over HTTP
-  (`/api/*` human plane, `/api/link/v1/*` + `/hubs/link` link plane).
-  There is no backdoor; even the console is a client of this API.
-- **Human-plane** calls need an OIDC bearer. **Link-plane** calls need a
-  per-endpoint **session token**: enroll once (your Ed25519 public key is
-  pinned), then buy short sessions by proving possession of the key. Never
-  mix them.
-- Writes are **at-least-once + idempotent**. Dedupe on `(event_source,
-event_id)` / `commandId` / `(provider, provider_delivery_id)`.
-  Retrying is correct; double-applying is impossible by construction.
-- Another team's resources answer **404**, not 403. Absence is the
-  honest disclosure — do not interpret it as "asked but forbidden".
-- Pending approvals may have silently expired: reads apply lazy expiry
-  first. Re-read before acting.
-- `GET /health` is anonymous and answers `200` on any deployment —
-  use it to verify reachability before anything else.
+- **Base URL authority.** All coordination occurs over HTTP against the kernel (`/api/*` for the human plane, `/api/link/v1/*` and `/hubs/link` for the link plane). The kernel is the sole authority.
+- **Authentication separation.** Human-plane requests require OIDC bearer tokens. Link-plane operations use cryptographic challenge-response session tokens backed by pinned Ed25519 keys.
+- **Idempotent ingestion.** All writes are at-least-once and idempotent. Deduplicate on `(event_source, event_id)`, `commandId`, or `(provider, provider_delivery_id)`.
+- **Non-disclosure status.** Resources belonging to other teams return `404 Not Found` rather than `403 Forbidden`.
+- **Lazy approval expiration.** Approvals expire lazily upon inspection. Re-read approval records before executing responses.
+- **Health probes.** `GET /health` is unauthenticated and returns `200 OK` on active kernels.
 
-## Sandbox: boot the whole world locally
+## Local reference environment
 
-No deployment yet? The repository ships a self-seeding laptop
-environment — kernel, IdP, artifact store, a demo team:
+Start a local reference instance with Keycloak, SeaweedFS, and sample seed data:
 
 ```bash
-./referencectl up slim            # Docker only; builds + boots + seeds
-./referencectl status             # service table + health probes
-TOKEN=$(./referencectl token | tail -1)   # client_credentials grant
+./referencectl up slim            # boots reference environment in Docker
+./referencectl status             # checks service health
+TOKEN=$(./referencectl token | tail -1)   # acquires client_credentials token
 ```
 
-Kernel `http://localhost:8088` (health: `GET /health`, anonymous). IdP
-`http://localhost:8080` — realm `facilitator`, users `alice`/`bob`/`carol`
-(password = username). Human grant:
-`./referencectl token --user alice --password alice`.
+The kernel listens at `http://localhost:8088`. Keycloak runs at `http://localhost:8080` (realm `facilitator`, test accounts `alice`/`bob`/`carol` with password matching username).
 
-## The API surface you'll actually call
+## Core API endpoints
 
 ```http
 POST /api/works                       {"objective": "..."}
-GET  /api/works/{id}                  # WorkDto {workId,state,version,...}
+GET  /api/works/{id}                  # returns WorkDto
 POST /api/works/{id}/steer            {"directive","commandId","expectedVersion"}
-GET  /api/works/{id}/timeline         # append-only history, ascending
+GET  /api/works/{id}/timeline         # returns ascending event history
 GET  /api/works/{id}/approvals        # + POST .../approvals/{id}/respond
-POST /api/ingress/events              # raw CloudEvents 1.0 envelope
-POST /api/memory/retain               # propose a memory entry
+POST /api/ingress/events              # CloudEvents 1.0 envelope
+POST /api/memory/retain               # propose memory entry
 POST /api/memory/recall               # {"query","purpose",...}
 ```
 
-Optimistic concurrency everywhere: pass the `version` you saw as
-`expectedVersion`; a mismatch is `409 version-conflict` with
-`currentVersion` in the problem body. Errors are RFC 9457
-(`application/problem+json`, camelCase) with stable `type` URIs — switch
-on those, not on message strings.
+State changes use optimistic concurrency. Include the known `version` in `expectedVersion`; conflicts return `409 Conflict`. Errors use RFC 9457 `application/problem+json` format.
 
-## Execute work yourself (link plane)
+## Executing work over the link plane
 
-You join by registering an identity, not by collecting a secret: enroll the
-public half of an Ed25519 key, then buy short-lived sessions by proving you
-hold the private half.
+Endpoints register by enrolling an Ed25519 public key and requesting short-lived session tokens via cryptographic proof:
 
 ```mermaid title="Enroll once, then buy sessions with the key"
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#f7f9fb", "primaryBorderColor": "#ab8612", "primaryTextColor": "#21262e", "lineColor": "#676f7c", "secondaryColor": "#faf2d6"}}}%%
 sequenceDiagram
-  participant A as Your agent (endpoint)
-  participant F as Open Facilitator
-  A->>F: POST /api/link/v1/enroll (team secret + your public key)
-  F-->>A: 201 { enrollmentId, endpointKeyId, seq } — no bearer, the key is pinned
-  A->>F: POST /api/link/v1/challenge → proof (signed by your key)
-  F-->>A: 200 { sessionToken (5 min), expiresAt, seq }
-  A->>F: POST /api/link/v1/capabilities (your manifest)
-  A->>F: hello (hub) — session opens
-  F-->>A: Deliver: work.assign (durable ledger row)
-  A->>F: receipt accepted (dedupe on commandId!)
-  A->>F: POST /api/link/v1/events (progress, completed)
+  participant A as Agent endpoint
+  participant F as Facilitator kernel
+  A->>F: POST /api/link/v1/enroll (team secret + public key)
+  F-->>A: 201 Created (pins endpointKeyId)
+  A->>F: POST /api/link/v1/challenge (requests challenge nonce)
+  F-->>A: 200 OK (nonce)
+  A->>F: POST /api/link/v1/proof (submits detached Ed25519 signature)
+  F-->>A: 200 OK (5-minute sessionToken)
+  A->>F: POST /api/link/v1/capabilities (manifest registration)
+  A->>F: Connect /hubs/link or start long-poll
+  F-->>A: Deliver work.assign command
+  A->>F: POST /api/link/v1/deliveries/{id}/receipt (accepted)
+  A->>F: POST /api/link/v1/events (progress, completion)
 ```
+
+Enrollment registers the public key:
 
 ```http
 POST /api/link/v1/enroll
 { "token": "enroll-dev", "endpointId": "gw.my-team",
   "team": "team-alpha", "role": "gateway", "trustMode": "shared-runtime",
-  "publicKey": "<raw ed25519, base64url>", "keyAlgorithm": "ed25519" }
-→ 201 { "enrollmentId": "...", "trustMode": "shared-runtime",
-        "endpointKeyId": "sha256:...", "seq": 0 }
+  "publicKey": "<raw-ed25519-base64url>", "keyAlgorithm": "ed25519" }
 ```
 
-Store the **private key** durably (a plain file beside your state — enrollment
-is an upsert, and a restart re-proves the same key, so the enrollment code is
-needed only on first boot). Then buy a session: `POST /api/link/v1/challenge`
-gets a nonce, `POST /api/link/v1/proof` carries a detached Ed25519 JWS bound to
-it and answers `{ sessionToken, expiresAt, seq }` — a ~5-minute bearer you put
-in `Authorization` and re-mint before it lapses. Then `POST /api/link/v1/capabilities` (your capability
-manifest), open a session (`hello` on `/hubs/link`, or a `@ofac/
-workspace-link` transport), long-poll
-`GET /api/link/v1/deliveries?wait=30`, and answer each delivery with
-`POST /api/link/v1/deliveries/{deliveryId}/receipt`
-(`accepted|duplicate|rejected|unsupported`). Deliveries re-offer after the
-in-flight lease (120 s): **dedupe on `commandId` before executing**.
-`@ofac/workspace-link` wraps all of this, including crash replay from a
-durable state file — prefer it over hand-rolling.
+Persist the private key locally. To authenticate a session, request a challenge via `POST /api/link/v1/challenge`, sign the nonce, and submit to `POST /api/link/v1/proof`. The returned `sessionToken` is valid for 5 minutes. Deliveries lease for 120 seconds; always deduplicate on `commandId`. Use `@ofac/workspace-link` to handle session lifecycles automatically.
 
-## Where the computer-readable truth lives
+## Machine-readable contract references
 
-| Need                     | Artifact                                                                                             |
-| ------------------------ | ---------------------------------------------------------------------------------------------------- |
-| Every message schema     | `protocol/json-schema/*.json` — closed models, `$id` under `https://schemas.openfacilitator.org/v1/` |
-| HTTP surfaces            | `protocol/openapi/link-v1.yaml`, `protocol/openapi/admin-v1.yaml`                                    |
-| Known command table      | `KNOWN_COMMAND_TYPES` in `@ofac/protocol` (21 types) — unknown commands fail closed `422`            |
-| Valid + invalid fixtures | `protocol/conformance-fixtures/index.json`                                                           |
-| Hard limits              | envelope ≤ 262144 B; artifact bytes go through the upload flow, never inline                         |
-| Approval digests         | RFC 8785 canonicalization + SHA-256, cross-language goldens in the fixtures                          |
+| Requirement | Specification file |
+| --- | --- |
+| Message schemas | `protocol/json-schema/*.json` (URN: `https://schemas.openfacilitator.org/v1/`) |
+| OpenAPI specifications | `protocol/openapi/link-v1.yaml`, `protocol/openapi/admin-v1.yaml` |
+| Known commands | `KNOWN_COMMAND_TYPES` in `@ofac/protocol` (21 types) |
+| Conformance fixtures | `protocol/conformance-fixtures/index.json` |
+| Envelope size limit | Maximum 262,144 bytes; large data must use artifact upload endpoints |
+| Approval digests | RFC 8785 JSON canonicalization + SHA-256 |
 
-## If you're working inside the repo
+## Repository developer workflow
 
-- Nearest `AGENTS.md` wins; `make docs-check` fails on dangling signposts.
-- Loop: `make restore && make build && make test && make lint`
-  (Docker needed). Zero warnings is the build law.
-- Any change touching the reference env must land with a green
-  `./referencectl down -v && ./referencectl up slim --no-seed &&
-./referencectl verify`.
-- Behavior bound to a scenario row (`docs/scenarios/scenario-bindings.json`)
-  must update its binding and pass `make scenario-gate`.
+- Consult the nearest `AGENTS.md` in each subdirectory.
+- Run builds and tests via `make build && make test && make lint`.
+- Verify reference environment changes with `./referencectl up slim --no-seed && ./referencectl verify`.
+- Update scenario bindings and run `make scenario-gate` when altering mapped behaviors.
 
-## Failing well
+## Error codes and resolution
 
-- `401` — no/invalid bearer. Re-mint; the demo tokens live ~5 min.
-- `403` + a named role — your principal lacks it; fix the principal, not
-  the rule.
-- `404` on something you believe exists — different team, or the
-  non-disclosure law; verify team scoping before assuming a bug.
-- `422` — schema-valid request, wrong business state (illegal edge,
-  digest mismatch, unknown command). The problem detail names the law.
-- `413` — envelope over 256 KiB: send large content via
-  `POST /api/artifacts/request-upload` + `PUT .../content`.
+- `401 Unauthorized` — Missing or expired bearer token. Refresh authentication credentials.
+- `403 Forbidden` — Principal lacks required role permissions.
+- `404 Not Found` — Resource does not exist or belongs to another team.
+- `409 Conflict` — Concurrency version mismatch. Re-fetch current state and retry.
+- `413 Payload Too Large` — Envelope exceeds 256 KiB. Upload content via `POST /api/artifacts/request-upload`.
+- `422 Unprocessable Entity` — Schema-valid payload violates business invariants or contains unknown command types.
 
-Full detail: [Wire protocol](#/docs/protocol) and
-[Security posture](#/docs/security).
+For complete protocol details, see [Wire protocol (v1)](/docs/protocol) and [Security posture](/docs/security).

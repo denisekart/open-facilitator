@@ -14,81 +14,89 @@ function tip(label, text) {
 
 tip(
   "the kernel (one container, your server)",
-  "The published kernel image: coordination, approvals, artifact ledger. Stateless — pair it with a PostgreSQL you already run.",
+  "The published kernel image: work lifecycle, approvals, and artifact ledger. Stateless container running against PostgreSQL.",
 );
 tip(
   "postgresql",
-  "The single durable store: works, decisions, ledgers, leases. Back it up; it is the product's memory.",
+  "The primary durable store: works, decisions, outbox, and session leases. Back it up as the system of record.",
 );
 tip(
   "artifacts s3 or a folder",
-  "Content-addressed artifact storage: S3-compatible in production, a plain folder for experiments.",
+  "Content-addressed storage: S3-compatible in production, local filesystem directory for testing.",
 );
 tip(
   "your login provider",
-  "Any OIDC-compliant provider: Azure AD, Keycloak, Authelia — the kernel verifies tokens, it does not store passwords.",
+  "Any OIDC-compliant provider: Keycloak, Entra ID, Okta. The kernel validates tokens without storing user credentials.",
 );
 tip(
   "your team's gateway",
-  "The team-side runtime: npm-installed, dialing out, spawning a harness per assignment.",
+  "The team-side Node runtime: connects outbound, manages child workspaces, and executes local policy.",
 );
 tip(
   "agents, scripts, humans",
-  "Whatever actually does the work, inside the team's own environment, on the team's credentials.",
+  "Workload executors running inside the team environment using team-owned credentials.",
 );
 tip("open", "A Work exists and is durable. It can be searched, steered, or cancelled.");
 tip(
   "routed",
-  "Policy has chosen a team; delivery is in flight or waiting for the team to come online.",
+  "Policy has assigned a team; delivery is in flight or queued waiting for the Gateway.",
 );
 tip(
   "inprogress",
-  "A harness is executing inside the team's own environment. Progress events land on the timeline as they arrive.",
+  "A harness executes inside the team workspace, emitting progress events to the timeline.",
 );
 tip(
   "awaitingapproval",
-  "A human decision is pending — durable, survives kernel restarts, fires exactly once.",
+  "Execution is paused on a durable approval request, surviving restarts until resolved.",
 );
 tip(
   "done",
-  "Result manifest available, artifacts verified. The timeline is complete and immutable.",
+  "Execution completed with verified result manifests and artifacts filed in storage.",
 );
-tip("cancelled", "Closed without a result; the reason is on the timeline.");
+tip("cancelled", "Closed without a result; the cancellation reason records on the timeline.");
 tip(
-  "your agent (endpoint)",
-  "Any language: enroll an Ed25519 key, prove possession per session, and the link plane treats you as a first-class endpoint.",
-);
-tip(
-  "open facilitator",
-  "The kernel's link plane: admission, durable delivery ledger, session leases. Every step is a schema-validated message.",
+  "agent endpoint",
+  "Any runtime connecting to the link plane: enrolls an Ed25519 key and proves possession per session.",
 );
 tip(
-  "your team's gateway",
-  "The team-side runtime: npm-installed, dialing out, spawning a harness per assignment.",
+  "facilitator kernel",
+  "The coordination service: admission, durable delivery ledger, session leases, and event routing.",
 );
 tip(
-  "enroll (public key + code)",
-  "One-time join: the enrollment code authorizes it and retires. No secret comes back — the key fingerprint is the identity.",
+  "adapter verify webhook, normalize",
+  "Translates external webhooks into standard CloudEvents; holds no outbound write credentials.",
 );
 tip(
-  "challenge + proof",
-  "A single-use nonce, then a detached Ed25519 signature: the session token you get is disposable, the private key is not.",
-);
-tip(
-  "adapter - normalizes to work events",
-  "Read-only by construction: it turns webhooks into schema-validated events and holds no write credential.",
-);
-tip(
-  "connector - team-side, bot token",
-  "The only path back to your forge: it performs the single write an approval allowed, under the team's own bot token.",
+  "connector privileged write",
+  "Executes approved outbound writes team-side using local platform credentials.",
 );
 tip(
   "kernel image - stateless, any container host",
-  "One published image, multi-arch. All state lives in the Postgres beside it — restart, replace, or run several.",
+  "Stateless multi-arch container. All relational state persists to PostgreSQL.",
 );
 tip(
-  "@ofac/adapter - your executor behind 3 lifecycle messages",
-  "Accept, progress, complete: the harness contract is small enough to audit in an afternoon, strict enough to gate releases.",
+  "postgresql - durable relational state",
+  "Durable storage for works, timeline events, routing configurations, and audit records.",
+);
+tip(
+  "s3-compatible store - artifact storage",
+  "Content-addressed binary storage for reports, diffs, datasets, and execution evidence.",
+);
+tip(
+  "oidc provider - user authentication",
+  "Validates operator and human identities for API and console access.",
+);
+tip(
+  "@ofac/adapter - child process communicating via line-oriented stdio",
+  "Harness protocol interface: accept, report progress, propose writes, and complete execution.",
+);
+tip(
+  "webhook ingress and approval-gated outbound writes",
+  "Pairing inbound event normalization with gated outbound write execution.",
+);
+tip(
+  "custom gateway or service implementing wire schemas",
+  "Custom implementation conforming to published CloudEvents, OpenAPI, and JSON Schemas.",
 );
 
 export function tooltipFor(label) {

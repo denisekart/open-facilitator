@@ -1,86 +1,67 @@
-# Artifacts & installation
+# Artifacts and installation
 
-Open Facilitator installs from published artifacts only: one kernel
-container image, a set of npm packages for the team side, and Dev
-Container Features that turn a container you already have into a linked
-workspace. Every one is versioned on a public registry — no source builds,
-no registry login for the base image stream.
+Open Facilitator distributes as published artifacts: one kernel container image, team-side npm packages, and Dev Container Features. Every component is versioned on public registries, requiring no private registry credentials or local source compilation.
 
-## The kernel image
+## Kernel container image
 
 ```bash
 docker pull ghcr.io/denisekart/open-facilitator/facilitator:v0.1.2
 ```
 
-One stateless container, multi-architecture (amd64 + arm64), tagged per
-release and pinned by digest in every release's provenance. It needs
-three things to start, all injected as configuration — and it is
-deliberately fail-closed: missing or ambiguous config stops startup with
-a readable error instead of guessing defaults:
+The kernel image is stateless and multi-architecture (amd64 and arm64). Each release is tagged by semantic version and pinned by digest in the release manifest. The kernel requires three configuration sources and fails closed if configuration is missing or invalid:
 
-| Needs                        | How                                                                                                   |
-| ---------------------------- | ----------------------------------------------------------------------------------------------------- |
-| PostgreSQL                   | `ConnectionStrings__Facilitator` — schema migrations run at startup                                   |
-| An OIDC provider             | config file block: authority, audience, and the claim mapping your provider emits                     |
-| S3-compatible object storage | `Storage__S3__*` env block (`Storage__Provider=filesystem` + `Storage:FileSystem:RootPath` for a toy) |
+| Requirement | Configuration |
+| --- | --- |
+| PostgreSQL | `ConnectionStrings__Facilitator` (migrations execute automatically on startup) |
+| OIDC provider | Configuration file block defining authority, audience, and claim mappings |
+| S3-compatible storage | `Storage__S3__*` environment variables (or `Storage__Provider=filesystem` for local testing) |
 
-Those three are the whole neighbourhood — drawn once, so you can see what
-you are responsible for operating:
+The diagram below illustrates the required infrastructure components:
 
 ```mermaid title="What must run beside the kernel image"
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#f7f9fb",
-"primaryBorderColor": "#ab8612", "primaryTextColor": "#21262e",
-"lineColor": "#676f7c", "secondaryColor": "#faf2d6"}}}%%
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#f7f9fb", "primaryBorderColor": "#ab8612", "primaryTextColor": "#21262e", "lineColor": "#676f7c", "secondaryColor": "#faf2d6"}}}%%
 flowchart TB
-  K["Kernel image - stateless, any container host"] --- PG[("PostgreSQL - the one mandatory dependency")]
-  K --- ART[("S3-compatible store - artifacts (a folder works for a toy)")]
-  K -.OIDC config.-> IDP["Your login provider - any OIDC-compliant provider"]
+  K["Kernel image - stateless, any container host"] --- PG[("PostgreSQL - durable relational state")]
+  K --- ART[("S3-compatible store - artifact storage")]
+  K -.OIDC config.-> IDP["OIDC provider - user authentication"]
 ```
 
-_The one claim: the kernel keeps no state of its own, so the three things
-beside it are all commodities you already run — PostgreSQL mandatory, the
-object store for artifact bytes, the login provider for identity — and the
-kernel itself can be replaced or multiplied freely._
+_The kernel holds no local state. Relational state resides in PostgreSQL, artifact binaries in object storage, and identities in your OIDC provider._
 
 ```bash
 docker run -d -p 8080:8080 \
-  -e ConnectionStrings__Facilitator="Host=db;Database=facilitator;Username=ofac;Password=…" \
+  -e ConnectionStrings__Facilitator="Host=db;Database=facilitator;Username=ofac;Password=secret" \
   -e Storage__Provider=s3 \
   -e Storage__S3__Endpoint=https://s3.example \
   -e Storage__S3__Bucket=facilitator \
-  -e Storage__S3__AccessKey=… -e Storage__S3__SecretKey=… \
+  -e Storage__S3__AccessKey=minioadmin -e Storage__S3__SecretKey=minioadmin \
   -v $PWD/facilitator.json:/app/config/facilitator.json:ro \
   ghcr.io/denisekart/open-facilitator/facilitator:v0.1.2
 ```
 
-Serving that URL is your whole control plane: the console and the API
-share the origin. Scale by running more copies against the same
-PostgreSQL — the coordination is in the database, not in the process.
+The container serves both the admin console and the HTTP API from a single origin. Scale horizontally by running additional replicas against the shared PostgreSQL database.
 
-## Node packages (team side)
+## Team-side Node packages
 
-From the `@ofac` scope on npm:
+The `@ofac` scope on npm publishes the following packages:
 
-| Package                                                                         | What you get                                                                |
-| ------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| `@ofac/gateway`                                                                 | the Gateway runtime (`ofac-gateway`) — one process, many workspaces         |
-| `@ofac/workspace-link`                                                          | Link SDK + `ofac-linkd` supervisor for custom runtimes                      |
-| `@ofac/protocol`                                                                | typed contract: envelope builders + schema validators for your own services |
-| `@ofac/adapter`                                                                 | harness-adapter SDK + conformance kit                                       |
-| `@ofac/provider-core`                                                           | shared scaffolding for a provider pair of your own                           |
-| `@ofac/harness-omp`, `@ofac/harness-codex`                                                        | ready-made harnesses                                                        |
-| `@ofac/mattermost-adapter`, `@ofac/telegram-adapter`                            | chat provider services                                                      |
-| `@ofac/github-adapter` + `@ofac/github-connector` (and `forgejo-*`, `gitlab-*`) | forge pairs: inbound normalization + approval-gated outbound writes         |
-| `@ofac/provisioning-oci`                                                        | workspace-provisioning launcher                                             |
+| Package | Function |
+| --- | --- |
+| `@ofac/gateway` | The Gateway runtime (`ofac-gateway`) multiplexing child workspaces. |
+| `@ofac/workspace-link` | Link SDK and `ofac-linkd` supervisor daemon. |
+| `@ofac/protocol` | Typed TypeScript models, envelope builders, and schema validators. |
+| `@ofac/adapter` | Harness adapter SDK and automated conformance test kit. |
+| `@ofac/provider-core` | Shared scaffolding for building custom chat and forge integrations. |
+| `@ofac/harness-omp`, `@ofac/harness-codex` | Shipped execution harnesses for oh-my-pi and Codex agents. |
+| `@ofac/mattermost-adapter`, `@ofac/telegram-adapter` | Chat provider adapter services. |
+| `@ofac/github-adapter`, `@ofac/forgejo-adapter`, `@ofac/gitlab-adapter` | Forge adapters with paired outbound write connectors. |
+| `@ofac/provisioning-oci` | Dynamic workspace provisioning service for container engines. |
 
-Everything is public: `npm install` works anywhere, without registry
-auth. Pin the version you consume; upgrades are your decision.
+All npm packages are public and require no registry authentication.
 
 ## Dev Container Features
 
-Turn any team container into a linked workspace with one line of
-`devcontainer.json` — OCI images on the same GHCR namespace, semver
-tagged plus a major alias (`:1.0.0` and `:1` today):
+Add features to your team's `devcontainer.json` to link development containers to the coordination plane:
 
 ```jsonc
 "features": {
@@ -90,40 +71,25 @@ tagged plus a major alias (`:1.0.0` and `:1` today):
 }
 ```
 
-Available features: `gateway`, `workspace-link`, `harness-adapter`,
-`omp-adapter`, `codex-adapter`, `forgejo-provider` — composable, each
-idempotent, supervised with crash-restart by the feature supervisor.
+Available features: `gateway`, `workspace-link`, `harness-adapter`, `omp-adapter`, `codex-adapter`, and `forgejo-provider`. Each feature includes supervision and automatic crash recovery.
 
-## The team-side runtime base
+## Team runtime base image
 
-`ghcr.io/denisekart/open-facilitator/node-runtime` carries every
-team-side process — Gateway, the `ofac-linkd` supervisor, the
-deterministic worker, the chat and forge adapters, the provisioning
-launcher — in one image, selected by the command you start it with. Using
-it as the base for a team image is convenience, not coupling: anything
-that speaks the wire works, including your own build.
+The image `ghcr.io/denisekart/open-facilitator/node-runtime` packages all team-side components in one container: Gateway, `ofac-linkd`, deterministic harness, chat/forge adapters, and the provisioning service. The command argument selects the active component.
 
-## Release discipline you can rely on
+## Release discipline
 
-- Every release cuts from a tag, builds multi-arch (amd64 + arm64), and
-  attaches a CycloneDX SBOM for both halves of the system.
-- Third-party base images are digest-pinned by the pipeline.
-- The wire contract is versioned in its schema names
-  (`org.facilitator.*.v1`): breaking changes get a new version segment,
-  never a silent edit — two independent implementations must pass the
-  same conformance fixtures before a change lands.
-- What gates a release is the same twelve-leg acceptance run you can run
-  yourself against the [guided tour](/docs/getting-started).
+- Every release originates from a signed Git tag and builds multi-architecture binaries (amd64 and arm64) with CycloneDX SBOMs.
+- Upstream base images are digest-pinned in build workflows.
+- Wire schemas use explicit version namespaces (`org.facilitator.*.v1`). Breaking changes increment the version segment.
+- Releases require passing the 12-leg automated acceptance suite used in the reference environment.
 
-## Current release
+## Release pinning
 
-The pipeline publishes on every version tag: multi-arch images and
-semver-tagged features, `latest` tracking the newest release. The current
-release line is `v0.1.2` — pin a tag or a digest, never `latest`, in
-anything you operate.
+Releases publish on version tags with major and minor aliases. The current release line is `v0.1.2`. Always pin immutable release tags or SHA-256 digests in production deployments.
 
 ## Where to go next
 
-- Start the pulled image against your own PostgreSQL: [Get running](/guide/human).
-- See what each piece talks to: [Explore the architecture](/architecture).
-- Write the package the coordinates do not cover: [Extend it yourself](/extend).
+- Deploy the kernel container: [Get running (humans)](/guide/human).
+- Review architectural boundaries: [Explore the architecture](/architecture).
+- Build a custom harness or provider: [Extend it yourself](/extend).

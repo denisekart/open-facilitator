@@ -1,127 +1,69 @@
 # open-facilitator.org
 
-The public website: a static landing page + documentation browser.
-**Fully separate from the facilitator runtime** — same repository, no shared
-code, nothing published to any registry, no backend.
+The public website: a static landing page and documentation browser. The site is decoupled from the facilitator runtime with no shared code, no backend, and no private registry dependencies.
 
-## What's here
+## Directory structure
 
 ```
 site/
-├── build.mjs              # the whole build: markdown -> HTML + search index + explorer bundle
+├── build.mjs              # build pipeline: markdown -> HTML + search index + explorer bundle
 ├── arch-explorer.vite.config.mjs  # IIFE bundle config for src/arch-explorer
-├── mermaid-ssr.mjs        # diagrams rendered at build time (headless chromium)
+├── mermaid-ssr.mjs        # build-time diagram renderer
 ├── serve.mjs              # dev server: node serve.mjs [port]
-├── package.json           # npm-managed, private; NOT part of the pnpm workspace
+├── package.json           # private npm package configuration
 └── src/
-    ├── config.mjs         # navigation, content manifest, landing-page copy
-    ├── architecture.mjs   # the explorer's graph model: nodes, zones, edges, scenarios
-    ├── arch-render.mjs    # renders that model to a fixed-layout inline SVG + JSON
-    ├── schema-ref.mjs     # palette reference generated from the wire schema at build time
-    ├── arch-explorer/     # the interactive map: a small Svelte 5 app (the site's one island)
-    ├── tooltips.mjs       # hover copy for diagram nodes (keyed by label)
-    ├── styles.css         # the site theme: quiet chrome, one accent (light + dark parity with the console)
-    ├── pages/index.mjs    # landing/404 template (interactive pipeline scene)
-    ├── pages/architecture.mjs  # /architecture page shell around the explorer
-    ├── pages/*.md         # site-only product pages (what/integrations/console/workflows/artifacts/extend):
-    │                      # each opens with one plain "what is this", builds up in place, and ends with a
-    │                      # "Where to go next" strip pointing at its successors on this site
-    ├── js/app.js          # hash router, doc viewer, live search, snapshot explorer (no deps)
-    ├── guides/*.md        # site-only getting-started guides
-    └── assets/            # the mark + product screenshots (light + dark, produced by the e2e run)
+    ├── config.mjs         # navigation, content manifest, and landing-page copy
+    ├── architecture.mjs   # explorer graph model: nodes, zones, edges, scenarios
+    ├── arch-render.mjs    # renders graph model to inline SVG and JSON
+    ├── schema-ref.mjs     # wire schema step palette reference generator
+    ├── arch-explorer/     # interactive architecture map (Svelte 5 island)
+    ├── tooltips.mjs       # hover tooltip text for diagram nodes
+    ├── styles.css         # visual theme with light and dark mode support
+    ├── pages/index.mjs    # landing page and 404 templates
+    ├── pages/architecture.mjs  # architecture explorer shell
+    ├── pages/*.md         # consumer-facing product documentation
+    ├── js/app.js          # client-side router, search engine, and doc viewer
+    ├── guides/*.md        # getting-started guides for humans and agents
+    └── assets/            # brand icons and interface screenshots
 ```
 
-Pages reference screenshots as `../assets/<name>.png` — the build rewrites
-those to the flat `dist/` filenames, so the source stays resolvable to a
-plain markdown reader and a link checker.
+Pages reference screenshots as `../assets/<name>.png`. The build pipeline rewrites paths to flat `dist/` filenames.
 
 ## Site pages
 
-`src/pages/*.md` and `src/guides/*.md` are the consumer surface, and they
-follow one shape: a first sentence that answers "what is this, in the
-reader's terms", detail that deepens in place, then a "Where to go next"
-list of the routes a reader naturally wants next (all of them in
-`config.mjs`, so the router and the sidebar know them too). Written copy
-names published coordinates rather than repo paths, ships no licensing or
-toolchain chatter, uses one word for the human actor, and claims only what
-`docs/` can back up.
+Pages in `src/pages/*.md` and `src/guides/*.md` follow standard consumer documentation principles: an opening sentence defining purpose, structured technical details, and a closing "Where to go next" navigation list. Copy references published artifact coordinates rather than repository source paths.
 
-Concepts a reader cannot see in a screenshot are drawn instead:
-` ```mermaid ` fences with the site theme in an `%%{init …}%%` block and a
-`title="…"` info-string, which the build turns into the figure caption.
-Every diagram carries a lead-in sentence and one claim. `/workflows` also
-gets a generated tail from the wire schema
-(`src/schema-ref.mjs`), so its palette table and the validator cannot
-drift apart.
+Mermaid diagrams declare standard theme initialization blocks and `title="..."` info-strings for accessible captions.
 
-## The architecture explorer
+## Architecture explorer
 
-`/architecture` is generated, not authored as markdown: `architecture.mjs`
-holds the graph model (one curated layout, no auto-layout engine),
-`arch-render.mjs` turns it into inline SVG + a JSON payload, and the
-explorer runtime in `app.js` adds node focus, a detail panel, and
-scenario playback. The ` ```archmap ` fence in any page renders a
-non-interactive miniature that links to it. Facts in the model must stay
-true to the implementation — they mirror `docs/`.
+The `/architecture` route renders from `architecture.mjs`. The data model defines layout coordinates and interactive scenarios, rendered as inline SVG by `arch-render.mjs`. The client runtime provides node focusing, details panels, and animated scenario steps.
 
-## Build & preview
+## Build and preview
 
 ```bash
 npm ci
-npm run build     # -> dist/
-npm run serve     # -> http://localhost:8788
+npm run build     # compiles to dist/
+npm run serve     # serves at http://localhost:8788
 ```
 
-The build reads the repository's `docs/` tree as the source of truth and
-renders every relative link correctly (site routes for published docs,
-GitHub links for everything else). Mermaid diagrams render to inline SVG
-at build time when a chromium binary is present; without one (e.g. a bare
-CI runner), the build ships the source plus the vendored `mermaid.min.js`
-and the page runtime renders the diagrams in the browser — with the same
-theme and the same hover tooltips, which it loads from `tooltips.json`.
-Diagram nodes get native `<title>` tooltips injected at build time (from
-`tooltips.mjs`, keyed by the node's visible label); the runtime styles
-them into hover cards. `404.html` forwards deep paths back into the SPA
-for routes that exist, and shows a real not-found page for the rest.
+The build processes `docs/` Markdown files and resolves relative cross-references. Mermaid diagrams render to inline SVG when headless Chromium is available, falling back to client-side rendering with identical themes.
 
-Design constraints (they keep the site deployable anywhere):
+Design constraints:
 
-- **No runtime dependencies on the happy path.** `app.js` is vanilla;
-  search is an inverted index (`search-index.json`) scored in the
-  browser. The vendored `mermaid.min.js` loads lazily and only when a
-  page actually contains an unrendered diagram.
-- **No absolute paths.** Every asset reference is relative, so the site
-  works at a domain root _or_ under a project-page subpath.
-- **Consumer content lives here, operator content in `docs/`.** Site
-  pages (`src/pages/*.md`, `src/guides/*.md`) are written for consumers
-  and never point at repo files; `docs/` (protocol, runbooks, security)
-  renders through unchanged as the deep reference.
+- **Zero runtime dependencies on core paths.** `app.js` runs vanilla JavaScript, using a pre-generated inverted index (`search-index.json`) for local search.
+- **Relative asset paths.** All links and assets use relative paths to support domain roots and subdirectory deployments.
+- **Consumer and operator separation.** Site pages target end users, while `docs/` provides comprehensive wire and protocol specifications.
 
 ## Deploying to GitHub Pages
 
-`.github/workflows/site.yml` builds `site/dist` and deploys through the
-official Pages artifact actions. One-time enablement:
+The `.github/workflows/site.yml` workflow builds `site/dist` and publishes the static output to GitHub Pages.
 
-1. Repository **Settings → Pages → Source: GitHub Actions**.
-2. (Optional) add a custom domain (`open-facilitator.org`) in the same
-   screen and point DNS at GitHub. The workflow's `OFAC_SITE_BASE`
-   defaults to `/` (custom domain or project page both work because all
-   references are relative); set it to `/<repo>/` if you serve from a
-   project path and want path-style deep links to survive the 404
-   forwarder.
+1. Enable GitHub Actions as the Pages source under repository settings.
+2. (Optional) Configure custom domains in DNS settings.
 
-Deploys fire on pushes that touch `site/**`, `docs/**`, or `README.md`;
-pull requests build the site without deploying. Anything else that
-serves static files (`nginx`, S3, Netlify, `docs/index.html`-style
-subfolders) can host `site/dist` verbatim — it is a plain folder.
+The build workflow runs on changes to `site/**`, `docs/**`, and `README.md`.
 
-## The mark
+## Visual identity
 
-A **kernel chip with linked environments**: the rounded square is the
-Open Facilitator — a coordination core that runs nothing itself — and its
-four links reach external environments (teams, tools, people). The
-gold endpoint is the work currently in motion on one of those links.
-Ink + cool blue-grey grounds + one gold signal (the "Ink on Paper"
-language): no green in the mark, works
-at 16 px, monochrome-safe (drop the gold dot for single-color
-contexts).
+The logo depicts a kernel core surrounded by four linked environments. The gold signal represents active work in transit across an outbound link. The design supports monochrome rendering and high contrast in light and dark themes.

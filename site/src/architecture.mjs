@@ -193,7 +193,7 @@ export const nodes = [
     what: "The durable state machine for every Work: created → routed → in progress → (awaiting approval) → done. Crash-safe by construction — state lives in PostgreSQL, not memory.",
     bullets: [
       "Leases and retries make dispatch exactly-once in effect.",
-      "Offline teams simply wait; nothing is lost.",
+      "Offline teams wait in durable queues; nothing is lost.",
     ],
     docs: "/docs/protocol",
   },
@@ -642,47 +642,47 @@ export const scenarios = [
     id: "journey",
     title: "The life of one Work",
     intro:
-      "What actually happens between “someone opens a piece of work” and “it is done and provable”. Seven hops.",
+      "The lifecycle of an objective from creation to verified evidence. Seven hops.",
     steps: [
       {
         caption:
-          "Anyone opens a Work: one idempotent POST from an API client, a console action, or a chat message. Nothing executes yet — the kernel only records.",
+          "An operator or agent creates a Work via API, console, or chat. The kernel records the durable objective.",
         nodes: ["cli", "console", "chatdec", "chat", "chatplat", "ingress", "apisrv"],
         edges: ["e-cli", "e-con", "e-chat-plat", "e-chat-dec"],
       },
       {
         caption:
-          "Ingress admits it exactly once. Deterministic policy — never a model — decides which team owns it, and the coordinator writes the record. Postgres is the only mandatory dependency: if it is not in there, it did not happen.",
+          "Ingress admits the event idempotently. Deterministic policy evaluates team capabilities and records the assignment in PostgreSQL.",
         nodes: ["ingress", "policy", "coord", "pg"],
         edges: ["e-ing-pol", "e-pol-coord", "e-coord-pg"],
       },
       {
         caption:
-          "The assignment rides to the link hub and out over the link the team itself dialled. No firewall hole on any team machine — the connection is always outbound.",
+          "The kernel dispatches the assignment across the outbound Link established by the team Gateway.",
         nodes: ["coord", "hub", "gw"],
         edges: ["e-coord-hub", "e-link"],
       },
       {
         caption:
-          "The gateway checks its own policy, then spawns a harness — an LLM agent working with the team's own models and keys. The kernel never sees those keys.",
+          "The Gateway validates local policy and starts an execution harness using team-owned credentials.",
         nodes: ["gw", "h1"],
         edges: ["e-gw-h1"],
       },
       {
         caption:
-          "The agent proposes a privileged write (push, merge, release). The forge connector performs it only after a human approves — the same gate a person would pass through, with an identity attached.",
+          "The harness proposes a privileged write. The forge connector waits until human approval is recorded.",
         nodes: ["h1", "gw", "forge", "forgeplat"],
         edges: ["e-gw-h1", "e-gw-forge", "e-forge-plat"],
       },
       {
         caption:
-          "The human answers from chat: approve, deny, or steer. Their identity is a real login mapped from your OIDC provider, and the decision lands on the Work's timeline.",
+          "The operator approves or steers the work from chat or console. The decision records to the immutable timeline.",
         nodes: ["gw", "chat", "chatplat", "chatdec"],
         edges: ["e-chat-plat", "e-chat-dec", "e-gw-chat"],
       },
       {
         caption:
-          "Results and evidence — reports, datasets, diffs, test output — are content-addressed into your object store; the timeline lands in Postgres. Status: done. Reconstructable months later, by anyone.",
+          "Artifacts and evidence upload to object storage, and the final state records to PostgreSQL.",
         nodes: ["coord", "broker", "s3", "pg"],
         edges: ["e-coord-brk", "e-brk-s3", "e-coord-pg"],
       },
@@ -692,29 +692,29 @@ export const scenarios = [
     id: "identity",
     title: "Three planes of identity",
     intro:
-      "Who is allowed to talk to what — and which secret lives where. The reason a kernel breach is survivable.",
+      "Cryptographic boundaries isolate credentials across human, link, and adapter planes.",
     steps: [
       {
         caption:
-          "Human plane: console and API calls carry an OIDC bearer from your login provider. The kernel maps claims, stores no passwords, and every action is attributed.",
+          "Human plane: Console and API requests carry standard OIDC bearer tokens. The kernel maps claims without storing credentials.",
         nodes: ["console", "cli", "apisrv", "ingress", "oidc"],
         edges: ["e-con", "e-cli", "e-oidc"],
       },
       {
         caption:
-          "Link plane: each gateway authenticates by proving its own pinned endpoint key. Revoke one team's token and its environments freeze — every other team is untouched.",
+          "Link plane: Gateways authenticate using pinned Ed25519 public keys and short-lived session tokens.",
         nodes: ["hub", "gw", "teamb"],
         edges: ["e-link", "e-link-b"],
       },
       {
         caption:
-          "Adapter plane: chat platforms and forges talk to team-side adapters, signature-verified, before anything reaches the kernel as an event. Platform tokens live on the team side, never in the kernel.",
+          "Adapter plane: Chat and forge webhooks authenticate via HMAC signatures. Outbound connectors hold local API tokens.",
         nodes: ["forgeplat", "chatplat", "forge", "chat"],
         edges: ["e-forge-plat", "e-chat-plat"],
       },
       {
         caption:
-          "Infrastructure: the kernel holds Postgres and object-store credentials; harnesses hold model and repo keys. No plane shares secrets with another — that containment is the security story.",
+          "Infrastructure plane: The kernel manages database and storage credentials. Harnesses hold model and repository keys.",
         nodes: ["coord", "pg", "s3", "broker"],
         edges: ["e-coord-pg", "e-coord-brk", "e-brk-s3"],
       },
@@ -724,29 +724,29 @@ export const scenarios = [
     id: "offline",
     title: "A team environment disappears",
     intro:
-      "The failure that kills most orchestrators: the worker vanishes mid-flight. Watch why nothing is lost.",
+      "Network partitions and worker restarts preserve in-flight state without data loss.",
     steps: [
       {
         caption:
-          "A gateway's link drops — laptop lid, redeploy, network cut. The hub notices within its heartbeat window. No team machine was listening for anything, so nothing was exposed.",
+          "The team Gateway link disconnects. The Link hub detects the disconnect within its heartbeat window.",
         nodes: ["gw", "hub"],
         edges: ["e-link"],
       },
       {
         caption:
-          "In-flight Work stays routed; new assignments queue. State lives in Postgres, so the kernel can crash and restart here too — the Work resumes where it was.",
+          "In-flight assignments remain recorded in PostgreSQL. New assignments queue durably.",
         nodes: ["coord", "pg", "hub"],
         edges: ["e-coord-pg", "e-coord-hub"],
       },
       {
         caption:
-          "Operators see the waiting state with an explicit reason — no silent black hole. The same view your agents read over the API.",
+          "Console operators view the waiting state with explicit status indicators.",
         nodes: ["console", "apisrv", "coord", "pg"],
         edges: ["e-con", "e-coord-pg"],
       },
       {
         caption:
-          "The gateway dials out again, replays its ledger, and delivery resumes exactly-once: completed assignments are never run twice, pending ones continue.",
+          "The Gateway reconnects outbound, replays its local ledger, and resumes processing without duplicate execution.",
         nodes: ["gw", "hub", "h1"],
         edges: ["e-link", "e-gw-h1"],
       },

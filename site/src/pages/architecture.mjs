@@ -13,10 +13,7 @@ export function architectureBody({ svg, payload }) {
         `<span class="arch-walk"><b>${sc.title}</b> — ${sc.intro}</span>`,
     )
     .join("");
-  return `<p class="lede">One map, drawn to scale with the system: a box is a thing that runs, an
-arrow is data actually moving. Hover a box to see what touches it, click it
-for what it guarantees. Then walk a scenario to watch the pieces light up in
-sequence.</p>
+  return `<p class="lede">Explore the system topology: boxes represent running services, and arrows indicate active data flows. Hover a box to inspect connections, click to view guarantees, or select a scenario to follow execution steps.</p>
 
 <div class="arch-controls" id="arch-controls" role="tablist" aria-label="Ways to explore"></div>
 <p class="arch-walks" hidden>${walks}</p>
@@ -29,32 +26,17 @@ sequence.</p>
 
 <h2 id="legend">Reading the map</h2>
 <div class="arch-legend">
-  <p><span class="al-key" style="border-color:#ab8612;background:#f7f9fb"></span><b>Solid outline</b><span>parts you deploy yourself. The kernel is one stateless container; it keeps no secrets of its own, which is why it can restart at any moment.</span></p>
-  <p><span class="al-key" style="border-color:#ab8612;background:#faf2d6"></span><b>Gold outline</b><span>a team's own environment. It holds the team's keys, makes its own allow/deny calls, and dials <i>out</i> to the kernel — nothing can dial in.</span></p>
-  <p><span class="al-key" style="border-color:#767d85;background:#f7f9fb"></span><b>Dashed outline</b><span>replaceable or external: your Postgres, your login provider, your object store, and the platforms teams already use.</span></p>
-  <p><span class="al-line" style="border-top:2.6px dotted #ab8612"></span><b>The link</b><span>every team-side connection, always outbound, resumable after any disconnect.</span></p>
+  <p><span class="al-key" style="border-color:#ab8612;background:#f7f9fb"></span><b>Solid outline</b><span>Self-hosted services. The kernel is a stateless container that persists all state to PostgreSQL.</span></p>
+  <p><span class="al-key" style="border-color:#ab8612;background:#faf2d6"></span><b>Gold outline</b><span>Team-operated environments holding team credentials, evaluating local policy, and connecting outbound to the kernel.</span></p>
+  <p><span class="al-key" style="border-color:#767d85;background:#f7f9fb"></span><b>Dashed outline</b><span>External infrastructure: PostgreSQL, OIDC identity providers, object storage, and forge platforms.</span></p>
+  <p><span class="al-line" style="border-top:2.6px dotted #ab8612"></span><b>The link</b><span>Outbound, resumable SignalR or HTTP connections maintained by team Gateways.</span></p>
 </div>
 
-<h2 id="three-planes">Three planes of identity</h2>
-<p>Who may talk to what, and which secret lives where. <b>Human plane:</b>
-console and API calls carry an OIDC bearer from your login provider — every
-action keeps an identity. <b>Link plane:</b> each gateway authenticates with
-its own link token; revoke one team and every other team is untouched.
-<b>Adapter plane:</b> chat platforms and forges reach team-side adapters
-first, signature-verified, before anything becomes a kernel event. Platform
-tokens and model keys never enter the kernel — that containment is why a
-kernel breach is survivable. The <em>identity</em> scenario walks it.</p>
+<h2 id="three-planes">Three identity planes</h2>
+<p>Authentication boundaries isolate credentials across planes. <b>Human plane:</b> Console and API requests carry OIDC bearer tokens. <b>Link plane:</b> Each Gateway authenticates using a pinned Ed25519 endpoint key. <b>Adapter plane:</b> Chat platforms and forges authenticate via signed webhooks. Platform tokens and model keys remain team-side.</p>
 
-<h2 id="where-things-run">Where things run</h2>
-<p>The kernel is the only always-on piece, and it executes nothing: work
-happens in team environments, evidence lands in your object store, state in
-your Postgres. Scaling is horizontal and boring — add kernels behind a
-load balancer, add teams by pointing another gateway at the hub. There is no
-second control plane to adopt. Deep dives:
-<a href="#/docs/overview">concepts</a> ·
-<a href="#/docs/protocol">the wire contract</a> ·
-<a href="#/docs/security">security posture</a> ·
-<a href="#/docs/advanced">operations</a>.</p>
+<h2 id="where-things-run">Where workloads run</h2>
+<p>The kernel runs continuously as a coordination service without executing application workloads. Workloads execute inside team environments, storing evidence in object storage and state in PostgreSQL. Scale horizontally by running additional kernel replicas behind a load balancer and connecting additional team Gateways.</p>
 
 <script type="application/json" id="arch-data">${payload}</script>`;
 }

@@ -1,69 +1,45 @@
 # Supported integrations
 
-An integration is a small program of yours that translates between one
-external system and the kernel: it turns what that system sends into
-events the kernel understands, and it performs the writes a human has
-allowed. Every one runs **team-side** on your credentials and speaks the
-same wire contract, so this page is a list of what works today rather
-than a roadmap. Type to filter; every category is a section with its own
-detail.
+An integration translates between an external system and the kernel. It normalizes external events into standard CloudEvents and executes approved outbound writes. Every integration runs team-side using your credentials and speaks the published wire contract.
 
-| Want to…                                              | Use                                                 | Direction                        | Ships as                   |
-| ----------------------------------------------------- | --------------------------------------------------- | -------------------------------- | -------------------------- |
-| Let humans create Work and answer approvals from chat | **Mattermost**, **Telegram**                        | two-way                          | standalone adapter service |
-| Feed issues/PRs into Work and gate forge writes       | **GitHub**, **Forgejo**, **GitLab**                 | inbound webhook + gated outbound | adapter + connector pair   |
-| Execute assignments with LLM agents or scripts        | **omp**, **Codex**, **deterministic**, **your own** | team-side child process          | harness package            |
-| Spawn fresh linked environments on demand             | **OCI launcher** (Docker)                           | outbound                         | provisioning service       |
-| Stream provider events through a bus                  | **Kafka** ingress leg                               | inbound                          | optional transport         |
-| Put the kernel behind your corporate login            | **any OIDC provider**                               | identity                         | configuration              |
+| Goal | Component | Direction | Distribution |
+| --- | --- | --- | --- |
+| Create Work and handle approvals in chat | **Mattermost**, **Telegram** | Bidirectional | Standalone service package |
+| Ingest issues/PRs and gate forge writes | **GitHub**, **Forgejo**, **GitLab** | Inbound webhook + gated outbound | Adapter and connector pair |
+| Execute workloads with agents or scripts | **oh-my-pi**, **Codex**, **deterministic**, **custom** | Team-side child process | Harness package |
+| Provision isolated workspaces on demand | **OCI launcher** (Docker) | Outbound | Provisioning service |
+| Stream events through a message bus | **Kafka** ingress leg | Inbound | Optional transport |
+| Authenticate operators through single sign-on | **Any OIDC provider** | Identity | Configuration |
 
 ## Chat providers
 
-Inbound messages and commands become Work events; outbound confirmations,
-approval prompts, and results come back as chat.
+Inbound messages and slash commands create Work items. Outbound status updates, approval prompts, and results return directly to the originating chat thread.
 
-| Provider       | What it does                                                                                                                      |
-| -------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| **Mattermost** | Full two-way provider: threads become Work context, approvals are delivered and answered in-channel, slash commands create Works. |
-| **Telegram**   | Bot-based chat leg: Works created from messages, approval prompts delivered to chats.                                             |
+| Provider | Mechanism |
+| --- | --- |
+| **Mattermost** | Bidirectional adapter (`@ofac/mattermost-adapter`). Chat threads become Work context, approvals resolve in-channel, and slash commands open Works. |
+| **Telegram** | Bot-based adapter (`@ofac/telegram-adapter`). Messages create Works and approval prompts route to configured chats. |
 
-Each chat adapter runs as its own small service (`@ofac/mattermost-adapter`,
-`@ofac/telegram-adapter`) on your side of the network, with a
-webhook-in / API-out shape you can audit. Every adapter declares a
-`media` facet in its capability manifest, and every provider speaks media
-in both directions — chat providers post files natively, the forges
-carry images as issue attachments or note markdown, each within the
-caps its facet declares. A completion reply attaches manifest outputs
-only where the facet allows it, and degrades honestly (a brokered link
-line + one audit row per media act) everywhere else — nothing ever
-vanishes silently. Every provider also answers `context.fetch`: a
-`thread://` reference is routed to the source adapter, which reads the
-thread window from the platform and answers as a stored
-`context.history` artifact. A route may also declare a `context` block: the kernel then
-folds the thread history, work fields and memory recalls into a
-digest-stamped document the harness receives with its assign, so "what
-did the agent actually see" is a queryable answer.
+Each chat adapter runs as an independent service on your network. Adapters declare a `media` facet in their capability manifest to manage native file uploads. Forges attach images to issues or markdown notes according to declared size limits.
 
-## Forges (source hosting)
+When a completion response includes media, the adapter uploads files where permitted. If media exceeds limits, the adapter writes an audit row and a brokered link to ensure no output is dropped.
 
-Forge integrations come as a pair: an **adapter** that consumes webhook
-events, and a **connector** that performs privileged writes — and every
-privileged write can ride a human approval.
+Providers also support `context.fetch`. A `thread://` URI resolves through the source adapter, which retrieves thread history and stores it as a `context.history` artifact. When a route defines a `context` block, the kernel compiles thread history, work attributes, and memory recalls into a digest-pinned document delivered with the assignment.
 
-| Forge       | Inbound today                                                      | Outbound today                                                      |
-| ----------- | ------------------------------------------------------------------ | ------------------------------------------------------------------- |
-| **GitHub**  | Webhooks: issues, pull requests, comments → normalized Work events | Issue/PR comments, PR creation — approval-gated, executed team-side |
-| **Forgejo** | Webhooks, same envelope family                                     | Same privileged-write pattern                                       |
-| **GitLab**  | Webhooks, same envelope family                                     | Same privileged-write pattern                                       |
+## Forge source hosting
 
-The split is deliberate, and it is the same shape for every forge:
-inbound normalization on one side, an approval-gated connector on the
-other, each with its own identity. Read it as the picture below.
+Forge integrations operate as an adapter and connector pair. The adapter consumes webhooks, while the connector executes privileged writes subject to approval policies.
+
+| Forge | Inbound operations | Outbound operations |
+| --- | --- | --- |
+| **GitHub** | Webhooks for issues, pull requests, and comments normalize into Work events. | Comments and pull request creation execute team-side under human approval gates. |
+| **Forgejo** | Webhooks normalize into standard CloudEvents envelopes. | Privileged repository writes execute team-side following approval. |
+| **GitLab** | Webhooks normalize into standard CloudEvents envelopes. | Privileged repository writes execute team-side following approval. |
+
+This separation keeps inbound automation isolated from outbound writes. The connector is the only component holding forge credentials.
 
 ```mermaid title="The forge pair — inbound is automated, outbound is gated"
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#f7f9fb",
-"primaryBorderColor": "#ab8612", "primaryTextColor": "#21262e",
-"lineColor": "#676f7c", "secondaryColor": "#faf2d6"}}}%%
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#f7f9fb", "primaryBorderColor": "#ab8612", "primaryTextColor": "#21262e", "lineColor": "#676f7c", "secondaryColor": "#faf2d6"}}}%%
 flowchart LR
   F["Forge<br/>(GitHub, Forgejo, GitLab)"]
   subgraph T["Team environment"]
@@ -80,57 +56,40 @@ flowchart LR
   C -->|"comment, PR"| F
 ```
 
-_The one claim: inbound traffic is safe to automate, so it is one plain
-service; a write back into the forge is a separate component that only
-acts after a human decision, and it is the only thing that holds the
-forge credential._
+_Inbound webhook events normalize automatically through the adapter. Outbound writes to the forge require human approval and execute team-side through the connector._
 
 ## Execution harnesses
 
-The harness is what actually does an assignment. The Gateway spawns one
-per assignment through a small adapter contract.
+The Gateway spawns one harness child process per assignment through a line-oriented stdio contract.
 
-| Harness                                           | Shape                                                                                                                                                         |
-| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Deterministic** (in the team runtime base image) | Scripted workers: fixed inputs → fixed outputs. The reference implementation and the conformance baseline.                                                  |
-| **oh-my-pi** (`@ofac/harness-omp`)                | Drives an autonomous agent runtime with tool use and multi-step reasoning.                                                                                    |
-| **Codex** (`@ofac/harness-codex`)                 | Drives a Codex-based coding agent as a workspace child.                                                                                                       |
-| **Your own** (`@ofac/adapter` SDK)                | Anything you can spawn: a language model loop, a Python pipeline, a checklist a human fills in. The contract is line-oriented JSON: a start command, optional steer and stop, your progress events, your terminal event with a result manifest. |
+| Harness | Architecture |
+| --- | --- |
+| **Deterministic** (built into runtime) | Scripted workers providing deterministic inputs and outputs. Serves as the conformance baseline. |
+| **oh-my-pi** (`@ofac/harness-omp`) | Autonomous agent runtime with multi-step reasoning and tool execution. |
+| **Codex** (`@ofac/harness-codex`) | Coding agent operating as a workspace child process. |
+| **Custom** (`@ofac/adapter` SDK) | Any executable process: language models, data pipelines, or human checklists. Communicates via line-oriented JSON. |
 
-## Provisioning
+## Workspace provisioning
 
-A provisioning launcher can stand up a fresh, linked workspace container
-on request — the mechanism behind “spin up a clean environment for this
-Work”. The shipped launcher (`@ofac/provisioning-oci`) drives an OCI
-runtime (Docker) through an outbound link, so nothing needs an inbound
-port.
+The provisioning launcher creates isolated workspace containers on demand. The `@ofac/provisioning-oci` package controls container runtimes over an outbound link, requiring no inbound network listeners.
 
 ## Transports and event buses
 
-- **SignalR** is the reference link transport (resumable, multiplexed).
-- **Plain HTTP long-poll** is the honest fallback for restrictive
-  networks — the same contract, no smart transports.
-- **Kafka** is available as an ingress leg: provider events can arrive
-  through a topic instead of a webhook, with the same idempotent
-  admission.
+- **SignalR** serves as the default bidirectional link transport, supporting session multiplexing and automatic reconnection.
+- **HTTP long-polling** provides a fallback transport for restrictive networks using identical envelope schemas.
+- **Kafka** acts as an optional ingress consumer, ingesting external events into the coordination pipeline with idempotent deduplication.
 
-## Identity
+## Identity providers
 
-Any **OIDC-compliant** provider is a login authority: the kernel needs
-nothing proprietary from it (Keycloak is the provider the acceptance suite
-exercises). Team-side humans, services, and agent identities are just
-different claims on the same tokens.
+The kernel validates tokens against any **OIDC-compliant** identity provider, such as Keycloak, Entra ID, or Okta. Human operators, automated services, and agent workloads authenticate using distinct claim mappings on standard tokens.
 
-## What it runs on
+## Infrastructure dependencies
 
-The kernel's hard requirements are three commodities you already run —
-PostgreSQL for the record, an S3-compatible store for artifacts, an OIDC
-provider for identity — each behind a configuration block. The picture and
-the coordinates are on [Artifacts & installation](/artifacts).
+The kernel requires three infrastructure components: PostgreSQL for relational state, S3-compatible storage for artifacts, and an OIDC provider for identity. See [Artifacts & installation](/artifacts) for configuration variables and container image tags.
 
 ## Where to go next
 
-- Turn a new system into an integration: [Extend it yourself](/extend).
-- See where these edges appear on the map: [Explore the architecture](/architecture).
-- Watch a Work collect its chat and forge traffic: [The admin console](/console).
-- Or stop reading and [get running](/guide/human).
+- Build a custom adapter using the SDK: [Extend it yourself](/extend).
+- Inspect connection boundaries on the interactive map: [Explore the architecture](/architecture).
+- View event timelines and delivery ledgers: [The admin console](/console).
+- Deploy the standalone stack: [Get running (humans)](/guide/human).

@@ -25,7 +25,7 @@ export const hero = {
   kicker: "Open-source orchestration for human + agent teams",
   tagline: "Your agents do the work. Open Facilitator remembers it.",
   oneLiner:
-    "A coordination kernel for teams of humans and AI agents. Hand it a piece of work — it tracks who has it, waits for the humans who must approve, files the evidence, and stays standing through every crash and restart, because the record lives in your database.",
+    "A coordination kernel for teams of humans and AI agents. Hand it a piece of work — it tracks who has it, waits for human approval, files verified evidence, and survives every restart because state lives in your database.",
 };
 
 // The interactive hero scene: a work item crossing four stations, with the
@@ -37,28 +37,28 @@ export const relay = {
       x: 75,
       who: "You or an agent",
       title: "A Work is created",
-      body: "One POST to the API — or a message in chat. An objective, nothing else required. It lands as a row in your database, so from that moment it outlives every process involved.",
+      body: "One POST to the API or an inbound chat message creates a Work with an objective. The record lands as a row in your database and outlives every worker process.",
       log: "work opened: refresh billing docs — via chat",
     },
     {
       x: 225,
       who: "The kernel",
       title: "Routing decides who acts",
-      body: "Policy picks a team by capability, mints an assignment, and pushes it out over an always-outbound link. A model may propose a route; only policy takes one, and the decision is written to the audit trail. If that team is offline, the work simply waits.",
+      body: "Deterministic policy evaluates team capabilities, mints an assignment, and dispatches it over an outbound link. If that team is offline, the work waits in the durable queue.",
       log: "routed to team-alpha by policy (audited)",
     },
     {
       x: 375,
       who: "A team's environment",
       title: "Agents execute, humans approve",
-      body: "Execution happens in the team's own environment, on the team's own credentials. The agent proposes; a human gate decides. Neither the kernel nor any other team can reach in.",
+      body: "Execution runs in the team's environment on team-owned credentials. The agent proposes changes; a designated human gate approves before privileged writes execute.",
       log: "agent proposed merge → alice approved (identity kept)",
     },
     {
       x: 525,
       who: "The record",
       title: "Evidence is filed",
-      body: "Every output becomes a digest-verified artifact, every decision an audit entry, every lesson a memory candidate. Six months later you can still answer: who did what, when, and who allowed it.",
+      body: "Outputs become digest-verified artifacts, decisions become audit entries, and reusable lessons become memory candidates. The full provenance remains queryable.",
       log: "evidence filed · status: done",
     },
   ],
@@ -69,28 +69,28 @@ export const story = [
   {
     who: "Monday, 09:02 — a person",
     title: "The ask goes in",
-    body: "A team lead opens a ticket that reads “draft the billing migration plan” — or an agent files it from a chat message. It lands as a Work: durable, versioned, searchable.",
+    body: "A team lead opens an issue or an agent creates a Work from a chat thread. The Work is durable, versioned, and searchable from the moment of creation.",
     cmd: 'curl -X POST https://facilitator.example/api/works \\\n  -H "authorization: Bearer $TOKEN" \\\n  -d \'{"objective": "draft the billing migration plan"}\'',
   },
   {
     who: "Monday, 09:02 — the kernel",
-    title: "Policy routes, never guesses",
-    body: "The kernel matches the work's capability need against what teams advertise, checks who is online, and assigns it. The decision is deterministic and written to the audit trail — a model can propose a route, only policy can take one.",
+    title: "Policy routes without guessing",
+    body: "The kernel matches required capabilities against advertised team capacity, verifies online state, and records the assignment. Routing decisions are deterministic and audited.",
   },
   {
     who: "Monday, 09:04 — a team's environment",
-    title: "An agent picks it up over an outbound link",
-    body: "The team's Gateway dials out to the kernel (nothing is exposed inbound), accepts the assignment, and starts a harness — an LLM agent, a deterministic script, or a human task list. The kernel never holds the team's source credentials, models, or API keys.",
+    title: "An agent accepts the assignment over an outbound link",
+    body: "The team's Gateway dials out to the kernel, accepts the assignment, and starts an execution harness. The kernel holds no team credentials, source keys, or model endpoints.",
   },
   {
     who: "Monday, 11:37 — a human gate",
-    title: "The agent asks; a human decides",
-    body: "The draft is ready, but opening the pull request is a privileged write. The kernel mints a durable approval request and delivers it into the team's chat. The kernel can restart, upgrade, or fall over at this exact moment — the approval survives and fires exactly once.",
+    title: "The agent proposes; a human approves",
+    body: "The draft is ready, but opening a pull request is a privileged write. The kernel mints a durable approval request and delivers it into team chat, surviving mid-flight restarts.",
   },
   {
     who: "Monday, 13:10 — the record",
-    title: "Everything is filed where it can be found",
-    body: "The report and its manifest are stored as digest-verified artifacts. The timeline holds every event, actor, and decision. Useful lessons can be promoted to shared memory with team-scoped access — so the next agent starts smarter.",
+    title: "Evidence lands in the durable store",
+    body: "The result and its manifest become digest-verified artifacts. The timeline records every event and decision, and proven lessons promote to scoped shared memory.",
   },
 ];
 
@@ -99,37 +99,37 @@ export const components = [
   {
     name: "The kernel",
     tag: "container image",
-    body: "One stateless service you run anywhere containers run. Work lifecycle, routing policy, approvals, links, artifacts, memory, admin console. Your PostgreSQL, your OIDC provider, your object store — no proprietary infrastructure.",
+    body: "Stateless service running as a container. Coordinates work lifecycles, routing policy, approvals, links, artifacts, memory, and the admin console on your PostgreSQL and OIDC.",
     docs: "/artifacts",
   },
   {
     name: "The Gateway",
     tag: "npm · @ofac/gateway",
-    body: "The team-side runtime. One outbound connection to the kernel, N workspaces behind it, a durable local ledger. One process on any host your team already runs — a container, a VM, a worker box.",
+    body: "Team-side Node runtime. Maintains one outbound connection to the kernel, multiplexes child workspaces, and stores state in a local ledger.",
     docs: "/artifacts",
   },
   {
     name: "Harness adapters",
     tag: "npm · @ofac/adapter",
-    body: "The plug between the Gateway and whatever actually executes: shipped reference harnesses for deterministic runs, oh-my-pi agents, and Codex — plus the SDK and conformance kit for your own.",
+    body: "Translators between the Gateway and execution harnesses. Shipped packages support deterministic workers, oh-my-pi agents, and Codex, with an SDK for custom harnesses.",
     docs: "/extend",
   },
   {
     name: "Provider adapters",
     tag: "npm · chat + forge",
-    body: "Chat and forge legs for Mattermost, Telegram, GitHub, Forgejo, and GitLab. Inbound events arrive normalized; privileged outbound writes ride approval policies and execute team-side.",
+    body: "Chat and forge adapters for Mattermost, Telegram, GitHub, Forgejo, and GitLab. Normalizes inbound webhooks and gates outbound privileged writes through team policy.",
     docs: "/integrations",
   },
   {
     name: "The wire contract",
     tag: "open protocol",
-    body: "Every message is a CloudEvents 1.0 envelope with a versioned JSON Schema; every endpoint is specified in OpenAPI 3.1. Two independent runtime stacks pass the same conformance fixtures — you can implement any component in any language.",
+    body: "CloudEvents 1.0 envelopes with versioned JSON Schemas and OpenAPI 3.1 specifications. A cross-language conformance suite verifies interoperability.",
     docs: "/docs/protocol",
   },
   {
     name: "Dev Container Features",
     tag: "OCI images · ghcr.io",
-    body: "Turn any team container into a linked workspace by adding one feature to devcontainer.json. Enroll, connect, advertise capabilities, stream logs — no bespoke daemon to write.",
+    body: "Turns any team container into a linked workspace through devcontainer.json. Automatically enrolls, connects, and advertises capabilities.",
     docs: "/artifacts",
   },
 ];
@@ -138,27 +138,27 @@ export const components = [
 export const benefits = [
   {
     title: "Agents come and go; the work remains",
-    body: "Crash a worker mid-approval and the run resumes exactly once. Nothing important lives only in a socket, a container, or a model's context window. The kernel's store is your PostgreSQL — back it up like anything else you care about.",
+    body: "If a worker crashes mid-approval, the run resumes once. Nothing lives exclusively in a socket, container, or context window. The store is your PostgreSQL database.",
   },
   {
     title: "No one loses authority over their environment",
-    body: "Teams dial out, never in. The kernel holds no source credentials, no deploy keys, no model access. Every external write a team makes passes the team's own policy first — enforced by code you can read, not by a hosting agreement.",
+    body: "Teams connect outbound. The kernel never holds source credentials, deployment keys, or model access. Every external write passes team-side policy first.",
   },
   {
-    title: "Humans stay in the loop where they chose to be",
-    body: "Privileged actions ride durable, digest-pinned, single-use approvals delivered into your chat. A restart, a failover, or a duplicate delivery cannot approve twice — the ledger refuses.",
+    title: "Humans stay in the loop where required",
+    body: "Privileged actions require durable, digest-pinned, single-use approvals delivered to chat or console. A restart or retry cannot approve twice.",
   },
   {
     title: "AI without amnesia",
-    body: "Outputs are content-addressed artifacts, decisions are audit entries, and proven lessons become shared memories with team-scoped access. Next quarter's agents can be held to what this quarter's work proved.",
+    body: "Outputs become content-addressed artifacts, decisions become audit entries, and verified lessons become scoped memories for future tasks.",
   },
   {
     title: "A protocol, not a platform",
-    body: "CloudEvents + JSON Schema + OpenAPI, with a cross-language conformance suite. Swap harnesses, swap chat providers, write your own adapter in any language — or implement the whole side from the contract alone.",
+    body: "Built on CloudEvents, JSON Schema, and OpenAPI with cross-language conformance tests. Swap harnesses, replace chat providers, or implement clients in any language.",
   },
   {
     title: "Replaceable infrastructure",
-    body: "Three things beside the kernel: your PostgreSQL, your OIDC provider, and somewhere to put artifact bytes — S3-compatible in production, a plain folder for a trial. Everything else — message buses, schedulers, vector databases, even the model providers — is optional. Small enough to audit, standard enough to keep.",
+    body: "The kernel requires only three dependencies: PostgreSQL, an OIDC provider, and S3-compatible or local storage. Message buses, vector stores, and model gateways remain optional.",
   },
 ];
 

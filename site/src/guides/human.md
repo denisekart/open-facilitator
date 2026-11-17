@@ -1,18 +1,14 @@
 # Get running — Humans
 
-You have Docker, a browser, and opinions about your
-team's tools. This page gets you from nothing to a kernel answering
-your API calls, with one Work moving through it.
+This guide explains how to start a kernel, connect a team Gateway, and create your first Work item.
 
-Two roads, take either:
+Choose between two setup methods:
 
-- **Road A — run the published image yourself** (10 minutes, your
-  infrastructure pattern, closest to production shape).
-- **Road B — the guided tour environment** (one command, boots a whole
-  demo world — kernel + login provider + artifact store + a demo team —
-  and proves every hop for you).
+- **Road A — Standalone container deployment** (10 minutes, using your infrastructure).
+- **Road B — Guided reference tour** (one command, boots kernel, OIDC provider, artifact storage, and a demo team).
 
 ```mermaid title="Where things run, either road"
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#f7f9fb", "primaryBorderColor": "#ab8612", "primaryTextColor": "#21262e", "lineColor": "#676f7c", "secondaryColor": "#faf2d6"}}}%%
 flowchart LR
   YOU(["You: curl / browser"]) -->|bearer token| K["The kernel<br/>(one container, your server)"]
   K --- PG[("PostgreSQL")]
@@ -22,58 +18,53 @@ flowchart LR
   GW --> W["Agents, scripts, humans"]
 ```
 
-Either road ends at the same API: everything below works against both.
+Both paths expose identical HTTP APIs and console interfaces.
 
-## Road A: your own kernel, two containers
+## Road A: standalone container deployment
 
-You need PostgreSQL and a container runtime — your login provider stays
-outside (any standards-compliant OIDC service). Everything else is one
-image.
+Deploy PostgreSQL and the Facilitator container on a shared Docker bridge network. Point the kernel at an external OIDC provider for user authentication.
 
 ```bash
 docker network create ofac
 docker run -d --name ofac-pg --network ofac \
-  -e POSTGRES_PASSWORD=… -e POSTGRES_DB=facilitator postgres:17
+  -e POSTGRES_PASSWORD=secret -e POSTGRES_DB=facilitator postgres:17
 
 docker run -d --name ofac --network ofac -p 8080:8080 \
-  -e ConnectionStrings__Facilitator="Host=ofac-pg;Database=facilitator;Username=postgres;Password=…" \
+  -e ConnectionStrings__Facilitator="Host=ofac-pg;Database=facilitator;Username=postgres;Password=secret" \
   -e Link__EnrollmentToken=change-me \
   -e Storage__Provider=filesystem \
   -v $PWD/facilitator.json:/app/config/facilitator.json:ro \
   ghcr.io/denisekart/open-facilitator/facilitator:v0.1.2
 ```
 
-`facilitator.json` points the kernel at your OIDC provider (the login
-authority — Azure AD, Keycloak, Authelia, anything standards-compliant)
-and tells it how identity claims are shaped. The kernel is fail-closed:
-it refuses to start on missing or ambiguous config rather than
-guessing, so this file is deliberately explicit:
+Create `facilitator.json` to define OIDC authority settings and claim mappings:
 
 ```jsonc
 {
   "ui": {
     "oidcAuthority": "https://login.example/realms/teams",
-    "oidcClientId": "facilitator-api",
+    "oidcClientId": "facilitator-api"
   },
   "identity": {
-    "oidc": { "authority": "https://login.example/realms/teams", "audience": "facilitator-api" },
+    "oidc": {
+      "authority": "https://login.example/realms/teams",
+      "audience": "facilitator-api"
+    },
     "claims": {
       "subject": "/sub",
       "displayName": "/preferred_username",
-      "groups": [{ "path": "/groups", "shape": "string-array" }],
-    },
+      "groups": [{ "path": "/groups", "shape": "string-array" }]
+    }
   },
-  "Link": { "Teams": ["team-alpha"] },
+  "Link": { "Teams": ["team-alpha"] }
 }
 ```
 
-When `GET http://localhost:8080/health` answers, you have a control
-plane. `/` serves the admin console, `/api/*` is the whole product.
+Verify startup by probing `GET http://localhost:8080/health`. The root path `/` serves the console, and `/api/*` handles API requests.
 
-### Connect a team, run a Work
+### Connect a team and create a Work
 
-Install the Gateway wherever your agents live (it is a Node process; a
-container is fine):
+Install `@ofac/gateway` on the host or container running your team's execution harnesses:
 
 ```bash
 npm install -g @ofac/gateway
@@ -82,7 +73,7 @@ apiVersion: facilitator.framework/v1
 kind: Gateway
 gatewayId: gw.team-alpha
 team: team-alpha
-facilitatorUrl: http://facilitator.example:8080
+facilitatorUrl: http://localhost:8080
 enrollmentSecret: change-me
 trustMode: isolated-executor
 stateDir: ./.ofac-gateway
@@ -92,41 +83,32 @@ EOF
 ofac-gateway run --config gateway.yaml
 ```
 
-The Gateway dials **out**, enrolls with the shared token, and waits for
-work for its team. Now create a Work as any OIDC-authenticated user:
+The Gateway connects outbound to the kernel, completes enrollment, and waits for assignments. Create a Work using an authenticated HTTP request:
 
 ```bash
-curl -X POST http://facilitator.example:8080/api/works \
+curl -X POST http://localhost:8080/api/works \
   -H "authorization: Bearer $TOKEN" -H 'content-type: application/json' \
   -d '{"objective": "draft the billing migration plan"}'
 ```
 
-Open the console, search the objective, and watch the timeline grow as
-the work routes, executes, and files its evidence.
+Open the console at `http://localhost:8080`, search for the objective, and view the real-time event timeline.
 
-## Road B: the guided tour
+## Road B: guided reference tour
 
-If you want to see the _whole_ system — kernel, login provider,
-artifact store, a demo team with a worker, and an acceptance suite that
-proves all twelve hops unattended — run the tour instead:
+To run a pre-configured environment including Keycloak, SeaweedFS, and an automated verification suite, clone the repository:
 
 ```bash
 git clone https://github.com/denisekart/open-facilitator.git
 cd open-facilitator
-./referencectl up slim   # ~4 GiB RAM, Docker only
-./referencectl verify    # proves every promise, unattended
+./referencectl up slim   # requires Docker Compose, ~4 GiB RAM
+./referencectl verify    # executes 12 automated verification steps
 ```
 
-It is a repository tool, not a runtime component — a permanent,
-self-testing demo world on your laptop. The
-[tour walkthrough](/docs/getting-started) drives it end to end: your
-first Work, an approval a human decides, artifacts you download, the
-console views.
+The [guided tour walkthrough](/docs/getting-started) demonstrates token acquisition, work creation, human approvals, and artifact downloads.
 
-## What you'll want next
+## Where to go next
 
-- **Make a container a workspace** → add a
-  [Dev Container Feature](/artifacts) to your team's `devcontainer.json`.
-- **Plug in your chat/forge** → [Supported integrations](/integrations).
-- **The operator surface, in depth** → [The admin console](/console).
-- **Wire-level reference** → [Wire protocol](/docs/protocol).
+- Add linked workspace features to containers: [Dev Container Features](/artifacts).
+- Configure chat and forge integrations: [Supported integrations](/integrations).
+- Explore operator surfaces and audit logs: [The admin console](/console).
+- Inspect the wire protocol specification: [Wire protocol (v1)](/docs/protocol).

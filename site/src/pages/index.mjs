@@ -147,7 +147,7 @@ function storyHtml() {
   return `<section id="how"><div class="wrap">
   <p class="kicker">How it works</p>
   <h2>One piece of work, start to finish</h2>
-  <p class="section-lede">Not an abstraction — a Monday. The same sequence runs for a research report, a migration plan, or a dependency update.</p>
+  <p class="section-lede">The lifecycle of an objective from request to verified completion.</p>
   <div class="story">
     ${story
       .map(
@@ -168,7 +168,7 @@ function whyHtml() {
   return `<section id="why"><div class="wrap">
   <p class="kicker">Why teams adopt it</p>
   <h2>Coordination you can audit, authority you keep</h2>
-  <p class="section-lede">Six claims, each one enforced by the published protocol — checkable in the open, not promised by a vendor.</p>
+  <p class="section-lede">Six architectural guarantees enforced by the open protocol.</p>
   <div class="grid cols-3">
     ${benefits.map((b) => `<div class="cell"><h3>${esc(b.title)}</h3><p>${esc(b.body)}</p></div>`).join("")}
   </div>
@@ -179,7 +179,7 @@ function componentsHtml() {
   return `<section id="components"><div class="wrap">
   <p class="kicker">Components</p>
   <h2>Small pieces, published artifacts, clear seams</h2>
-  <p class="section-lede">Take the whole kernel, or consume one package and speak the wire directly. Every component below ships versioned and stands on the same contract.</p>
+  <p class="section-lede">Deploy the full kernel or consume individual packages. Every component builds against the same published contract.</p>
   <div class="grid cols-3">
     ${components
       .map(
@@ -195,7 +195,7 @@ function consoleHtml() {
   return `<section id="console"><div class="wrap">
   <p class="kicker">The operator surface</p>
   <h2>The console is the product, photographed</h2>
-  <p class="section-lede">Every kernel serves an operator console at its own URL: search across every Work, the live fleet, the delivery ledger, the audit trail. It is a client of the same public API your agents use — <a href="#/console">here is what each view shows</a>.</p>
+  <p class="section-lede">Every kernel serves an operator console at its own origin. Search works, inspect fleet health, and view delivery ledgers over the public API — <a href="#/console">view console surfaces</a>.</p>
   <figure class="shot" style="margin:0">
     <div class="shot-bar"><i></i><i></i><i></i></div>
     <img src="console-explorer.png" alt="The Open Facilitator console showing Work search results, a fleet summary, and throughput counters" width="1140" height="760">
@@ -210,16 +210,16 @@ function startHtml() {
   <div class="roles">
     <div class="role">
       <h3>You are a person</h3>
-      <p style="color:var(--ink-2);font-size:15px">Run the kernel image next to your PostgreSQL, point it at your login provider, connect a team, and drive your first Work from curl and a browser.</p>
+      <p style="color:var(--ink-2);font-size:15px">Deploy the kernel alongside PostgreSQL and your OIDC provider, connect a team Gateway, and create your first Work item.</p>
       <a class="btn" style="margin-top:6px" href="#/guide/human">Human guide →</a>
     </div>
     <div class="role">
       <h3>You are an agent</h3>
-      <p style="color:var(--ink-2);font-size:15px">Dense orientation for LLM workers: auth planes, the endpoints you'll actually call, idempotency rules, how to fail well, and the computer-readable contract.</p>
+      <p style="color:var(--ink-2);font-size:15px">Technical orientation for automated systems: authentication planes, core endpoints, idempotency invariants, and machine-readable schemas.</p>
       <a class="btn inverse" style="margin-top:6px" href="#/guide/agent">Agent guide →</a>
     </div>
   </div>
-  <p style="margin-top:26px;color:var(--ink-2)">Want the artifact coordinates first? <a href="#/artifacts">Artifacts &amp; installation</a> · <a href="#/integrations">Supported integrations</a> · <a href="#/extend">Write your own adapter</a></p>
+  <p style="margin-top:26px;color:var(--ink-2)">Explore components: <a href="#/artifacts">Artifacts &amp; installation</a> · <a href="#/integrations">Supported integrations</a> · <a href="#/extend">Extend it yourself</a></p>
 </div></section>`;
 }
 

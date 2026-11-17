@@ -1,71 +1,51 @@
 # What Open Facilitator is
 
-Open Facilitator is the durable record of work your team shares between AI
-agents, humans, and scripts: it holds who has a piece of work, what
-happened to it, what a human was asked to allow, and what evidence came
-out. It runs no workload, holds none of your credentials, and covers only
-the work that matters enough to audit, to approve, to hand across a wall
-between teams, or to still understand in six months.
+Open Facilitator coordinates and records work shared across AI agents, humans, and deterministic scripts. It tracks who owns an objective, what progress occurred, what approvals were granted, and what evidence was produced. The kernel executes no workload and holds no credentials. It manages the work that requires auditability, governance, cross-team handoffs, and long-term durability.
 
-## The system at a glance
+## System at a glance
 
-One map of every moving part, grouped by **who operates it** — and it is
-interactive: click any box for what it guarantees, or walk a scenario to
-watch the pieces light up in sequence.
+One map shows every moving part, grouped by operational boundary. Click any node to inspect its guarantees, or run a guided scenario to follow data flow step by step.
 
 ```archmap
 
 ```
 
-Nothing crosses an ownership boundary except an **outbound link** or a
-**normalized event**: the kernel cannot reach into a team environment,
-and a team cannot forge another team's history. Everything inside your
-border is yours alone.
+Communication across team boundaries uses outbound links and normalized events. The kernel cannot reach into a team environment, and teams cannot alter another team's ledger. Every team retains complete operational control over its own infrastructure.
 
 ## The object at the center: a Work
 
-A **Work** is one piece of work with a life of its own: an objective, a
-state, a timeline of everything that happened to it, and the evidence it
-produced. You create one with a single API call (or from a chat message),
-and from that moment it survives every process, container, and model
-involved in doing it.
+A Work represents a durable objective with a defined lifecycle. It tracks current state, an append-only timeline of events, and references to produced artifacts. You create a Work through an API call or chat event. Once created, the record survives container restarts, network partitions, and process crashes.
 
 ```mermaid title="The life of a Work"
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#f7f9fb", "primaryBorderColor": "#ab8612", "primaryTextColor": "#21262e", "lineColor": "#676f7c", "secondaryColor": "#faf2d6"}}}%%
 stateDiagram-v2
     direction LR
     [*] --> Open: created (API, chat, webhook)
     Open --> Routed: policy picks a team
-    Routed --> InProgress: team's agent accepts
+    Routed --> InProgress: team agent accepts
     InProgress --> AwaitingApproval: privileged step
     AwaitingApproval --> InProgress: human approves
-    AwaitingApproval --> AwaitingApproval: human says not yet
+    AwaitingApproval --> AwaitingApproval: human requests changes
     InProgress --> Done: result + evidence filed
-    Open --> Cancelled: you change your mind
+    Open --> Cancelled: cancelled by caller
     Done --> [*]
     Cancelled --> [*]
 ```
 
-Move the mouse over any node above to see what it guarantees.
+Hover any node above to inspect its guarantees.
 
-## The cast, and who holds what
+## System actors and responsibilities
 
-Three roles, each with exactly one job:
+Three roles operate within the framework, each with a single responsibility:
 
-- **The kernel** coordinates and remembers. It holds the work queue, the
-  routing decisions, the approvals, the artifact ledger. It never
-  executes anything and holds none of your credentials.
-- **Teams** execute. Each team runs a small **Gateway** on its own
-  environment, holding its own source checkouts, API keys, and model
-  access. It keeps its own ledger of what it was told and what it did.
-- **You** decide. Wherever a gate is configured, the work pauses and a
-  human — through chat or the console — makes the call. Gates are
-  durable: they survive kernel restarts and fire exactly once.
+- **The kernel** coordinates and records. It maintains the work queue, routing policy, approval state, and artifact ledger. It executes no code and holds no team credentials.
+- **Teams** execute. Each team runs a Gateway within its own environment, managing source repositories, API keys, and model access. The Gateway records assignments and status in a local ledger.
+- **Humans** decide. When policy requires approval, execution pauses until an operator decides through chat or the console. Approvals are durable records that survive kernel restarts and fire once.
 
-Information always flows the same way: your team dials **out** to the
-kernel. Nothing on a team's network is exposed to the kernel, to other
-teams, or to the internet.
+Network connections flow outbound from the team Gateway to the kernel. No team port or endpoint is exposed to the kernel, external teams, or the public internet.
 
 ```mermaid title="One assignment, hop by hop — every arrow outbound from the team"
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#f7f9fb", "primaryBorderColor": "#ab8612", "primaryTextColor": "#21262e", "lineColor": "#676f7c", "secondaryColor": "#faf2d6"}}}%%
 sequenceDiagram
     actor H as Human
     participant K as Kernel
@@ -74,56 +54,39 @@ sequenceDiagram
     H->>K: Create a Work (API / chat)
     K->>K: Policy: pick team, mint assignment
     K--)G: Push assignment (outbound link, at-least-once)
-    G->>G: Team policy: allow? record in team ledger
-    G->>W: Spawn harness for the assignment
+    G->>G: Team policy: verify and record in team ledger
+    G->>W: Spawn harness for assignment
     W--)K: Progress events (idempotent)
     W->>G: Propose privileged write (open PR)
     G--)K: Approval request (durable)
     K--)H: Approval prompt (chat / console)
     H->>K: Approve (consumed exactly once)
     K--)G: Approval granted
-    G->>G: Connector executes the write, team-side
+    G->>G: Connector executes write team-side
     W->>G: Complete with result manifest
     G--)K: Artifacts + completion (digest-verified)
     K->>K: File evidence, update timeline
 ```
 
-Note what is _not_ here: the kernel never touches your repository, your
-model provider, or your chat server. Those edges belong to the team
-environment, and they only appear when a human or a policy let them.
+The kernel never connects directly to your source repositories, model providers, or chat platforms. Those connections remain team-side and execute only when local policy and human approvals permit.
 
-## What makes it different from a task queue or a workflow engine
+## Differences from task queues and workflow engines
 
-- **The workers are agents with opinions.** A Workflow engine assumes
-  steps are known. Here, an agent decides _how_ to do the assignment,
-  and the framework only insists on the contract: accept, progress,
-  propose, deliver — every step recorded.
-- **Federated, not centralized.** Every team is a separate authority
-  with its own policy and its own ledger. The kernel cannot reach into
-  a team's environment; a team cannot forge another team's history.
-- **Evidence is the product.** Each Work accumulates digest-verified
-  artifacts, a complete audit timeline, and optional shared memories.
-  "Who did what, when, and who allowed it" is a query, not an
-  investigation.
-- **It is a protocol first.** The whole coordination is a published
-  wire contract — event envelopes, schemas, HTTP surfaces — that two
-  independent runtime implementations already satisfy. You are never
-  trapped inside one implementation of the idea.
+- **Autonomous agents decide execution.** Workflow engines expect predefined step graphs. In Open Facilitator, agents determine execution paths, adhering to a defined protocol: accept, progress, propose, and deliver.
+- **Federated authority.** Teams operate as sovereign entities with independent policies and local ledgers. The kernel cannot execute commands inside a team workspace.
+- **Evidence-first output.** Each Work produces digest-verified artifacts, an append-only timeline, and team-scoped memories. Operators query proven history rather than reconstructing logs.
+- **Open protocol specification.** Coordination relies on published contracts: CloudEvents envelopes, JSON Schemas, and OpenAPI specifications. Two independent implementations verify wire compatibility.
 
-## What it is not
+## What the system is not
 
-- **Not an agent framework inside your process.** It coordinates across
-  processes and organizational boundaries, not within one agent loop.
-- **Not a chat product, a forge, or a model gateway.** It plugs into
-  the chat and forge you already use; it never proxies your model
-  traffic.
-- **Not a managed service.** You deploy the published image on
-  infrastructure you already run; your database is your data.
+- **Not an intra-process agent framework.** It coordinates across processes and team boundaries, rather than managing internal agent prompt loops.
+- **Not a chat server, forge, or model gateway.** It integrates with existing chat and code hosting platforms and does not proxy model traffic.
+- **Not a proprietary managed platform.** You deploy the published container on existing infrastructure alongside PostgreSQL and object storage.
 
 ## Where to go next
 
-- See the pieces you install: [Artifacts & installation](/artifacts).
-- See what plugs in today: [Supported integrations](/integrations).
-- Look at the operator surface: [The admin console](/console).
-- Teach it your team's rituals: [Authoring flows](/workflows).
-- Or stop reading and [get running](/guide/human).
+- Review installation artifacts and container images: [Artifacts & installation](/artifacts).
+- Inspect supported chat, forge, and harness integrations: [Supported integrations](/integrations).
+- Explore operator views and search tools: [The admin console](/console).
+- Configure automated multi-step trigger rules: [Authoring flows](/workflows).
+- Deploy the kernel and run your first Work: [Get running (humans)](/guide/human).

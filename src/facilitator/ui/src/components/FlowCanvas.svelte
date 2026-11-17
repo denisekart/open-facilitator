@@ -21,6 +21,7 @@
     currentStep = null,
     subflows = [],
     onselect = () => {},
+    class: klass = "",
   }: {
     doc: Doc;
     log?: Leg[] | null;
@@ -29,6 +30,7 @@
     currentStep?: string | null;
     subflows?: Subflow[];
     onselect?: (stepId: string | null) => void;
+    class?: string;
   } = $props();
 
   const model = $derived(
@@ -65,7 +67,7 @@
 </script>
 
 <div
-  class="flow-canvas h-[420px] overflow-hidden rounded border border-edge bg-sunken/20"
+  class="flow-canvas {klass}"
   data-testid="flow-graph">
   <SvelteFlow
     {nodes}
@@ -93,5 +95,12 @@
     text-overflow: clip !important;
     white-space: nowrap;
     border-radius: 4px;
+  }
+  .flow-canvas {
+    height: 420px;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-control);
+    background: var(--surface);
   }
 </style>

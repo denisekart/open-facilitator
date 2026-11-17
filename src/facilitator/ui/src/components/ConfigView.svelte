@@ -173,7 +173,7 @@
   <div class="mb-3 flex items-center justify-between">
     <h2 class="text-sm font-medium">
       Config
-      <span class="ml-1 text-xs font-normal text-ink-3"
+      <span class="ml-1 text-xs font-normal text-ink-2"
         >— stored intent, versioned; features read it, you write it</span
       >
     </h2>
@@ -199,17 +199,17 @@
   </ul>
 
   {#if open && loaded}
-    <div class="rounded-lg border border-edge bg-sunken p-4">
+    <div class="rounded border border-edge bg-sunken p-4">
       <h3 class="mb-1 font-medium">{open.resource}</h3>
-      <p class="mb-3 text-xs text-ink-3">
+      <p class="mb-3 text-xs text-ink-2">
         {view ? `stored v${view.rowVersion} · ${view.author} · ${view.reason}` : "never written — first save creates v1"}
       </p>
       <ProblemNote error={saveError} />
       {#if conflict}
-        <p class="badge mb-2 bg-amber-veil text-amber ring-amber/25" data-testid="config-conflict">{describeConflict(conflict)}</p>
+        <p class="badge mb-2 bg-amber-veil text-amber" data-testid="config-conflict">{describeConflict(conflict)}</p>
       {/if}
       {#if notice}
-        <p class="badge mb-2 bg-ok-veil text-ok ring-ok/25" data-testid="config-notice">{notice}</p>
+        <p class="badge mb-2 bg-ok-veil text-ok" data-testid="config-notice">{notice}</p>
       {/if}
 
       <div class="mb-3 grid gap-3 sm:grid-cols-2">
@@ -217,7 +217,7 @@
           <div>
             <label class="label" for={`f-${field.name}`}>
               {field.name}
-              {#if field.kind === "int"}<span class="text-ink-3">[{field.min}..{field.max}]</span>{/if}
+              {#if field.kind === "int"}<span class="text-ink-2">[{field.min}..{field.max}]</span>{/if}
             </label>
             {#if field.kind === "enum"}
               <select class="input" id={`f-${field.name}`} data-testid={`field-${field.name}`} bind:value={form[field.name]}>
@@ -252,7 +252,7 @@
       {/if}
 
       {#if history.length > 0}
-        <h4 class="mb-1 mt-4 text-xs font-medium uppercase text-ink-3">History (newest first, rollback = re-PATCH)</h4>
+        <h4 class="mb-1 mt-4 text-xs font-medium uppercase text-ink-2">History (newest first, rollback = re-PATCH)</h4>
         <table class="table" data-testid="config-history">
           <thead><tr><th>V</th><th>Payload</th><th>Author</th><th>Reason</th><th>At</th>{#if canMutate}<th></th>{/if}</tr></thead>
           <tbody>

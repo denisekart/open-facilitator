@@ -108,7 +108,7 @@
   <div class="mb-3 flex items-center justify-between">
     <h2 class="text-sm font-medium">
       Enrollment tokens
-      <span class="ml-1 text-xs font-normal text-ink-3"
+      <span class="ml-1 text-xs font-normal text-ink-2"
         >— one-time keys a team trades for its gateway's own identity</span
       >
     </h2>
@@ -154,7 +154,7 @@
   </div>
 
   {#if minted}
-    <div class="mb-3 rounded-lg border border-accent/60 bg-accent/10 p-3" data-testid="minted-token">
+    <div class="mb-3 rounded border border-edge p-3" style="background: var(--tint-selected)" data-testid="minted-token">
       <p class="mono mb-2 break-all text-xs" data-testid="minted-token-value">{minted.token}</p>
       <div class="flex items-center gap-2">
         <button class="btn" data-testid="token-copy" onclick={() => void copyToken()}>
@@ -185,13 +185,13 @@
                 revoke
               </button>
             {:else}
-              <span class="text-ink-3">—</span>
+              <span class="text-ink-2">—</span>
             {/if}
           </td>
         </tr>
       {/each}
       {#if rows.length === 0}
-        <tr><td colspan="6" class="text-ink-3">no tokens</td></tr>
+        <tr><td colspan="6" class="text-ink-2">no tokens</td></tr>
       {/if}
     </tbody>
   </table>

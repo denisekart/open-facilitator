@@ -120,7 +120,8 @@ subfolders) can host `site/dist` verbatim — it is a plain folder.
 A **kernel chip with linked environments**: the rounded square is the
 Open Facilitator — a coordination core that runs nothing itself — and its
 four links reach external environments (teams, tools, people). The
-amber endpoint is the work currently in motion on one of those links.
-Ink + slate + work amber on a cool canvas: no green in the mark, works
-at 16 px, monochrome-safe (drop the amber dot for single-color
+gold endpoint is the work currently in motion on one of those links.
+Ink + cool blue-grey grounds + one gold signal (the "Ink on Paper"
+language): no green in the mark, works
+at 16 px, monochrome-safe (drop the gold dot for single-color
 contexts).

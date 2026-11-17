@@ -10,9 +10,9 @@ The three seams differ in how much of the system you take responsibility
 for, not in how much authority you get:
 
 ```mermaid title="The three seams, from cheapest to deepest"
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#EAF1F9",
-"primaryBorderColor": "#0B5FBF", "primaryTextColor": "#1F2328",
-"lineColor": "#5B6B7C", "secondaryColor": "#FDF0DC"}}}%%
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#f7f9fb",
+"primaryBorderColor": "#ab8612", "primaryTextColor": "#21262e",
+"lineColor": "#676f7c", "secondaryColor": "#faf2d6"}}}%%
 flowchart LR
   subgraph S1["1. a harness"]
     AD["@ofac/adapter - your executor behind a line-oriented stdio protocol"]

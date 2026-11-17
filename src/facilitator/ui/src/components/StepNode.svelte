@@ -55,7 +55,7 @@
 </script>
 
 <div
-  class="step-node tone-{node.tone} {selected ? 'ring-2 ring-accent' : ''}"
+  class="step-node tone-{node.tone}" class:selected={selected}
   data-testid={`canvas-node-${node.id}`}>
   <Handle type="target" position={Position.Top} />
   <div class="flex items-center gap-2">
@@ -66,7 +66,7 @@
       aria-hidden="true" />
     <span class="truncate text-sm font-medium">{node.label}</span>
   </div>
-  <p class="mt-0.5 truncate text-xs text-ink-3">{node.sub}</p>
+  <p class="mt-0.5 truncate text-xs text-ink-2">{node.sub}</p>
   <Handle type="source" position={Position.Bottom} />
 </div>
 
@@ -74,8 +74,8 @@
   .step-node {
     width: 190px;
     min-height: 58px;
-    border-radius: 10px;
-    border: 1.5px solid var(--color-edge);
+    border-radius: var(--radius-overlay, 6px);
+    border: 1px solid var(--color-edge);
     background: var(--color-sunken);
     color: var(--color-ink);
     padding: 8px 10px;
@@ -93,26 +93,33 @@
   .tone-pending {
     background: transparent;
     border-style: dashed;
-    border-color: var(--color-ink-3);
+    border-color: var(--color-ink-3); /* dashed/dotted = unset/pending SHAPE, not hue */
   }
   .tone-shadow {
     border-style: dotted;
-    border-color: var(--color-ink-3);
+    border-color: var(--color-ink-3); /* dashed/dotted = unset/pending SHAPE, not hue */
   }
   .tone-live {
-    border-color: var(--color-accent);
-    border-width: 2.5px;
+    border-color: var(--accent-rule);
+    border-width: 2px;
   }
   .tone-park-live {
-    border-color: var(--color-amber);
-    border-width: 2.5px;
+    border-color: var(--accent-rule);
+    border-width: 2px;
+    border-style: dashed;
   }
   .tone-paused {
     border-color: var(--color-amber);
     border-style: dashed;
   }
   .tone-trigger {
-    border-color: var(--color-accent);
-    background: var(--color-accent-veil);
+    border-color: var(--accent-rule);
+    background: var(--tint-selected);
+  }
+  /* Selected: the 2px accent rule is the state edge (§7), plus the tint —
+     a shape + weight change, never a hue alone. */
+  .step-node.selected {
+    border: 2px solid var(--accent-rule);
+    background: var(--tint-selected);
   }
 </style>

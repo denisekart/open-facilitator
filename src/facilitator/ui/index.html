@@ -4,6 +4,15 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Facilitator — operator console</title>
+    <script>
+      // Ink on Paper: apply the persisted theme before first paint — a
+      // theme flash on load counts as a defect.
+      (function () {
+        var s = localStorage.getItem("ofac-ui-theme");
+        var d = s ? s === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+        document.documentElement.dataset.theme = d ? "dark" : "light";
+      })();
+    </script>
   </head>
   <body>
     <div id="app"></div>

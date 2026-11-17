@@ -28,9 +28,9 @@ security give that experience exact edges, and the runbooks inherit all of
 it when production asks questions.
 
 ```mermaid title="How the documentation tree discloses itself"
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#EAF1F9",
-"primaryBorderColor": "#0B5FBF", "primaryTextColor": "#1F2328",
-"lineColor": "#5B6B7C", "secondaryColor": "#FDF0DC"}}}%%
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#f7f9fb",
+"primaryBorderColor": "#ab8612", "primaryTextColor": "#21262e",
+"lineColor": "#676f7c", "secondaryColor": "#faf2d6"}}}%%
 flowchart LR
   NEW["First visit"] --> OVF["overview.md - the vocabulary"]
   OVF --> GS["getting-started.md - run it yourself"]

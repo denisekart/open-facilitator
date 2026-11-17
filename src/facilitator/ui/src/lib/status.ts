@@ -89,14 +89,15 @@ export function flowTone(status: string): Tone {
   return FLOW[status] ?? "neutral";
 }
 
-/** Tailwind classes for a state badge, keyed only off the tone. */
+/** Tailwind classes for a state badge, keyed only off the tone. State is
+ *  dot + word + tint, never a hue halo: no alpha rings. */
 export const TONE_CLASS: Record<Tone, string> = {
-  neutral: "bg-sunken text-ink-2 ring-edge",
-  progress: "bg-accent-veil text-accent ring-accent/25",
-  wait: "bg-amber-veil text-amber ring-amber/25",
-  ok: "bg-ok-veil text-ok ring-ok/25",
-  bad: "bg-danger-veil text-danger ring-danger/25",
-  motion: "bg-amber-veil text-amber ring-amber/25",
+  neutral: "bg-sunken text-ink-2",
+  progress: "bg-accent-veil text-accent",
+  wait: "bg-amber-veil text-amber",
+  ok: "bg-ok-veil text-ok",
+  bad: "bg-danger-veil text-danger",
+  motion: "bg-amber-veil text-amber",
 };
 
 function fmtUTC(d: Date): string {

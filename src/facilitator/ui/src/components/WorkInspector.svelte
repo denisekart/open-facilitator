@@ -99,7 +99,7 @@
   <div class="mb-3 flex items-center justify-between gap-2">
     <h2 class="text-sm font-medium">
       Work
-      <span class="mono ml-1 text-xs font-normal text-ink-3" title={workId}
+      <span class="mono ml-1 text-xs font-normal text-ink-2" title={workId}
         >{workId.slice(0, 8)}…</span
       >
     </h2>
@@ -111,7 +111,7 @@
 
   <ProblemNote {error} />
   {#if notice}
-    <p class="badge mb-2 bg-ok-veil text-ok ring-ok/25" data-testid="inspector-notice" role="status">
+    <p class="badge mb-2 bg-ok-veil text-ok" data-testid="inspector-notice" role="status">
       {notice}
     </p>
   {/if}
@@ -119,24 +119,24 @@
   {#if detail}
     {@const w = detail.work}
     <div class="mb-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-      <span class="text-ink-3">Objective</span><span data-testid="work-objective">{w.objective}</span>
-      <span class="text-ink-3">State</span>
+      <span class="text-ink-2">Objective</span><span data-testid="work-objective">{w.objective}</span>
+      <span class="text-ink-2">State</span>
       <span>
         <span class="badge {TONE_CLASS[stateTone(w.state)]}" data-testid="work-state">
           <span class="dot" aria-hidden="true"></span>{stateLabel(w.state)}
         </span>
         {#if w.state === "awaitingapproval"}
-          <span class="ml-2 text-xs text-ink-3">a human decision is holding this work</span>
+          <span class="ml-2 text-xs text-ink-2">a human decision is holding this work</span>
         {/if}
       </span>
-      <span class="text-ink-3">Version</span><span class="mono">v{w.version}</span>
-      <span class="text-ink-3">Created</span>
+      <span class="text-ink-2">Version</span><span class="mono">v{w.version}</span>
+      <span class="text-ink-2">Created</span>
       <span class="mono text-xs text-ink-2" title={stamp(w.createdAt)}>{ago(w.createdAt).text}</span>
     </div>
 
     {#if flow}
       <p class="mb-4 text-sm" data-testid="work-flow-strip">
-        <span class="text-ink-3">Flow</span>
+        <span class="text-ink-2">Flow</span>
         <a class="mono text-accent underline" href={`#/monitor/runs/${flow.instanceId}`}>
           {flow.definitionId}@{flow.definitionVersion}
         </a>
@@ -144,13 +144,13 @@
           {flow.status}
         </span>
         {#if flow.currentStep}
-          <span class="mono ml-1 text-xs text-ink-3">at {flow.currentStep}</span>
+          <span class="mono ml-1 text-xs text-ink-2">at {flow.currentStep}</span>
         {/if}
       </p>
     {/if}
 
     {#if detail.assignments.length > 0}
-      <h3 class="mb-1 text-xs font-medium uppercase text-ink-3">
+      <h3 class="mb-1 text-xs font-medium uppercase text-ink-2">
         Assignments <span class="normal-case">· {detail.assignments.length}</span>
       </h3>
       <table class="table mb-4">
@@ -173,15 +173,15 @@
         </tbody>
       </table>
     {:else}
-      <p class="mb-4 text-xs text-ink-3">
+      <p class="mb-4 text-xs text-ink-2">
         No team has taken this work yet — it is waiting for a gateway with matching capability to
         pick it up.
       </p>
     {/if}
 
-    <h3 class="mb-1 text-xs font-medium uppercase text-ink-3">Approvals</h3>
+    <h3 class="mb-1 text-xs font-medium uppercase text-ink-2">Approvals</h3>
     {#if detail.approvals.length === 0}
-      <p class="mb-4 text-ink-3">No human decision requested on this work.</p>
+      <p class="mb-4 text-ink-2">No human decision requested on this work.</p>
     {:else}
       <table class="table mb-2" data-testid="approvals">
         <thead>
@@ -238,7 +238,7 @@
     {/if}
 
     {#if detail.manifests.length > 0}
-      <h3 class="mb-1 text-xs font-medium uppercase text-ink-3">
+      <h3 class="mb-1 text-xs font-medium uppercase text-ink-2">
         Results <span class="normal-case">· {detail.manifests.length}</span>
       </h3>
       <table class="table mb-4">
@@ -283,11 +283,11 @@
       </table>
     {/if}
   {:else if !error}
-    <p class="text-ink-3">loading…</p>
+    <p class="text-ink-2">loading…</p>
   {/if}
 
   {#if timeline}
-    <h3 class="mb-1 text-xs font-medium uppercase text-ink-3">
+    <h3 class="mb-1 text-xs font-medium uppercase text-ink-2">
       Activity <span class="normal-case">· {timeline.length} entries, newest last</span>
     </h3>
     <table class="table" data-testid="timeline">
@@ -304,18 +304,18 @@
             <td>
               {#if row.correlationId}
                 <button
-                  class="mono badge bg-sunken text-ink-2 ring-edge"
+                  class="mono badge bg-sunken text-ink-2"
                   title="copy correlation id — every hop of this decision shares it"
                   data-testid="trace-chip"
                   onclick={() => void navigator.clipboard.writeText(row.correlationId ?? "")}
                   >{row.correlationId.slice(0, 8)}…</button
                 >
               {:else}
-                <span class="text-ink-3">—</span>
+                <span class="text-ink-2">—</span>
               {/if}
               {#if row.traceId}
                 <button
-                  class="mono badge bg-sunken text-ink-2 ring-edge"
+                  class="mono badge bg-sunken text-ink-2"
                   title="copy OTel trace id — paste it into the OTLP viewer to see this span"
                   data-testid="trace-chip-trace"
                   onclick={() => void navigator.clipboard.writeText(row.traceId ?? "")}

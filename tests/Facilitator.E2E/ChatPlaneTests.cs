@@ -120,6 +120,9 @@ public sealed class ChatPlaneTests(PostgresFixture fixture)
             // iPhone-14-class viewport: everything the operator needs stays
             // reachable, nothing overflows the screen sideways.
             var page = await NewLoginPageAsync(browser, host.ServerAddress, new ViewportSize { Width = 390, Height = 844 });
+            // Compact chrome: the view menu is a left drawer; open it, then
+            // pick the AiDeck entry (the drawer dismisses on navigation).
+            await page.GetByTestId("menu-toggle").ClickAsync();
             await page.GetByTestId("view-chat").ClickAsync();
             await page.GetByTestId("chat-input").FillAsync("hello deck");
             await page.GetByTestId("chat-send").ClickAsync();

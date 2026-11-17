@@ -93,9 +93,9 @@ advertised capabilities; the kernel routes only to what is declared.
 The ownership lines are the point of the whole model:
 
 ```mermaid title="Ownership boundaries: only outbound links cross"
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#EAF1F9",
-"primaryBorderColor": "#0B5FBF", "primaryTextColor": "#1F2328",
-"lineColor": "#5B6B7C", "secondaryColor": "#FDF0DC"}}}%%
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#f7f9fb",
+"primaryBorderColor": "#ab8612", "primaryTextColor": "#21262e",
+"lineColor": "#676f7c", "secondaryColor": "#faf2d6"}}}%%
 flowchart TB
   subgraph TEAM["Team boundary (your network, your credentials)"]
     GW["Gateway - policy file + execution ledger"]
@@ -145,9 +145,9 @@ The same six legs as one hop diagram, with the human gate drawn where it
 actually appears:
 
 ```mermaid title="One piece of work, hop by hop"
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#EAF1F9",
-"primaryBorderColor": "#0B5FBF", "primaryTextColor": "#1F2328",
-"lineColor": "#5B6B7C", "secondaryColor": "#FDF0DC"}}}%%
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#f7f9fb",
+"primaryBorderColor": "#ab8612", "primaryTextColor": "#21262e",
+"lineColor": "#676f7c", "secondaryColor": "#faf2d6"}}}%%
 sequenceDiagram
     participant P as Provider event / API
     participant K as Kernel

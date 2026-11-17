@@ -65,7 +65,7 @@ you touch — the nearest file wins.
   zephyr/zmk skills unless on an embedded harness.
 - Project skills `.omp/skills/`: `facilitator-architecture`, `facilitator-protocol`,
   `facilitator-workspace-packaging`, `facilitator-reference-env`; docs:
-  `ofac-doc-authoring` + agent-diagram-gif siblings. **Maintenance rule:**
+  `ofac-writing` + agent-diagram-gif siblings. **Maintenance rule:**
   skills describe implemented reality — update the matching skill in the
   same change that lands a schema/endpoint/table/CLI.
 - Plans → `.omp/plans/` (reviewable in-repo); `/continue` for handoff;

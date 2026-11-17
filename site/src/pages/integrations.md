@@ -61,9 +61,9 @@ inbound normalization on one side, an approval-gated connector on the
 other, each with its own identity. Read it as the picture below.
 
 ```mermaid title="The forge pair — inbound is automated, outbound is gated"
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#EAF1F9",
-"primaryBorderColor": "#0B5FBF", "primaryTextColor": "#1F2328",
-"lineColor": "#5B6B7C", "secondaryColor": "#FDF0DC"}}}%%
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#f7f9fb",
+"primaryBorderColor": "#ab8612", "primaryTextColor": "#21262e",
+"lineColor": "#676f7c", "secondaryColor": "#faf2d6"}}}%%
 flowchart LR
   F["Forge<br/>(GitHub, Forgejo, GitLab)"]
   subgraph T["Team environment"]

@@ -129,7 +129,7 @@
             {/if}
           </span>
         </h2>
-        <p class="mono text-xs text-ink-3">
+        <p class="mono text-xs text-ink-2">
           {instanceId} · depth {detail.depth} · started {ago(detail.startedAt).text}
           {#if detail.primaryWorkId}
             · <a class="text-accent underline" href={`#/work/${detail.primaryWorkId}`}>work</a>
@@ -159,7 +159,7 @@
   </div>
 
   {#if notice}
-    <p class="badge mb-2 bg-accent-veil text-accent ring-accent/25" data-testid="flow-notice" role="status">{notice}</p>
+    <p class="badge mb-2 bg-accent-veil text-accent" data-testid="flow-notice" role="status">{notice}</p>
   {/if}
   {#if error}
     <ProblemNote {error} />
@@ -168,7 +168,7 @@
   {#if detail && (detail.ancestors.length > 0 || detail.children.length > 0)}
     <div class="mb-4 text-sm" data-testid="lineage">
       {#if detail.ancestors.length > 0}
-        <p class="mb-1 text-ink-3">
+        <p class="mb-1 text-ink-2">
           called by:
           {#each detail.ancestors as a, i (a.instanceId)}
             {#if i > 0} →{/if}
@@ -180,7 +180,7 @@
         </p>
       {/if}
       {#if detail.children.length > 0}
-        <p class="mb-1 text-ink-3">invokes:</p>
+        <p class="mb-1 text-ink-2">invokes:</p>
         <ul class="ml-4 list-disc">
           {#each detail.children as c (c.instanceId)}
             <li>
@@ -225,7 +225,7 @@
 
   <div class="overflow-x-auto" data-testid="step-log">
     <table class="table">
-      <caption class="caption-bottom pt-2 text-xs text-ink-3">
+      <caption class="caption-bottom pt-2 text-xs text-ink-2">
         Step log · oldest first · what each leg recorded
       </caption>
       <thead>
@@ -250,7 +250,7 @@
           </tr>
         {:else}
           <tr>
-            <td colspan="5" class="text-ink-3">
+            <td colspan="5" class="text-ink-2">
               {log === null ? "loading…" : "no steps recorded"}
             </td>
           </tr>

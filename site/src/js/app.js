@@ -255,24 +255,27 @@
   // source">` inside a pending figure. The vendored mermaid renders it here,
   // with the same theme and the same hover tooltips the build injects.
 
+  // Ink on Paper: surface fills, accent-rule edges, ink text, the selected
+  // tint for the secondary lane. The site fences and the docs fences copy
+  // these exact values (ofac-diagram-style).
   const MERMAID_THEME = {
     darkMode: false,
     fontFamily: "system-ui, sans-serif",
-    primaryColor: "#EAF1F9",
-    primaryBorderColor: "#0B5FBF",
-    primaryTextColor: "#1F2328",
-    lineColor: "#5B6B7C",
-    secondaryColor: "#FDF0DC",
-    tertiaryColor: "#F2F5F8",
-    edgeLabelBackground: "#FFFFFF",
-    clusterBkg: "#F7F9FC",
-    clusterBorder: "#C6CFDA",
-    actorBkg: "#EAF1F9",
-    actorBorder: "#0B5FBF",
-    activationBkgColor: "#E7F0FA",
-    sequenceNumberColor: "#FFFFFF",
-    labelBoxBkgColor: "#EAF1F9",
-    labelBoxBorderColor: "#0B5FBF",
+    primaryColor: "#f7f9fb",
+    primaryBorderColor: "#ab8612",
+    primaryTextColor: "#21262e",
+    lineColor: "#676f7c",
+    secondaryColor: "#faf2d6",
+    tertiaryColor: "#eef2f6",
+    edgeLabelBackground: "#ffffff",
+    clusterBkg: "#f7f9fb",
+    clusterBorder: "#d5dbe3",
+    actorBkg: "#f7f9fb",
+    actorBorder: "#ab8612",
+    activationBkgColor: "#faf2d6",
+    sequenceNumberColor: "#14171a",
+    labelBoxBkgColor: "#f7f9fb",
+    labelBoxBorderColor: "#ab8612",
   };
 
   let mermaidP = null;
@@ -842,8 +845,46 @@
 
   // ---------------------------------------------------------------- boot
 
+  // §22 compact chrome: past 720px the topnav is a plain horizontal menu;
+  // at or under it, the hamburger opens the same nav as a left drawer over
+  // a 28% scrim. Esc closes, focus returns to the toggle; navigating (any
+  // link inside) closes it too.
+  function wireNavDrawer() {
+    const toggle = document.getElementById("nav-toggle");
+    const nav = document.getElementById("topnav");
+    const scrim = document.getElementById("nav-scrim");
+    if (!toggle || !nav || !scrim) return;
+    const setOpen = (open) => {
+      nav.classList.toggle("open", open);
+      scrim.hidden = !open;
+      toggle.setAttribute("aria-expanded", String(open));
+      if (open) nav.querySelector("a, button")?.focus();
+      else toggle.focus();
+    };
+    const isOpen = () => nav.classList.contains("open");
+    toggle.addEventListener("click", () => setOpen(!isOpen()));
+    scrim.addEventListener("click", () => setOpen(false));
+    nav.addEventListener("click", (e) => {
+      if (e.target.closest("a") && isOpen()) setOpen(false);
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && isOpen()) setOpen(false);
+    });
+  }
+
+  // The active page carries aria-current (styled as the 2px accent rule +
+  // ink weight), never a bare class.
+  function markActiveNav(route) {
+    document.querySelectorAll(".topnav a").forEach((a) => {
+      const href = (a.getAttribute("href") || "").split("?")[0];
+      if (href === "#" + route) a.setAttribute("aria-current", "page");
+      else a.removeAttribute("aria-current");
+    });
+  }
+
   function render() {
     const { route, anchor, query } = parseHash();
+    markActiveNav(route === null ? "/" : route);
     if (route === null) {
       // landing anchor (#how etc.) or bare load
       if (landing) {
@@ -920,6 +961,7 @@
         searchInput.value = "";
       }
     });
+    wireNavDrawer();
     window.addEventListener("hashchange", render);
     render();
     if (!location.hash && location.pathname.replace(/\/$/, "").endsWith("index.html")) {

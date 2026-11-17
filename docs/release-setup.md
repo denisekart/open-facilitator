@@ -14,9 +14,9 @@ the whole setup with a throwaway tag before any real version is burned.
 The pipeline's shape, end to end:
 
 ```mermaid title="The release pipeline end to end"
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#EAF1F9",
-"primaryBorderColor": "#0B5FBF", "primaryTextColor": "#1F2328",
-"lineColor": "#5B6B7C", "secondaryColor": "#FDF0DC"}}}%%
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#f7f9fb",
+"primaryBorderColor": "#ab8612", "primaryTextColor": "#21262e",
+"lineColor": "#676f7c", "secondaryColor": "#faf2d6"}}}%%
 flowchart LR
     TAG[push v* tag] --> C[containers job]
     TAG --> F[features job]

@@ -81,7 +81,7 @@
   <div class="mb-4 flex flex-wrap items-start justify-between gap-4">
     <div>
       <h2 class="mb-1 text-xl font-semibold">Monitor</h2>
-      <p class="text-sm text-ink-3">
+      <p class="text-sm text-ink-2">
         Every workflow instance, newest first.
         {#if defFilter}
           filtered to <span class="mono">{defFilter}</span>
@@ -113,12 +113,12 @@
   {#if error}
     <ProblemNote {error} />
   {:else if !loaded}
-    <p class="text-sm text-ink-3">loading…</p>
+    <p class="text-sm text-ink-2">loading…</p>
   {/if}
 
   <div class="overflow-x-auto" data-testid="instance-list">
     <table class="table">
-      <caption class="caption-bottom pt-2 text-xs text-ink-3">
+      <caption class="caption-bottom pt-2 text-xs text-ink-2">
         Instances · open one for its step-by-step checklist
       </caption>
       <thead>

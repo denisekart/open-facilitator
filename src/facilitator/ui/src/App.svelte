@@ -3,6 +3,7 @@
     Activity,
     GitBranch,
     LayoutDashboard,
+    Menu,
     ScrollText,
     Send,
     Server,
@@ -22,6 +23,7 @@
   import HealthStrip from "./components/HealthStrip.svelte";
   import HitDetail from "./components/HitDetail.svelte";
   import LinksView from "./components/LinksView.svelte";
+  import Logo from "./components/Logo.svelte";
   import MonitorView from "./components/MonitorView.svelte";
   import RuntimeView from "./components/RuntimeView.svelte";
   import WorkInspector from "./components/WorkInspector.svelte";
@@ -320,228 +322,236 @@
   }
 
   const view = $derived(route.route.view);
+
+  // §22 compact chrome: past 720px the nav lives in a horizontal strip
+  // under the header; at or under it, the same nav becomes a left drawer
+  // behind a hamburger. One nav element (one set of testids), restyled.
+  let menuOpen = $state(false);
+  $effect(() => {
+    // Navigating dismisses the drawer (the destination is what matters).
+    void route.route.view;
+    menuOpen = false;
+  });
 </script>
 
 <svelte:window onkeydown={onKeydown} />
 
 {#if bootError}
-  <main class="mx-auto max-w-lg p-8">
-    <p class="badge bg-danger-veil text-danger ring-danger/25" data-testid="boot-error">
+  <main class="mx-auto max-w-lg p-4">
+    <p class="badge bg-danger-veil text-danger" data-testid="boot-error">
       The console could not start: {bootError}
     </p>
   </main>
 {:else if !booted}
-  <main class="p-8 text-ink-3" data-testid="booting">loading…</main>
+  <main class="p-4 text-ink-2" data-testid="booting">loading…</main>
 {:else if !authenticated}
-  <main class="flex min-h-screen flex-col items-center justify-center gap-4" data-testid="login-gate">
-    <svg class="size-12 text-ink" viewBox="0 0 32 32" aria-hidden="true"
-      ><g stroke="currentColor" stroke-width="2.6" stroke-linecap="round"
-        ><path d="M11.8 11.8 L6.4 6.4" /><path d="M20.2 11.8 L25.6 6.4" /><path
-          d="M11.8 20.2 L6.4 25.6" /><path d="M20.2 20.2 L25.6 25.6" /></g
-      ><rect x="9.6" y="9.6" width="12.8" height="12.8" rx="3.4" fill="currentColor" /><circle
-        cx="4.6" cy="4.6" r="2.7" fill="currentColor" opacity="0.55" /><circle
-        cx="27.4" cy="4.6" r="2.7" fill="currentColor" opacity="0.55" /><circle
-        cx="4.6" cy="27.4" r="2.7" fill="currentColor" opacity="0.55" /><circle
-        cx="27.4" cy="27.4" r="2.7" fill="#D97706" /></svg
-    >
-    <h1 class="text-xl font-medium">Open Facilitator — operator console</h1>
-    <p class="max-w-sm text-center text-ink-3">
+  <main class="flex min-h-screen flex-col items-center justify-center gap-3" data-testid="login-gate">
+    <Logo class="size-12 text-ink" />
+    <h1 class="text-xl font-semibold">Open Facilitator — operator console</h1>
+    <p class="max-w-sm text-center text-ink-2">
       The live view of one facilitator kernel: works, decisions, links, evidence.
     </p>
-    <p class="text-xs text-ink-3">sign in with a kernel-operator or framework-admin identity</p>
+    <p class="text-xs text-ink-2">sign in with a kernel-operator or framework-admin identity</p>
     <button class="btn btn-primary" data-testid="login" onclick={() => void session.login()}>
       sign in
     </button>
   </main>
 {:else}
-  <div class="mx-auto max-w-7xl p-4">
-    <header class="mb-4 flex min-h-12 flex-wrap items-center gap-3">
-      <span class="flex items-center gap-2">
-        <svg class="size-6 text-ink" viewBox="0 0 32 32" aria-hidden="true"
-          ><g stroke="currentColor" stroke-width="2.6" stroke-linecap="round"
-            ><path d="M11.8 11.8 L6.4 6.4" /><path d="M20.2 11.8 L25.6 6.4" /><path
-              d="M11.8 20.2 L6.4 25.6" /><path d="M20.2 20.2 L25.6 25.6" /></g
-          ><rect x="9.6" y="9.6" width="12.8" height="12.8" rx="3.4" fill="currentColor" /><circle
-            cx="4.6" cy="4.6" r="2.7" fill="currentColor" opacity="0.55" /><circle
-            cx="27.4" cy="4.6" r="2.7" fill="currentColor" opacity="0.55" /><circle
-            cx="4.6" cy="27.4" r="2.7" fill="currentColor" opacity="0.55" /><circle
-            cx="27.4" cy="27.4" r="2.7" fill="#D97706" /></svg
-        >
-        <h1 class="font-medium">Open Facilitator</h1>
-        <span class="rounded-full bg-sunken px-2 py-0.5 text-xs text-ink-2">operator console</span>
-      </span>
-      <div class="relative order-last w-full grow md:order-none md:w-auto">
-        <input
-          class="input pr-16"
-          placeholder="search works, projects, artifacts, memories…"
-          aria-label="search"
-          bind:this={searchBox}
-          bind:value={query}
-          oninput={onQuery}
-          data-testid="search-input" />
-        {#if !query}
-          <kbd
-            class="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 rounded border border-edge bg-sunken px-1.5 py-0.5 text-xs text-ink-3"
-            >/ or ⌘K</kbd
-          >
-        {/if}
-      </div>
-      <button class="btn" data-testid="search-go" onclick={() => void runSearch()}>search</button>
-      <div class="flex items-center gap-2">
-        <span
-          class="badge bg-sunken text-ink-2 ring-edge"
-          title="your identity, as the kernel sees it"
-          data-testid="identity-chip">
-          {[session.displayName, ...operatorRoles].join(" · ")}
-        </span>
-        <button
-          class="btn"
-          data-testid="theme-toggle"
-          title={theme.value === "dark" ? "Switch to light theme" : "Switch to dark theme"}
-          aria-pressed={theme.value === "dark"}
-          onclick={toggleTheme}>
-          {theme.value === "dark" ? "light" : "dark"}
-        </button>
-        <button class="btn" data-testid="logout" onclick={() => void session.logout()}>
-          sign out
-        </button>
-      </div>
-    </header>
-
-    <div class="mb-2 flex flex-wrap items-center gap-2">
-      <span class="sr-only" role="status" aria-live="polite">
-        {#if searching}searching…{:else if results}{hitTotal} hits{/if}
-      </span>
-      {#each SECTIONS as { key, label }}
-        <button
-          class="chip {activeSections.has(key) ? 'chip-active' : ''}"
-          data-testid={`section-${key}`}
-          aria-pressed={activeSections.has(key)}
-          onclick={() => toggleSection(key)}>{label}</button
-        >
-      {/each}
-      {#if results && !searching}
-        <span class="ml-auto text-xs text-ink-3"
-          >{hitTotal} {hitTotal === 1 ? "hit" : "hits"}</span
+  <header class="chrome sticky top-0 z-5 flex items-center gap-3">
+    <button
+      class="nav-item hamburger"
+      data-testid="menu-toggle"
+      aria-label="open the view menu"
+      aria-expanded={menuOpen}
+      onclick={() => (menuOpen = !menuOpen)}>
+      <Menu class="size-5" strokeWidth={1.5} aria-hidden="true" />
+    </button>
+    <span class="flex min-w-0 items-center gap-2">
+      <Logo class="size-6 shrink-0 text-ink" />
+      <h1 class="truncate text-sm font-semibold tracking-[0.01em]">Open Facilitator</h1>
+      <span class="chip max-md:hidden">operator console</span>
+    </span>
+    <div class="chrome-search relative">
+      <input
+        class="input pr-16"
+        type="search"
+        placeholder="search works, projects, artifacts, memories…"
+        aria-label="search"
+        bind:this={searchBox}
+        bind:value={query}
+        oninput={onQuery}
+        data-testid="search-input" />
+      {#if !query}
+        <kbd
+          class="mono pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 border border-edge px-1 text-xs text-ink-2 max-md:hidden"
+          >/ or ⌘K</kbd
         >
       {/if}
     </div>
+    <button class="btn hide-compact" data-testid="search-go" onclick={() => void runSearch()}>
+      search
+    </button>
+    <span
+      class="badge identity-chip"
+      title="your identity, as the kernel sees it"
+      data-testid="identity-chip">
+      {[session.displayName, ...operatorRoles].join(" · ")}
+    </span>
+    <button
+      class="nav-item"
+      data-testid="theme-toggle"
+      title={theme.value === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+      aria-pressed={theme.value === "dark"}
+      onclick={toggleTheme}>
+      {theme.value === "dark" ? "light" : "dark"}
+    </button>
+    <button class="btn" data-testid="logout" onclick={() => void session.logout()}>
+      sign out
+    </button>
+  </header>
 
-    {#if searchError}
-      <p class="badge mb-4 bg-danger-veil text-danger ring-danger/25" data-testid="search-error">
-        {searchError.code === "search-query-required"
-          ? "type at least one character"
-          : `${searchError.title} (${searchError.code})`}
-      </p>
-    {/if}
+  {#if menuOpen}
+    <button
+      class="scrim fixed inset-0 z-30"
+      aria-label="close the view menu"
+      onclick={() => (menuOpen = false)}></button>
+  {/if}
 
-    {#if results && visibleSections.length === 0 && !searching}
-      <p class="mb-4 text-ink-3" data-testid="search-empty">
-        Nothing matches “{results.query}”. Try a work id prefix, an objective word, or an artifact
-        name.
-      </p>
-    {/if}
+  <nav
+    class="viewnav"
+    class:open={menuOpen}
+    aria-label="views"
+    data-testid="rail">
+    {#each railEntries as entry (entry.key)}
+      {@const Icon = entry.icon}
+      <button
+        class="nav-item"
+        title={entry.hint}
+        data-testid={`view-${entry.key}`}
+        aria-current={railActive(entry) ? "page" : entry.drawer && deck.state.open ? "true" : undefined}
+        onclick={() => railClick(entry)}>
+        <Icon class="size-4 shrink-0" strokeWidth={1.5} aria-hidden="true" />
+        {entry.label}
+      </button>
+    {/each}
+  </nav>
 
-    {#if results}
-      {#each visibleSections as { key, label }}
-        {@const hits = results[key]}
-        <section class="card mb-4" data-testid={`hits-${key}`}>
-          <h2 class="mb-2 text-xs font-medium uppercase text-ink-3">{label} · {hits.length}</h2>
-          <ul class="grid gap-1">
-            {#each hits as hit}
-              <li>
-                <button
-                  class="w-full cursor-pointer rounded px-2 py-1 text-left hover:bg-sunken"
-                  data-testid={`hit-${key}-${hit.id.slice(0, 8)}`}
-                  onclick={() => openHit(key, hit.id)}>
-                  <span data-testid="hit-display">{hit.display}</span>
-                  <span class="badge ml-2 {TONE_CLASS[stateTone(hit.state)]}"
-                    ><span class="dot" aria-hidden="true"></span>{stateLabel(hit.state)}</span
-                  >
-                  <span class="mono ml-2 text-xs text-ink-3">{hit.id.slice(0, 8)}</span>
-                </button>
-              </li>
-            {/each}
-          </ul>
-        </section>
-      {/each}
-    {/if}
-
-    <div class="flex gap-4 max-md:flex-col">
-      <nav
-        class="flex w-44 shrink-0 flex-col gap-1 max-md:w-full max-md:flex-row max-md:flex-wrap"
-        aria-label="views"
-        data-testid="rail">
-        {#each railEntries as entry (entry.key)}
-          {@const Icon = entry.icon}
+  <div class="mx-auto w-full max-w-7xl p-3">
+    {#if query}
+      <div class="mb-2 flex flex-wrap items-center gap-2">
+        <span class="sr-only" role="status" aria-live="polite">
+          {#if searching}searching…{:else if results}{hitTotal} hits{/if}
+        </span>
+        {#each SECTIONS as { key, label }}
           <button
-            class="btn max-md:flex-1 justify-start gap-2 {railActive(entry) ? 'btn-primary' : ''}"
-            title={entry.hint}
-            data-testid={`view-${entry.key}`}
-            aria-pressed={railActive(entry) || (entry.drawer && deck.state.open)}
-            onclick={() => railClick(entry)}>
-            <Icon class="size-4 shrink-0" strokeWidth={1.5} aria-hidden="true" />
-            <span class="max-md:sr-only">{entry.label}</span>
-          </button>
+            class="chip {activeSections.has(key) ? 'chip-active' : ''}"
+            data-testid={`section-${key}`}
+            aria-pressed={activeSections.has(key)}
+            onclick={() => toggleSection(key)}>{label}</button
+          >
         {/each}
-      </nav>
-
-      <div class="min-w-0 grow">
-        <Breadcrumbs />
-
-        {#if isMonitor}
-          <section class="mb-4" aria-label="kernel health bar" data-testid="monitor-bar">
-            <HealthStrip />
-          </section>
+        {#if results && !searching}
+          <span class="mono ml-auto text-xs text-ink-2"
+            >{hitTotal} {hitTotal === 1 ? "hit" : "hits"}</span
+          >
         {/if}
-
-        {#if route.route.view === "work" && route.route.id}
-          <div class="mb-4">
-            <WorkInspector workId={route.route.id} onclose={() => go("#/")} />
-          </div>
-        {/if}
-
-        {#if route.route.view === "hit" && route.route.id && route.route.kind}
-          <div class="mb-4">
-            <HitDetail kind={route.route.kind} id={route.route.id} onclose={() => go("#/")} />
-          </div>
-        {/if}
-
-        {#key screenKey}
-        {#if view === "works" || view === "chat"}
-          <WorksView />
-        {:else if view === "team"}
-          <LinksView />
-        {:else if view === "monitor-deliveries"}
-          <DeliveriesView />
-        {:else if view === "monitor-audit"}
-          <AuditView />
-        {:else if view === "config"}
-          <ConfigView />
-        {:else if view === "monitor-runtime"}
-          <RuntimeView />
-        {:else if view === "flows" && !route.route.id}
-          <FlowsView />
-        {:else if view === "flows" && route.route.id}
-          <FlowEditor
-            defId={route.route.id}
-            clone={route.route.params.get("clone") === "1"}
-            onclose={() => go("#/flows")}
-          />
-        {:else if view === "monitor-runs"}
-          {#key route.route.params.get("def") ?? ""}
-            <MonitorView defFilter={route.route.params.get("def")} />
-          {/key}
-        {:else if view === "monitor-run" && route.route.id}
-          <FlowDetail instanceId={route.route.id} onclose={() => go("#/monitor/runs")} />
-        {:else if view === "monitor-definition" && route.route.id}
-          {#key route.route.id}
-            <DefinitionDetailView defId={route.route.id} />
-          {/key}
-        {/if}
-        {/key}
       </div>
-    </div>
+
+      {#if searchError}
+        <p class="badge mb-3 bg-danger-veil text-danger" data-testid="search-error">
+          {searchError.code === "search-query-required"
+            ? "type at least one character"
+            : `${searchError.title} (${searchError.code})`}
+        </p>
+      {/if}
+
+      {#if results && visibleSections.length === 0 && !searching}
+        <p class="mb-3 text-ink-2" data-testid="search-empty">
+          Nothing matches “{results.query}”. Try a work id prefix, an objective word, or an
+          artifact name.
+        </p>
+      {/if}
+
+      {#if results}
+        {#each visibleSections as { key, label }}
+          {@const hits = results[key]}
+          <section class="card mb-3" data-testid={`hits-${key}`}>
+            <h2 class="micro-label mb-2">{label} · {hits.length}</h2>
+            <ul class="grid gap-1">
+              {#each hits as hit}
+                <li>
+                  <button
+                    class="w-full cursor-pointer px-2 py-1 text-left hover:bg-surface"
+                    style="border-radius: var(--radius-control)"
+                    data-testid={`hit-${key}-${hit.id.slice(0, 8)}`}
+                    onclick={() => openHit(key, hit.id)}>
+                    <span data-testid="hit-display">{hit.display}</span>
+                    <span class="badge ml-2 {TONE_CLASS[stateTone(hit.state)]}"
+                      ><span class="dot" aria-hidden="true"></span>{stateLabel(hit.state)}</span
+                    >
+                    <span class="mono ml-2 text-xs text-ink-2">{hit.id.slice(0, 8)}</span>
+                  </button>
+                </li>
+              {/each}
+            </ul>
+          </section>
+        {/each}
+      {/if}
+    {/if}
+
+    {#if isMonitor}
+      <section class="mb-3" aria-label="kernel health bar" data-testid="monitor-bar">
+        <HealthStrip />
+      </section>
+    {/if}
+
+    {#if route.route.view === "work" && route.route.id}
+      <div class="mb-3">
+        <WorkInspector workId={route.route.id} onclose={() => go("#/")} />
+      </div>
+    {/if}
+
+    {#if route.route.view === "hit" && route.route.id && route.route.kind}
+      <div class="mb-3">
+        <HitDetail kind={route.route.kind} id={route.route.id} onclose={() => go("#/")} />
+      </div>
+    {/if}
+
+    <Breadcrumbs />
+
+    {#key screenKey}
+      {#if view === "works" || view === "chat"}
+        <WorksView />
+      {:else if view === "team"}
+        <LinksView />
+      {:else if view === "monitor-deliveries"}
+        <DeliveriesView />
+      {:else if view === "monitor-audit"}
+        <AuditView />
+      {:else if view === "config"}
+        <ConfigView />
+      {:else if view === "monitor-runtime"}
+        <RuntimeView />
+      {:else if view === "flows" && !route.route.id}
+        <FlowsView />
+      {:else if view === "flows" && route.route.id}
+        <FlowEditor
+          defId={route.route.id}
+          clone={route.route.params.get("clone") === "1"}
+          onclose={() => go("#/flows")}
+        />
+      {:else if view === "monitor-runs"}
+        {#key route.route.params.get("def") ?? ""}
+          <MonitorView defFilter={route.route.params.get("def")} />
+        {/key}
+      {:else if view === "monitor-run" && route.route.id}
+        <FlowDetail instanceId={route.route.id} onclose={() => go("#/monitor/runs")} />
+      {:else if view === "monitor-definition" && route.route.id}
+        {#key route.route.id}
+          <DefinitionDetailView defId={route.route.id} />
+        {/key}
+      {/if}
+    {/key}
   </div>
 
   <AiDeck onclose={closeDeck} />

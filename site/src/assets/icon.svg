@@ -5,15 +5,15 @@
     external environments (teams, tools, people); the amber endpoint is
     the work currently in motion on one of those links.
   -->
-  <g stroke="#1F2328" stroke-width="2.6" stroke-linecap="round">
+  <g stroke="#21262e" stroke-width="2.6" stroke-linecap="round">
     <path d="M11.8 11.8 L6.4 6.4"/>
     <path d="M20.2 11.8 L25.6 6.4"/>
     <path d="M11.8 20.2 L6.4 25.6"/>
     <path d="M20.2 20.2 L25.6 25.6"/>
   </g>
-  <rect x="9.6" y="9.6" width="12.8" height="12.8" rx="3.4" fill="#1F2328"/>
-  <circle cx="4.6" cy="4.6" r="2.7" fill="#55606B"/>
-  <circle cx="27.4" cy="4.6" r="2.7" fill="#55606B"/>
-  <circle cx="4.6" cy="27.4" r="2.7" fill="#55606B"/>
-  <circle cx="27.4" cy="27.4" r="2.7" fill="#D97706"/>
+  <rect x="9.6" y="9.6" width="12.8" height="12.8" rx="3.4" fill="#21262e"/>
+  <circle cx="4.6" cy="4.6" r="2.7" fill="#676f7c"/>
+  <circle cx="27.4" cy="4.6" r="2.7" fill="#676f7c"/>
+  <circle cx="4.6" cy="27.4" r="2.7" fill="#676f7c"/>
+  <circle cx="27.4" cy="27.4" r="2.7" fill="#e6bf34"/>
 </svg>

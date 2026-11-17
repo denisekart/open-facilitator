@@ -86,7 +86,7 @@
   <div class="mb-3 flex items-center justify-between">
     <h2 class="text-sm font-medium">
       Audit
-      <span class="ml-1 text-xs font-normal text-ink-3"
+      <span class="ml-1 text-xs font-normal text-ink-2"
         >— every allow and deny the kernel recorded</span
       >
     </h2>
@@ -183,7 +183,7 @@
           <td class="mono text-xs">
             {#if row.traceId}
               <button
-                class="mono badge bg-sunken text-ink-2 ring-edge"
+                class="mono badge bg-sunken text-ink-2"
                 title="copy trace id — paste it into the OTLP viewer"
                 data-testid={`audit-copy-trace-${short}`}
                 onclick={() => void navigator.clipboard.writeText(row.traceId ?? "")}
@@ -204,7 +204,7 @@
       {/each}
       {#if items.length === 0}
         <tr>
-          <td colspan="7" class="text-ink-3">Nothing here — nothing matched.</td>
+          <td colspan="7" class="text-ink-2">Nothing here — nothing matched.</td>
         </tr>
       {/if}
     </tbody>

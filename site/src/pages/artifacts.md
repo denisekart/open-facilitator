@@ -28,9 +28,9 @@ Those three are the whole neighbourhood — drawn once, so you can see what
 you are responsible for operating:
 
 ```mermaid title="What must run beside the kernel image"
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#EAF1F9",
-"primaryBorderColor": "#0B5FBF", "primaryTextColor": "#1F2328",
-"lineColor": "#5B6B7C", "secondaryColor": "#FDF0DC"}}}%%
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#f7f9fb",
+"primaryBorderColor": "#ab8612", "primaryTextColor": "#21262e",
+"lineColor": "#676f7c", "secondaryColor": "#faf2d6"}}}%%
 flowchart TB
   K["Kernel image - stateless, any container host"] --- PG[("PostgreSQL - the one mandatory dependency")]
   K --- ART[("S3-compatible store - artifacts (a folder works for a toy)")]

@@ -63,7 +63,7 @@
     box-sizing: border-box;
     border: 2px solid;
     border-radius: 8px;
-    background: #18212d;
+    background: #33373d;
     padding: 5px 8px;
     display: flex;
     flex-direction: column;
@@ -76,7 +76,7 @@
   .arch-part.ghost {
     border-style: dashed;
     opacity: 0.85;
-    background: #141c27;
+    background: #2b2e33;
   }
   .arch-part.selected {
     box-shadow: 0 0 0 3px rgba(76, 141, 255, 0.45);
@@ -94,14 +94,14 @@
     font-size: 12px;
     font-weight: 650;
     line-height: 1.15;
-    color: #e6edf3;
+    color: #d6dae0;
   }
   .arch-part.far .arch-part-t {
     font-size: 10.5px;
   }
   .arch-part-sub {
     font-size: 10px;
-    color: #9aa8b8;
+    color: #99a1ab;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -121,13 +121,13 @@
     box-sizing: border-box;
     border: 1.5px solid;
     border-radius: 8px;
-    background: #131b27;
+    background: #2b2e33;
     box-shadow: 0 4px 16px rgba(4, 8, 14, 0.45);
   }
   .arch-part-what {
     font-size: 10.5px;
     line-height: 1.35;
-    color: #c3cedb;
+    color: #d6dae0;
     display: -webkit-box;
     -webkit-line-clamp: 4;
     -webkit-box-orient: vertical;
@@ -135,7 +135,7 @@
   }
   .arch-part-art {
     font: 500 9.5px/1.3 var(--mono, ui-monospace, monospace);
-    color: #7d8896;
+    color: #99a1ab;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;

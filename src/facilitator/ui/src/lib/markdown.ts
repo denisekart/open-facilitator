@@ -13,7 +13,7 @@ const ESCAPES: [RegExp, string][] = [
 ];
 
 const CODE_BLOCK = '<pre class="mono mt-1 mb-1 overflow-x-auto rounded bg-bg p-2 text-xs">$1</pre>';
-const CODE_INLINE = '<code class="mono rounded bg-bg px-1 text-[0.92em]">$1</code>';
+const CODE_INLINE = '<code class="mono rounded bg-bg px-1 text-xs">$1</code>';
 const STRONG = "<strong>$1</strong>";
 const EMPHASIS = "<em>$1</em>";
 const LINK =

@@ -63,7 +63,7 @@
   <div class="mb-3 flex items-center justify-between">
     <h2 class="text-sm font-medium">
       Works
-      <span class="ml-1 text-xs font-normal text-ink-3"
+      <span class="ml-1 text-xs font-normal text-ink-2"
         >— everything the kernel is holding, newest first</span
       >
     </h2>
@@ -113,7 +113,7 @@
       {/each}
       {#if items.length === 0}
         <tr>
-          <td colspan="5" class="text-ink-3">Nothing here — the queue is clear.</td>
+          <td colspan="5" class="text-ink-2">Nothing here — the queue is clear.</td>
         </tr>
       {/if}
     </tbody>

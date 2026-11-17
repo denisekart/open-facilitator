@@ -70,7 +70,7 @@
   <div class="mb-3 flex items-center justify-between">
     <h2 class="text-sm font-medium">
       Runtime
-      <span class="ml-1 text-xs font-normal text-ink-3"
+      <span class="ml-1 text-xs font-normal text-ink-2"
         >— which replica answers, and the sweeps you can fire</span
       >
     </h2>
@@ -78,12 +78,12 @@
   </div>
   <ProblemNote {error} />
   {#if notice}
-    <p class="badge mb-2 bg-accent-veil text-accent ring-accent/25" data-testid="sweep-notice" role="status">
+    <p class="badge mb-2 bg-accent-veil text-accent" data-testid="sweep-notice" role="status">
       {notice}
     </p>
   {/if}
 
-  <h3 class="mb-1 text-xs font-medium uppercase text-ink-3">Replicas</h3>
+  <h3 class="mb-1 text-xs font-medium uppercase text-ink-2">Replicas</h3>
   <table class="table mb-4">
     <thead>
       <tr>
@@ -96,7 +96,7 @@
           <td class="mono text-xs">
             {row.replicaId}
             {#if row.replicaId === replicas?.answeringReplicaId}
-              <span class="badge ml-1 bg-ok-veil text-ok ring-ok/25"
+              <span class="badge ml-1 bg-ok-veil text-ok"
                 ><span class="dot" aria-hidden="true"></span>answering</span
               >
             {/if}
@@ -106,12 +106,12 @@
         </tr>
       {:else}
         <tr>
-          <td colspan="3" class="text-ink-3">No replica has taken a lease yet.</td>
+          <td colspan="3" class="text-ink-2">No replica has taken a lease yet.</td>
         </tr>
       {/each}
       {#if replicas}
         <tr>
-          <td class="text-ink-3">outbox pending (fleet)</td>
+          <td class="text-ink-2">outbox pending (fleet)</td>
           <td class="mono" colspan="2">{replicas.outboxPending}</td>
         </tr>
       {/if}
@@ -119,7 +119,7 @@
   </table>
 
   {#if canMutate}
-    <h3 class="mb-1 text-xs font-medium uppercase text-ink-3">Sweeps</h3>
+    <h3 class="mb-1 text-xs font-medium uppercase text-ink-2">Sweeps</h3>
     <div class="mb-4 flex flex-wrap items-center gap-2">
       {#each SWEEPS as name}
         {#if sweeping === name}
@@ -154,7 +154,7 @@
     </div>
   {/if}
 
-  <h3 class="mb-1 text-xs font-medium uppercase text-ink-3">Provisioning ledger</h3>
+  <h3 class="mb-1 text-xs font-medium uppercase text-ink-2">Provisioning ledger</h3>
   <table class="table">
     <thead>
       <tr>
@@ -179,7 +179,7 @@
         </tr>
       {:else}
         <tr>
-          <td colspan="6" class="text-ink-3">Nothing has been provisioned yet.</td>
+          <td colspan="6" class="text-ink-2">Nothing has been provisioned yet.</td>
         </tr>
       {/each}
     </tbody>

@@ -93,7 +93,7 @@
   <div class="mb-3 flex items-center justify-between gap-2">
     <h2 class="text-sm font-medium">
       {kind}
-      <span class="mono ml-1 text-xs font-normal text-ink-3" title={id}>{id.slice(0, 8)}…</span>
+      <span class="mono ml-1 text-xs font-normal text-ink-2" title={id}>{id.slice(0, 8)}…</span>
     </h2>
     <div class="flex items-center gap-2">
       <button class="btn" title="reload" onclick={() => void load()}>↻</button>
@@ -105,14 +105,14 @@
 
   {#if project}
     <div class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-      <span class="text-ink-3">Name</span><span data-testid="hit-project-name">{project.name}</span>
-      <span class="text-ink-3">Team</span
+      <span class="text-ink-2">Name</span><span data-testid="hit-project-name">{project.name}</span>
+      <span class="text-ink-2">Team</span
       ><span class="mono text-xs">{project.teamSlug ?? "—"}</span>
-      <span class="text-ink-3">Created</span>
+      <span class="text-ink-2">Created</span>
       <span class="mono text-xs text-ink-2" title={stamp(project.createdAt)}>
         {ago(project.createdAt).text}
       </span>
-      <span class="text-ink-3">Works</span>
+      <span class="text-ink-2">Works</span>
       <span>
         {#if project.works.length > 0}
           <ul class="grid gap-1">
@@ -130,13 +130,13 @@
             {/each}
           </ul>
         {:else}
-          <span class="text-ink-3">no works in this project yet</span>
+          <span class="text-ink-2">no works in this project yet</span>
         {/if}
       </span>
     </div>
   {:else if artifact}
     <span
-      class="badge bg-sunken text-ink-2 ring-edge"
+      class="badge bg-sunken text-ink-2"
       data-testid="hit-artifact-meta">
       {artifact.state} · {artifact.mediaType} · {artifact.size} B
     </span>
@@ -147,21 +147,21 @@
     >
   {:else if memory}
     <div class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-      <span class="text-ink-3">Scope</span><span class="mono text-xs">{memory.scopeId}</span>
-      <span class="text-ink-3">Type</span><span>{memory.type}</span>
-      <span class="text-ink-3">Status</span>
+      <span class="text-ink-2">Scope</span><span class="mono text-xs">{memory.scopeId}</span>
+      <span class="text-ink-2">Type</span><span>{memory.type}</span>
+      <span class="text-ink-2">Status</span>
       <span>
         <span class="badge {TONE_CLASS[stateTone(memory.status)]}">
           <span class="dot" aria-hidden="true"></span>{stateLabel(memory.status)}
         </span>
-        <span class="ml-2 text-xs text-ink-3">r{memory.revision}</span>
+        <span class="ml-2 text-xs text-ink-2">r{memory.revision}</span>
       </span>
-      <span class="text-ink-3">Classified</span><span>{memory.classification}</span>
-      <span class="text-ink-3">By</span><span class="mono text-xs">{memory.createdBy}</span>
-      <span class="text-ink-3">Summary</span>
+      <span class="text-ink-2">Classified</span><span>{memory.classification}</span>
+      <span class="text-ink-2">By</span><span class="mono text-xs">{memory.createdBy}</span>
+      <span class="text-ink-2">Summary</span>
       <span>{memory.contentSummary ?? "—"}</span>
     </div>
   {:else if !path && !error}
-    <p class="text-ink-3" data-testid="hit-no-detail">No detail surface for this kind yet.</p>
+    <p class="text-ink-2" data-testid="hit-no-detail">No detail surface for this kind yet.</p>
   {/if}
 </section>

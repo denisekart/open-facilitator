@@ -14,7 +14,7 @@ import {
   docs,
 } from "../config.mjs";
 
-const ICON = `<svg viewBox="0 0 32 32" aria-hidden="true"><g stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M11.8 11.8 L6.4 6.4"/><path d="M20.2 11.8 L25.6 6.4"/><path d="M11.8 20.2 L6.4 25.6"/><path d="M20.2 20.2 L25.6 25.6"/></g><rect x="9.6" y="9.6" width="12.8" height="12.8" rx="3.4" fill="currentColor"/><circle cx="4.6" cy="4.6" r="2.7" fill="currentColor" opacity="0.55"/><circle cx="27.4" cy="4.6" r="2.7" fill="currentColor" opacity="0.55"/><circle cx="4.6" cy="27.4" r="2.7" fill="currentColor" opacity="0.55"/><circle cx="27.4" cy="27.4" r="2.7" fill="#D97706"/></svg>`;
+const ICON = `<svg viewBox="0 0 32 32" aria-hidden="true"><g stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M11.8 11.8 L6.4 6.4"/><path d="M20.2 11.8 L25.6 6.4"/><path d="M11.8 20.2 L6.4 25.6"/><path d="M20.2 20.2 L25.6 25.6"/></g><rect x="9.6" y="9.6" width="12.8" height="12.8" rx="3.4" fill="currentColor"/><circle cx="4.6" cy="4.6" r="2.7" fill="currentColor" opacity="0.55"/><circle cx="27.4" cy="4.6" r="2.7" fill="currentColor" opacity="0.55"/><circle cx="4.6" cy="27.4" r="2.7" fill="currentColor" opacity="0.55"/><circle cx="27.4" cy="27.4" r="2.7" style="fill: var(--accent)"/></svg>`;
 
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
@@ -59,8 +59,11 @@ function header(base, notFound) {
     })
     .join("");
   return `<header class="topbar">
+  <button class="nav-toggle" id="nav-toggle" type="button" aria-label="Open the menu" aria-expanded="false" aria-controls="topnav">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+  </button>
   <a class="brand" href="${P("index.html")}">${ICON}<span>Open&nbsp;Facilitator</span></a>
-  <nav class="topnav" aria-label="Main">${links}
+  <nav class="topnav" id="topnav" aria-label="Main">${links}
     <form class="searchbox" action="${P("#/search")}" role="search">
       <input id="q" type="search" name="q" placeholder="Search…" aria-label="Search the documentation" autocomplete="off">
       <div class="search-pop" id="search-pop"></div>
@@ -70,6 +73,7 @@ function header(base, notFound) {
 </button>
     <a class="ghost" rel="noopener" href="${repo.url}">GitHub</a>
   </nav>
+  <button class="nav-scrim" id="nav-scrim" type="button" aria-label="Close the menu" hidden></button>
 </header>`;
 }
 
@@ -88,14 +92,14 @@ function heroHtml() {
     <p class="scene-title">What one piece of work looks like</p>
     <div class="relay">
       <svg viewBox="0 0 600 128" role="img" aria-label="Diagram: a work item passes from you, through the facilitator, into a team's environment, and becomes a permanent record">
-        <line x1="75" y1="62" x2="525" y2="62" stroke="#dfe5ec" stroke-width="2.5"/>
+        <line x1="75" y1="62" x2="525" y2="62" style="stroke: var(--line)" stroke-width="2.5"/>
         ${relay.steps.map((s, i) => stationSvg(s, i)).join("")}
         <g class="workchip">
-          <rect x="-44" y="-13" width="88" height="26" rx="6" fill="#D97706"/>
-          <rect x="-37" y="-6.5" width="42" height="3.5" rx="1.75" fill="#FFF" fill-opacity="0.85"/>
-          <rect x="-37" y="0.5" width="26" height="3.5" rx="1.75" fill="#FFF" fill-opacity="0.55"/>
-          <circle cx="29" cy="-2.5" r="3.4" fill="#FFF" fill-opacity="0.9"/>
-          <text x="29" y="0.4" text-anchor="middle" font-size="5.5" font-weight="700" fill="#8a4d02" font-family="system-ui,sans-serif">✓</text>
+          <rect x="-44" y="-13" width="88" height="26" rx="6" style="fill: var(--accent)"/>
+          <rect x="-37" y="-6.5" width="42" height="3.5" rx="1.75" style="fill: var(--accent-on)" fill-opacity="0.85"/>
+          <rect x="-37" y="0.5" width="26" height="3.5" rx="1.75" style="fill: var(--accent-on)" fill-opacity="0.55"/>
+          <circle cx="29" cy="-2.5" r="3.4" style="fill: var(--accent-on)" fill-opacity="0.9"/>
+          <text x="29" y="0.4" text-anchor="middle" font-size="5.5" font-weight="700" style="fill: var(--accent-on)" font-family="system-ui,sans-serif">✓</text>
         </g>
       </svg>
     </div>
@@ -125,17 +129,17 @@ function heroHtml() {
 function stationSvg(s, i) {
   const glyphs = [
     // you / your agent: a chat bubble + terminal
-    `<rect x="-15" y="-13" width="30" height="20" rx="5" fill="#fff" stroke="currentColor" stroke-width="1.6"/><path d="M-6 7 l0 6 l7 -6" fill="#fff" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M-8 -5 l5 4 l-5 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><line x1="1" y1="3" x2="8" y2="3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>`,
+    `<rect x="-15" y="-13" width="30" height="20" rx="5" style="fill: var(--surface-raise)" stroke="currentColor" stroke-width="1.6"/><path d="M-6 7 l0 6 l7 -6" style="fill: var(--surface-raise)" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M-8 -5 l5 4 l-5 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><line x1="1" y1="3" x2="8" y2="3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>`,
     // the kernel: the brand chip
     `<g stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M-9 -9 L-14 -14"/><path d="M9 -9 L14 -14"/><path d="M-9 9 L-14 14"/><path d="M9 9 L14 14"/></g><rect x="-7.5" y="-7.5" width="15" height="15" rx="4" fill="currentColor"/>`,
     // a team environment: container with agent + human gate
-    `<rect x="-16" y="-12" width="32" height="24" rx="5" fill="#fff" stroke="currentColor" stroke-width="1.6" stroke-dasharray="3.5 3"/><circle cx="-6" cy="-3" r="3.2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M-11.5 6 a5.5 5.5 0 0 1 11 0" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="3" y="-6" width="10" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M5.5 0 l2 2 l3.5 -4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>`,
+    `<rect x="-16" y="-12" width="32" height="24" rx="5" style="fill: var(--surface-raise)" stroke="currentColor" stroke-width="1.6" stroke-dasharray="3.5 3"/><circle cx="-6" cy="-3" r="3.2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M-11.5 6 a5.5 5.5 0 0 1 11 0" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="3" y="-6" width="10" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M5.5 0 l2 2 l3.5 -4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>`,
     // the record: vault/cylinder with a check
-    `<path d="M-12 -9 a12 4 0 0 1 24 0 v14 a12 4 0 0 1 -24 0 z" fill="#fff" stroke="currentColor" stroke-width="1.6"/><path d="M-12 -9 a12 4 0 0 0 24 0" fill="none" stroke="currentColor" stroke-width="1.2" stroke-opacity="0.6"/><path d="M-4 -1 l3 3 l6 -6.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>`,
+    `<path d="M-12 -9 a12 4 0 0 1 24 0 v14 a12 4 0 0 1 -24 0 z" style="fill: var(--surface-raise)" stroke="currentColor" stroke-width="1.6"/><path d="M-12 -9 a12 4 0 0 0 24 0" fill="none" stroke="currentColor" stroke-width="1.2" stroke-opacity="0.6"/><path d="M-4 -1 l3 3 l6 -6.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>`,
   ];
   return `<g class="relay-station" data-station="${i}" transform="translate(${s.x} 34)">
-    <g class="relay-glyph" color="#9aa6b4">${glyphs[i]}</g>
-    <text y="52" text-anchor="middle" fill="#7c8794" font-size="9.5" font-family="system-ui,sans-serif">${esc(s.who)}</text>
+    <g class="relay-glyph" style="color: var(--ink-3)">${glyphs[i]}</g>
+    <text y="52" text-anchor="middle" style="fill: var(--ink-2)" font-size="9.5" font-family="system-ui,sans-serif">${esc(s.who)}</text>
   </g>`;
 }
 
@@ -248,7 +252,7 @@ const RELAY_JS = `
     btns.forEach(function(b,j){ b.classList.toggle("on", i===j); b.setAttribute("aria-selected", i===j); });
     detail.innerHTML = "<b>"+steps[i].title+"</b> — "+steps[i].body;
     if (chip) chip.style.transform = "translate(" + steps[i].x + "px, 62px)";
-    glyphs.forEach(function(g,j){ g.setAttribute("color", j<=i ? (j===i ? "#0550AE" : "#7c93b5") : "#9aa6b4"); });
+    glyphs.forEach(function(g,j){ g.setAttribute("style", "color: " + (j<=i ? (j===i ? "#e6bf34" : "#ab8612") : "#767d85")); });
     lines.forEach(function(l,j){ l.classList.toggle("lit", j<=i); });
   }
   btns.forEach(function(b){

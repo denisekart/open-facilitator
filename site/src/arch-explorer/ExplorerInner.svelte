@@ -205,7 +205,7 @@
       onmovestart={() => undefined}
       onmoveend={onMoveEnd}
     >
-      <Background gap={24} size={1} color="#26313f" />
+      <Background gap={24} size={1} color="#464c54" />
       <Controls showInteractive={false} />
       {#if zoomBand === "mid"}
         <MiniMap
@@ -216,12 +216,12 @@
           maskColor="rgba(6,10,16,0.55)"
           nodeColor={(n) =>
             n.type === "zone"
-              ? { you: "#1d3a63", infra: "#232c37", team: "#4a3714", external: "#2a3138" }[
+              ? { you: "#4d4a3a", infra: "#3b4046", team: "#57523b", external: "#3b4046" }[
                   n.data?.zone?.own
-                ] || "#232c37"
+                ] || "#3b4046"
               : n.data?.own === "team"
-                ? "#E3A008"
-                : "#2f4a72"}
+                ? "#e6bf34"
+                : "#4d4a3a"}
           nodeStrokeWidth={0}
         />
       {/if}
@@ -301,18 +301,18 @@
     width: auto;
     overflow: visible;
     text-overflow: clip;
-    color: #9fb0c3;
-    background: #0d1420;
-    border: 1px solid #223042;
+    color: #99a1ab;
+    background: #2b2e33;
+    border: 1px solid #464c54;
     padding: 1px 6px;
     border-radius: 5px;
     font-size: 10.5px;
   }
   .arch-explorer :global(.svelte-flow__minimap) {
-    border: 1px solid #2b3a4d;
+    border: 1px solid #565d66;
     border-radius: 8px;
     overflow: hidden;
-    background: #101826;
+    background: #2b2e33;
   }
   @media (prefers-reduced-motion: reduce) {
     .arch-explorer :global(.svelte-flow__edge.animated path) {
@@ -322,14 +322,14 @@
   .arch-explorer {
     position: relative;
     height: min(78vh, 860px);
-    border: 1px solid #223042;
+    border: 1px solid #464c54;
     border-radius: 12px;
     overflow: hidden;
-    background: #0d1420;
+    background: #2b2e33;
     color-scheme: dark;
-    --chrome-line: #2b3a4d;
+    --chrome-line: #565d66;
     --chrome-bg: rgba(13, 20, 32, 0.88);
-    --chrome-ink: #d5e0ee;
+    --chrome-ink: #d6dae0;
   }
   .arch-full {
     position: absolute;
@@ -364,7 +364,7 @@
     cursor: pointer;
   }
   .arch-scen:hover {
-    border-color: #4c8dff;
+    border-color: #e6bf34;
   }
   .arch-ownkey {
     position: absolute;
@@ -402,22 +402,22 @@
     border-radius: 10px;
     /* Solid card: on the slate map a translucent panel lets edges and
        zones bleed through the caption text. */
-    background: #18212d;
-    border: 1px solid #3b4b60;
+    background: #33373d;
+    border: 1px solid #565d66;
     box-shadow: 0 6px 24px rgba(4, 8, 14, 0.5);
-    color: #d5e0ee;
+    color: #d6dae0;
   }
   .arch-cap {
     margin: 0 0 10px;
     font-size: 13px;
     line-height: 1.45;
-    color: #e6edf3;
+    color: #d6dae0;
   }
   .arch-step-n {
     display: inline-block;
     font-weight: 700;
     margin-right: 6px;
-    color: #4c8dff;
+    color: #e6bf34;
   }
   .arch-nav {
     display: flex;
@@ -426,16 +426,16 @@
   .arch-nav button {
     border: 1px solid var(--chrome-line);
     border-radius: 8px;
-    background: #18212d;
+    background: #33373d;
     color: var(--chrome-ink);
     font-size: 12px;
     padding: 4px 10px;
     cursor: pointer;
   }
   .arch-nav button.primary {
-    background: #0b5fbf;
-    border-color: #0b5fbf;
-    color: #fff;
+    background: #ab8612;
+    border-color: #ab8612;
+    color: var(--accent-on, #1b1e22);
   }
   .arch-nav button:disabled {
     opacity: 0.45;
@@ -451,40 +451,40 @@
     overflow: auto;
     padding: 12px 14px;
     border-radius: 10px;
-    background: #18212d;
-    border: 1px solid #3b4b60;
+    background: #33373d;
+    border: 1px solid #565d66;
     box-shadow: 0 6px 24px rgba(4, 8, 14, 0.5);
-    color: #d5e0ee;
+    color: #d6dae0;
   }
   .arch-sheet p {
-    color: #c3cedb;
+    color: #d6dae0;
   }
   .arch-sheet ul {
-    color: #c3cedb;
+    color: #d6dae0;
   }
   .arch-sheet h3 {
-    color: #e6edf3;
+    color: #d6dae0;
   }
   .arch-sheet a {
-    color: #4c8dff;
+    color: #e6bf34;
   }
   .arch-sheet li {
-    color: #c3cedb;
+    color: #d6dae0;
   }
   .arch-sheet-x {
     float: right;
     border: 0;
     background: none;
-    color: #9aa8b8;
+    color: #99a1ab;
     font-size: 18px;
     cursor: pointer;
   }
   .arch-sub {
-    color: #9aa8b8;
+    color: #99a1ab;
     font-size: 12px;
   }
   .arch-art {
     font-size: 12px;
-    color: #9aa8b8;
+    color: #99a1ab;
   }
 </style>

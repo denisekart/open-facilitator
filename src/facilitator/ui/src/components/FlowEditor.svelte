@@ -392,7 +392,7 @@
       <h2 class="mb-1 text-xl font-semibold">
         {#if isNew}author a flow{:else}<span class="mono">{id}</span> · v{loadedVersion}{/if}
       </h2>
-      <p class="text-sm text-ink-3">
+      <p class="text-sm text-ink-2">
         YAML is the source of truth; the graph redraws as you type.
         <a class="text-accent underline" href={`#/monitor/definitions/${id}`}>runs &amp; history</a>
       </p>
@@ -453,8 +453,8 @@
     </label>
   </div>
 
-  <div class="grid gap-4 lg:grid-cols-2">
-    <div class="min-w-0">
+  <div class="mirror-grid">
+    <div class="pane min-w-0">
       <div class="mb-1 flex items-center justify-between">
         <span class="label mb-0">definition YAML</span>
         <div class="flex gap-2">
@@ -469,7 +469,7 @@
         </div>
       </div>
       {#if parseError}
-        <p class="badge mb-1 bg-amber-veil text-amber ring-amber/25" data-testid="graph-error">
+        <p class="badge mb-1 bg-amber-veil text-amber" data-testid="graph-error">
           graph shows the last good version: {parseError}
         </p>
       {/if}
@@ -480,11 +480,11 @@
       {#if validation}
         <div class="mt-2" data-testid="yaml-validation">
           {#if validation.ok}
-            <p class="badge bg-ok-veil text-ok ring-ok/25">valid</p>
+            <p class="badge bg-ok-veil text-ok">valid</p>
           {:else}
             <ul class="grid gap-1">
               {#each validation.errors as e (e.code + e.detail)}
-                <li class="badge bg-danger-veil text-danger ring-danger/25">
+                <li class="badge bg-danger-veil text-danger">
                   <span class="mono">{e.code}</span> {e.detail}
                 </li>
               {/each}
@@ -495,7 +495,7 @@
       {#if changes.length > 0}
         <ul class="mt-2 flex flex-wrap gap-1" data-testid="editor-diff" aria-label="pending changes">
           {#each changes as path (path)}
-            <li class="badge bg-amber-veil text-amber ring-amber/25 mono">{path}</li>
+            <li class="badge bg-amber-veil text-amber mono">{path}</li>
           {/each}
         </ul>
       {:else}
@@ -503,9 +503,10 @@
       {/if}
     </div>
 
-    <div class="min-w-0">
+    <div class="pane min-w-0">
       {#if lastGoodDoc !== null}
         <FlowCanvas
+          class="graph-host"
           doc={graphDoc}
           selected={selectedStep}
           onselect={(stepId) => (selectedStep = stepId && stepId !== "trigger" && stepId !== "end" ? stepId : null)} />
@@ -531,7 +532,41 @@
 </section>
 
 <style>
+  /* The YAML/graph mirror (§10): side by side the panes get equal width
+     (one 1fr track each, minmax(0,1fr)); stacked they get equal height.
+     The grid, not the children, owns the sizing — no intrinsic drift. */
+  .mirror-grid {
+    display: grid;
+    gap: 12px;
+    grid-auto-rows: minmax(0, 1fr);
+    grid-template-columns: 1fr;
+  }
+
+  @media (min-width: 720px) {
+    .mirror-grid {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      grid-auto-rows: auto;
+    }
+
+    .mirror-grid > .pane {
+      min-height: 420px;
+    }
+  }
+
+  .pane {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .yaml-host {
+    flex: 1;
+    min-height: 260px;
+  }
+
   .yaml-host :global(.cm-editor) {
+    height: 100%;
     border-radius: 6px;
     font-size: 13px;
   }
@@ -540,5 +575,10 @@
   }
   .yaml-host :global(.cm-scroller) {
     font-family: var(--font-mono);
+  }
+
+  :global(.graph-host) {
+    height: 100% !important;
+    min-height: 260px;
   }
 </style>

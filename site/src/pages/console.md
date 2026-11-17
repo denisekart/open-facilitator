@@ -30,7 +30,7 @@ payload.
 ![Searching the console](../assets/console-explorer.png)
 _Search an objective, and the hit opens the Work it belongs to —
 artifacts, memories, and messages are the other search sections. The
-left rail switches surfaces; every one of them is a URL._
+menu switches surfaces; every one of them is a URL._
 
 ![The Work inspector](../assets/console-work.png)
 _The same Work opened: a pending approval names its approver, the
@@ -39,12 +39,12 @@ same audited write the API would take._
 
 This is the “who did what, when, and who allowed it” view, and it is the
 screen you live in once agents start touching production. Below: what
-every entry on the rail opens, and what the console deliberately leaves
+every menu entry opens, and what the console deliberately leaves
 out.
 
-## Every surface on the rail
+## Every surface in the menu
 
-Under the search box, what each rail entry opens:
+The header menu (a drawer on narrow screens) opens, entry by entry:
 
 - **Works** — the queue: everything, newest first, filterable by state;
   a team-scoped operator automatically sees only their teams' works.
@@ -94,6 +94,6 @@ both are yours.
 - See it live: the [guided tour](/docs/getting-started) boots a full
   environment on one laptop — kernel, console, a demo team, and works
   already executed — with Docker the only thing you install.
-- Author what the Flows rail shows: [Authoring flows](/workflows).
+- Author what the Flows menu entry shows: [Authoring flows](/workflows).
 - See what feeds the record: [Supported integrations](/integrations).
 - Run your own kernel and open this console on it: [Get running](/guide/human).

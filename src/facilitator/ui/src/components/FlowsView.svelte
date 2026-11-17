@@ -41,7 +41,7 @@
   <div class="mb-4 flex items-start justify-between gap-4">
     <div>
       <h2 class="mb-1 text-xl font-semibold">Flows</h2>
-      <p class="text-sm text-ink-3">
+      <p class="text-sm text-ink-2">
         Every definition, latest version. Runs and their progress live under
         <a class="text-accent underline" href="#/monitor/runs">Monitor</a>.
         {#if canMutate}
@@ -58,7 +58,7 @@
 
   <div class="overflow-x-auto">
     <table class="table">
-      <caption class="caption-bottom pt-2 text-xs text-ink-3">
+      <caption class="caption-bottom pt-2 text-xs text-ink-2">
         Definitions · edit opens the authoring face, runs opens the filtered monitor
       </caption>
       <thead>
@@ -80,11 +80,11 @@
             <td>{d.title}</td>
             <td>
               {#if !d.enabled}
-                <span class="badge bg-sunken text-ink-2 ring-edge">off</span>
+                <span class="badge bg-sunken text-ink-2">off</span>
               {:else if d.shadow}
-                <span class="badge bg-amber-veil text-amber ring-amber/25">shadow</span>
+                <span class="badge bg-amber-veil text-amber">shadow</span>
               {:else}
-                <span class="badge bg-ok-veil text-ok ring-ok/25">live</span>
+                <span class="badge bg-ok-veil text-ok">live</span>
               {/if}
             </td>
             <td>{d.team ?? "—"}</td>
@@ -106,7 +106,7 @@
         {:else}
           {#if loaded && !error}
           <tr>
-            <td colspan="7" class="text-ink-3">
+            <td colspan="7" class="text-ink-2">
               {#if canMutate}
                 <EmptyState
                   title="no definitions yet"

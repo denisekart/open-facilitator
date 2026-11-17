@@ -20,10 +20,10 @@
 </script>
 
 <div class="flex flex-col items-center gap-2 py-8 text-center" data-testid={testid}>
-  <Inbox class="size-6 text-ink-3" strokeWidth={1.5} aria-hidden="true" />
+  <Inbox class="size-6 text-ink-2" strokeWidth={1.5} aria-hidden="true" />
   <p class="text-sm font-medium text-ink-2">{title}</p>
   {#if hint}
-    <p class="max-w-sm text-xs text-ink-3">{hint}</p>
+    <p class="max-w-sm text-xs text-ink-2">{hint}</p>
   {/if}
   {#if actionHref && actionLabel}
     <a class="mono text-sm text-accent underline" href={actionHref}>{actionLabel}</a>

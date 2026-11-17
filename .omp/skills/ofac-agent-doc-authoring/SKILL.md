@@ -11,7 +11,8 @@ Two distinct artifacts, one law (every claim resolves in the tree):
 - **`docs/getting-started-agents.md`** — the repo-wide agent walkthrough:
   auth, the HTTP surface, link enrollment, contract locations, error
   contract. It is *consumer doc that happens to address an agent*, so it
-  follows ofac-doc-authoring too; a signpost is *operational law*.
+  follows ofac-writing too (register: signpost-adjacent, but its prose
+  laws are that skill's); a signpost is *operational law*.
 
 ## Signpost law (what `make docs-check` enforces, learned the hard way)
 
@@ -27,10 +28,9 @@ Two distinct artifacts, one law (every claim resolves in the tree):
   the signpost edits ride the SAME commit.
 - **No implementation-plan status prose** (`Plan 3`, "landed this week").
   Status lives in `.omp/plans/`; a signpost states as-built law only.
-- **No dialogue or provenance** (the ofac-doc-authoring law applies here
-  with extra force — a signpost is read cold by an agent with no memory
-  of the discussion): no "we agreed", no "kept because X asked", no
-  decision narration. Law and anchors only.
+- **No dialogue or provenance** — the ofac-writing law, applying here with
+  extra force because a signpost is read cold by an agent with no memory
+  of any discussion. Law and anchors only.
 - **Every `src/<area>/` (and `tests/Facilitator.Tests`, `reference`,
   `features`) needs its own `AGENTS.md`** — a new area lands one in the
   same commit.
@@ -50,16 +50,17 @@ API (that is `docs/protocol.md`), changelog narration.
 
 ## For the agent-walkthrough page
 
-An agent reads to *act*: every section must name a concrete endpoint,
-header, or file, and the exact failure shape. "Authentication" is wrong;
-"`Authorization: Bearer <token>`; a wrong-team token is 403
-`forbidden-team`, not 401" is right. Machine-readable contract locations
-are a table of schema/OpenAPI paths, never descriptions of them.
+An agent reads to *act*: every section names a concrete endpoint, header,
+or file, and the exact failure shape — "`Authorization: Bearer <token>`; a
+wrong-team token is 403 `forbidden-team`, not 401", never a heading that
+just says "Authentication". Prose laws are ofac-writing's (register:
+reference). Machine-readable contract locations are a table of schema/OpenAPI
+paths, never descriptions of them.
 
 ## Skills as agent docs
 
-A procedure an agent executes belongs in `.omp/skills/<name>/SKILL.md`
-(frontmatter `name` + `description` with the trigger conditions; body =
-steps + gotchas learned the hard way, no narrative). Docs a human reads
-belongs in `docs/` or the site (ofac-doc-authoring). If a doc says "when
-X, do Y, Z, then check W", it is a skill.
+A procedure an agent executes belongs in `.omp/skills/<name>/SKILL.md`; a
+document a human reads belongs in `docs/` or the site (ofac-writing,
+register: skill). If a doc says "when X, do Y, Z, then check W", it is a
+skill. Frontmatter and body laws, including progressive disclosure via
+`references/`, are ofac-writing's.

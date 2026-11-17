@@ -9,10 +9,15 @@ Design rules that keep it coherent (all in `src/app.css` + `src/lib/status.ts`):
 - One vocabulary for machine states — `stateLabel`/`stateTone` render every
   status as a plain word plus one dot of semantic color (never hue alone);
   `ago()` shows relative time with the exact UTC stamp in the tooltip.
-- Light is the default, dark follows the OS, the header toggle persists the
-  choice (`lib/theme.svelte.ts`); accents follow the public site's palette.
+- The "Ink on Paper" token set (the design-language skill is the law):
+  light is the default, dark follows the OS, the header toggle persists the
+  choice (`lib/theme.svelte.ts`), `index.html` applies it before first
+  paint, and the hexes are shared with the public site (parity law).
+- One 44px chrome frame on every route: the view menu is a horizontal
+  strip past 720px and a left drawer behind the hamburger at or under it;
+  the AiDeck opens as a right drawer (Esc closes, focus returns).
 - Keyboard: `/` focuses search, Esc releases it, every control has a visible
-  focus ring; wide tables scroll inside themselves below 700px.
+  focus ring; wide tables scroll inside themselves below 720px.
 
 ## Build & embed
 

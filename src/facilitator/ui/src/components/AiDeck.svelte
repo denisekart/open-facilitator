@@ -52,7 +52,7 @@
 
 {#if deck.state.open}
   <div
-    class="fixed inset-0 z-40 flex justify-end {modal ? 'bg-black/20 items-end' : 'pointer-events-none items-stretch'}"
+    class="fixed inset-0 z-40 flex justify-end {modal ? 'scrim items-end' : 'pointer-events-none items-stretch'}"
     role="dialog"
     aria-modal={modal}
     aria-label="AiDeck"
@@ -65,8 +65,8 @@
         onclick={onclose}></button>
     {/if}
     <div
-      class="pointer-events-auto relative flex h-full w-[min(560px,100%)] flex-col border-l border-edge bg-canvas shadow-2xl {modal
-        ? 'h-[85vh] w-full border-t border-l-0'
+      class="deck-panel pointer-events-auto relative flex h-full w-[min(400px,100%)] flex-col border-l border-edge bg-surface {modal
+        ? 'h-[70vh] w-full border-t border-l-0'
         : ''}">
       <div class="flex items-center justify-between border-b border-edge px-4 py-2">
         <span class="text-sm font-semibold">AiDeck</span>
@@ -89,3 +89,14 @@
     </div>
   </div>
 {/if}
+
+<style>
+  /* A drawer takes over a region on purpose (§13): the one place sliding
+     belongs — 180ms in, 120ms out, standard easing. Desktop keeps it
+     non-modal: content stays interactive beside it, so no scrim there. */
+  @media (prefers-reduced-motion: no-preference) {
+    .deck-panel {
+      transition: transform 180ms cubic-bezier(0.2, 0, 0, 1);
+    }
+  }
+</style>

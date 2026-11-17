@@ -1,96 +1,125 @@
 @import "tailwindcss";
 
-/* Icons: lucide-svelte only, strokeWidth={1.5}, currentColor — no new icon
-   system, no emoji icons. Typography: the 12/14/16/20/24 scale
-   (text-xs sm:text-sm md:text-base xl:text-xl 2xl:text-2xl) and two weights
-   (font-medium body, font-semibold headings); no ad-hoc text-[Npx]. */
+/* Operator console — "Ink on Paper" (the design-language skill is the law).
+   This file is the only place hex colours live; components consume the
+   semantic aliases below. Cool blue-grey grounds, one gold signal for
+   state, borders are real borders, one shadow on floats only. Light is
+   the default (it lives under office lights all day); dark follows the OS
+   unless the toggle says otherwise; index.html applies the choice before
+   first paint and the choice persists.
 
-/* Operator console, same design language as the public site: a tool, not a
-   brochure. Cool slate canvas, precise blue reserved for actions, one warm
-   amber reserved for "a human decision is pending / work in flight".
-   Light is the default (it lives under office lights all day); dark follows
-   the OS unless the toggle says otherwise, and the choice persists. */
+   Icons: lucide-svelte only, strokeWidth={1.5}, currentColor. Typography:
+   the 12/13/14/16/20/24 scale and the weights 400/500/600; button labels
+   600 uppercase at 0.04em; no ad-hoc text-[Npx]. */
 
 @theme {
-  --color-canvas: var(--paper);
-  --color-bg: var(--sunken);
-  --color-surface: var(--card);
-  --color-sunken: var(--sunken);
-  --color-raised: var(--sunken);
+  /* Semantic aliases (skill §1 names, kept through the Tailwind map). */
+  --color-canvas: var(--bg);
+  --color-bg: var(--surface);
+  --color-surface: var(--surface);
+  --color-sunken: var(--surface);
+  --color-raised: var(--surface-raise);
   --color-edge: var(--line);
   --color-edge-2: var(--line-2);
-  --color-ink: var(--text-primary);
-  --color-ink-2: var(--text-secondary);
-  --color-ink-3: var(--text-muted);
-  --color-accent: var(--accent);
-  --color-accent-veil: var(--accent-veil);
-  --color-amber: var(--amber);
-  --color-amber-veil: var(--amber-veil);
-  --color-danger: var(--destructive);
-  --color-danger-veil: var(--destructive-veil);
-  --color-ok: var(--success);
-  --color-ok-veil: var(--success-veil);
-  --color-warn: var(--amber);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-muted);
+  --color-ink-3: var(--ink-faint);
+  /* Components read `accent` as a WORD (links, hover, badge labels): the
+     text role, never the bare fill — the fill is for btn-primary only. */
+  --color-accent: var(--accent-text);
+  --color-accent-veil: var(--tint-selected);
+  --color-amber: var(--accent-text);
+  --color-amber-veil: var(--tint-selected);
+  --color-danger: var(--danger-text);
+  --color-danger-veil: var(--danger-veil);
+  --color-ok: var(--ok);
+  --color-ok-veil: var(--ok-veil);
+  --color-warn: var(--accent-text);
 
-  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Menlo, Consolas,
-    monospace;
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Mono", "JetBrains Mono", Menlo, monospace;
 }
 
 :root,
 [data-theme="light"] {
-  --paper: #f6f8fa;
-  --sunken: #eef2f6;
-  --card: #ffffff;
-  --line: #dde3ea;
-  --line-2: #c6cfda;
-  --text-primary: #1f2328;
-  --text-secondary: #55606b;
-  --text-muted: #8b95a1;
-  --accent: #0550ae;
-  --accent-veil: #e7f0fa;
-  --amber: #b45309;
-  --amber-veil: #fdf0dc;
-  --destructive: #cf222e;
-  --destructive-veil: #ffebe9;
-  --success: #1a7f37;
-  --success-veil: #dafbe1;
+  --bg: #eef2f6;
+  --surface: #f7f9fb;
+  --surface-raise: #ffffff;
+  --ink: #21262e;
+  --ink-muted: #676f7c;
+  --ink-faint: #8690a0;
+  --line: #d5dbe3;
+  --accent: #e6bf34;
+  --accent-rule: #ab8612;
+  --accent-text: #8d6e0e;
+  --accent-on: #14171a;
+  --danger: #d54e4e;
+  --danger-text: #b03a3a;
+  --line-soft: #e0e5ec;
+  --tint-selected: #faf2d6;
   color-scheme: light;
 }
 
 [data-theme="dark"] {
-  --paper: #0f141a;
-  --sunken: #171d26;
-  --card: #131923;
-  --line: #2b3543;
-  --line-2: #3d4a5c;
-  --text-primary: #e6edf3;
-  --text-secondary: #a8b3bf;
-  --text-muted: #7d8896;
-  --accent: #4c8dff;
-  --accent-veil: #123055;
-  --amber: #e3a008;
-  --amber-veil: #3a2c10;
-  --destructive: #f85149;
-  --destructive-veil: #462023;
-  --success: #3fb950;
-  --success-veil: #17351f;
+  --bg: #2b2e33;
+  --surface: #33373d;
+  --surface-raise: #3b4046;
+  --ink: #d6dae0;
+  --ink-muted: #99a1ab;
+  --ink-faint: #767d85;
+  --line: #464c54;
+  --accent: #e6bf34;
+  --accent-rule: #e6bf34;
+  --accent-text: #e6bf34;
+  --accent-on: #1b1e22;
+  --danger: #ff8f99;
+  --danger-text: #ff8f99;
+  --line-soft: #373b42;
+  --tint-selected: #57523b;
   color-scheme: dark;
+}
+
+/* Derived tokens: computed, never new hex (§1, §2). One formula, both
+   themes — each theme feeds its own accent-text/ink pair, so
+   `--ok` lands olive (8.9:1 on light raise) and sand-gold (6.7:1 on
+   dark raise): a success WORD, not a second accent. Veils are 12-16%
+   washes behind those words, never a frame. */
+:root {
+  --line-2: color-mix(in oklab, var(--ink) 18%, var(--line));
+  --hover: color-mix(in oklab, var(--ink) 6%, var(--surface-raise));
+  --danger-veil: color-mix(in oklab, var(--danger-text) 14%, var(--surface-raise));
+  --ok: color-mix(in oklab, var(--accent-text) 50%, var(--ink) 50%);
+  --ok-veil: color-mix(in oklab, var(--ok) 14%, var(--surface-raise));
+  --shadow-1: 0 1px 3px rgb(0 0 0 / 12%);
+  --radius-control: 4px;
+  --radius-overlay: 6px;
+  --chrome-h: 44px;
 }
 
 body {
   @apply bg-canvas text-ink text-sm antialiased;
   font-family: var(--font-sans);
+  line-height: 1.45;
 }
 
 .mono {
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
 }
 
 /* Keyboard focus is never decorative here: one visible ring, everywhere. */
 :where(button, a, input, select, textarea):focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
+  outline: 2px solid var(--accent-rule);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: color-mix(in oklab, var(--accent) 35%, var(--surface-raise));
+}
+
+html {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -100,61 +129,125 @@ body {
       border-color 0.12s ease,
       color 0.12s ease;
   }
+  .drawer {
+    transition: transform 180ms cubic-bezier(0.2, 0, 0, 1);
+  }
 }
 
+/* Surfaces: docked chrome is --surface with a real 1px --line border;
+   floats are --surface-raise with the one shadow. */
 .card {
-  @apply rounded-lg border border-edge bg-surface p-4;
+  @apply border border-edge bg-surface p-3;
+  border-radius: var(--radius-control);
+}
+
+.float {
+  background: var(--surface-raise);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-overlay);
+  box-shadow: var(--shadow-1);
 }
 
 .badge {
-  @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset;
+  @apply inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium ring-1 ring-inset;
+  border-radius: var(--radius-control);
 }
 
-/* A small colored dot + word: readable for color-blind users and in
-   monochrome prints, never relying on hue alone. */
+/* A small shape + word: readable for color-blind users and in monochrome
+   prints, never relying on hue alone. */
 .dot {
-  @apply inline-block size-1.5 shrink-0 rounded-full bg-current;
+  @apply inline-block size-1.5 shrink-0 bg-current;
+  border-radius: var(--radius-control);
 }
 
+/* Buttons are ghost by default: no border, no fill, muted ink. Treatment
+   is earned: one accent-fill primary per view, quiet on raise, destructive
+   text-only in danger. Labels: 13px, 600, uppercase, 0.04em. */
 .btn {
-  @apply inline-flex cursor-pointer items-center gap-1 rounded-md border border-edge-2 bg-surface px-3 py-1.5 text-ink hover:border-accent hover:text-accent disabled:cursor-default disabled:opacity-40 disabled:hover:border-edge-2 disabled:hover:text-ink;
+  @apply inline-flex cursor-pointer items-center gap-2 border border-transparent bg-transparent px-3 py-1.5 font-semibold tracking-[0.04em] text-ink-2 uppercase disabled:cursor-default disabled:text-ink-3;
+  border-radius: var(--radius-control);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.btn:hover {
+  background: var(--hover);
+  color: var(--ink);
 }
 
 .btn-primary {
-  @apply border-accent bg-accent text-canvas hover:border-accent hover:text-canvas;
+  @apply border-transparent px-3 font-semibold;
+  background: var(--accent);
+  color: var(--accent-on);
+  font-weight: 600;
+}
+
+.btn-primary:hover {
+  background: color-mix(in oklab, var(--accent) 88%, var(--ink));
+  color: var(--accent-on);
 }
 
 .btn-danger {
-  @apply border-danger/50 text-danger hover:border-danger hover:bg-danger-veil hover:text-danger;
+  @apply border-transparent bg-transparent;
+  color: var(--danger-text);
+}
+
+.btn-danger:hover {
+  background: var(--danger-veil);
+  color: var(--danger-text);
 }
 
 .input {
-  @apply w-full rounded-md border border-edge-2 bg-surface px-3 py-1.5 text-ink placeholder:text-ink-3 focus:border-accent focus:outline-none;
+  @apply w-full px-3 py-1.5 text-ink;
+  background: var(--surface-raise);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-control);
+}
+
+.input:focus {
+  outline: 2px solid var(--accent-rule);
+  outline-offset: 2px;
+}
+
+.input::placeholder {
+  color: var(--ink-faint);
 }
 
 .label {
-  @apply mb-1 block text-xs font-medium text-ink-2;
+  @apply block text-[13px] font-medium;
+  color: var(--ink-muted);
+}
+
+/* Group heads in panels and strips: 12px/500 caps at 0.04em, faint. */
+.micro-label {
+  @apply text-xs font-medium uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-faint);
 }
 
 .table {
-  @apply w-full border-collapse text-left text-sm;
+  @apply w-full border-collapse text-left;
+  font-size: 13px;
 }
 
 .table th {
-  @apply border-b border-edge px-2 py-1.5 text-xs font-medium text-ink-3 uppercase;
+  @apply border-b border-edge px-2 py-1.5 text-xs font-medium uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-faint);
 }
 
 .table td {
-  @apply border-b border-edge/60 px-2 py-1.5 align-top;
+  @apply border-b border-edge px-2 align-top;
+  padding-block: 6px;
 }
 
 .table tbody tr:hover {
-  @apply bg-sunken/60;
+  background: var(--hover);
 }
 
 /* Narrow screens: wide tables scroll inside themselves instead of pushing
    the whole page sideways. */
-@media (max-width: 700px) {
+@media (max-width: 720px) {
   .table {
     display: block;
     overflow-x: auto;
@@ -162,11 +255,164 @@ body {
 }
 
 .chip {
-  @apply cursor-pointer rounded-full border border-edge-2 bg-surface px-2.5 py-0.5 text-xs text-ink-2 hover:border-accent hover:text-accent;
+  @apply inline-flex cursor-pointer items-center gap-2 px-2 text-xs;
+  min-height: 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  color: var(--ink-muted);
+  background: var(--surface-raise);
+}
+
+.chip:hover {
+  color: var(--ink);
+  background: var(--hover);
 }
 
 .chip-active {
-  @apply border-accent bg-accent-veil text-accent;
+  border-color: var(--accent-rule);
+  background: var(--tint-selected);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* App shell (§9, §12, §22): one 44px header on every route; nav horizontal
+   past 720px, a left hamburger drawer below it. The active item wears a
+   2px accent rule, a few px shorter than the label, left-aligned with it. */
+.chrome {
+  min-height: var(--chrome-h);
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  padding-inline: 12px;
+}
+
+@media (max-width: 720px) {
+  .chrome {
+    padding-inline: 8px;
+  }
+}
+
+.nav-item {
+  @apply relative inline-flex cursor-pointer items-center gap-2 px-2;
+  min-height: 32px;
+  font-size: 13px;
+  color: var(--ink-muted);
+  background: none;
+  border: none;
+  border-radius: var(--radius-control);
+}
+
+.nav-item:hover {
+  color: var(--ink);
+  background: var(--hover);
+}
+
+.nav-item[aria-current="page"],
+.nav-item[aria-current="true"] {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.nav-item[aria-current="page"]::after,
+.nav-item[aria-current="true"]::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  bottom: 0;
+  width: calc(100% - 16px);
+  height: 2px;
+  background: var(--accent-rule);
+}
+
+.scrim {
+  background: rgb(0 0 0 / 28%);
+}
+
+/* The nav strip (§12, §22): past 720px a horizontal menu row docked under
+   the header; at or under it, the same nav collapses into a left drawer
+   that slides in (the one place sliding belongs) over a 28% scrim. */
+.viewnav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  min-height: 36px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  padding: 4px 12px;
+}
+
+.hamburger {
+  display: none;
+}
+
+/* The header's search field: a fixed comfortable column on desktop, a
+   shrinking flexible one on compact chrome. */
+/* The identity chip: always present (it is the trust anchor), but on
+   compact chrome it shrinks to initials-width instead of hiding. */
+.identity-chip {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chrome-search {
+  margin-inline-start: auto;
+  width: 256px;
+  max-width: 448px;
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+@media (max-width: 720px) {
+  .chrome-search {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 96px;
+  }
+
+  .identity-chip {
+    max-width: 72px;
+  }
+
+  /* Secondary chrome yields width to the primary row (§22): identity
+     rides the drawer's story on phones; search answers as you type. */
+  .hide-compact {
+    display: none;
+  }
+
+  .hamburger {
+    display: inline-flex;
+  }
+
+  .viewnav {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 40;
+    flex-direction: column;
+    align-items: stretch;
+    width: min(280px, 84vw);
+    max-height: none;
+    padding: 8px;
+    border-bottom: 0;
+    border-right: 1px solid var(--line);
+    overflow-y: auto;
+  }
+
+  .viewnav:not(.open) {
+    transform: translateX(-100%);
+  }
+
+  .viewnav .nav-item {
+    min-height: 44px;
+    justify-content: flex-start;
+  }
+}
+
+.drawer {
+  background: var(--surface);
+  border-right: 1px solid var(--line);
+  width: min(280px, 84vw);
 }
 
 /* Screen-reader-only text (live regions, column context). */

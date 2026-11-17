@@ -60,7 +60,7 @@
   <div class="mb-3 flex items-center justify-between">
     <h2 class="text-sm font-medium">
       Team environments
-      <span class="ml-1 text-xs font-normal text-ink-3"
+      <span class="ml-1 text-xs font-normal text-ink-2"
         >— gateways dial out to this kernel; nothing dials in</span
       >
     </h2>
@@ -69,7 +69,7 @@
   <ProblemNote {error} />
   {#if links}
     {#if links.gateways.length === 0}
-      <p class="text-ink-3">
+      <p class="text-ink-2">
         No team has linked yet. Mint an enrollment token below, hand it to a team, and their
         gateway will appear here the moment it dials out.
       </p>
@@ -87,18 +87,18 @@
               <td class="mono text-xs" title={g.endpointId}>{g.endpointId}</td>
               <td>{g.team}</td>
               <td>
-                <span class="badge bg-sunken text-ink-2 ring-edge" data-testid={`trust-${g.endpointId}`}
+                <span class="badge bg-sunken text-ink-2" data-testid={`trust-${g.endpointId}`}
                   >{g.trustMode}</span
                 >
               </td>
               <td>
                 {#if g.online}
-                  <span class="badge bg-ok-veil text-ok ring-ok/25" data-testid={`online-${g.endpointId}`}>
+                  <span class="badge bg-ok-veil text-ok" data-testid={`online-${g.endpointId}`}>
                     <span class="dot" aria-hidden="true"></span>online
                   </span>
                 {:else}
                   <span
-                    class="badge bg-sunken text-ink-2 ring-edge"
+                    class="badge bg-sunken text-ink-2"
                     data-testid={`offline-${g.endpointId}`}
                     title={g.lastHeartbeat ? stamp(g.lastHeartbeat) : null}>
                     <span class="dot" aria-hidden="true"></span>offline · last seen
@@ -117,7 +117,7 @@
               <td class="mono">{g.liveSockets}</td>
               <td class="text-xs text-ink-2">
                 {#if g.replaySuspect}
-                  <span class="badge bg-warn-veil text-warn ring-warn/25" data-testid={`replay-${g.endpointId}`}
+                  <span class="badge bg-amber-veil text-amber" data-testid={`replay-${g.endpointId}`}
                     title="the last proof of possession was rejected by the replay fence"
                     >replay?</span
                   >
@@ -144,10 +144,10 @@
       </table>
     {/if}
     {#if links.affectedAssignments.length > 0}
-      <h3 class="mb-1 text-xs font-medium uppercase text-ink-3">
+      <h3 class="mb-1 text-xs font-medium uppercase text-ink-2">
         Work waiting on an offline environment
       </h3>
-      <p class="mb-1 text-xs text-ink-3">
+      <p class="mb-1 text-xs text-ink-2">
         Durable: these resume on their own when the team's gateway returns.
       </p>
       <table class="table" data-testid="affected-assignments">
@@ -168,7 +168,7 @@
       </table>
     {/if}
   {:else if !error}
-    <p class="text-ink-3">loading…</p>
+    <p class="text-ink-2">loading…</p>
   {/if}
 </section>
 

@@ -29,10 +29,10 @@ sequence.</p>
 
 <h2 id="legend">Reading the map</h2>
 <div class="arch-legend">
-  <p><span class="al-key" style="border-color:#0B5FBF;background:#F2F7FD"></span><b>Solid outline</b><span>parts you deploy yourself. The kernel is one stateless container; it keeps no secrets of its own, which is why it can restart at any moment.</span></p>
-  <p><span class="al-key" style="border-color:#B25E09;background:#FDFAF3"></span><b>Warm outline</b><span>a team's own environment. It holds the team's keys, makes its own allow/deny calls, and dials <i>out</i> to the kernel — nothing can dial in.</span></p>
-  <p><span class="al-key" style="border-color:#9AA6B2;background:#F7F8F9"></span><b>Dashed outline</b><span>replaceable or external: your Postgres, your login provider, your object store, and the platforms teams already use.</span></p>
-  <p><span class="al-line" style="border-top:2.6px dotted #0B5FBF"></span><b>The link</b><span>every team-side connection, always outbound, resumable after any disconnect.</span></p>
+  <p><span class="al-key" style="border-color:#ab8612;background:#f7f9fb"></span><b>Solid outline</b><span>parts you deploy yourself. The kernel is one stateless container; it keeps no secrets of its own, which is why it can restart at any moment.</span></p>
+  <p><span class="al-key" style="border-color:#ab8612;background:#faf2d6"></span><b>Gold outline</b><span>a team's own environment. It holds the team's keys, makes its own allow/deny calls, and dials <i>out</i> to the kernel — nothing can dial in.</span></p>
+  <p><span class="al-key" style="border-color:#767d85;background:#f7f9fb"></span><b>Dashed outline</b><span>replaceable or external: your Postgres, your login provider, your object store, and the platforms teams already use.</span></p>
+  <p><span class="al-line" style="border-top:2.6px dotted #ab8612"></span><b>The link</b><span>every team-side connection, always outbound, resumable after any disconnect.</span></p>
 </div>
 
 <h2 id="three-planes">Three planes of identity</h2>

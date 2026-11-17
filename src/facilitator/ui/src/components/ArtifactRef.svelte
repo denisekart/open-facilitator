@@ -27,10 +27,10 @@
   class="mono text-xs text-accent underline"
   data-testid="artifact-link"
   onclick={() => void show()}>{artifactId.slice(0, 8)}</button>
-{#if loading}<span class="text-ink-3 text-xs">…</span>{/if}
+{#if loading}<span class="text-ink-2 text-xs">…</span>{/if}
 {#if artifact}
   <span class="badge bg-sunken text-ink-2" data-testid="artifact-meta">
     {artifact.state} · {artifact.mediaType} · {artifact.size} B
   </span>
 {/if}
-{#if error}<span class="badge bg-danger-veil text-danger ring-danger/25" data-testid="artifact-error">{error}</span>{/if}
+{#if error}<span class="badge bg-danger-veil text-danger" data-testid="artifact-error">{error}</span>{/if}

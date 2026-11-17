@@ -55,9 +55,9 @@ ladder is the smallest real one: four steps, entered on `always` and
 chained by three `completed` edges.
 
 ```mermaid title="The nudge ladder as the editor draws it"
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#EAF1F9",
-"primaryBorderColor": "#0B5FBF", "primaryTextColor": "#1F2328",
-"lineColor": "#5B6B7C", "secondaryColor": "#FDF0DC"}}}%%
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#f7f9fb",
+"primaryBorderColor": "#ab8612", "primaryTextColor": "#21262e",
+"lineColor": "#676f7c", "secondaryColor": "#faf2d6"}}}%%
 flowchart LR
   T["timer - PT30M"] -->|"first-pause:completed"| N["emit work.nudge"]
   N -->|"nudge:completed"| S["timer - PT2H"]

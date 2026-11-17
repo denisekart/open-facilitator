@@ -61,7 +61,7 @@
 </script>
 
 {#if crumbs.length > 1}
-  <nav class="mb-3 flex items-center gap-1 text-xs text-ink-3" aria-label="breadcrumbs" data-testid="breadcrumbs">
+  <nav class="mb-3 flex items-center gap-1 text-xs text-ink-2" aria-label="breadcrumbs" data-testid="breadcrumbs">
     {#each crumbs as crumb, i}
       {#if i > 0}<span aria-hidden="true">/</span>{/if}
       {#if i === crumbs.length - 1}

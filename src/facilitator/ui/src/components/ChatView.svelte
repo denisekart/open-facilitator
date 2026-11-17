@@ -449,7 +449,7 @@
       <button class="btn" data-testid="chat-new-session" onclick={newSession}>new</button>
     </div>
     <div class="mb-3 md:max-w-40">
-      <label class="mb-1 block text-xs uppercase text-ink-3" for="chat-verbosity">verbosity</label>
+      <label class="mb-1 block text-xs uppercase text-ink-2" for="chat-verbosity">verbosity</label>
       <select
         id="chat-verbosity"
         class="input"
@@ -491,7 +491,7 @@
           {:else}
             <div class="flex items-start gap-1">
               <button
-                class="w-full min-w-0 rounded px-2 py-1 text-left hover:bg-sunken {sessionId === s.sessionId
+                class="w-full min-w-0 rounded px-2 py-1 text-left hover:bg-surface {sessionId === s.sessionId
                   ? 'bg-sunken'
                   : ''}"
                 data-testid={`chat-session-${s.sessionId}`}
@@ -500,11 +500,11 @@
                   <span class="block truncate text-xs">{s.title || "(untitled)"}</span>
                   {#if updatedSinceOpen(s)}
                     <span
-                      class="badge bg-accent-veil text-accent ring-accent/25 shrink-0 px-1 py-0 text-xs"
+                      class="badge bg-accent-veil text-accent shrink-0 px-1 py-0 text-xs"
                       data-testid="chat-session-updated">new</span>
                   {/if}
                 </span>
-                <span class="mono text-xs text-ink-3" title={seen.title}>{seen.text}</span>
+                <span class="mono text-xs text-ink-2" title={seen.title}>{seen.text}</span>
               </button>
               <button
                 class="chip shrink-0"
@@ -522,7 +522,7 @@
           {/if}
         </li>
       {:else}
-        <li class="text-xs text-ink-3">No conversations yet — start one below.</li>
+        <li class="text-xs text-ink-2">No conversations yet — start one below.</li>
       {/each}
     </ul>
   </aside>
@@ -535,9 +535,9 @@
       onscroll={onThreadScroll}>
       {#each messages as m, i}
         <div
-          class="max-w-full rounded-lg border border-edge p-3 {m.role === 'user' ? 'bg-sunken' : ''}"
+          class="max-w-full rounded border border-edge p-3 {m.role === 'user' ? 'bg-sunken' : ''}"
           data-testid={`chat-message-${i}`}>
-          <p class="mb-1 flex items-center gap-2 text-xs uppercase text-ink-3">
+          <p class="mb-1 flex items-center gap-2 text-xs uppercase text-ink-2">
             {m.role}
             <span
               class="badge px-1.5 py-0 text-xs {TONE_CLASS[BASIS_TONE[m.basis] ?? 'neutral']}"
@@ -554,7 +554,7 @@
                     <button class="chip" data-testid={`chat-fallback-verb-${v.verb}`} onclick={() => useVerb(v.verb)}>
                       <span class="mono">/{v.verb}</span>
                       {#if v.args.length}
-                        <span class="text-ink-3">{v.args.map((a) => (a.required ? `<${a.name}>` : `[${a.name}]`)).join(" ")}</span>
+                        <span class="text-ink-2">{v.args.map((a) => (a.required ? `<${a.name}>` : `[${a.name}]`)).join(" ")}</span>
                       {/if}
                       — {v.description}
                     </button>
@@ -564,7 +564,7 @@
             {/if}
             {#if readTrail(m).length}
               <details class="mt-1" data-testid={`chat-reads-${i}`}>
-                <summary class="cursor-pointer text-xs text-ink-3">looked at {readTrail(m).length} endpoint{readTrail(m).length === 1 ? "" : "s"}</summary>
+                <summary class="cursor-pointer text-xs text-ink-2">looked at {readTrail(m).length} endpoint{readTrail(m).length === 1 ? "" : "s"}</summary>
                 <ul class="mt-1 space-y-0.5">
                   {#each readTrail(m) as r}
                     <li class="mono text-xs text-ink-2">looked at: {r.method} {r.path} ({r.status})</li>
@@ -578,7 +578,7 @@
           {#if actionsByMessage[m.messageId]?.length}
             {@const proposal = actionsByMessage[m.messageId]}
             <div
-              class="mt-2 rounded-lg border border-edge bg-sunken p-2"
+              class="mt-2 rounded border border-edge bg-sunken p-2"
               data-testid="chat-option-card">
               <div class="mb-1 flex items-center justify-between gap-2">
                 <h3 class="text-xs font-medium text-ink-2">
@@ -612,7 +612,7 @@
                   data-testid={`chat-action-${action.method.toLowerCase()}`}>
                   <div class="flex items-baseline justify-between gap-2">
                     <p class="text-xs font-medium">{live.summary || action.description}</p>
-                    <span class="text-xs uppercase text-ink-3" data-testid={`chat-action-effect-${action.actionId}`}>
+                    <span class="text-xs uppercase text-ink-2" data-testid={`chat-action-effect-${action.actionId}`}>
                       {effectFor(action)}
                     </span>
                   </div>
@@ -625,14 +625,14 @@
                     {#if live.expiresAt}
                       {@const exp = ago(live.expiresAt)}
                       <span
-                        class="text-xs text-ink-3"
+                        class="text-xs text-ink-2"
                         title={stamp(live.expiresAt)}
                         data-testid="chat-action-expires">expires {exp.text}</span>
                     {/if}
                   </p>
                   {#if lines.length}
                     <details class="mt-1" data-testid="chat-action-body">
-                      <summary class="mono cursor-pointer whitespace-pre text-xs text-ink-3">body · {lines.length} line{lines.length === 1 ? "" : "s"}
+                      <summary class="mono cursor-pointer whitespace-pre text-xs text-ink-2">body · {lines.length} line{lines.length === 1 ? "" : "s"}
 {lines.length > 5 ? `${lines.slice(0, 5).join("\n")}\n…` : lines.join("\n")}</summary>
                       <pre class="mono overflow-x-auto rounded bg-bg p-2 text-xs">{lines.join("\n")}</pre>
                     </details>
@@ -681,7 +681,7 @@
         </div>
       {/each}
       {#if pending}
-        <p class="badge w-fit bg-amber-veil text-amber ring-amber/25" data-testid="chat-pending">thinking…</p>
+        <p class="badge w-fit bg-amber-veil text-amber" data-testid="chat-pending">thinking…</p>
       {/if}
     </div>
     {#if !atBottom}
@@ -696,13 +696,13 @@
           <button class="chip" data-testid={`chat-verb-${v.verb}`} onclick={() => useVerb(v.verb)}>
             <span class="mono">/{v.verb}</span>
             {#if v.args.length}
-              <span class="text-ink-3">{v.args.map((a) => (a.required ? `<${a.name}>` : `[${a.name}]`)).join(" ")}</span>
+              <span class="text-ink-2">{v.args.map((a) => (a.required ? `<${a.name}>` : `[${a.name}]`)).join(" ")}</span>
             {/if}
             — {v.description}
           </button>
         {/each}
         {#if paletteVerbs.length === 0}
-          <p class="text-xs text-ink-3">no matching command</p>
+          <p class="text-xs text-ink-2">no matching command</p>
         {/if}
       </div>
     {/if}

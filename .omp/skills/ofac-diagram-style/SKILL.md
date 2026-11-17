@@ -5,17 +5,22 @@ description: "Draw diagrams in the open-facilitator house design language: the S
 
 # Diagrams: one language, two tiers
 
-The house look is the console/site palette (dark instrument surface, cool
-slate, one blue for action, one amber reserved for the thing in flight —
-`site/src/styles.css` `:root` is the single source: `--accent #0550ae`,
-`--amber #b45309`, ink slate ramp). Diagrams borrow it; they never invent
-a palette.
+The house look is "Ink on Paper" (the console/site palette: cool
+blue-grey grounds, one gold signal `#e6bf34` for state, ink
+`#21262e` light / `#d6dae0` dark, line `#d5dbe3` / `#464c54`, light
+surface `#f7f9fb` / raise `#ffffff`, dark ground `#2b2e33` / surface
+`#33373d` / raise `#3b4046`; the accent as a thin edge takes
+`--accent-rule` `#ab8612` in light and `#e6bf34` in dark —
+`site/src/styles.css` `:root` is the single source). Diagrams borrow
+it; they never invent a palette.
 
 ## Tier 1 — the architecture map (SvelteFlow): do not restyle
 
 `site/src/architecture.mjs` (nodes/edges/corridors as data) +
 `site/src/arch-render.mjs` (SSR) + `site/src/arch-explorer/` (the live
-`@xyflow/svelte` view). It is hand-routed, one fixed dark surface,
+`@xyflow/svelte` view). It is hand-routed, one fixed dark surface (the
+Ink dark ramp: ground `#2b2e33`, surface `#33373d`, raise `#3b4046`,
+ink `#d6dae0`, line `#464c54`, gold `#e6bf34`),
 click-any-part with walkable corridors, and an ``archmap` fence embeds a
 mini teaser (`site/build.mjs` renders it). Editing it means the
 managed `svelte-flow-ofac` laws (no `parentNode`, string edge styles, the
@@ -27,14 +32,15 @@ hand-place pixels and never change the visual language.
 
 Sequence/flow/state diagrams in `docs/` and site pages ride the site
 theme — copy `MERMAID_THEME` from `site/src/js/app.js` verbatim (base
-theme, `system-ui`, blue node borders `#0B5FBF`, ink `#1F2328`, line
-`#5B6B7C`, amber veil `#FDF0DC` for the secondary lane):
+theme, `system-ui`, node fills on surface `#f7f9fb`, accent-rule borders
+`#ab8612`, ink `#21262e`, line `#676f7c`, selected tint `#faf2d6` for
+the secondary lane):
 
 ````
 ```mermaid title="The dispatch funnel"
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#EAF1F9",
-"primaryBorderColor": "#0B5FBF", "primaryTextColor": "#1F2328",
-"lineColor": "#5B6B7C", "secondaryColor": "#FDF0DC"}}}%%
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#f7f9fb",
+"primaryBorderColor": "#ab8612", "primaryTextColor": "#21262e",
+"lineColor": "#676f7c", "secondaryColor": "#faf2d6"}}}%%
 flowchart LR ...
 ```
 ````

@@ -66,7 +66,7 @@
   <div class="mb-3 flex items-center justify-between">
     <h2 class="text-sm font-medium">
       Deliveries
-      <span class="ml-1 text-xs font-normal text-ink-3"
+      <span class="ml-1 text-xs font-normal text-ink-2"
         >— every message the kernel sent out, and what became of it</span
       >
     </h2>
@@ -86,7 +86,7 @@
   </div>
   <ProblemNote {error} />
   {#if notice}
-    <p class="badge mb-2 bg-accent-veil text-accent ring-accent/25" data-testid="replay-notice" role="status">
+    <p class="badge mb-2 bg-accent-veil text-accent" data-testid="replay-notice" role="status">
       {notice}
     </p>
   {/if}
@@ -132,7 +132,7 @@
                   >
                 {/if}
               {:else}
-                <span class="text-ink-3">—</span>
+                <span class="text-ink-2">—</span>
               {/if}
             </td>
           {/if}
@@ -140,7 +140,7 @@
       {/each}
       {#if items.length === 0}
         <tr>
-          <td colspan="7" class="text-ink-3">
+          <td colspan="7" class="text-ink-2">
             {filter
               ? `Nothing ${stateLabel(filter)} — the closest thing to a good sign.`
               : "Nothing has been delivered yet."}

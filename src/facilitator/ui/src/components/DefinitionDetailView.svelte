@@ -52,16 +52,16 @@
         {#if summary}
           · v{summary.version}
           {#if !summary.enabled}
-            <span class="badge bg-sunken text-ink-2 ring-edge ml-1">off</span>
+            <span class="badge bg-sunken text-ink-2 ml-1">off</span>
           {:else if summary.shadow}
-            <span class="badge bg-amber-veil text-amber ring-amber/25 ml-1">shadow</span>
+            <span class="badge bg-amber-veil text-amber ml-1">shadow</span>
           {:else}
-            <span class="badge bg-ok-veil text-ok ring-ok/25 ml-1">live</span>
+            <span class="badge bg-ok-veil text-ok ml-1">live</span>
           {/if}
         {/if}
       </h2>
       {#if summary?.description}
-        <p class="text-sm text-ink-3">{summary.description}</p>
+        <p class="text-sm text-ink-2">{summary.description}</p>
       {/if}
     </div>
     <div class="flex gap-2">
@@ -72,7 +72,7 @@
   {#if error}
     <ProblemNote error={String(error)} />
   {:else if summary === null}
-    <p class="text-sm text-ink-3">loading…</p>
+    <p class="text-sm text-ink-2">loading…</p>
   {/if}
 </section>
 

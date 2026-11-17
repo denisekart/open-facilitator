@@ -54,9 +54,9 @@ lives. Pick by who is trusted to run code on the host:
 | `standalone` | several, workspace-isolated | the Gateway owns no work itself; children are the workspaces |
 
 ```mermaid title="Gateway shapes: the kernel sees one endpoint"
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#EAF1F9",
-"primaryBorderColor": "#0B5FBF", "primaryTextColor": "#1F2328",
-"lineColor": "#5B6B7C", "secondaryColor": "#FDF0DC"}}}%%
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#f7f9fb",
+"primaryBorderColor": "#ab8612", "primaryTextColor": "#21262e",
+"lineColor": "#676f7c", "secondaryColor": "#faf2d6"}}}%%
 flowchart LR
   K["Kernel - sees ONE endpoint"] --> GW["Gateway - policy + execution ledger"]
   GW -->|"embedded: in-process call"| C1["single child"]

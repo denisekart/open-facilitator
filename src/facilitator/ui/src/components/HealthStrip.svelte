@@ -48,11 +48,11 @@
 
 <section class="grid gap-4 md:grid-cols-2" aria-label="kernel health" data-testid="health-strip">
   <div class="card">
-    <h2 class="mb-2 text-xs font-medium uppercase text-ink-3">Right now</h2>
+    <h2 class="mb-2 text-xs font-medium uppercase text-ink-2">Right now</h2>
     {#if health.summary}
       {@const s = health.summary}
       <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
-        <dt class="text-ink-3">Works</dt>
+        <dt class="text-ink-2">Works</dt>
         <dd class="flex flex-wrap gap-1">
           {#each Object.entries(s.workByState) as [state, n]}
             <span class="badge {TONE_CLASS[stateTone(state)]}"
@@ -60,10 +60,10 @@
               <span class="font-semibold">{n}</span></span
             >
           {:else}
-            <span class="text-ink-3">none yet</span>
+            <span class="text-ink-2">none yet</span>
           {/each}
         </dd>
-        <dt class="text-ink-3">Assignments</dt>
+        <dt class="text-ink-2">Assignments</dt>
         <dd class="flex flex-wrap gap-1">
           {#each Object.entries(s.assignmentsByState) as [state, n]}
             <span class="badge {TONE_CLASS[stateTone(state)]}"
@@ -71,55 +71,55 @@
               <span class="font-semibold">{n}</span></span
             >
           {:else}
-            <span class="text-ink-3">none yet</span>
+            <span class="text-ink-2">none yet</span>
           {/each}
         </dd>
-        <dt class="text-ink-3">Gateways</dt>
+        <dt class="text-ink-2">Gateways</dt>
         <dd>
-          <span class="badge bg-ok-veil text-ok ring-ok/25"
+          <span class="badge bg-ok-veil text-ok"
             ><span class="dot" aria-hidden="true"></span>{s.gatewaysOnline} online</span
           >
           {#if s.gatewaysOffline > 0}
-            <span class="badge ml-1 bg-sunken text-ink-2 ring-edge"
+            <span class="badge ml-1 bg-sunken text-ink-2"
               >{s.gatewaysOffline} offline</span
             >
           {/if}
         </dd>
-        <dt class="text-ink-3">Awaiting a human</dt>
+        <dt class="text-ink-2">Awaiting a human</dt>
         <dd>
           {#if (s.approvalsByState["pending"] ?? 0) > 0}
             <a
-              class="badge bg-amber-veil text-amber ring-amber/25"
+              class="badge bg-amber-veil text-amber"
               title="the works a decision is holding up"
               href={href(parse("#/works?state=blocked,review"))}
               ><span class="dot" aria-hidden="true"></span>{s.approvalsByState["pending"]}
               pending</a
             >
           {:else}
-            <span class="text-ink-3">nothing is blocked on a decision</span>
+            <span class="text-ink-2">nothing is blocked on a decision</span>
           {/if}
         </dd>
-        <dt class="text-ink-3">Dead letters</dt>
+        <dt class="text-ink-2">Dead letters</dt>
         <dd>
           {#if s.deadLettersTotal > 0}
             <span
-              class="badge bg-danger-veil text-danger ring-danger/25"
+              class="badge bg-danger-veil text-danger"
               data-testid="deadletters"
               title="undeliverable kernel messages — replay from Deliveries"
               ><span class="dot" aria-hidden="true"></span>{s.deadLettersTotal}</span
             >
           {:else}
-            <span class="text-ink-3" data-testid="deadletters">0</span>
+            <span class="text-ink-2" data-testid="deadletters">0</span>
           {/if}
         </dd>
-        <dt class="text-ink-3">Artifacts</dt>
+        <dt class="text-ink-2">Artifacts</dt>
         <dd class="text-ink-2">
           {s.artifactsTotal} stored · {Object.values(s.manifestsByResultState).reduce(
             (a, b) => a + b,
             0,
           )} result manifests
         </dd>
-        <dt class="text-ink-3">Link sessions</dt>
+        <dt class="text-ink-2">Link sessions</dt>
         <dd class="text-ink-2">{s.linkSessionsLive} live</dd>
       </dl>
     {:else}
@@ -128,7 +128,7 @@
   </div>
 
   <div class="card">
-    <h2 class="mb-2 text-xs font-medium uppercase text-ink-3">Last hours (UTC)</h2>
+    <h2 class="mb-2 text-xs font-medium uppercase text-ink-2">Last hours (UTC)</h2>
     {#if health.metrics}
       {@const m = health.metrics}
       <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-sm text-ink-2">
@@ -144,13 +144,13 @@
           <div>
             <p class="mb-1 flex justify-between text-xs">
               {#if link}
-                <a class="text-ink-3 underline decoration-dotted" title={hint} href={link}
+                <a class="text-ink-2 underline decoration-dotted" title={hint} href={link}
                   >{label}</a
                 >
               {:else}
-                <span class="text-ink-3" title={hint}>{label}</span>
+                <span class="text-ink-2" title={hint}>{label}</span>
               {/if}
-              <span class="mono {total > 0 && bad ? 'text-danger' : 'text-ink-3'}">{total}</span>
+              <span class="mono {total > 0 && bad ? 'text-danger' : 'text-ink-2'}">{total}</span>
             </p>
             <div
               class="flex h-10 items-end gap-0.5"
@@ -164,7 +164,7 @@
         {/each}
       </div>
     {:else}
-      <p class="text-ink-3">loading…</p>
+      <p class="text-ink-2">loading…</p>
     {/if}
   </div>
 </section>

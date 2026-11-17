@@ -1324,6 +1324,12 @@ export interface StepElement {
    */
   select?: Select;
   /**
+   * Atomic audited transfer of artifact ownership (artifacts.team_slug + binding repoint +
+   * ledger ownership stamp) from the instance's team to `team`; the inbound leg of
+   * router-team routing - transfer changes ownership, a grant only rents access.
+   */
+  "sign-over"?: SignOver;
+  /**
    * Fire-and-forget point-to-point wake: appends a wire event addressed to ONE instance; the
    * sink wakes the target's park (or falls through to on.event matching). No timeout, no
    * onTimeout: the step is `done` when the row is appended.
@@ -1632,6 +1638,47 @@ export interface Select {
  * leg). Paths are relative to the manifest document.
  */
 export type SelectSource = "event" | "manifest";
+
+/**
+ * Atomic audited transfer of artifact ownership (artifacts.team_slug + binding repoint +
+ * ledger ownership stamp) from the instance's team to `team`; the inbound leg of
+ * router-team routing - transfer changes ownership, a grant only rents access.
+ */
+export interface SignOver {
+  /**
+   * Timeline actor of the ownership rows; absent = workflow:kernel.
+   */
+  actor?: string;
+  /**
+   * Optional: resolves to the provider_event_id whose ledger row gains the ownership stamp
+   * (the ledger row itself never moves).
+   */
+  eventRef?: string;
+  /**
+   * Artifact refs to transfer: each resolves to a guid, or a JSON array whose items are
+   * artifactRef objects (the normalized sourceRefs shape); the executor takes every item's
+   * `artifactId`.
+   */
+  refs: [string, ...string[]];
+  /**
+   * Destination team slug (a branch-provided template value, the `work-create.team` posture);
+   * the slug must be rostered or the leg fails.
+   */
+  team: string;
+  /**
+   * Optional conversation whose teamless binding is repointed to the destination team.
+   */
+  thread?: Thread;
+}
+
+/**
+ * Optional conversation whose teamless binding is repointed to the destination team.
+ */
+export interface Thread {
+  channel: string;
+  provider: string;
+  rootMessageId: string;
+}
 
 /**
  * Fire-and-forget point-to-point wake: appends a wire event addressed to ONE instance; the

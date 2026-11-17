@@ -44,6 +44,7 @@
     join: GitMerge,
     "fork-work": GitBranchPlus,
     "work-create": Workflow,
+    "sign-over": GitBranchPlus,
     escalate: MessageSquare,
     memory: Brain,
     signal: Server,

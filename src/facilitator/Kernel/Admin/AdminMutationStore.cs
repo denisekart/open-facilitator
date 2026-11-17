@@ -27,6 +27,13 @@ public sealed class AdminMutationStore(
     IDbContextFactory<FacilitatorDbContext> contextFactory,
     AuditWriter audit)
 {
+    /// <summary>Roster check for admin mutations that name a team.</summary>
+    public async Task<bool> TeamExistsAsync(string slug, CancellationToken ct)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(ct);
+        return await db.Teams.AnyAsync(t => t.Slug == slug, ct);
+    }
+
     /// <summary>Human attestation re-mark: any→any of the three writable result states.</summary>
     public async Task<ReMarkOutcome> ReMarkManifestAsync(string manifestId, string resultState, string? actor, CancellationToken ct)
     {

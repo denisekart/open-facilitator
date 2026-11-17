@@ -272,6 +272,10 @@ public static class KernelServiceCollection
         builder.Services.AddSingleton<StorageStartupCheck>();
         builder.Services.AddHostedService(sp => sp.GetRequiredService<StorageStartupCheck>());
         builder.Services.AddScoped<IArtifactLedger, ArtifactLedger>();
+        builder.Services.AddScoped<ArtifactSignOver>();
+        // Singleton: LinkReceipts (singleton) consumes it, and it holds no
+        // scoped state (context factory + audit writer are both singleton-safe).
+        builder.Services.AddSingleton<ArtifactGrantStore>();
         builder.Services.AddSingleton<RetentionGcService>();
         builder.Services.AddHostedService(sp => sp.GetRequiredService<RetentionGcService>());
         return builder;
@@ -365,6 +369,9 @@ public static class KernelServiceCollection
         builder.Services.AddSingleton<Facilitator.Kernel.Workflows.WorkflowDefinitionValidator>();
         builder.Services.AddSingleton<Facilitator.Kernel.Workflows.WorkflowDefinitionStore>();
         builder.Services.AddHostedService<Facilitator.Kernel.Workflows.WorkflowGallerySeeder>();
+        // Router-team hygiene (router-team routing): one boot WARN for teams
+        // that hold enrollments but run no flows — never fatal, no state.
+        builder.Services.AddHostedService<Facilitator.Kernel.Shared.Storage.RouterTeamHygiene>();
         builder.Services.AddSingleton(sp =>
             builder.Configuration.GetSection(Facilitator.Kernel.Workflows.WorkflowOptions.SectionName)
                 .Get<Facilitator.Kernel.Workflows.WorkflowOptions>()

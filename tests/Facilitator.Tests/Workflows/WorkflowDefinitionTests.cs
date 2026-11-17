@@ -330,12 +330,24 @@ public sealed class WorkflowDefinitionTests(PostgresFixture fixture) : IAsyncLif
         foreach (var id in new[]
                  {
                      "review-fork", "pr-on-manifest", "assign-rules", "nudge-escalation",
-                     "ensure-capacity", "agentic-research",
+                     "ensure-capacity", "agentic-research", "router-ingress", "team-home",
                  })
         {
             Assert.True(byId.ContainsKey(id), $"gallery entry '{id}' seeded");
             Assert.False(byId[id].GetProperty("enabled").GetBoolean()); // gallery ships disabled
             Assert.Equal("gallery", byId[id].GetProperty("source").GetString());
+        }
+
+        // The router pair documents the ownership law, so both must pass it:
+        // router-ingress dispatches to foreign teams only behind a preceding
+        // sign-over (content-not-signed-over clean), team-home needs none.
+        foreach (var id in new[] { "router-ingress", "team-home" })
+        {
+            var detail = await GetAsync($"/api/admin/workflows/definitions/{id}");
+            var validated = await KernelOps.PostJsonAsync(_client, "/api/admin/workflows/definitions/validate",
+                detail.GetProperty("document").GetRawText(), HttpStatusCode.OK, "dry run");
+            Assert.True(validated.GetProperty("ok").GetBoolean(),
+                $"gallery entry '{id}': {validated.GetProperty("errors")}");
         }
     }
 

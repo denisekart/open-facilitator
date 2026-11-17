@@ -87,6 +87,11 @@ public static class WorkflowIdentity
     public static Guid WorkCreateWorkId(Guid instance, string stepId) =>
         Uuid5(WorkCreateNamespace, $"{instance:N}:{stepId}");
 
+    /// <summary>The sign-over step's deterministic effect seed: a redelivered
+    /// leg re-derives the same id, so the audit correlation never forks.</summary>
+    public static Guid SignOverSeed(Guid instance, string stepId) =>
+        Uuid5(WorkCreateNamespace, $"{instance:N}:{stepId}:sign-over");
+
     public static Guid ForkWorkId(Guid instance, string stepId) =>
         Uuid5(ForkNamespace, $"{instance:N}:{stepId}");
 

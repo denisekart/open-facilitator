@@ -32,6 +32,6 @@ public sealed class WorkEventEntityConfiguration : IEntityTypeConfiguration<Work
                     "provider.input", "provider.attachment", "provider.reaction", "input.required", "input.answered",
                     "provider.duplicate", "work.linked", "work.triaged", "approval.nudged", "work.consent-expired",
                     "address.obsolete", "review.decision", "effects-disclosed", "assignment.queue-reason",
-                    "workflow.stage"])));
+                    "artifact.signed-over", "workflow.stage"])));
     }
 }

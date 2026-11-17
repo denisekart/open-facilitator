@@ -255,6 +255,11 @@
         },
         {
           "required": [
+            "sign-over"
+          ]
+        },
+        {
+          "required": [
             "escalate"
           ]
         },
@@ -699,6 +704,59 @@
             }
           },
           "description": "Create a Work and append its routing intent (the shared WorkCreate law, one implementation with the provider arm's labeled-issue branch); the created work carries this instance in `works.workflow_instance_id`; the trigger event's conversation reference becomes the work's residence and binding."
+        },
+        "sign-over": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "team",
+            "refs"
+          ],
+          "properties": {
+            "team": {
+              "$ref": "common.v1.json#/$defs/idToken",
+              "description": "Destination team slug (a branch-provided template value, the `work-create.team` posture); the slug must be rostered or the leg fails."
+            },
+            "refs": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 64,
+              "items": {
+                "$ref": "#/$defs/ref"
+              },
+              "description": "Artifact refs to transfer: each resolves to a guid, or a JSON array whose items are artifactRef objects (the normalized sourceRefs shape); the executor takes every item's `artifactId`."
+            },
+            "thread": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "provider",
+                "channel",
+                "rootMessageId"
+              ],
+              "properties": {
+                "provider": {
+                  "$ref": "#/$defs/ref"
+                },
+                "channel": {
+                  "$ref": "#/$defs/ref"
+                },
+                "rootMessageId": {
+                  "$ref": "#/$defs/ref"
+                }
+              },
+              "description": "Optional conversation whose teamless binding is repointed to the destination team."
+            },
+            "eventRef": {
+              "$ref": "#/$defs/ref",
+              "description": "Optional: resolves to the provider_event_id whose ledger row gains the ownership stamp (the ledger row itself never moves)."
+            },
+            "actor": {
+              "$ref": "common.v1.json#/$defs/evidenceRef",
+              "description": "Timeline actor of the ownership rows; absent = workflow:kernel."
+            }
+          },
+          "description": "Atomic audited transfer of artifact ownership (artifacts.team_slug + binding repoint + ledger ownership stamp) from the instance's team to `team`; the inbound leg of router-team routing - transfer changes ownership, a grant only rents access."
         },
         "escalate": {
           "type": "object",

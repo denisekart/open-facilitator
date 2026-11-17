@@ -3,6 +3,8 @@ using System.Text.Json;
 
 using Facilitator.Kernel.Work;
 
+using Npgsql;
+
 namespace Facilitator.Tests.Work;
 
 /// <summary>
@@ -221,4 +223,97 @@ public sealed class ContextFetchTests(DispatchDbFixture fixture) : IAsyncLifetim
     }
 
     private const string RoutingIntentType = "org.facilitator.event.routing.requested.v1";
+
+    /// <summary>Copy-on-forward provenance (router-team routing): a fetch
+    /// answered for a work whose conversation binding names a team (the
+    /// thread was signed over) stores the window as the WORK TEAM's own
+    /// context.history row and the audit gains a `routerLedger` member
+    /// pointing at the router ledger's originals. The same answer on a
+    /// teamless thread stays verbatim — no provenance, no lie.</summary>
+    [Fact]
+    public async Task FetchedAnswerOnSignedOverThreadCarriesRouterLedgerProvenance()
+    {
+        using var factory = new KernelTestFactory(fixture, noDispatcher: true);
+        using var kernel = factory.CreateAuthedClient();
+        var endpoint = "gw-cfr-" + Leaf();
+        using var link = factory.CreateLinkClient(await LinkTestHarness.EnrollAsync(kernel, endpoint));
+        var workId = await fixture.Db.SeedWorkOwned(
+            await fixture.Db.SeedProject("team-alpha"), null, "review", "team-alpha");
+
+        // The conversation: a teamless binding, one ledger row, and the
+        // work's residence document pointing at it.
+        var channel = "chat-" + Leaf();
+        const string Root = "thread-7";
+        await fixture.Db.SeedBinding("telegram", channel, Root, workId, $"ctxr-{Leaf()}");
+        await fixture.Db.NonQueryAsync(
+            "UPDATE facilitator.works SET active_where = $2::jsonb WHERE work_id = $1",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(workId);
+                cmd.Parameters.AddWithValue(
+                    "{\"provider\":\"telegram\",\"channel\":\"" + channel
+                    + "\",\"root\":\"" + Root + "\",\"kind\":\"thread\"}");
+            });
+        var ledgerId = Guid.NewGuid();
+        await fixture.Db.NonQueryAsync(
+            """
+            INSERT INTO facilitator.provider_events
+                (provider_event_id, provider, provider_delivery_id, body_sha256, body, verified_reference, received_at)
+            VALUES (@id, 'telegram', @pdv, 'sha256:' || repeat('e', 64),
+                    @body::jsonb, 'mention:seed', now() at time zone 'utc')
+            """,
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue("@id", ledgerId);
+                cmd.Parameters.AddWithValue("@pdv", "pdv-" + Leaf());
+                cmd.Parameters.AddWithValue("@body",
+                    "{\"reference\":{\"provider\":\"telegram\",\"channelOrResourceId\":\"" + channel
+                    + "\",\"rootThreadId\":\"" + Root + "\"}}");
+            });
+
+        // 1. Teamless thread: the answer stays verbatim, zero provenance.
+        await PostFetchedAnswerAsync(link, workId, channel);
+        var plain = (await fixture.Db.AuditRowsFor("context.fetched"))
+            .Single(a => a.Resource == $"work/{workId}");
+        Assert.DoesNotContain("routerLedger", plain.Detail, StringComparison.Ordinal);
+
+        // 2. The sign-over lands (the binding names the owner): the next
+        // answer is a COPY of router-held history, and the audit says so.
+        await fixture.Db.NonQueryAsync(
+            "UPDATE facilitator.communication_bindings SET team = 'team-alpha'"
+            + " WHERE provider = 'telegram' AND channel = $1 AND root_message_id = $2",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue(channel);
+                cmd.Parameters.AddWithValue(Root);
+            });
+        await PostFetchedAnswerAsync(link, workId, channel);
+        var stamped = (await fixture.Db.AuditRowsFor("context.fetched"))
+            .Where(a => a.Resource == $"work/{workId}")
+            .Single(a => a.Detail.Contains("routerLedger", StringComparison.Ordinal));
+        using var detail = JsonDocument.Parse(stamped.Detail);
+        var provenance = detail.RootElement.GetProperty("routerLedger");
+        Assert.Equal("telegram", provenance.GetProperty("provider").GetString());
+        Assert.Equal(
+            ledgerId.ToString(),
+            Assert.Single(provenance.GetProperty("eventIds").EnumerateArray()).GetString());
+        Assert.Equal("sha256:" + new string('e', 64),
+            Assert.Single(provenance.GetProperty("digests").EnumerateArray()).GetString());
+
+        // The window's bytes are the WORK TEAM's own artifact (copy, not
+        // pointer): two history rows, both team-alpha's.
+        var history = await fixture.Db.ArtifactRowsForKind(workId, "context.history");
+        Assert.Equal(2, history.Count);
+        Assert.All(history, h => Assert.Equal("stored", h.State));
+    }
+
+    private async Task PostFetchedAnswerAsync(HttpClient link, Guid workId, string channel)
+    {
+        var answer = File.ReadAllText(Path.Combine(PostgresFixture.FixtureRoot(), "valid", "event.context.fetched.json"))
+            .Replace("\"work-123\"", $"\"{workId}\"")
+            .Replace("\"work/work-123\"", $"\"work/{workId}\"")
+            .Replace("thread://telegram/123/456", $"thread://telegram/{channel}/999");
+        answer = answer.Replace("\"id\": \"", "\"id\": \"ctxr-" + Leaf() + "-");
+        await KernelOps.PostJsonAsync(link, "/api/link/v1/events", answer, HttpStatusCode.Accepted);
+    }
 }

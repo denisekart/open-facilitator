@@ -419,6 +419,79 @@ namespace Facilitator.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.ArtifactGrantEntity", b =>
+                {
+                    b.Property<Guid>("GrantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("grant_id");
+
+                    b.Property<Guid>("ArtifactId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("artifact_id");
+
+                    b.Property<string>("CommandId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("command_id");
+
+                    b.Property<string>("ConsumeReason")
+                        .HasColumnType("text")
+                        .HasColumnName("consume_reason");
+
+                    b.Property<DateTime?>("ConsumedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("consumed_at");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("GranteeEndpointId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("grantee_endpoint_id");
+
+                    b.Property<string>("GranteeTeamSlug")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("grantee_team_slug");
+
+                    b.Property<string>("MintedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("minted_by");
+
+                    b.Property<string>("Reason")
+                        .HasColumnType("text")
+                        .HasColumnName("reason");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.HasKey("GrantId");
+
+                    b.HasIndex("ArtifactId", "CommandId")
+                        .IsUnique()
+                        .HasDatabaseName("artifact_grants_artifact_command_unique");
+
+                    b.HasIndex("ArtifactId", "GranteeEndpointId")
+                        .HasDatabaseName("artifact_grants_open_idx")
+                        .HasFilter("status = 'active'");
+
+                    b.ToTable("artifact_grants", "facilitator", t =>
+                        {
+                            t.HasCheckConstraint("artifact_grants_consume_reason_check", "consume_reason IN ('read', 'receipt', 'expiry')");
+
+                            t.HasCheckConstraint("artifact_grants_status_check", "status IN ('active', 'consumed', 'revoked', 'expired')");
+                        });
+                });
+
             modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.AssignmentEntity", b =>
                 {
                     b.Property<Guid>("AssignmentId")
@@ -755,6 +828,10 @@ namespace Facilitator.Migrations
                         .HasColumnType("text")
                         .HasColumnName("root_message_id");
 
+                    b.Property<string>("TeamSlug")
+                        .HasColumnType("text")
+                        .HasColumnName("team");
+
                     b.Property<Guid?>("WorkId")
                         .HasColumnType("uuid")
                         .HasColumnName("work_id");
@@ -768,7 +845,13 @@ namespace Facilitator.Migrations
 
                     b.HasIndex("Provider", "Channel", "RootMessageId")
                         .IsUnique()
-                        .HasDatabaseName("communication_bindings_conversation_unique");
+                        .HasDatabaseName("communication_bindings_conversation_unique")
+                        .HasFilter("work_id IS NULL");
+
+                    b.HasIndex("Provider", "Channel", "RootMessageId", "WorkId")
+                        .IsUnique()
+                        .HasDatabaseName("communication_bindings_conversation_work_unique")
+                        .HasFilter("work_id IS NOT NULL");
 
                     b.ToTable("communication_bindings", "facilitator");
                 });
@@ -2659,7 +2742,7 @@ namespace Facilitator.Migrations
 
                     b.ToTable("work_events", "facilitator", t =>
                         {
-                            t.HasCheckConstraint("work_events_kind_check", "kind IN ('created', 'state.transition', 'steer', 'command.accepted', 'assignment.transition', 'approval.decided', 'artifact.stored', 'artifact.registered', 'artifact.available', 'artifact.gc', 'manifest.recorded', 'manifest.superseded', 'memory.candidate', 'memory.promoted', 'provider.input', 'provider.attachment', 'provider.reaction', 'input.required', 'input.answered', 'provider.duplicate', 'work.linked', 'work.triaged', 'approval.nudged', 'work.consent-expired', 'address.obsolete', 'review.decision', 'effects-disclosed', 'assignment.queue-reason', 'workflow.stage')");
+                            t.HasCheckConstraint("work_events_kind_check", "kind IN ('created', 'state.transition', 'steer', 'command.accepted', 'assignment.transition', 'approval.decided', 'artifact.stored', 'artifact.registered', 'artifact.available', 'artifact.gc', 'manifest.recorded', 'manifest.superseded', 'memory.candidate', 'memory.promoted', 'provider.input', 'provider.attachment', 'provider.reaction', 'input.required', 'input.answered', 'provider.duplicate', 'work.linked', 'work.triaged', 'approval.nudged', 'work.consent-expired', 'address.obsolete', 'review.decision', 'effects-disclosed', 'assignment.queue-reason', 'artifact.signed-over', 'workflow.stage')");
                         });
                 });
 
@@ -2924,6 +3007,16 @@ namespace Facilitator.Migrations
                         {
                             t.HasCheckConstraint("workflow_step_log_status_check", "status IN ('pending', 'running', 'done', 'failed', 'skipped', 'shadow')");
                         });
+                });
+
+            modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.ArtifactGrantEntity", b =>
+                {
+                    b.HasOne("Facilitator.Kernel.Shared.Persistence.ArtifactEntity", null)
+                        .WithMany()
+                        .HasForeignKey("ArtifactId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("artifact_grants_artifact_id_fkey");
                 });
 
             modelBuilder.Entity("Facilitator.Kernel.Shared.Persistence.AssignmentEntity", b =>

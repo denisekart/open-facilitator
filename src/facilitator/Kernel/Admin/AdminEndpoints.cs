@@ -4,6 +4,7 @@ using System.Text.Json;
 using Facilitator.Kernel.Shared;
 using Facilitator.Kernel.Shared.Identity;
 using Facilitator.Kernel.Shared.Persistence;
+using Facilitator.Kernel.Shared.Storage;
 
 using Microsoft.AspNetCore.Mvc;
 
@@ -340,6 +341,52 @@ public static class AdminEndpoints
             return outcome == ReMarkOutcome.Stored
                 ? Results.Ok(new { manifestId, resultState = target })
                 : Results.Problem(ProblemErrors.ManifestNotFound(manifestId));
+        });
+
+        // The admin leg of the transfer primitive: the SAME ArtifactSignOver
+        // the flow step runs, identical audit shape, no thread/ledger legs.
+        group.MapPost("/artifacts/sign-over", async (
+            HttpRequest request, ArtifactSignOver signOver, AdminMutationStore mutations, HttpContext http, CancellationToken ct) =>
+        {
+            var body = await new StreamReader(request.Body, Encoding.UTF8).ReadToEndAsync(ct);
+            List<Guid>? ids;
+            string? fromTeam;
+            string? toTeam;
+            string? reason;
+            try
+            {
+                using var document = JsonDocument.Parse(body);
+                ids = document.RootElement.TryGetProperty("artifactIds", out var a) && a.ValueKind == JsonValueKind.Array
+                    ? a.EnumerateArray().Select(e => Guid.TryParse(e.GetString(), out var g) ? g : Guid.Empty).ToList()
+                    : null;
+                fromTeam = document.RootElement.TryGetProperty("fromTeam", out var f) ? f.GetString() : null;
+                toTeam = document.RootElement.TryGetProperty("toTeam", out var t) ? t.GetString() : null;
+                reason = document.RootElement.TryGetProperty("reason", out var r) ? r.GetString() : null;
+            }
+            catch (JsonException)
+            {
+                return Results.Problem(ProblemErrors.Create("sign-over-invalid", "Sign-over body invalid",
+                    StatusCodes.Status400BadRequest, "body must be {\"artifactIds\": [guid], \"fromTeam\": s, \"toTeam\": s, \"reason\": s?}"));
+            }
+
+            if (ids is null || ids.Count == 0 || ids.Any(id => id == Guid.Empty)
+                || string.IsNullOrWhiteSpace(fromTeam) || string.IsNullOrWhiteSpace(toTeam))
+            {
+                return Results.Problem(ProblemErrors.Create("sign-over-invalid", "Sign-over body invalid",
+                    StatusCodes.Status400BadRequest, "artifactIds (non-empty guid array), fromTeam and toTeam are required"));
+            }
+
+            if (!await mutations.TeamExistsAsync(toTeam, ct))
+            {
+                return Results.Problem(ProblemErrors.Create("team-not-found", "Team not found",
+                    StatusCodes.Status400BadRequest, $"destination team '{toTeam}' is not rostered"));
+            }
+
+            var caller = http.GetFacilitatorPrincipal()?.Actor ?? "admin:unknown";
+            var auditId = Guid.NewGuid();
+            var outcome = await signOver.SignOverAsync(
+                new SignOverRequest(ids, toTeam, fromTeam, $"admin:{caller}", $"admin:{auditId}", ProviderEventId: null, Thread: null), ct);
+            return Results.Ok(new { transferred = outcome.Transferred.Count, skipped = outcome.Skipped, auditId = outcome.AuditId, reason });
         });
     }
 }

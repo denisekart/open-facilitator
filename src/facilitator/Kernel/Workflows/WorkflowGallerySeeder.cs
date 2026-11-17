@@ -12,7 +12,7 @@ using Microsoft.Extensions.Logging;
 namespace Facilitator.Kernel.Workflows;
 
 /// <summary>
-/// Gallery seeding: the six built-in definitions ship as embedded resources
+/// Gallery seeding: the eight built-in definitions ship as embedded resources
 /// (canonical JSON) and land at boot as <c>source='gallery'</c>,
 /// <c>enabled=false</c> rows — <b>missing rows only, operator edits are never
 /// overwritten</b> (the TeamRosterSeeder posture: config seeds, DB is truth
@@ -268,12 +268,12 @@ public sealed class WorkflowGallerySeeder(
                      .Where(static n => n.EndsWith(".json", StringComparison.Ordinal))
                      .Where(static n =>
                      {
-                         // The gallery files are the six known names; the
+                         // The gallery files are the eight known names; the
                          // protocol schemas embed under the same simple
                          // logical-name regime in Ofac.Protocol, not here.
                          var name = n[..^".json".Length];
                          return name is "review-fork" or "pr-on-manifest" or "assign-rules" or "nudge-escalation"
-                                or "ensure-capacity" or "agentic-research";
+                                or "ensure-capacity" or "agentic-research" or "router-ingress" or "team-home";
                      }))
         {
             using var stream = assembly.GetManifestResourceStream(resourceName)!;

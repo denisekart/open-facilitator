@@ -283,6 +283,7 @@ public sealed partial class WorkflowRunner(
             "approval" => ExecuteApprovalAsync(db, instance, stepId, payload, context, now, ct, shadowMode),
             "escalate" => ExecuteEscalateAsync(db, instance, payload, context, ct, shadowMode),
             "work-create" => ExecuteWorkCreateAsync(db, instance, stepId, payload, context, envelope, now, ct, shadowMode),
+            "sign-over" => ExecuteSignOverAsync(db, instance, stepId, payload, context, now, ct, shadowMode),
             "fork-work" => ExecuteForkAsync(db, instance, stepId, payload, context, envelope, now, ct, shadowMode),
             "invoke" => ExecuteInvokeAsync(db, instance, stepId, payload, context, now, ct, shadowMode),
             "signal" => ExecuteSignalAsync(db, instance, stepId, payload, context, commandId, now, ct, shadowMode),
@@ -1011,6 +1012,155 @@ public sealed partial class WorkflowRunner(
             new JsonObject { ["effect"] = "work-create", ["workId"] = workId.ToString(), ["effectCommandId"] = plan.EffectCommandId },
             null,
             note: $"flow effect: work {workId:N} + routing intent {capability}");
+    }
+
+    /// <summary>The ownership step: resolve the artifact refs (each a guid or a
+    /// template that resolves to a guid or to an artifactRef array), resolve the
+    /// destination team (declared slug must be rostered — the
+    /// <c>work-create</c> team law), and run the one transfer primitive
+    /// (<see cref="ArtifactSignOver"/>) the admin mutation runs too. Shadow mode
+    /// computes the plan, moves nothing.</summary>
+    private async Task<StepOutcome> ExecuteSignOverAsync(
+        FacilitatorDbContext db,
+        WorkflowInstanceEntity instance,
+        string stepId,
+        JsonElement payload,
+        JsonObject context,
+        DateTime now,
+        CancellationToken ct,
+        bool shadow)
+    {
+        // Artifact refs: every entry resolves to a guid, or to a JSON array of
+        // artifactRef items (the normalized sourceRefs shape) whose artifactId
+        // members join the transfer.
+        var artifactIds = new List<Guid>();
+        foreach (var refElement in payload.GetProperty("refs").EnumerateArray())
+        {
+            var resolved = ResolveTemplate(JsonNode.Parse(refElement.GetRawText()), context);
+            CollectSignOverIds(resolved, artifactIds);
+        }
+
+        if (artifactIds.Count == 0)
+        {
+            return StepOutcome.LegFailed(new JsonObject { ["error"] = "sign-over resolved zero artifact refs" });
+        }
+
+        // Destination team: the declared slug must be rostered (the work-create
+        // team law); an unresolved template or an unknown slug fails the leg —
+        // ownership never lands on a ghost.
+        var declaredTeam = ResolveString(payload.GetProperty("team"), context);
+        var toTeam = await db.Teams.AsNoTracking()
+            .Where(t => t.Slug == declaredTeam).Select(t => t.Slug).FirstOrDefaultAsync(ct);
+        if (toTeam is null)
+        {
+            return StepOutcome.LegFailed(new JsonObject { ["error"] = $"sign-over team '{declaredTeam}' is not rostered" });
+        }
+
+        // Source team: the DEFINITION's scope — the plane the flow runs on is
+        // where the content lives before the move (a router-team flow signs
+        // router-team bytes over). The instance's work team is the fallback
+        // for a definition with no team scope (a work-scoped flow moving its
+        // own content). An unknown origin simply transfers nothing: the rows
+        // skip as `foreign-owner`, never a silent move.
+        var fromTeam = await db.WorkflowDefinitions.AsNoTracking()
+                .Where(d => d.DefId == instance.DefId && d.Version == instance.DefVersion)
+                .Select(d => d.Team).FirstOrDefaultAsync(ct)
+            ?? instance.Team ?? string.Empty;
+        var actor = payload.TryGetProperty("actor", out var actorRef)
+            ? ResolveString(actorRef, context) ?? "workflow:kernel"
+            : "workflow:kernel";
+        var providerEventId = payload.TryGetProperty("eventRef", out var eventRef)
+            ? ResolveString(eventRef, context)
+            : null;
+        ThreadRef? thread = null;
+        if (payload.TryGetProperty("thread", out var threadPayload) && threadPayload.ValueKind == JsonValueKind.Object)
+        {
+            var provider = ResolveString(threadPayload.GetProperty("provider"), context);
+            var channel = ResolveString(threadPayload.GetProperty("channel"), context);
+            var root = ResolveString(threadPayload.GetProperty("rootMessageId"), context);
+            if (provider is { Length: > 0 } && channel is { Length: > 0 } && root is { Length: > 0 })
+            {
+                thread = new ThreadRef(provider, channel, root);
+            }
+        }
+
+        var rule = $"{instance.DefId}@{instance.DefVersion}:{stepId}";
+        if (shadow)
+        {
+            return StepOutcome.Done(
+                new JsonObject
+                {
+                    ["wouldDo"] = "sign-over",
+                    ["plan"] = new JsonObject
+                    {
+                        ["fromTeam"] = fromTeam,
+                        ["toTeam"] = toTeam,
+                        ["artifacts"] = new JsonArray(artifactIds.Select(id => (JsonNode)JsonValue.Create(id.ToString("D"))!).ToArray()),
+                        ["thread"] = thread is null ? null : (JsonNode)new JsonObject { ["provider"] = thread.Provider, ["channel"] = thread.Channel, ["rootMessageId"] = thread.RootMessageId },
+                    },
+                },
+                null);
+        }
+
+        var outcome = await scopeFactory.CreateScope().ServiceProvider
+            .GetRequiredService<ArtifactSignOver>()
+            .SignOverAsync(new SignOverRequest(
+                artifactIds, toTeam, fromTeam, actor, rule, providerEventId, thread), ct);
+
+        var skippedNode = new JsonArray(outcome.Skipped.Select(s => (JsonNode)JsonValue.Create(s)!).ToArray());
+        if (outcome.Transferred.Count == 0)
+        {
+            return StepOutcome.LegFailed(new JsonObject
+            {
+                ["error"] = "sign-over transferred nothing",
+                ["skipped"] = skippedNode,
+            });
+        }
+
+        return StepOutcome.Done(
+            new JsonObject
+            {
+                ["effect"] = "sign-over",
+                ["transferred"] = outcome.Transferred.Count,
+                ["skipped"] = skippedNode,
+                ["auditId"] = outcome.AuditId.ToString(),
+            },
+            WorkflowIdentity.SignOverSeed(instance.InstanceId, stepId).ToString("N"),
+            note: $"flow effect: sign-over {outcome.Transferred.Count} → {toTeam}");
+    }
+
+    /// <summary>Sign-over ref law: a resolved scalar that parses as a guid joins
+    /// the transfer; a resolved array contributes every member's
+    /// <c>artifactId</c>/<c>artifactRef</c> member when it parses as a guid;
+    /// everything else is inert.</summary>
+    private static void CollectSignOverIds(JsonNode? node, List<Guid> into)
+    {
+        switch (node)
+        {
+            case JsonValue value when value.TryGetValue<string>(out var text) && Guid.TryParse(text, out var direct):
+                into.Add(direct);
+                return;
+            case JsonArray array:
+                foreach (var item in array)
+                {
+                    if (item is JsonObject obj)
+                    {
+                        var candidate = obj["artifactId"]?.GetValue<string>() ?? obj["artifactRef"]?.GetValue<string>();
+                        if (Guid.TryParse(candidate, out var member))
+                        {
+                            into.Add(member);
+                        }
+                    }
+                    else
+                    {
+                        CollectSignOverIds(item, into);
+                    }
+                }
+
+                return;
+            default:
+                return;
+        }
     }
 
     /// <summary>
@@ -2374,8 +2524,8 @@ public sealed partial class WorkflowRunner(
         await db.Database.ExecuteSqlInterpolatedAsync(
             $"""
              INSERT INTO facilitator.communication_bindings
-                 (binding_id, provider, channel, root_message_id, work_id, idempotency_key, created_at)
-             VALUES (gen_random_uuid(), {provider}, {channel}, {root}, {instance.PrimaryWorkId}, {"wf-binding:" + wireDigest + ":" + root}, {now})
+                 (binding_id, provider, channel, root_message_id, work_id, team, idempotency_key, created_at)
+             VALUES (gen_random_uuid(), {provider}, {channel}, {root}, {instance.PrimaryWorkId}, CAST(NULL AS text), {"wf-binding:" + wireDigest + ":" + root}, {now})
              ON CONFLICT DO NOTHING
              """, ct);
         return root;

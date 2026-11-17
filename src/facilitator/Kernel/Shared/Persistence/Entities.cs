@@ -925,9 +925,47 @@ public sealed class CommunicationBindingEntity
 
     public Guid? WorkId { get; set; }
 
+    /// <summary>Owning content team for this conversation (null = router-or-sole-team
+    /// posture). Stamped by <c>artifact.sign-over</c> so a thread whose router flow ran
+    /// resolves inbound content to the owning team.</summary>
+    public string? TeamSlug { get; set; }
+
     public string? IdempotencyKey { get; set; }
 
     public DateTime CreatedAt { get; set; }
+}
+
+/// <summary>
+/// facilitator.artifact_grants — delivery-scoped read rentals over a foreign team's
+/// artifact bytes (outbound leg of router-team routing). One row per
+/// (artifact, delivery command); the read itself consumes the row (rent exactly
+/// once), the adapter's receipt revokes a never-read grant, expiry is enforced
+/// lazily at read time. Transfer changes ownership; grant rents access.
+/// </summary>
+public sealed class ArtifactGrantEntity
+{
+    public Guid GrantId { get; set; }
+    public Guid ArtifactId { get; set; }
+    /// <summary>The renting (router) team.</summary>
+    public string GranteeTeamSlug { get; set; } = string.Empty;
+    /// <summary>The exact enrollment endpoint allowed to read.</summary>
+    public string GranteeEndpointId { get; set; } = string.Empty;
+    /// <summary>The delivery it was minted for (<c>communication-reply:…</c>);
+    /// unique together with <c>ArtifactId</c> — the replay guard.</summary>
+    public string CommandId { get; set; } = string.Empty;
+    /// <summary>active | consumed | revoked | expired (CHECK).</summary>
+    public string Status { get; set; } = "active";
+    /// <summary><c>kernel:reply</c> | <c>admin:&lt;actor&gt;</c>.</summary>
+    public string MintedBy { get; set; } = string.Empty;
+    /// <summary>Why (rule id / audit join).</summary>
+    public string? Reason { get; set; }
+    public DateTime CreatedAt { get; set; }
+    /// <summary>TTL ceiling.</summary>
+    public DateTime ExpiresAt { get; set; }
+    /// <summary>Set by read, receipt, or expiry.</summary>
+    public DateTime? ConsumedAt { get; set; }
+    /// <summary>read | receipt | expiry (CHECK).</summary>
+    public string? ConsumeReason { get; set; }
 }
 
 /// <summary>facilitator.provider_identities — verified provider-account mapping

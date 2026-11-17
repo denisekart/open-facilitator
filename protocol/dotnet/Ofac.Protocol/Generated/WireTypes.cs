@@ -2805,6 +2805,15 @@ namespace Ofac.Protocol
         public Select? select { get; set; }
 
         /// <summary>
+        /// Atomic audited transfer of artifact ownership (artifacts.team_slug + binding repoint +
+        /// ledger ownership stamp) from the instance's team to `team`; the inbound leg of
+        /// router-team routing - transfer changes ownership, a grant only rents access.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("sign-over")]
+        public SignOver? signover { get; set; }
+
+        /// <summary>
         /// Fire-and-forget point-to-point wake: appends a wire event addressed to ONE instance; the
         /// sink wakes the target's park (or falls through to on.event matching). No timeout, no
         /// onTimeout: the step is `done` when the row is appended.
@@ -3269,6 +3278,72 @@ namespace Ofac.Protocol
         /// </summary>
         [JsonPropertyName("type")]
         public string type { get; set; }
+    }
+
+    /// <summary>
+    /// Atomic audited transfer of artifact ownership (artifacts.team_slug + binding repoint +
+    /// ledger ownership stamp) from the instance's team to `team`; the inbound leg of
+    /// router-team routing - transfer changes ownership, a grant only rents access.
+    /// </summary>
+    public partial class SignOver
+    {
+        /// <summary>
+        /// Timeline actor of the ownership rows; absent = workflow:kernel.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("actor")]
+        public string? actor { get; set; }
+
+        /// <summary>
+        /// Optional: resolves to the provider_event_id whose ledger row gains the ownership stamp
+        /// (the ledger row itself never moves).
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("eventRef")]
+        [JsonConverter(typeof(FluffyMinMaxLengthCheckConverter))]
+        public string? eventRef { get; set; }
+
+        /// <summary>
+        /// Artifact refs to transfer: each resolves to a guid, or a JSON array whose items are
+        /// artifactRef objects (the normalized sourceRefs shape); the executor takes every item's
+        /// `artifactId`.
+        /// </summary>
+        [JsonPropertyName("refs")]
+        [JsonConverter(typeof(AmbitiousDecodeArrayConverter))]
+        public string[] refs { get; set; }
+
+        /// <summary>
+        /// Destination team slug (a branch-provided template value, the `work-create.team` posture);
+        /// the slug must be rostered or the leg fails.
+        /// </summary>
+        [JsonPropertyName("team")]
+        [JsonConverter(typeof(PurpleMinMaxLengthCheckConverter))]
+        public string team { get; set; }
+
+        /// <summary>
+        /// Optional conversation whose teamless binding is repointed to the destination team.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("thread")]
+        public Thread? thread { get; set; }
+    }
+
+    /// <summary>
+    /// Optional conversation whose teamless binding is repointed to the destination team.
+    /// </summary>
+    public partial class Thread
+    {
+        [JsonPropertyName("channel")]
+        [JsonConverter(typeof(FluffyMinMaxLengthCheckConverter))]
+        public string channel { get; set; }
+
+        [JsonPropertyName("provider")]
+        [JsonConverter(typeof(FluffyMinMaxLengthCheckConverter))]
+        public string provider { get; set; }
+
+        [JsonPropertyName("rootMessageId")]
+        [JsonConverter(typeof(FluffyMinMaxLengthCheckConverter))]
+        public string rootMessageId { get; set; }
     }
 
     /// <summary>
@@ -5805,6 +5880,39 @@ namespace Ofac.Protocol
         }
 
         public static readonly SelectSourceConverter Singleton = new SelectSourceConverter();
+    }
+
+    internal class AmbitiousDecodeArrayConverter : JsonConverter<string[]>
+    {
+        public override bool CanConvert(Type t) => t == typeof(string[]);
+
+        public override string[] Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            reader.Read();
+            var value = new List<string>();
+            while (reader.TokenType != JsonTokenType.EndArray)
+            {
+                var converter = FluffyMinMaxLengthCheckConverter.Singleton;
+                var arrayItem = (string)converter.Read(ref reader, typeof(string), options);
+                value.Add(arrayItem);
+                reader.Read();
+            }
+            return value.ToArray();
+        }
+
+        public override void Write(Utf8JsonWriter writer, string[] value, JsonSerializerOptions options)
+        {
+            writer.WriteStartArray();
+            foreach (var arrayItem in value)
+            {
+                var converter = FluffyMinMaxLengthCheckConverter.Singleton;
+                converter.Write(writer, arrayItem, options);
+            }
+            writer.WriteEndArray();
+            return;
+        }
+
+        public static readonly AmbitiousDecodeArrayConverter Singleton = new AmbitiousDecodeArrayConverter();
     }
 
     internal class MinMaxLengthCheckConverter10 : JsonConverter<string>

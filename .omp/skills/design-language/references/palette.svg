@@ -1,0 +1,165 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 736" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">
+<defs><filter id="sh" x="-40%" y="-40%" width="180%" height="180%"><feDropShadow dx="0" dy="1" stdDeviation="1.5" flood-color="#000" flood-opacity="0.14"/></filter></defs>
+<rect width="1200" height="736" fill="#e9ecef"/>
+<rect x="12" y="394" width="1176" height="306" rx="6" fill="#2b2e33"/>
+<text x="24" y="34" font-size="20" font-weight="600" fill="#21262e">Palette — cool grounds, one warm signal</text>
+<text x="24" y="56" font-size="12" font-weight="400" fill="#676f7c">Neutrals carry blue, never a warm cast. The accent is the only warm value, and it appears only where state does.</text>
+<text x="24" y="84" font-size="11" font-weight="500" letter-spacing="0.6" fill="#8690a0">LIGHT</text>
+<rect x="24" y="98" width="92" height="40" rx="4" fill="#eef2f6" stroke="#d5dbe3" stroke-opacity="0.6"/>
+<text x="24" y="151" font-size="11" font-weight="500" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#21262e">--bg</text>
+<text x="24" y="165" font-size="11" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#676f7c">#eef2f6</text>
+<text x="24" y="178" font-size="10" font-weight="400" fill="#8690a0">app ground</text>
+<rect x="146" y="98" width="92" height="40" rx="4" fill="#f7f9fb" stroke="#d5dbe3" stroke-opacity="0.6"/>
+<text x="146" y="151" font-size="11" font-weight="500" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#21262e">--surface</text>
+<text x="146" y="165" font-size="11" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#676f7c">#f7f9fb</text>
+<text x="146" y="178" font-size="10" font-weight="400" fill="#8690a0">header, strips</text>
+<rect x="268" y="98" width="92" height="40" rx="4" fill="#ffffff" stroke="#d5dbe3" stroke-opacity="0.6"/>
+<text x="268" y="151" font-size="11" font-weight="500" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#21262e">--raise</text>
+<text x="268" y="165" font-size="11" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#676f7c">#ffffff</text>
+<text x="268" y="178" font-size="10" font-weight="400" fill="#8690a0">menus, panels</text>
+<rect x="390" y="98" width="92" height="40" rx="4" fill="#21262e" stroke="#d5dbe3" stroke-opacity="0.6"/>
+<text x="390" y="151" font-size="11" font-weight="500" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#21262e">--ink</text>
+<text x="390" y="165" font-size="11" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#676f7c">#21262e</text>
+<text x="390" y="178" font-size="10" font-weight="400" fill="#8690a0">primary text</text>
+<rect x="512" y="98" width="92" height="40" rx="4" fill="#676f7c" stroke="#d5dbe3" stroke-opacity="0.6"/>
+<text x="512" y="151" font-size="11" font-weight="500" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#21262e">--muted</text>
+<text x="512" y="165" font-size="11" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#676f7c">#676f7c</text>
+<text x="512" y="178" font-size="10" font-weight="400" fill="#8690a0">secondary</text>
+<rect x="634" y="98" width="92" height="40" rx="4" fill="#8690a0" stroke="#d5dbe3" stroke-opacity="0.6"/>
+<text x="634" y="151" font-size="11" font-weight="500" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#21262e">--faint</text>
+<text x="634" y="165" font-size="11" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#676f7c">#8690a0</text>
+<text x="634" y="178" font-size="10" font-weight="400" fill="#8690a0">placeholder</text>
+<rect x="24" y="196" width="92" height="40" rx="4" fill="#d5dbe3" stroke="#d5dbe3" stroke-opacity="0.6"/>
+<text x="24" y="249" font-size="11" font-weight="500" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#21262e">--line</text>
+<text x="24" y="263" font-size="11" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#676f7c">#d5dbe3</text>
+<text x="24" y="276" font-size="10" font-weight="400" fill="#8690a0">frames, rules</text>
+<rect x="146" y="196" width="92" height="40" rx="4" fill="#e0e5ec" stroke="#d5dbe3" stroke-opacity="0.6"/>
+<text x="146" y="249" font-size="11" font-weight="500" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#21262e">--soft</text>
+<text x="146" y="263" font-size="11" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#676f7c">#e0e5ec</text>
+<text x="146" y="276" font-size="10" font-weight="400" fill="#8690a0">floating edge</text>
+<rect x="268" y="196" width="92" height="40" rx="4" fill="#eef2f6" stroke="#d5dbe3" stroke-opacity="0.6"/>
+<text x="268" y="249" font-size="11" font-weight="500" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#21262e">--work</text>
+<text x="268" y="263" font-size="11" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#676f7c">#eef2f6</text>
+<text x="268" y="276" font-size="10" font-weight="400" fill="#8690a0">content area</text>
+<rect x="390" y="196" width="92" height="40" rx="4" fill="#e6bf34" stroke="#d5dbe3" stroke-opacity="0.6"/>
+<text x="390" y="249" font-size="11" font-weight="500" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#21262e">--accent</text>
+<text x="390" y="263" font-size="11" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#676f7c">#e6bf34</text>
+<text x="390" y="276" font-size="10" font-weight="400" fill="#8690a0">state fills</text>
+<rect x="512" y="196" width="92" height="40" rx="4" fill="#14171a" stroke="#d5dbe3" stroke-opacity="0.6"/>
+<text x="512" y="249" font-size="11" font-weight="500" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#21262e">--on</text>
+<text x="512" y="263" font-size="11" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#676f7c">#14171a</text>
+<text x="512" y="276" font-size="10" font-weight="400" fill="#8690a0">text on accent</text>
+<rect x="634" y="196" width="92" height="40" rx="4" fill="#d54e4e" stroke="#d5dbe3" stroke-opacity="0.6"/>
+<text x="634" y="249" font-size="11" font-weight="500" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#21262e">--danger</text>
+<text x="634" y="263" font-size="11" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#676f7c">#d54e4e</text>
+<text x="634" y="276" font-size="10" font-weight="400" fill="#8690a0">destructive</text>
+<rect x="24" y="294" width="92" height="40" rx="4" fill="#8d6e0e" stroke="#d5dbe3" stroke-opacity="0.6"/>
+<text x="24" y="347" font-size="11" font-weight="500" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#21262e">--tx</text>
+<text x="24" y="361" font-size="11" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#676f7c">#8d6e0e</text>
+<text x="24" y="374" font-size="10" font-weight="400" fill="#8690a0">accent in text</text>
+<rect x="146" y="294" width="92" height="40" rx="4" fill="#ab8612" stroke="#d5dbe3" stroke-opacity="0.6"/>
+<text x="146" y="347" font-size="11" font-weight="500" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#21262e">--rt</text>
+<text x="146" y="361" font-size="11" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#676f7c">#ab8612</text>
+<text x="146" y="374" font-size="10" font-weight="400" fill="#8690a0">accent as edges</text>
+<rect x="268" y="294" width="92" height="40" rx="4" fill="#faf2d6" stroke="#d5dbe3" stroke-opacity="0.6"/>
+<text x="268" y="347" font-size="11" font-weight="500" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#21262e">--tint</text>
+<text x="268" y="361" font-size="11" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#676f7c">#faf2d6</text>
+<text x="268" y="374" font-size="10" font-weight="400" fill="#8690a0">selected ground</text>
+<rect x="756" y="98" width="420" height="268" rx="6" fill="#f7f9fb" stroke="#d5dbe3"/>
+<text x="768" y="110" font-size="11" font-weight="500" letter-spacing="0.6" fill="#8690a0">DERIVED, LIVE</text>
+<g transform="translate(768,128)"><rect width="118" height="24" rx="4" fill="#faf2d6" stroke="#e0e5ec"/><text x="12" y="16" font-size="12" font-weight="600" fill="#21262e">selected</text></g>
+<g transform="translate(894,128)"><rect x="0" y="0" width="64" height="20" rx="4" fill="#ffffff" stroke="#e0e5ec" stroke-width="1"/><circle cx="11" cy="10" r="3" fill="#676f7c"/><text x="20" y="14" font-size="12" font-weight="400" fill="#676f7c">Saved</text></g>
+<g transform="translate(966,128)"><rect x="0" y="0" width="76" height="20" rx="4" fill="#ffffff" stroke="#e0e5ec" stroke-width="1"/><circle cx="11" cy="10" r="3" fill="#ab8612"/><text x="20" y="14" font-size="12" font-weight="400" fill="#676f7c">Saving…</text></g>
+<text x="768" y="170" font-size="10" font-weight="400" fill="#676f7c">tint plus a weight shift, so state never rides colour alone</text>
+<g transform="translate(768,180)"><rect x="0" y="0" width="88" height="20" rx="4" fill="#ffffff" stroke="#d54e4e" stroke-width="1"/><circle cx="11" cy="10" r="3" fill="#d54e4e"/><text x="20" y="14" font-size="12" font-weight="400" fill="#b03a3a">Not saved</text></g>
+<g transform="translate(864,180)"><rect x="0" y="0" width="124" height="20" rx="4" fill="#ffffff" stroke="#e0e5ec" stroke-width="1"/><circle cx="11" cy="10" r="3" fill="#676f7c"/><text x="20" y="14" font-size="12" font-weight="400" fill="#676f7c">Saved</text><line x1="65" y1="4" x2="65" y2="16" stroke="#e0e5ec"/><text x="73" y="14" font-size="12" font-weight="400" fill="#676f7c">Offline</text></g>
+<text x="768" y="218" font-size="10" font-weight="400" fill="#676f7c">one pill for state; badges share the slot behind a divider</text>
+<g transform="translate(768,232)"><rect x="0" y="0" width="100" height="28" rx="4" fill="#e6bf34"/><text x="50" y="19" font-size="13" font-weight="600" text-anchor="middle" letter-spacing="0.5" fill="#14171a">PRIMARY</text></g>
+<g transform="translate(874,232)"><rect x="0" y="0" width="76" height="28" rx="4" fill="#ffffff" stroke="#e0e5ec" stroke-width="1"/><text x="38" y="19" font-size="13" font-weight="600" text-anchor="middle" letter-spacing="0.5" fill="#676f7c">QUIET</text></g>
+<g transform="translate(956,232)"><text x="38" y="19" font-size="13" font-weight="600" text-anchor="middle" letter-spacing="0.5" fill="#21262e">GHOST</text></g>
+<g transform="translate(768,268)"><text x="44" y="19" font-size="13" font-weight="600" text-anchor="middle" letter-spacing="0.5" fill="#b03a3a">DELETE</text></g>
+<g transform="translate(866,268)"><rect width="150" height="28" rx="4" fill="#ffffff" stroke="#e0e5ec"/><rect x="-2" y="-2" width="154" height="32" rx="6" fill="none" stroke="#ab8612" stroke-width="2"/><text x="12" y="19" font-size="12" fill="#21262e">focus 2px, offset 2px</text></g>
+<text x="768" y="314" font-size="10" font-weight="400" fill="#8690a0">a border means frame, field, or error, never decoration</text>
+<text x="768" y="336" font-size="11" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#676f7c">AA  ink 14.4:1   muted 4.8:1   accent-text 4.55:1</text>
+<text x="768" y="356" font-size="11" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#676f7c">danger-text 5.67:1   ring 3.41:1   faint 3.06:1</text>
+<line x1="24" y1="384" x2="1176" y2="384" stroke="#d5dbe3"/>
+<text x="24" y="402" font-size="11" font-weight="500" letter-spacing="0.6" fill="#767d85">DARK</text>
+<rect x="24" y="416" width="92" height="40" rx="4" fill="#2b2e33" stroke="#464c54" stroke-opacity="0.6"/>
+<text x="24" y="469" font-size="11" font-weight="500" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#d6dae0">--bg</text>
+<text x="24" y="483" font-size="11" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#99a1ab">#2b2e33</text>
+<text x="24" y="496" font-size="10" font-weight="400" fill="#767d85">app ground</text>
+<rect x="146" y="416" width="92" height="40" rx="4" fill="#33373d" stroke="#464c54" stroke-opacity="0.6"/>
+<text x="146" y="469" font-size="11" font-weight="500" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#d6dae0">--surface</text>
+<text x="146" y="483" font-size="11" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#99a1ab">#33373d</text>
+<text x="146" y="496" font-size="10" font-weight="400" fill="#767d85">header, strips</text>
+<rect x="268" y="416" width="92" height="40" rx="4" fill="#3b4046" stroke="#464c54" stroke-opacity="0.6"/>
+<text x="268" y="469" font-size="11" font-weight="500" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#d6dae0">--raise</text>
+<text x="268" y="483" font-size="11" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#99a1ab">#3b4046</text>
+<text x="268" y="496" font-size="10" font-weight="400" fill="#767d85">menus, panels</text>
+<rect x="390" y="416" width="92" height="40" rx="4" fill="#d6dae0" stroke="#464c54" stroke-opacity="0.6"/>
+<text x="390" y="469" font-size="11" font-weight="500" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#d6dae0">--ink</text>
+<text x="390" y="483" font-size="11" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#99a1ab">#d6dae0</text>
+<text x="390" y="496" font-size="10" font-weight="400" fill="#767d85">primary text</text>
+<rect x="512" y="416" width="92" height="40" rx="4" fill="#99a1ab" stroke="#464c54" stroke-opacity="0.6"/>
+<text x="512" y="469" font-size="11" font-weight="500" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#d6dae0">--muted</text>
+<text x="512" y="483" font-size="11" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#99a1ab">#99a1ab</text>
+<text x="512" y="496" font-size="10" font-weight="400" fill="#767d85">secondary</text>
+<rect x="634" y="416" width="92" height="40" rx="4" fill="#767d85" stroke="#464c54" stroke-opacity="0.6"/>
+<text x="634" y="469" font-size="11" font-weight="500" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#d6dae0">--faint</text>
+<text x="634" y="483" font-size="11" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#99a1ab">#767d85</text>
+<text x="634" y="496" font-size="10" font-weight="400" fill="#767d85">placeholder</text>
+<rect x="24" y="514" width="92" height="40" rx="4" fill="#464c54" stroke="#464c54" stroke-opacity="0.6"/>
+<text x="24" y="567" font-size="11" font-weight="500" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#d6dae0">--line</text>
+<text x="24" y="581" font-size="11" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#99a1ab">#464c54</text>
+<text x="24" y="594" font-size="10" font-weight="400" fill="#767d85">frames, rules</text>
+<rect x="146" y="514" width="92" height="40" rx="4" fill="#373b42" stroke="#464c54" stroke-opacity="0.6"/>
+<text x="146" y="567" font-size="11" font-weight="500" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#d6dae0">--soft</text>
+<text x="146" y="581" font-size="11" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#99a1ab">#373b42</text>
+<text x="146" y="594" font-size="10" font-weight="400" fill="#767d85">floating edge</text>
+<rect x="268" y="514" width="92" height="40" rx="4" fill="#24272b" stroke="#464c54" stroke-opacity="0.6"/>
+<text x="268" y="567" font-size="11" font-weight="500" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#d6dae0">--work</text>
+<text x="268" y="581" font-size="11" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#99a1ab">#24272b</text>
+<text x="268" y="594" font-size="10" font-weight="400" fill="#767d85">content area</text>
+<rect x="390" y="514" width="92" height="40" rx="4" fill="#e6bf34" stroke="#464c54" stroke-opacity="0.6"/>
+<text x="390" y="567" font-size="11" font-weight="500" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#d6dae0">--accent</text>
+<text x="390" y="581" font-size="11" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#99a1ab">#e6bf34</text>
+<text x="390" y="594" font-size="10" font-weight="400" fill="#767d85">state fills</text>
+<rect x="512" y="514" width="92" height="40" rx="4" fill="#1b1e22" stroke="#464c54" stroke-opacity="0.6"/>
+<text x="512" y="567" font-size="11" font-weight="500" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#d6dae0">--on</text>
+<text x="512" y="581" font-size="11" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#99a1ab">#1b1e22</text>
+<text x="512" y="594" font-size="10" font-weight="400" fill="#767d85">text on accent</text>
+<rect x="634" y="514" width="92" height="40" rx="4" fill="#ff8f99" stroke="#464c54" stroke-opacity="0.6"/>
+<text x="634" y="567" font-size="11" font-weight="500" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#d6dae0">--danger</text>
+<text x="634" y="581" font-size="11" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#99a1ab">#ff8f99</text>
+<text x="634" y="594" font-size="10" font-weight="400" fill="#767d85">destructive</text>
+<rect x="24" y="612" width="92" height="40" rx="4" fill="#e6bf34" stroke="#464c54" stroke-opacity="0.6"/>
+<text x="24" y="665" font-size="11" font-weight="500" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#d6dae0">--tx</text>
+<text x="24" y="679" font-size="11" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#99a1ab">#e6bf34</text>
+<text x="24" y="692" font-size="10" font-weight="400" fill="#767d85">accent in text</text>
+<rect x="146" y="612" width="92" height="40" rx="4" fill="#e6bf34" stroke="#464c54" stroke-opacity="0.6"/>
+<text x="146" y="665" font-size="11" font-weight="500" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#d6dae0">--rt</text>
+<text x="146" y="679" font-size="11" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#99a1ab">#e6bf34</text>
+<text x="146" y="692" font-size="10" font-weight="400" fill="#767d85">accent as edges</text>
+<rect x="268" y="612" width="92" height="40" rx="4" fill="#57523b" stroke="#464c54" stroke-opacity="0.6"/>
+<text x="268" y="665" font-size="11" font-weight="500" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#d6dae0">--tint</text>
+<text x="268" y="679" font-size="11" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#99a1ab">#57523b</text>
+<text x="268" y="692" font-size="10" font-weight="400" fill="#767d85">selected ground</text>
+<rect x="756" y="416" width="420" height="268" rx="6" fill="#33373d" stroke="#464c54"/>
+<text x="768" y="428" font-size="11" font-weight="500" letter-spacing="0.6" fill="#767d85">DERIVED, LIVE</text>
+<g transform="translate(768,446)"><rect width="118" height="24" rx="4" fill="#57523b" stroke="#373b42"/><text x="12" y="16" font-size="12" font-weight="600" fill="#d6dae0">selected</text></g>
+<g transform="translate(894,446)"><rect x="0" y="0" width="64" height="20" rx="4" fill="#3b4046" stroke="#373b42" stroke-width="1"/><circle cx="11" cy="10" r="3" fill="#99a1ab"/><text x="20" y="14" font-size="12" font-weight="400" fill="#99a1ab">Saved</text></g>
+<g transform="translate(966,446)"><rect x="0" y="0" width="76" height="20" rx="4" fill="#3b4046" stroke="#373b42" stroke-width="1"/><circle cx="11" cy="10" r="3" fill="#e6bf34"/><text x="20" y="14" font-size="12" font-weight="400" fill="#99a1ab">Saving…</text></g>
+<text x="768" y="488" font-size="10" font-weight="400" fill="#99a1ab">tint plus a weight shift, so state never rides colour alone</text>
+<g transform="translate(768,498)"><rect x="0" y="0" width="88" height="20" rx="4" fill="#3b4046" stroke="#ff8f99" stroke-width="1"/><circle cx="11" cy="10" r="3" fill="#ff8f99"/><text x="20" y="14" font-size="12" font-weight="400" fill="#ff8f99">Not saved</text></g>
+<g transform="translate(864,498)"><rect x="0" y="0" width="124" height="20" rx="4" fill="#3b4046" stroke="#373b42" stroke-width="1"/><circle cx="11" cy="10" r="3" fill="#99a1ab"/><text x="20" y="14" font-size="12" font-weight="400" fill="#99a1ab">Saved</text><line x1="65" y1="4" x2="65" y2="16" stroke="#373b42"/><text x="73" y="14" font-size="12" font-weight="400" fill="#99a1ab">Offline</text></g>
+<text x="768" y="536" font-size="10" font-weight="400" fill="#99a1ab">one pill for state; badges share the slot behind a divider</text>
+<g transform="translate(768,550)"><rect x="0" y="0" width="100" height="28" rx="4" fill="#e6bf34"/><text x="50" y="19" font-size="13" font-weight="600" text-anchor="middle" letter-spacing="0.5" fill="#1b1e22">PRIMARY</text></g>
+<g transform="translate(874,550)"><rect x="0" y="0" width="76" height="28" rx="4" fill="#3b4046" stroke="#373b42" stroke-width="1"/><text x="38" y="19" font-size="13" font-weight="600" text-anchor="middle" letter-spacing="0.5" fill="#99a1ab">QUIET</text></g>
+<g transform="translate(956,550)"><text x="38" y="19" font-size="13" font-weight="600" text-anchor="middle" letter-spacing="0.5" fill="#d6dae0">GHOST</text></g>
+<g transform="translate(768,586)"><text x="44" y="19" font-size="13" font-weight="600" text-anchor="middle" letter-spacing="0.5" fill="#ff8f99">DELETE</text></g>
+<g transform="translate(866,586)"><rect width="150" height="28" rx="4" fill="#3b4046" stroke="#373b42"/><rect x="-2" y="-2" width="154" height="32" rx="6" fill="none" stroke="#e6bf34" stroke-width="2"/><text x="12" y="19" font-size="12" fill="#d6dae0">focus 2px, offset 2px</text></g>
+<text x="768" y="632" font-size="10" font-weight="400" fill="#767d85">a border means frame, field, or error, never decoration</text>
+<text x="768" y="654" font-size="11" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#99a1ab">AA  ink 8.53:1   muted 4.58:1   accent-text 6.76:1</text>
+<text x="768" y="674" font-size="11" font-weight="400" font-family="ui-monospace, 'Cascadia Mono', Menlo, monospace" fill="#99a1ab">danger-text 5.49:1   ring 5.91:1   faint 2.87:1</text>
+<text x="24" y="708" font-size="11" font-weight="400" fill="#676f7c">Rejected #efeae1 ground, ochre and brown accents: warm neutrals and mud read as packaging. Ink on tint: light 13.56:1, dark 5.59:1.</text>
+</svg>

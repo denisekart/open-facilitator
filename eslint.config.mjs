@@ -8,6 +8,9 @@ export default tseslint.config(
     ignores: [
       "**/dist/",
       "node_modules/",
+      // Project layer: agent skills/plans (docs + self-contained generators),
+      // not buildable source.
+      ".omp/",
       "site/node_modules/",
       "site/vendor/",
       "site/dist/",

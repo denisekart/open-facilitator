@@ -1,0 +1,23 @@
+{
+  "id": "team-home",
+  "version": 1,
+  "title": "Team home: the destination plane after sign-over",
+  "description": "The counterpart of router-ingress on the OWNING team: content that arrives through the router is signed over once, and from then on the team's own flows act on it with no router leg at all. The minimal proof of that posture: when an approval raised on team-owned work is decided, the team's OWN dispatch plane carries the next step (capability routing picks the team's endpoint) - the definition carries a team scope and no sign-over step, because nothing crosses a team boundary any more.",
+  "enabled": false,
+  "team": "team-alpha",
+  "on": {
+    "event": "org.facilitator.event.approval.decided.v1"
+  },
+  "steps": [
+    {
+      "id": "ack",
+      "title": "Acknowledge the decision on the team's own plane",
+      "emit": {
+        "capability": "research.default",
+        "inputs": {
+          "text": "approval ${event.data.approvalId} decided: ${event.data.decision}"
+        }
+      }
+    }
+  ]
+}

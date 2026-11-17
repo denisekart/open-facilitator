@@ -518,6 +518,52 @@ paths:
           content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
+  /api/admin/artifacts/sign-over:
+    post:
+      operationId: signOverArtifacts
+      tags: [mutate]
+      summary: >
+        Transfer artifact ownership (the admin leg of the sign-over primitive):
+        moves artifacts.team_slug from fromTeam to toTeam with digest re-verify
+        and an artifact.sign-over audit row. Rows missing, foreign-owned, or
+        already owned by the destination are skipped with a reason, never moved.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [artifactIds, fromTeam, toTeam]
+              properties:
+                artifactIds:
+                  type: array
+                  minItems: 1
+                  items: { type: string, format: uuid }
+                fromTeam: { type: string }
+                toTeam: { type: string }
+                reason: { type: string }
+      responses:
+        "200":
+          description: >
+            Applied. transferred counts the moved rows; skipped names each
+            unmoved row as "<artifactId>:<reason>"; auditId correlates the audit rows.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [transferred, skipped, auditId]
+                properties:
+                  transferred: { type: integer }
+                  skipped: { type: array, items: { type: string } }
+                  auditId: { type: string, format: uuid }
+                  reason: { type: string, nullable: true }
+        "400":
+          description: sign-over-invalid (body) or team-not-found (destination unrostered).
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
   /api/admin/workflows/definitions:
     get:
       operationId: listWorkflowDefinitions

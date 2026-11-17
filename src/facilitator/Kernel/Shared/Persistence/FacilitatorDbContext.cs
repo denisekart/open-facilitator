@@ -72,6 +72,8 @@ public class FacilitatorDbContext(DbContextOptions<FacilitatorDbContext> options
 
     public DbSet<ArtifactEntity> Artifacts => Set<ArtifactEntity>();
 
+    public DbSet<ArtifactGrantEntity> ArtifactGrants => Set<ArtifactGrantEntity>();
+
     public DbSet<ResultManifestEntity> ResultManifests => Set<ResultManifestEntity>();
 
     public DbSet<MemoryScopeEntity> MemoryScopes => Set<MemoryScopeEntity>();

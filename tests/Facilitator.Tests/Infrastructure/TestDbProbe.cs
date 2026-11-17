@@ -1688,6 +1688,10 @@ public sealed class TestDbProbe : IAsyncDisposable
         return Convert.ToInt64(await command.ExecuteScalarAsync());
     }
 
+    /// <summary>A raw parameterized statement for tests that need a seam no
+    /// seed helper covers (columns the seeded rows do not carry).</summary>
+    public Task NonQueryAsync(string sql, Action<NpgsqlCommand> bind) => NonQuery(sql, bind);
+
     private async Task NonQuery(string sql, Action<NpgsqlCommand> bind)
     {
         await using var connection = await _dataSource.OpenConnectionAsync();

@@ -18,6 +18,7 @@ const PAYLOAD_ORDER = [
   "select",
   "fork-work",
   "work-create",
+  "sign-over",
   "escalate",
   "fan-out",
   "signal",

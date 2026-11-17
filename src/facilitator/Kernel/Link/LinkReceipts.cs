@@ -1,11 +1,14 @@
 using Facilitator.Kernel.Shared.Auth;
 using Facilitator.Kernel.Shared.Persistence;
+using Facilitator.Kernel.Shared.Storage;
+
+using Microsoft.EntityFrameworkCore;
 
 namespace Facilitator.Kernel.Link;
 
 /// <summary>
 /// The ONE receipt-commit path (parity is the design goal): ownership check →
-/// ledger ack → pump pass → long-poll wake. Both the hub <c>Receipt</c>
+/// ledger ack → grant revoke → pump pass → long-poll wake. Both the hub <c>Receipt</c>
 /// method and <c>POST /deliveries/&#123;id&#125;/receipt</c> call it, so the two
 /// transports behave identically by construction.
 /// </summary>
@@ -13,7 +16,9 @@ public sealed class LinkReceipts(
     LinkLedger ledger,
     LinkDeliveryPump pump,
     LinkConnectionRegistry registry,
-    LinkOptions options)
+    LinkOptions options,
+    IDbContextFactory<FacilitatorDbContext> contextFactory,
+    ArtifactGrantStore grants)
 {
     /// <summary>
     /// Commit a receipt: false when the delivery is unknown or owned by
@@ -33,6 +38,22 @@ public sealed class LinkReceipts(
         if (!await ledger.AckAsync(deliveryId, principal.EndpointId, receiptJson, ct))
         {
             return false;
+        }
+
+        // Grant hygiene: the delivery is done — any read rental minted for its
+        // command that the adapter never consumed is revoked here. The
+        // delivery id IS the outbox id (link_deliveries' PK is the outbox row);
+        // zero matching rows is the replay answer, no audit.
+        await using (var db = await contextFactory.CreateDbContextAsync(ct))
+        {
+            var commandId = await db.Outbox.AsNoTracking()
+                .Where(o => o.OutboxId == deliveryId)
+                .Select(o => o.CommandId)
+                .FirstOrDefaultAsync(ct);
+            if (commandId is not null)
+            {
+                await grants.RevokeByCommandAsync(commandId, principal.EndpointId, ct);
+            }
         }
 
         // Acking frees in-flight capacity ⇒ the waiting half of the pump + a wake for long-pollers.

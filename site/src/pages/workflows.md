@@ -41,6 +41,7 @@ duration is refused by the validator.
 | `decide` | branch on a guard or a model verdict, with a mandatory fallback |
 | `select` | project values into the run's output |
 | `fork-work` / `work-create` | re-fork the subject work, or create new work |
+| `sign-over` | move the frozen artifact refs of this event to a named team (ownership, not bytes) and repoint the thread's binding |
 | `escalate` | raise the stakes on a stalled assignment |
 | `fan-out` | spawn one child leg per item |
 | `signal` | wake a parked waiter elsewhere, by correlation key |

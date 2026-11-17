@@ -378,17 +378,35 @@ public sealed class ProviderEventStore(
 
         // D1: cadence resolves channel -> team -> system, one truth (the
         // slash plane and the decode sink read the same resolver).
+        // Born-team-from-binding: a conversation whose router flow already
+        // signed over resolves to the OWNING team at ingest, so second-and-
+        // later messages are born team-owned and the router leg runs once per
+        // thread. The ledger row above keeps the workload's own team (ledger
+        // ≠ content; the ownership stamp arrives with sign-over). All
+        // bindings of the conversation are consulted; the oldest team-bearing
+        // row wins (one conversation, one content home).
+        var bindingTeam = (await db.CommunicationBindings.AsNoTracking()
+                .Where(b => b.Provider == reference.Provider && b.Channel == reference.Channel
+                         && b.RootMessageId == reference.Root && b.TeamSlug != null)
+                .OrderBy(b => b.CreatedAt).FirstOrDefaultAsync(ct))?.TeamSlug;
+        var ingestTeamId = bindingTeam is null || bindingTeam == workload.TeamSlug
+            ? workload.TeamId
+            : await db.Teams.AsNoTracking().Where(t => t.Slug == bindingTeam)
+                .Select(t => (Guid?)t.TeamId).FirstOrDefaultAsync(ct) ?? workload.TeamId;
+        var ingestWorkload = ingestTeamId == workload.TeamId
+            ? workload
+            : workload with { TeamSlug = bindingTeam!, TeamId = ingestTeamId };
         var ack = await Facilitator.Kernel.Notifications.NotificationLedger.CadenceAsync(
-            db, workload.TeamSlug, $"{reference.Provider}/{reference.Channel}", "reaction", ct);
+            db, ingestWorkload.TeamSlug, $"{reference.Provider}/{reference.Channel}", "reaction", ct);
         var effect = type switch
         {
-            ProviderEventClass.Mention => await MentionArmAsync(db, workload, options, data, reference, providerDeliveryId, ack, now, ct),
+            ProviderEventClass.Mention => await MentionArmAsync(db, ingestWorkload, options, root, data, reference, providerDeliveryId, ack, now, ct),
             ProviderEventClass.Reaction => await ReactionArmAsync(db, options, data, reference, providerDeliveryId, ack, now, ct),
-            ProviderEventClass.Issue => await IssueArmAsync(db, workload, options, root, data, reference, providerDeliveryId, now, ct, type),
+            ProviderEventClass.Issue => await IssueArmAsync(db, ingestWorkload, options, root, data, reference, providerDeliveryId, now, ct, type),
             ProviderEventClass.ChangeRequest => await ChangeRequestArmAsync(db, provider, options, data, reference, providerDeliveryId, now, ct),
             ProviderEventClass.Pipeline => await PipelineArmAsync(db, data, reference, providerDeliveryId, now, ct),
             ProviderEventClass.Review => await ReviewArmAsync(db, provider, root, data, reference, providerDeliveryId, now, ct),
-            ProviderEventClass.Message => await MessageArmAsync(db, workload, options, data, reference, providerDeliveryId, now, ct),
+            ProviderEventClass.Message => await MessageArmAsync(db, ingestWorkload, options, data, reference, providerDeliveryId, now, ct),
             _ => new ArmEffect(null, "observe:unhandled"),
         };
         inbox.WorkId = effect.Work;
@@ -525,7 +543,7 @@ public sealed class ProviderEventStore(
     // the verbatim-Work behavior plus the no-AI hint. /link mints a challenge
     // and never a Work.
     private async Task<ArmEffect> MentionArmAsync(
-        FacilitatorDbContext db, Facilitator.Kernel.Shared.Auth.LinkPrincipal workload, ProviderOptions options, JsonElement data, Reference reference, string deliveryId, string replyVsReaction, DateTime now, CancellationToken ct)
+        FacilitatorDbContext db, Facilitator.Kernel.Shared.Auth.LinkPrincipal workload, ProviderOptions options, JsonElement envelope, JsonElement data, Reference reference, string deliveryId, string replyVsReaction, DateTime now, CancellationToken ct)
     {
         var text = data.GetProperty("text").GetString() ?? string.Empty;
         var actor = data.GetProperty("actorProviderAccountId").GetString() ?? string.Empty;
@@ -600,6 +618,25 @@ public sealed class ProviderEventStore(
                 db, now, parsed, commands, reference, options, actor, workload.TeamId,
                 deliveryId, replyVsReaction, policy, ct, rule: rule, sourceRefs: media);
             return new ArmEffect(commandEffect.WorkId, commandEffect.Judgment, PostCommit: commandEffect.PostCommit);
+        }
+
+        // Plane hook (the issue arm's posture, at the mention's creation
+        // point): an UNOWNED conversation (we reach here only when the
+        // conversation has no binding row at all) with an enabled mention
+        // flow lets the plane own creation — trigger rows ride this
+        // transaction, subjectless (no work exists yet; the plane's
+        // work-create mints it deterministically). A conversation whose
+        // binding already names a team is BORN team-owned: the arms above
+        // route its messages, the plane stays out, and the router leg that
+        // stamped the binding ran exactly once.
+        if (workflows is not null)
+        {
+            var appended = await workflows.EmitAsync(db, envelope, subjectWork: null, ct);
+            var planeWork = await PlaneOwnedMentionWorkAsync(db, appended, ct);
+            if (planeWork is not null)
+            {
+                return new ArmEffect(planeWork.Value.Work, $"work/{planeWork.Value.Work} (plane: {planeWork.Value.Definition})");
+            }
         }
 
         // Non-command text with a live decoder: queue the async decode
@@ -830,9 +867,9 @@ public sealed class ProviderEventStore(
                     await db.Database.ExecuteSqlInterpolatedAsync(
                         $"""
                          INSERT INTO facilitator.communication_bindings
-                             (binding_id, provider, channel, root_message_id, parent_message_id, work_id, idempotency_key, created_at)
+                             (binding_id, provider, channel, root_message_id, parent_message_id, work_id, team, idempotency_key, created_at)
                          VALUES (gen_random_uuid(), {reference.Provider}, {reference.Channel}, {reference.Root},
-                                 {marker.ParentMessageId}, {resolved}, {"pr-binding:" + deliveryId}, {now})
+                                 {marker.ParentMessageId}, {resolved}, CAST(NULL AS text), {"pr-binding:" + deliveryId}, {now})
                          ON CONFLICT DO NOTHING
                          """, ct);
                     return new ArmEffect(resolved, $"pr-bound:{reference.Root}");
@@ -1386,6 +1423,71 @@ public sealed class ProviderEventStore(
             return (
                 Facilitator.Kernel.Workflows.WorkflowIdentity.WorkCreateWorkId(
                     instance, Facilitator.Kernel.Workflows.AssignRulesTemplate.CreateStepId),
+                trigger.DefinitionId);
+        }
+
+        return null;
+    }
+
+    /// <summary>The mention arm's plane deferral: when the accepted mention
+    /// matched an ENABLED definition that owns work creation (its steps carry
+    /// a `work-create` leg), the arm reports the plane's deterministic work id
+    /// and creates nothing itself — the trigger row (appended by the caller,
+    /// in this transaction) starts the instance, whose work-create mints that
+    /// exact id. The first work-create step in array order is the creator
+    /// (index order is the plane's ordering law). Any other matched flow
+    /// (no work-create leg) leaves creation to the arm, exactly as before.</summary>
+    private async Task<(Guid Work, string Definition)?> PlaneOwnedMentionWorkAsync(
+        FacilitatorDbContext db,
+        IReadOnlyList<Facilitator.Kernel.Workflows.WorkflowTriggerEmitter.AppendedTrigger> appended,
+        CancellationToken ct)
+    {
+        if (workflows is null || appended.Count == 0)
+        {
+            return null;
+        }
+
+        // THE ARM's context: the trigger rows live here, uncommitted — a
+        // second connection could not see them (ReadCommitted).
+        foreach (var trigger in appended)
+        {
+            var expectedCommand = Facilitator.Kernel.Workflows.WorkflowIdentity.TriggerCommandId(
+                trigger.DefinitionId, trigger.Version, trigger.OutboxId);
+            if (!db.Outbox.Local.Any(o => o.OutboxId == trigger.OutboxId && o.CommandId == expectedCommand)
+                && !await db.Outbox.AnyAsync(
+                    o => o.OutboxId == trigger.OutboxId && o.CommandId == expectedCommand, ct))
+            {
+                continue;
+            }
+
+            if (await workflows.LiveVersionAsync(db, trigger.DefinitionId, ct) != trigger.Version)
+            {
+                continue;
+            }
+
+            string? creatorStep = null;
+            var definitionPayload = await db.WorkflowDefinitions.AsNoTracking()
+                .Where(d => d.DefId == trigger.DefinitionId && d.Version == trigger.Version)
+                .Select(d => d.Payload).FirstOrDefaultAsync(ct);
+            if (definitionPayload is not null)
+            {
+                using var doc = System.Text.Json.JsonDocument.Parse(definitionPayload);
+                creatorStep = doc.RootElement.GetProperty("steps").EnumerateArray()
+                    .FirstOrDefault(s => s.TryGetProperty("work-create", out _))
+                    .TryGetProperty("id", out var sid)
+                        ? sid.GetString()
+                        : null;
+            }
+
+            if (creatorStep is null)
+            {
+                continue;
+            }
+
+            var instance = Facilitator.Kernel.Workflows.WorkflowIdentity.InstanceIdFor(
+                trigger.DefinitionId, trigger.Version, trigger.OutboxId);
+            return (
+                Facilitator.Kernel.Workflows.WorkflowIdentity.WorkCreateWorkId(instance, creatorStep),
                 trigger.DefinitionId);
         }
 

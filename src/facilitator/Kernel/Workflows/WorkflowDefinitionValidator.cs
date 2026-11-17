@@ -38,7 +38,7 @@ public sealed class WorkflowDefinitionValidator(EnvelopeValidator envelopes)
     /// interpreter does not grow speculatively.</summary>
     public static IReadOnlySet<string> ExecutableKinds { get; } = new HashSet<string>(StringComparer.Ordinal)
     {
-        "emit", "wait", "timer", "approval", "decide", "select", "fan-out", "fork-work", "work-create", "escalate", "invoke", "signal",
+        "emit", "wait", "timer", "approval", "decide", "select", "fan-out", "fork-work", "work-create", "sign-over", "escalate", "invoke", "signal",
     };
 
     /// <summary>Validate a parsed definition document (structure + referential
@@ -178,6 +178,36 @@ public sealed class WorkflowDefinitionValidator(EnvelopeValidator envelopes)
                         }
 
                         break;
+                }
+            }
+        }
+
+        // Ownership ordering law: a leg that dispatches to a team other than
+        // the definition's own may only do so AFTER ownership was moved — a
+        // `sign-over` step earlier in the `steps` array. Index order is the
+        // law (no dataflow inference); an absent definition team means every
+        // declared team differs.
+        var definitionTeam = document.TryGetProperty("team", out var docTeam) ? docTeam.GetString() : null;
+        var signOverSeen = false;
+        foreach (var step in steps)
+        {
+            var stepId = step.GetProperty("id").GetString()!;
+            foreach (var (kind, payload) in Payload(step))
+            {
+                if (kind == "sign-over")
+                {
+                    signOverSeen = true;
+                    continue;
+                }
+
+                if (kind is "emit" or "work-create" or "fork-work" or "invoke"
+                    && payload.TryGetProperty("team", out var stepTeam)
+                    && stepTeam.ValueKind == JsonValueKind.String
+                    && !string.Equals(stepTeam.GetString(), definitionTeam, StringComparison.Ordinal)
+                    && !signOverSeen)
+                {
+                    errors.Add(new("content-not-signed-over",
+                        $"step '{stepId}' dispatches to team '{stepTeam.GetString()}' with no preceding sign-over"));
                 }
             }
         }

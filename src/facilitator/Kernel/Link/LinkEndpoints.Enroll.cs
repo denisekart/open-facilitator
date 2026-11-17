@@ -271,7 +271,9 @@ public static partial class LinkEndpoints
             async (Guid id, IArtifactLedger ledger, IArtifactStore store, HttpContext http, CancellationToken ct) =>
             {
                 var workload = LinkAuthMiddleware.RequirePrincipal(http);
-                var scoped = await ledger.GetForWorkloadAsync(workload, id, ct);
+                // The one allowGrant caller: a delivery-scoped grant rents one
+                // foreign-team read for this reply; PUT/confirm stay strict.
+                var scoped = await ledger.GetForWorkloadAsync(workload, id, ct, allowGrant: true);
                 if (scoped is not { State: "stored" } || !store.Owns(scoped.StorageUri))
                 {
                     return Results.Problem(ProblemErrors.ArtifactNotFound(id.ToString()));

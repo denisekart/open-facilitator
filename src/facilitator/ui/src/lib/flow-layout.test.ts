@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildModel, extract, layout, toneFor } from "./flow-layout.js";
+import { buildModel, extract, KINDS, layout, toneFor } from "./flow-layout.js";
 import type { Doc } from "./flow-layout.js";
 
 // The canvas's brain, tested pure: the dagre layout must produce finite
@@ -22,6 +22,23 @@ describe("extract", () => {
     expect(g.steps.map((s) => s.kind)).toEqual(["emit", "wait"]);
     expect(g.edges.some((e) => e.from === "trigger" && e.to === "a")).toBe(true);
     expect(g.edges.some((e) => e.from === "a" && e.to === "b" && e.label === "")).toBe(true);
+  });
+
+  it("the palette knows sign-over as an act-kind", () => {
+    const doc: Doc = {
+      on: { event: "e" },
+      steps: [
+        {
+          id: "own",
+          title: "sign over",
+          on: "always",
+          "sign-over": { team: "team-alpha", refs: ["$event.data.sourceRefs"] },
+        },
+      ],
+    };
+    const g = extract(doc);
+    expect(g.steps.map((s) => s.kind)).toEqual(["sign-over"]);
+    expect(KINDS).toContain("sign-over");
   });
 
   it("a completed run walks to end", () => {
@@ -81,6 +98,10 @@ describe("toneFor", () => {
     expect(toneFor({ id: "a", kind: "emit" }, log)).toBe("ok");
     expect(toneFor({ id: "b", kind: "emit" }, log)).toBe("pending");
     expect(toneFor({ id: "b", kind: "emit" }, null)).toBe("act");
+  });
+
+  it("sign-over rides the act lane", () => {
+    expect(toneFor({ id: "own", kind: "sign-over" }, null)).toBe("act");
   });
 });
 

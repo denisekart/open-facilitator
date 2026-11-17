@@ -306,9 +306,9 @@ public sealed class ResultIngress(
                 await db.Database.ExecuteSqlInterpolatedAsync(
                     $"""
                      INSERT INTO facilitator.communication_bindings
-                         (binding_id, provider, channel, root_message_id, work_id, idempotency_key, created_at)
+                         (binding_id, provider, channel, root_message_id, work_id, team, idempotency_key, created_at)
                      VALUES (gen_random_uuid(), {options.Provider}, {repo}, {"branch:" + head},
-                             {workId}, {"pr-request:" + digest}, {now})
+                             {workId}, CAST(NULL AS text), {"pr-request:" + digest}, {now})
                      ON CONFLICT DO NOTHING
                      """, ct);
                 dispatched = true;

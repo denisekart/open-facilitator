@@ -1,0 +1,96 @@
+{
+  "id": "router-ingress",
+  "version": 1,
+  "title": "Router ingress: resolve the owning team, sign the media over",
+  "description": "The globally-hosted bot's inbound leg: a provider mention arrives on the router team (the adapter's enrollment team owns inbound bytes at birth), a guard chain resolves the conversation's channel to the ONE team that owns it, and the ownership leg moves the frozen artifactRefs to that team (audited, digest re-verified) before the work is dispatched there. One guard per team is the v1 channel-to-team resolver law; an unmapped channel parks as an escalation and the bytes stay on the router team. A thread whose flow ran once repoints its binding, so later messages are born team-owned and this leg runs once per thread.",
+  "enabled": false,
+  "team": "router",
+  "on": {
+    "event": "org.facilitator.event.provider.mention.v1",
+    "where": {
+      "data.reference.provider": "telegram"
+    }
+  },
+  "steps": [
+    {
+      "id": "alpha-guard",
+      "title": "Does alpha-channel belong to team-alpha?",
+      "decide": {
+        "source": "guard",
+        "guard": {
+          "field": "event.data.reference.channelOrResourceId",
+          "in": ["alpha-channel"]
+        },
+        "fallback": "park"
+      }
+    },
+    {
+      "id": "alpha",
+      "title": "Sign the inbound media over to team-alpha",
+      "sign-over": {
+        "team": "team-alpha",
+        "refs": ["$event.data.sourceRefs"],
+        "thread": {
+          "provider": "$event.data.reference.provider",
+          "channel": "$event.data.reference.channelOrResourceId",
+          "rootMessageId": "$event.data.reference.rootThreadId"
+        },
+        "eventRef": "$event.data.providerDeliveryId"
+      }
+    },
+    {
+      "id": "assign-alpha",
+      "title": "Dispatch the work on team-alpha",
+      "work-create": {
+        "objectiveRef": "$event.data.text",
+        "capability": "research.default",
+        "team": "team-alpha"
+      }
+    },
+    {
+      "id": "beta-guard",
+      "title": "Does beta-channel belong to team-beta?",
+      "on": "alpha-guard:completed",
+      "decide": {
+        "source": "guard",
+        "guard": {
+          "field": "event.data.reference.channelOrResourceId",
+          "in": ["beta-channel"]
+        },
+        "fallback": "park"
+      }
+    },
+    {
+      "id": "beta",
+      "title": "Sign the inbound media over to team-beta",
+      "sign-over": {
+        "team": "team-beta",
+        "refs": ["$event.data.sourceRefs"],
+        "thread": {
+          "provider": "$event.data.reference.provider",
+          "channel": "$event.data.reference.channelOrResourceId",
+          "rootMessageId": "$event.data.reference.rootThreadId"
+        },
+        "eventRef": "$event.data.providerDeliveryId"
+      }
+    },
+    {
+      "id": "assign-beta",
+      "title": "Dispatch the work on team-beta",
+      "work-create": {
+        "objectiveRef": "$event.data.text",
+        "capability": "research.default",
+        "team": "team-beta"
+      }
+    },
+    {
+      "id": "park",
+      "title": "No team owns this channel: ask a human",
+      "on": "failed",
+      "escalate": {
+        "to": "team:router",
+        "message": "router-ingress: no team is mapped to this channel; the mention and its media stay on the router team until a human resolves the owner."
+      }
+    }
+  ]
+}

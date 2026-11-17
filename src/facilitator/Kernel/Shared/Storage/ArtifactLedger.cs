@@ -148,8 +148,11 @@ public interface IArtifactLedger
     /// <summary>Team-scoped row for the content endpoints: row + readable state (stored, and a scheme one configured adapter Owns). Null when missing/foreign/not-readable.</summary>
     Task<ArtifactView?> GetReadableAsync(string actor, IReadOnlyList<string> groups, IReadOnlySet<string> roles, Guid artifactId, CancellationToken ct);
 
-    /// <summary>Team-scoped row for the workload PUT plane: the allocating endpoint (same team) may store; foreign ⇒ null.</summary>
-    Task<ArtifactView?> GetForWorkloadAsync(LinkPrincipal workload, Guid artifactId, CancellationToken ct);
+    /// <summary>Team-scoped row for the workload PUT plane: the allocating endpoint (same team) may store; foreign ⇒ null.
+    /// <paramref name="allowGrant"/> (the content GET only): a foreign-team row with an active
+    /// delivery-scoped grant for this exact endpoint is consumable — a rented principal may
+    /// read, never write; PUT/confirm stay strict.</summary>
+    Task<ArtifactView?> GetForWorkloadAsync(LinkPrincipal workload, Guid artifactId, CancellationToken ct, bool allowGrant = false);
 }
 
 /// <summary>Ledger-backed <see cref="IArtifactLedger"/>.</summary>
@@ -159,7 +162,8 @@ public sealed class ArtifactLedger(
     IArtifactStore store,
     KernelMetrics metrics,
     TimeProvider timeProvider,
-    ArtifactOptions options) : IArtifactLedger
+    ArtifactOptions options,
+    ArtifactGrantStore grants) : IArtifactLedger
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     private static readonly TimeSpan AllocationTtl = ArtifactTicket.AllocationTtl;
@@ -562,11 +566,32 @@ public sealed class ArtifactLedger(
     }
 
     /// <inheritdoc />
-    public async Task<ArtifactView?> GetForWorkloadAsync(LinkPrincipal workload, Guid artifactId, CancellationToken ct)
+    public async Task<ArtifactView?> GetForWorkloadAsync(LinkPrincipal workload, Guid artifactId, CancellationToken ct, bool allowGrant = false)
     {
         await using var db = await contextFactory.CreateDbContextAsync(ct);
         var row = await db.Artifacts.AsNoTracking().FirstOrDefaultAsync(a => a.ArtifactId == artifactId, ct);
-        return row is not null && string.Equals(row.TeamSlug, workload.TeamSlug, StringComparison.Ordinal) ? View(row) : null;
+        if (row is null)
+        {
+            return null;
+        }
+
+        if (string.Equals(row.TeamSlug, workload.TeamSlug, StringComparison.Ordinal))
+        {
+            return View(row);
+        }
+
+        // Foreign row: only the content GET may pass allowGrant, and then only
+        // a live grant decides — rent exactly once. A row whose bytes cannot
+        // be served (pending, foreign scheme) never burns the rental. The 404
+        // answer stays ProblemErrors.ArtifactNotFound either way (non-disclosure
+        // preserved).
+        if (allowGrant && row.State == "stored" && store.Owns(row.StorageUri)
+            && await grants.TryConsumeOnReadAsync(artifactId, workload.EndpointId, workload.TeamSlug, ct))
+        {
+            return View(row);
+        }
+
+        return null;
     }
 
     private static (string CreatedBy, string? TeamSlug, string? EndpointId) OriginOf(

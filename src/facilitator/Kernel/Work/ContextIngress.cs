@@ -181,6 +181,67 @@ public sealed class ContextIngress(
         var digest = "sha256:" + put.DigestHex.ToLowerInvariant();
         await using (var db = await contextFactory.CreateDbContextAsync(ct))
         {
+            // Copy-on-forward provenance (router-team routing): when the
+            // answered window came from a conversation whose binding names a
+            // team — a thread the router flow signed over — the answered
+            // bytes are a COPY and the ORIGINALS live on the router ledger.
+            // Point at those rows so "where did this history come from" is a
+            // query, not a guess.
+            JsonNode? routerLedger = null;
+            if (workId is { } ledgerWork)
+            {
+                var residence = await db.Works.AsNoTracking()
+                    .Where(wo => wo.WorkId == ledgerWork && wo.ActiveWhere != null)
+                    .Select(wo => wo.ActiveWhere).FirstOrDefaultAsync(ct);
+                if (residence is { Length: > 0 })
+                {
+                    using var where = JsonDocument.Parse(residence);
+                    var whereRoot = where.RootElement;
+                    if (whereRoot.TryGetProperty("provider", out var p)
+                        && whereRoot.TryGetProperty("channel", out var c)
+                        && whereRoot.TryGetProperty("root", out var r0)
+                        && p.ValueKind == JsonValueKind.String && c.ValueKind == JsonValueKind.String
+                        && r0.ValueKind == JsonValueKind.String)
+                    {
+                        var provider = p.GetString()!;
+                        var channel = c.GetString()!;
+                        var rootMessage = r0.GetString()!;
+                        var owned = await db.CommunicationBindings.AsNoTracking().AnyAsync(b =>
+                            b.Provider == provider && b.Channel == channel
+                            && b.RootMessageId == rootMessage && b.TeamSlug != null, ct);
+                        if (owned)
+                        {
+                            // The ledger never moves; the window's originals
+                            // are the provider rows whose reference names
+                            // this exact conversation (bounded window: the
+                            // newest rows for this provider, filtered in
+                            // memory — provenance, not a hot path).
+                            var originals = await db.ProviderEvents.AsNoTracking()
+                                .Where(e => e.Provider == provider)
+                                .OrderByDescending(e => e.ReceivedAt)
+                                .Take(200)
+                                .Select(e => new { e.ProviderEventId, e.BodySha256, e.Body })
+                                .ToListAsync(ct);
+                            var window = originals
+                                .Where(e => CarriesReference(e.Body, channel, rootMessage))
+                                .Reverse()
+                                .ToList();
+                            if (window.Count > 0)
+                            {
+                                routerLedger = new JsonObject
+                                {
+                                    ["provider"] = provider,
+                                    ["eventIds"] = new JsonArray(window
+                                        .Select(e => (JsonNode)JsonValue.Create(e.ProviderEventId.ToString())!).ToArray()),
+                                    ["digests"] = new JsonArray(window
+                                        .Select(e => (JsonNode)JsonValue.Create(e.BodySha256)!).ToArray()),
+                                };
+                            }
+                        }
+                    }
+                }
+            }
+
             // 5.2: the policy's retentionDays.context.history when set, else 1d.
             var retention = await MediaPolicy.RetentionForKindAsync(db, "context.history", 1, ct);
             var days = int.Parse(retention[..^1], System.Globalization.CultureInfo.InvariantCulture);
@@ -203,6 +264,17 @@ public sealed class ContextIngress(
                 StoredAt = now,
                 RetentionPolicy = retention,
             });
+            // The verbatim answer; when the window came off a signed-over
+            // (team-owned) thread, the router-ledger provenance rides as one
+            // added member — copy-on-forward made queryable.
+            var detail = data.GetRawText();
+            if (routerLedger is not null)
+            {
+                var detailNode = JsonNode.Parse(detail)!.AsObject();
+                detailNode["routerLedger"] = routerLedger;
+                detail = detailNode.ToJsonString();
+            }
+
             audit.Append(db, new AuditRecord(
                 Actor: $"link:{responder}",
                 Action: "context.fetched",
@@ -211,7 +283,7 @@ public sealed class ContextIngress(
                 Reason: "answered",
                 EvidenceRef: null,
                 PolicyVersion: "context-v1",
-                Detail: data.GetRawText()));
+                Detail: detail));
             await db.SaveChangesAsync(ct);
 
             // Wake the parked intents (the dependency-gate wake): a fetched
@@ -223,6 +295,25 @@ public sealed class ContextIngress(
         }
 
         return new ContextArm(null, "accepted");
+    }
+
+    /// <summary>True when one ledger body's wire reference names exactly this
+    /// conversation (the provenance join: ledger rows never move).</summary>
+    private static bool CarriesReference(string body, string channel, string rootMessage)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            return doc.RootElement.TryGetProperty("reference", out var reference)
+                   && reference.TryGetProperty("channelOrResourceId", out var c)
+                   && reference.TryGetProperty("rootThreadId", out var r)
+                   && c.ValueKind == JsonValueKind.String && c.GetString() == channel
+                   && r.ValueKind == JsonValueKind.String && r.GetString() == rootMessage;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
     }
 
     private static JsonObject FetchCommand(

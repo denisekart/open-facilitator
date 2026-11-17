@@ -153,6 +153,10 @@ public static class WorkCreate
             RootMessageId = plan.Root,
             ParentMessageId = plan.BindingMessageId,
             WorkId = plan.WorkId,
+            // Born-team law: the binding names the OWNING team of the work it
+            // routes to, so later messages on the thread are born team-owned
+            // (ingest resolves the conversation's team from this row).
+            TeamSlug = plan.TeamSlug,
             IdempotencyKey = plan.BindingIdempotencyKey,
             CreatedAt = now,
         });

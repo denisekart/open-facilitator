@@ -25,7 +25,8 @@ public sealed class EfCoordinationStore(
     AiPolicyStore? aiPolicies = null,
     CommunicationDecision? communication = null,
     Facilitator.Kernel.Notifications.NotificationLedger? notifications = null,
-    InteractionOptions? interaction = null) : ICoordinationStore
+    InteractionOptions? interaction = null,
+    Facilitator.Kernel.Shared.Storage.ArtifactGrantStore? grants = null) : ICoordinationStore
 {
     private const string KernelLogChannel = "kernel.log";
 
@@ -810,6 +811,41 @@ public sealed class EfCoordinationStore(
             foreach (var audit in mediaAudits)
             {
                 db.Audit.Add(audit);
+            }
+
+            // Delivery-scoped read grants: a reply on a foreign-team artifact
+            // rents the receiving enrollment exactly one read of those bytes
+            // (the router bot delivers, never owns). The deterministic
+            // commandId + the unique (artifact, command) index make a replay
+            // of this append mint nothing new.
+            if (grants is not null && mediaArtifacts is { Count: > 0 })
+            {
+                var attachedIds = mediaArtifacts.OfType<System.Text.Json.Nodes.JsonObject>()
+                    .Select(o => o["artifactId"]?.GetValue<string>())
+                    .Where(s => s is not null && Guid.TryParse(s, out _))
+                    .Select(s => Guid.Parse(s!))
+                    .ToList();
+                if (attachedIds.Count > 0)
+                {
+                    var enrollmentTeam = await db.LinkEnrollments.AsNoTracking()
+                        .Where(e => e.EndpointId == endpoint)
+                        .Join(db.Teams.AsNoTracking(), e => e.TeamId, t => t.TeamId, (e, t) => t.Slug)
+                        .FirstOrDefaultAsync(ct);
+                    var foreign = await db.Artifacts.AsNoTracking()
+                        .Where(a => attachedIds.Contains(a.ArtifactId)
+                                 && a.TeamSlug != null && a.TeamSlug != enrollmentTeam)
+                        .Select(a => a.ArtifactId)
+                        .ToListAsync(ct);
+                    var alreadyMinted = await db.ArtifactGrants.AsNoTracking()
+                        .Where(g => g.CommandId == commandId && foreign.Contains(g.ArtifactId))
+                        .Select(g => g.ArtifactId)
+                        .ToListAsync(ct);
+                    foreach (var id in foreign.Except(alreadyMinted))
+                    {
+                        grants.Mint(db, id, enrollmentTeam ?? string.Empty, endpoint, commandId,
+                            "kernel:reply", "reply-media", now);
+                    }
+                }
             }
         }
 

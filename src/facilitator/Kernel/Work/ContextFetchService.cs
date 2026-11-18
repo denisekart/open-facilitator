@@ -197,7 +197,7 @@ public sealed class ContextFetchService(
     /// <summary>Manual URI split (memory://team:alpha?q=… has an authority
     /// the <see cref="Uri"/> class would not parse as a host): returns
     /// scheme, authority (without the query/fragment), and the raw query.</summary>
-    internal static (string Scheme, string Authority, string Query) Split(string uri)
+    public static (string Scheme, string Authority, string Query) Split(string uri)
     {
         var schemeEnd = uri.IndexOf("://", StringComparison.Ordinal);
         if (schemeEnd <= 0)

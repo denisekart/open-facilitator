@@ -665,7 +665,7 @@ public sealed class ContextBuilder
 
     /// <summary>Resolve one <c>$…</c> template (closed vocabulary); a
     /// non-template rides verbatim, an unknown template resolves to null.</summary>
-    internal static string? ResolveTemplate(
+    public static string? ResolveTemplate(
         string? template, string? threadUri, string? teamSlug, string? projectConfigJson)
     {
         if (string.IsNullOrEmpty(template))

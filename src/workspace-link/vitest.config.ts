@@ -1,4 +1,4 @@
-import { withCoverage } from "../../tools/coverage/vitest-coverage.mts";
+import { withCoverage } from "../../tools/coverage/vitest-coverage.mjs";
 
 // Unit tier: mock-transport tests + fixture conformance, no containers.
 // E2E tier (`*.e2e.test.ts`) needs a live Facilitator (FACILITATOR_URL) and
@@ -8,6 +8,7 @@ export default withCoverage(
     test: {
       include: [
         "test/client/**/*.test.ts",
+        "test/core/**/*.test.ts",
         "test/ledger/**/*.test.ts",
         "test/transport/**/*.test.ts",
         "test/faults/**/*.test.ts",

@@ -83,6 +83,34 @@ public sealed class TracePropagationTests(DispatchDbFixture fixture)
         public void Dispose() => _listener.Dispose();
     }
 
+    /// <summary>
+    /// Drain to settle: the manual drain claims GLOBALLY with a batch cap,
+    /// and this dedicated container is shared with every dispatch-link class
+    /// (serial, but earlier classes leave expired-lease link rows pending),
+    /// so one pass may only deliver foreign rows — under coverage-instrumented
+    /// timing the test's own row can sit outside the first batch (the flake:
+    /// a fresh-root foreign span collected, the stamped envelope not yet
+    /// written). With the host quiesced (noDispatcher + linkPump: false) the
+    /// test is the ONLY dispatcher, so repeated passes are deterministic:
+    /// stop when the sentinel holds, or when a pass claims nothing.
+    /// </summary>
+    private static async Task DrainUntilAsync(
+        IEventDispatcher dispatcher, Func<Task<bool>> settled, int maxPasses = 50)
+    {
+        for (var pass = 0; pass < maxPasses; pass++)
+        {
+            if (await settled())
+            {
+                return;
+            }
+
+            if (await dispatcher.DrainOnceAsync(CancellationToken.None) == 0 && await settled())
+            {
+                return;
+            }
+        }
+    }
+
     [Fact]
     public async Task UntracedAssign_StampedIntoStoredEnvelopeAndSpanTrace()
     {
@@ -104,9 +132,16 @@ public sealed class TracePropagationTests(DispatchDbFixture fixture)
         await fixture.Db.ExpireLinkLeases();
 
         var dispatcher = factory.Services.GetRequiredService<IEventDispatcher>();
-        await dispatcher.DrainOnceAsync(CancellationToken.None);
+        string? storedText = null;
+        await DrainUntilAsync(
+            dispatcher,
+            async () =>
+            {
+                storedText = await fixture.Db.OutboxEnvelopeByCommand(commandId);
+                return storedText is not null
+                    && JsonDocument.Parse(storedText).RootElement.TryGetProperty("traceparent", out _);
+            });
 
-        var storedText = await fixture.Db.OutboxEnvelopeByCommand(commandId);
         Assert.NotNull(storedText);
         var stored = JsonDocument.Parse(storedText);
         var stamped = stored.RootElement.GetProperty("traceparent").GetString()!;
@@ -144,7 +179,10 @@ public sealed class TracePropagationTests(DispatchDbFixture fixture)
         await fixture.Db.ExpireLinkLeases();
 
         var dispatcher = factory.Services.GetRequiredService<IEventDispatcher>();
-        await dispatcher.DrainOnceAsync(CancellationToken.None);
+        await DrainUntilAsync(
+            dispatcher,
+            () => Task.FromResult(
+                collector.Spans.Any(s => s.OperationName == "outbox.dispatch" && s.ParentId == seeded)));
 
         // Extract law: the dispatch span re-parents onto the stored carrier.
         Assert.Contains(collector.Spans, s => s.OperationName == "outbox.dispatch" && s.ParentId == seeded);

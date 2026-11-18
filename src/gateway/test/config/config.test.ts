@@ -254,6 +254,60 @@ describe("parseConfig mode matrix (config v2)", () => {
     expect(config.childTransport?.tcp).toEqual({ port: 8090 });
   });
 
+  it("parses the tls listener block for remote children", () => {
+    const config = parseConfig(
+      `${STANDALONE.replace(
+        "  tcp:\n    port: 8090\n",
+        "",
+      )}  tls:\n    cert: certs/child.crt\n    key: certs/child.key\n    port: 8443\n`,
+      { configDir: "/etc/gw" },
+    );
+    // cert/key are literal PEM paths (the listener reads them at bind time);
+    // the port is the listen port for the remote-child leg.
+    expect(config.childTransport?.tls).toEqual({
+      cert: "certs/child.crt",
+      key: "certs/child.key",
+      port: 8443,
+    });
+  });
+
+  it("rejects a tls block missing a key or carrying a foreign one", () => {
+    const base = `${STANDALONE.replace(
+      "  tcp:\n    port: 8090\n",
+      "",
+    )}  tls:\n    cert: c\n    key: k\n    port: 8443\n`;
+    expectKey(base.replace("    key: k\n", ""), "childTransport.tls.key");
+    expectKey(base.replace("port: 8443", "caBundle: x"), "unknown key 'caBundle'");
+  });
+
+  it("a childTransport block that is not a mapping names the key", () => {
+    expectKey(
+      STANDALONE.replace(
+        "childTransport:\n  socket:\n    path: ./child.sock\n  tcp:\n    port: 8090\n",
+        "childTransport:\n  socket: 42\n",
+      ),
+      "childTransport.socket",
+    );
+    expectKey(
+      STANDALONE.replace(
+        "childTransport:\n  socket:\n    path: ./child.sock\n  tcp:\n    port: 8090\n",
+        "childTransport:\n  socket:\n    path: ./child.sock\n  tcp: nope\n",
+      ),
+      "childTransport.tcp",
+    );
+  });
+
+  it("loadConfigFile on an unreadable path fails as a config error", () => {
+    const missing = join(stateDir(), "nowhere", "gateway.yaml");
+    try {
+      loadConfigFile(missing, {});
+      throw new Error("expected a GatewayConfigError");
+    } catch (error) {
+      expect(error).toBeInstanceOf(GatewayConfigError);
+      expect((error as Error).message).toContain(missing);
+    }
+  });
+
   it("accepts an explicitly empty children list in standalone", () => {
     const config = parseConfig(`${STANDALONE}children: []\n`, {});
     expect(config.children).toEqual([]);

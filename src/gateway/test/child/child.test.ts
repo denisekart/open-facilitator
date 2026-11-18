@@ -248,3 +248,73 @@ describe("newExecutionId", () => {
     expect(a).not.toBe(b);
   });
 });
+
+describe("EmbeddedChild handler outcomes", () => {
+  type Outcome = { kind: "rejected"; reason: string } | { kind: "unsupported"; reason?: string };
+
+  function withHandler(outcome: Outcome): EmbeddedChild {
+    return new EmbeddedChild({
+      childWorkspaceId: "gw.t/echo",
+      mode: "echo",
+      manifest: builtinChildManifest("echo"),
+      handler: {
+        onCommand: async () => outcome,
+      },
+    });
+  }
+
+  it("a send of kind register answers accepted with an empty execution id", async () => {
+    const c = child();
+    expect(
+      await c.send({
+        kind: "register",
+        childWorkspaceId: "gw.t/echo",
+        manifest: builtinChildManifest("echo"),
+      }),
+    ).toEqual({ kind: "accepted", executionId: "" });
+  });
+
+  it("steer dispatches through the handler (its outcome is the reply)", async () => {
+    const c = child();
+    await c.send({ kind: "start", executionId: "exec-s", executionGeneration: 1, command: assignCommand() });
+    const reply = await c.send({ kind: "steer", executionId: "exec-s", command: assignCommand() });
+    // The echo handler re-answers accepted for the steer.
+    expect(reply).toEqual({ kind: "accepted", executionId: "exec-s" });
+  });
+
+  it("a rejecting handler settles the execution failed and answers rejected", async () => {
+    const c = withHandler({ kind: "rejected", reason: "no capacity" });
+    expect(
+      await c.send({ kind: "start", executionId: "exec-r", executionGeneration: 1, command: assignCommand() }),
+    ).toEqual({ kind: "rejected", reason: "no capacity" });
+    expect(await c.send({ kind: "status", executionId: "exec-r" })).toMatchObject({
+      kind: "status",
+      state: "failed",
+    });
+  });
+
+  it("an unsupported handler answer deletes the execution (reason carried or absent)", async () => {
+    const withReason = withHandler({ kind: "unsupported", reason: "not mine" });
+    expect(
+      await withReason.send({
+        kind: "start",
+        executionId: "exec-u",
+        executionGeneration: 1,
+        command: assignCommand(),
+      }),
+    ).toEqual({ kind: "unsupported", reason: "not mine" });
+    expect(await withReason.send({ kind: "status", executionId: "exec-u" })).toMatchObject({
+      kind: "unknown",
+    });
+
+    const bare = withHandler({ kind: "unsupported" });
+    expect(
+      await bare.send({
+        kind: "start",
+        executionId: "exec-u2",
+        executionGeneration: 1,
+        command: assignCommand(),
+      }),
+    ).toEqual({ kind: "unsupported", reason: undefined });
+  });
+});

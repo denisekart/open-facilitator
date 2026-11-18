@@ -105,6 +105,12 @@ describe("loadPolicyFile", () => {
 describe("TeamPolicy matrix", () => {
   const policy = new TeamPolicy(loadPolicyFile(POLICY_YAML), FLEET);
 
+  it("the engine cites the loaded policy identity (audit citation)", () => {
+    const loaded = loadPolicyFile(POLICY_YAML);
+    expect(new TeamPolicy(loaded, FLEET).policyId).toBe(loaded.policyId);
+    expect(new TeamPolicy(loaded, FLEET).policyId).toMatch(/^team-alpha\/[0-9a-f]{12}$/);
+  });
+
   it("allows a wildcard row for the advertised capability", () => {
     expect(policy.evaluate("command.forward", ctx({}))).toBe("allow");
   });

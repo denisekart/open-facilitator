@@ -3,6 +3,7 @@
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { Socket } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
 import { parseConfig, type GatewayConfig } from "../../src/config.js";
 import { createGatewayRuntime, type GatewayRuntime } from "../../src/runtime.js";
@@ -86,5 +87,24 @@ describe("diagnostics endpoint", () => {
     runtime = bareRuntime();
     handle = await startDiagnostics(runtime, 39_418);
     await expect(startDiagnostics(runtime, 39_418)).rejects.toThrow(/cannot bind/);
+  });
+
+  it("a malformed request line is answered 400 on the raw socket (clientError)", async () => {
+    runtime = bareRuntime();
+    const port = 39_419;
+    handle = await startDiagnostics(runtime, port);
+    const { promise, resolve, reject } = Promise.withResolvers<string>();
+    const socket = new Socket();
+    let collected = "";
+    socket.once("connect", () => socket.write("this is not HTTP\r\n\r\n"));
+    socket.on("data", (chunk: Buffer) => {
+      collected += chunk.toString("utf8");
+      if (collected.includes("400")) resolve(collected);
+    });
+    socket.once("error", reject);
+    socket.connect(port, "127.0.0.1");
+    const answer = await promise;
+    expect(answer).toContain("HTTP/1.1 400 Bad Request");
+    socket.destroy();
   });
 });

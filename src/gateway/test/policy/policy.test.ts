@@ -1,7 +1,11 @@
 import type { CapabilityDescriptor } from "@ofac/protocol";
 import { describe, expect, it } from "vitest";
 
-import { DefaultPolicy, type PolicyContext } from "../../src/policy.js";
+import {
+  DefaultPolicy,
+  resourceMatches,
+  type PolicyContext,
+} from "../../src/policy.js";
 
 const ANALYZE: CapabilityDescriptor = {
   id: "research.analyze",
@@ -109,5 +113,19 @@ describe("DefaultPolicy deny-by-default matrix", () => {
         ctx({ commandType: "org.facilitator.event.assignment.completed.v1" }),
       ),
     ).toBe("allow");
+  });
+});
+
+describe("resourceMatches term law", () => {
+  it("`*` matches anything; a trailing `*` is a prefix; else exact", () => {
+    expect(resourceMatches("*", "anything/at/all")).toBe(true);
+    expect(resourceMatches("docs/*", "docs/readme.md")).toBe(true);
+    expect(resourceMatches("docs/*", "wiki/readme.md")).toBe(false);
+    // The exact term is the whole remaining branch: equal matches, other does not.
+    expect(resourceMatches("docs/readme.md", "docs/readme.md")).toBe(true);
+    expect(resourceMatches("docs/readme.md", "docs/other.md")).toBe(false);
+    // `*` is only a wildcard standalone: a bare `*` mid-term is literal.
+    expect(resourceMatches("a*b", "a*b")).toBe(true);
+    expect(resourceMatches("a*b", "aXb")).toBe(false);
   });
 });

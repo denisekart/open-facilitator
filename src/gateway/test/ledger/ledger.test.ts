@@ -302,3 +302,41 @@ describe("ExecutionLedger schema v2/v3", () => {
     expect(l.byChildState("gw.t/none", "running")).toEqual([]);
   });
 });
+
+describe("ExecutionLedger pinned keys + constraint honesty", () => {
+  it("pinChildKey: first pin carries rotatedAt NULL, a re-pin keeps pinnedAt", () => {
+    const l = open();
+    const first = l.pinChildKey("gw.t/a", "kid-1", "pk-1", "ed25519");
+    expect(first).toMatchObject({
+      childId: "gw.t/a",
+      keyId: "kid-1",
+      publicKey: "pk-1",
+      algorithm: "ed25519",
+      rotatedAt: null,
+    });
+    expect(first.pinnedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+
+    const second = l.pinChildKey("gw.t/a", "kid-2", "pk-2", "ed25519");
+    expect(second.pinnedAt).toBe(first.pinnedAt); // the first pin's moment survives
+    expect(second.rotatedAt).not.toBeNull();
+    expect(second.keyId).toBe("kid-2");
+    expect(l.childKey("gw.t/a")?.keyId).toBe("kid-2");
+  });
+
+  it("childKeys() lists every pin, child_id-sorted", () => {
+    const l = open();
+    l.pinChildKey("gw.t/z", "kid-z", "pk-z", "ed25519");
+    l.pinChildKey("gw.t/a", "kid-a", "pk-a", "ed25519");
+    expect(l.childKeys().map((r) => r.childId)).toEqual(["gw.t/a", "gw.t/z"]);
+    expect(l.childKeys()[0]).toMatchObject({ keyId: "kid-a", rotatedAt: null });
+  });
+
+  it("a non-UNIQUE constraint failure rethrows the raw error (not a typed conflict)", () => {
+    const l = open();
+    // The already-bound law maps UNIQUE hits onto BindingConflictError; any
+    // other constraint is a corrupt write and must surface raw.
+    expect(() =>
+      l.insert(binding({ workId: null as unknown as string })),
+    ).toThrow(/NOT NULL constraint failed: bindings.work_id/);
+  });
+});

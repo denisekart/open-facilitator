@@ -27,8 +27,9 @@ public sealed class LiteLlmDecisionsGateway : IDecisionGateway
         this.httpClientFactory = httpClientFactory;
     }
 
-    /// <summary>Test seam: real wire path against an injected handler.</summary>
-    internal LiteLlmDecisionsGateway(AiOptions options, HttpMessageHandler handler)
+    /// <summary>Test/E2E seam: run the REAL wire path against an injected handler
+    /// (no factory, no network) — mirrors the chat gateway's seam law.</summary>
+    public LiteLlmDecisionsGateway(AiOptions options, HttpMessageHandler handler)
     {
         this.options = options;
         httpClientFactory = null!;

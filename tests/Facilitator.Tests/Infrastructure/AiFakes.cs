@@ -39,6 +39,16 @@ public sealed class FakeAiGateway : IAiGateway
     /// <summary>When true, both ports throw <see cref="AiUnavailableException"/>.</summary>
     public bool Unavailable { get; set; }
 
+    /// <summary>Template ids that fail on every call even when the port is
+    /// otherwise healthy — the one-leg-down shape (e.g. the decode call lands
+    /// and the reply-composer leg is down).</summary>
+    public HashSet<string> AlwaysFails { get; } = [];
+
+    /// <summary>Template ids whose first N calls answer normally and whose
+    /// later calls fail — the mid-turn outage (a chat turn's read phase lands
+    /// and the second model call does not).</summary>
+    public Dictionary<string, int> FailAfterCalls { get; } = [];
+
     /// <summary>Queue a canned assistant response for the next call rendering
     /// <paramref name="templateId"/> (FIFO per template).</summary>
     public void Enqueue(string templateId, string responseJson) => _chat.Enqueue((templateId, responseJson));
@@ -51,7 +61,14 @@ public sealed class FakeAiGateway : IAiGateway
             Requests.Add(request);
         }
 
-        if (Unavailable)
+        var seen = 0;
+        lock (Requests)
+        {
+            seen = Requests.Count(r => r.TemplateId == request.TemplateId) - 1;
+        }
+
+        if (Unavailable || AlwaysFails.Contains(request.TemplateId)
+            || (FailAfterCalls.TryGetValue(request.TemplateId, out var budget) && seen >= budget))
         {
             throw new AiUnavailableException("fake gateway unavailable");
         }

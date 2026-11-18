@@ -31,6 +31,13 @@ export default defineConfig(({ mode }) =>
       test: {
         environment: "jsdom",
         setupFiles: ["./src/lib/test-harness.ts"],
+        // jsdom+svelte cold start is ~34s PER FILE with the default fork
+        // isolation, which (a) made the coverage leg the ladder's wall-clock
+        // outlier and (b) trips vitest's hardcoded worker-start timeout under
+        // suite load (observed: "Timeout waiting for worker to respond" on
+        // FlowDetail.test.ts during `make coverage`). Workers are reused
+        // across files; component tests keep state hygiene via the harness.
+        poolOptions: { forks: { isolate: false } },
         server: {
           deps: {
             inline: ["svelte"],

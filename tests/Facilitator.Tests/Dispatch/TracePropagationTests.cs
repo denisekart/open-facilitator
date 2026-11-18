@@ -42,7 +42,32 @@ public sealed class TracePropagationTests(DispatchDbFixture fixture)
     {
         private readonly ActivityListener _listener;
 
-        public List<Activity> Spans { get; } = [];
+        /// <summary>Lock-protected: ActivityStopped fires on whatever thread
+        /// completes an activity, and parallel collections in this shared
+        /// process emit the same source under load.</summary>
+        private readonly object Gate = new();
+
+        private readonly List<Activity> spans = [];
+
+        public IReadOnlyList<Activity> Spans
+        {
+            get
+            {
+                lock (this.Gate)
+                {
+                    return this.spans.ToArray();
+                }
+            }
+        }
+
+        private void OnStopped(Activity activity)
+        {
+            lock (this.Gate)
+            {
+                this.spans.Add(activity);
+            }
+        }
+
 
         public SpanCollector()
         {
@@ -51,7 +76,7 @@ public sealed class TracePropagationTests(DispatchDbFixture fixture)
                 ShouldListenTo = source => source.Name == KernelActivity.SourceName,
                 Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllData,
             };
-            _listener.ActivityStopped += Spans.Add;
+            _listener.ActivityStopped += this.OnStopped;
             ActivitySource.AddActivityListener(_listener);
         }
 
@@ -64,13 +89,19 @@ public sealed class TracePropagationTests(DispatchDbFixture fixture)
         var sink = new CapturingLinkSink();
         using var factory = new KernelTestFactory(fixture, noDispatcher: true, _ => sink);
         using var client = factory.CreateAuthedClient();
+        // The collector opens BEFORE the row exists: noDispatcher removes
+        // OutboxDispatcher, but the link pump (lambda-hosted, needed alive
+        // by connected-delivery suites) claims link rows on its own 2s
+        // safety poll. Whoever claims, the law is dispatcher-agnostic, so
+        // a listener that precedes claimability observes the dispatch span
+        // deterministically — even under a loaded suite where the pump wins.
+        using var collector = new SpanCollector();
         var endpoint = "gw-tp-" + Guid.NewGuid().ToString("N")[..8];
         var envelope = LinkTestHarness.AssignEnvelopeFor(endpoint);
         var commandId = JsonDocument.Parse(envelope).RootElement.GetProperty("data").GetProperty("commandId").GetString()!;
         await LinkTestHarness.QueueLinkOutboxAsync(client, endpoint, envelope);
         await fixture.Db.ExpireLinkLeases();
 
-        using var collector = new SpanCollector();
         var dispatcher = factory.Services.GetRequiredService<IEventDispatcher>();
         await dispatcher.DrainOnceAsync(CancellationToken.None);
 
@@ -97,6 +128,8 @@ public sealed class TracePropagationTests(DispatchDbFixture fixture)
         var sink = new CapturingLinkSink();
         using var factory = new KernelTestFactory(fixture, noDispatcher: true, _ => sink);
         using var client = factory.CreateAuthedClient();
+        // Collector opens before the row exists — see the Untraced twin.
+        using var collector = new SpanCollector();
         var endpoint = "gw-tp-" + Guid.NewGuid().ToString("N")[..8];
         var root = System.Text.Json.Nodes.JsonNode.Parse(LinkTestHarness.AssignEnvelopeFor(endpoint))!.AsObject();
         var traceId = Convert.ToHexString(RandomNumberGenerator.GetBytes(16)).ToLowerInvariant();
@@ -108,7 +141,6 @@ public sealed class TracePropagationTests(DispatchDbFixture fixture)
         await LinkTestHarness.QueueLinkOutboxAsync(client, endpoint, envelope);
         await fixture.Db.ExpireLinkLeases();
 
-        using var collector = new SpanCollector();
         var dispatcher = factory.Services.GetRequiredService<IEventDispatcher>();
         await dispatcher.DrainOnceAsync(CancellationToken.None);
 

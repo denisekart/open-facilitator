@@ -1,7 +1,7 @@
 // Unit tier: op law (ledger replay, ambiguous-timeout reconcile) against a
 // fake forge HTTP server, the connector_actions ledger, config validation —
 // all in-process, no Gateway, no live Forgejo.
-import { withCoverage } from "../../../../tools/coverage/vitest-coverage.mts";
+import { withCoverage } from "../../../../tools/coverage/vitest-coverage.mjs";
 
 export default withCoverage(
   {

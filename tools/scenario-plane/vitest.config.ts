@@ -1,4 +1,4 @@
-import { withCoverage } from "../../tools/coverage/vitest-coverage.mts";
+import { withCoverage } from "../../tools/coverage/vitest-coverage.mjs";
 
 export default withCoverage(
   {

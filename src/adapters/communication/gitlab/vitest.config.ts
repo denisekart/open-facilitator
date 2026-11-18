@@ -1,7 +1,7 @@
 // Unit tier: system-hook token law, normalize classification against
 // recorded fixtures, comment-ledger replay law, config validation — all
 // in-process, no live GitLab.
-import { withCoverage } from "../../../../tools/coverage/vitest-coverage.mts";
+import { withCoverage } from "../../../../tools/coverage/vitest-coverage.mjs";
 
 export default withCoverage(
   {

@@ -1,4 +1,4 @@
-import { withCoverage } from "../../tools/coverage/vitest-coverage.mts";
+import { withCoverage } from "../../tools/coverage/vitest-coverage.mjs";
 
 // Unit tier: conformance-fixture validation, no containers.
 export default withCoverage(

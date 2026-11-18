@@ -1,6 +1,6 @@
 // Unit tier: config law matrix + the scripted execution driven in-process
 // with a fake RunContext (no sockets, no Facilitator).
-import { withCoverage } from "../../../../tools/coverage/vitest-coverage.mts";
+import { withCoverage } from "../../../../tools/coverage/vitest-coverage.mjs";
 
 export default withCoverage(
   {

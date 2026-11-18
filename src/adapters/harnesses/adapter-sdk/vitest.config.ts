@@ -1,4 +1,4 @@
-import { withCoverage } from "../../../../tools/coverage/vitest-coverage.mts";
+import { withCoverage } from "../../../../tools/coverage/vitest-coverage.mjs";
 
 // Unit tier: an in-process child listener + scripted Gateway-side frames
 // (the @ofac/gateway listener IS the peer — no Facilitator needed). The

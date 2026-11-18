@@ -1,7 +1,7 @@
 // Unit tier: the provision handler + GC law + allowlist gate + config parsing,
 // all against a fake Docker Engine API served over a unix socket in tmpdir —
 // no real docker, no kernel.
-import { withCoverage } from "../../../tools/coverage/vitest-coverage.mts";
+import { withCoverage } from "../../../tools/coverage/vitest-coverage.mjs";
 
 export default withCoverage(
   {

@@ -2,7 +2,7 @@
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite";
-import { withCoverage } from "../../../tools/coverage/vitest-coverage.mts";
+import { withCoverage } from "../../../tools/coverage/vitest-coverage.mjs";
 
 // The SPA embeds into the kernel: hashed assets land in src/facilitator/wwwroot
 // (served by UseStaticFiles + MapFallbackToFile). The dev proxy keeps the

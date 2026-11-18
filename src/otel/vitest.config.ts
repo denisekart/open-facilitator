@@ -1,4 +1,4 @@
-import { withCoverage } from "../../tools/coverage/vitest-coverage.mts";
+import { withCoverage } from "../../tools/coverage/vitest-coverage.mjs";
 
 // Unit tier: env-only bootstrap tests, no network (port 1 black-holes).
 export default withCoverage(

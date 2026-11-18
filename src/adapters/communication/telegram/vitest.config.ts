@@ -1,7 +1,7 @@
 // Unit tier: normalize classification, config laws, media pipeline against a
 // fake Telegram API + stub kernel, handler idempotency — all in-process, no
 // live Telegram.
-import { withCoverage } from "../../../../tools/coverage/vitest-coverage.mts";
+import { withCoverage } from "../../../../tools/coverage/vitest-coverage.mjs";
 
 export default withCoverage(
   {

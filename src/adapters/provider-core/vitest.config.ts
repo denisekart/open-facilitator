@@ -1,6 +1,6 @@
 // Unit tier: config fail-closed law, ledger replay/conflict law, manifest
 // flag filtering, webhook-receiver decode/outcome law — all in-process.
-import { withCoverage } from "../../../tools/coverage/vitest-coverage.mts";
+import { withCoverage } from "../../../tools/coverage/vitest-coverage.mjs";
 
 export default withCoverage(
   {

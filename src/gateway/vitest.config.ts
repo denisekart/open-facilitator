@@ -1,4 +1,4 @@
-import { withCoverage } from "../../tools/coverage/vitest-coverage.mts";
+import { withCoverage } from "../../tools/coverage/vitest-coverage.mjs";
 
 // Unit tier: mock-transport tests over the runtime, no containers. The E2E
 // tier (`*.e2e.test.ts`) needs a live Facilitator (FACILITATOR_URL) and runs

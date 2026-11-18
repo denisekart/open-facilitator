@@ -1,31 +1,31 @@
 {
-  "generated": "2026-11-18T00:50:34.583Z",
+  "generated": "2026-11-18T21:28:13.243Z",
   "areas": {
     "protocol/dotnet": {
       "lines": {
-        "pct": 88.6,
-        "covered": 93,
+        "pct": 98.1,
+        "covered": 103,
         "total": 105
       },
       "branches": {
-        "pct": 73.6,
-        "covered": 53,
+        "pct": 88.9,
+        "covered": 64,
         "total": 72
       },
       "tiers": {
-        "unit": 88.6
+        "unit": 98.1
       },
       "zeroFiles": [],
       "ecosystems": {
         "dotnet": {
           "lines": {
-            "pct": 88.6,
-            "covered": 93,
+            "pct": 98.1,
+            "covered": 103,
             "total": 105
           },
           "branches": {
-            "pct": 73.6,
-            "covered": 53,
+            "pct": 88.9,
+            "covered": 64,
             "total": 72
           }
         }
@@ -341,38 +341,29 @@
     },
     "src/adapters/harnesses/adapter-sdk": {
       "lines": {
-        "pct": 54.1,
-        "covered": 422,
+        "pct": 97.8,
+        "covered": 763,
         "total": 780
       },
       "branches": {
-        "pct": 47.9,
-        "covered": 253,
+        "pct": 80.5,
+        "covered": 425,
         "total": 528
       },
       "tiers": {
-        "unit": 54.1
+        "unit": 97.8
       },
-      "zeroFiles": [
-        {
-          "path": "src/adapters/harnesses/adapter-sdk/src/media-law.ts",
-          "lines": 47
-        },
-        {
-          "path": "src/adapters/harnesses/adapter-sdk/src/kernel-leg.ts",
-          "lines": 7
-        }
-      ],
+      "zeroFiles": [],
       "ecosystems": {
         "ts": {
           "lines": {
-            "pct": 54.1,
-            "covered": 422,
+            "pct": 97.8,
+            "covered": 763,
             "total": 780
           },
           "branches": {
-            "pct": 47.9,
-            "covered": 253,
+            "pct": 80.5,
+            "covered": 425,
             "total": 528
           }
         }
@@ -513,34 +504,29 @@
     },
     "src/adapters/provider-core": {
       "lines": {
-        "pct": 64.6,
-        "covered": 235,
+        "pct": 99.7,
+        "covered": 363,
         "total": 364
       },
       "branches": {
-        "pct": 48.7,
-        "covered": 170,
+        "pct": 96.3,
+        "covered": 336,
         "total": 349
       },
       "tiers": {
-        "unit": 64.6
+        "unit": 99.7
       },
-      "zeroFiles": [
-        {
-          "path": "src/adapters/provider-core/src/adapter-face.ts",
-          "lines": 18
-        }
-      ],
+      "zeroFiles": [],
       "ecosystems": {
         "ts": {
           "lines": {
-            "pct": 64.6,
-            "covered": 235,
+            "pct": 99.7,
+            "covered": 363,
             "total": 364
           },
           "branches": {
-            "pct": 48.7,
-            "covered": 170,
+            "pct": 96.3,
+            "covered": 336,
             "total": 349
           }
         }
@@ -587,23 +573,19 @@
     },
     "src/facilitator": {
       "lines": {
-        "pct": 87.9,
-        "covered": 20634,
-        "total": 23469
+        "pct": 91.7,
+        "covered": 21524,
+        "total": 23471
       },
       "branches": {
-        "pct": 66.3,
-        "covered": 5792,
-        "total": 8733
+        "pct": 72.8,
+        "covered": 6333,
+        "total": 8700
       },
       "tiers": {
-        "unit": 87.9
+        "unit": 91.7
       },
       "zeroFiles": [
-        {
-          "path": "src/facilitator/Kernel/Workflows/WorkflowShadowReport.cs",
-          "lines": 118
-        },
         {
           "path": "src/facilitator/Kernel/Shared/Persistence/FacilitatorDbContextFactory.cs",
           "lines": 6
@@ -616,14 +598,14 @@
       "ecosystems": {
         "dotnet": {
           "lines": {
-            "pct": 87.9,
-            "covered": 20634,
-            "total": 23469
+            "pct": 91.7,
+            "covered": 21524,
+            "total": 23471
           },
           "branches": {
-            "pct": 66.3,
-            "covered": 5792,
-            "total": 8733
+            "pct": 72.8,
+            "covered": 6333,
+            "total": 8700
           }
         }
       }
@@ -701,34 +683,29 @@
     },
     "src/gateway": {
       "lines": {
-        "pct": 79.7,
-        "covered": 1266,
+        "pct": 93.4,
+        "covered": 1483,
         "total": 1588
       },
       "branches": {
-        "pct": 69,
-        "covered": 864,
+        "pct": 81.5,
+        "covered": 1020,
         "total": 1252
       },
       "tiers": {
-        "unit": 79.7
+        "unit": 93.4
       },
-      "zeroFiles": [
-        {
-          "path": "src/gateway/src/bin/gateway.ts",
-          "lines": 65
-        }
-      ],
+      "zeroFiles": [],
       "ecosystems": {
         "ts": {
           "lines": {
-            "pct": 79.7,
-            "covered": 1266,
+            "pct": 93.4,
+            "covered": 1483,
             "total": 1588
           },
           "branches": {
-            "pct": 69,
-            "covered": 864,
+            "pct": 81.5,
+            "covered": 1020,
             "total": 1252
           }
         }
@@ -736,29 +713,29 @@
     },
     "src/otel": {
       "lines": {
-        "pct": 55.7,
-        "covered": 97,
+        "pct": 99.4,
+        "covered": 173,
         "total": 174
       },
       "branches": {
-        "pct": 46.9,
-        "covered": 38,
+        "pct": 90.1,
+        "covered": 73,
         "total": 81
       },
       "tiers": {
-        "unit": 55.7
+        "unit": 99.4
       },
       "zeroFiles": [],
       "ecosystems": {
         "ts": {
           "lines": {
-            "pct": 55.7,
-            "covered": 97,
+            "pct": 99.4,
+            "covered": 173,
             "total": 174
           },
           "branches": {
-            "pct": 46.9,
-            "covered": 38,
+            "pct": 90.1,
+            "covered": 73,
             "total": 81
           }
         }
@@ -796,42 +773,29 @@
     },
     "src/workspace-link": {
       "lines": {
-        "pct": 55.5,
-        "covered": 553,
+        "pct": 91.8,
+        "covered": 914,
         "total": 996
       },
       "branches": {
-        "pct": 40.7,
-        "covered": 246,
+        "pct": 84.4,
+        "covered": 510,
         "total": 604
       },
       "tiers": {
-        "unit": 55.5
+        "unit": 91.8
       },
-      "zeroFiles": [
-        {
-          "path": "src/workspace-link/src/bin/linkd.ts",
-          "lines": 70
-        },
-        {
-          "path": "src/workspace-link/src/core/session.ts",
-          "lines": 50
-        },
-        {
-          "path": "src/workspace-link/src/node/signalr.ts",
-          "lines": 48
-        }
-      ],
+      "zeroFiles": [],
       "ecosystems": {
         "ts": {
           "lines": {
-            "pct": 55.5,
-            "covered": 553,
+            "pct": 91.8,
+            "covered": 914,
             "total": 996
           },
           "branches": {
-            "pct": 40.7,
-            "covered": 246,
+            "pct": 84.4,
+            "covered": 510,
             "total": 604
           }
         }
@@ -869,7 +833,7 @@
     }
   },
   "tierSeconds": {
-    "unit": "788",
-    "ts-unit": "515"
+    "unit": "1954",
+    "ts-unit": "499"
   }
 }

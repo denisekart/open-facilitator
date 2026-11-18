@@ -2,36 +2,45 @@
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite";
+import { withCoverage } from "../../../tools/coverage/vitest-coverage.mts";
 
 // The SPA embeds into the kernel: hashed assets land in src/facilitator/wwwroot
 // (served by UseStaticFiles + MapFallbackToFile). The dev proxy keeps the
 // 5173-loop cookie/CORS-free: /api + /ui-config ride to the kernel on 8088.
-export default defineConfig(({ mode }) => ({
-  root: import.meta.dirname,
-  base: "/",
-  plugins: [svelte(), tailwindcss()],
-  build: {
-    outDir: "../wwwroot",
-    emptyOutDir: true,
-  },
-  server: {
-    proxy: {
-      "/api": "http://localhost:8088",
-      "/ui-config": "http://localhost:8088",
-    },
-  },
-  // Component tests mount real components: resolve svelte's browser
-  // (client) build, not the node default (the server build has no mount()).
-  // Build MUST keep Vite's default conditions — an explicit array here
-  // REPLACES them, and the SPA bundle silently ships the svelte server build.
-  ...(mode === "test" ? { resolve: { conditions: ["browser"] } } : {}),
-  test: {
-    environment: "jsdom",
-    setupFiles: ["./src/lib/test-harness.ts"],
-    server: {
-      deps: {
-        inline: ["svelte"],
+export default defineConfig(({ mode }) =>
+  withCoverage(
+    {
+      root: import.meta.dirname,
+      base: "/",
+      plugins: [svelte(), tailwindcss()],
+      build: {
+        outDir: "../wwwroot",
+        emptyOutDir: true,
+      },
+      server: {
+        proxy: {
+          "/api": "http://localhost:8088",
+          "/ui-config": "http://localhost:8088",
+        },
+      },
+      // Component tests mount real components: resolve svelte's browser
+      // (client) build, not the node default (the server build has no mount()).
+      // Build MUST keep Vite's default conditions — an explicit array here
+      // REPLACES them, and the SPA bundle silently ships the svelte server build.
+      ...(mode === "test" ? { resolve: { conditions: ["browser"] } } : {}),
+      test: {
+        environment: "jsdom",
+        setupFiles: ["./src/lib/test-harness.ts"],
+        server: {
+          deps: {
+            inline: ["svelte"],
+          },
+        },
       },
     },
-  },
-}));
+    import.meta.dirname,
+    "ui",
+    // We ship the console: components count as production source.
+    { include: ["src/**/*.ts", "src/**/*.svelte"] },
+  ),
+);

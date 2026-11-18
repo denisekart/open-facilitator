@@ -39,6 +39,11 @@ catalog:
   typescript: "^6.0.3"
   tsup: "^9.0.0"
   vitest: "^5.0.5"
+  # Coverage provider for the measurement ladder (`make coverage`). Pinned
+  # exactly to the vitest version the lockfile resolves: vitest refuses to
+  # run the provider against a mismatched major.minor ("mixed versions" is a
+  # warning, but a misaligned pair silently reports nothing).
+  "@vitest/coverage-v8": "5.0.5"
   # @ofac/protocol runtime deps (Plan 01 Step 4), resolved via npm registry 2026-10.
   ajv: "^8.20.0"
   ajv-formats: "^3.0.1"

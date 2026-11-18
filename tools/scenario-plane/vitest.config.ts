@@ -1,5 +1,9 @@
-import { defineConfig } from "vitest/config";
+import { withCoverage } from "../../tools/coverage/vitest-coverage.mts";
 
-export default defineConfig({
-  test: { include: ["test/**/*.test.ts"], testTimeout: 15_000 },
-});
+export default withCoverage(
+  {
+    test: { include: ["test/**/*.test.ts"], testTimeout: 15_000 },
+  },
+  import.meta.dirname,
+  "scenario-plane",
+);

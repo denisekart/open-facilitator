@@ -16,6 +16,13 @@ dist/
 node_modules/
 coverage/
 TestResults/
+# The bare `coverage/` above also matches these committed dirs (the ladder's
+# shared configs and its ratchet baseline) — re-include them explicitly.
+!.omp/coverage/
+!tools/coverage/
+# Raw measurement-ladder outputs (`make coverage`); the committed rollup lives
+# in .omp/coverage/, not here.
+artifacts/
 # pnpm falls back to a project-local store when the global one is
 # unreachable (sandboxed installs); 12k content-addressable files must
 # never surface in git status.

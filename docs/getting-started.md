@@ -50,6 +50,14 @@ Running individual tests:
 | TypeScript, one package | `pnpm --filter @ofac/gateway test` |
 | TypeScript, one file | `pnpm --filter @ofac/workspace-link exec vitest run test/package.test.ts` |
 
+Measuring coverage: `make coverage` runs the unit-tier ladder (.NET
+`Facilitator.Tests` + every TS package) with the collectors attached, merges
+the results into `.omp/coverage/baseline.json` + `README.md`, and fails if any
+area's line coverage regressed — move the ratchet upward with
+`COVERAGE_UPDATE=1 make coverage`. `FULL=1` adds the heavier legs (scenario
+walks, Playwright browser tier, reference-env flows); that combination is
+nightly-sized, not the default. Collection never rides on `make test`.
+
 ## 3. Bring up the reference environment
 
 You will have: every service healthy and one demo Work already dispatched

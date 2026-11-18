@@ -8,6 +8,10 @@
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <!-- Coverage ladder FULL=1 leg only (`make coverage FULL=1`): the
+         collector is inert unless the run passes the runsettings file, so
+         `make test` / `make admin-e2e` are unaffected. -->
+    <PackageReference Include="coverlet.collector" />
     <PackageReference Include="Microsoft.Playwright" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
     <PackageReference Include="Testcontainers.PostgreSql" />

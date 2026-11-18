@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Coverage ladder collector settings (`make coverage`).
+     XPlat Code Coverage = the coverlet.collector data collector referenced by
+     the test projects. Cobertura because it carries absolute-ish source paths
+     we can normalize repo-relative in tools/coverage-report.mjs. Generated EF
+     migrations and the staged SPA (wwwroot) are excluded per the idea's
+     non-goals (generated code is not on the pyramid).
+     Output lands in the results-directory run-guid dir as
+     coverage.cobertura.xml; each tier gets its own results directory,
+     which is the tier tag. -->
+<RunSettings>
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="XPlat Code Coverage" enabled="true">
+        <Configuration>
+          <Format>cobertura</Format>
+          <ExcludeByFile>**/Migrations/**,**/wwwroot/**</ExcludeByFile>
+          <ExcludeByAttribute>GeneratedCodeAttribute,CompilerGeneratedAttribute</ExcludeByAttribute>
+          <UseSourceLink>false</UseSourceLink>
+          <IncludeTestAssembly>false</IncludeTestAssembly>
+          <SingleHit>false</SingleHit>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+</RunSettings>

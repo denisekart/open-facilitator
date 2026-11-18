@@ -1,4 +1,4 @@
-.PHONY: restore build test lint format protocol db-update compose-slim compose-full compose-down clean link-e2e gateway-e2e worker-e2e admin-e2e example-slim-up docs-check provider-e2e gitlab-up gitlab-down example-local-smoke scenario-gate scenario-walks scenario-golden scenario-plane-up scenario-gate-e2e ref-env release release-npm
+.PHONY: restore build test coverage lint format protocol db-update compose-slim compose-full compose-down clean link-e2e gateway-e2e worker-e2e admin-e2e example-slim-up docs-check provider-e2e gitlab-up gitlab-down example-local-smoke scenario-gate scenario-walks scenario-golden scenario-plane-up scenario-gate-e2e ref-env release release-npm
 
 restore:
 	dotnet restore OpenFacilitator.slnx
@@ -14,6 +14,40 @@ test: build
 	dotnet test tests/Facilitator.Tests/Facilitator.Tests.csproj -c Release --no-build
 	pnpm -r test
 	dotnet run --project protocol/tools/Validate.Fixtures -c Release --no-build
+
+# --- Coverage measurement ladder (see .omp/ideas/test-coverage-pyramid.md) ----
+# The fast ladder: unit (.NET Facilitator.Tests + all TS packages), then the
+# rollup merger with the ratchet against .omp/coverage/baseline.json.
+# Collection rides on tools/coverage/coverlet.runsettings (data collector),
+# never on csproj props: `make test` cost stays unchanged.
+# Measured split (first honest run, this machine): unit 790s, ts-unit 517s,
+# integration (ScenarioWalks) 69s — fast ladder ~22 min, over the 10±5 budget
+# even after dropping ScenarioWalks. Per the plan the shaping decision is
+# deferred to the baseline analysis; ScenarioWalks therefore rides FULL, and
+# its 69s of integration attribution only appears there.
+# FULL=1 adds the heavy legs (scenario walks, Playwright browser tier +
+# reference-env acceptance flows) — nightly territory, wired nowhere.
+COVDIR := artifacts/coverage
+coverage: build
+	rm -rf $(COVDIR)
+	tools/coverage/with-time.sh unit $(COVDIR)/timings.json \
+	  dotnet test tests/Facilitator.Tests/Facilitator.Tests.csproj -c Release --no-build \
+	    --settings tools/coverage/coverlet.runsettings --results-directory $(COVDIR)/dotnet/unit
+	tools/coverage/with-time.sh ts-unit $(COVDIR)/timings.json pnpm run test:coverage
+ifneq ($(FULL),)
+	tools/coverage/with-time.sh integration $(COVDIR)/timings.json \
+	  dotnet test tests/Facilitator.ScenarioWalks/Facilitator.ScenarioWalks.csproj -c Release --no-build \
+	    --settings tools/coverage/coverlet.runsettings --results-directory $(COVDIR)/dotnet/integration
+	tools/coverage/with-time.sh e2e $(COVDIR)/timings.json \
+	  dotnet test tests/Facilitator.E2E/Facilitator.E2E.csproj -c Release --no-build \
+	    --settings tools/coverage/coverlet.runsettings --results-directory $(COVDIR)/dotnet/e2e
+	@# Reference leg: the kernel runs in a container there, so it contributes
+	@# flows-proved attribution only (reference.json), no .NET instrumentation.
+	tools/coverage/with-time.sh reference $(COVDIR)/timings.json \
+	  bash -c './referencectl down -v && ./referencectl up slim && reference/checks/verify.sh && \
+	    printf "{\"note\": \"kernel in container: flows proved only\"}" > $(COVDIR)/reference.json'
+endif
+	node tools/coverage-report.mjs
 
 lint:
 	dotnet format OpenFacilitator.slnx --verify-no-changes

@@ -1,0 +1,875 @@
+{
+  "generated": "2026-11-18T00:50:34.583Z",
+  "areas": {
+    "protocol/dotnet": {
+      "lines": {
+        "pct": 88.6,
+        "covered": 93,
+        "total": 105
+      },
+      "branches": {
+        "pct": 73.6,
+        "covered": 53,
+        "total": 72
+      },
+      "tiers": {
+        "unit": 88.6
+      },
+      "zeroFiles": [],
+      "ecosystems": {
+        "dotnet": {
+          "lines": {
+            "pct": 88.6,
+            "covered": 93,
+            "total": 105
+          },
+          "branches": {
+            "pct": 73.6,
+            "covered": 53,
+            "total": 72
+          }
+        }
+      }
+    },
+    "src/adapters/communication/forgejo": {
+      "lines": {
+        "pct": 58.4,
+        "covered": 359,
+        "total": 615
+      },
+      "branches": {
+        "pct": 51.7,
+        "covered": 345,
+        "total": 667
+      },
+      "tiers": {
+        "unit": 58.4
+      },
+      "zeroFiles": [
+        {
+          "path": "src/adapters/communication/forgejo/src/init.ts",
+          "lines": 96
+        },
+        {
+          "path": "src/adapters/communication/forgejo/src/bin/adapter.ts",
+          "lines": 46
+        },
+        {
+          "path": "src/adapters/communication/forgejo/src/index.ts",
+          "lines": 31
+        }
+      ],
+      "ecosystems": {
+        "ts": {
+          "lines": {
+            "pct": 58.4,
+            "covered": 359,
+            "total": 615
+          },
+          "branches": {
+            "pct": 51.7,
+            "covered": 345,
+            "total": 667
+          }
+        }
+      }
+    },
+    "src/adapters/communication/forgejo-connector": {
+      "lines": {
+        "pct": 57.9,
+        "covered": 135,
+        "total": 233
+      },
+      "branches": {
+        "pct": 38.3,
+        "covered": 41,
+        "total": 107
+      },
+      "tiers": {
+        "unit": 57.9
+      },
+      "zeroFiles": [
+        {
+          "path": "src/adapters/communication/forgejo-connector/src/bin/connector.ts",
+          "lines": 54
+        }
+      ],
+      "ecosystems": {
+        "ts": {
+          "lines": {
+            "pct": 57.9,
+            "covered": 135,
+            "total": 233
+          },
+          "branches": {
+            "pct": 38.3,
+            "covered": 41,
+            "total": 107
+          }
+        }
+      }
+    },
+    "src/adapters/communication/github": {
+      "lines": {
+        "pct": 75.6,
+        "covered": 434,
+        "total": 574
+      },
+      "branches": {
+        "pct": 67,
+        "covered": 385,
+        "total": 575
+      },
+      "tiers": {
+        "unit": 75.6
+      },
+      "zeroFiles": [
+        {
+          "path": "src/adapters/communication/github/src/bin/adapter.ts",
+          "lines": 34
+        },
+        {
+          "path": "src/adapters/communication/github/src/index.ts",
+          "lines": 31
+        }
+      ],
+      "ecosystems": {
+        "ts": {
+          "lines": {
+            "pct": 75.6,
+            "covered": 434,
+            "total": 574
+          },
+          "branches": {
+            "pct": 67,
+            "covered": 385,
+            "total": 575
+          }
+        }
+      }
+    },
+    "src/adapters/communication/github-connector": {
+      "lines": {
+        "pct": 63.6,
+        "covered": 168,
+        "total": 264
+      },
+      "branches": {
+        "pct": 43.6,
+        "covered": 51,
+        "total": 117
+      },
+      "tiers": {
+        "unit": 63.6
+      },
+      "zeroFiles": [
+        {
+          "path": "src/adapters/communication/github-connector/src/bin/connector.ts",
+          "lines": 54
+        }
+      ],
+      "ecosystems": {
+        "ts": {
+          "lines": {
+            "pct": 63.6,
+            "covered": 168,
+            "total": 264
+          },
+          "branches": {
+            "pct": 43.6,
+            "covered": 51,
+            "total": 117
+          }
+        }
+      }
+    },
+    "src/adapters/communication/gitlab": {
+      "lines": {
+        "pct": 57.2,
+        "covered": 311,
+        "total": 544
+      },
+      "branches": {
+        "pct": 46.6,
+        "covered": 261,
+        "total": 560
+      },
+      "tiers": {
+        "unit": 57.2
+      },
+      "zeroFiles": [
+        {
+          "path": "src/adapters/communication/gitlab/src/bin/adapter.ts",
+          "lines": 33
+        }
+      ],
+      "ecosystems": {
+        "ts": {
+          "lines": {
+            "pct": 57.2,
+            "covered": 311,
+            "total": 544
+          },
+          "branches": {
+            "pct": 46.6,
+            "covered": 261,
+            "total": 560
+          }
+        }
+      }
+    },
+    "src/adapters/communication/gitlab-connector": {
+      "lines": {
+        "pct": 60.6,
+        "covered": 149,
+        "total": 246
+      },
+      "branches": {
+        "pct": 44.6,
+        "covered": 54,
+        "total": 121
+      },
+      "tiers": {
+        "unit": 60.6
+      },
+      "zeroFiles": [
+        {
+          "path": "src/adapters/communication/gitlab-connector/src/bin/connector.ts",
+          "lines": 53
+        }
+      ],
+      "ecosystems": {
+        "ts": {
+          "lines": {
+            "pct": 60.6,
+            "covered": 149,
+            "total": 246
+          },
+          "branches": {
+            "pct": 44.6,
+            "covered": 54,
+            "total": 121
+          }
+        }
+      }
+    },
+    "src/adapters/communication/mattermost": {
+      "lines": {
+        "pct": 57.6,
+        "covered": 329,
+        "total": 571
+      },
+      "branches": {
+        "pct": 51.8,
+        "covered": 258,
+        "total": 498
+      },
+      "tiers": {
+        "unit": 57.6
+      },
+      "zeroFiles": [
+        {
+          "path": "src/adapters/communication/mattermost/src/index.ts",
+          "lines": 75
+        },
+        {
+          "path": "src/adapters/communication/mattermost/src/bin/adapter.ts",
+          "lines": 33
+        }
+      ],
+      "ecosystems": {
+        "ts": {
+          "lines": {
+            "pct": 57.6,
+            "covered": 329,
+            "total": 571
+          },
+          "branches": {
+            "pct": 51.8,
+            "covered": 258,
+            "total": 498
+          }
+        }
+      }
+    },
+    "src/adapters/communication/telegram": {
+      "lines": {
+        "pct": 61.8,
+        "covered": 493,
+        "total": 798
+      },
+      "branches": {
+        "pct": 60.5,
+        "covered": 439,
+        "total": 726
+      },
+      "tiers": {
+        "unit": 61.8
+      },
+      "zeroFiles": [
+        {
+          "path": "src/adapters/communication/telegram/src/index.ts",
+          "lines": 123
+        },
+        {
+          "path": "src/adapters/communication/telegram/src/updates-listener.ts",
+          "lines": 41
+        },
+        {
+          "path": "src/adapters/communication/telegram/src/bin/adapter.ts",
+          "lines": 33
+        },
+        {
+          "path": "src/adapters/communication/telegram/src/loop-guard.ts",
+          "lines": 16
+        }
+      ],
+      "ecosystems": {
+        "ts": {
+          "lines": {
+            "pct": 61.8,
+            "covered": 493,
+            "total": 798
+          },
+          "branches": {
+            "pct": 60.5,
+            "covered": 439,
+            "total": 726
+          }
+        }
+      }
+    },
+    "src/adapters/harnesses/adapter-sdk": {
+      "lines": {
+        "pct": 54.1,
+        "covered": 422,
+        "total": 780
+      },
+      "branches": {
+        "pct": 47.9,
+        "covered": 253,
+        "total": 528
+      },
+      "tiers": {
+        "unit": 54.1
+      },
+      "zeroFiles": [
+        {
+          "path": "src/adapters/harnesses/adapter-sdk/src/media-law.ts",
+          "lines": 47
+        },
+        {
+          "path": "src/adapters/harnesses/adapter-sdk/src/kernel-leg.ts",
+          "lines": 7
+        }
+      ],
+      "ecosystems": {
+        "ts": {
+          "lines": {
+            "pct": 54.1,
+            "covered": 422,
+            "total": 780
+          },
+          "branches": {
+            "pct": 47.9,
+            "covered": 253,
+            "total": 528
+          }
+        }
+      }
+    },
+    "src/adapters/harnesses/codex": {
+      "lines": {
+        "pct": 61.8,
+        "covered": 317,
+        "total": 513
+      },
+      "branches": {
+        "pct": 55.7,
+        "covered": 244,
+        "total": 438
+      },
+      "tiers": {
+        "unit": 61.8
+      },
+      "zeroFiles": [
+        {
+          "path": "src/adapters/harnesses/codex/src/bin/mcp-shim.ts",
+          "lines": 57
+        },
+        {
+          "path": "src/adapters/harnesses/codex/src/bin/worker.ts",
+          "lines": 55
+        },
+        {
+          "path": "src/adapters/harnesses/codex/src/git.ts",
+          "lines": 46
+        },
+        {
+          "path": "src/adapters/harnesses/codex/src/capabilities.ts",
+          "lines": 1
+        }
+      ],
+      "ecosystems": {
+        "ts": {
+          "lines": {
+            "pct": 61.8,
+            "covered": 317,
+            "total": 513
+          },
+          "branches": {
+            "pct": 55.7,
+            "covered": 244,
+            "total": 438
+          }
+        }
+      }
+    },
+    "src/adapters/harnesses/deterministic": {
+      "lines": {
+        "pct": 66.4,
+        "covered": 144,
+        "total": 217
+      },
+      "branches": {
+        "pct": 61.1,
+        "covered": 118,
+        "total": 193
+      },
+      "tiers": {
+        "unit": 66.4
+      },
+      "zeroFiles": [
+        {
+          "path": "src/adapters/harnesses/deterministic/src/bin/worker.ts",
+          "lines": 54
+        },
+        {
+          "path": "src/adapters/harnesses/deterministic/src/capabilities.ts",
+          "lines": 1
+        }
+      ],
+      "ecosystems": {
+        "ts": {
+          "lines": {
+            "pct": 66.4,
+            "covered": 144,
+            "total": 217
+          },
+          "branches": {
+            "pct": 61.1,
+            "covered": 118,
+            "total": 193
+          }
+        }
+      }
+    },
+    "src/adapters/harnesses/omp": {
+      "lines": {
+        "pct": 63.9,
+        "covered": 370,
+        "total": 579
+      },
+      "branches": {
+        "pct": 55.4,
+        "covered": 256,
+        "total": 462
+      },
+      "tiers": {
+        "unit": 63.9
+      },
+      "zeroFiles": [
+        {
+          "path": "src/adapters/harnesses/omp/src/bin/worker.ts",
+          "lines": 63
+        },
+        {
+          "path": "src/adapters/harnesses/omp/src/bin/mcp-shim.ts",
+          "lines": 57
+        },
+        {
+          "path": "src/adapters/harnesses/omp/src/git.ts",
+          "lines": 34
+        },
+        {
+          "path": "src/adapters/harnesses/omp/src/capabilities.ts",
+          "lines": 1
+        }
+      ],
+      "ecosystems": {
+        "ts": {
+          "lines": {
+            "pct": 63.9,
+            "covered": 370,
+            "total": 579
+          },
+          "branches": {
+            "pct": 55.4,
+            "covered": 256,
+            "total": 462
+          }
+        }
+      }
+    },
+    "src/adapters/provider-core": {
+      "lines": {
+        "pct": 64.6,
+        "covered": 235,
+        "total": 364
+      },
+      "branches": {
+        "pct": 48.7,
+        "covered": 170,
+        "total": 349
+      },
+      "tiers": {
+        "unit": 64.6
+      },
+      "zeroFiles": [
+        {
+          "path": "src/adapters/provider-core/src/adapter-face.ts",
+          "lines": 18
+        }
+      ],
+      "ecosystems": {
+        "ts": {
+          "lines": {
+            "pct": 64.6,
+            "covered": 235,
+            "total": 364
+          },
+          "branches": {
+            "pct": 48.7,
+            "covered": 170,
+            "total": 349
+          }
+        }
+      }
+    },
+    "src/adapters/provisioning-oci": {
+      "lines": {
+        "pct": 71.5,
+        "covered": 183,
+        "total": 256
+      },
+      "branches": {
+        "pct": 70.7,
+        "covered": 130,
+        "total": 184
+      },
+      "tiers": {
+        "unit": 71.5
+      },
+      "zeroFiles": [
+        {
+          "path": "src/adapters/provisioning-oci/src/bin/launcher.ts",
+          "lines": 42
+        },
+        {
+          "path": "src/adapters/provisioning-oci/src/index.ts",
+          "lines": 15
+        }
+      ],
+      "ecosystems": {
+        "ts": {
+          "lines": {
+            "pct": 71.5,
+            "covered": 183,
+            "total": 256
+          },
+          "branches": {
+            "pct": 70.7,
+            "covered": 130,
+            "total": 184
+          }
+        }
+      }
+    },
+    "src/facilitator": {
+      "lines": {
+        "pct": 87.9,
+        "covered": 20634,
+        "total": 23469
+      },
+      "branches": {
+        "pct": 66.3,
+        "covered": 5792,
+        "total": 8733
+      },
+      "tiers": {
+        "unit": 87.9
+      },
+      "zeroFiles": [
+        {
+          "path": "src/facilitator/Kernel/Workflows/WorkflowShadowReport.cs",
+          "lines": 118
+        },
+        {
+          "path": "src/facilitator/Kernel/Shared/Persistence/FacilitatorDbContextFactory.cs",
+          "lines": 6
+        },
+        {
+          "path": "src/facilitator/Kernel/Workflows/WorkflowLimits.cs",
+          "lines": 1
+        }
+      ],
+      "ecosystems": {
+        "dotnet": {
+          "lines": {
+            "pct": 87.9,
+            "covered": 20634,
+            "total": 23469
+          },
+          "branches": {
+            "pct": 66.3,
+            "covered": 5792,
+            "total": 8733
+          }
+        }
+      }
+    },
+    "src/facilitator/ui": {
+      "lines": {
+        "pct": 52.3,
+        "covered": 1574,
+        "total": 3010
+      },
+      "branches": {
+        "pct": 40.6,
+        "covered": 865,
+        "total": 2132
+      },
+      "tiers": {
+        "unit": 52.3
+      },
+      "zeroFiles": [
+        {
+          "path": "src/facilitator/ui/src/App.svelte",
+          "lines": 270
+        },
+        {
+          "path": "src/facilitator/ui/src/components/WorkInspector.svelte",
+          "lines": 173
+        },
+        {
+          "path": "src/facilitator/ui/src/components/HealthStrip.svelte",
+          "lines": 82
+        },
+        {
+          "path": "src/facilitator/ui/src/components/DeliveriesView.svelte",
+          "lines": 73
+        },
+        {
+          "path": "src/facilitator/ui/src/components/Breadcrumbs.svelte",
+          "lines": 31
+        },
+        {
+          "path": "src/facilitator/ui/src/components/DefinitionDetailView.svelte",
+          "lines": 30
+        },
+        {
+          "path": "src/facilitator/ui/src/components/ArtifactRef.svelte",
+          "lines": 17
+        },
+        {
+          "path": "src/facilitator/ui/src/components/Skeleton.svelte",
+          "lines": 5
+        },
+        {
+          "path": "src/facilitator/ui/src/main.ts",
+          "lines": 5
+        },
+        {
+          "path": "src/facilitator/ui/src/components/Logo.svelte",
+          "lines": 2
+        }
+      ],
+      "ecosystems": {
+        "ts": {
+          "lines": {
+            "pct": 52.3,
+            "covered": 1574,
+            "total": 3010
+          },
+          "branches": {
+            "pct": 40.6,
+            "covered": 865,
+            "total": 2132
+          }
+        }
+      }
+    },
+    "src/gateway": {
+      "lines": {
+        "pct": 79.7,
+        "covered": 1266,
+        "total": 1588
+      },
+      "branches": {
+        "pct": 69,
+        "covered": 864,
+        "total": 1252
+      },
+      "tiers": {
+        "unit": 79.7
+      },
+      "zeroFiles": [
+        {
+          "path": "src/gateway/src/bin/gateway.ts",
+          "lines": 65
+        }
+      ],
+      "ecosystems": {
+        "ts": {
+          "lines": {
+            "pct": 79.7,
+            "covered": 1266,
+            "total": 1588
+          },
+          "branches": {
+            "pct": 69,
+            "covered": 864,
+            "total": 1252
+          }
+        }
+      }
+    },
+    "src/otel": {
+      "lines": {
+        "pct": 55.7,
+        "covered": 97,
+        "total": 174
+      },
+      "branches": {
+        "pct": 46.9,
+        "covered": 38,
+        "total": 81
+      },
+      "tiers": {
+        "unit": 55.7
+      },
+      "zeroFiles": [],
+      "ecosystems": {
+        "ts": {
+          "lines": {
+            "pct": 55.7,
+            "covered": 97,
+            "total": 174
+          },
+          "branches": {
+            "pct": 46.9,
+            "covered": 38,
+            "total": 81
+          }
+        }
+      }
+    },
+    "src/protocol": {
+      "lines": {
+        "pct": 91.2,
+        "covered": 83,
+        "total": 91
+      },
+      "branches": {
+        "pct": 78.9,
+        "covered": 45,
+        "total": 57
+      },
+      "tiers": {
+        "unit": 91.2
+      },
+      "zeroFiles": [],
+      "ecosystems": {
+        "ts": {
+          "lines": {
+            "pct": 91.2,
+            "covered": 83,
+            "total": 91
+          },
+          "branches": {
+            "pct": 78.9,
+            "covered": 45,
+            "total": 57
+          }
+        }
+      }
+    },
+    "src/workspace-link": {
+      "lines": {
+        "pct": 55.5,
+        "covered": 553,
+        "total": 996
+      },
+      "branches": {
+        "pct": 40.7,
+        "covered": 246,
+        "total": 604
+      },
+      "tiers": {
+        "unit": 55.5
+      },
+      "zeroFiles": [
+        {
+          "path": "src/workspace-link/src/bin/linkd.ts",
+          "lines": 70
+        },
+        {
+          "path": "src/workspace-link/src/core/session.ts",
+          "lines": 50
+        },
+        {
+          "path": "src/workspace-link/src/node/signalr.ts",
+          "lines": 48
+        }
+      ],
+      "ecosystems": {
+        "ts": {
+          "lines": {
+            "pct": 55.5,
+            "covered": 553,
+            "total": 996
+          },
+          "branches": {
+            "pct": 40.7,
+            "covered": 246,
+            "total": 604
+          }
+        }
+      }
+    },
+    "tools/scenario-plane": {
+      "lines": {
+        "pct": 79.3,
+        "covered": 96,
+        "total": 121
+      },
+      "branches": {
+        "pct": 63.9,
+        "covered": 101,
+        "total": 158
+      },
+      "tiers": {
+        "unit": 79.3
+      },
+      "zeroFiles": [],
+      "ecosystems": {
+        "ts": {
+          "lines": {
+            "pct": 79.3,
+            "covered": 96,
+            "total": 121
+          },
+          "branches": {
+            "pct": 63.9,
+            "covered": 101,
+            "total": 158
+          }
+        }
+      }
+    }
+  },
+  "tierSeconds": {
+    "unit": "788",
+    "ts-unit": "515"
+  }
+}

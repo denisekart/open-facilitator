@@ -1,10 +1,14 @@
 // Unit tier: config law matrix + the scripted execution driven in-process
 // with a fake RunContext (no sockets, no Facilitator).
-import { defineConfig } from "vitest/config";
+import { withCoverage } from "../../../../tools/coverage/vitest-coverage.mts";
 
-export default defineConfig({
-  test: {
-    include: ["test/**/*.test.ts"],
-    exclude: ["**/node_modules/**", "**/dist/**", "**/*.e2e.test.ts"],
+export default withCoverage(
+  {
+    test: {
+      include: ["test/**/*.test.ts"],
+      exclude: ["**/node_modules/**", "**/dist/**", "**/*.e2e.test.ts"],
+    },
   },
-});
+  import.meta.dirname,
+  "deterministic",
+);

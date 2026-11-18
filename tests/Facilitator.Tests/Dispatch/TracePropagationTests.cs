@@ -87,14 +87,15 @@ public sealed class TracePropagationTests(DispatchDbFixture fixture)
     public async Task UntracedAssign_StampedIntoStoredEnvelopeAndSpanTrace()
     {
         var sink = new CapturingLinkSink();
-        using var factory = new KernelTestFactory(fixture, noDispatcher: true, _ => sink);
+        // linkPump: false quiesces the hosted pump loop. Its 2s safety poll
+        // otherwise dispatches link rows concurrently with this manual
+        // drain: the dispatch span may not have COMPLETED when asserted and
+        // the stamped envelope may not be written yet — both raced under
+        // the loaded coverage run. noDispatcher removes OutboxDispatcher;
+        // together the test owns every dispatcher in its host.
+        using var factory = new KernelTestFactory(
+            fixture, noDispatcher: true, sinkOverride: _ => sink, linkPump: false);
         using var client = factory.CreateAuthedClient();
-        // The collector opens BEFORE the row exists: noDispatcher removes
-        // OutboxDispatcher, but the link pump (lambda-hosted, needed alive
-        // by connected-delivery suites) claims link rows on its own 2s
-        // safety poll. Whoever claims, the law is dispatcher-agnostic, so
-        // a listener that precedes claimability observes the dispatch span
-        // deterministically — even under a loaded suite where the pump wins.
         using var collector = new SpanCollector();
         var endpoint = "gw-tp-" + Guid.NewGuid().ToString("N")[..8];
         var envelope = LinkTestHarness.AssignEnvelopeFor(endpoint);
@@ -126,9 +127,10 @@ public sealed class TracePropagationTests(DispatchDbFixture fixture)
     public async Task TracedAssign_SpanIsChildAndEnvelopeUnchanged()
     {
         var sink = new CapturingLinkSink();
-        using var factory = new KernelTestFactory(fixture, noDispatcher: true, _ => sink);
+        using var factory = new KernelTestFactory(
+            fixture, noDispatcher: true, sinkOverride: _ => sink, linkPump: false);
         using var client = factory.CreateAuthedClient();
-        // Collector opens before the row exists — see the Untraced twin.
+        // Quiesced host — see the Untraced twin.
         using var collector = new SpanCollector();
         var endpoint = "gw-tp-" + Guid.NewGuid().ToString("N")[..8];
         var root = System.Text.Json.Nodes.JsonNode.Parse(LinkTestHarness.AssignEnvelopeFor(endpoint))!.AsObject();

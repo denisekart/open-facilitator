@@ -200,7 +200,10 @@ public static class KernelServiceCollection
         builder.Services.AddSingleton<LinkConnectionRegistry>();
         builder.Services.AddSingleton<LinkLedger>();
         builder.Services.AddSingleton<LinkDeliveryPump>();
-        builder.Services.AddHostedService(sp => sp.GetRequiredService<LinkDeliveryPump>());
+        if (linkOptions.PumpEnabled)
+        {
+            builder.Services.AddHostedService(sp => sp.GetRequiredService<LinkDeliveryPump>());
+        }
         builder.Services.AddSingleton<EvidenceValidator>();
         builder.Services.AddSingleton<AdmissionGate>();
         builder.Services.AddSingleton<LinkReceipts>();

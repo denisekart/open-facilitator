@@ -22,6 +22,12 @@ public sealed class LinkOptions
     /// is empty is fatal — the transport must expose a TLS exporter.</summary>
     public required bool RequireChannelBinding { get; init; }
 
+    /// <summary>When false (Link:PumpEnabled=false), the pump loop never
+    /// starts as a hosted service; the singleton still exists for inline
+    /// claim/materialize calls. Test hosts quiesce background dispatching
+    /// with it — a manual-drain test cannot observe a pump mid-dispatch.</summary>
+    public bool PumpEnabled { get; init; } = true;
+
     /// <summary>Per-session in-flight window (Link:MaxInFlight).</summary>
     public required int MaxInFlight { get; init; }
 
@@ -79,6 +85,7 @@ public sealed class LinkOptions
             ChallengeLifetimeSeconds = configuration.GetValue("Link:ChallengeLifetimeSeconds", 30),
             RotateGraceMinutes = configuration.GetValue("Link:RotateGraceMinutes", 60),
             RequireChannelBinding = configuration.GetValue("Link:RequireChannelBinding", false),
+            PumpEnabled = configuration.GetValue("Link:PumpEnabled", true),
             MaxInFlight = maxInFlight,
             HeartbeatSeconds = heartbeat,
             InFlightLeaseSeconds = configuration.GetValue("Link:InFlightLeaseSeconds", 120),

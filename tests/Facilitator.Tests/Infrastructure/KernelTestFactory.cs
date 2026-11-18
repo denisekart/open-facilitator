@@ -23,6 +23,7 @@ public sealed class KernelTestFactory : WebApplicationFactory<Program>
 {
     private readonly PostgresFixture _fixture;
     private readonly bool _noDispatcher;
+    private readonly bool _linkPump;
     private readonly Func<IServiceProvider, ISink>? _sinkOverride;
     private readonly AiFixtures _ai;
     private readonly IReadOnlyDictionary<string, string?>? _settings;
@@ -42,10 +43,12 @@ public sealed class KernelTestFactory : WebApplicationFactory<Program>
         IReadOnlyDictionary<string, string?>? settings = null,
         bool fakeClock = false,
         bool useKestrel = false,
-        AiFixtures? aiFixtures = null)
+        AiFixtures? aiFixtures = null,
+        bool linkPump = true)
     {
         _fixture = fixture;
         _noDispatcher = noDispatcher;
+        _linkPump = linkPump;
         _sinkOverride = sinkOverride;
         _settings = settings;
         _fakeClock = fakeClock;
@@ -131,6 +134,16 @@ public sealed class KernelTestFactory : WebApplicationFactory<Program>
             {
                 builder.UseSetting(key, value);
             }
+        }
+
+        if (!_linkPump)
+        {
+            // Quiesce the background dispatch loop (eager like _settings:
+            // link options bind during ConfigureServices, before the
+            // ConfigureTestServices pass). The pump singleton stays for
+            // inline claim/materialize paths; no ExecuteAsync timer races
+            // a manual-drain observer.
+            builder.UseSetting("Link:PumpEnabled", "false");
         }
 
         builder.ConfigureTestServices(services =>

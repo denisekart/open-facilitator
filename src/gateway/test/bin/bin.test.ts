@@ -168,12 +168,17 @@ describe("ofac-gateway run", () => {
   });
 
   it("an enrollment refusal (4xx) maps to exit 4", async () => {
-      // A 403 on the challenge is terminal: repeating it changes nothing.
+    // A 403 on the challenge is terminal: repeating it changes nothing.
     const inner = kernel.fetchImpl;
     vi.stubGlobal("fetch", async (url: unknown, init?: RequestInit) =>
       String(url).includes("/challenge")
         ? new Response(
-            JSON.stringify({ type: "about:blank", title: "refused", status: 403, detail: "team unknown" }),
+            JSON.stringify({
+              type: "about:blank",
+              title: "refused",
+              status: 403,
+              detail: "team unknown",
+            }),
             { status: 403, headers: { "content-type": "application/json" } },
           )
         : inner(url as string, init),

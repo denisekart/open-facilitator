@@ -114,11 +114,15 @@ describe("startStubKernel artifact legs", () => {
   it("request_upload allocates a slot; a pending slot and a never-seen id both 404 the GET", async () => {
     const kernel = await startStubKernel();
     try {
-      const ack = await postEvent(kernel.url, "org.facilitator.command.artifact.request_upload.v1", {
-        commandId: "cmd-alloc-1",
-        mediaType: "text/plain",
-        digest: sha(BYTES),
-      });
+      const ack = await postEvent(
+        kernel.url,
+        "org.facilitator.command.artifact.request_upload.v1",
+        {
+          commandId: "cmd-alloc-1",
+          mediaType: "text/plain",
+          digest: sha(BYTES),
+        },
+      );
       expect(ack["status"]).toBe("accepted");
       const data = ack["data"] as Record<string, unknown>;
       const artifactId = String(data["artifactId"]);
@@ -132,16 +136,23 @@ describe("startStubKernel artifact legs", () => {
       expect(pending.status).toBe(404);
       // Never-seen id.
       expect(
-        (await fetch(`${kernel.url}/api/link/v1/artifacts/0000000000000000000000000000000f/content`))
-          .status,
+        (
+          await fetch(
+            `${kernel.url}/api/link/v1/artifacts/0000000000000000000000000000000f/content`,
+          )
+        ).status,
       ).toBe(404);
 
       // Re-delivery of the same commandId re-attaches the live ticket.
-      const again = await postEvent(kernel.url, "org.facilitator.command.artifact.request_upload.v1", {
-        commandId: "cmd-alloc-1",
-        mediaType: "text/plain",
-        digest: sha(BYTES),
-      });
+      const again = await postEvent(
+        kernel.url,
+        "org.facilitator.command.artifact.request_upload.v1",
+        {
+          commandId: "cmd-alloc-1",
+          mediaType: "text/plain",
+          digest: sha(BYTES),
+        },
+      );
       expect(again["status"]).toBe("duplicate");
       expect((again["data"] as Record<string, unknown>)["artifactId"]).toBe(artifactId);
     } finally {
@@ -152,11 +163,15 @@ describe("startStubKernel artifact legs", () => {
   it("proxied PUT: stores on a matching digest, 404s an unallocated id, 422s a mismatch", async () => {
     const kernel = await startStubKernel();
     try {
-      const ack = await postEvent(kernel.url, "org.facilitator.command.artifact.request_upload.v1", {
-        commandId: "cmd-put-1",
-        mediaType: "application/octet-stream",
-        digest: sha(BYTES),
-      });
+      const ack = await postEvent(
+        kernel.url,
+        "org.facilitator.command.artifact.request_upload.v1",
+        {
+          commandId: "cmd-put-1",
+          mediaType: "application/octet-stream",
+          digest: sha(BYTES),
+        },
+      );
       const artifactId = String((ack["data"] as Record<string, unknown>)["artifactId"]);
       const put = await fetch(`${kernel.url}/api/link/v1/artifacts/${artifactId}/content`, {
         method: "PUT",
@@ -184,18 +199,24 @@ describe("startStubKernel artifact legs", () => {
       expect(orphan.status).toBe(404);
 
       // Digest mismatch: the kernel's law refuses the bytes.
-      const ack2 = await postEvent(kernel.url, "org.facilitator.command.artifact.request_upload.v1", {
-        commandId: "cmd-put-2",
-        mediaType: "text/plain",
-        digest: sha(BYTES),
-      });
+      const ack2 = await postEvent(
+        kernel.url,
+        "org.facilitator.command.artifact.request_upload.v1",
+        {
+          commandId: "cmd-put-2",
+          mediaType: "text/plain",
+          digest: sha(BYTES),
+        },
+      );
       const id2 = String((ack2["data"] as Record<string, unknown>)["artifactId"]);
       const bad = await fetch(`${kernel.url}/api/link/v1/artifacts/${id2}/content`, {
         method: "PUT",
         body: new TextEncoder().encode("different bytes"),
       });
       expect(bad.status).toBe(422);
-      expect(((await bad.json()) as Record<string, unknown>)["detail"]).toContain("digest mismatch");
+      expect(((await bad.json()) as Record<string, unknown>)["detail"]).toContain(
+        "digest mismatch",
+      );
     } finally {
       await kernel.close();
     }
@@ -204,11 +225,15 @@ describe("startStubKernel artifact legs", () => {
   it("configured to reject even a matching digest (failure legs are testable)", async () => {
     const kernel = await startStubKernel({ rejectDigest: true });
     try {
-      const ack = await postEvent(kernel.url, "org.facilitator.command.artifact.request_upload.v1", {
-        commandId: "cmd-rej-1",
-        mediaType: "text/plain",
-        digest: sha(BYTES),
-      });
+      const ack = await postEvent(
+        kernel.url,
+        "org.facilitator.command.artifact.request_upload.v1",
+        {
+          commandId: "cmd-rej-1",
+          mediaType: "text/plain",
+          digest: sha(BYTES),
+        },
+      );
       const artifactId = String((ack["data"] as Record<string, unknown>)["artifactId"]);
       const put = await fetch(`${kernel.url}/api/link/v1/artifacts/${artifactId}/content`, {
         method: "PUT",
@@ -226,11 +251,15 @@ describe("startStubKernel artifact legs", () => {
   it("presigned: bytes land with no authority, confirm re-hashes and settles", async () => {
     const kernel = await startStubKernel({ presign: true });
     try {
-      const ack = await postEvent(kernel.url, "org.facilitator.command.artifact.request_upload.v1", {
-        commandId: "cmd-pre-1",
-        mediaType: "text/plain",
-        digest: sha(BYTES),
-      });
+      const ack = await postEvent(
+        kernel.url,
+        "org.facilitator.command.artifact.request_upload.v1",
+        {
+          commandId: "cmd-pre-1",
+          mediaType: "text/plain",
+          digest: sha(BYTES),
+        },
+      );
       const data = ack["data"] as Record<string, unknown>;
       const artifactId = String(data["artifactId"]);
       expect(data["method"]).toBe("PUT");
@@ -243,10 +272,14 @@ describe("startStubKernel artifact legs", () => {
         (await fetch(`${kernel.url}/api/link/v1/artifacts/${artifactId}/content`)).status,
       ).toBe(404);
 
-      const confirm = await postEvent(kernel.url, "org.facilitator.command.artifact.confirm_upload.v1", {
-        commandId: "cmd-pre-cfm-1",
-        artifactId,
-      });
+      const confirm = await postEvent(
+        kernel.url,
+        "org.facilitator.command.artifact.confirm_upload.v1",
+        {
+          commandId: "cmd-pre-cfm-1",
+          artifactId,
+        },
+      );
       expect(confirm["status"]).toBe("confirmed");
       expect(kernel.artifacts.get(artifactId)?.bytes).toEqual(Buffer.from(BYTES));
     } finally {
@@ -258,27 +291,39 @@ describe("startStubKernel artifact legs", () => {
     const kernel = await startStubKernel({ presign: true });
     try {
       // No direct bytes ever landed for this id (unknown row too).
-      const ghost = await postEvent(kernel.url, "org.facilitator.command.artifact.confirm_upload.v1", {
-        commandId: "cmd-ghost",
-        artifactId: "ffffffffffffffffffffffffffffffff",
-      });
+      const ghost = await postEvent(
+        kernel.url,
+        "org.facilitator.command.artifact.confirm_upload.v1",
+        {
+          commandId: "cmd-ghost",
+          artifactId: "ffffffffffffffffffffffffffffffff",
+        },
+      );
       expect(ghost["status"]).toBe("failed");
 
       // Bytes landed but differ from the declared digest.
-      const ack = await postEvent(kernel.url, "org.facilitator.command.artifact.request_upload.v1", {
-        commandId: "cmd-pre-2",
-        mediaType: "text/plain",
-        digest: sha(BYTES),
-      });
+      const ack = await postEvent(
+        kernel.url,
+        "org.facilitator.command.artifact.request_upload.v1",
+        {
+          commandId: "cmd-pre-2",
+          mediaType: "text/plain",
+          digest: sha(BYTES),
+        },
+      );
       const artifactId = String((ack["data"] as Record<string, unknown>)["artifactId"]);
       await fetch(`${kernel.url}/presigned/${artifactId}`, {
         method: "PUT",
         body: new TextEncoder().encode("tampered bytes"),
       });
-      const mismatch = await postEvent(kernel.url, "org.facilitator.command.artifact.confirm_upload.v1", {
-        commandId: "cmd-pre-cfm-2",
-        artifactId,
-      });
+      const mismatch = await postEvent(
+        kernel.url,
+        "org.facilitator.command.artifact.confirm_upload.v1",
+        {
+          commandId: "cmd-pre-cfm-2",
+          artifactId,
+        },
+      );
       expect(mismatch["status"]).toBe("failed");
       // The slot never settled: the link-plane GET still has nothing to stream.
       expect(

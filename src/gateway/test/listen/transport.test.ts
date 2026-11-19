@@ -126,13 +126,15 @@ async function waitFor(what: string, probe: () => boolean): Promise<void> {
 }
 
 function hello(name: string, manifest?: CapabilityManifestV1): Buffer {
-  return Buffer.from(encodeFrame({
-    v: 1,
-    type: "hello",
-    childWorkspaceId: `${GATEWAY_ID}/${name}`,
-    token: "t",
-    manifest: manifest ?? builtinChildManifest("echo"),
-  } as ChildWireFrame));
+  return Buffer.from(
+    encodeFrame({
+      v: 1,
+      type: "hello",
+      childWorkspaceId: `${GATEWAY_ID}/${name}`,
+      token: "t",
+      manifest: manifest ?? builtinChildManifest("echo"),
+    } as ChildWireFrame),
+  );
 }
 
 /** Connect + hello over a raw socket, expecting an accepted register-ack. */

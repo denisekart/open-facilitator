@@ -335,8 +335,8 @@ describe("ExecutionLedger pinned keys + constraint honesty", () => {
     const l = open();
     // The already-bound law maps UNIQUE hits onto BindingConflictError; any
     // other constraint is a corrupt write and must surface raw.
-    expect(() =>
-      l.insert(binding({ workId: null as unknown as string })),
-    ).toThrow(/NOT NULL constraint failed: bindings.work_id/);
+    expect(() => l.insert(binding({ workId: null as unknown as string }))).toThrow(
+      /NOT NULL constraint failed: bindings.work_id/,
+    );
   });
 });

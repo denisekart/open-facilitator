@@ -124,7 +124,10 @@ describe("connectChild edges", () => {
     socket.once("data", (chunk: Buffer) =>
       frame.resolve(JSON.parse(chunk.toString("utf8").split("\n")[0] ?? "") as ChildWireFrame),
     );
-    expect(await frame.promise).toMatchObject({ type: "event", requestId: expect.stringMatching(/^ev-/) });
+    expect(await frame.promise).toMatchObject({
+      type: "event",
+      requestId: expect.stringMatching(/^ev-/),
+    });
     // Post-ack socket death resolves waitClosed (the honest close, no throw).
     const closed = conn.conn.waitClosed();
     await conn.conn.close();

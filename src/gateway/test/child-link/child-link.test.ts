@@ -53,7 +53,9 @@ function linked(options: { timeoutSeconds?: number; generation?: number } = {}):
     childWorkspaceId: "gw.unit/alpha",
     manifest: builtinChildManifest("echo"),
     generation: options.generation ?? 1,
-    entry: entry(options.timeoutSeconds === undefined ? {} : { timeoutSeconds: options.timeoutSeconds }),
+    entry: entry(
+      options.timeoutSeconds === undefined ? {} : { timeoutSeconds: options.timeoutSeconds },
+    ),
     write: (frame) => {
       if (writeError.error !== null) throw writeError.error;
       frames.push(frame);
@@ -287,7 +289,11 @@ describe("ChildFleet edges", () => {
       manifest: manifestWith("cap.one"),
       executor: {
         childWorkspaceId: "gw.unit/alpha",
-        register: async () => ({ kind: "register", childWorkspaceId: "", manifest: manifestWith("cap.one") }),
+        register: async () => ({
+          kind: "register",
+          childWorkspaceId: "",
+          manifest: manifestWith("cap.one"),
+        }),
         send: async () => ({ kind: "accepted", executionId: "" }),
         drainEvents: () => [],
         close: async () => undefined,
@@ -312,7 +318,11 @@ describe("ChildFleet edges", () => {
       manifest: manifestWith("cap.one"),
       executor: {
         childWorkspaceId: "gw.unit/alpha",
-        register: async () => ({ kind: "register", childWorkspaceId: "", manifest: manifestWith("cap.one") }),
+        register: async () => ({
+          kind: "register",
+          childWorkspaceId: "",
+          manifest: manifestWith("cap.one"),
+        }),
         send: async () => ({ kind: "accepted", executionId: "" }),
         drainEvents: () => [],
         close: async () => undefined,

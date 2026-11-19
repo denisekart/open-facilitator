@@ -1,11 +1,7 @@
 import type { CapabilityDescriptor } from "@ofac/protocol";
 import { describe, expect, it } from "vitest";
 
-import {
-  DefaultPolicy,
-  resourceMatches,
-  type PolicyContext,
-} from "../../src/policy.js";
+import { DefaultPolicy, resourceMatches, type PolicyContext } from "../../src/policy.js";
 
 const ANALYZE: CapabilityDescriptor = {
   id: "research.analyze",

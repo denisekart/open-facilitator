@@ -11,9 +11,7 @@ import { kernelLegFromEnv } from "../src/kernel-leg.js";
 import { startStubKernel } from "../src/testing.js";
 
 /** A fetch that answers fixed shapes without touching the network. */
-function scriptedFetch(
-  handler: (url: string, init?: RequestInit) => Response,
-): typeof fetch {
+function scriptedFetch(handler: (url: string, init?: RequestInit) => Response): typeof fetch {
   return (async (input: RequestInfo | URL, init?: RequestInit) =>
     handler(String(input), init)) as unknown as typeof fetch;
 }

@@ -67,7 +67,7 @@ describe("memoryChildKeyStore", () => {
 });
 
 describe("TLS socket probes", () => {
-  const plain = { } as Socket;
+  const plain = {} as Socket;
   const tlsSocket = {
     getProtocol: () => "TLSv1.3",
     getCipher: () => ({ name: "TLS_AES_256_GCM_SHA384", version: "TLSv1.3" }),

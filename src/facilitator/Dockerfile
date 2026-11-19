@@ -6,6 +6,8 @@ FROM node:22-alpine AS ui
 WORKDIR /ui
 RUN corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
+# vite.config.ts imports the coverage fragment from tools/coverage.
+COPY tools/coverage/vitest-coverage.mjs tools/coverage/vitest-coverage.d.mts tools/coverage/
 COPY src/facilitator/ui/package.json src/facilitator/ui/
 RUN pnpm install --frozen-lockfile --filter @ofac/ui
 COPY src/facilitator/ui/ src/facilitator/ui/

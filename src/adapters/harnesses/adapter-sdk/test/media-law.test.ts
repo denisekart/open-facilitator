@@ -76,7 +76,9 @@ describe("createMediaLedger", () => {
     expect(ledger.known("uniq-1")).toBeUndefined();
     ledger.remember(entry);
     // The law's SQL: the files table, file_unique_id keys, seen_at stamped.
-    expect(sql[0]).toContain("SELECT file_unique_id, artifact_id, media_type, size, digest FROM files");
+    expect(sql[0]).toContain(
+      "SELECT file_unique_id, artifact_id, media_type, size, digest FROM files",
+    );
     expect(sql[1]).toContain("INSERT INTO files");
     expect(sql[1]).toContain("ON CONFLICT(file_unique_id) DO UPDATE");
     expect(rows.get("uniq-1")?.["seen_at"]).toEqual(expect.any(Number));
@@ -96,14 +98,20 @@ describe("createMediaLedger", () => {
     });
     ledger.remember(entry);
     // The insert is the first prepared statement in this case.
-    expect(sql[0]).toContain("INSERT INTO attachments (provider_id, kernel_artifact, mime, bytes, sha, created_at)");
+    expect(sql[0]).toContain(
+      "INSERT INTO attachments (provider_id, kernel_artifact, mime, bytes, sha, created_at)",
+    );
     expect(ledger.known("uniq-1")?.artifactId).toBe("art-1");
   });
 
   it("fills honest defaults for a row missing optional facts", () => {
     const { db } = fakeDb();
     const ledger = createMediaLedger(db);
-    ledger.remember({ ...entry, mediaType: undefined as unknown as string, size: undefined as unknown as number });
+    ledger.remember({
+      ...entry,
+      mediaType: undefined as unknown as string,
+      size: undefined as unknown as number,
+    });
     // The fake stores undefined params; known() must fall back lawfully.
     const known = ledger.known("uniq-1");
     expect(known?.mediaType).toBe("application/octet-stream");
@@ -142,7 +150,16 @@ describe("providerArtifactRef", () => {
     expect(Date.parse(ref.createdAt)).not.toBeNaN();
     // The seven required common.v1 artifactRef fields + kind, all present.
     expect(Object.keys(ref).sort()).toEqual(
-      ["artifactId", "createdAt", "createdBy", "digest", "kind", "mediaType", "size", "storageUrl"].sort(),
+      [
+        "artifactId",
+        "createdAt",
+        "createdBy",
+        "digest",
+        "kind",
+        "mediaType",
+        "size",
+        "storageUrl",
+      ].sort(),
     );
   });
 
@@ -193,8 +210,11 @@ describe("fetchArtifactContent", () => {
 
 // ── ingestMedia: the full decision table ────────────────────────────────────
 
-function recordingLogger(): MediaLogger & { lines: { level: string; message: string; fields: Record<string, unknown> | undefined }[] } {
-  const lines: { level: string; message: string; fields: Record<string, unknown> | undefined }[] = [];
+function recordingLogger(): MediaLogger & {
+  lines: { level: string; message: string; fields: Record<string, unknown> | undefined }[];
+} {
+  const lines: { level: string; message: string; fields: Record<string, unknown> | undefined }[] =
+    [];
   return {
     lines,
     info: (message, fields) => lines.push({ level: "info", message, fields }),
@@ -202,7 +222,9 @@ function recordingLogger(): MediaLogger & { lines: { level: string; message: str
   };
 }
 
-function inMemoryLedger(seed: MediaLedgerEntry[] = []): MediaLedger & { stored: MediaLedgerEntry[] } {
+function inMemoryLedger(
+  seed: MediaLedgerEntry[] = [],
+): MediaLedger & { stored: MediaLedgerEntry[] } {
   const rows = new Map(seed.map((row) => [row.uniqueId, row]));
   const stored: MediaLedgerEntry[] = [];
   return {

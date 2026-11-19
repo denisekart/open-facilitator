@@ -335,22 +335,26 @@ describe("startTelemetryFromEnv: dark env", () => {
 });
 
 describe("startTelemetryFromEnv: log-bridge opt-in", () => {
-  it("unset or 'none' (in any list position) keeps the bridge off", { timeout: 60_000 }, async () => {
-    const mod = await freshModule();
-    vi.stubEnv("OTEL_EXPORTER_OTLP_ENDPOINT", ENDPOINT);
-    for (const v of ["", "none", " none ,NONE"]) {
-      vi.stubEnv("OTEL_LOGS_EXPORTER", v);
-      const handle = mod.startTelemetryFromEnv(BASE);
-      expect(handle.emitting).toBe(true);
-      expect(handle.logsExported).toBe(false);
-      handle.log({ message: "still a no-op" });
-      await handle.ready();
-      await handle.shutdown();
-    }
-    // Three registrations, traces + metrics only: no log exporter constructed.
-    expect(state.logExporterCtorCalls).toBe(0);
-    expect(state.exporterCtorCalls).toBe(6);
-  });
+  it(
+    "unset or 'none' (in any list position) keeps the bridge off",
+    { timeout: 60_000 },
+    async () => {
+      const mod = await freshModule();
+      vi.stubEnv("OTEL_EXPORTER_OTLP_ENDPOINT", ENDPOINT);
+      for (const v of ["", "none", " none ,NONE"]) {
+        vi.stubEnv("OTEL_LOGS_EXPORTER", v);
+        const handle = mod.startTelemetryFromEnv(BASE);
+        expect(handle.emitting).toBe(true);
+        expect(handle.logsExported).toBe(false);
+        handle.log({ message: "still a no-op" });
+        await handle.ready();
+        await handle.shutdown();
+      }
+      // Three registrations, traces + metrics only: no log exporter constructed.
+      expect(state.logExporterCtorCalls).toBe(0);
+      expect(state.exporterCtorCalls).toBe(6);
+    },
+  );
 
   it("one non-none entry opts the bridge in; lines carry shaped attributes", async () => {
     const logsApi = await import("@opentelemetry/api-logs");

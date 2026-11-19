@@ -190,8 +190,7 @@ runAdapterLifecycleContract({
   gatewayId: "gw.kit",
   steerReply: "unsupported",
   interactionLeg: false,
-  startAdapter: async (gate) =>
-    start(noSteerPath, minimalHooks({ gate, steerable: false })),
+  startAdapter: async (gate) => start(noSteerPath, minimalHooks({ gate, steerable: false })),
 });
 
 // ── instantiation 3: steer-able, context leg ON, hook never asks ────────────

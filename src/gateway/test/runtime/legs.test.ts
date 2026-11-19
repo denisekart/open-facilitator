@@ -118,20 +118,25 @@ interface Booted {
 
 let live: Booted | null = null;
 
-async function booted(options: {
-  extra?: string;
-  heartbeatSeconds?: number;
-  policy?: PolicyEvaluator;
-  kernel?: FakeKernel;
-  handlerFactory?: () => LinkHandler;
-  transport?: MockTransport;
-  mutate?: (deps: { transportFactory: () => LinkTransport }) => void;
-  childOnlineGraceMs?: number;
-} = {}): Promise<Booted> {
+async function booted(
+  options: {
+    extra?: string;
+    heartbeatSeconds?: number;
+    policy?: PolicyEvaluator;
+    kernel?: FakeKernel;
+    handlerFactory?: () => LinkHandler;
+    transport?: MockTransport;
+    mutate?: (deps: { transportFactory: () => LinkTransport }) => void;
+    childOnlineGraceMs?: number;
+  } = {},
+): Promise<Booted> {
   const dir = mkdtempSync(join(tmpdir(), "gw-legs-"));
-  const cfg = parseConfig(baseYaml(dir, options.extra ?? EMBEDDED_EXTRA, options.heartbeatSeconds ?? 3600), {
-    env: {},
-  });
+  const cfg = parseConfig(
+    baseYaml(dir, options.extra ?? EMBEDDED_EXTRA, options.heartbeatSeconds ?? 3600),
+    {
+      env: {},
+    },
+  );
   const mock = options.transport ?? new MockTransport();
   const server = options.kernel ?? fakeKernel();
   const logger = createMemoryLogger();
@@ -146,7 +151,9 @@ async function booted(options: {
     logger,
     ...(options.policy !== undefined ? { policy: options.policy } : {}),
     ...(options.handlerFactory !== undefined ? { handlerFactory: options.handlerFactory } : {}),
-    ...(options.childOnlineGraceMs !== undefined ? { childOnlineGraceMs: options.childOnlineGraceMs } : {}),
+    ...(options.childOnlineGraceMs !== undefined
+      ? { childOnlineGraceMs: options.childOnlineGraceMs }
+      : {}),
   });
   live = { cfg, rt, mock, server, lines: logger.lines, paths };
   await rt.start();
@@ -333,7 +340,11 @@ describe("embedded runtime legs", () => {
       return row !== null && row.state === "failed" ? row : false;
     });
     expect(paths.execution.byAssignment("asg-cmd-f")?.error).toBe("adapter died");
-    expect(mock.envelopes.some((e) => e.type === FAILED && e.source === "urn:workspace:gw.legs-test/echo")).toBe(true); // forwarded verbatim
+    expect(
+      mock.envelopes.some(
+        (e) => e.type === FAILED && e.source === "urn:workspace:gw.legs-test/echo",
+      ),
+    ).toBe(true); // forwarded verbatim
   });
 
   it("a deny policy gives the silent event drop its audit line", async () => {
@@ -419,7 +430,9 @@ policy:
   manifestFile: ${join(dir, "caps.yaml")}
 `,
     });
-    const posted = JSON.parse(server.bodiesFor("capabilities").at(-1) ?? "") as CapabilityManifestV1;
+    const posted = JSON.parse(
+      server.bodiesFor("capabilities").at(-1) ?? "",
+    ) as CapabilityManifestV1;
     expect(posted.capabilities.map((c) => c.id)).toEqual(["file.capability"]);
     // And the assign routes to it (the union advertises it now).
     mock.pushDeliver(assignDelivery({ commandId: "cmd-file", capabilityId: "file.capability" }));
@@ -430,14 +443,20 @@ policy:
   it("child.manifestFile without capabilities[] aborts the boot", () => {
     const dir = mkdtempSync(join(tmpdir(), "gw-legs-mf2-"));
     writeFileSync(join(dir, "caps.yaml"), "owner: nobody\n");
-    const cfg = parseConfig(baseYaml(dir, `child:
+    const cfg = parseConfig(
+      baseYaml(
+        dir,
+        `child:
   name: badmanifest
   mode: echo
   manifestFile: ${join(dir, "caps.yaml")}
-`), { env: {} });
-    expect(() => createGatewayRuntime(cfg, { transportFactory: () => new MockTransport() })).toThrow(
-      /manifestFile .* has no capabilities/,
+`,
+      ),
+      { env: {} },
     );
+    expect(() =>
+      createGatewayRuntime(cfg, { transportFactory: () => new MockTransport() }),
+    ).toThrow(/manifestFile .* has no capabilities/);
   });
 
   it("an unknown command type passes through to the child (embedded answers unsupported)", async () => {
@@ -501,12 +520,15 @@ async function standalone(
 ): Promise<Standalone> {
   const dir = mkdtempSync(join(tmpdir(), "gw-legs-sa-"));
   const cfg = parseConfig(
-    baseYaml(dir, `mode: standalone
+    baseYaml(
+      dir,
+      `mode: standalone
 children: []
 childTransport:
   socket:
     path: child.sock
-`),
+`,
+    ),
     { env: {} },
   );
   const mock = new MockTransport();
@@ -544,7 +566,15 @@ childTransport:
         path: standalone_.socketPath,
         onCommand: (frame) =>
           handler(frame as never) as Promise<
-            { kind: "accepted"; executionId: string } | { kind: "rejected"; reason: string } | { kind: "unsupported"; reason?: string } | { kind: "status"; executionId: string; state: "running" | "completed" | "failed" | "lost" } | { kind: "unknown"; executionId: string }
+            | { kind: "accepted"; executionId: string }
+            | { kind: "rejected"; reason: string }
+            | { kind: "unsupported"; reason?: string }
+            | {
+                kind: "status";
+                executionId: string;
+                state: "running" | "completed" | "failed" | "lost";
+              }
+            | { kind: "unknown"; executionId: string }
           >,
         heartbeatSeconds: 1,
       });
@@ -664,14 +694,16 @@ describe("standalone interaction + input legs", () => {
   it("interactions for a vanished child answer child-disconnected", async () => {
     const sa = await standalone({ childOnlineGraceMs: 100 });
     await sa.rt.start();
-    const conn = await sa.attach(
-      "alpha",
-      async (frame) => ({ kind: "accepted", executionId: frame.message.executionId ?? "" }),
-    );
+    const conn = await sa.attach("alpha", async (frame) => ({
+      kind: "accepted",
+      executionId: frame.message.executionId ?? "",
+    }));
     sa.mock.pushDeliver(assignDelivery({ commandId: "cmd-live" }));
     await waitFor("assign receipt", () => sa.mock.receipts[0] ?? false);
     await conn.close();
-    await waitFor("fleet offline", () => sa.rt.gatewayStatus().children.every((c) => c.state === "offline"));
+    await waitFor("fleet offline", () =>
+      sa.rt.gatewayStatus().children.every((c) => c.state === "offline"),
+    );
 
     sa.mock.pushDeliver(interactionDelivery("steer", "cmd-2", "asg-cmd-live"));
     await waitFor("steer receipt", () => sa.mock.receipts.length === 2);
@@ -692,7 +724,12 @@ describe("reconcile + probe against a live socket child", () => {
   it("boot reconcile: running answers stand, terminal answers settle; a re-register probe calls the vanished execution lost", async () => {
     const sa = await standalone({ helloDelayMs: 1_000 });
     // A fleet shadow from a previous life with two running rows.
-    sa.paths.execution.upsertChild("gw.legs-test/alpha", "sha256:0", JSON.stringify(builtinChildManifest("echo")), false);
+    sa.paths.execution.upsertChild(
+      "gw.legs-test/alpha",
+      "sha256:0",
+      JSON.stringify(builtinChildManifest("echo")),
+      false,
+    );
     for (const [exec, work] of [
       ["exec-seed-a", "work-a"],
       ["exec-seed-b", "work-b"],

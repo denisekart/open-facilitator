@@ -1,5 +1,5 @@
 /* open-facilitator.org — a tool, not a brochure. "Ink on Paper": cool
-   blue-grey grounds, one gold signal reserved for state, real 1px
+   blue-grey grounds, one copper signal reserved for state, real 1px
    borders, one shadow on floats. No beige, no serif, no gradients. The
    design-language skill is the law; these tokens mirror the console's
    app.css (parity: two files, one palette). */
@@ -7,24 +7,38 @@
 :root {
   /* "Ink on Paper" (the design-language skill is the law). Same tokens as
      the console's app.css (parity law: two files, one palette). Cool
-     blue-grey grounds, one gold signal for state, real 1px borders, one
+     blue-grey grounds, one copper signal for state, real 1px borders, one
      shadow on floats only. */
-  --bg: #eef2f6;
-  --surface: #f7f9fb;
+  --bg: #f1f3f5;
+  --surface: #ffffff;
+  --surface-alt: #e8ecf0;
   --surface-raise: #ffffff;
-  --ink: #21262e;
-  --ink-2: #676f7c;
-  --ink-3: #8690a0;
-  --line: #d5dbe3;
-  --line-2: #b1b7bf;
-  --accent: #e6bf34;
-  --accent-rule: #ab8612;
-  --accent-text: #8d6e0e;
-  --accent-on: #14171a;
-  --danger: #d54e4e;
-  --danger-text: #b03a3a;
-  --line-soft: #e0e5ec;
-  --tint-selected: #faf2d6;
+  --ink: #1a202c;
+  --ink-2: #505a69;
+  --ink-3: #7a8699;
+  --line: #cfd6e0;
+  --line-2: #dee3eb;
+  --accent: #c96a2d;
+  --accent-hover: #b3581e;
+  --accent-rule: #c96a2d;
+  --accent-text: #ac531c;
+  --accent-on: #ffffff;
+  --tint-selected: #f8efe8;
+  --border-primary: #e2b696;
+  --info: #127377;
+  --info-tint: #e5f3f4;
+  --info-border: #92cad0;
+  --success: #447a38;
+  --success-tint: #eaf3e8;
+  --success-border: #9fc497;
+  --warning: #a87400;
+  --warning-tint: #faf2de;
+  --warning-border: #dec177;
+  --danger: #ba3c3c;
+  --danger-text: #ba3c3c;
+  --danger-tint: #f9e8e8;
+  --danger-border: #df9e9e;
+  --line-soft: #dee3eb;
   --hover: color-mix(in oklab, var(--ink) 6%, var(--surface-raise));
   --shadow-1: 0 1px 3px rgb(0 0 0 / 12%);
   /* Legacy aliases the page templates already speak. */
@@ -33,10 +47,12 @@
   --card: var(--surface-raise);
   --accent-dark: var(--accent-text);
   --accent-veil: var(--tint-selected);
-  --amber: var(--accent-text);
-  --amber-veil: var(--tint-selected);
-  --code-bg: #2b2e33;
-  --code-ink: #d6dae0;
+  --amber: var(--warning);
+  --amber-veil: var(--warning-tint);
+  /* Code blocks stay a fixed dark instrument surface in both themes. */
+  --code-bg: #232831;
+  --code-ink: #f3f4f6;
+  --code-line: #3f4754;
   color-scheme: light;
 
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -44,31 +60,79 @@
 
   --step: 4px;
   --maxw: 1080px;
-  --r: 4px;
+  --radius-control: 4px;
+  --radius-overlay: 6px;
+  --r: var(--radius-control);
 }
 
 /* Dark follows the OS until the header toggle overrides it — the same law
    and the same hexes as the console's [data-theme="dark"]. */
 [data-theme="dark"] {
-  --bg: #2b2e33;
-  --surface: #33373d;
-  --surface-raise: #3b4046;
-  --ink: #d6dae0;
-  --ink-2: #99a1ab;
-  --ink-3: #767d85;
-  --line: #464c54;
-  --line-2: #5a616a;
-  --accent: #e6bf34;
-  --accent-rule: #e6bf34;
-  --accent-text: #e6bf34;
-  --accent-on: #1b1e22;
-  --danger: #ff8f99;
-  --danger-text: #ff8f99;
-  --line-soft: #373b42;
-  --tint-selected: #57523b;
-  --code-bg: #232629;
-  --code-ink: #d6dae0;
+  --bg: #232831;
+  --surface: #2b313b;
+  --surface-alt: #323944;
+  --surface-raise: #3b4350;
+  --ink: #f3f4f6;
+  --ink-2: #9ca3af;
+  --ink-3: #6b7280;
+  --line: #3f4754;
+  --line-2: #343b47;
+  --accent: #c96a2d;
+  --accent-hover: #e58a45;
+  --accent-rule: #c96a2d;
+  --accent-text: #e58a45;
+  --accent-on: #ffffff;
+  --tint-selected: #3d332d;
+  --border-primary: #8a4820;
+  --info: #168b90;
+  --info-tint: #223538;
+  --info-border: #175b5f;
+  --success: #58894c;
+  --success-tint: #273426;
+  --success-border: #3b5832;
+  --warning: #c48a00;
+  --warning-tint: #373121;
+  --warning-border: #7a5b0b;
+  --danger: #c75454;
+  --danger-text: #c75454;
+  --danger-tint: #382626;
+  --danger-border: #7d2e2e;
+  --line-soft: #343b47;
+  /* The fixed dark instrument surface keeps its values in dark too. */
+  --code-bg: #232831;
+  --code-ink: #f3f4f6;
+  --code-line: #3f4754;
   color-scheme: dark;
+}
+
+:where(button, a, input, select, textarea):focus-visible {
+  outline: 2px solid var(--accent-rule);
+  outline-offset: 2px;
+}
+
+/* Touch law: on touch devices and in the mobile drawer, interactive
+   chrome never shrinks below 44px. Fine-pointer desktop keeps the 44px
+   bar roomy by centering 32px controls instead of stuffing 44px ones
+   into a 44px bar. */
+@media (pointer: coarse), (max-width: 720px) {
+  .topnav a,
+  .nav-toggle,
+  .topnav .ghost,
+  .topbar #theme-toggle,
+  .searchbox input {
+    min-height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0ms !important;
+    animation-duration: 0ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 * {
@@ -118,7 +182,10 @@ a:hover {
   display: flex;
   align-items: center;
   gap: 28px;
-  padding: 0 max(20px, calc((100vw - var(--maxw)) / 2));
+  /* Same box the .wrap sections center their content in — the brand
+     line and every heading below share one left edge. (100% not 100vw:
+     the scrollbar would push the bar off the content grid.) */
+  padding: 0 max(20px, calc((100% - var(--maxw)) / 2 + 24px));
   height: 44px;
   background: var(--surface);
   border-bottom: 1px solid var(--line);
@@ -232,13 +299,49 @@ a:hover {
     cursor: default;
   }
 }
+/* One control family for the header: every interactive box is 32px
+   tall, centered in the 44px bar, so search, theme, and GitHub read as
+   a row, not a crowd. */
+.topnav .ghost,
+.topnav .icon-btn,
+.topbar #theme-toggle,
+.searchbox input {
+  height: 32px;
+}
+.topnav .ghost,
+.topnav .icon-btn,
+.topbar #theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1;
+}
 .topnav .ghost {
   border: 1px solid var(--line-2);
   border-radius: 6px;
-  padding: 5px 12px;
+  padding: 0 12px;
+  font-size: 14px;
 }
 .topnav .ghost:hover {
   border-color: var(--ink-3);
+}
+.topbar #theme-toggle {
+  justify-content: center;
+  width: 32px;
+  padding: 0;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+.topbar #theme-toggle:hover {
+  border-color: var(--line-2);
+  color: var(--ink);
+}
+.topnav a {
+  display: inline-flex;
+  align-items: center;
 }
 
 .searchbox {
@@ -246,7 +349,6 @@ a:hover {
 }
 .searchbox input {
   width: 190px;
-  height: 32px;
   padding: 0 10px;
   border: 1px solid var(--line-2);
   border-radius: 6px;
@@ -261,7 +363,8 @@ a:hover {
 .search-pop {
   position: absolute;
   right: 0;
-  top: 38px;
+  top: 100%;
+  margin-top: 6px;
   width: 380px;
   max-height: 420px;
   overflow: auto;
@@ -592,9 +695,9 @@ p {
   align-items: start;
 }
 .arch-scroll {
-  border: 1px solid #464c54;
+  border: 1px solid #3f4754;
   border-radius: 6px;
-  background: #2b2e33;
+  background: #232831;
   overflow: auto;
 }
 .arch-svg {
@@ -605,45 +708,45 @@ p {
 }
 .arch-zt {
   font: 700 13px var(--sans);
-  fill: #d6dae0;
+  fill: #f3f4f6;
 }
 .arch-zs {
   font: 400 10.5px var(--sans);
-  fill: #99a1ab;
+  fill: #9ca3af;
 }
 .arch-ztag {
   font: 600 9.5px var(--mono);
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  fill: #99a1ab;
+  fill: #9ca3af;
 }
 .arch-nt {
   font: 650 12px var(--sans);
-  fill: #d6dae0;
+  fill: #f3f4f6;
 }
 .arch-ns {
   font: 400 10px var(--sans);
-  fill: #99a1ab;
+  fill: #9ca3af;
 }
 .arch-el {
   font: 500 9.5px var(--sans);
-  fill: #99a1ab;
+  fill: #9ca3af;
   paint-order: stroke fill;
-  stroke: #2b2e33;
+  stroke: #232831;
   stroke-width: 4;
   stroke-linejoin: round;
 }
 .arch-mzt {
   font: 600 15px var(--sans);
-  fill: #99a1ab;
+  fill: #9ca3af;
 }
 .arch-teaser {
   display: block;
   position: relative;
   margin: 20px 0;
-  border: 1px solid #464c54;
+  border: 1px solid #3f4754;
   border-radius: 6px;
-  background: #2b2e33;
+  background: #232831;
   overflow: hidden;
 }
 .arch-teaser:hover {
@@ -855,9 +958,23 @@ p {
   border: 1.6px solid;
   border-radius: 4px;
 }
+.al-key.al-solid {
+  border-color: var(--accent);
+  background: var(--surface);
+}
+.al-key.al-team {
+  border-color: var(--accent);
+  background: var(--tint-selected);
+}
+.al-key.al-external {
+  border-color: var(--ink-3);
+  border-style: dashed;
+  background: var(--surface);
+}
 .al-line {
   flex: none;
   width: 26px;
+  border-top: 2.6px dotted var(--accent);
 }
 @media (max-width: 1100px) {
   .arch-fig {
@@ -969,7 +1086,7 @@ pre.cmd {
   margin: 0 0 10px;
 }
 pre.cmd .c {
-  color: #7ea2c9;
+  color: var(--info);
 }
 
 /* ---------------------------------------------------------------- console */
@@ -984,6 +1101,25 @@ pre.cmd .c {
 .shot img {
   display: block;
   width: 100%;
+  /* The width/height attributes ride as a presentational height hint
+     and would stretch the frame at other widths — free the ratio. */
+  height: auto;
+  aspect-ratio: auto;
+}
+/* Light/dark screenshot twins (see withDarkShots in build.mjs): the pair
+   follows the site's own theme attribute, never the raw OS media query —
+   a forced-light reader on an OS-dark machine sees light screenshots. */
+.shot-pair {
+  display: block;
+}
+.shot-pair .shot-dark {
+  display: none;
+}
+[data-theme="dark"] .shot-pair .shot-light {
+  display: none;
+}
+[data-theme="dark"] .shot-pair .shot-dark {
+  display: block;
 }
 .shot-bar {
   display: flex;
@@ -1282,10 +1418,14 @@ pre.cmd code {
 
 /* ---------------------------------------------------------------- diagrams */
 
+/* Diagrams are a fixed dark instrument surface in both themes (the
+   code-block and architecture-explorer precedent): the copper dark ramp
+   below matches the palette the mermaid harness renders with, so the
+   figure reads the same on light and dark pages. */
 .diagram {
   position: relative;
-  background: var(--card);
-  border: 1px solid var(--line);
+  background: #232831;
+  border: 1px solid #3f4754;
   border-radius: 4px;
   padding: 22px;
   margin: 22px 0;
@@ -1302,7 +1442,7 @@ pre.cmd code {
   font: 600 11.5px/1.5 var(--mono);
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--ink-3);
+  color: #9ca3af;
   margin-top: 14px;
 }
 .diagram-zoom {
@@ -1310,10 +1450,10 @@ pre.cmd code {
   top: 10px;
   right: 10px;
   z-index: 2;
-  background: var(--card);
-  border: 1px solid var(--line-2);
+  background: #2b313b;
+  border: 1px solid #3f4754;
   border-radius: 6px;
-  color: var(--ink-2);
+  color: #f3f4f6;
   font: 600 11px/1 var(--mono);
   letter-spacing: 0.04em;
   padding: 6px 9px;
@@ -1322,8 +1462,8 @@ pre.cmd code {
 }
 .diagram-zoom:hover {
   opacity: 1;
-  border-color: var(--accent-text);
-  color: var(--accent-text);
+  border-color: #e58a45;
+  color: #e58a45;
 }
 .mermaid-source {
   font-size: 13px;
@@ -1334,7 +1474,7 @@ pre.cmd code {
   max-width: 300px;
   pointer-events: none;
   background: var(--code-bg);
-  color: #dfe9f5;
+  color: var(--info-tint);
   border-radius: 4px;
   padding: 10px 12px;
   font: 400 13px/1.5 var(--sans);
@@ -1367,7 +1507,7 @@ pre.cmd code {
   position: relative;
   cursor: grab;
   touch-action: none;
-  background: var(--paper);
+  background: #232831;
   border: 1px solid var(--line-2);
   border-radius: 4px;
   box-shadow: var(--shadow-1);
@@ -1409,7 +1549,7 @@ pre.cmd code {
   position: absolute;
   left: 16px;
   bottom: 14px;
-  color: #9fb2c9;
+  color: var(--info-border);
   font: 500 12px/1 var(--mono);
   letter-spacing: 0.04em;
 }
@@ -1509,6 +1649,7 @@ mark {
   }
   .searchbox input {
     width: min(150px, 34vw);
+    height: 44px;
   }
   section {
     padding: 56px 0;

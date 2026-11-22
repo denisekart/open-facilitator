@@ -10,23 +10,23 @@
 // .arch-explorer block in the site stylesheet for the surface itself.
 
 export const OWN_STYLE = {
-  you: { border: "#e6bf34", fill: "rgba(230,191,52,0.10)", chip: "yours: central deploy" },
-  infra: { border: "#99a1ab", fill: "rgba(153,161,171,0.10)", chip: "yours: commodity infra" },
-  team: { border: "#e6bf34", fill: "rgba(230,191,52,0.10)", chip: "team's" },
-  external: { border: "#767d85", fill: "rgba(118,125,133,0.10)", chip: "external" },
+  you: { border: "#c96a2d", fill: "#3d332d", chip: "yours: central deploy" },
+  infra: { border: "#9ca3af", fill: "#2b313b", chip: "yours: commodity infra" },
+  team: { border: "#c96a2d", fill: "#3d332d", chip: "team's" },
+  external: { border: "#6b7280", fill: "#2b313b", chip: "external" },
 };
 
 // Same kind -> stroke table as arch-render.mjs (the static twin). The map
 // is a fixed dark-slate instrument surface in BOTH site themes (the
 // --code-bg precedent), so these hexes are deliberately constant.
 export const KIND_STYLE = {
-  internal: { stroke: "#565d66", dash: "", width: 1.6 },
-  sync: { stroke: "#e6bf34", dash: "", width: 2 },
-  idp: { stroke: "#99a1ab", dash: "6 5", width: 1.8 },
-  link: { stroke: "#f0d27a", dash: "1 6", width: 2.6 },
-  spawn: { stroke: "#e6bf34", dash: "", width: 1.8 },
-  webhook: { stroke: "#99a1ab", dash: "2 5", width: 1.8 },
-  async: { stroke: "#565d66", dash: "8 6", width: 1.6 },
+  internal: { stroke: "#3f4754", dash: "", width: 1.6 },
+  sync: { stroke: "#c96a2d", dash: "", width: 2 },
+  idp: { stroke: "#9ca3af", dash: "6 5", width: 1.8 },
+  link: { stroke: "#e58a45", dash: "1 6", width: 2.6 },
+  spawn: { stroke: "#c96a2d", dash: "", width: 1.8 },
+  webhook: { stroke: "#9ca3af", dash: "2 5", width: 1.8 },
+  async: { stroke: "#3f4754", dash: "8 6", width: 1.6 },
 };
 
 export function toFlow(data) {

@@ -13,11 +13,11 @@ The house look is "Ink on Paper" with the Refined Copper palette (cool neutral/s
 
 ## Tier 2 — everything else: mermaid first
 
-Sequence/flow/state diagrams in `docs/` and site pages ride the site theme — copy `MERMAID_THEME` from `site/src/js/app.js` verbatim (base theme, `system-ui`, node fills on surface `#FFFFFF`, copper border `#C96A2D`, ink `#1A202C`, line `#505A69`, selected tint `#F8EFE8` for the secondary lane):
+Sequence/flow/state diagrams in `docs/` and site pages are a fixed dark instrument surface in BOTH themes (the code-block and Tier-1 precedent — the SVGs render once, so they ride the copper dark ramp, never the page theme): copy `MERMAID_THEME` from `site/src/js/app.js` verbatim (base theme, `darkMode`, `system-ui`, node fills on dark surface `#2B313B`, copper border `#C96A2D`, ink `#F3F4F6`, line `#9CA3AF`, selected copper tint `#3D332D` for the secondary lane). The `.diagram` frame in `site/src/styles.css` carries the matching dark ground `#232831`:
 
 ````
 ```mermaid title="The dispatch funnel"
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#FFFFFF", "primaryBorderColor": "#C96A2D", "primaryTextColor": "#1A202C", "lineColor": "#505A69", "secondaryColor": "#F8EFE8"}}}%%
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#2B313B", "primaryBorderColor": "#C96A2D", "primaryTextColor": "#F3F4F6", "lineColor": "#9CA3AF", "secondaryColor": "#3D332D"}}}%%
 flowchart LR ...
 ```
 ````

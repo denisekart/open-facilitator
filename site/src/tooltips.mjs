@@ -38,20 +38,24 @@ tip(
 );
 tip("open", "A Work exists and is durable. It can be searched, steered, or cancelled.");
 tip(
-  "routed",
-  "Policy has assigned a team; delivery is in flight or queued waiting for the Gateway.",
+  "planning",
+  "The objective is being decomposed or routed; assignments are proposed and policy picks a team.",
 );
 tip(
-  "inprogress",
-  "A harness executes inside the team workspace, emitting progress events to the timeline.",
+  "active",
+  "A team assignment is accepted and a harness executes inside the team workspace, emitting progress events to the timeline.",
 );
 tip(
-  "awaitingapproval",
-  "Execution is paused on a durable approval request, surviving restarts until resolved.",
+  "review",
+  "Results and evidence are filed and await acceptance; a privileged gate parks here until a human decides.",
 );
 tip(
-  "done",
-  "Execution completed with verified result manifests and artifacts filed in storage.",
+  "blocked",
+  "The park row: execution waits on a gate, dependency, or question and resumes into the state it left.",
+);
+tip(
+  "completed",
+  "Closed with verified result manifests and artifacts filed in storage.",
 );
 tip("cancelled", "Closed without a result; the cancellation reason records on the timeline.");
 tip(

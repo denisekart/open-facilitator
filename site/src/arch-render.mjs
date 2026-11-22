@@ -7,12 +7,12 @@ const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replac
 
 // Fixed dark-slate instrument surface in BOTH site themes (the code-block
 // precedent) — keeps the static snapshot and the hydrated explorer the
-// same picture. Tints are alpha washes so the slate shows through.
+// same picture. Zone fills are opaque copper/steel tints on the slate ground.
 const OWN = {
-  you: { border: "#e6bf34", fill: "rgba(230,191,52,0.10)", tag: "yours" },
-  infra: { border: "#99a1ab", fill: "rgba(153,161,171,0.10)", tag: "yours" },
-  team: { border: "#e6bf34", fill: "rgba(230,191,52,0.10)", tag: "team's" },
-  external: { border: "#767d85", fill: "rgba(118,125,133,0.10)", tag: "external" },
+  you: { border: "#c96a2d", fill: "#3d332d", tag: "yours" },
+  infra: { border: "#9ca3af", fill: "#2b313b", tag: "yours" },
+  team: { border: "#c96a2d", fill: "#3d332d", tag: "team's" },
+  external: { border: "#6b7280", fill: "#2b313b", tag: "external" },
 };
 
 const byId = Object.fromEntries(nodes.map((n) => [n.id, n]));
@@ -101,13 +101,13 @@ const norm2 = (v) => {
 };
 
 const KIND = {
-  internal: { stroke: "#565d66", dash: "", width: 1.6 },
-  sync: { stroke: "#e6bf34", dash: "", width: 2 },
-  idp: { stroke: "#99a1ab", dash: "6 5", width: 1.8 },
-  link: { stroke: "#f0d27a", dash: "1 6", width: 2.6 },
-  spawn: { stroke: "#e6bf34", dash: "", width: 1.8 },
-  webhook: { stroke: "#99a1ab", dash: "2 5", width: 1.8 },
-  async: { stroke: "#565d66", dash: "8 6", width: 1.6 },
+  internal: { stroke: "#505a69", dash: "", width: 1.6 },
+  sync: { stroke: "#c96a2d", dash: "", width: 2 },
+  idp: { stroke: "#9ca3af", dash: "6 5", width: 1.8 },
+  link: { stroke: "#e58a45", dash: "1 6", width: 2.6 },
+  spawn: { stroke: "#c96a2d", dash: "", width: 1.8 },
+  webhook: { stroke: "#9ca3af", dash: "2 5", width: 1.8 },
+  async: { stroke: "#505a69", dash: "8 6", width: 1.6 },
 };
 
 function wrap(s, max) {
@@ -173,7 +173,7 @@ export function renderArchitecture() {
         n.zone === "kernel" &&
         ["coord", "policy", "hub", "ingress", "apisrv", "broker"].includes(n.id);
       const stroke =
-        n.zone === "team" || n.zone === "teamB" ? "#e6bf34" : core ? "#e6bf34" : "#99a1ab";
+        n.zone === "team" || n.zone === "teamB" ? "#c96a2d" : core ? "#c96a2d" : "#9ca3af";
       const LH = 13.5;
       const SH = 11.5;
       const GAP = 3;
@@ -196,7 +196,7 @@ export function renderArchitecture() {
         .join("");
       return (
         `<g class="arch-node${n.ghost ? " arch-ghost" : ""}" data-id="${n.id}" tabindex="0" role="button" aria-label="${esc(n.t)}">` +
-        `<rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="9" fill="#33373d" stroke="${stroke}" stroke-width="1.6"${ghost}/>` +
+        `<rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="9" fill="#2b313b" stroke="${stroke}" stroke-width="1.6"${ghost}/>` +
         title +
         subt +
         `</g>`
@@ -207,9 +207,9 @@ export function renderArchitecture() {
   const svg =
     `<svg class="arch-svg" viewBox="0 0 ${canvas.w} ${canvas.h}" role="img" aria-label="System architecture map">` +
     `<defs>` +
-    `<marker id="arch-ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#99a1ab"/></marker>` +
-    `<marker id="arch-arb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#e6bf34"/></marker>` +
-    `<marker id="arch-dot" viewBox="0 0 6 6" refX="3" refY="3" markerWidth="6" markerHeight="6" orient="auto"><circle cx="3" cy="3" r="2.6" fill="#e6bf34"/></marker>` +
+    `<marker id="arch-ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#9ca3af"/></marker>` +
+    `<marker id="arch-arb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#c96a2d"/></marker>` +
+    `<marker id="arch-dot" viewBox="0 0 6 6" refX="3" refY="3" markerWidth="6" markerHeight="6" orient="auto"><circle cx="3" cy="3" r="2.6" fill="#c96a2d"/></marker>` +
     `</defs>` +
     zoneSvg +
     edgeSvg +
@@ -276,7 +276,7 @@ export function renderArchitectureMini() {
   const nodeSvg = nodes
     .map(
       (n) =>
-        `<rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="7" fill="#33373d" stroke="${n.zone === "team" || n.zone === "teamB" ? "#e6bf34" : "#565d66"}" stroke-opacity="0.5" stroke-width="1"/>`,
+        `<rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="7" fill="#2b313b" stroke="${n.zone === "team" || n.zone === "teamB" ? "#c96a2d" : "#505a69"}" stroke-opacity="0.5" stroke-width="1"/>`,
     )
     .join("");
   return `<svg class="arch-mini" viewBox="0 0 ${canvas.w} ${canvas.h}" aria-hidden="true">${zoneSvg}${nodeSvg}</svg>`;

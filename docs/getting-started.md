@@ -74,9 +74,9 @@ deterministic worker), waits for every healthcheck, then seeds one
 `work.assign` that dispatches end-to-end. What you are booting:
 
 ```mermaid title="The slim reference stack you are about to boot"
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#f7f9fb",
-"primaryBorderColor": "#ab8612", "primaryTextColor": "#21262e",
-"lineColor": "#676f7c", "secondaryColor": "#faf2d6"}}}%%
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#2b313b",
+"primaryBorderColor": "#c96a2d", "primaryTextColor": "#f3f4f6",
+"lineColor": "#9ca3af", "secondaryColor": "#3d332d"}}}%%
 flowchart LR
   subgraph SLIM["slim reference stack (one laptop, docker compose)"]
     PG[("Postgres 17 :5432")] --- K["Facilitator :8088"]

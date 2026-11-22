@@ -99,7 +99,7 @@ export const components = [
   {
     name: "The kernel",
     tag: "container image",
-    body: "Stateless service running as a container. Coordinates work lifecycles, routing policy, approvals, links, artifacts, memory, and the admin console on your PostgreSQL and OIDC.",
+    body: "Stateless service running as a container. Coordinates work lifecycles, routing policy, approvals, links, artifacts, memory, the workflow plane (`/api/admin/workflows*`), the operator Assistant (`/api/chat`), and the admin console on your PostgreSQL and OIDC.",
     docs: "/artifacts",
   },
   {
@@ -129,7 +129,7 @@ export const components = [
   {
     name: "Dev Container Features",
     tag: "OCI images · ghcr.io",
-    body: "Turns any team container into a linked workspace through devcontainer.json. Automatically enrolls, connects, and advertises capabilities.",
+    body: "Turns any team container into a linked workspace through devcontainer.json. Automatically enrolls, connects, and advertises capabilities, powered by the Workspace Link SDK (`@ofac/workspace-link`) and its `ofac-linkd` supervisor.",
     docs: "/artifacts",
   },
 ];
@@ -212,7 +212,7 @@ export const pages = [
         route: "/console",
         src: "site/src/pages/console.md",
         title: "The admin console",
-        body: "The operator surface: search, links, deliveries, config, AiDeck — with screenshots of the real thing.",
+        body: "The operator surface: search, activities, flows, deliveries, config, Assistant — with screenshots of the real thing.",
       },
       {
         route: "/workflows",
@@ -302,6 +302,24 @@ export const docs = [
         src: "docs/security.md",
         title: "Security posture",
         body: "Identities, roles, gates, approval lifecycle, team policy, artifact and memory laws.",
+      },
+      {
+        route: "/docs/workflows",
+        src: "docs/workflows.md",
+        title: "The workflow plane",
+        body: "Flow definitions, versions, triggers, the step palette, instance lifecycle, shadow mode, operator controls.",
+      },
+      {
+        route: "/docs/console",
+        src: "docs/console.md",
+        title: "The operator console",
+        body: "Nav surfaces, URL scheme, role gates and read-only mode, config law, the Assistant as an API client.",
+      },
+      {
+        route: "/docs/observability",
+        src: "docs/observability.md",
+        title: "Telemetry and health",
+        body: "OTLP traces, metrics and logs, instrumented sources, admin metrics and sweeps, gateway telemetry.",
       },
       {
         route: "/docs/advanced",

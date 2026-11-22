@@ -61,7 +61,7 @@ writer emits the new form — so a stale bookmark lands on the right screen
 and the address bar heals itself to the canonical route. Anything else is
 `#/`: the shell with no view open.
 
-```mermaid
+```mermaid title="Console authentication and API interaction flow"
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#2b313b", "primaryBorderColor": "#c96a2d", "primaryTextColor": "#f3f4f6", "lineColor": "#9ca3af", "secondaryColor": "#3d332d"}}}%%
 flowchart LR
   B["Browser (operator)"] -->|"OIDC login: auth-code + PKCE"| IdP["Identity provider"]

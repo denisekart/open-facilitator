@@ -29,6 +29,8 @@ site/
 
 Pages reference screenshots as `../assets/<name>.png`. The build pipeline rewrites paths to flat `dist/` filenames.
 
+Interface screenshots are cut from `.omp/evidence/` — the copper-era frames captured by `tools/capture-evidence.mjs` against the reference environment. Each site asset carries a stable role name (`console-activities`, `console-search`, `console-work-inspector`, `console-audit`, `console-config`, `console-assistant`, `console-flow-editor`, `console-run-detail`, `console-mobile-drawer`) with a `-dark` twin; the per-frame mapping is documented beside `SHOT_NAMES` in `build.mjs`, and that table is the re-sync contract.
+
 ## Site pages
 
 Pages in `src/pages/*.md` and `src/guides/*.md` follow standard consumer documentation principles: an opening sentence defining purpose, structured technical details, and a closing "Where to go next" navigation list. Copy references published artifact coordinates rather than repository source paths.

@@ -17,22 +17,26 @@ Communication across team boundaries uses outbound links and normalized events. 
 A Work represents a durable objective with a defined lifecycle. It tracks current state, an append-only timeline of events, and references to produced artifacts. You create a Work through an API call or chat event. Once created, the record survives container restarts, network partitions, and process crashes.
 
 ```mermaid title="The life of a Work"
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#f7f9fb", "primaryBorderColor": "#ab8612", "primaryTextColor": "#21262e", "lineColor": "#676f7c", "secondaryColor": "#faf2d6"}}}%%
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#2b313b", "primaryBorderColor": "#c96a2d", "primaryTextColor": "#f3f4f6", "lineColor": "#9ca3af", "secondaryColor": "#3d332d"}}}%%
 stateDiagram-v2
     direction LR
     [*] --> Open: created (API, chat, webhook)
-    Open --> Routed: policy picks a team
-    Routed --> InProgress: team agent accepts
-    InProgress --> AwaitingApproval: privileged step
-    AwaitingApproval --> InProgress: human approves
-    AwaitingApproval --> AwaitingApproval: human requests changes
-    InProgress --> Done: result + evidence filed
+    Open --> Planning: decomposition started
+    Open --> Blocked: gate or dependency parks it
+    Planning --> Active: team assignment accepted
+    Planning --> Blocked: gate or dependency parks it
+    Active --> Review: result + evidence filed
+    Active --> Blocked: gate or dependency parks it
+    Review --> Completed: accepted
+    Blocked --> Planning: resumes into decomposition
+    Blocked --> Active: resumes into execution
     Open --> Cancelled: cancelled by caller
-    Done --> [*]
+    Completed --> [*]
     Cancelled --> [*]
+    Failed --> [*]
 ```
 
-Hover any node above to inspect its guarantees.
+Work moves through `open`, `planning`, `active`, `review`, and `completed`, with `blocked` as the park row for anything that must wait — an approval gate, a dependency, a human question. When a gate clears, the Work resumes into the state it left. When policy requires a privileged decision, the Work parks as `blocked` or `review`; there is no separate "awaiting approval" state. The team's side of the same story is the **Assignment**, which moves through its own lane (`proposed → routed → accepted → running → completed`) with fencing generations for restarts.
 
 ## System actors and responsibilities
 
@@ -45,7 +49,7 @@ Three roles operate within the framework, each with a single responsibility:
 Network connections flow outbound from the team Gateway to the kernel. No team port or endpoint is exposed to the kernel, external teams, or the public internet.
 
 ```mermaid title="One assignment, hop by hop — every arrow outbound from the team"
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#f7f9fb", "primaryBorderColor": "#ab8612", "primaryTextColor": "#21262e", "lineColor": "#676f7c", "secondaryColor": "#faf2d6"}}}%%
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#2b313b", "primaryBorderColor": "#c96a2d", "primaryTextColor": "#f3f4f6", "lineColor": "#9ca3af", "secondaryColor": "#3d332d"}}}%%
 sequenceDiagram
     actor H as Human
     participant K as Kernel
@@ -80,7 +84,7 @@ The kernel never connects directly to your source repositories, model providers,
 ## What the system is not
 
 - **Not an intra-process agent framework.** It coordinates across processes and team boundaries, rather than managing internal agent prompt loops.
-- **Not a chat server, forge, or model gateway.** It integrates with existing chat and code hosting platforms and does not proxy model traffic.
+- **Not a chat server, forge, or model gateway.** It integrates with existing chat and code hosting platforms and does not proxy model traffic — a team's agent talks to its own models directly. The kernel does keep an operator-configured decisions gateway (LiteLLM or any OpenAI-compatible endpoint, managed as the `llm` admin config resource) exclusively for its own reasoning: workflow `decide` steps and the operator Assistant.
 - **Not a proprietary managed platform.** You deploy the published container on existing infrastructure alongside PostgreSQL and object storage.
 
 ## Where to go next

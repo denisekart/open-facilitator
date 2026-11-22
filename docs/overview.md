@@ -93,9 +93,9 @@ advertised capabilities; the kernel routes only to what is declared.
 The ownership lines are the point of the whole model:
 
 ```mermaid title="Ownership boundaries: only outbound links cross"
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#f7f9fb",
-"primaryBorderColor": "#ab8612", "primaryTextColor": "#21262e",
-"lineColor": "#676f7c", "secondaryColor": "#faf2d6"}}}%%
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#2b313b",
+"primaryBorderColor": "#c96a2d", "primaryTextColor": "#f3f4f6",
+"lineColor": "#9ca3af", "secondaryColor": "#3d332d"}}}%%
 flowchart TB
   subgraph TEAM["Team boundary (your network, your credentials)"]
     GW["Gateway - policy file + execution ledger"]
@@ -141,13 +141,23 @@ holds them.*
    chat reply, PR, or other external side effect happens team-side, under
    team credentials, through the adapter that owns the provider.
 
+When a handoff crosses team boundaries, a `sign-over` step (a workflow
+step kind, or the `POST /api/admin/artifacts/sign-over` admin twin)
+transfers the record: artifact **ownership is a column on the artifact
+row**, the router team mints the sign-over transfer, and the receiving
+team's access runs through **delivery-scoped artifact grants** — minted
+at reply time, consumed on receipt, so a fetch is proof of the delivery
+it belongs to (`Migrations/20261116234551_AddRouterTeamSignOver.cs`,
+`WorkflowRunner.ExecuteSignOverAsync`). No team ever shares a bucket
+credential; the kernel re-mints access per delivery.
+
 The same six legs as one hop diagram, with the human gate drawn where it
 actually appears:
 
 ```mermaid title="One piece of work, hop by hop"
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#f7f9fb",
-"primaryBorderColor": "#ab8612", "primaryTextColor": "#21262e",
-"lineColor": "#676f7c", "secondaryColor": "#faf2d6"}}}%%
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#2b313b",
+"primaryBorderColor": "#c96a2d", "primaryTextColor": "#f3f4f6",
+"lineColor": "#9ca3af", "secondaryColor": "#3d332d"}}}%%
 sequenceDiagram
     participant P as Provider event / API
     participant K as Kernel

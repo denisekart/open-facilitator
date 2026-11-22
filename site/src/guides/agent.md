@@ -43,7 +43,7 @@ State changes use optimistic concurrency. Include the known `version` in `expect
 Endpoints register by enrolling an Ed25519 public key and requesting short-lived session tokens via cryptographic proof:
 
 ```mermaid title="Enroll once, then buy sessions with the key"
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#f7f9fb", "primaryBorderColor": "#ab8612", "primaryTextColor": "#21262e", "lineColor": "#676f7c", "secondaryColor": "#faf2d6"}}}%%
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#2b313b", "primaryBorderColor": "#c96a2d", "primaryTextColor": "#f3f4f6", "lineColor": "#9ca3af", "secondaryColor": "#3d332d"}}}%%
 sequenceDiagram
   participant A as Agent endpoint
   participant F as Facilitator kernel

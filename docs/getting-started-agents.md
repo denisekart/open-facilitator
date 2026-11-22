@@ -133,9 +133,9 @@ The three calls as one picture — after this, nothing but the private key is
 state worth keeping:
 
 ```mermaid title="Enroll once, then buy sessions with the key"
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#f7f9fb",
-"primaryBorderColor": "#ab8612", "primaryTextColor": "#21262e",
-"lineColor": "#676f7c", "secondaryColor": "#faf2d6"}}}%%
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#2b313b",
+"primaryBorderColor": "#c96a2d", "primaryTextColor": "#f3f4f6",
+"lineColor": "#9ca3af", "secondaryColor": "#3d332d"}}}%%
 sequenceDiagram
     participant E as Endpoint (you)
     participant K as Kernel link plane

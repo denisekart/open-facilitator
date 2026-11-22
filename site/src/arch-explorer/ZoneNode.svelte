@@ -39,7 +39,7 @@
     font-size: 13px;
     font-weight: 700;
     line-height: 1.25;
-    color: #d6dae0;
+    color: #f3f4f6;
   }
   .arch-zone-chip {
     position: absolute;

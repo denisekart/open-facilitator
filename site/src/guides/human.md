@@ -8,7 +8,7 @@ Choose between two setup methods:
 - **Road B — Guided reference tour** (one command, boots kernel, OIDC provider, artifact storage, and a demo team).
 
 ```mermaid title="Where things run, either road"
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#f7f9fb", "primaryBorderColor": "#ab8612", "primaryTextColor": "#21262e", "lineColor": "#676f7c", "secondaryColor": "#faf2d6"}}}%%
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#2b313b", "primaryBorderColor": "#c96a2d", "primaryTextColor": "#f3f4f6", "lineColor": "#9ca3af", "secondaryColor": "#3d332d"}}}%%
 flowchart LR
   YOU(["You: curl / browser"]) -->|bearer token| K["The kernel<br/>(one container, your server)"]
   K --- PG[("PostgreSQL")]

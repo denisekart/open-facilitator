@@ -239,9 +239,9 @@ authorizes against.
 `pending → approved|denied|expired|revoked → consumed`.
 
 ```mermaid title="The approval lifecycle: only pending can move, once"
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#f7f9fb",
-"primaryBorderColor": "#ab8612", "primaryTextColor": "#21262e",
-"lineColor": "#676f7c", "secondaryColor": "#faf2d6"}}}%%
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#2b313b",
+"primaryBorderColor": "#c96a2d", "primaryTextColor": "#f3f4f6",
+"lineColor": "#9ca3af", "secondaryColor": "#3d332d"}}}%%
 stateDiagram-v2
     [*] --> pending: approval.required recorded (digest verified)
     pending --> approved: eligible human decides

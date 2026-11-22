@@ -19,7 +19,7 @@ The kernel image is stateless and multi-architecture (amd64 and arm64). Each rel
 The diagram below illustrates the required infrastructure components:
 
 ```mermaid title="What must run beside the kernel image"
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#f7f9fb", "primaryBorderColor": "#ab8612", "primaryTextColor": "#21262e", "lineColor": "#676f7c", "secondaryColor": "#faf2d6"}}}%%
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#2b313b", "primaryBorderColor": "#c96a2d", "primaryTextColor": "#f3f4f6", "lineColor": "#9ca3af", "secondaryColor": "#3d332d"}}}%%
 flowchart TB
   K["Kernel image - stateless, any container host"] --- PG[("PostgreSQL - durable relational state")]
   K --- ART[("S3-compatible store - artifact storage")]

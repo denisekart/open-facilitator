@@ -11,7 +11,7 @@ import { docs, guides, pages, repo } from "./src/config.mjs";
 import { renderMermaid, mermaidAvailable } from "./mermaid-ssr.mjs";
 import { tooltipFor, tooltips } from "./src/tooltips.mjs";
 import { renderArchitecture, renderArchitectureMini } from "./src/arch-render.mjs";
-import { architectureBody } from "./src/pages/architecture.mjs";
+import { architectureBody, architectureMarkdown } from "./src/pages/architecture.mjs";
 import { paletteReference, galleryDoc } from "./src/schema-ref.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -46,6 +46,7 @@ const MERMAID = new Map(); // normalized code -> svg
   for (const g of pages)
     for (const e of g.entries) if (e.src) allMd.push(await readFile(join(ROOT, e.src), "utf8"));
   for (const g of guides) allMd.push(await readFile(join(ROOT, g.src), "utf8"));
+  if (architectureMarkdown) allMd.push(architectureMarkdown);
   const codes = [];
   for (const md of allMd) {
     for (const m of md.matchAll(/```mermaid[^\n]*\r?\n([\s\S]*?)```/g)) codes.push(m[1]);
@@ -258,7 +259,7 @@ done.</p>
 validator can never disagree. <code>*</code> marks a required field.</p>
 ${palette}
 <h2 id="cookbook">Cookbook: the gallery, byte for byte</h2>
-<p>Two of the six shipped definitions, embedded as the seeder stores
+<p>Two of the eight shipped definitions, embedded as the seeder stores
 them. Clone either in the console (<code>#/flows</code>) and the diff
 block will show exactly what you bent.</p>
 <h3 id="cookbook-nudge">Nudge ladder</h3>
@@ -274,33 +275,51 @@ ${code(fork.yaml, "review-fork gallery definition")}
   );
 }
 
-// A console screenshot and its dark twin, offered as one <picture>: the
-// dark source rides the OS preference (the site's default theme law).
-// Only rewritten when the e2e run actually produced the twin, so the
-// markup never references a file that was not photographed.
+// A console screenshot and its dark twin, emitted as a light/dark <img>
+// pair. The CSS in styles.css shows one or the other according to the
+// site's persisted theme toggle (NOT the raw OS media query, which would
+// ignore an explicit user choice). Only the pairs the evidence run
+// actually produced are wrapped, so the markup never references a file
+// that was not photographed.
+//
+// Re-sync contract — each role name maps to a frame in .omp/evidence/
+// (captured by tools/capture-evidence.mjs; light + dark twin each):
+//   console-activities      desktop-{light,dark}-02-shell-home
+//   console-search          desktop-{light,dark}-39-search-results
+//   console-work-inspector  desktop-{light,dark}-17-work-inspector
+//   console-audit           desktop-{light,dark}-10-monitor-audit
+//   console-config          desktop-{light,dark}-24-config-resource-edit
+//   console-assistant       desktop-{light,dark}-27-aideck-answer
+//   console-flow-editor     desktop-{light,dark}-07-flow-editor-new
+//   console-run-detail      desktop-{light,dark}-20-monitor-run-detail
+//   console-mobile-drawer   mobile-{light,dark}-30-mobile-nav-drawer
 const SHOT_NAMES = [
-  "console-explorer",
-  "console-work",
-  "console-editor",
-  "console-instance",
+  "console-activities",
+  "console-search",
+  "console-work-inspector",
+  "console-audit",
+  "console-config",
+  "console-assistant",
+  "console-flow-editor",
+  "console-run-detail",
+  "console-mobile-drawer",
 ];
 function withDarkShots(html) {
   for (const name of SHOT_NAMES) {
     if (!existsSync(join(HERE, "src/assets", `${name}-dark.png`))) continue;
-    html = html.replaceAll(
-      `<img src="${name}.png"`,
-      `<picture><source media="(prefers-color-scheme: dark)" srcset="${name}-dark.png"><img src="${name}.png"`,
-    );
-  }
-  // <picture> needs a closing tag: mark the wrapped imgs and close them.
-  for (const name of SHOT_NAMES) {
-    const wrapped = `<picture><source media="(prefers-color-scheme: dark)" srcset="${name}-dark.png">`;
-    let at = html.indexOf(wrapped);
+    const open = `<img src="${name}.png"`;
+    let at = html.indexOf(open);
     while (at !== -1) {
-      const close = html.indexOf(">", html.indexOf("<img", at));
-      const end = close + 1;
-      html = html.slice(0, end) + "</picture>" + html.slice(end);
-      at = html.indexOf(wrapped, end + 10);
+      const close = html.indexOf(">", at);
+      const attrs = html.slice(at + open.length, close); // width/height/alt
+      html =
+        html.slice(0, at) +
+        `<span class="shot-pair">` +
+        `<img class="shot-img shot-light" src="${name}.png"${attrs}>` +
+        `<img class="shot-img shot-dark" src="${name}-dark.png"${attrs}>` +
+        `</span>` +
+        html.slice(close + 1);
+      at = html.indexOf(open, at + 10);
     }
   }
   return html;
@@ -343,7 +362,7 @@ for (const g of guides) await emit({ route: g.route, title: g.title }, g.src, "G
 {
   const entry = contentEntries.find((e) => e.generated === "architecture");
   const arch = renderArchitecture();
-  const html = `<h1 class="doc-title">${entry.title}</h1>` + architectureBody(arch);
+  const html = `<h1 class="doc-title">${entry.title}</h1>` + architectureBody(arch, renderMarkdown);
   await writeFile(join(DIST, "content", "architecture.html"), html);
   const secs = splitSections(html, entry.title);
   searchPages.push({
@@ -409,17 +428,12 @@ await copy("src/styles.css", "styles.css");
 await copy("src/js/app.js", "app.js");
 await copy("src/assets/icon.svg", "icon.svg");
 await copy("src/assets/icon.svg", "favicon.svg");
-await copy("src/assets/console-explorer.png", "console-explorer.png");
-await copy("src/assets/console-work.png", "console-work.png");
-for (const shot of [
-  "console-explorer-dark.png",
-  "console-work-dark.png",
-  "console-editor.png",
-  "console-instance.png",
-  "console-editor-dark.png",
-  "console-instance-dark.png",
-]) {
-  if (existsSync(join(HERE, "src/assets", shot))) await copy(`src/assets/${shot}`, shot);
+// The curated screenshot set: nine light frames + dark twins, cut from
+// .omp/evidence/ per the mapping table beside SHOT_NAMES above.
+for (const name of SHOT_NAMES) {
+  for (const file of [`${name}.png`, `${name}-dark.png`]) {
+    if (existsSync(join(HERE, "src/assets", file))) await copy(`src/assets/${file}`, file);
+  }
 }
 
 // The interactive explorer bundle (Svelte 5 + Svelte Flow). Programmatic

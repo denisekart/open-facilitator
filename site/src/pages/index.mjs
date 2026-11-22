@@ -198,7 +198,7 @@ function consoleHtml() {
   <p class="section-lede">Every kernel serves an operator console at its own origin. Search works, inspect fleet health, and view delivery ledgers over the public API — <a href="#/console">view console surfaces</a>.</p>
   <figure class="shot" style="margin:0">
     <div class="shot-bar"><i></i><i></i><i></i></div>
-    <img src="console-explorer.png" alt="The Open Facilitator console showing Work search results, a fleet summary, and throughput counters" width="1140" height="760">
+    <img src="console-activities.png" alt="The Open Facilitator console showing the activities queue with state filters, the top navigation rail, and the search box" width="1440" height="900">
   </figure>
 </div></section>`;
 }
@@ -252,7 +252,7 @@ const RELAY_JS = `
     btns.forEach(function(b,j){ b.classList.toggle("on", i===j); b.setAttribute("aria-selected", i===j); });
     detail.innerHTML = "<b>"+steps[i].title+"</b> — "+steps[i].body;
     if (chip) chip.style.transform = "translate(" + steps[i].x + "px, 62px)";
-    glyphs.forEach(function(g,j){ g.setAttribute("style", "color: " + (j<=i ? (j===i ? "#e6bf34" : "#ab8612") : "#767d85")); });
+    glyphs.forEach(function(g,j){ g.setAttribute("style", "color: " + (j<=i ? (j===i ? "#e58a45" : "#c96a2d") : "#6b7280")); });
     lines.forEach(function(l,j){ l.classList.toggle("lit", j<=i); });
   }
   btns.forEach(function(b){

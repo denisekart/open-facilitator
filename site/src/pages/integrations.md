@@ -8,7 +8,7 @@ An integration translates between an external system and the kernel. It normaliz
 | Ingest issues/PRs and gate forge writes | **GitHub**, **Forgejo**, **GitLab** | Inbound webhook + gated outbound | Adapter and connector pair |
 | Execute workloads with agents or scripts | **oh-my-pi**, **Codex**, **deterministic**, **custom** | Team-side child process | Harness package |
 | Provision isolated workspaces on demand | **OCI launcher** (Docker) | Outbound | Provisioning service |
-| Stream events through a message bus | **Kafka** ingress leg | Inbound | Optional transport |
+| Stream events through a message bus | **Kafka** ingress leg (documented stub) | Inbound | Planned transport |
 | Authenticate operators through single sign-on | **Any OIDC provider** | Identity | Configuration |
 
 ## Chat providers
@@ -39,7 +39,7 @@ Forge integrations operate as an adapter and connector pair. The adapter consume
 This separation keeps inbound automation isolated from outbound writes. The connector is the only component holding forge credentials.
 
 ```mermaid title="The forge pair — inbound is automated, outbound is gated"
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#f7f9fb", "primaryBorderColor": "#ab8612", "primaryTextColor": "#21262e", "lineColor": "#676f7c", "secondaryColor": "#faf2d6"}}}%%
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#2b313b", "primaryBorderColor": "#c96a2d", "primaryTextColor": "#f3f4f6", "lineColor": "#9ca3af", "secondaryColor": "#3d332d"}}}%%
 flowchart LR
   F["Forge<br/>(GitHub, Forgejo, GitLab)"]
   subgraph T["Team environment"]
@@ -64,7 +64,7 @@ The Gateway spawns one harness child process per assignment through a line-orien
 
 | Harness | Architecture |
 | --- | --- |
-| **Deterministic** (built into runtime) | Scripted workers providing deterministic inputs and outputs. Serves as the conformance baseline. |
+| **Deterministic** (`@ofac/harness-deterministic`) | Scripted workers providing deterministic inputs and outputs. Serves as the conformance baseline. |
 | **oh-my-pi** (`@ofac/harness-omp`) | Autonomous agent runtime with multi-step reasoning and tool execution. |
 | **Codex** (`@ofac/harness-codex`) | Coding agent operating as a workspace child process. |
 | **Custom** (`@ofac/adapter` SDK) | Any executable process: language models, data pipelines, or human checklists. Communicates via line-oriented JSON. |
@@ -77,7 +77,7 @@ The provisioning launcher creates isolated workspace containers on demand. The `
 
 - **SignalR** serves as the default bidirectional link transport, supporting session multiplexing and automatic reconnection.
 - **HTTP long-polling** provides a fallback transport for restrictive networks using identical envelope schemas.
-- **Kafka** acts as an optional ingress consumer, ingesting external events into the coordination pipeline with idempotent deduplication.
+- **Kafka** is a documented stub: the design for an ingress consumer that would feed external events into the coordination pipeline with idempotent deduplication exists, but no shippable adapter has been cut yet.
 
 ## Identity providers
 

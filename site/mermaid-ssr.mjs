@@ -37,12 +37,12 @@ ${diags}
 <script>
 (async () => {
   mermaid.initialize({ startOnLoad: false, theme: "base", security: "strict", themeVariables: {
-    darkMode: false, fontFamily: "system-ui, sans-serif",
-    primaryColor: "#EAF1F9", primaryBorderColor: "#0B5FBF", primaryTextColor: "#1F2328",
-    lineColor: "#5B6B7C", secondaryColor: "#FDF0DC", tertiaryColor: "#F2F5F8",
-    edgeLabelBackground: "#FFFFFF", clusterBkg: "#F7F9FC", clusterBorder: "#C6CFDA",
-    actorBkg: "#EAF1F9", actorBorder: "#0B5FBF", activationBkgColor: "#E7F0FA",
-    sequenceNumberColor: "#FFFFFF", labelBoxBkgColor: "#EAF1F9", labelBoxBorderColor: "#0B5FBF"
+    darkMode: true, fontFamily: "system-ui, sans-serif",
+    primaryColor: "#2b313b", primaryBorderColor: "#c96a2d", primaryTextColor: "#f3f4f6",
+    textColor: "#f3f4f6", lineColor: "#9ca3af", secondaryColor: "#3d332d", tertiaryColor: "#323944",
+    edgeLabelBackground: "#2b313b", clusterBkg: "#2b313b", clusterBorder: "#3f4754",
+    actorBkg: "#2b313b", actorBorder: "#c96a2d", actorTextColor: "#f3f4f6", activationBkgColor: "#3d332d",
+    sequenceNumberColor: "#ffffff", signalColor: "#9ca3af", labelBoxBkgColor: "#2b313b", labelBoxBorderColor: "#c96a2d"
   } });
   const out = [];
   for (const el of document.querySelectorAll("pre.mermaid")) {

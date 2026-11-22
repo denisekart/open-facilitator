@@ -35,7 +35,7 @@ All flow durations use ISO-8601 formatting: `PT30M` for 30 minutes, `PT2H` for t
 Steps link via deterministic edges: `always` (sequential execution), `<stepId>:completed`, `timeout`, and `failed`. This forms a directed acyclic graph (DAG) rendered in the editor during authoring.
 
 ```mermaid title="The nudge ladder as the editor draws it"
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#f7f9fb", "primaryBorderColor": "#ab8612", "primaryTextColor": "#21262e", "lineColor": "#676f7c", "secondaryColor": "#faf2d6"}}}%%
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#2b313b", "primaryBorderColor": "#c96a2d", "primaryTextColor": "#f3f4f6", "lineColor": "#9ca3af", "secondaryColor": "#3d332d"}}}%%
 flowchart LR
   T["timer - PT30M"] -->|"first-pause:completed"| N["emit work.nudge"]
   N -->|"nudge:completed"| S["timer - PT2H"]
@@ -55,17 +55,17 @@ _Timer steps suspend execution as durable database rows. Every step emits standa
 
 To author or modify flows, navigate to **Flows** in the console. The editor validates fields against live registries: event schemas, command types, and advertised gateway capabilities.
 
-![The flow editor](../assets/console-editor.png)
+![The flow editor](../assets/console-flow-editor.png)
 _The flow editor renders the step graph dynamically as you edit. Pickers populate from the live schema registry, and changes generate versioned diffs._
 
 ## Inspecting flow instances
 
 Opening an active instance displays real-time execution status on the DAG: green for completed steps, amber for waiting timers, and red for failures. Operators can pause, retry, skip, or cancel steps with required audit reasons.
 
-![A running flow instance](../assets/console-instance.png)
+![A running flow instance](../assets/console-run-detail.png)
 _The instance view tracks execution progress. The step log displays output payloads, and controls enforce valid state transitions._
 
-The kernel ships with six built-in flow templates: review forks, PR pipelines, routing rules, nudge ladders, research workflows, and callable capacity checks.
+The kernel ships with eight built-in flow definitions: agentic research, assignment rules, callable capacity checks, the nudge escalation ladder, PR-on-manifest, review forks, router ingress, and team home. The console seeds them on first boot; each is a normal definition you can copy, edit, and version.
 
 ## Where to go next
 

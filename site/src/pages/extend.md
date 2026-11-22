@@ -7,7 +7,7 @@ You can extend any part of the system. First-party and third-party components op
 Extension points vary by operational responsibility:
 
 ```mermaid title="The three seams, from cheapest to deepest"
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#f7f9fb", "primaryBorderColor": "#ab8612", "primaryTextColor": "#21262e", "lineColor": "#676f7c", "secondaryColor": "#faf2d6"}}}%%
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#2b313b", "primaryBorderColor": "#c96a2d", "primaryTextColor": "#f3f4f6", "lineColor": "#9ca3af", "secondaryColor": "#3d332d"}}}%%
 flowchart LR
   subgraph S1["1. Harness"]
     AD["@ofac/adapter - child process communicating via line-oriented stdio"]

@@ -256,7 +256,7 @@ export const nodes = [
     h: 64,
     t: "PostgreSQL",
     sub: "the durable record",
-    what: "The only mandatory dependency. Works, ledgers, leases, approvals, timelines — if it is not in here, it did not happen.",
+    what: "The durable record — one of the kernel's three dependencies, beside your OIDC provider and S3-compatible or local storage. Works, ledgers, leases, approvals, timelines — if it is not in here, it did not happen.",
     bullets: ["Plain Postgres: your backups, your failover, your ops."],
     docs: "/docs/advanced",
   },

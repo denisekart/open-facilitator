@@ -255,27 +255,32 @@
   // source">` inside a pending figure. The vendored mermaid renders it here,
   // with the same theme and the same hover tooltips the build injects.
 
-  // Ink on Paper: surface fills, accent-rule edges, ink text, the selected
-  // tint for the secondary lane. The site fences and the docs fences copy
-  // these exact values (ofac-diagram-style).
+  // Diagrams are a fixed dark instrument surface in BOTH site themes (the
+  // code-block and architecture-explorer precedent): the SVGs are rendered
+  // once, so they ride the copper dark ramp, not the page theme. The fence
+  // `%%{init}%%` blocks in docs/ and site pages and the SSR harness
+  // (mermaid-ssr.mjs) copy these exact values (ofac-diagram-style).
   const MERMAID_THEME = {
-    darkMode: false,
+    darkMode: true,
     fontFamily: "system-ui, sans-serif",
-    primaryColor: "#f7f9fb",
-    primaryBorderColor: "#ab8612",
-    primaryTextColor: "#21262e",
-    lineColor: "#676f7c",
-    secondaryColor: "#faf2d6",
-    tertiaryColor: "#eef2f6",
-    edgeLabelBackground: "#ffffff",
-    clusterBkg: "#f7f9fb",
-    clusterBorder: "#d5dbe3",
-    actorBkg: "#f7f9fb",
-    actorBorder: "#ab8612",
-    activationBkgColor: "#faf2d6",
-    sequenceNumberColor: "#14171a",
-    labelBoxBkgColor: "#f7f9fb",
-    labelBoxBorderColor: "#ab8612",
+    primaryColor: "#2b313b",
+    primaryBorderColor: "#c96a2d",
+    primaryTextColor: "#f3f4f6",
+    textColor: "#f3f4f6",
+    lineColor: "#9ca3af",
+    secondaryColor: "#3d332d",
+    tertiaryColor: "#323944",
+    edgeLabelBackground: "#2b313b",
+    clusterBkg: "#2b313b",
+    clusterBorder: "#3f4754",
+    actorBkg: "#2b313b",
+    actorBorder: "#c96a2d",
+    actorTextColor: "#f3f4f6",
+    activationBkgColor: "#3d332d",
+    sequenceNumberColor: "#ffffff",
+    signalColor: "#9ca3af",
+    labelBoxBkgColor: "#2b313b",
+    labelBoxBorderColor: "#c96a2d",
   };
 
   let mermaidP = null;

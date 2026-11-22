@@ -1,5 +1,5 @@
-using System.Net;
 using System.Diagnostics;
+using System.Net;
 using System.Text.Json;
 
 using Facilitator.Kernel.Ai;
@@ -179,7 +179,7 @@ public sealed class OpenAiChatCompletionsGatewayWireTests
         Assert.Contains("ai gateway", error.Message);
     }
 
-[Theory]
+    [Theory]
     [InlineData("""{"choices":[]}""", "no choices")]
     [InlineData("""{"choices":[{"message":{"role":"assistant"}}]}""", "no content property")]
     [InlineData("""{"choices":[{"message":{"content":null}}]}""", "explicit null content")]

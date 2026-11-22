@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import { marked } from "marked";
 import { docs, guides, pages, repo } from "./src/config.mjs";
 import { renderMermaid, mermaidAvailable } from "./mermaid-ssr.mjs";
+import { retintDiagram } from "./src/diagram-palette.mjs";
 import { tooltipFor, tooltips } from "./src/tooltips.mjs";
 import { renderArchitecture, renderArchitectureMini } from "./src/arch-render.mjs";
 import { architectureBody, architectureMarkdown } from "./src/pages/architecture.mjs";
@@ -57,7 +58,7 @@ const MERMAID = new Map(); // normalized code -> svg
       console.warn("no chromium for mermaid SSR; diagrams render client-side");
     else {
       const map = await renderMermaid(uniq);
-      if (map) uniq.forEach((c, i) => MERMAID.set(norm(c), injectTooltips(map.get(i))));
+      if (map) uniq.forEach((c, i) => MERMAID.set(norm(c), retintDiagram(injectTooltips(map.get(i)))));
       else console.warn("mermaid SSR incomplete; diagrams render client-side");
     }
   }

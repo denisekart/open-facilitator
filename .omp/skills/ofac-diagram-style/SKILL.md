@@ -13,7 +13,16 @@ The house look is "Ink on Paper" with the Refined Copper palette (cool neutral/s
 
 ## Tier 2 — everything else: mermaid first
 
-Sequence/flow/state diagrams in `docs/` and site pages are a fixed dark instrument surface in BOTH themes (the code-block and Tier-1 precedent — the SVGs render once, so they ride the copper dark ramp, never the page theme): copy `MERMAID_THEME` from `site/src/js/app.js` verbatim (base theme, `darkMode`, `system-ui`, node fills on dark surface `#2B313B`, copper border `#C96A2D`, ink `#F3F4F6`, line `#9CA3AF`, selected copper tint `#3D332D` for the secondary lane). The `.diagram` frame in `site/src/styles.css` carries the matching dark ground `#232831`:
+Sequence/flow/state diagrams in `docs/` and site pages **render once with
+the dark instrument set and retint with the site theme**: mermaid bakes
+the literals (SSR at build via `mermaid-ssr.mjs`, or the client fallback
+in `site/src/js/app.js`), then `site/src/diagram-palette.mjs` rewrites
+every baked hex into a `--dia-*` CSS variable (both theme legs defined in
+`site/src/styles.css`), so the inline SVG flips light/dark with the
+toggle — no re-render. Rendering is always the dark set below (the fence
+`%%{init}%%` carries it so GitHub renders the same picture standalone);
+light mode comes from the `--dia-*` light leg. Copper `#C96A2D` is
+theme-invariant and never mapped:
 
 ````
 ```mermaid title="The dispatch funnel"
@@ -21,6 +30,12 @@ Sequence/flow/state diagrams in `docs/` and site pages are a fixed dark instrume
 flowchart LR ...
 ```
 ````
+
+- New diagram colors introduced via themeVariables? Add the hex to
+  `DIAGRAM_VAR_MAP` in `diagram-palette.mjs` AND the inline copy in
+  `app.js` AND both `--dia-*` legs in `styles.css` — all three, or the
+  hex stays frozen mid-theme-switch.
+- The `.diagram` frame carries `var(--dia-bg)`/`var(--dia-frame-line)`.
 
 - The `title="…"` info-string becomes the site figcaption; docs/ fences may omit it but then need a prose caption line above.
 - Validate with the managed `mermaid-doc-validation` skill (real `mermaid.parse` + HEAD baseline) — never eyeball a fence.

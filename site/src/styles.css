@@ -1418,14 +1418,60 @@ pre.cmd code {
 
 /* ---------------------------------------------------------------- diagrams */
 
-/* Diagrams are a fixed dark instrument surface in both themes (the
-   code-block and architecture-explorer precedent): the copper dark ramp
-   below matches the palette the mermaid harness renders with, so the
-   figure reads the same on light and dark pages. */
+/* Diagrams: one palette, two themes. Mermaid bakes the dark instrument
+   set at render time; site/src/diagram-palette.mjs rewrites the literals
+   to the --dia-* properties below, so an inline SVG retints with the
+   theme toggle in place (no re-render). Dark re-derives the rendered
+   hexes exactly; copper stays copper in both. */
+:root {
+  --dia-bg: #ffffff;
+  --dia-frame-line: #cfd6e0;
+  --dia-node: #f8efe8;
+  --dia-node-alt: #f1f3f5;
+  --dia-tint: #f8efe8;
+  --dia-cluster-border: #cfd6e0;
+  --dia-ink: #1a202c;
+  --dia-line: #505a69;
+  --dia-error-ink: #7a8699;
+  --dia-loop: #e8ecf0;
+  --dia-surface: #ffffff;
+  --dia-note: #faf2de;
+  --dia-note-seq: #faf2de;
+  --dia-alt: #f1f3f5;
+  --dia-arrowhead: #1a202c;
+  --dia-marker: #1a202c;
+  --dia-note-ink: #1a202c;
+  --dia-seq: #1a202c;
+  --dia-loop-border: #505a69;
+  --dia-line-faint: #b6bfcb;
+}
+[data-theme="dark"] {
+  --dia-bg: #232831;
+  --dia-frame-line: #3f4754;
+  --dia-node: #2b313b;
+  --dia-node-alt: #323944;
+  --dia-tint: #3d332d;
+  --dia-cluster-border: #3f4754;
+  --dia-ink: #f3f4f6;
+  --dia-line: #9ca3af;
+  --dia-error-ink: #cdc6bb;
+  --dia-loop: #eaeaea;
+  --dia-surface: #f4f4f4;
+  --dia-note: #fff5ad;
+  --dia-note-seq: #edf2ae;
+  --dia-alt: #e0e0e0;
+  --dia-arrowhead: #0b0b0b;
+  --dia-marker: #000000;
+  --dia-note-ink: #333333;
+  --dia-seq: #ffffff;
+  --dia-loop-border: #666666;
+  --dia-line-faint: #999999;
+}
+
 .diagram {
   position: relative;
-  background: #232831;
-  border: 1px solid #3f4754;
+  background: var(--dia-bg);
+  border: 1px solid var(--dia-frame-line);
   border-radius: 4px;
   padding: 22px;
   margin: 22px 0;
@@ -1442,7 +1488,7 @@ pre.cmd code {
   font: 600 11.5px/1.5 var(--mono);
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #9ca3af;
+  color: var(--ink-2);
   margin-top: 14px;
 }
 .diagram-zoom {
@@ -1450,10 +1496,10 @@ pre.cmd code {
   top: 10px;
   right: 10px;
   z-index: 2;
-  background: #2b313b;
-  border: 1px solid #3f4754;
+  background: var(--surface-raise);
+  border: 1px solid var(--line-2);
   border-radius: 6px;
-  color: #f3f4f6;
+  color: var(--ink-2);
   font: 600 11px/1 var(--mono);
   letter-spacing: 0.04em;
   padding: 6px 9px;
@@ -1462,11 +1508,26 @@ pre.cmd code {
 }
 .diagram-zoom:hover {
   opacity: 1;
-  border-color: #e58a45;
-  color: #e58a45;
+  border-color: var(--accent-text);
+  color: var(--accent-text);
 }
 .mermaid-source {
   font-size: 13px;
+}
+/* Legibility overrides. Mermaid's per-diagram rules are id-scoped
+   (#dN .actor…), which outrank any class selector, so these carry
+   !important — surgical, diagram-scoped only:
+   - actor labels (sequence): the `.actor` class fills the shape AND
+     leaks into `<text class="actor">`, so stick-figure (actor-man)
+     labels render in the plate color itself; force themed ink.
+   - stick-figure strokes follow the line color, not copper. */
+.diagram svg text.actor,
+.diagram svg text.actor > tspan {
+  fill: var(--dia-ink) !important;
+  stroke: none !important;
+}
+.diagram svg .actor-man line {
+  stroke: var(--dia-line) !important;
 }
 .diagram-tip {
   position: fixed;
@@ -1507,7 +1568,7 @@ pre.cmd code {
   position: relative;
   cursor: grab;
   touch-action: none;
-  background: #232831;
+  background: var(--dia-bg);
   border: 1px solid var(--line-2);
   border-radius: 4px;
   box-shadow: var(--shadow-1);

@@ -255,11 +255,13 @@
   // source">` inside a pending figure. The vendored mermaid renders it here,
   // with the same theme and the same hover tooltips the build injects.
 
-  // Diagrams are a fixed dark instrument surface in BOTH site themes (the
-  // code-block and architecture-explorer precedent): the SVGs are rendered
-  // once, so they ride the copper dark ramp, not the page theme. The fence
-  // `%%{init}%%` blocks in docs/ and site pages and the SSR harness
-  // (mermaid-ssr.mjs) copy these exact values (ofac-diagram-style).
+  // Diagrams render once with the DARK instrument set (the set the build's
+  // SSR harness and the fence `%%{init}%%` blocks also use, per
+  // ofac-diagram-style), then every literal hex is rewritten to a --dia-*
+  // CSS variable so the inline SVG retints with the site's theme toggle
+  // without re-rendering. app.js is dependency-free, so this is a copy of
+  // site/src/diagram-palette.mjs — the build's SSR leg applies the original;
+  // keep the two maps in lockstep.
   const MERMAID_THEME = {
     darkMode: true,
     fontFamily: "system-ui, sans-serif",
@@ -282,6 +284,65 @@
     labelBoxBkgColor: "#2b313b",
     labelBoxBorderColor: "#c96a2d",
   };
+
+  const DIAGRAM_HEX = [
+    ["#2b313b", "--dia-node"],
+    ["#323944", "--dia-node-alt"],
+    ["#3d332d", "--dia-tint"],
+    ["#3f4754", "--dia-cluster-border"],
+    ["#f3f4f6", "--dia-ink"],
+    ["#f8efe8", "--dia-ink"],
+    ["#9ca3af", "--dia-line"],
+    ["#cdc6bb", "--dia-error-ink"],
+    ["#eaeaea", "--dia-loop"],
+    ["#f4f4f4", "--dia-surface"],
+    ["#fff5ad", "--dia-note"],
+    ["#edf2ae", "--dia-note-seq"],
+    ["#e0e0e0", "--dia-alt"],
+    ["#0b0b0b", "--dia-arrowhead"],
+    ["#000000", "--dia-marker"],
+    ["#000", "--dia-marker"],
+    ["#ffffff", "--dia-seq"],
+    ["#333333", "--dia-note-ink"],
+    ["#333", "--dia-note-ink"],
+    ["#666666", "--dia-loop-border"],
+    ["#666", "--dia-loop-border"],
+    ["#999999", "--dia-line-faint"],
+    ["#999", "--dia-line-faint"],
+  ];
+  const DIAGRAM_VAR = new Map(DIAGRAM_HEX.map(([h, v]) => [h.toLowerCase(), v]));
+  function retintDiagram(svg) {
+    // Presentation attributes cannot carry var(): move mapped fill/stroke
+    // hexes from attributes into the element's style attribute.
+    svg = svg.replace(/<(rect|path|circle|line|polygon|text|ellipse|feDropShadow|feFlood|marker)\b[^>]*>/g, (tag) => {
+      // classless only: a presentation attribute loses to mermaid's class
+      // rules anyway, and promoting it to inline style would override the
+      // themed rule. See site/src/diagram-palette.mjs for the law.
+      if (/\sclass="/i.test(tag)) return tag;
+      let out = tag;
+      const inject = [];
+      for (const attr of ["fill", "stroke"]) {
+        out = out.replace(new RegExp(`\\s${attr}="#([0-9a-fA-F]{3,6})"`, "i"), (m, hex) => {
+          const v = DIAGRAM_VAR.get("#" + hex.toLowerCase());
+          if (!v) return m;
+          inject.push(`${attr}:var(${v})`);
+          return "";
+        });
+      }
+      if (!inject.length) return tag;
+      const decl = inject.join(";");
+      if (/\sstyle="[^"]*"/i.test(out))
+        out = out.replace(/\sstyle="([^"]*)"/i, (m, css) => ` style="${css.replace(/;+\s*$/, "")};${decl}"`);
+      else if (/\s*\/>$/.test(out)) out = out.replace(/\s*\/>$/, ` style="${decl}"/>`);
+      else out = out.replace(/>$/, ` style="${decl}">`);
+      return out;
+    });
+    for (const [hex, v] of DIAGRAM_HEX) {
+      const guard = hex.length === 4 ? "(?![0-9a-fA-F])" : "";
+      svg = svg.replace(new RegExp(hex + guard, "gi"), `var(${v})`);
+    }
+    return svg;
+  }
 
   let mermaidP = null;
   function loadMermaid() {
@@ -356,7 +417,7 @@
         );
         const frame = document.createElement("div");
         frame.className = "svg-frame";
-        frame.innerHTML = titled;
+        frame.innerHTML = retintDiagram(titled);
         const btn = document.createElement("button");
         btn.className = "diagram-zoom";
         btn.setAttribute("aria-label", "Expand diagram");

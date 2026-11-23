@@ -18,9 +18,12 @@ capabilities:
     outputKinds: [analysis.report]
     outputMediaTypes: [text/markdown]
     # holdMs: an assignment may widen the analyze step (inputs.vars) to
-    # open a steer/cancel/kill window for e2e legs; 0 by default.
+    # open a steer/cancel/kill window for e2e legs. The reference env
+    # defaults it to the old deterministic worker's pacing (2 x 800ms of
+    # sleep): the acceptance leg kills mid-flight right after the first
+    # progress note, so the run must stay alive ~1.6s past it.
     vars:
-      holdMs: "0"
+      holdMs: "1600"
     steps:
       - name: analyze
         progress: "accepted: analyzing research.analyze for {{workId}}"

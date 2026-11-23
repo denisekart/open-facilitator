@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ofac-harness-adapter Feature install: verify + extract the baked runtime
-# tarball, put ofac-deterministic-worker on PATH, drop the supervisor + this
+# tarball, put ofac-cli-worker on PATH, drop the supervisor + this
 # Feature's unit. Idempotent: a second run with the same VERSION stamp is a
 # no-op. Options arrive as uppercase env: ADAPTER, CONFIGPATH.
 set -euo pipefail
@@ -11,8 +11,8 @@ VERSION=1.0.0
 PREFIX=/usr/local/lib/openfacilitator/$NAME
 SHARE=/usr/local/share/openfacilitator
 
-if [ "${ADAPTER:-deterministic}" != "deterministic" ]; then
-  echo "ofac-$NAME: adapter '${ADAPTER}' not implemented; only 'deterministic' ships a binary today." >&2
+if [ "${ADAPTER:-cli}" != "cli" ]; then
+  echo "ofac-$NAME: adapter '${ADAPTER}' not implemented; only 'cli' ships a binary today." >&2
   exit 1
 fi
 
@@ -35,17 +35,17 @@ if [ ! -f "$STAMP" ] || [ "$(cat "$STAMP")" != "$VERSION" ]; then
   printf '%s' "$VERSION" > "$STAMP"
 fi
 
-cat > /usr/local/bin/ofac-deterministic-worker <<EOF
+cat > /usr/local/bin/ofac-cli-worker <<EOF
 #!/bin/sh
 exec node "$PREFIX/dist/bin/worker.js" "\$@"
 EOF
-chmod 0755 /usr/local/bin/ofac-deterministic-worker
+chmod 0755 /usr/local/bin/ofac-cli-worker
 
 install -m 0755 "$FEATURE_DIR/pkg/ofac-supervisor.sh" "$SHARE/ofac-supervisor.sh"
 
 cat > "$SHARE/units/30-harness-adapter.sh" <<EOF
 #!/bin/sh
-# ofac-deterministic-worker unit (Feature-baked defaults; env still wins:
+# ofac-cli-worker unit (Feature-baked defaults; env still wins:
 # WORKER_CONFIG overrides the config path, OFAC_CHILD_SECRET the file token,
 # OFAC_ADAPTER_LOG the level).
 export WORKER_CONFIG=\${WORKER_CONFIG:-${CONFIGPATH:-.facilitator/harness.yaml}}
@@ -67,7 +67,7 @@ fi
 restarts=0
 max=\${OFAC_SUPERVISOR_MAX_RESTARTS:-10}
 while true; do
-  ofac-deterministic-worker run --config "\$WORKER_CONFIG" &
+  ofac-cli-worker run --config "\$WORKER_CONFIG" &
   child=\$!
   trap 'kill -TERM "\$child" 2>/dev/null; exit 0' TERM INT
   wait "\$child"; rc=\$?

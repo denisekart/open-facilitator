@@ -19,7 +19,7 @@ const featuresDir = join(repoRoot, "features", "src");
 const FEATURES = [
   { feature: "gateway", pkg: "@ofac/gateway", entry: "dist/bin/gateway.js" },
   { feature: "workspace-link", pkg: "@ofac/workspace-link", entry: "dist/bin/linkd.js" },
-  { feature: "harness-adapter", pkg: "@ofac/harness-deterministic", entry: "dist/bin/worker.js" },
+  { feature: "harness-adapter", pkg: "@ofac/harness-cli", entry: "dist/bin/worker.js" },
   { feature: "omp-adapter", pkg: "@ofac/harness-omp", entry: "dist/bin/worker.js" },
   { feature: "codex-adapter", pkg: "@ofac/harness-codex", entry: "dist/bin/worker.js" },
   { feature: "forgejo-provider", pkg: "@ofac/forgejo-connector", entry: "dist/bin/connector.js" },

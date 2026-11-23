@@ -60,11 +60,11 @@ flowchart LR
     C --> ID
   end
   subgraph node1 [Node box pc1]
-    G1[Team gateway\n+ deterministic worker]
+    G1[Team gateway\n+ cli worker]
     L1[OCI launcher\nDocker socket]
   end
   subgraph node2 [Node box pc2]
-    G2[Team gateway\n+ deterministic worker]
+    G2[Team gateway\n+ cli worker]
   end
   P[Provider\nGitHub/Mattermost] -- webhooks via Funnel --> C
   G1 & L1 & G2 -- outbound only:\nlink plane + enroll --> C
@@ -223,7 +223,7 @@ verification run.
    (the `TOKEN` recipe: Keycloak `facilitator-cli` client_credentials, as
    `localctl` does; `projectId` from the admin SPA search.)
 5. Watch `GET /api/works/{id}/timeline` fill up: dispatch → the
-   deterministic worker completes → one result manifest.
+   cli worker (playbook) completes → one result manifest.
 
 ## Tests & gates
 

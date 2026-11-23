@@ -35,4 +35,4 @@ into any team-owned container, published as OCI images
 ## Truth anchors
 - `../.omp/skills/facilitator-workspace-packaging/SKILL.md` — provisioning rules.
 - `../docs/specs/open_facilitator_framework_architecture.md` — requirements.
-- `../examples/slim/deterministic-research-worker/.devcontainer` — composed example.
+- `../examples/slim/cli-research-worker/.devcontainer` — composed example.

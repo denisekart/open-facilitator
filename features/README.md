@@ -13,7 +13,7 @@ its README.
 |---|---|---|
 |`gateway`|`ofac-gateway` — team-owned Gateway + supervisor unit|[src/gateway/README.md](src/gateway/README.md)|
 |`workspace-link`|`ofac-linkd` — direct Link endpoint, no Gateway|[src/workspace-link/README.md](src/workspace-link/README.md)|
-|`harness-adapter`|`ofac-deterministic-worker` — deterministic Gateway child|[src/harness-adapter/README.md](src/harness-adapter/README.md)|
+|`harness-adapter`|`ofac-cli-worker` — playbook-driven Gateway child|[src/harness-adapter/README.md](src/harness-adapter/README.md)|
 |`omp-adapter`|`ofac-omp-worker` — omp CLI Gateway child|[src/omp-adapter/README.md](src/omp-adapter/README.md)|
 |`codex-adapter`|`ofac-codex-worker` — Codex CLI Gateway child|[src/codex-adapter/README.md](src/codex-adapter/README.md)|
 |`forgejo-provider`|`ofac-forgejo-connector` — forge-ops Gateway child|[src/forgejo-provider/README.md](src/forgejo-provider/README.md)|
@@ -34,7 +34,7 @@ ghcr.io/denisekart/open-facilitator/features/<name>:1
 against `--registry ghcr.io --namespace denisekart/open-facilitator/features`
 and moves the `:1` tag). The repo-source coordinates `./features/src/<name>`
 work identically for local composition — see
-`../examples/slim/deterministic-research-worker/.devcontainer`. A Feature
+`../examples/slim/cli-research-worker/.devcontainer`. A Feature
 version is not a protocol major.
 
 ## Build and test

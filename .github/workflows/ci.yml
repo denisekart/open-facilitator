@@ -387,12 +387,12 @@ jobs:
           FACILITATOR_PG: postgresql://postgres:postgres@localhost:5432/postgres
           KEYCLOAK_URL: http://localhost:8480
         run: pnpm -C src/gateway test:e2e
-      - name: harness worker e2e (plan 07 deterministic worker vs standalone gateway)
+      - name: harness worker e2e (playbook cli worker vs standalone gateway)
         env:
           FACILITATOR_URL: http://gate-only
           FACILITATOR_PG: postgresql://postgres:postgres@localhost:5432/postgres
           KEYCLOAK_URL: http://localhost:8480
-        run: pnpm -C src/adapters/harnesses/deterministic test:e2e
+        run: pnpm -C src/adapters/harnesses/cli test:e2e
       - name: omp harness worker e2e (omp worker vs standalone gateway)
         env:
           FACILITATOR_URL: http://gate-only

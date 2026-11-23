@@ -2,7 +2,7 @@
 # the SAME gateway code, booted by the OCI launcher. Identity: mode-(a)
 # enrollment on the STATIC kernel secret (spec env OFAC_ENROLL_SECRET,
 # name-indirect), gw.elastic on team home, empty standalone fleet + the
-# deterministic worker child over the in-container unix socket. facilitatorUrl
+# cli worker child over the in-container unix socket. facilitatorUrl
 # is repointed via OFAC_KERNEL_URL env where needed.
 apiVersion: facilitator.framework/v1
 kind: Gateway

@@ -1,5 +1,5 @@
 #!/bin/sh
-# ofac-deterministic-worker unit for the local-example node container.
+# ofac-cli-worker unit for the local-example node container.
 # Copied from reference/container/units/30-harness-adapter.sh with ONE
 # change: the self-enroll block reads OFAC_KERNEL_SECRET first (the STATIC
 # kernel secret the node bundle injects for exactly this child identity —

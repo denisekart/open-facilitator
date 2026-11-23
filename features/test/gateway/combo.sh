@@ -1,6 +1,6 @@
 #!/bin/bash
 set -eu
-command -v ofac-gateway ofac-linkd ofac-deterministic-worker
+command -v ofac-gateway ofac-linkd ofac-cli-worker
 for u in 10-gateway.sh 20-linkd.sh 30-harness-adapter.sh; do
   test -f "/usr/local/share/openfacilitator/units/$u"
 done

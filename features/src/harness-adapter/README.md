@@ -1,7 +1,7 @@
 # Dev Container Feature: ofac-harness-adapter
 
-Installs a **harness worker** — today the deterministic reference adapter
-(`ofac-deterministic-worker`) — as a self-contained Node bundle plus a
+Installs a **harness worker** — today the playbook-driven CLI adapter
+(`ofac-cli-worker`) — as a self-contained Node bundle plus a
 supervisor unit; read this when a container runs a Gateway child. The worker
 attaches over the child transport (unix socket or 127.0.0.1 TCP), registers
 its capability manifest, and executes assignments the Gateway routes to it.
@@ -11,7 +11,7 @@ its capability manifest, and executes assignments the Gateway routes to it.
 1. Base image with Node **>= 22** on PATH (hard-fails otherwise; a
    Node-shipping base image or the official
    `ghcr.io/devcontainers/features/node` Feature satisfies this).
-2. `adapter: deterministic` — the only adapter binary that exists; any other
+2. `adapter: cli` — the only adapter binary that exists; any other
    option value fails the install with exit 1.
 3. A Gateway's child socket reachable at the config's transport path, and
    `OFAC_CHILD_SECRET` equal to the Gateway's.
@@ -22,7 +22,7 @@ its capability manifest, and executes assignments the Gateway routes to it.
 
 |Option|Default|Meaning|
 |---|---|---|
-|`adapter`|`deterministic`|Which adapter binary to install (only value accepted)|
+|`adapter`|`cli`|Which adapter binary to install (only value accepted)|
 |`configPath`|`.facilitator/harness.yaml`|Worker config the unit starts with; `WORKER_CONFIG` env overrides|
 
 Options bake the unit script's defaults; the runtime env surface is the truth.
@@ -37,7 +37,7 @@ config file's directory**, the Gateway resolves its socket against
 `stateDir` — so with configs in `.facilitator/` and `stateDir:
 /workspace/.ofac-gateway`, use the **absolute** path
 `/workspace/.ofac-gateway/child.sock` in the worker config (see
-`examples/slim/deterministic-research-worker/.facilitator/harness.yaml`).
+`examples/slim/cli-research-worker/.facilitator/harness.yaml`).
 
 ## Runtime env surface (1:1 with the binary)
 

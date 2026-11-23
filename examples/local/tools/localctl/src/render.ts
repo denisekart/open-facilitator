@@ -604,7 +604,8 @@ export async function render(
     for (const [file, template] of [
       ["config/gateway.yaml", "gateway.yaml.tmpl"],
       ["config/worker.yaml", "worker.yaml.tmpl"],
-      ["config/capabilities.yaml", "capabilities.yaml"],
+      ["config/research.playbook.yaml", "research.playbook.yaml"],
+      ["config/fake-research-tool.mjs", "fake-research-tool.mjs"],
       ["config/policy.yaml", "policy.yaml"],
       ["launcher/adapter.yaml", "launcher-adapter.yaml.tmpl"],
     ] as const) {

@@ -1,5 +1,5 @@
 # Per-node persistent Gateway (mode (a): the minted enrollment token rides
-# OFAC_ENROLL_SECRET). Empty fleet + the deterministic worker attaches late
+# OFAC_ENROLL_SECRET). Empty fleet + the cli worker (playbook-driven) attaches late
 # over the in-container unix child socket. Values rendered per node:
 # gatewayId, team, facilitatorUrl.
 apiVersion: facilitator.framework/v1
@@ -12,9 +12,9 @@ trustMode: isolated-executor
 stateDir: /var/lib/ofac/gateway
 mode: standalone
 children:
-  # The deterministic worker registers late over the child socket; hello
+  # The cli worker registers late over the child socket; hello
   # auth falls back to OFAC_CHILD_SECRET, so no per-child token here.
-  - name: deterministic
+  - name: cli
 childTransport:
   socket:
     path: child.sock

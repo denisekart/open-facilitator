@@ -1,0 +1,97 @@
+# The parity playbook: the same capability pair the deterministic worker
+# advertised — research.analyze v1 (async, analysis.report) and
+# research.publish v1 (the confirm-scoped flavor, not cancellable) —
+# executed by a plain CLI. Two steps each with work.progress notes, an
+# optional config-driven human leg (`when: askQuestion` mirrors the
+# worker's optional askQuestion config key), one report capture plus the
+# canonical manifest and completed event (the harness's law, not this
+# file's). Steps name the fake research CLI relative to {{playbookDir}}:
+# a runbook travels with its helpers, never with the cwd.
+apiVersion: facilitator.framework/v1
+kind: Playbook
+ownerTeam: team-alpha
+capabilities:
+  - id: research.analyze
+    version: 1
+    execution: asynchronous
+    acceptedContexts: [uri-reference]
+    outputKinds: [analysis.report]
+    outputMediaTypes: [text/markdown]
+    # holdMs: an assignment may widen the analyze step (inputs.vars) to
+    # open a steer/cancel/kill window for e2e legs; 0 by default.
+    vars:
+      holdMs: "0"
+    steps:
+      - name: analyze
+        progress: "accepted: analyzing research.analyze for {{workId}}"
+        run:
+          command: node
+          args:
+            - "{{playbookDir}}/fake-research-tool.mjs"
+            - analyze
+            - report.md
+            - --objective
+            - "{{objective}}"
+            - --attachments
+            - attachments
+            - --hold
+            - "{{vars.holdMs}}"
+        expect: { exit: 0 }
+      - name: ask
+        when: askQuestion
+        ask: { question: "{{vars.askQuestion}}" }
+      - name: draft
+        progress: "drafting report"
+        run:
+          command: node
+          args:
+            - "{{playbookDir}}/fake-research-tool.mjs"
+            - analyze
+            - report.md
+            - --objective
+            - "{{objective}}"
+            - --attachments
+            - attachments
+            - --answer
+            - "{{steps.ask.answer}}"
+        expect: { exit: 0, fileExists: report.md }
+        capture: { as: report, from: file, path: report.md, mediaType: text/markdown }
+  - id: research.publish
+    version: 1
+    execution: asynchronous
+    acceptedContexts: [uri-reference]
+    outputKinds: [research-publish.result]
+    outputMediaTypes: [text/markdown]
+    supportsCancellation: false
+    vars:
+      holdMs: "0"
+    steps:
+      - name: analyze
+        progress: "accepted: analyzing research.publish for {{workId}}"
+        run:
+          command: node
+          args:
+            - "{{playbookDir}}/fake-research-tool.mjs"
+            - publish
+            - report.md
+            - --objective
+            - "{{objective}}"
+            - --attachments
+            - attachments
+            - --hold
+            - "{{vars.holdMs}}"
+        expect: { exit: 0 }
+      - name: draft
+        progress: "drafting report"
+        run:
+          command: node
+          args:
+            - "{{playbookDir}}/fake-research-tool.mjs"
+            - publish
+            - report.md
+            - --objective
+            - "{{objective}}"
+            - --attachments
+            - attachments
+        expect: { exit: 0, fileExists: report.md }
+        capture: { as: report, from: file, path: report.md, mediaType: text/markdown }

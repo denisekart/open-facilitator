@@ -112,9 +112,10 @@ export interface LinkTransport {
   /**
    * The channel URI a hello-carried proof binds to (htm "WS"), exactly as this
    * client sees it — set by socket transports, absent for `http-poll`, which
-   * has no handshake to prove.
+   * has no handshake to prove. `| undefined` so wrappers may expose a getter
+   * that forwards an inner transport's absence (exactOptionalPropertyTypes).
    */
-  hubUrl?: string;
+  readonly hubUrl?: string | undefined;
 }
 
 /**

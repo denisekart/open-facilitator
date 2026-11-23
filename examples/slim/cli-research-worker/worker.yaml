@@ -1,0 +1,18 @@
+# CLI worker for the walkthrough. Relative paths resolve against this
+# file's directory. `token` must equal the Gateway's OFAC_CHILD_SECRET
+# (start the Gateway with that env set — see README). The capability
+# manifest is DERIVED FROM THE PLAYBOOK — no separate capabilities file.
+apiVersion: facilitator.framework/v1
+kind: HarnessAdapter
+childWorkspaceId: gw.demo/cli
+token: child-secret-demo
+# The kernel origin for the artifact byte path (the completion upload runs
+# with the child token — the same secret the Gateway admits us with).
+kernelUrl: http://localhost:8088
+transport:
+  socket:
+    path: .ofac-gateway/child.sock
+playbookFile: research.playbook.yaml
+workDir: ./.ofac-worker
+heartbeatSeconds: 5
+restartBackoffMs: [100, 250, 500, 1000, 2000, 5000]

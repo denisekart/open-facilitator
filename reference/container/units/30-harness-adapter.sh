@@ -1,5 +1,5 @@
 #!/bin/sh
-# ofac-deterministic-worker unit for the compose demo-workspace container.
+# ofac-cli-worker unit for the compose demo-workspace container.
 # Mirrors the Feature-baked unit (features/src/harness-adapter/install.sh);
 # the kernel-leg block below is a deliberate byte-for-byte copy (see
 # README.md). Config paths are compose mounts; tokens come from env only.

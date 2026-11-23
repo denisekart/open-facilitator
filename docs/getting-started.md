@@ -70,7 +70,7 @@ end to end.
 This builds the kernel + node-runtime images, boots Postgres, Keycloak
 (realm `facilitator`), SeaweedFS (S3), the Aspire dashboard, the Facilitator
 container, and `demo-workspace` (standalone Gateway `gw.team-alpha` +
-deterministic worker), waits for every healthcheck, then seeds one
+cli worker), waits for every healthcheck, then seeds one
 `work.assign` that dispatches end-to-end. What you are booting:
 
 ```mermaid title="The slim reference stack you are about to boot"
@@ -83,7 +83,7 @@ flowchart LR
     KC["Keycloak :8080\nrealm facilitator"] --> K
     S3[("SeaweedFS S3 :8333")] --- K
     K --> ASP["Aspire dashboard :18888"]
-    WS["demo-workspace\ngw.team-alpha + deterministic worker"]
+    WS["demo-workspace\ngw.team-alpha + cli worker"]
   end
   WS -->|"outbound link"| K
   ADMIN["Your browser / curl"] --> K
@@ -322,7 +322,7 @@ harness-specific `omp-adapter` / `codex-adapter` and the `forgejo-provider`
 feature) — see the sibling READMEs under
 [`features/src/`](../features/src/). A fully composed
 three-Feature example with an end-to-end walkthrough:
-[`examples/slim/deterministic-research-worker`](../examples/slim/deterministic-research-worker/README.md).
+[`examples/slim/cli-research-worker`](../examples/slim/cli-research-worker/README.md).
 
 ### The full-profile walkthrough
 

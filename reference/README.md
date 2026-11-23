@@ -18,7 +18,7 @@ make compose-slim / compose-full / compose-down   # raw compose path
 `facilitator`), SeaweedFS (S3 artifact store), the Aspire dashboard (OTLP),
 the Facilitator kernel container, and `demo-workspace` — a team-owned
 workspace container running a standalone Gateway (`gw.team-alpha`) plus the
-deterministic worker over an in-container unix child leg, enrolled and
+playbook-driven cli worker over an in-container unix child leg, enrolled and
 policy-gated. One seeded `work.assign` then dispatches end-to-end.
 
 You should now see: a healthy service table from `status`, a 0 exit from

@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# Source-built Node runtime image: gateway, linkd and the deterministic worker
+# Source-built Node runtime image: gateway, linkd and the cli worker
 # share one dependency closure (the worker depends on @ofac/adapter,
 # @ofac/gateway, @ofac/protocol, @ofac/workspace-link at runtime), so one image
 # carries three self-contained app dirs. Consumers pick a process via command
@@ -54,7 +54,7 @@ RUN pnpm -r build
 # package's `files: ["dist"]`.
 RUN pnpm deploy --filter=@ofac/gateway --prod /deploy/gateway \
  && pnpm deploy --filter=@ofac/workspace-link --prod /deploy/linkd \
- && pnpm deploy --filter=@ofac/harness-deterministic --prod /deploy/worker \
+ && pnpm deploy --filter=@ofac/harness-cli --prod /deploy/worker \
  && pnpm deploy --filter=@ofac/mattermost-adapter --prod /deploy/mattermost-adapter \
  && pnpm deploy --filter=@ofac/telegram-adapter --prod /deploy/telegram-adapter \
  && pnpm deploy --filter=@ofac/forgejo-adapter --prod /deploy/forgejo-adapter \

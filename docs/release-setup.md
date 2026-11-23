@@ -72,7 +72,7 @@ section 3's scope question before creating anything else.
    "Workflows permissions: Read and write allowed" (the default); do not set
    the org/repo limit to Read-only.
 5. Feature OCI path contract (consumers depend on this —
-   `docs/getting-started.md` (registry coordinates table) and `examples/slim/deterministic-research-worker/README.md`
+   `docs/getting-started.md` (registry coordinates table) and `examples/slim/cli-research-worker/README.md`
    advertise the coordinates): `@devcontainers/cli features publish` pushes
    each directory of `features/src` to
    `<registry>/<namespace>/<id>` where `<id>` is the `id` field of that

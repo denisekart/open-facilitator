@@ -96,6 +96,9 @@ heartbeatSeconds: 1
       ...process.env,
       OFAC_KERNEL_ENDPOINT: options.kernelEndpoint,
       OFAC_ENROLL_SECRET: options.enrollSecret,
+      // The config file is the harness's truth: an OFAC_KERNEL_URL leaked
+      // from the dev shell would silently override the scraped origin.
+      OFAC_KERNEL_URL: options.kernelUrl,
     },
   });
   let log = "";

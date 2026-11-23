@@ -148,7 +148,7 @@ The locked YAML surface (`loadConfigFile` rejects any other key, naming it):
 A HarnessAdapter is the thin translation layer between the Gateway's child
 transport and one harness execution engine. Shipped as
 `@ofac/adapter` (`src/adapters/harnesses/adapter-sdk/`); the worked example
-is `@ofac/harness-deterministic`.
+is `@ofac/harness-cli` — a playbook-driven worker that spawns any CLI tool.
 
 ### Lifecycle
 
@@ -265,7 +265,7 @@ implemented; re-dispatch generations fence against a resumed older worker.
 it boots an in-process Gateway listener, drives the full lifecycle against
 your adapter, and schema-validates your terminal event. Wire-level fixtures
 live in `protocol/conformance-fixtures/` (class `adapter`). The no-Docker
-walkthrough: `examples/slim/deterministic-research-worker/`.
+walkthrough: `examples/slim/cli-research-worker/`.
 
 ## Provider (communication) adapters
 

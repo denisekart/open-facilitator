@@ -29,7 +29,7 @@ registry, no network, no toolchain at container-install time). Ids
 |---|---|---|---|
 | `gateway` | `ofac-gateway` bundle + supervisor | `configPath`, `log` | `units/10-gateway.sh` (exit >=2 terminal) |
 | `workspace-link` | `ofac-linkd` bundle + supervisor | `facilitatorUrl`, `endpointId`, `team`, `manifest`, `mode` | `units/20-linkd.sh` (exit 2 terminal, 0 stops, else restart) |
-| `harness-adapter` | `ofac-deterministic-worker` bundle + supervisor | `adapter` (=deterministic only), `configPath` | `units/30-harness-adapter.sh` (exit >=2 terminal) |
+| `harness-adapter` | `ofac-cli-worker` bundle + supervisor | `adapter` (=cli only), `configPath` | `units/30-harness-adapter.sh` (exit >=2 terminal) |
 | `omp-adapter` | `ofac-omp-worker` bundle + supervisor | `configPath`, `requireCli` (=true: hard-fail unless `omp` on PATH) | `units/31-omp-adapter.sh` (exit >=2 terminal) |
 | `codex-adapter` | `ofac-codex-worker` bundle + supervisor | `configPath`, `requireCli` (=true: hard-fail unless `codex` on PATH) | `units/32-codex-adapter.sh` (exit >=2 terminal) |
 

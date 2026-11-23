@@ -149,7 +149,7 @@ jobs:
 #       - name: demo workspace linked + dispatch completed
 #         working-directory: reference
 #         run: |
-#           # Gateway ready with the deterministic worker registered as a child.
+#           # Gateway ready with the cli worker registered as a child.
 #           # Diagnostics bind the container's loopback only -> probe in place.
 #           docker compose --env-file versions.env --env-file .env -f compose.slim.yaml \
 #             exec -T demo-workspace node -e \
@@ -529,10 +529,10 @@ jobs:
 #             curl -sf http://localhost:8088/health >/dev/null && exit 0; sleep 1
 #           done; tail -20 /tmp/kernel.log; exit 1
 #       - name: devcontainer up
-#         run: npx --yes @devcontainers/cli@^0.79 up --workspace-folder examples/slim/deterministic-research-worker
+#         run: npx --yes @devcontainers/cli@^0.79 up --workspace-folder examples/slim/cli-research-worker
 #       - name: supervisors reach ready
 #         run: |
-#           W=examples/slim/deterministic-research-worker
+#           W=examples/slim/cli-research-worker
 #           for u in 10-gateway.sh 30-harness-adapter.sh 20-linkd.sh; do
 #             for _ in $(seq 1 60); do
 #               npx --yes @devcontainers/cli@^0.79 exec --workspace-folder $W \
@@ -543,7 +543,7 @@ jobs:
 #           done
 #       - name: seed assignment + verify completion
 #         run: |
-#           W=examples/slim/deterministic-research-worker
+#           W=examples/slim/cli-research-worker
 #           KERNEL_TOKEN=$(curl -sf http://localhost:8480/realms/facilitator/protocol/openid-connect/token \
 #             -d grant_type=client_credentials -d client_id=facilitator-cli -d client_secret=e2e-cli-secret | jq -r .access_token)
 #           curl -sf -X POST localhost:8088/api/dev/link-outbox \

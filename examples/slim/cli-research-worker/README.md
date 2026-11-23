@@ -1,7 +1,8 @@
-# Deterministic research worker — no-Docker walkthrough
+# CLI research worker — no-Docker walkthrough
 
 The smallest real deployment — dev Facilitator + standalone Gateway + the
-deterministic harness worker, driven end-to-end by hand — read by anyone
+playbook-driven CLI harness worker (a fake research tool under a research
+playbook), driven end-to-end by hand — read by anyone
 porting or verifying the HarnessAdapter contract
 (`protocol/json-schema/adapter.v1.json`) without Docker. The `.devcontainer/`
 in this directory composes the same wiring from the OFAC Features — see
@@ -31,14 +32,14 @@ pnpm -r build
 
 # this directory — relative paths below resolve from here (the Gateway
 # resolves stateDir against CWD; the worker resolves against worker.yaml)
-cd examples/slim/deterministic-research-worker
+cd examples/slim/cli-research-worker
 
 OFAC_CHILD_SECRET=child-secret-demo \
   node ../../../src/gateway/dist/bin/gateway.js run --config gateway.yaml
 # prints "gateway ready ..." — the child listener already owns .ofac-gateway/child.sock
 
-node ../../../src/adapters/harnesses/deterministic/dist/bin/worker.js run --config worker.yaml
-# prints "worker ready childId=gw.demo/deterministic socket=.../child.sock"
+node ../../../src/adapters/harnesses/cli/dist/bin/worker.js run --config worker.yaml
+# prints "worker ready childId=gw.demo/cli socket=.../child.sock"
 ```
 
 The Gateway self-enrolls (`enrollmentSecret: enroll-dev`), POSTs the worker's
@@ -53,7 +54,7 @@ You should now see both ready lines, in either spawn order.
 
 ```bash
 curl -s http://127.0.0.1:8099/status | jq .children
-# → [{"childWorkspaceId":"gw.demo/deterministic","state":"online","inFlight":0,...}]
+# → [{"childWorkspaceId":"gw.demo/cli","state":"online","inFlight":0,...}]
 ```
 
 You should now see the child `online`.
@@ -101,8 +102,9 @@ You should now see `202` with an `outboxId`.
 
 ## 5. Watch it run
 
-The worker logs each lifecycle step (`worker-step` ×2, `worker-completed`
-with the report path); the two `work.progress` events and the
+The worker logs each lifecycle step (`worker-step` per playbook step, `worker-completed`
+with the report path, plus the fake tool's own stderr lines relayed as
+progress); the two `work.progress` events and the
 `assignment.completed` event flow child → Gateway → kernel, deduped into the
 kernel's `facilitator.inbox` table:
 
@@ -112,8 +114,9 @@ curl -s http://127.0.0.1:8099/status | jq .bindings   # while running: the execu
 ```
 
 You should now see the execution row, then `/status`
-`executions.completed` at 1. With `stepMs: 800` the run completes ~1.6s after
-the assign.
+`executions.completed` at 1. The playbook's analyze step takes ~1.5s
+(the fake tool's own pacing), so the run completes shortly after the
+assign.
 
 ## 5b. The confirm round-trip
 
@@ -149,7 +152,7 @@ You should now see `200` with an `evidenceRef` of the form
 `kernel:...`. The kernel's decided-push (`link.gw.demo` outbox row → the
 Gateway's session) wakes the Gateway: it re-evaluates, consumes the approval
 over the Link plane (row flips `consumed`), and the child runs the SAME
-deterministic script — the artifact lands as `*-published.md`. `/status`
+playbook (the publish step) — the artifact lands as `*-published.md`. `/status`
 `executions.completed` ticks to 1; a second respond answers `409
 approval-already-consumed`.
 
@@ -189,7 +192,7 @@ the digest check; the report's own digest is the manifest's
 |`enrollmentSecret` (`gateway.yaml`)|`enroll-dev`|Gateway self-enrollment; the dev kernel seeds `team-alpha` and `team-beta`|
 |`team` (`gateway.yaml`)|`team-alpha`|must equal a kernel team slug, or the capabilities POST is 403|
 |`policy.path` (`gateway.yaml`)|`./policy.yaml`|`research.analyze` allow, `research.publish` confirm|
-|`stepMs` (`worker.yaml`)|`800`|two steps ⇒ ~1.6 s per run|
+|`playbookFile` (`worker.yaml`)|`research.playbook.yaml`|the steps AND the advertised capability set live there|
 |state paths|`.ofac-gateway/`, `.ofac-worker/`, `.ofac-logs/`, `.ofac-linkd.sqlite3`|all gitignored|
 
 ## Troubleshooting
@@ -212,7 +215,7 @@ Same wiring, automated: the `.devcontainer/` adds the three OFAC Features
 (gateway, harness-adapter, workspace-link) from the repo source
 (`../../features/src/…` — teams use the published
 `ghcr.io/denisekart/open-facilitator/features/<name>:1` coordinates). The
-supervisor entrypoint boots a standalone Gateway + deterministic worker (the
+supervisor entrypoint boots a standalone Gateway + cli worker (the
 `.facilitator/` configs) **and** a direct `linkd` endpoint (`ws.demo`, echo)
 beside it — the coexistence proof.
 
@@ -224,7 +227,7 @@ ConnectionStrings__Facilitator="Host=localhost;Database=facilitator;Username=dem
 # Feature payloads (runtime tarballs) must exist before `devcontainer up`
 node features/build.mjs
 
-devcontainer up --workspace-folder examples/slim/deterministic-research-worker
+devcontainer up --workspace-folder examples/slim/cli-research-worker
 # or: make example-slim-up
 ```
 
@@ -247,12 +250,12 @@ Seed an assignment with section 4's curl (it targets the host kernel on :8088),
 then:
 
 ```bash
-devcontainer exec --workspace-folder examples/slim/deterministic-research-worker \
+devcontainer exec --workspace-folder examples/slim/cli-research-worker \
   curl -s 127.0.0.1:8099/status | jq '.children[] | select(.state=="connected")'
-# → the gw.demo/deterministic child, online
+# → the gw.demo/cli child, online
 ```
 
 The completion row lands in `facilitator.inbox` exactly as section 6 verifies.
-Cleanup: `devcontainer rm --workspace-folder examples/slim/deterministic-research-worker`
+Cleanup: `devcontainer rm --workspace-folder examples/slim/cli-research-worker`
 (state lives in the workspace mount: `.ofac-gateway/`, `.ofac-worker/`,
 `.ofac-logs/`, `.ofac-linkd.sqlite3` — all gitignored).

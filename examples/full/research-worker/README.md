@@ -12,5 +12,5 @@ memory behaviour follows the memory-broker law in `docs/advanced.md` (the
 design for a workspace of this shape is the `research-worker` service in
 `docs/specs/open_facilitator_framework_architecture.md`. Closest working
 code to build on: `examples/full/coding-worker` (a full-profile workspace
-container) and `examples/slim/deterministic-research-worker` (the
-deterministic worker's end-to-end contract).
+container) and `examples/slim/cli-research-worker` (the
+playbook-driven worker's end-to-end contract).

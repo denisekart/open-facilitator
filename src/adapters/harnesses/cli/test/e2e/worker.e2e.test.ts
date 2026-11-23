@@ -27,13 +27,15 @@ import {
   gatewaySession,
   inboxRowsByType,
   kernelToken,
+  psql,
   seedDelivery,
   startGateway,
   useFacilitator,
+  userToken,
   waitFor,
   type Harness,
 } from "../../../../../gateway/test/e2e/gateway-harness.js";
-import { linkGet } from "../../../../../workspace-link/test/e2e/harness.js";
+import { linkGet, linkPost } from "../../../../../workspace-link/test/e2e/harness.js";
 
 const ROOT = new URL("../../../../../../", import.meta.url).pathname;
 
@@ -80,6 +82,9 @@ heartbeatSeconds: 1
       OFAC_ADAPTER_LOG: "debug",
       OFAC_KERNEL_ENDPOINT: options.kernelEndpoint,
       OFAC_ENROLL_SECRET: options.enrollSecret,
+      // The config file is the harness's truth: an OFAC_KERNEL_URL leaked
+      // from the dev shell would silently override the scraped origin.
+      OFAC_KERNEL_URL: options.kernelUrl,
     },
   });
   let log = "";
@@ -150,16 +155,36 @@ describe.skipIf(!E2E)("cli worker e2e", () => {
       p.catch((e: unknown) => {
         throw new Error(`${String(e)}\n${dump(label)}`, { cause: e });
       });
-    const fetchContent = async (path: string): Promise<Buffer> => {
+    const fetchContent = async (path: string, token: string): Promise<Buffer> => {
       const r = await fetch(`${harness.baseUrl}${path}`, {
-        headers: { authorization: `Bearer ${await kernelToken()}` },
+        headers: { authorization: `Bearer ${token}` },
       });
       if (!r.ok) throw new Error(`GET ${path} -> ${r.status}`);
       return Buffer.from(await r.arrayBuffer());
     };
-    const workA = randomUUID();
-    const workP = randomUUID();
-    const workK = randomUUID();
+    // Real works on a team-alpha PROJECT (the ledger resolves team scope via
+    // work → project → team; a projectless work answers manifest-not-found).
+    const projectRows = await psql(
+      harness.dbUrl,
+      `INSERT INTO facilitator.projects (project_id, team_id, name, config, created_at)
+       VALUES (gen_random_uuid(), (SELECT team_id FROM facilitator.teams WHERE slug = 'team-alpha'),
+               'e2e-cli-proj', '{}', now())
+       RETURNING project_id`,
+    );
+    const projectId = projectRows[0]!;
+    const workIdOf = async (objective: string): Promise<string> => {
+      const r = await linkPost(harness.baseUrl, "/api/works", await kernelToken(), {
+        objective,
+        capabilityId: "research.analyze",
+        projectId,
+      });
+      if (r.status !== 201) throw new Error(`work create failed: ${r.status}`);
+      return String((r.body as { workId: string }).workId);
+    };
+    const alice = await userToken("alice", "alice");
+    const workA = await workIdOf("cli parity objective");
+    const workP = await workIdOf("publish leg objective");
+    const workK = await workIdOf("kill leg objective");
     // GUID assignment ids: the ledger's assignment_id is uuid.
     const asgA = randomUUID();
     const asgP = randomUUID();
@@ -169,12 +194,16 @@ describe.skipIf(!E2E)("cli worker e2e", () => {
     let worker: WorkerHandle | undefined;
     try {
       // ── 1. boot + register + capability union (ownerTeam rewritten) ──
+      const ready = await withDump(gateway.ready(), "awaiting gateway ready line");
+      expect(ready.children).toBe(0); // listener boots empty: fleet modes POST nothing
+      // Spawn AFTER the gateway's ready line, never alongside it (the
+      // empty-listener assertion must not race the child registration).
       worker = startWorker({
         childWorkspaceId: `${gw.gatewayId}/cli`,
         socket: String(gw.socketPath),
         workDir,
         kernelUrl: harness.baseUrl,
-        token: "tok",
+        token: "enroll-dev",
         kernelEndpoint: "cli-e2e-child",
         enrollSecret: "enroll-dev",
       });
@@ -199,9 +228,9 @@ describe.skipIf(!E2E)("cli worker e2e", () => {
       ).toBe(false);
       const online = await waitFor("worker connected", async () => {
         const s = await gatewayStatus(gw.diagnosticsPort);
-        return s.children?.some((c) => c.state === "online") ? s : false;
+        return s.children?.some((c) => c.state === "connected") ? s : false;
       });
-      expect(online.children?.[0]?.state).toBe("online");
+      expect(online.children?.[0]?.state).toBe("connected");
 
       // ── 2. analyze leg: progress notes + completed + digest truth ──
       await seedDelivery(
@@ -232,6 +261,7 @@ describe.skipIf(!E2E)("cli worker e2e", () => {
       expect(ref.startsWith("artifact://")).toBe(true);
       const docBytes = await fetchContent(
         `/api/artifacts/${ref.split("/").pop()}/content`,
+        alice,
       );
       const doc = JSON.parse(docBytes.toString("utf8")) as Record<string, unknown>;
       expect(computeManifestDigest(doc)).toBe(resultDigest);
@@ -240,6 +270,7 @@ describe.skipIf(!E2E)("cli worker e2e", () => {
       expect(docOutput["mediaType"]).toBe("text/markdown");
       const reportBytes = await fetchContent(
         `/api/artifacts/${String(docOutput["artifactId"])}/content`,
+        alice,
       );
       // The parity assertion: the served report carries the objective and
       // the deterministic conclusion line the old worker wrote.
@@ -273,6 +304,7 @@ describe.skipIf(!E2E)("cli worker e2e", () => {
         (
           await fetchContent(
             `/api/artifacts/${String(pubData["resultManifestRef"]).split("/").pop()}/content`,
+            alice,
           )
         ).toString("utf8"),
       ) as Record<string, unknown>;
@@ -307,7 +339,7 @@ describe.skipIf(!E2E)("cli worker e2e", () => {
         socket: String(gw.socketPath),
         workDir,
         kernelUrl: harness.baseUrl,
-        token: "tok",
+        token: "enroll-dev",
         kernelEndpoint: "cli-e2e-child",
         enrollSecret: "enroll-dev",
       });

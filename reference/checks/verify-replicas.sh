@@ -279,7 +279,7 @@ r_outbox_settled() { # <command-id>: delivered WITH a gateway receipt
 # not the inbox-dedupe arm). Exactly one 200 + one 409; the loser's retry
 # with the fresh version wins. The target is a FRESH research.publish work
 # parked at approval (steer on a completed work is a terminal-state refusal,
-# and the deterministic worker completes research.analyze in seconds).
+# and the cli worker completes research.analyze in seconds).
 step_replica_steer_conflict() {
   local ver ca cb wins conflicts fresh work_steer body_a body_b
   work_steer=$(verify_seed_leg replica-steer research.publish "replica matrix steer target") \

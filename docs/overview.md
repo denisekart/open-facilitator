@@ -210,7 +210,7 @@ command down a link the team opened. Dashed arrows are at-least-once.*
 | Kernel (ingress, work lifecycle, Link hub, brokers, admin SPA, CLI) | `src/facilitator/` (.NET 10) |
 | Gateway runtime | `src/gateway/` (TypeScript, `@ofac/gateway`) |
 | Link client SDK + supervisor | `src/workspace-link/` (`@ofac/workspace-link`) |
-| Harness-adapter SDK + reference harnesses | `src/adapters/harnesses/` (`@ofac/adapter`, deterministic/omp/codex workers) |
+| Harness-adapter SDK + reference harnesses | `src/adapters/harnesses/` (`@ofac/adapter`, cli/omp/codex workers) |
 | Chat/forge adapters | `src/adapters/communication/` (Mattermost, Telegram, Forgejo/GitHub/GitLab pairs, Kafka) |
 | The wire contract | `protocol/` (JSON Schemas, CloudEvents schemas, OpenAPI, conformance fixtures) |
 | Dev Container Features (one-step workspace onboarding) | `features/` |

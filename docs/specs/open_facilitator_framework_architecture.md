@@ -1573,7 +1573,7 @@ framework/
 │   └── harness-adapter/
 ├── examples/
 │   ├── slim/
-│   │   └── deterministic-research-worker/
+│   │   └── cli-research-worker/
 │   └── full/
 │       ├── coding-worker/
 │       ├── research-worker/
@@ -1685,7 +1685,7 @@ services:
   demo-workspace:
     build:
       context: ..
-      dockerfile: examples/slim/deterministic-research-worker/Dockerfile
+      dockerfile: examples/slim/cli-research-worker/Dockerfile
     environment:
       FACILITATOR_URL: http://facilitator:8088
       GATEWAY_MODE: embedded

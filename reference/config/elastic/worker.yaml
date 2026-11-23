@@ -1,15 +1,15 @@
-# Deterministic worker for the launcher-managed elastic container. Mirrors
+# CLI worker for the launcher-managed elastic container. Mirrors
 # ../workspace/worker.yaml; the child wire + the kernel-leg credentials ride
 # the launcher-provided env (OFAC_CHILD_SECRET / OFAC_ENROLL_SECRET; the bin
-# self-enrolls its kernel endpoint when OFAC_KERNEL_ENDPOINT is set).
+# self-enrolls its kernel endpoint when OFAC_KERNEL_ENDPOINT is set). The
+# capability manifest is DERIVED FROM THE PLAYBOOK.
 apiVersion: facilitator.framework/v1
 kind: HarnessAdapter
-childWorkspaceId: gw.team-beta/deterministic
+childWorkspaceId: gw.team-beta/cli
 kernelUrl: http://facilitator:8080
 transport:
   socket:
     path: /var/lib/ofac/gateway/child.sock
-manifestFile: /opt/ofac/config/capabilities.yaml
+playbookFile: /opt/ofac/config/research.playbook.yaml
 workDir: /var/lib/ofac/worker
-stepMs: 800
 heartbeatSeconds: 5

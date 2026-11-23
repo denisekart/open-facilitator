@@ -3,7 +3,7 @@
 # gate; hosted ref-env CI is commented out by free-tier law).
 # Sources verify.sh for the shared primitives (recording, polling, psql,
 # kernel REST) and drives the Mattermost leg over the published provider port:
-# a real @facilitator mention creates a Work, the deterministic worker runs it,
+# a real @facilitator mention creates a Work, the cli worker runs it,
 # the completion reply lands in the same thread, the bot's own posts echo
 # without arm effects, a reaction audits but never consents, and /link in a DM
 # mints a challenge that redeems against a Keycloak identity.
@@ -238,7 +238,7 @@ full_ack_reaction() {
 step_provider_completion_reply() {
   VERIFY_TOKEN_ALICE=${VERIFY_TOKEN_ALICE:-$(seed_mint_user_token alice alice)}
   VERIFY_TOKEN_CLI=${VERIFY_TOKEN_CLI:-$(seed_mint_cli_token)}
-  # The assign interim rides to gw.team-alpha; the deterministic worker runs
+  # The assign interim rides to gw.team-alpha; the cli worker runs
   # research.analyze and lands the manifest — the typed timeline row is the
   # witness (the Work itself stays wherever its humans left it).
   full_manifest_recorded() {

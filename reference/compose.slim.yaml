@@ -132,10 +132,10 @@ services:
         condition: service_healthy
 
   # Team-owned workspace: one container, two processes — a
-  # standalone Gateway (empty fleet) + the deterministic worker over a unix
+  # standalone Gateway (empty fleet) + the cli worker over a unix
   # child leg, under the Feature supervisor's unit law. Enrolls kernel-side
   # as gw.team-alpha (realm workload), self-enrolls the worker's child
-  # kernel credential, and advertises the research.analyze manifest.
+  # kernel credential, and advertises the playbook-derived research manifests.
   demo-workspace:
     build:
       context: ..

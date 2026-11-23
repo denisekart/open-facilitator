@@ -3,7 +3,7 @@
   // repo source via the ./features symlink (the CLI requires local-path
   // Features to sit under .devcontainer/). Teams consume the published form:
   //   "ghcr.io/denisekart/open-facilitator/features/gateway:1" etc.
-  "name": "ofac-slim-deterministic-worker",
+  "name": "ofac-slim-cli-worker",
   "image": "mcr.microsoft.com/devcontainers/typescript-node:1-22-bookworm",
   "remoteUser": "node",
   "workspaceFolder": "/workspace",

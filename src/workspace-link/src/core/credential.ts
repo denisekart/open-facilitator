@@ -149,10 +149,25 @@ export async function createEndpointCredential(
       /fetch failed|ECONNREFUSED|EAI_AGAIN|ECONNRESET|socket hang up/.test(error.message));
   const deadline = Date.now() + 60_000;
   let backoff = 500;
+  // "fetch failed" alone names nothing: walk the cause chain so the log
+  // carries the transport truth (ECONNREFUSED, UND_ERR_SOCKET, …).
+  const describeError = (error: unknown): string => {
+    const parts: string[] = [String(error)];
+    let cause = error instanceof Error ? error.cause : undefined;
+    for (let depth = 0; cause !== undefined && depth < 4; depth += 1) {
+      const code =
+        typeof cause === "object" && cause !== null && "code" in cause
+          ? String((cause as { code: unknown }).code)
+          : undefined;
+      parts.push(code !== undefined ? `${code} (${String(cause)})` : String(cause));
+      cause = cause instanceof Error ? cause.cause : undefined;
+    }
+    return parts.join(" <- ");
+  };
   const wait = async (error: unknown, phase: string): Promise<void> => {
     options.logger?.warn(`kernel not ready at boot (${phase}); waiting`, {
       endpointId: options.endpointId,
-      error: String(error),
+      error: describeError(error),
     });
     await sleep(backoff);
     backoff = Math.min(backoff * 2, 5_000);

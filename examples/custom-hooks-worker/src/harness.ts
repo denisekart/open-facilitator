@@ -1,13 +1,14 @@
-// The deterministic harness: a two-step, zero-randomness research run that
-// behaves identically every time — the worked example third-party
-// implementers copy as the shape of "harness hooks".
-// Script (locked): progress → sleep → progress → sleep → write report →
+// The custom-hooks harness: a two-step, zero-randomness research run that
+// behaves identically every time — the worked example of building a harness
+// YOURSELF with `HarnessHooks` over @ofac/adapter, for runs that are plain
+// TypeScript rather than a CLI a playbook would drive.
+// Script (locked): progress -> sleep -> progress -> sleep -> write report ->
 // publish assignment.completed.v1. Completion truth: the report
 // bytes are UPLOADED to the kernel artifact store over the link plane
 // (child link token), an immutable canonical Result Manifest is uploaded as
 // an artifact, and the completed event carries resultManifestRef +
-// resultDigest — no file:// URLs, no self-declared digests. Cancel law: an
-// abort during a sleep unwinds as cancelled — NO terminal event (the
+// resultDigest - no file:// URLs, no self-declared digests. Cancel law: an
+// abort during a sleep unwinds as cancelled - NO terminal event (the
 // accepted stop reply already settled the Gateway row). A failed upload is
 // an honest failure: the hook throws and the SDK publishes
 // assignment.failed.

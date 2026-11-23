@@ -75,7 +75,7 @@ Available features: `gateway`, `workspace-link`, `harness-adapter`, `omp-adapter
 
 ## Team runtime base image
 
-The image `ghcr.io/denisekart/open-facilitator/node-runtime` packages all team-side components in one container: Gateway, `ofac-linkd`, deterministic harness, chat/forge adapters, and the provisioning service. The command argument selects the active component.
+The image `ghcr.io/denisekart/open-facilitator/node-runtime` packages all team-side components in one container: Gateway, `ofac-linkd`, the CLI harness, chat/forge adapters, and the provisioning service. The command argument selects the active component.
 
 ## Release discipline
 

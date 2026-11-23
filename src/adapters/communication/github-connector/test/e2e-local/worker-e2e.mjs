@@ -5,7 +5,7 @@
 //       commentRequests: [{repo, issue, body: "On it …"}] }
 //   execution 2+ (inputs.steers non-empty, the re-dispatch leg): folded
 //     commentRequests ["steer incorporated: <directive>", …], no new PR.
-// The @ofac/harness-deterministic completion law: upload report + manifest
+// The harness completion law: upload report + manifest
 // as artifacts, complete with resultManifestRef + resultDigest.
 import { readFileSync } from "node:fs";
 import { Buffer } from "node:buffer";

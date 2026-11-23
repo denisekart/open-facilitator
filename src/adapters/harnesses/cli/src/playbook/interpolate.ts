@@ -61,7 +61,10 @@ function lookup(scope: InterpolationScope, path: string, where: string): string 
     const [, stepName, field] = stepMatch as unknown as [string, string, string];
     const record = scope.steps.get(stepName);
     if (record === undefined) {
-      throw new PlaybookError(where, `{{${path}}} references unknown or unfinished step '${stepName}'`);
+      throw new PlaybookError(
+        where,
+        `{{${path}}} references unknown or unfinished step '${stepName}'`,
+      );
     }
     const value = field === "answer" ? record.answer : String(record.exitCode ?? "");
     if (value === undefined) {

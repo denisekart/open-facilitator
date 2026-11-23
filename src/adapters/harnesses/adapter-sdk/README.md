@@ -7,7 +7,9 @@ the profile of the shipped 06 child transport) to a Gateway. Invocation is
 `sdk` only — the adapter is a library inside your worker process, never a
 spawned CLI.
 
-Worked example to copy: `../deterministic` (config loader, CLI, `sample/`).
+Worked examples to copy: `../cli` (playbook-driven: config loader, worker bin,
+`sample/` playbook + fake tool) and `../../../examples/custom-hooks-worker`
+(pure-hooks: the scripted two-step shape + the kit test).
 
 ## Authority law
 
@@ -90,7 +92,7 @@ manifest; start→progress→completed relay with the manifest validated against
 `result-manifest.v1.json`; steer reaches the hook (or answers your declared
 `steerReply`); stop aborts; kill-the-listener mid-run ⇒ auto-reconnect +
 probe answers `running`. Call it in your `test/lifecycle.test.ts` — the
-deterministic harness instantiates it twice (steering + no-steer variants)
+custom-hooks example instantiates it twice (steering + no-steer variants)
 to prove the kit asserts, not just runs.
 
 ## The functionality list
@@ -112,9 +114,9 @@ comms plane's command family:
 `fullHarnessCapabilities(omissions)` derives a `HarnessCapabilities` from
 the full list; an omission MUST carry its reason, and
 `unsupportedFor(cmd, caps)` is the answer owed for anything outside the
-list — never silence, never a timeout. `omp`, `codex` and `deterministic`
+list — never silence, never a timeout. `omp`, `codex` and `cli`
 each export their honest declaration (`OMP_CAPABILITIES`,
-`CODEX_CAPABILITIES`, `DETERMINISTIC_CAPABILITIES`); the as-built gap
+`CODEX_CAPABILITIES`, the playbook-derived `manifest`); the as-built gap
 (nudge has no child-wire frame — the Gateway answers on the child's
 behalf) is recorded there, not hidden.
 

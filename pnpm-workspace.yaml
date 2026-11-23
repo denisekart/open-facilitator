@@ -3,7 +3,7 @@ packages:
   - "src/gateway"
   - "src/adapters/harnesses/adapter-sdk"
   - "src/adapters/harnesses/cli"
-  - "src/adapters/harnesses/deterministic"
+  - "examples/custom-hooks-worker"
   - "src/adapters/harnesses/omp"
   - "src/adapters/harnesses/codex"
   - "src/protocol"

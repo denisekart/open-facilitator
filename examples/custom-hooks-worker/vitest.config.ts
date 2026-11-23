@@ -1,6 +1,6 @@
 // Unit tier: config law matrix + the scripted execution driven in-process
 // with a fake RunContext (no sockets, no Facilitator).
-import { withCoverage } from "../../../../tools/coverage/vitest-coverage.mjs";
+import { withCoverage } from "../../tools/coverage/vitest-coverage.mjs";
 
 export default withCoverage(
   {
@@ -10,5 +10,5 @@ export default withCoverage(
     },
   },
   import.meta.dirname,
-  "deterministic",
+  "custom-hooks-worker",
 );

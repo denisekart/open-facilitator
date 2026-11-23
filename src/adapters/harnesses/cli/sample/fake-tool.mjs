@@ -12,8 +12,8 @@
 //   report [PATH]                 write a small markdown report (PATH or stdout)
 import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
 
+
 const mode = process.argv[2] ?? "echo";
-const flags = new Set(process.argv.slice(3));
 const flagValue = (name) => {
   const index = process.argv.indexOf(name);
   return index >= 0 ? process.argv[index + 1] : undefined;

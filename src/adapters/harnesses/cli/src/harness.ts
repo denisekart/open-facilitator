@@ -88,7 +88,9 @@ export function createCliHooks(options: CliRunOptions, playbook: Playbook): CliH
         const blob = await client.download(artifactId);
         const path = join(dir, "attachments", String(index + 1));
         writeFileSync(path, blob);
-        lines.push(`attachment ${String(index + 1)}: ${mediaType} ${String(blob.byteLength)} ${path}`);
+        lines.push(
+          `attachment ${String(index + 1)}: ${mediaType} ${String(blob.byteLength)} ${path}`,
+        );
       } catch (error) {
         logger.warn("attachment-unreadable", { artifactId, error: String(error) });
         lines.push(`attachment ${String(index + 1)}: ${mediaType} unreadable (${artifactId})`);
@@ -118,8 +120,10 @@ export function createCliHooks(options: CliRunOptions, playbook: Playbook): CliH
     let bridge: Awaited<ReturnType<typeof startAskUserBridge>> | undefined;
     let shimCommand: string | undefined;
     if (askUser === "mcp" && capability.askUserInject !== undefined) {
-      bridge = await startAskUserBridge(async ({ question, choices }) =>
-        (await ctx.requestInput({ question, ...(choices !== undefined ? { choices } : {}) })).text,
+      bridge = await startAskUserBridge(
+        async ({ question, choices }) =>
+          (await ctx.requestInput({ question, ...(choices !== undefined ? { choices } : {}) }))
+            .text,
       );
       writeMcpConfig(
         dir,

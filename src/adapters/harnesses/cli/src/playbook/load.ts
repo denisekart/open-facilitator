@@ -4,11 +4,7 @@
 import { readFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { parse } from "yaml";
-import type {
-  AcceptedContext,
-  CapabilityDescriptor,
-  CapabilityManifestV1,
-} from "@ofac/protocol";
+import type { AcceptedContext, CapabilityDescriptor, CapabilityManifestV1 } from "@ofac/protocol";
 import { PlaybookError } from "./schema.js";
 import type {
   AskUserInject,
@@ -99,7 +95,11 @@ function asRecord(value: unknown, key: string): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
-function rejectUnknown(doc: Record<string, unknown>, allowed: Record<string, true>, where: string): void {
+function rejectUnknown(
+  doc: Record<string, unknown>,
+  allowed: Record<string, true>,
+  where: string,
+): void {
   for (const key of Object.keys(doc)) {
     if (!(key in allowed)) fail(`${where}.${key}`, "unknown key");
   }
@@ -224,7 +224,8 @@ function parseStringMap(
 }
 
 function parseRegex(value: unknown, key: string): RegExp {
-  if (typeof value !== "string" || value.length === 0) fail(key, "must be a non-empty regex string");
+  if (typeof value !== "string" || value.length === 0)
+    fail(key, "must be a non-empty regex string");
   try {
     return new RegExp(value);
   } catch (error) {
@@ -306,7 +307,8 @@ function parseCapture(doc: Record<string, unknown>, where: string): StepCapture 
     fail(`${where}.capture.from`, "must be 'stdout', 'file' or 'stderr'");
   }
   const path = optionalString(captureDoc, "path", `${where}.capture`);
-  if (from === "file" && path === undefined) fail(`${where}.capture.path`, "required for from: file");
+  if (from === "file" && path === undefined)
+    fail(`${where}.capture.path`, "required for from: file");
   if (from !== "file" && path !== undefined) {
     fail(`${where}.capture.path`, "only valid with from: file");
   }
@@ -349,9 +351,14 @@ function parseRun(
   const runDoc = asRecord(value, `${where}.run`);
   rejectUnknown(runDoc, RUN_KEYS, `${where}.run`);
   const shell = optionalBool(runDoc, "shell", `${where}.run`, false);
-  if (shell !== false) fail(`${where}.run.shell`, "v1 supports only shell: false (argv, no implicit shell)");
+  if (shell !== false)
+    fail(`${where}.run.shell`, "v1 supports only shell: false (argv, no implicit shell)");
   const args = runDoc["args"];
-  if (args !== undefined && args !== null && (!Array.isArray(args) || args.some((a) => typeof a !== "string"))) {
+  if (
+    args !== undefined &&
+    args !== null &&
+    (!Array.isArray(args) || args.some((a) => typeof a !== "string"))
+  ) {
     fail(`${where}.run.args`, "must be a list of strings");
   }
   const env = parseEnv(runDoc, "env", `${where}.run`, allowedEnv);
@@ -392,14 +399,18 @@ function parseStep(
   return {
     name,
     ...(when !== undefined ? { when } : {}),
-    ...(parseRun(stepDoc, at, allowedEnv) !== undefined ? { run: parseRun(stepDoc, at, allowedEnv) } : {}),
+    ...(parseRun(stepDoc, at, allowedEnv) !== undefined
+      ? { run: parseRun(stepDoc, at, allowedEnv) }
+      : {}),
     tty: optionalBool(stepDoc, "tty", at, false),
     timeoutMs: optionalInt(stepDoc, "timeoutMs", at, 1, 3_600_000, defaultTimeoutMs),
     ...(expectDoc !== undefined && expectDoc !== null
       ? { expect: parseExpect(asRecord(expectDoc, `${at}.expect`), `${at}.expect`) }
       : {}),
     promptMarkers: parseMarkers(stepDoc, at),
-    ...(optionalString(stepDoc, "feed", at) !== undefined ? { feed: optionalString(stepDoc, "feed", at) } : {}),
+    ...(optionalString(stepDoc, "feed", at) !== undefined
+      ? { feed: optionalString(stepDoc, "feed", at) }
+      : {}),
     ...(parseAsk(stepDoc, at) !== undefined ? { ask: parseAsk(stepDoc, at) } : {}),
     ...(parseCapture(stepDoc, at) !== undefined ? { capture: parseCapture(stepDoc, at) } : {}),
     ...(parseRetry(stepDoc, at) !== undefined ? { retry: parseRetry(stepDoc, at) } : {}),
@@ -473,7 +484,11 @@ function parseCapability(
     if (step.run === undefined && step.ask === undefined) {
       fail(`${at}.steps('${step.name}')`, "needs 'run' and/or 'ask' (a step does something)");
     }
-    if (step.retry !== undefined && step.expect?.exit === undefined && step.retry.retryOn.length === 0) {
+    if (
+      step.retry !== undefined &&
+      step.expect?.exit === undefined &&
+      step.retry.retryOn.length === 0
+    ) {
       fail(`${at}.steps('${step.name}').retry`, "retryOn is empty and no expect.exit to key off");
     }
   }
@@ -519,10 +534,7 @@ export interface ParsePlaybookOptions {
   playbookDir?: string | undefined;
 }
 
-export function parsePlaybook(
-  yamlText: string,
-  options: ParsePlaybookOptions = {},
-): Playbook {
+export function parsePlaybook(yamlText: string, options: ParsePlaybookOptions = {}): Playbook {
   const defaultTimeoutMs = options.defaultTimeoutMs ?? 600_000;
   let doc: unknown;
   try {
@@ -562,17 +574,15 @@ export function parsePlaybook(
     kind: "CapabilityManifest",
     ownerTeam,
     // Non-empty by law above: `capabilitiesRaw.length === 0` failed first.
-    capabilities: [
-      ...[...capabilities.values()].map((capability) => capability.manifestEntry),
-    ] as [CapabilityDescriptor, ...CapabilityDescriptor[]],
+    capabilities: [...[...capabilities.values()].map((capability) => capability.manifestEntry)] as [
+      CapabilityDescriptor,
+      ...CapabilityDescriptor[],
+    ],
   };
   return { capabilities, manifest, binaries, playbookDir: options.playbookDir ?? "" };
 }
 
-export function loadPlaybookFile(
-  path: string,
-  options: ParsePlaybookOptions = {},
-): Playbook {
+export function loadPlaybookFile(path: string, options: ParsePlaybookOptions = {}): Playbook {
   let text: string;
   try {
     text = readFileSync(path, "utf8");

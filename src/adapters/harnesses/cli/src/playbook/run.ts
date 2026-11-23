@@ -108,7 +108,9 @@ async function attemptStep(
   const run = step.run;
   if (run === undefined) throw new Error(`step '${step.name}' has no run`);
   const where = `step '${step.name}'`;
-  const args = run.args.map((arg, index) => interpolate(scope, `${where}.args[${String(index)}]`, arg));
+  const args = run.args.map((arg, index) =>
+    interpolate(scope, `${where}.args[${String(index)}]`, arg),
+  );
   const env: NodeJS.ProcessEnv = { ...process.env, ...(hooks.spawnEnv ?? {}) };
   for (const [key, value] of Object.entries(run.env ?? {})) {
     env[key] = interpolate(scope, `${where}.run.env.${key}`, value);
@@ -146,10 +148,7 @@ async function attemptStep(
 
   // TUI law: match the rolling tail window, not full scrollback. Each
   // marker fires once on its first de-ansified match.
-  const drainMarkers = (
-    write: (chunk: string) => void,
-    close?: (() => void) | undefined,
-  ): void => {
+  const drainMarkers = (write: (chunk: string) => void, close?: (() => void) | undefined): void => {
     const text = outWindow.text();
     let allFired = markers.length > 0;
     for (const marker of markers) {
@@ -283,7 +282,8 @@ function checkExpect(
     return `prompt marker never seen: ${attempt.unmatchedMarkers.join(", ")}`;
   }
   const expect = step.expect;
-  if (expect === undefined) return attempt.timedOut ? `timed out after ${String(step.timeoutMs)}ms` : undefined;
+  if (expect === undefined)
+    return attempt.timedOut ? `timed out after ${String(step.timeoutMs)}ms` : undefined;
   if (attempt.timedOut) return `timed out after ${String(step.timeoutMs)}ms`;
   if (expect.exit !== undefined && attempt.exitCode !== expect.exit) {
     return `exit code ${String(attempt.exitCode)}, expected ${String(expect.exit)}`;
@@ -308,7 +308,9 @@ function checkExpect(
     }
   }
   if (expect.fileAbsent !== undefined) {
-    const path = isAbsolute(expect.fileAbsent) ? expect.fileAbsent : join(workDir, expect.fileAbsent);
+    const path = isAbsolute(expect.fileAbsent)
+      ? expect.fileAbsent
+      : join(workDir, expect.fileAbsent);
     try {
       readFileSync(path);
       return `expected-absent file '${expect.fileAbsent}' exists`;
@@ -346,7 +348,9 @@ export async function runCapability(
       continue;
     }
     if (step.progress !== undefined) {
-      hooks.publishProgress(truncateNote(interpolate(scope, `step '${step.name}'.progress`, step.progress)));
+      hooks.publishProgress(
+        truncateNote(interpolate(scope, `step '${step.name}'.progress`, step.progress)),
+      );
     }
     const started = Date.now();
     let answer: string | undefined;
@@ -355,7 +359,13 @@ export async function runCapability(
         question: interpolate(scope, `step '${step.name}'.ask.question`, step.ask.question),
         ...(step.ask.choices !== undefined ? { choices: step.ask.choices } : {}),
         ...(step.ask.contextRef !== undefined
-          ? { contextRef: interpolate(scope, `step '${step.name}'.ask.contextRef`, step.ask.contextRef) }
+          ? {
+              contextRef: interpolate(
+                scope,
+                `step '${step.name}'.ask.contextRef`,
+                step.ask.contextRef,
+              ),
+            }
           : {}),
       });
       if (hooks.signal.aborted) return { kind: "cancelled" };
@@ -369,7 +379,11 @@ export async function runCapability(
         if (attemptResult.cancelled) return { kind: "cancelled" };
         const durationMs = Date.now() - started;
         failure = checkExpect(step, attemptResult, options.workDir);
-        if (failure === undefined && step.expect?.maxDurationMs !== undefined && durationMs > step.expect.maxDurationMs) {
+        if (
+          failure === undefined &&
+          step.expect?.maxDurationMs !== undefined &&
+          durationMs > step.expect.maxDurationMs
+        ) {
           failure = `took ${String(durationMs)}ms, expected <= ${String(step.expect.maxDurationMs)}ms`;
         }
         if (failure === undefined) break;

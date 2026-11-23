@@ -1,7 +1,7 @@
 // @ofac/harness-omp — the omp HarnessAdapter: config loader + the
 // `omp --mode rpc` TUI stand-in (agentic mode, ask_user relay, native
-// session resume) + `ofac-omp-worker`. Shaped after
-// @ofac/harness-deterministic; the conformance kit proves the lifecycle.
+// session resume) + `ofac-omp-worker`. Shaped after the
+// worked-example harnesses; the conformance kit proves the lifecycle.
 export { OMP_CAPABILITIES } from "./capabilities.js";
 export type { HarnessCapabilities } from "@ofac/adapter";
 export {

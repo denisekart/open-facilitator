@@ -42,14 +42,7 @@ describe("sample research playbook", () => {
     const playbook = loadPlaybookFile(SAMPLE);
     const template = parse(
       readFileSync(
-        join(
-          import.meta.dirname,
-          "..",
-          "..",
-          "deterministic",
-          "sample",
-          "capabilities.yaml",
-        ),
+        join(import.meta.dirname, "..", "sample", "deterministic-capabilities.template.yaml"),
         "utf8",
       ),
     ) as { capabilities: Record<string, unknown>[] };

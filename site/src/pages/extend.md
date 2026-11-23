@@ -25,7 +25,7 @@ _Moving from left to right increases control over the runtime environment while 
 
 ### 1. Write a harness
 
-A harness executes assigned work. Shipped harnesses support LLM agents, deterministic scripts, and coding tools. Custom harnesses can wrap data pipelines, batch jobs, or manual checklists.
+A harness executes assigned work. Shipped harnesses support LLM agents, playbook-driven CLI tools, and coding agents. Custom harnesses can wrap data pipelines, batch jobs, or manual checklists.
 
 - Depend on `@ofac/adapter` to implement the child lifecycle: accept, report progress, propose privileged writes, and return result manifests.
 - Use the included **conformance kit** to validate that your harness passes the same test suite as shipped implementations.

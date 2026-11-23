@@ -6,7 +6,7 @@ description: Use for backend-TypeScript packages in this repo (adapters, connect
 # Backend TypeScript (this repo)
 
 Exemplars: `src/adapters/communication/mattermost` (link-plane adapter),
-`src/adapters/harnesses/deterministic` (Gateway child),
+`examples/custom-hooks-worker` (Gateway child hooks example),
 `src/adapters/harnesses/adapter-sdk` (`@ofac/adapter`).
 
 ## Package anatomy (tsup, node22)

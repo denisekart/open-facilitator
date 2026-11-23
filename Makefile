@@ -101,7 +101,7 @@ example-slim-up:
 	@echo "Slim example devcontainer: needs Docker, @devcontainers/cli (npx @devcontainers/cli),"
 	@echo "a host Facilitator on :8088 (see examples/slim/.../README.md section 1) and"
 	@echo "'node features/build.mjs' (Feature runtime tarballs) beforehand."
-	npx --yes @devcontainers/cli@^0.79 up --workspace-folder examples/slim/deterministic-research-worker
+	npx --yes @devcontainers/cli@^0.79 up --workspace-folder examples/slim/cli-research-worker
 
 example-local-smoke:
 	@echo "Local home-deployment example gate: AI-free sim run (needs Docker Engine;"

@@ -17,7 +17,6 @@ Merged numbers sum line/branch counters across ecosystems and tiers (.NET union 
 | `src/adapters/communication/telegram` | 61.8% | 60.5% | unit 61.8% |
 | `src/adapters/harnesses/adapter-sdk` | 97.8% | 80.5% | unit 97.8% |
 | `src/adapters/harnesses/codex` | 61.8% | 55.7% | unit 61.8% |
-| `src/adapters/harnesses/deterministic` | 66.4% | 61.1% | unit 66.4% |
 | `src/adapters/harnesses/omp` | 63.9% | 55.4% | unit 63.9% |
 | `src/adapters/provider-core` | 99.7% | 96.3% | unit 99.7% |
 | `src/adapters/provisioning-oci` | 71.5% | 70.7% | unit 71.5% |
@@ -81,9 +80,6 @@ Phase 2 input: untested decision paths in code that has tests.
 
 - `src/adapters/harnesses/codex/src/mcp/bridge.ts` — lines 80.4%, branches 43.2% (21 untested branches)
 
-### `src/adapters/harnesses/deterministic`
-
-- `src/adapters/harnesses/deterministic/src/harness.ts` — lines 86.1%, branches 57.1% (18 untested branches)
 
 ### `src/adapters/harnesses/omp`
 

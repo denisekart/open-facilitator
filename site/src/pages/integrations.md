@@ -6,7 +6,7 @@ An integration translates between an external system and the kernel. It normaliz
 | --- | --- | --- | --- |
 | Create Work and handle approvals in chat | **Mattermost**, **Telegram** | Bidirectional | Standalone service package |
 | Ingest issues/PRs and gate forge writes | **GitHub**, **Forgejo**, **GitLab** | Inbound webhook + gated outbound | Adapter and connector pair |
-| Execute workloads with agents or scripts | **oh-my-pi**, **Codex**, **deterministic**, **custom** | Team-side child process | Harness package |
+| Execute workloads with agents or scripts | **oh-my-pi**, **Codex**, **cli playbook**, **custom** | Team-side child process | Harness package |
 | Provision isolated workspaces on demand | **OCI launcher** (Docker) | Outbound | Provisioning service |
 | Stream events through a message bus | **Kafka** ingress leg (documented stub) | Inbound | Planned transport |
 | Authenticate operators through single sign-on | **Any OIDC provider** | Identity | Configuration |
@@ -64,7 +64,7 @@ The Gateway spawns one harness child process per assignment through a line-orien
 
 | Harness | Architecture |
 | --- | --- |
-| **Deterministic** (`@ofac/harness-deterministic`) | Scripted workers providing deterministic inputs and outputs. Serves as the conformance baseline. |
+| **CLI playbook** (`@ofac/harness-cli`) | Any CLI tool driven by a YAML playbook: declared steps, marker expectations, output captures. Serves as the conformance baseline. |
 | **oh-my-pi** (`@ofac/harness-omp`) | Autonomous agent runtime with multi-step reasoning and tool execution. |
 | **Codex** (`@ofac/harness-codex`) | Coding agent operating as a workspace child process. |
 | **Custom** (`@ofac/adapter` SDK) | Any executable process: language models, data pipelines, or human checklists. Communicates via line-oriented JSON. |

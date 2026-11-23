@@ -290,7 +290,9 @@ describe("pty leg", () => {
     }
     const result = await outcome;
     expect(
-      result.kind === "completed" ? "completed" : `${result.kind}: ${(result as { reason?: string }).reason ?? ""}`,
+      result.kind === "completed"
+        ? "completed"
+        : `${result.kind}: ${(result as { reason?: string }).reason ?? ""}`,
     ).toBe("completed");
   });
 });

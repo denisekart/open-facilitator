@@ -6,6 +6,7 @@
 // dropped from `inputs.sourceRefs` (so the inbound-media leg is
 // exercised) and embeds a passed --answer (the human leg's ride).
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { Buffer } from "node:buffer";
 import { join } from "node:path";
 
 const mode = process.argv[2] ?? "analyze"; // analyze | publish

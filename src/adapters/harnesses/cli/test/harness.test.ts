@@ -168,9 +168,9 @@ describe("cli hooks", () => {
     });
     const outcome = await hooks.onExecute(ctx);
     expect(outcome.kind).toBe("completed");
-    expect(readFileSync(join(BASE_CONFIG.workDir, "runs", executionId, "attachments", "1"), "utf8")).toBe(
-      "PNGDATA",
-    );
+    expect(
+      readFileSync(join(BASE_CONFIG.workDir, "runs", executionId, "attachments", "1"), "utf8"),
+    ).toBe("PNGDATA");
   });
 
   it("an expect miss fails with the step-named reason and publishes no event", async () => {
@@ -185,7 +185,10 @@ describe("cli hooks", () => {
       inputs: { objective: "why" },
     });
     const outcome = await hooks.onExecute(ctx);
-    expect(outcome).toEqual({ kind: "failed", reason: "step 'wants-three': exit code 7, expected 3" });
+    expect(outcome).toEqual({
+      kind: "failed",
+      reason: "step 'wants-three': exit code 7, expected 3",
+    });
     expect(events).toHaveLength(0);
   });
 

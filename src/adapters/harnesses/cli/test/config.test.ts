@@ -51,9 +51,9 @@ describe("worker config law", () => {
   it("playbookFile: required, resolved against the config dir; absolute stands", () => {
     expectFail(BASE.replace("playbookFile: ./research.playbook.yaml\n", ""), "playbookFile");
     expectFail(`${BASE}playbookFile: 7\n`, "playbookFile");
-    expect(
-      parse(BASE.replace("./research.playbook.yaml", "/opt/pb.yaml")).playbookFile,
-    ).toBe("/opt/pb.yaml");
+    expect(parse(BASE.replace("./research.playbook.yaml", "/opt/pb.yaml")).playbookFile).toBe(
+      "/opt/pb.yaml",
+    );
   });
 
   it("killGraceMs / defaultTimeoutMs: bounded integers with defaults", () => {
@@ -95,10 +95,7 @@ describe("worker config law", () => {
       "childWorkspaceId: gw.t/x\nplaybookFile: ./p.yaml\ntransport:\n  socket:\n    path: ./c.sock\n  tcp:\n    port: 1\n",
       "transport",
     );
-    expectFail(
-      "childWorkspaceId: gw.t/x\nplaybookFile: ./p.yaml\ntransport: {}\n",
-      "transport",
-    );
+    expectFail("childWorkspaceId: gw.t/x\nplaybookFile: ./p.yaml\ntransport: {}\n", "transport");
   });
 
   it("tcp transport parses with host default", () => {

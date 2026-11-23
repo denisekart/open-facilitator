@@ -13,7 +13,9 @@ and `gitlab{,-connector}` (GitHub unit/e2e-only via an exported fake; GitLab
 additionally on-demand via `make gitlab-up` + `reference/checks/verify-gitlab.sh`),
 `provider-core` (the shared scaffolding BOTH faces ride — single way to
 integrate a provider), `harnesses/adapter-sdk` (the HarnessAdapter lifecycle
-library), and `harnesses/deterministic` (the worked-example worker).
+library), `harnesses/cli` (the playbook-driven worker that spawns any CLI) and
+`harnesses/omp`/`harnesses/codex` (agent harnesses); the worked-example of
+writing hooks yourself is `examples/custom-hooks-worker`.
 `kafka` remains a documented stub — a README stating its future role.
 
 ## Truth anchors
@@ -31,7 +33,8 @@ library), and `harnesses/deterministic` (the worked-example worker).
   scheme, vendor→domain mapping, init seeding; pattern:
   `communication/forgejo{,-connector}`); register it in `pnpm-workspace.yaml`
   and, when it ships in the node image, in `Dockerfile.node`'s deploy list.
-- New harness adapter: copy `harnesses/deterministic` and run the conformance
+- New harness adapter: copy `harnesses/cli` (or `examples/custom-hooks-worker`
+  for a pure-hooks shape) and run the conformance
   kit (`@ofac/adapter/testing`), and declare your functionality list (the
   `fullHarnessCapabilities` omission law in
   `harnesses/adapter-sdk/src/capabilities.ts` — every capability the plane

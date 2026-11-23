@@ -416,45 +416,6 @@
         }
       }
     },
-    "src/adapters/harnesses/deterministic": {
-      "lines": {
-        "pct": 66.4,
-        "covered": 144,
-        "total": 217
-      },
-      "branches": {
-        "pct": 61.1,
-        "covered": 118,
-        "total": 193
-      },
-      "tiers": {
-        "unit": 66.4
-      },
-      "zeroFiles": [
-        {
-          "path": "src/adapters/harnesses/deterministic/src/bin/worker.ts",
-          "lines": 54
-        },
-        {
-          "path": "src/adapters/harnesses/deterministic/src/capabilities.ts",
-          "lines": 1
-        }
-      ],
-      "ecosystems": {
-        "ts": {
-          "lines": {
-            "pct": 66.4,
-            "covered": 144,
-            "total": 217
-          },
-          "branches": {
-            "pct": 61.1,
-            "covered": 118,
-            "total": 193
-          }
-        }
-      }
-    },
     "src/adapters/harnesses/omp": {
       "lines": {
         "pct": 63.9,

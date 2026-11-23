@@ -7,10 +7,13 @@ skill). Shipped:
 - `adapter-sdk/` — `@ofac/adapter`: the lifecycle law over the child wire
   (`adapter.v1.json`) + the `./testing` conformance kit. Library only: no
   config, no CLI.
-- `deterministic/` — `@ofac/harness-deterministic` (bin
-  `ofac-deterministic-worker`): the zero-randomness worked example — two-step
-  run, progress events, on-disk report with `sha256:` digest,
-  `file://` external refs. Third-party implementers copy this package.
+- `cli/` — `@ofac/harness-cli` (bin `ofac-cli-worker`): the playbook-driven
+  worker — a YAML playbook declares the capability face and the steps, the
+  worker spawns any CLI tool, watches markers, captures outputs, and derives
+  the advertised manifest from the playbook itself. The zero-randomness
+  parity face (research.analyze + research.publish) rides the sample
+  playbook + fake tool. Third-party implementers copy this package, or
+  `examples/custom-hooks-worker` for the pure-hooks shape.
 - `omp/` — `@ofac/harness-omp` (bin `ofac-omp-worker`): full TUI stand-in for
   the oh-my-pi CLI (`omp --mode rpc`), live steer, resume-aware, `ask_user`
   MCP relay. Shipped as the `ofac-omp-adapter` Dev Container Feature.

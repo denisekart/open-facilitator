@@ -1,3 +1,6 @@
+# The parity template: the exact manifest the removed
+# @ofac/harness-deterministic advertised. sample.test.ts cross-checks the
+# playbook-derived manifest against it (the wire-face parity law).
 # The manifest the deterministic worker advertises: the same
 # research.analyze v1 descriptor the e2e seeding targets (identical bytes
 # to 06's builtinChildManifest capability entry, so an embedded+fleet demo

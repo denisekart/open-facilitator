@@ -223,9 +223,9 @@ describe.skipIf(!E2E)("cli worker e2e", () => {
       });
       expect(caps.ownerTeam).toBe("team-alpha");
       // The playbook-derived face: fire-per-step never claims steering.
-      expect(
-        caps.capabilities.find((c) => c.id === "research.analyze")?.supportsSteering,
-      ).toBe(false);
+      expect(caps.capabilities.find((c) => c.id === "research.analyze")?.supportsSteering).toBe(
+        false,
+      );
       const online = await waitFor("worker connected", async () => {
         const s = await gatewayStatus(gw.diagnosticsPort);
         return s.children?.some((c) => c.state === "connected") ? s : false;
@@ -259,10 +259,7 @@ describe.skipIf(!E2E)("cli worker e2e", () => {
       const ref = String(envelope.data["resultManifestRef"]);
       const resultDigest = String(envelope.data["resultDigest"]);
       expect(ref.startsWith("artifact://")).toBe(true);
-      const docBytes = await fetchContent(
-        `/api/artifacts/${ref.split("/").pop()}/content`,
-        alice,
-      );
+      const docBytes = await fetchContent(`/api/artifacts/${ref.split("/").pop()}/content`, alice);
       const doc = JSON.parse(docBytes.toString("utf8")) as Record<string, unknown>;
       expect(computeManifestDigest(doc)).toBe(resultDigest);
       const docOutput = (doc["outputs"] as Record<string, unknown>[])[0]!;
@@ -309,9 +306,9 @@ describe.skipIf(!E2E)("cli worker e2e", () => {
         ).toString("utf8"),
       ) as Record<string, unknown>;
       expect(computeManifestDigest(pubDoc)).toBe(String(pubData["resultDigest"]));
-      expect(
-        (pubDoc["outputs"] as Record<string, unknown>[])[0]?.["kind"],
-      ).toBe("research-publish.result");
+      expect((pubDoc["outputs"] as Record<string, unknown>[])[0]?.["kind"]).toBe(
+        "research-publish.result",
+      );
 
       // ── 4. crash law: SIGKILL mid-run ⇒ ONE child-lost failed row ──
       const lostBefore = (
@@ -327,10 +324,7 @@ describe.skipIf(!E2E)("cli worker e2e", () => {
       // The assignment's holdMs var gives the kill a 30s window; the run
       // must be live (progress row seen) before the kill.
       await waitFor("kill-run progress", async () => {
-        const rows = await inboxRowsByType(
-          harness.dbUrl,
-          "org.facilitator.event.work.progress.v1",
-        );
+        const rows = await inboxRowsByType(harness.dbUrl, "org.facilitator.event.work.progress.v1");
         return rows.some((r) => r.payload.includes(asgK)) ? true : false;
       });
       worker.child.kill("SIGKILL"); // die mid-step: no terminal event
@@ -351,8 +345,9 @@ describe.skipIf(!E2E)("cli worker e2e", () => {
             "org.facilitator.event.assignment.failed.v1",
           );
           return (
-            rows.find((r) => r.payload.includes(asgK) && r.payload.includes("child-lost-execution")) ??
-            false
+            rows.find(
+              (r) => r.payload.includes(asgK) && r.payload.includes("child-lost-execution"),
+            ) ?? false
           );
         }).catch((e: unknown) => {
           throw new Error(`${String(e)}\n${dump("no child-lost row")}`, { cause: e });

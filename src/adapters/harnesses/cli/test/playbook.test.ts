@@ -78,7 +78,10 @@ describe("playbook law", () => {
   it("unknown keys rejected by name at every level", () => {
     expectFail(`${BASE}sidecar: true\n`, "file.sidecar: unknown key");
     expectFail(
-      BASE.replace("outputKinds: [analysis.report]", "outputKinds: [analysis.report]\n    weird: 1"),
+      BASE.replace(
+        "outputKinds: [analysis.report]",
+        "outputKinds: [analysis.report]\n    weird: 1",
+      ),
       "capabilities[0].weird: unknown key",
     );
     expectFail(
@@ -86,7 +89,10 @@ describe("playbook law", () => {
       "capabilities[0]('research.analyze').steps[0].expect.code: unknown key",
     );
     expectFail(
-      BASE.replace('run: { command: node, args: ["tool.mjs", "{{objective}}"] }', 'run: { command: node, args: [], chdir: "." }'),
+      BASE.replace(
+        'run: { command: node, args: ["tool.mjs", "{{objective}}"] }',
+        'run: { command: node, args: [], chdir: "." }',
+      ),
       "steps[0].run.chdir: unknown key",
     );
   });
@@ -100,7 +106,7 @@ describe("playbook law", () => {
       "expect.exit: must be an integer in 0..255",
     );
     expectFail(
-      BASE.replace("expect: { exit: 0 }", "expect: { stdout: \"[unclosed\" }"),
+      BASE.replace("expect: { exit: 0 }", 'expect: { stdout: "[unclosed" }'),
       "expect.stdout: not a valid regex",
     );
     expectFail(
@@ -111,11 +117,17 @@ describe("playbook law", () => {
 
   it("step grammar: run and/or ask, unique names, shell:false only", () => {
     expectFail(
-      BASE.replace('run: { command: node, args: ["tool.mjs", "{{objective}}"] }\n        expect: { exit: 0 }', "progress: thinking"),
+      BASE.replace(
+        'run: { command: node, args: ["tool.mjs", "{{objective}}"] }\n        expect: { exit: 0 }',
+        "progress: thinking",
+      ),
       "needs 'run' and/or 'ask'",
     );
     expectFail(
-      BASE.replace('run: { command: node, args: ["tool.mjs", "{{objective}}"] }', 'run: { command: node, args: [], shell: true }'),
+      BASE.replace(
+        'run: { command: node, args: ["tool.mjs", "{{objective}}"] }',
+        "run: { command: node, args: [], shell: true }",
+      ),
       "shell",
     );
     expectFail(
@@ -126,24 +138,34 @@ describe("playbook law", () => {
 
   it("capture/from law: file needs a path, others forbid one", () => {
     expectFail(
-      BASE.replace("expect: { exit: 0 }", "capture: { as: report, from: file, mediaType: text/markdown }"),
+      BASE.replace(
+        "expect: { exit: 0 }",
+        "capture: { as: report, from: file, mediaType: text/markdown }",
+      ),
       "capture.path: required for from: file",
     );
     expectFail(
-      BASE.replace("expect: { exit: 0 }", "capture: { as: report, from: stdout, mediaType: text/markdown, path: x }"),
+      BASE.replace(
+        "expect: { exit: 0 }",
+        "capture: { as: report, from: stdout, mediaType: text/markdown, path: x }",
+      ),
       "capture.path: only valid with from: file",
     );
   });
 
   it("env allow-list: keys outside allowedEnvKeys name the key", () => {
     expectFail(
-      BASE.replace("acceptedContexts: [uri-reference]", "acceptedContexts: [uri-reference]\n    allowedEnvKeys: [HOME]")
-        .replace('args: ["tool.mjs", "{{objective}}"] }', 'args: [], env: { TOKEN: x } }'),
+      BASE.replace(
+        "acceptedContexts: [uri-reference]",
+        "acceptedContexts: [uri-reference]\n    allowedEnvKeys: [HOME]",
+      ).replace('args: ["tool.mjs", "{{objective}}"] }', "args: [], env: { TOKEN: x } }"),
       "run.env.TOKEN: not in the capability's allowedEnvKeys",
     );
     const ok = parse(
-      BASE.replace("acceptedContexts: [uri-reference]", "acceptedContexts: [uri-reference]\n    allowedEnvKeys: [TOKEN]")
-        .replace('args: ["tool.mjs", "{{objective}}"] }', 'args: [], env: { TOKEN: x } }'),
+      BASE.replace(
+        "acceptedContexts: [uri-reference]",
+        "acceptedContexts: [uri-reference]\n    allowedEnvKeys: [TOKEN]",
+      ).replace('args: ["tool.mjs", "{{objective}}"] }', "args: [], env: { TOKEN: x } }"),
     );
     expect(ok.capabilities.get("research.analyze")?.steps[0]?.run?.env).toEqual({ TOKEN: "x" });
   });
@@ -155,7 +177,10 @@ describe("playbook law", () => {
       "steps[0].when: must name a var",
     );
     const pb = parse(
-      BASE.replace("acceptedContexts: [uri-reference]", "acceptedContexts: [uri-reference]\n    supportsCancellation: false"),
+      BASE.replace(
+        "acceptedContexts: [uri-reference]",
+        "acceptedContexts: [uri-reference]\n    supportsCancellation: false",
+      ),
     );
     expect(pb.manifest.capabilities[0]?.supportsCancellation).toBe(false);
     // The manifest face stays honest: still derived, now demoted.
@@ -214,13 +239,19 @@ describe("interpolation law", () => {
 
   it("assignment vars override capability defaults at scope build; missing var fails loud", () => {
     expect(() => interpolate(scope(), "args[0]", "{{vars.nope}}")).toThrow(/vars\.nope/);
-    expect(() => interpolate(scope({ vars: {} }), "args[0]", "{{vars.tier}}")).toThrow(/vars\.tier/);
+    expect(() => interpolate(scope({ vars: {} }), "args[0]", "{{vars.tier}}")).toThrow(
+      /vars\.tier/,
+    );
   });
 
   it("unknown or unfinished references fail, never blank", () => {
     expect(() => interpolate(scope(), "args[0]", "{{bogus}}")).toThrow(/unknown placeholder/);
-    expect(() => interpolate(scope(), "args[0]", "{{steps.missing.answer}}")).toThrow(/unknown or unfinished step/);
-    expect(() => interpolate(scope(), "args[0]", "{{steps.analyze.answer}}")).toThrow(/recorded no answer/);
+    expect(() => interpolate(scope(), "args[0]", "{{steps.missing.answer}}")).toThrow(
+      /unknown or unfinished step/,
+    );
+    expect(() => interpolate(scope(), "args[0]", "{{steps.analyze.answer}}")).toThrow(
+      /recorded no answer/,
+    );
     expect(() => interpolate(scope(), "args[0]", "{{shimCommand}}")).toThrow(/not seeded/);
     expect(interpolate(scope({ shimCommand: "node shim.js" }), "args[0]", "{{shimCommand}}")).toBe(
       "node shim.js",
@@ -229,8 +260,14 @@ describe("interpolation law", () => {
 
   it("static validation: only declared vars and known steps may be referenced", () => {
     validatePlaceholders(capability, "args", "{{vars.tier}} {{steps.ask.answer}} {{objective}}");
-    expect(() => validatePlaceholders(capability, "args", "{{vars.undeclared}}")).toThrow(/no declared default/);
-    expect(() => validatePlaceholders(capability, "args", "{{steps.nope.answer}}")).toThrow(/unknown step/);
-    expect(() => validatePlaceholders(capability, "args", "{{weird}}")).toThrow(/unknown placeholder/);
+    expect(() => validatePlaceholders(capability, "args", "{{vars.undeclared}}")).toThrow(
+      /no declared default/,
+    );
+    expect(() => validatePlaceholders(capability, "args", "{{steps.nope.answer}}")).toThrow(
+      /unknown step/,
+    );
+    expect(() => validatePlaceholders(capability, "args", "{{weird}}")).toThrow(
+      /unknown placeholder/,
+    );
   });
 });

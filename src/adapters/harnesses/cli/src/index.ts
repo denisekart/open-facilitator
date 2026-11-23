@@ -30,10 +30,6 @@ export type {
   StepRetry,
   StepRun,
 } from "./playbook/schema.js";
-export {
-  createCliHooks,
-  type CliHooks,
-  type CliRunOptions,
-} from "./harness.js";
+export { createCliHooks, type CliHooks, type CliRunOptions } from "./harness.js";
 export { deansify, DeansifyWindow } from "./playbook/ansi.js";
 export { startAskUserBridge, writeMcpConfig } from "./mcp/bridge.js";

@@ -61,7 +61,9 @@ for (const { feature, pkg, entry } of FEATURES) {
   // the deploy-tree root (pnpm deploy places the filtered package itself at
   // the root, deps — including every @ofac/* workspace dep — under
   // node_modules/), and native sqlite prebuilds ride along transitively.
-  const listing = execFileSync("tar", ["-tzf", tarPath], { encoding: "utf8" });
+  // maxBuffer: the default 1MB is smaller than the listing of a deployed
+  // pnpm tree (omp-adapter alone lists >2MB of paths) — ENOBUFS otherwise.
+  const listing = execFileSync("tar", ["-tzf", tarPath], { encoding: "utf8", maxBuffer: 256 * 1024 * 1024 });
   for (const needle of [`./${entry}`, "better-sqlite3/prebuilds/"]) {
     if (!listing.includes(needle)) {
       console.error(`FAIL: ${tarPath} lacks ${needle}`);

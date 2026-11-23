@@ -56,8 +56,8 @@ public sealed class ChatPlaneTests(PostgresFixture fixture)
             using var playwright = await Playwright.CreateAsync();
             await using var browser = await playwright.Chromium.LaunchAsync();
             var page = await NewLoginPageAsync(browser, host.ServerAddress);
-            await Expect(page.GetByTestId("view-chat")).ToBeVisibleAsync();
-            await page.GetByTestId("view-chat").ClickAsync();
+            await Expect(DesktopView(page, "chat")).ToBeVisibleAsync();
+            await DesktopView(page, "chat").ClickAsync();
 
             await page.GetByTestId("chat-input").FillAsync("replay the stuck dead letter");
             await page.GetByTestId("chat-send").ClickAsync();
@@ -123,7 +123,7 @@ public sealed class ChatPlaneTests(PostgresFixture fixture)
             // Compact chrome: the view menu is a left drawer; open it, then
             // pick the AiDeck entry (the drawer dismisses on navigation).
             await page.GetByTestId("menu-toggle").ClickAsync();
-            await page.GetByTestId("view-chat").ClickAsync();
+            await page.GetByTestId("menu-view-chat").ClickAsync();
             await page.GetByTestId("chat-input").FillAsync("hello deck");
             await page.GetByTestId("chat-send").ClickAsync();
 
@@ -150,7 +150,7 @@ public sealed class ChatPlaneTests(PostgresFixture fixture)
         var page = await NewLoginPageAsync(browser, host.ServerAddress);
 
         // alice (ai-operator in the realm) sees the panel...
-        await Expect(page.GetByTestId("view-chat")).ToBeVisibleAsync();
+        await Expect(DesktopView(page, "chat")).ToBeVisibleAsync();
 
         // ...the kernel-operator CLI token does not hold chat.use: the gate refuses.
         using var cli = host.CreateSeedClient();
@@ -190,7 +190,9 @@ public sealed class ChatPlaneTests(PostgresFixture fixture)
         await page.FillAsync("input[name=\"password\"]", "alice");
         await page.ClickAsync("#kc-login");
         await page.WaitForURLAsync($"{baseUrl}/**");
-        await Expect(page.GetByTestId("identity-chip")).ToBeVisibleAsync();
+        // The chip itself hides on compact viewports; the account button that
+        // carries the avatar (and the name on wide ones) always shows.
+        await Expect(page.GetByTestId("user-menu-toggle")).ToBeVisibleAsync();
         return page;
     }
 
@@ -207,4 +209,10 @@ public sealed class ChatPlaneTests(PostgresFixture fixture)
 
     private static byte[] Base64UrlDecode(string segment) =>
         Convert.FromBase64String(segment.Replace('-', '+').Replace('_', '/').PadRight(segment.Length + (4 - segment.Length % 4) % 4, '='));
+
+    /// <summary>Header desktop nav entry, scoped so the mobile drawer's
+    /// mirror (menu-view-*) can never make the locator ambiguous.</summary>
+    private static ILocator DesktopView(IPage page, string key) =>
+        page.Locator("nav.nav-desktop").GetByTestId($"view-{key}");
+
 }

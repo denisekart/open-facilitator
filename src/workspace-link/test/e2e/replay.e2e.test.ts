@@ -9,8 +9,6 @@
 // process keeps the socket open, so the server marks d2 in_flight and pushes
 // it; the receipt can never arrive while frozen — the crash window is
 // structural, not timed.
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {

@@ -68,7 +68,7 @@ public sealed class FlowEditorConsoleTests(PostgresFixture fixture)
             ShotDir is null ? null : new ViewportSize { Width = 1440, Height = 900 });
 
         // Clone the nudge-escalation gallery entry through the flows table.
-        await page.GetByTestId("view-flows").ClickAsync();
+        await DesktopView(page, "flows").ClickAsync();
         await Expect(page.GetByTestId("flows-view")).ToBeVisibleAsync();
         var row = page.Locator("[data-testid='flows-view'] tbody tr", new() { HasText = "nudge-escalation" });
         await Expect(row).ToBeVisibleAsync();
@@ -95,7 +95,7 @@ public sealed class FlowEditorConsoleTests(PostgresFixture fixture)
         await Expect(page.GetByTestId("editor-notice")).ToContainTextAsync("enabled");
         await page.GoBackAsync();
         await Expect(page.GetByTestId("flows-view")).ToBeVisibleAsync();
-        var copyRow = page.Locator("[data-testid='flows-view'] tbody tr", new() { HasText = "nudge-escalation-copy1" });
+        var copyRow = page.Locator("[data-testid='flows-view'] tbody tr", new() { HasText = "nudge-escalation-copyv1" });
         await Expect(copyRow).ToContainTextAsync("live");
 
         // One work.progress event: an instance of v1, parked on a timer.
@@ -103,7 +103,7 @@ public sealed class FlowEditorConsoleTests(PostgresFixture fixture)
         // by default, but the walkthrough still pokes refresh once so the
         // assertion is about the row, not the poll.
         await PostWorkProgressAsync(host, "e2e-editor-a");
-        await page.GetByTestId("view-monitor").ClickAsync();
+        await DesktopView(page, "monitor").ClickAsync();
         await page.GetByTestId("monitor-refresh").ClickAsync();
         var parked = page.Locator("[data-testid='instance-list'] tbody tr", new() { HasText = "nudge-escalation-copy@1" });
         await Expect(parked).ToBeVisibleAsync(new() { Timeout = 15_000 });
@@ -120,7 +120,7 @@ public sealed class FlowEditorConsoleTests(PostgresFixture fixture)
 
         // Edit again through the UI: v2 lands, and the OLD instance keeps
         // its v1 pin — a stored version is immutable under a running run.
-        await page.GetByTestId("view-flows").ClickAsync();
+        await DesktopView(page, "flows").ClickAsync();
         await copyRow.GetByText("edit", new() { Exact = true }).ClickAsync();
         await Expect(page.GetByTestId("flow-editor")).ToBeVisibleAsync();
         await Expect(page.GetByTestId("editor-title")).ToHaveValueAsync("Nudge escalation (tuned)");
@@ -129,11 +129,11 @@ public sealed class FlowEditorConsoleTests(PostgresFixture fixture)
         await Expect(page.GetByTestId("editor-notice")).ToContainTextAsync("version 2");
         await page.GoBackAsync();
         await Expect(
-            page.Locator("[data-testid='flows-view'] tbody tr", new() { HasText = "nudge-escalation-copy2" }))
+            page.Locator("[data-testid='flows-view'] tbody tr", new() { HasText = "nudge-escalation-copyv2" }))
             .ToContainTextAsync("live");
 
         await PostWorkProgressAsync(host, "e2e-editor-b");
-        await page.GetByTestId("view-monitor").ClickAsync();
+        await DesktopView(page, "monitor").ClickAsync();
         // Reload law: the session lives in oidc-client-ts storage, and the
         // spent auth code must be off the URL before this moment — a
         // replayed ?code= must not break the boot.
@@ -239,4 +239,10 @@ public sealed class FlowEditorConsoleTests(PostgresFixture fixture)
         await Expect(page.GetByTestId("identity-chip")).ToBeVisibleAsync();
         return page;
     }
+
+    /// <summary>Header desktop nav entry, scoped so the mobile drawer's
+    /// mirror (menu-view-*) can never make the locator ambiguous.</summary>
+    private static ILocator DesktopView(IPage page, string key) =>
+        page.Locator("nav.nav-desktop").GetByTestId($"view-{key}");
+
 }

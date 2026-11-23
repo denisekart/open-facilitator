@@ -39,7 +39,7 @@ public sealed class AdminInspectorTests(PostgresFixture fixture)
         Assert.Contains("alice", await page.GetByTestId("identity-chip").TextContentAsync());
         // The health bar lives on the Monitor column since the shell
         // overhaul; a fresh login lands on Works, so visit Monitor first.
-        await page.GetByTestId("view-monitor").ClickAsync();
+        await DesktopView(page, "monitor").ClickAsync();
         await Expect(page.GetByTestId("health-strip")).ToBeVisibleAsync();
     }
 
@@ -80,7 +80,7 @@ public sealed class AdminInspectorTests(PostgresFixture fixture)
             host.ServerAddress,
             ShotDir is null ? null : new ViewportSize { Width = 1440, Height = 900 });
         await page.GetByTestId("search-input").FillAsync(objective);
-        await page.GetByTestId("search-go").ClickAsync();
+        await page.GetByTestId("search-input").PressAsync("Enter");
         await Expect(page.GetByTestId("hits-works")).ToBeVisibleAsync();
         await ShootAsync(page, "console-explorer.png");
         await page.GetByTestId($"hit-works-{workId.ToString()[..8]}").ClickAsync();
@@ -114,7 +114,7 @@ public sealed class AdminInspectorTests(PostgresFixture fixture)
         using var playwright = await Playwright.CreateAsync();
         await using var browser = await playwright.Chromium.LaunchAsync();
         var page = await NewLoginPageAsync(browser, baseUrl);
-        await page.GetByTestId("view-team").ClickAsync();
+        await DesktopView(page, "team").ClickAsync();
 
         await Expect(page.GetByTestId($"gateway-{live}")).ToBeVisibleAsync();
         await Expect(page.GetByTestId($"online-{live}")).ToHaveTextAsync("online");
@@ -141,7 +141,7 @@ public sealed class AdminInspectorTests(PostgresFixture fixture)
         using var playwright = await Playwright.CreateAsync();
         await using var browser = await playwright.Chromium.LaunchAsync();
         var page = await NewLoginPageAsync(browser, host.ServerAddress);
-        await page.GetByTestId("view-deliveries").ClickAsync();
+        await DesktopView(page, "deliveries").ClickAsync();
         await page.GetByTestId("filter-dead_letter").ClickAsync();
 
         var deadLetterId = Guid.Parse((await fixture.Db.DeadLetterIdsForWork(workId)).First());
@@ -173,7 +173,7 @@ public sealed class AdminInspectorTests(PostgresFixture fixture)
         using var playwright = await Playwright.CreateAsync();
         await using var browser = await playwright.Chromium.LaunchAsync();
         var page = await NewLoginPageAsync(browser, baseUrl);
-        await page.GetByTestId("view-config").ClickAsync();
+        await DesktopView(page, "config").ClickAsync();
         await page.GetByTestId("config-open-nudge-policy").ClickAsync();
 
         await page.GetByTestId("field-staleAfterMinutes").FillAsync("30");
@@ -260,4 +260,10 @@ public sealed class AdminInspectorTests(PostgresFixture fixture)
         await fixture.Db.SeedApproval(approvalId, workId, "[\"user:alice\"]");
         return (workId, approvalId);
     }
+
+    /// <summary>Header desktop nav entry, scoped so the mobile drawer's
+    /// mirror (menu-view-*) can never make the locator ambiguous.</summary>
+    private static ILocator DesktopView(IPage page, string key) =>
+        page.Locator("nav.nav-desktop").GetByTestId($"view-{key}");
+
 }

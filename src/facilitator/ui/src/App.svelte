@@ -421,6 +421,7 @@
         bind:this={searchBox}
         bind:value={query}
         oninput={onQuery}
+        onkeydown={(ev) => ev.key === "Enter" && void runSearch()}
         data-testid="search-input" />
       <button class="sr-only" data-testid="search-go" onclick={() => void runSearch()}>
         search
@@ -541,7 +542,7 @@
       <button
         class="nav-item"
         title={entry.hint}
-        data-testid={`view-${entry.key}`}
+        data-testid={`menu-view-${entry.key}`}
         aria-current={railActive(entry) ? "page" : entry.drawer && deck.state.open ? "true" : undefined}
         onclick={() => railClick(entry)}>
         <Icon class="size-4 shrink-0" strokeWidth={1.5} aria-hidden="true" />

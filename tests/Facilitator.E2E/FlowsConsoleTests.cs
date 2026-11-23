@@ -75,14 +75,14 @@ public sealed class FlowsConsoleTests(PostgresFixture fixture)
         await using var browser = await playwright.Chromium.LaunchAsync();
         var page = await NewLoginPageAsync(browser, host.ServerAddress);
 
-        await page.GetByTestId("view-flows").ClickAsync();
+        await DesktopView(page, "flows").ClickAsync();
         await Expect(page.GetByTestId("flows-view")).ToBeVisibleAsync();
         await Expect(page.GetByTestId("flows-view")).ToContainTextAsync(defId);
         await Expect(page.GetByTestId("flows-view")).ToContainTextAsync("live");
 
         // The instance row lives on the Monitor column now: the def's runs
         // link goes to the filtered instance table.
-        await page.GetByTestId("view-monitor").ClickAsync();
+        await DesktopView(page, "monitor").ClickAsync();
         var row = page.Locator("[data-testid='instance-list'] tbody tr", new() { HasText = defId });
         await Expect(row).ToBeVisibleAsync();
         await Expect(row).ToContainTextAsync("completed");
@@ -114,4 +114,10 @@ public sealed class FlowsConsoleTests(PostgresFixture fixture)
         await Expect(page.GetByTestId("identity-chip")).ToBeVisibleAsync();
         return page;
     }
+
+    /// <summary>Header desktop nav entry, scoped so the mobile drawer's
+    /// mirror (menu-view-*) can never make the locator ambiguous.</summary>
+    private static ILocator DesktopView(IPage page, string key) =>
+        page.Locator("nav.nav-desktop").GetByTestId($"view-{key}");
+
 }

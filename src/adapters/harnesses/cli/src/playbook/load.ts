@@ -3,7 +3,11 @@
 // fails, naming the full dotted path of the offending key.
 import { readFileSync } from "node:fs";
 import { parse } from "yaml";
-import type { CapabilityDescriptor, CapabilityManifestV1 } from "@ofac/protocol";
+import type {
+  AcceptedContext,
+  CapabilityDescriptor,
+  CapabilityManifestV1,
+} from "@ofac/protocol";
 import { PlaybookError } from "./schema.js";
 import type {
   AskUserInject,
@@ -373,7 +377,6 @@ function parseStep(
   if (!STEP_NAME_RE.test(name)) {
     fail(`${at}.name`, "must match ^[a-z][a-z0-9_-]*$");
   }
-  const stepAt = `${at}('${name}')`;
   const onFail = optionalString(stepDoc, "onFail", at) ?? "abort";
   if (onFail !== "abort" && onFail !== "continue") {
     fail(`${at}.onFail`, "must be 'abort' or 'continue'");
@@ -471,7 +474,7 @@ function parseCapability(
     id,
     version: requireInt(capDoc, "version", where, 1, 1000),
     execution: "asynchronous",
-    acceptedContexts: acceptedContexts as CapabilityDescriptor["acceptedContexts"],
+    acceptedContexts: acceptedContexts as AcceptedContext[],
     outputKinds: [...outputKinds],
     outputMediaTypes: [...outputMediaTypes],
     // Fire-per-step: no mid-run channel, so never steerable; the group kill
@@ -543,7 +546,10 @@ export function parsePlaybook(
     apiVersion: "facilitator.framework/v1",
     kind: "CapabilityManifest",
     ownerTeam,
-    capabilities: [...capabilities.values()].map((capability) => capability.manifestEntry),
+    // Non-empty by law above: `capabilitiesRaw.length === 0` failed first.
+    capabilities: [
+      ...[...capabilities.values()].map((capability) => capability.manifestEntry),
+    ] as [CapabilityDescriptor, ...CapabilityDescriptor[]],
   };
   return { capabilities, manifest, binaries };
 }

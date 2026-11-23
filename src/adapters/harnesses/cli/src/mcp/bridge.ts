@@ -92,27 +92,42 @@ export async function startAskUserBridge(
 }
 
 /**
- * The MCP config omp auto-loads from the session cwd (probe law): a
- * Claude-compatible `.mcp.json` launching the package shim, which connects
- * back to the bridge address.
+ * Seed the MCP config a hosted CLI auto-loads from the step cwd/home
+ * (probe law), pointing its MCP-loader at the package shim, which connects
+ * back to the bridge address. `format` picks the dialect: the
+ * Claude-compatible `.mcp.json` (json) or codex-style `[mcp_servers.ofac]`
+ * TOML. Returns the file written (relative to `dir`).
  */
-export function writeMcpConfig(repoDir: string, shimEntry: string, bridgeAddress: string): string {
-  const path = join(repoDir, ".mcp.json");
-  writeFileSync(
-    path,
-    `${JSON.stringify(
-      {
-        mcpServers: {
-          ofac: {
-            command: process.execPath,
-            args: [shimEntry],
-            env: { OFAC_MCP_BRIDGE: bridgeAddress },
+export function writeMcpConfig(
+  dir: string,
+  shimEntry: string,
+  bridgeAddress: string,
+  format: "json" | "toml",
+  file: string,
+): string {
+  const path = join(dir, file);
+  const body =
+    format === "json"
+      ? `${JSON.stringify(
+          {
+            mcpServers: {
+              ofac: {
+                command: process.execPath,
+                args: [shimEntry],
+                env: { OFAC_MCP_BRIDGE: bridgeAddress },
+              },
+            },
           },
-        },
-      },
-      null,
-      2,
-    )}\n`,
-  );
+          null,
+          2,
+        )}\n`
+      : `[mcp_servers.ofac]
+command = "${process.execPath}"
+args = ["${shimEntry}"]
+
+[mcp_servers.ofac.env]
+OFAC_MCP_BRIDGE = "${bridgeAddress}"
+`;
+  writeFileSync(path, body);
   return path;
 }

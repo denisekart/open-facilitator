@@ -11,7 +11,6 @@ import { runCapability, type StepOutcome } from "../src/playbook/run.js";
 import { parsePlaybook } from "../src/playbook/load.js";
 import type { Playbook, PlaybookCapability } from "../src/playbook/schema.js";
 import type { InterpolationScope } from "../src/playbook/interpolate.js";
-import type { RunContext } from "@ofac/adapter";
 
 const FAKE = join(import.meta.dirname, "..", "sample", "fake-tool.mjs");
 

@@ -2,6 +2,7 @@ packages:
   - "src/otel"
   - "src/gateway"
   - "src/adapters/harnesses/adapter-sdk"
+  - "src/adapters/harnesses/cli"
   - "src/adapters/harnesses/deterministic"
   - "src/adapters/harnesses/omp"
   - "src/adapters/harnesses/codex"
@@ -28,6 +29,10 @@ packages:
 allowBuilds:
   better-sqlite3: false
   esbuild: true
+  # node-pty (the cli harness's opt-in PTY legs) needs its node-gyp install
+  # script: the helper spawn talks to a real terminal, no prebuilt binding
+  # ships. PTY stays opt-in — pipes never import node-pty at runtime.
+  node-pty: true
   # better-sqlite3 13 is deliberately NOT allow-built: its published install
   # script (`node-gyp rebuild`) needs node-gyp + a SQLite source download,
   # while the tarball ships prebuilds/ for linux+darwin+win x64/arm64 that

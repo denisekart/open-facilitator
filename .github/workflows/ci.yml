@@ -44,10 +44,18 @@ jobs:
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
       - uses: actions/setup-dotnet@v6
         with:
           cache: true
           cache-dependency-path: "**/packages.lock.json"
+      # make's restore target runs `pnpm install`, so the toolchain must be
+      # on PATH before any make target — same setup as the typescript job.
+      - run: pnpm install --frozen-lockfile
       - run: dotnet restore OpenFacilitator.slnx --locked-mode
       - run: dotnet build OpenFacilitator.slnx -c Release --no-restore
       - run: make scenario-walks

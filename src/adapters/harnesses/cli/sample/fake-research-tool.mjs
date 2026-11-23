@@ -19,8 +19,10 @@ function arg(flag) {
 const objective = arg("--objective") ?? "unknown";
 const attachDir = arg("--attachments") ?? "attachments";
 const answer = arg("--answer");
+const hold = Number(arg("--hold") ?? 0); // ms: a wide kill/cancel window for e2e legs
 
 process.stdout.write("analyzing: source review\n");
+if (hold > 0) await new Promise((resolve) => setTimeout(resolve, hold));
 
 const attachmentLines = [];
 if (existsSync(attachDir)) {

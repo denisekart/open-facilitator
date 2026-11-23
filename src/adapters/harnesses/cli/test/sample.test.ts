@@ -71,8 +71,9 @@ describe("sample research playbook", () => {
     const ask = playbook.capabilities.get("research.analyze")?.steps.find((s) => s.name === "ask");
     expect(ask?.when).toBe("askQuestion");
     expect(ask?.ask?.question).toBe("{{vars.askQuestion}}");
-    // No declared default: without config askQuestion the step never runs,
-    // matching the deterministic worker's optional askQuestion exactly.
-    expect(playbook.capabilities.get("research.analyze")?.vars).toBeUndefined();
+    // No declared default for askQuestion: without config askQuestion the
+    // step never runs, matching the deterministic worker's optional
+    // askQuestion exactly.
+    expect(playbook.capabilities.get("research.analyze")?.vars?.["askQuestion"]).toBeUndefined();
   });
 });

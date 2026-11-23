@@ -333,13 +333,31 @@ export async function runCapability(
   for (const step of capability.steps) {
     const scope: InterpolationScope = { ...base, ...(hooks.extraScope ?? {}), steps: records };
     if (hooks.signal.aborted) return { kind: "cancelled" };
+    if (
+      step.when !== undefined &&
+      (scope.vars[step.when] === undefined || scope.vars[step.when] === "")
+    ) {
+      // The optional leg's key is absent from this run's vars: the step
+      // (and its human question) never happens. Its record carries an
+      // empty answer so later declared slots still resolve — an optional
+      // leg that never ran honestly contributes no text.
+      hooks.logger.info("playbook-step-skipped", { step: step.name, when: step.when });
+      records.set(step.name, { answer: "" });
+      continue;
+    }
     if (step.progress !== undefined) {
       hooks.publishProgress(truncateNote(interpolate(scope, `step '${step.name}'.progress`, step.progress)));
     }
     const started = Date.now();
     let answer: string | undefined;
     if (step.ask !== undefined) {
-      answer = await hooks.requestInput(step.ask);
+      answer = await hooks.requestInput({
+        question: interpolate(scope, `step '${step.name}'.ask.question`, step.ask.question),
+        ...(step.ask.choices !== undefined ? { choices: step.ask.choices } : {}),
+        ...(step.ask.contextRef !== undefined
+          ? { contextRef: interpolate(scope, `step '${step.name}'.ask.contextRef`, step.ask.contextRef) }
+          : {}),
+      });
       if (hooks.signal.aborted) return { kind: "cancelled" };
     }
     let failure: string | undefined;

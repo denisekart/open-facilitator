@@ -46,6 +46,11 @@ export interface WorkerConfig {
   defaultTimeoutMs: number;
   /** "mcp" seeds the shim config so a hosted CLI can ask_user unprompted. */
   askUser: "mcp" | "off";
+  /** Optional: when set, injected into every run's vars as `askQuestion` —
+   * the parity seam for a playbook's `when: askQuestion` optional human
+   * leg (the deterministic worker's config-driven askQuestion, declared
+   * law instead of code). */
+  askQuestion?: string | undefined;
   heartbeatSeconds: number;
   restartBackoffMs: readonly number[];
   logLevel: string;
@@ -68,6 +73,7 @@ const TOP_KEYS: Record<string, true> = {
   killGraceMs: true,
   defaultTimeoutMs: true,
   askUser: true,
+  askQuestion: true,
   heartbeatSeconds: true,
   restartBackoffMs: true,
 };
@@ -207,6 +213,9 @@ export function parseWorkerConfig(
     killGraceMs,
     defaultTimeoutMs,
     askUser: askUserRaw ?? "off",
+    ...(optionalString(root, "askQuestion") !== undefined
+      ? { askQuestion: optionalString(root, "askQuestion") }
+      : {}),
     heartbeatSeconds,
     restartBackoffMs,
     logLevel: env["OFAC_ADAPTER_LOG"] ?? "info",

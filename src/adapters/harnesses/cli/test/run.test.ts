@@ -160,6 +160,7 @@ function drive(
     assignmentId: "a-1",
     objective: "test objective",
     attachments: "",
+    playbookDir: workDir,
     vars: { ...(capability(capabilityId).vars ?? {}), ...(opts.env ?? {}) },
   };
   const outcome = runCapability(

@@ -33,6 +33,9 @@ export interface CliRunOptions {
   readonly killGraceMs: number;
   /** "mcp" enables the ask_user shim leg for capabilities that opt in. */
   readonly askUser: "mcp" | "off";
+  /** Optional: injected into every run's vars, gating `when: askQuestion`
+   * steps (the parity seam for the deterministic worker's askQuestion). */
+  readonly askQuestion?: string | undefined;
   readonly logger: LinkLogger;
   /** Test seam: fetch for the artifact leg; default global. */
   readonly fetchImpl?: typeof fetch;
@@ -58,7 +61,7 @@ function defaultShimEntry(): string {
 }
 
 export function createCliHooks(options: CliRunOptions, playbook: Playbook): CliHooks {
-  const { childWorkspaceId, workDir, killGraceMs, askUser, logger } = options;
+  const { childWorkspaceId, workDir, killGraceMs, askUser, askQuestion, logger } = options;
   const shimEntry = options.shimEntry ?? defaultShimEntry();
 
   async function attachmentsSection(
@@ -133,11 +136,15 @@ export function createCliHooks(options: CliRunOptions, playbook: Playbook): CliH
     for (const [key, value] of Object.entries(inputVars)) {
       if (typeof value === "string") vars[key] = value;
     }
+    // The config-injected optional human leg: a playbook step guarded with
+    // `when: askQuestion` runs exactly when the deployment sets the key.
+    if (askQuestion !== undefined) vars["askQuestion"] = askQuestion;
     const base: Omit<InterpolationScope, "steps"> = {
       workId,
       assignmentId,
       objective,
       attachments,
+      playbookDir: playbook.playbookDir,
       vars,
       ...(shimCommand !== undefined ? { shimCommand } : {}),
     };

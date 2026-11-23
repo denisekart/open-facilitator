@@ -71,6 +71,11 @@ export interface StepRun {
 
 export interface PlaybookStep {
   readonly name: string;
+  /** Skip the step entirely when the named var is absent from the run
+   * scope (the config-injected `askQuestion` is the canonical use: the
+   * optional human leg rides a config key, exactly like the deterministic
+   * worker's askQuestion). */
+  readonly when?: string | undefined;
   readonly run?: StepRun | undefined;
   readonly tty: boolean;
   readonly timeoutMs: number;
@@ -117,4 +122,7 @@ export interface Playbook {
   readonly manifest: CapabilityManifestV1;
   /** Every binary any step may run (allow-listed; the payload surface). */
   readonly binaries: ReadonlySet<string>;
+  /** Absolute dir of the source file ("" for an in-memory parse): the
+   * `{{playbookDir}}` slot a runbook's helper scripts live beside. */
+  readonly playbookDir: string;
 }

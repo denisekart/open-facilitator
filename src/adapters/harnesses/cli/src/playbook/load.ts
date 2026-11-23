@@ -2,6 +2,7 @@
 // config.ts, extended to every nesting level: an unknown key at ANY level
 // fails, naming the full dotted path of the offending key.
 import { readFileSync } from "node:fs";
+import { dirname } from "node:path";
 import { parse } from "yaml";
 import type {
   AcceptedContext,
@@ -37,6 +38,7 @@ const CAP_KEYS: Record<string, true> = {
   acceptedContexts: true,
   outputKinds: true,
   outputMediaTypes: true,
+  supportsCancellation: true,
   allowedEnvKeys: true,
   vars: true,
   askUserInject: true,
@@ -44,6 +46,7 @@ const CAP_KEYS: Record<string, true> = {
 };
 const STEP_KEYS: Record<string, true> = {
   name: true,
+  when: true,
   run: true,
   tty: true,
   timeoutMs: true,
@@ -377,6 +380,10 @@ function parseStep(
   if (!STEP_NAME_RE.test(name)) {
     fail(`${at}.name`, "must match ^[a-z][a-z0-9_-]*$");
   }
+  const when = optionalString(stepDoc, "when", at);
+  if (when !== undefined && !ENV_KEY_RE.test(when) && !/^[a-z][a-zA-Z0-9_]*$/.test(when)) {
+    fail(`${at}.when`, "must name a var (lowerCamel or ENV-key)");
+  }
   const onFail = optionalString(stepDoc, "onFail", at) ?? "abort";
   if (onFail !== "abort" && onFail !== "continue") {
     fail(`${at}.onFail`, "must be 'abort' or 'continue'");
@@ -384,6 +391,7 @@ function parseStep(
   const expectDoc = stepDoc["expect"];
   return {
     name,
+    ...(when !== undefined ? { when } : {}),
     ...(parseRun(stepDoc, at, allowedEnv) !== undefined ? { run: parseRun(stepDoc, at, allowedEnv) } : {}),
     tty: optionalBool(stepDoc, "tty", at, false),
     timeoutMs: optionalInt(stepDoc, "timeoutMs", at, 1, 3_600_000, defaultTimeoutMs),
@@ -470,6 +478,10 @@ function parseCapability(
     }
   }
   const askUserInject = parseInject(capDoc, at);
+  // The group kill is always there, so cancellable is the honest default;
+  // a capability may demote itself (parity: the confirm-scoped publish
+  // flavor answers cancel before the run boots).
+  const supportsCancellation = optionalBool(capDoc, "supportsCancellation", at, true);
   const manifestEntry: CapabilityDescriptor = {
     id,
     version: requireInt(capDoc, "version", where, 1, 1000),
@@ -477,10 +489,10 @@ function parseCapability(
     acceptedContexts: acceptedContexts as AcceptedContext[],
     outputKinds: [...outputKinds],
     outputMediaTypes: [...outputMediaTypes],
-    // Fire-per-step: no mid-run channel, so never steerable; the group kill
-    // is always there, and input.required works (ask steps + the shim).
+    // Fire-per-step: no mid-run channel, so never steerable; input.required
+    // works (ask steps + the shim).
     supportsSteering: false,
-    supportsCancellation: true,
+    supportsCancellation,
     supportsNudge: false,
     supportsInteraction: true,
   };
@@ -502,6 +514,9 @@ function parseCapability(
 export interface ParsePlaybookOptions {
   /** Ceiling for steps without an explicit timeoutMs (the worker config's). */
   defaultTimeoutMs?: number | undefined;
+  /** Absolute dir of the playbook file ({{playbookDir}}); loadPlaybookFile
+   * derives it from the path. */
+  playbookDir?: string | undefined;
 }
 
 export function parsePlaybook(
@@ -551,7 +566,7 @@ export function parsePlaybook(
       ...[...capabilities.values()].map((capability) => capability.manifestEntry),
     ] as [CapabilityDescriptor, ...CapabilityDescriptor[]],
   };
-  return { capabilities, manifest, binaries };
+  return { capabilities, manifest, binaries, playbookDir: options.playbookDir ?? "" };
 }
 
 export function loadPlaybookFile(
@@ -564,5 +579,5 @@ export function loadPlaybookFile(
   } catch (error) {
     throw new PlaybookError("playbookFile", `cannot read ${path}: ${(error as Error).message}`);
   }
-  return parsePlaybook(text, options);
+  return parsePlaybook(text, { ...options, playbookDir: dirname(path) });
 }

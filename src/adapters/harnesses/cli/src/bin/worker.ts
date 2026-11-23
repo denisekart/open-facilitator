@@ -84,6 +84,7 @@ export async function bootWorker(config: WorkerConfig, log: LinkLogger): Promise
         workDir: config.workDir,
         killGraceMs: config.killGraceMs,
         askUser: config.askUser,
+        ...(config.askQuestion !== undefined ? { askQuestion: config.askQuestion } : {}),
         logger: log,
       },
       playbook,

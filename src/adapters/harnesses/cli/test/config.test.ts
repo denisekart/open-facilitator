@@ -138,6 +138,12 @@ describe("worker config law", () => {
     expectFail(`${BASE}restartBackoffMs: fancy\n`, "restartBackoffMs");
   });
 
+  it("askQuestion: optional string; gates the optional human leg", () => {
+    expect(parse(`${BASE}askQuestion: which framework?\n`).askQuestion).toBe("which framework?");
+    expect(parse(BASE).askQuestion).toBeUndefined();
+    expectFail(`${BASE}askQuestion: 7\n`, "askQuestion");
+  });
+
   it("kind/apiVersion: only the known values", () => {
     expectFail(`${BASE}kind: Nope\n`, "kind");
     expectFail(`${BASE}apiVersion: facilitator.framework/v2\n`, "apiVersion");

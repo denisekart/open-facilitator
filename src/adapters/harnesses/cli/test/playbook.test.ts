@@ -148,6 +148,30 @@ describe("playbook law", () => {
     expect(ok.capabilities.get("research.analyze")?.steps[0]?.run?.env).toEqual({ TOKEN: "x" });
   });
 
+  it("when: optional-leg guard; supportsCancellation may demote", () => {
+    expectFail(BASE.replace("expect: { exit: 0 }", "when: 42"), "steps[0].when");
+    expectFail(
+      BASE.replace("expect: { exit: 0 }", "when: Not-A-Var"),
+      "steps[0].when: must name a var",
+    );
+    const pb = parse(
+      BASE.replace("acceptedContexts: [uri-reference]", "acceptedContexts: [uri-reference]\n    supportsCancellation: false"),
+    );
+    expect(pb.manifest.capabilities[0]?.supportsCancellation).toBe(false);
+    // The manifest face stays honest: still derived, now demoted.
+    expect(pb.capabilities.get("research.analyze")?.manifestEntry.supportsSteering).toBe(false);
+  });
+
+  it("{{playbookDir}} resolves from the loader options", () => {
+    const pb = parsePlaybook(BASE.replace("command: node", 'command: "{{playbookDir}}/node"'), {
+      playbookDir: "/opt/pb",
+    });
+    // A placeholder may not NAME a binary (payload law): it lands in args.
+    expect(pb.capabilities.get("research.analyze")?.steps[0]?.run?.command).toBe(
+      "{{playbookDir}}/node",
+    );
+  });
+
   it("askUserInject: json or toml only", () => {
     expectFail(
       BASE.replace("steps:", "askUserInject: { file: .mcp.json, format: yaml }\n    steps:"),
@@ -169,6 +193,7 @@ describe("interpolation law", () => {
       assignmentId: "a-1",
       objective: "why",
       attachments: "",
+      playbookDir: "/pb",
       vars: { tier: "deep" },
       steps: new Map([
         ["ask", { answer: "redteam" }],
@@ -180,6 +205,7 @@ describe("interpolation law", () => {
 
   it("substitutes run state into declared slots only", () => {
     expect(interpolate(scope(), "args[0]", "--objective {{objective}}")).toBe("--objective why");
+    expect(interpolate(scope(), "args[0]", "{{playbookDir}}/tool.mjs")).toBe("/pb/tool.mjs");
     expect(interpolate(scope(), "args[0]", "{{workId}}/{{assignmentId}}")).toBe("w-1/a-1");
     expect(interpolate(scope(), "args[0]", "{{vars.tier}}")).toBe("deep");
     expect(interpolate(scope(), "args[0]", "{{steps.ask.answer}}")).toBe("redteam");

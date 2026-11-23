@@ -15,6 +15,9 @@ export interface InterpolationScope {
   readonly objective: string;
   /** Rendered attachment lines (already de-risked by the harness). */
   readonly attachments: string;
+  /** Absolute dir of the playbook file: steps name their helper scripts
+   * relative to their own runbook, never to the run cwd. */
+  readonly playbookDir: string;
   /** `node <mcp-shim.js>` + bridge env note, when the ask leg is seeded. */
   readonly shimCommand?: string | undefined;
   /** inputs.vars over the capability's declared defaults. */
@@ -35,6 +38,7 @@ function lookup(scope: InterpolationScope, path: string, where: string): string 
   if (path === "assignmentId") return scope.assignmentId;
   if (path === "objective") return scope.objective;
   if (path === "attachments") return scope.attachments;
+  if (path === "playbookDir") return scope.playbookDir;
   if (path === "shimCommand") {
     if (scope.shimCommand === undefined) {
       throw new PlaybookError(where, "{{shimCommand}} used but the ask leg is not seeded");
@@ -88,6 +92,7 @@ export function validatePlaceholders(
       path === "assignmentId" ||
       path === "objective" ||
       path === "attachments" ||
+      path === "playbookDir" ||
       path === "shimCommand"
     ) {
       continue;

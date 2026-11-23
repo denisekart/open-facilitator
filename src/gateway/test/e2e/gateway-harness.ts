@@ -8,7 +8,12 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { loadOrCreateIdentity, SessionProvider, type EndpointIdentity } from "@ofac/workspace-link";
-import { KEYCLOAK_URL, psql, waitExit, workloadToken } from "../../../workspace-link/test/e2e/harness.js";
+import {
+  KEYCLOAK_URL,
+  psql,
+  waitExit,
+  workloadToken,
+} from "../../../workspace-link/test/e2e/harness.js";
 
 export {
   E2E,

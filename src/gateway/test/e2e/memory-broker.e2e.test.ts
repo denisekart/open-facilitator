@@ -42,7 +42,13 @@ describe.skipIf(!E2E)("memory broker e2e", () => {
       trustMode: "isolated-executor",
     });
     expect(enrolled.status).toBe(201);
-    const linkToken = String((enrolled.body as { linkToken: string }).linkToken);
+    // Class `oidc` buys its session at the SAME proof route: one POST of the
+    // workload token (mirrors artifact-store.e2e.test.ts).
+    const minted = await linkPost(harness.baseUrl, "/api/link/v1/proof", "", {
+      token: await workloadToken(),
+    });
+    expect(minted.status).toBe(200);
+    const linkToken = String((minted.body as { sessionToken: string }).sessionToken);
     const evidence = await evidenceToken("alice", "alice");
 
     // 1. Workload retain, alice-delegated: the receipt rides the ack `data`,

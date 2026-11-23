@@ -183,7 +183,6 @@ public sealed class LinkEnrollmentStore(
             }
 
             enrollmentId = existing.EnrollmentId;
-            seq = 0; // a re-enroll restarts the fence: the key swap is the reset
             existing.CredentialClass = credentialClass;
             existing.TrustMode = trustMode;
             existing.RevokedAt = null;
@@ -192,7 +191,21 @@ public sealed class LinkEnrollmentStore(
             existing.AcceptsDelegatedClaims = acceptsDelegatedClaims;
             existing.WorkloadIssuer = workload?.Issuer;
             existing.WorkloadSubject = workload?.Subject;
-            existing.Seq = 0;
+            if (credentialClass == "key")
+            {
+                // The rotate-on-re-enroll law: a re-enroll restarts the fence —
+                // the key swap is the reset.
+                seq = 0;
+                existing.Seq = 0;
+            }
+            else
+            {
+                // A class-oidc re-enroll rotates no key: the fence keeps
+                // counting, so a session minted BEFORE this re-enroll stays
+                // fenced out (a re-arm would let the stale bearer replay).
+                seq = existing.Seq + 1;
+                existing.Seq = seq;
+            }
             if (credentialClass == "key")
             {
                 // The rotate-on-re-enroll law: a DIFFERENT presented key retires the

@@ -160,7 +160,7 @@ describe.skipIf(!E2E)("gateway dedupe + rotation e2e", () => {
       await waitCompleted(commandId);
       expect(await waitAcked(outboxId)).toBe("accepted");
       const up = await gatewayStatus(gw.diagnosticsPort);
-      expect(up.session?.state).toBe("connected");
+      expect(up.session?.state).toBe("ready");
 
       // A restart re-proves with the same key (the identity file is unchanged)
       // and flows: no enrollment code, no stored bearer, no rotation needed.

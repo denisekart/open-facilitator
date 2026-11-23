@@ -125,7 +125,9 @@ public static partial class LinkEndpoints
                 }
 
                 var oidcMint = await verifier.MintWorkloadSessionAsync(link, ct);
-                return Results.Ok(new ProofResponseDto(oidcMint.SessionToken, oidcMint.ExpiresAt, oidcMint.Seq));
+                return oidcMint is null
+                    ? Results.Problem(ProblemErrors.ReplaySuspect(link.EndpointId))
+                    : Results.Ok(new ProofResponseDto(oidcMint.SessionToken, oidcMint.ExpiresAt, oidcMint.Seq));
             }
 
             var proof = dto?.Proof;

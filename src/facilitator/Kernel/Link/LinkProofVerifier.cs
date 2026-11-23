@@ -167,24 +167,39 @@ public sealed class LinkProofVerifier(
 
     /// <summary>Hand a minted session to a caller that verified a proof (audits
     /// <c>link.session-issued</c>) for a class-oidc principal (issuer trust, no key).</summary>
-    public async Task<SessionMint> MintWorkloadSessionAsync(WorkloadSubjectLink link, CancellationToken ct, string resource = "/api/link/v1/proof")
+    public async Task<SessionMint?> MintWorkloadSessionAsync(WorkloadSubjectLink link, CancellationToken ct, string resource = "/api/link/v1/proof")
     {
         var key = await sessionKeys.CurrentAsync(ct);
         var expiresAt = timeProvider.GetUtcNow().UtcDateTime.AddSeconds(options.SessionTokenLifetimeSeconds);
+        // A class-oidc mint advances the same replay fence a proof mint
+        // advances: issuer trust vetted the caller, so the fence just moves
+        // one step past the row as read (a fresh session always costs a
+        // step; a re-enroll's bump is what fences older mints out). Null
+        // when the fence already moved beyond this view — the caller
+        // answers replay-suspect, same shape as a proof denial.
+        var seq = link.Seq + 1;
+        if (!await store.AdvanceSeqAsync(link.EndpointId, seq, ct))
+        {
+            await audit.WriteAsync(new AuditRecord(
+                null, "link.replay-suspect", resource, "deny", "seq-below-fence",
+                null, null,
+                JsonSerializer.Serialize(new { endpointId = link.EndpointId, claimedSeq = seq })), ct);
+            return null;
+        }
         var token = LinkSessionJwt.Mint(key, new SessionClaims(
             link.EndpointId, link.TeamSlug, link.Role, link.TrustMode, "oidc",
-            link.Epoch, link.Seq, expiresAt));
+            link.Epoch, seq, expiresAt));
         await audit.WriteAsync(new AuditRecord(
             null, "link.session-issued", resource, "allow", null, null, null,
             JsonSerializer.Serialize(new
             {
                 endpointId = link.EndpointId,
                 authSource = "oidc",
-                seq = link.Seq,
+                seq,
                 epoch = link.Epoch,
                 expiresAt,
             })), ct);
-        return new SessionMint(token, expiresAt, link.Seq, key.Kid);
+        return new SessionMint(token, expiresAt, seq, key.Kid);
     }
 
     /// <summary>

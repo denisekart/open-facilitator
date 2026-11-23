@@ -8,7 +8,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { loadOrCreateIdentity, SessionProvider, type EndpointIdentity } from "@ofac/workspace-link";
-import { KEYCLOAK_URL, psql, waitExit } from "../../../workspace-link/test/e2e/harness.js";
+import { KEYCLOAK_URL, psql, waitExit, workloadToken } from "../../../workspace-link/test/e2e/harness.js";
 
 export {
   E2E,
@@ -193,10 +193,11 @@ export function gatewayIdentity(stateDir: string): EndpointIdentity {
 }
 
 /**
- * A link-plane session for the Gateway, minted by the harness from the key in
- * the Gateway's OWN stateDir — the credential model's own story: the identity
- * file is the credential, so anything that can read that file can prove. Tests
- * use this where they used to read the persisted link token.
+ * A link-plane session for the Gateway. The e2e gateway enrolls as a class-
+ * `oidc` workload (realm client `ofac-gateway-alpha`), and a class-oidc
+ * enrollment mints only from a workload token — a key proof is refused, the
+ * identity authenticates by issuer trust. Tests use this where they used to
+ * read the persisted link token.
  */
 export async function gatewaySession(
   stateDir: string,
@@ -207,6 +208,7 @@ export async function gatewaySession(
     baseUrl,
     endpointId,
     identity: loadOrCreateIdentity(stateDir),
+    workloadToken,
   }).getToken();
 }
 

@@ -9,6 +9,9 @@
 // process keeps the socket open, so the server marks d2 in_flight and pushes
 // it; the receipt can never arrive while frozen — the crash window is
 // structural, not timed.
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   assignEnvelope,
@@ -29,7 +32,9 @@ const h = useFacilitator({ InFlightLeaseSeconds: "3" });
 describe.skipIf(!E2E)("linkd crash replay", () => {
   it("restarts from the state file and replays only the un-acked delivery", async () => {
     const endpointId = `e2e-replay-${Math.random().toString(36).slice(2, 8)}`;
-    const state = tempFile("replay.sqlite");
+    // The state dir IS the logical instance: identity.key + ledger.sqlite3.
+    const stateDir = tempFile("link-state");
+    const state = join(stateDir, "ledger.sqlite3");
     const manifest = manifestFile(makeManifest("team-alpha"));
 
     const first = startLinkd([
@@ -44,8 +49,8 @@ describe.skipIf(!E2E)("linkd crash replay", () => {
       "team-alpha",
       "--manifest",
       manifest,
-      "--state",
-      state,
+      "--state-dir",
+      stateDir,
       "--mode",
       "echo",
     ]);
@@ -112,8 +117,8 @@ describe.skipIf(!E2E)("linkd crash replay", () => {
       "team-alpha",
       "--manifest",
       manifest,
-      "--state",
-      state,
+      "--state-dir",
+      stateDir,
       "--mode",
       "echo",
     ]);

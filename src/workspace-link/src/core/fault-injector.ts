@@ -33,6 +33,14 @@ export class FaultInjector implements LinkTransport {
     private readonly policy: FaultPolicy,
   ) {}
 
+  // Channel surface mirrors the inner transport: the handshaker dials
+  // `hubUrl` to decide whether a hello must carry a proof — a wrapper that
+  // swallows it silently de-proofs a socket client (the kernel then denies
+  // the handshake for a missing proof).
+  get hubUrl(): string | undefined {
+    return this.inner.hubUrl;
+  }
+
   private checkPartition(): void {
     if (this.policy.partition?.()) {
       throw new TransportError("simulated network partition");

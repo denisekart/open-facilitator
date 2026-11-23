@@ -83,6 +83,15 @@ export class HttpPollTransport implements LinkTransport {
     this.keeper.onDisconnect((g) => this.disconnect.emit(g));
   }
 
+  /**
+   * The keeper socket IS a hub connection, so the hello this transport
+   * forwards rides that channel and MUST carry its proof: expose the
+   * keeper's channel URI to the handshaker.
+   */
+  get hubUrl(): string | undefined {
+    return this.keeper.hubUrl;
+  }
+
   async connect(): Promise<void> {
     this.closed = false;
     await this.keeper.connect();
